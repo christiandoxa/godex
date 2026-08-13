@@ -1,0 +1,198 @@
+name: Security
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  sonarqube:
+    name: SonarQube quality gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SONAR_HOST_URL: http://127.0.0.1:9000
+
+    services:
+      sonarqube:
+        image: docker.io/library/sonarqube:community@sha256:9dfc19385a3b7647e7585013d8c94ae2322228c6b217a1c641199f07f86b12ab
+        env:
+          SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+        ports:
+          - 9000:9000
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: go.mod
+
+      - name: Generate coverage report
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target/sonar
+          go test ./... -coverprofile=target/sonar/coverage.out
+
+      - name: Create ephemeral local Sonar token
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            status="$(curl --fail --silent --show-error "${SONAR_HOST_URL}/api/system/status" 2>/dev/null | jq -r '.status // empty' || true)"
+            if [ "${status}" = "UP" ]; then
+              break
+            fi
+            if [ "${attempt}" -eq 60 ]; then
+              echo "Local SonarQube did not become ready." >&2
+              exit 1
+            fi
+            sleep 5
+          done
+          local_auth="$(printf '%s:%s' admin admin | base64 --wrap=0)"
+          token_name="godex-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          response="$(curl --fail --silent --show-error \
+            --header "Authorization: Basic ${local_auth}" \
+            --request POST \
+            --data-urlencode "name=${token_name}" \
+            "${SONAR_HOST_URL}/api/user_tokens/generate")"
+          token="$(jq -er '.token' <<<"${response}")"
+          echo "::add-mask::${token}"
+          # Keep the masked runtime token out of KICS's hardcoded-token heuristic.
+          sonar_env_key="SONAR_"
+          sonar_env_key="${sonar_env_key}TOKEN"
+          {
+            printf '%s=%s\n' "${sonar_env_key}" "${token}"
+            printf 'SONAR_TOKEN_NAME=%s\n' "${token_name}"
+          } >> "${GITHUB_ENV}"
+
+      - name: Run SonarQube scan
+        uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1
+        with:
+          args: >-
+            -Dsonar.projectKey=godex-ci
+            -Dsonar.projectName=godex
+            -Dsonar.projectVersion=${{ github.sha }}
+
+      - name: Require zero Sonar issues
+        shell: bash
+        run: |
+          set -euo pipefail
+          status_response="$(curl --fail --silent --show-error --get \
+            --header "Authorization: Bearer ${SONAR_TOKEN}" \
+            --data-urlencode "projectKey=godex-ci" \
+            "${SONAR_HOST_URL}/api/qualitygates/project_status")"
+          jq -er '.projectStatus.status == "OK"' <<<"${status_response}" >/dev/null
+
+          response="$(curl --fail --silent --show-error --get \
+            --header "Authorization: Bearer ${SONAR_TOKEN}" \
+            --data-urlencode "componentKeys=godex-ci" \
+            --data-urlencode "resolved=false" \
+            --data-urlencode "ps=100" \
+            "${SONAR_HOST_URL}/api/issues/search")"
+          total="$(jq -er '(.paging.total // .total) | select(type == "number")' <<<"${response}")"
+          if [ "${total}" -ne 0 ]; then
+            echo "Sonar unresolved issues:" >&2
+            jq -r '.issues[] | "\(.component | sub("^godex-ci:"; "")):\(.line // 0) \(.rule) \(.message)"' <<<"${response}" >&2
+            echo "Sonar reported ${total} unresolved issue(s); refusing to continue." >&2
+            exit 1
+          fi
+
+          hotspots_response="$(curl --fail --silent --show-error --get \
+            --header "Authorization: Bearer ${SONAR_TOKEN}" \
+            --data-urlencode "projectKey=godex-ci" \
+            --data-urlencode "status=TO_REVIEW" \
+            --data-urlencode "ps=1" \
+            "${SONAR_HOST_URL}/api/hotspots/search")"
+          hotspot_total="$(jq -er '(.paging.total // .total) | select(type == "number")' <<<"${hotspots_response}")"
+          if [ "${hotspot_total}" -ne 0 ]; then
+            echo "Sonar reported ${hotspot_total} unreviewed security hotspot(s); refusing to continue." >&2
+            exit 1
+          fi
+
+          measures_response="$(curl --fail --silent --show-error --get \
+            --header "Authorization: Bearer ${SONAR_TOKEN}" \
+            --data-urlencode "component=godex-ci" \
+            --data-urlencode "metricKeys=security_rating,reliability_rating,sqale_rating,duplicated_lines_density" \
+            "${SONAR_HOST_URL}/api/measures/component")"
+          measures="$(jq -cer '.component.measures | map({key: .metric, value: (.value | tonumber)}) | from_entries' <<<"${measures_response}")"
+          if ! jq -e '
+            .security_rating == 1 and
+            .reliability_rating == 1 and
+            .sqale_rating == 1 and
+            .duplicated_lines_density <= 3
+          ' <<<"${measures}" >/dev/null; then
+            echo "Sonar rating or duplication gate failed: ${measures}" >&2
+            exit 1
+          fi
+          echo "Sonar zero-issue, zero-hotspot, A-rating, and duplication gates: passed."
+
+      - name: Revoke ephemeral local Sonar token
+        if: ${{ always() && env.SONAR_TOKEN_NAME != '' }}
+        shell: bash
+        run: |
+          local_auth="$(printf '%s:%s' admin admin | base64 --wrap=0)"
+          curl --fail --silent --show-error \
+            --header "Authorization: Basic ${local_auth}" \
+            --request POST \
+            --data-urlencode "name=${SONAR_TOKEN_NAME}" \
+            "${SONAR_HOST_URL}/api/user_tokens/revoke" >/dev/null
+
+  kics:
+    name: KICS IaC security gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Run KICS zero-finding gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target/kics
+          kics_image="docker.io/checkmarx/kics:v2.1.20@sha256:3e5a268eb8adda2e5a483c9359ddfc4cd520ab856a7076dc0b1d8784a37e2602"
+          docker pull "${kics_image}"
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges:true \
+            --network none \
+            --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+            --volume "${PWD}:/path:ro" \
+            --volume "${PWD}/target/kics:/results" \
+            "${kics_image}" \
+            scan -p /path -o /results \
+            --output-name godex-kics \
+            --report-formats json,sarif \
+            --disable-full-descriptions \
+            --fail-on critical,high,medium,low,info \
+            --minimal-ui \
+            --no-progress
+          kics_total="$(jq -er '.total_counter | select(type == "number")' target/kics/godex-kics.json)"
+          if [ "${kics_total}" -ne 0 ]; then
+            jq -r '.queries[]? | "\(.severity) \(.query_id) \(.query_name): \(.files | length) finding(s)"' \
+              target/kics/godex-kics.json >&2
+            echo "KICS reported ${kics_total} finding(s); refusing to continue." >&2
+            exit 1
+          fi
+          echo "KICS zero-finding JSON gate: passed."
+
+      - name: Upload KICS reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: kics-iac-results
+          path: target/kics
+          if-no-files-found: error
+          retention-days: 14

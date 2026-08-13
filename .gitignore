@@ -1,0 +1,47 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/bin/
+/dist/
+/target/
+/godex
+
+# Test binary, built with `go test -c`
+*.test
+
+# Code coverage profiles and other test artifacts
+*.out
+coverage.*
+*.coverprofile
+profile.cov
+
+# Dependency directories (remove the comment below to include it)
+vendor/
+
+# Go workspace file
+go.work
+go.work.sum
+
+# env file
+.env
+.env.*
+!.env.example
+
+# Local Godex state and Codex credentials
+.godex/
+**/auth.json
+**/state.json
+**/state.lock/
+**/credentials*.json
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Editor/IDE
+.idea/
+*.iml
+.vscode/
