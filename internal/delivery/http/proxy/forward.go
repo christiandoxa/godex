@@ -14,7 +14,12 @@ func (proxy *Proxy) forwardResponse(ctx context.Context, writer http.ResponseWri
 	}
 	stream := strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream")
 	if prefix == nil && !stream {
-		prefix, _ = inspectResponse(response.Body, proxy.maxInspect)
+		var err error
+		prefix, err = inspectResponse(response.Body, proxy.maxInspect)
+		if err != nil {
+			http.Error(writer, "upstream response failed before commitment", http.StatusBadGateway)
+			return
+		}
 	}
 	copyResponseHeaders(writer.Header(), response.Header)
 	for _, header := range []string{"Content-Type", "Content-Length", "Date"} {
@@ -128,10 +133,10 @@ func copyResponseBody(writer http.ResponseWriter, reader io.Reader) bool {
 	}
 }
 
-func inspectResponse(body io.Reader, limit int64) ([]byte, bool) {
+func inspectResponse(body io.Reader, limit int64) ([]byte, error) {
 	if body == nil {
-		return nil, true
+		return nil, nil
 	}
 	data, err := io.ReadAll(io.LimitReader(body, limit+1))
-	return data, err == nil && int64(len(data)) <= limit
+	return data, err
 }

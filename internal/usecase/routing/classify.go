@@ -35,26 +35,29 @@ func (pending *pendingResponse) close() {
 	}
 }
 
-func (proxy *Router) classify(response *proxymodel.Response) (responseOutcome, *pendingResponse) {
+func (proxy *Router) classify(response *proxymodel.Response) (responseOutcome, *pendingResponse, error) {
 	pending := &pendingResponse{response: response}
 	switch {
 	case response.StatusCode == http.StatusUnauthorized:
-		return responseOutcome{kind: responseAuthFailure}, pending
+		return responseOutcome{kind: responseAuthFailure}, pending, nil
 	case response.StatusCode == http.StatusTooManyRequests:
-		return responseOutcome{kind: responseRetry, quarantine: retryAfter(response.Header, proxy.now())}, pending
+		return responseOutcome{kind: responseRetry, quarantine: retryAfter(response.Header, proxy.now())}, pending, nil
 	case response.StatusCode == http.StatusInternalServerError ||
 		response.StatusCode == http.StatusBadGateway ||
 		response.StatusCode == http.StatusServiceUnavailable ||
 		response.StatusCode == http.StatusGatewayTimeout:
-		return responseOutcome{kind: responseRetry}, pending
+		return responseOutcome{kind: responseRetry}, pending, nil
 	case response.StatusCode == http.StatusBadRequest || response.StatusCode == http.StatusForbidden:
-		prefix, complete := inspectResponse(response.Body, proxy.maxInspect)
+		prefix, complete, err := inspectResponse(response.Body, proxy.maxInspect)
 		pending.prefix = prefix
+		if err != nil {
+			return responseOutcome{}, pending, err
+		}
 		if complete && isQuotaResponse(prefix) {
-			return responseOutcome{kind: responseRetry, quarantine: 30 * time.Second}, pending
+			return responseOutcome{kind: responseRetry, quarantine: 30 * time.Second}, pending, nil
 		}
 	}
-	return responseOutcome{kind: responsePass}, pending
+	return responseOutcome{kind: responsePass}, pending, nil
 }
 
 func retryAfter(headers http.Header, now time.Time) time.Duration {
@@ -81,15 +84,15 @@ func clampDuration(duration time.Duration) time.Duration {
 	return duration
 }
 
-func inspectResponse(body io.Reader, limit int64) ([]byte, bool) {
+func inspectResponse(body io.Reader, limit int64) ([]byte, bool, error) {
 	if body == nil {
-		return nil, true
+		return nil, true, nil
 	}
 	data, err := io.ReadAll(io.LimitReader(body, limit+1))
 	if err != nil {
-		return data, false
+		return data, false, err
 	}
-	return data, int64(len(data)) <= limit
+	return data, int64(len(data)) <= limit, nil
 }
 
 func isQuotaResponse(body []byte) bool {

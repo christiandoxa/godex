@@ -77,7 +77,10 @@ func TestClassifyPreCommitFailures(t *testing.T) {
 			if testCase.name == "rate limit" {
 				response.Header.Set("Retry-After", "5")
 			}
-			outcome, pending := proxy.classify(response)
+			outcome, pending, err := proxy.classify(response)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if outcome.kind != testCase.kind || (outcome.quarantine > 0) != testCase.quarantine {
 				t.Fatalf("outcome = %#v, pending = %#v", outcome, pending)
 			}

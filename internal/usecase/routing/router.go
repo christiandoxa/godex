@@ -112,7 +112,11 @@ func (router *Router) Forward(ctx context.Context, request proxymodel.Request) (
 	if result.Response.StatusCode < 400 {
 		stream := strings.Contains(strings.ToLower(result.Response.Header.Get("Content-Type")), "text/event-stream")
 		if result.Prefix == nil && !stream {
-			result.Prefix, _ = inspectResponse(result.Response.Body, router.maxInspect)
+			result.Prefix, _, err = inspectResponse(result.Response.Body, router.maxInspect)
+			if err != nil {
+				result.Response.Body.Close()
+				return nil, &proxymodel.Error{StatusCode: 502, Message: "upstream response failed before commitment"}
+			}
 		}
 		if err := router.affinity.remember(ctx, result.AccountID, keys, router.now()); err != nil {
 			result.Response.Body.Close()

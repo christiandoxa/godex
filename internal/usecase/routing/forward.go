@@ -46,7 +46,11 @@ func (router *Router) forwardFresh(ctx context.Context, request proxymodel.Reque
 			}
 			continue
 		}
-		outcome, pending := router.classify(response)
+		outcome, pending, err := router.classify(response)
+		if err != nil {
+			pending.close()
+			return proxymodel.Forwarded{}, &proxymodel.Error{StatusCode: 502, Message: "upstream response failed before commitment"}
+		}
 		if last != nil {
 			last.close()
 			last = nil

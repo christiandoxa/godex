@@ -56,6 +56,11 @@ or per-chunk checks, and hard continuation affinity always wins.
 | Other 4xx | Pass through without rotation. | Pass through without rotation. |
 | Downstream cancellation | Stop immediately and cancel upstream work. | Stop immediately. |
 
+An upstream body read failure during bounded inspection returns a local 502
+before commitment. It is not silently converted to a successful truncated body
+or replayed. Size-limit exhaustion remains distinct from a read failure; large
+responses continue forwarding without being buffered in full.
+
 Valid Retry-After values influence quarantine duration. Quarantine entries are
 bounded and expire. Quarantine is in memory. Continuity bindings are backed by a bounded, versioned
 hashed ownership snapshot, so restart and cache expiry recover the owner.
