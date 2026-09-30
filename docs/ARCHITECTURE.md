@@ -221,3 +221,18 @@ No access token, ID token, refresh token, or API token belongs in this file.
 ## Deliberate exclusions
 
 The first release has no SQL database, browser dashboard, metrics backend, remote daemon, provider abstraction matrix, enterprise policy engine, or plugin runtime. Adding any of these requires a separate product decision after the OpenAI path is stable.
+
+## Managed sessions
+
+`repository/session` reads Codex-owned active and archived rollout metadata and
+`session_index.jsonl` thread names. Each profile scan is bounded to 4,096 files,
+4 MiB per rollout, 512 KiB per JSON line, and a 16 MiB name index. Symlink roots
+are rejected and symlink rollout entries are skipped. Malformed rollouts without
+valid UUID metadata are skipped; conversation bodies are never returned.
+`entity/session` owns the session identity invariant. `usecase/session` filters,
+sorts, resolves unique IDs/prefixes, and preserves profile ownership on resume.
+`model/session` carries queries and reports; `delivery/cli/session` owns flags
+and text/JSON presentation. These packages follow the repository's layer-first,
+domain-second layout. Session helpers remain private to their owning packages.
+The composition root injects the runtime launcher through a narrow consumed
+interface; session workflows do not import the runtime use-case implementation.

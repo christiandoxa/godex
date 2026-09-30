@@ -119,6 +119,26 @@ Supported wrapper flags are `--web-search`, `--rollout-budget-tokens`,
 `--respect-system-proxy`, and `--no-respect-system-proxy`. Put them before the
 first Codex argument, or use `--` to end Godex option parsing.
 
+Find sessions across managed profiles, or only sessions for this directory:
+
+~~~bash
+godex session list --limit 20
+godex session current --parent-only
+godex session list --profile work --query repair --json
+godex session current --id-only
+godex session list --resume-command
+godex session resume UNIQUE_ID_PREFIX
+~~~
+
+Sessions are sorted newest first. `--cwd PATH` changes the directory matched by
+`session current`. `--parent-only` hides spawned subagent sessions; subagents are
+included by default. `--json`, `--id-only`, and `--resume-command` are mutually
+exclusive. `--limit 0` returns no rows. Missing or ambiguous profile selectors and
+session prefixes fail clearly. Resume uses the owning account's isolated home,
+even when another account is active. Listing is read-only and does not expose
+conversation contents or credentials. Oversized stores fail with a bounded-scan
+error; incomplete rollouts without valid metadata are skipped.
+
 Inspect the installation:
 
 ~~~bash

@@ -9,9 +9,11 @@ import (
 	authcli "github.com/christiandoxa/godex/internal/delivery/cli/auth"
 	quotacli "github.com/christiandoxa/godex/internal/delivery/cli/quota"
 	runtimecli "github.com/christiandoxa/godex/internal/delivery/cli/runtime"
+	sessioncli "github.com/christiandoxa/godex/internal/delivery/cli/session"
 	authusecase "github.com/christiandoxa/godex/internal/usecase/auth"
 	quotausecase "github.com/christiandoxa/godex/internal/usecase/quota"
 	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
+	sessionusecase "github.com/christiandoxa/godex/internal/usecase/session"
 	"github.com/christiandoxa/godex/internal/version"
 )
 
@@ -22,6 +24,7 @@ type App struct {
 	runtime  *runtimeusecase.Runner
 	doctor   *runtimeusecase.Doctor
 	quota    *quotausecase.Status
+	sessions *sessionusecase.Catalog
 	out      io.Writer
 }
 
@@ -67,6 +70,11 @@ func (app *App) Run(ctx context.Context, arguments []string) error {
 			return fmt.Errorf("quota support is not configured")
 		}
 		return quotacli.Show(ctx, app.quota, app.out, arguments[1:])
+	case "session":
+		if app.sessions == nil {
+			return fmt.Errorf("session support is not configured")
+		}
+		return sessioncli.Run(ctx, app.sessions, app.out, arguments[1:])
 	case "doctor":
 		return runtimecli.Doctor(ctx, app.doctor, app.out, arguments[1:])
 	case "version", "--version", "-version":
@@ -101,6 +109,9 @@ Usage:
   godex quota [--all] [--detail] [--once] [selector]
                                Show ChatGPT quota for managed accounts
   godex run [--account SEL] -- [codex args...]
+  godex session list/current [--json|--id-only|--resume-command]
+                               Find sessions across managed profiles
+  godex session resume ID       Resume in the owning profile
   godex doctor
   godex --version
   godex <codex-subcommand> ...  Run an unknown Codex command through Godex
@@ -119,3 +130,5 @@ Login options:
 `)
 	return err
 }
+
+func (app *App) SetSessions(catalog *sessionusecase.Catalog) { app.sessions = catalog }

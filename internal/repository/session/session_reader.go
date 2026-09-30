@@ -1,0 +1,151 @@
+package session
+
+import (
+	"bufio"
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	sessionentity "github.com/christiandoxa/godex/internal/entity/session"
+)
+
+const (
+	maxSessionFiles     = 4096
+	maxSessionScanBytes = 4 << 20
+	maxSessionLineBytes = 512 << 10
+)
+
+type Reader struct{}
+
+func NewReader() *Reader { return &Reader{} }
+
+func (*Reader) List(ctx context.Context, codexHome string) ([]sessionentity.Session, error) {
+	var paths []string
+	for _, directory := range []string{"sessions", "archived_sessions"} {
+		found, err := collectSessionPaths(ctx, filepath.Join(codexHome, directory), maxSessionFiles-len(paths))
+		if err != nil {
+			return nil, err
+		}
+		paths = append(paths, found...)
+		if len(paths) > maxSessionFiles {
+			return nil, fmt.Errorf("codex session count exceeds safe limit of %d", maxSessionFiles)
+		}
+	}
+
+	reports := make([]sessionentity.Session, 0, len(paths))
+	for _, path := range paths {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		report, ok, err := readSessionReport(ctx, path)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			reports = append(reports, report)
+		}
+	}
+	if err := applySessionIndex(ctx, codexHome, reports); err != nil {
+		return nil, err
+	}
+	return reports, nil
+}
+
+func collectSessionPaths(ctx context.Context, root string, remaining int) ([]string, error) {
+	info, err := os.Lstat(root)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("inspect Codex sessions: %w", err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+		return nil, fmt.Errorf("codex session root %s must be a real directory", root)
+	}
+
+	paths := make([]string, 0)
+	err = filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if path == root {
+			return nil
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		if !sessionFileName(entry.Name()) {
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() {
+			return nil
+		}
+		paths = append(paths, path)
+		if len(paths) > remaining {
+			return fmt.Errorf("codex session count exceeds safe limit of %d", maxSessionFiles)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("scan Codex sessions: %w", err)
+	}
+	return paths, nil
+}
+
+func sessionFileName(name string) bool {
+	return strings.HasPrefix(name, "rollout-") && (strings.HasSuffix(name, ".jsonl") || strings.HasSuffix(name, ".json"))
+}
+
+func readSessionReport(ctx context.Context, path string) (sessionentity.Session, bool, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return sessionentity.Session{}, false, fmt.Errorf("inspect Codex session: %w", err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+		return sessionentity.Session{}, false, nil
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return sessionentity.Session{}, false, fmt.Errorf("open Codex session: %w", err)
+	}
+	defer file.Close()
+
+	report := sessionentity.Session{
+		Path:        path,
+		UpdatedAt:   info.ModTime().UTC().Format(time.RFC3339),
+		UpdatedUnix: info.ModTime().Unix(),
+	}
+	scanner := bufio.NewScanner(io.LimitReader(file, maxSessionScanBytes))
+	scanner.Buffer(make([]byte, 64<<10), maxSessionLineBytes)
+	for scanner.Scan() {
+		if err := ctx.Err(); err != nil {
+			return sessionentity.Session{}, false, err
+		}
+		applySessionMetadata(&report, scanner.Bytes())
+	}
+	if err := scanner.Err(); err != nil && report.ID == "" {
+		return sessionentity.Session{}, false, fmt.Errorf("scan Codex session metadata: %w", err)
+	}
+	if !sessionentity.ValidID(report.ID) {
+		return sessionentity.Session{}, false, nil
+	}
+	return report, true, nil
+}
