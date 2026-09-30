@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="https://github.com/christiandoxa/godex/actions/workflows/ci.yml"><img src="https://github.com/christiandoxa/godex/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI" /></a>
-  <a href="https://go.dev/"><img src="https://img.shields.io/badge/go-1.26-00ADD8?logo=go&logoColor=white" alt="Go 1.26" /></a>
+  <a href="https://go.dev/"><img src="https://img.shields.io/badge/go-1.27-00ADD8?logo=go&logoColor=white" alt="Go 1.27" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="Apache 2.0" /></a>
 </p>
 
@@ -28,7 +28,7 @@ runtime details are documented in [Runtime rotation and affinity](docs/ROTATION.
 
 - The official Codex CLI available as codex.
 - Linux, macOS, or Windows on amd64 or arm64 for release binaries.
-- Go 1.26 or newer only when building from source.
+- Go 1.27.1 or newer only when building from source.
 
 Check Codex before installing or building Godex:
 
