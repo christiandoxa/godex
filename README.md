@@ -91,6 +91,7 @@ List accounts and launch the normal Codex experience:
 godex accounts
 godex current
 godex quota --all --once
+godex quota --all --detail --once
 godex
 ~~~
 
@@ -133,9 +134,18 @@ Available account commands:
 | godex account list | Alias for godex accounts. |
 | godex current | Show the active managed account. |
 | godex profile import-current [NAME] | Import the ChatGPT login from the current Codex home. |
-| godex quota [--all] [--once] [SELECTOR] | Show a one-shot OpenAI/Codex quota snapshot. |
+| godex quota [--all] [--detail] [--once] [SELECTOR] | Show a one-shot OpenAI/Codex quota snapshot. |
 | godex account use SELECTOR | Set the preferred account. |
 | godex account remove SELECTOR | Remove an account. |
+
+Quota output stays compact by default. Add `--detail` for Prodex 0.434.2's
+expanded quota-window view: `5H_RESET_AT` and `WEEKLY_RESET_AT` contain exact
+UTC reset timestamps in RFC 3339 format, while `5H_WINDOW_SECONDS` and
+`WEEKLY_WINDOW_SECONDS` contain the upstream window lengths in seconds.
+Missing fields, disabled accounts, and failed probes display `-` for unavailable
+quota values. Probe failures retain the `error` state without printing error
+contents. The command remains one-shot, with or without `--once`. Without
+`--all` or a selector, it shows the active account.
 
 Selectors match an exact account ID, friendly name, or email. Ambiguous
 selectors fail. Unknown top-level commands are treated as Codex subcommands and

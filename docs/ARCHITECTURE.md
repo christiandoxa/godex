@@ -80,6 +80,15 @@ quota command is intentionally a one-shot OpenAI/Codex view. Live dashboards,
 provider-wide quota catalogs, and background quota daemons remain outside
 Godex's scope.
 
+The CLI quota delivery package owns `--detail` parsing and rendering of exact
+UTC reset timestamps and window lengths from the existing quota models. This
+is the bounded one-shot counterpart of Prodex 0.434.2's detailed quota view.
+The presentation flag stays local to delivery; account selection and quota
+classification remain in `usecase/quota`, and fetching remains in
+`gateway/openai`. Formatting helpers stay private to the delivery package
+because no other domain consumes this table format. Failed probes expose only
+their error state, never gateway error contents.
+
 ### Local proxy
 
 The local proxy owns:

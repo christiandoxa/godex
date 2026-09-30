@@ -98,7 +98,7 @@ Usage:
                                Import the current Codex ChatGPT login
   godex account use <selector>  Choose the first account for the next launch
   godex account remove <sel>    Remove an account
-  godex quota [--all] [--once] [selector]
+  godex quota [--all] [--detail] [--once] [selector]
                                Show ChatGPT quota for managed accounts
   godex run [--account SEL] -- [codex args...]
   godex doctor
