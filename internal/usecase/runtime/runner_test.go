@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
@@ -15,6 +16,21 @@ type fakeLaunchAccounts struct {
 	listCalls int
 	selectErr error
 	listErr   error
+}
+
+func (fake *fakeLaunchAccounts) LaunchCandidates(_ context.Context, selector string) ([]accountentity.Account, error) {
+	if fake.selectErr != nil {
+		return nil, fake.selectErr
+	}
+	if selector != "" {
+		for _, account := range fake.accounts {
+			if account.Name == selector || account.ID == selector {
+				return []accountentity.Account{account}, nil
+			}
+		}
+		return nil, errors.New("not found")
+	}
+	return append([]accountentity.Account(nil), fake.accounts...), nil
 }
 
 func (fake *fakeLaunchAccounts) SelectForLaunch(_ context.Context, selector string) (accountentity.Account, error) {
@@ -240,5 +256,114 @@ func TestRunPropagatesSelectionListingFactoryAndStartErrors(t *testing.T) {
 		return &fakeProxy{startError: startErr}, nil
 	}).Run(context.Background(), "one", nil); !errors.Is(err, startErr) {
 		t.Fatalf("start error = %v", err)
+	}
+}
+
+type fakeQuotaPreflight struct {
+	ready map[string]bool
+	errs  map[string]error
+	calls []string
+}
+
+func (fake *fakeQuotaPreflight) Ready(_ context.Context, account accountentity.Account) (bool, error) {
+	fake.calls = append(fake.calls, account.ID)
+	if err := fake.errs[account.ID]; err != nil {
+		return false, err
+	}
+	return fake.ready[account.ID], nil
+}
+
+func TestRunQuotaPreflightRotatesBeforeCommittingSelection(t *testing.T) {
+	accounts := &fakeLaunchAccounts{
+		accounts: []accountentity.Account{
+			{ID: "one", Name: "one", Enabled: true},
+			{ID: "two", Name: "two", Enabled: true},
+		},
+		homes: map[string]string{"one": "/profiles/one", "two": "/profiles/two"},
+	}
+	preflight := &fakeQuotaPreflight{ready: map[string]bool{"one": false, "two": true}, errs: map[string]error{}}
+	process := &fakeProxyProcess{}
+	proxy := &fakeProxy{}
+	var config proxyconfig.Config
+	runner := NewRunner(accounts, process, func(got proxyconfig.Config) (Proxy, error) {
+		config = got
+		return proxy, nil
+	})
+	runner.SetQuotaPreflight(preflight)
+	if err := runner.Run(context.Background(), "", nil); err != nil {
+		t.Fatal(err)
+	}
+	if process.home != "/profiles/two" || config.PreferredAccount != "two" {
+		t.Fatalf("selected home/preferred = %q / %q", process.home, config.PreferredAccount)
+	}
+	managed, err := config.Accounts(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(managed) != 2 || managed[0].Enabled || !managed[1].Enabled {
+		t.Fatalf("quota-filtered accounts = %#v", managed)
+	}
+	if strings.Join(preflight.calls, ",") != "one,two" {
+		t.Fatalf("quota preflight calls = %#v", preflight.calls)
+	}
+}
+
+func TestRunQuotaPreflightFailsOpenOnProbeError(t *testing.T) {
+	accounts := &fakeLaunchAccounts{
+		accounts: []accountentity.Account{
+			{ID: "one", Name: "one", Enabled: true},
+			{ID: "two", Name: "two", Enabled: true},
+		},
+		homes: map[string]string{"one": "/profiles/one", "two": "/profiles/two"},
+	}
+	preflight := &fakeQuotaPreflight{
+		ready: map[string]bool{"one": false},
+		errs:  map[string]error{"two": errors.New("synthetic quota probe failure")},
+	}
+	process := &fakeProcess{}
+	runner := NewRunner(accounts, process, nil)
+	runner.SetQuotaPreflight(preflight)
+	if err := runner.Run(context.Background(), "", nil); err != nil {
+		t.Fatal(err)
+	}
+	if len(process.homes) != 1 || process.homes[0] != "/profiles/two" {
+		t.Fatalf("fail-open homes = %#v", process.homes)
+	}
+}
+
+func TestRunStopsBeforeLaunchWhenEveryEnabledAccountIsQuotaExhausted(t *testing.T) {
+	accounts := &fakeLaunchAccounts{
+		accounts: []accountentity.Account{
+			{ID: "one", Name: "one", Enabled: true},
+			{ID: "two", Name: "two", Enabled: true},
+		},
+		homes: map[string]string{"one": "/profiles/one", "two": "/profiles/two"},
+	}
+	preflight := &fakeQuotaPreflight{ready: map[string]bool{"one": false, "two": false}, errs: map[string]error{}}
+	runner := NewRunner(accounts, &fakeProcess{}, nil)
+	runner.SetQuotaPreflight(preflight)
+	err := runner.Run(context.Background(), "", nil)
+	if err == nil || !strings.Contains(err.Error(), "quota exhausted") {
+		t.Fatalf("quota exhaustion error = %v", err)
+	}
+}
+
+func TestRunExplicitQuotaExhaustedAccountDoesNotSilentlyRotate(t *testing.T) {
+	accounts := &fakeLaunchAccounts{
+		accounts: []accountentity.Account{
+			{ID: "one", Name: "one", Enabled: true},
+			{ID: "two", Name: "two", Enabled: true},
+		},
+		homes: map[string]string{"one": "/profiles/one", "two": "/profiles/two"},
+	}
+	preflight := &fakeQuotaPreflight{ready: map[string]bool{"one": false, "two": true}, errs: map[string]error{}}
+	runner := NewRunner(accounts, &fakeProcess{}, nil)
+	runner.SetQuotaPreflight(preflight)
+	err := runner.Run(context.Background(), "one", nil)
+	if err == nil || !strings.Contains(err.Error(), `account "one" is currently quota exhausted`) {
+		t.Fatalf("explicit exhaustion error = %v", err)
+	}
+	if strings.Join(preflight.calls, ",") != "one" {
+		t.Fatalf("explicit quota preflight calls = %#v", preflight.calls)
 	}
 }

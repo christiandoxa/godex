@@ -14,6 +14,10 @@ type fakeRunnerAccounts struct {
 	selected string
 }
 
+func (accounts *fakeRunnerAccounts) LaunchCandidates(_ context.Context, selector string) ([]accountentity.Account, error) {
+	return []accountentity.Account{{ID: "synthetic-account", Name: selector, Enabled: true}}, nil
+}
+
 func (accounts *fakeRunnerAccounts) SelectForLaunch(_ context.Context, selector string) (accountentity.Account, error) {
 	accounts.selected = selector
 	return accountentity.Account{ID: "synthetic-account", Enabled: true}, nil

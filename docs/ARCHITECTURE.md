@@ -65,6 +65,16 @@ The Codex gateway owns:
 
 Godex does not implement OAuth or refresh-token exchange.
 
+### Quota client
+
+The OpenAI quota client is a narrow outbound adapter for the ChatGPT usage
+endpoint. It reads the current Codex-owned ChatGPT auth at request time, keeps
+responses bounded, and never persists credentials or quota snapshots. The quota
+use case classifies ready/exhausted state; the runtime consumes that policy
+through a narrow preflight interface rather than importing another use-case
+implementation. Probe failures fail open, while confirmed exhaustion can remove
+a fresh account from launch eligibility.
+
 ### Local proxy
 
 The local proxy owns:
@@ -79,6 +89,12 @@ The local proxy owns:
 - remembering conversation affinity.
 
 The proxy must not become a generic API gateway.
+
+### Quota snapshot
+
+Godex reads the official Codex profile's ChatGPT authentication only through a narrow gateway and calls the OpenAI/Codex usage endpoint with bounded HTTP responses. The access token is never persisted in Godex state, printed, or included in errors. A managed launch probes enabled accounts once before proxy startup. Explicit exhaustion removes an account from fresh-work eligibility for that launch; probe failure is conservative and leaves the account eligible.
+
+The quota command is intentionally a one-shot OpenAI/Codex view. Live dashboards, provider-wide quota catalogs, and background quota daemons remain outside Godex's scope.
 
 ### Selector and health state
 
@@ -149,14 +165,19 @@ internal/delivery/cli/                 dispatcher only
 internal/delivery/cli/account/
 internal/delivery/cli/auth/
 internal/delivery/cli/runtime/
+internal/delivery/cli/quota/
 internal/entity/account/
 internal/model/account/
 internal/model/proxy/
+internal/model/quota/
+internal/model/quota/
 internal/gateway/codex/
 internal/gateway/openai/
 internal/repository/account/
 internal/usecase/account/
 internal/usecase/runtime/
+internal/usecase/quota/
+internal/usecase/quota/
 internal/version/
 ```
 

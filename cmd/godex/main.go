@@ -53,6 +53,7 @@ func run() int {
 		return openai.NewProxyFromModel(config)
 	})
 	runner := runtimeusecase.NewRunner(store, process, factory)
+	runner.SetQuotaPreflight(quotaStatus)
 	runner.SetUpstreamURL(settings.UpstreamURL)
 	application := cli.New(login, importer, store, runner, doctor, quotaStatus, os.Stdout)
 

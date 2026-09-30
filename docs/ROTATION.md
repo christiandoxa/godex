@@ -17,17 +17,31 @@ Only an **uncommitted** request may move to another account.
 
 ### Selection and affinity
 
+Before starting Codex, Godex previews the same deterministic round-robin order
+used by the account store and probes ChatGPT quota for each candidate until it
+finds a ready account. Accounts known to be exhausted are excluded from the
+initial proxy candidate set. A quota transport/auth probe failure is treated as
+unknown and fails open rather than making the runtime unavailable. An explicit
+account selector is never silently replaced by another account. Only the final
+chosen account advances the persisted rotation cursor and `LastUsedAt`.
+
+Once Codex is running:
+
 1. Godex extracts only the opaque continuity identifiers needed by Codex:
    previous_response_id, x-codex-turn-state, and session/conversation IDs.
 2. A known continuation is sent to its original account.
-3. A fresh request filters disabled and quarantined accounts.
-4. The remaining accounts are selected by deterministic round-robin order.
-5. Attempts are capped at the number of eligible accounts captured for that
+3. At launch, Godex takes one bounded quota snapshot for enabled accounts. An account that is explicitly exhausted is marked ineligible for fresh work in that launch; a failed quota probe remains eligible.
+4. A fresh request filters disabled, launch-ineligible, and quarantined accounts.
+5. The remaining accounts are selected by deterministic round-robin order.
+6. Attempts are capped at the number of eligible accounts captured for that
    request; an account is not tried twice in one cycle.
 
 If a continuation's owner is disabled, unavailable, or no longer registered,
 Godex returns a continuity-preserving error. It does not silently move that
 conversation to another account.
+
+Quota preflight is launch-scoped. It does not probe per request, per retry, or per
+stream chunk, and it never changes hard continuation affinity.
 
 ## Failure policy
 

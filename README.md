@@ -21,9 +21,12 @@ OAuth, store credentials in state.json, or require a daemon, database,
 dashboard, or remote service.
 
 Fresh requests may rotate between eligible accounts. Existing conversations
-stay with their account, and an established stream is never replayed. `godex quota`
-provides a bounded one-shot view of OpenAI/Codex 5-hour and weekly usage windows;
-it intentionally does not add Prodex's live dashboard or multi-provider quota surface. The
+stay with their account, and an established stream is never replayed. Managed
+launches probe quota once before the local proxy starts: accounts that are
+explicitly exhausted are skipped for fresh work, while a failed quota probe is
+kept eligible rather than being treated as exhaustion. `godex quota` provides a
+bounded one-shot view of OpenAI/Codex 5-hour and weekly usage windows; it
+intentionally does not add Prodex's live dashboard or multi-provider quota surface. The
 runtime details are documented in [Runtime rotation and affinity](docs/ROTATION.md).
 
 ## Requirements

@@ -35,6 +35,18 @@ func NewStatus(accounts accountStore, usage usageGateway) *Status {
 	return &Status{accounts: accounts, usage: usage, now: time.Now}
 }
 
+func (status *Status) Ready(ctx context.Context, account accountentity.Account) (bool, error) {
+	if !account.Enabled {
+		return false, nil
+	}
+	usage, err := status.usage.Fetch(ctx, status.accounts.CodexHome(account.ID))
+	if err != nil {
+		return false, err
+	}
+	report := quotamodel.Report{Enabled: true, Usage: usage}
+	return quotaState(report, status.now()) != "exhausted", nil
+}
+
 func (status *Status) Run(ctx context.Context, options Options) ([]quotamodel.Report, error) {
 	accounts, err := status.selectedAccounts(ctx, options)
 	if err != nil {
@@ -52,7 +64,9 @@ func (status *Status) Run(ctx context.Context, options Options) ([]quotamodel.Re
 			Active:      account.ID == current.ID,
 			Enabled:     account.Enabled,
 		}
-		report.Usage, report.Err = status.usage.Fetch(ctx, status.accounts.CodexHome(account.ID))
+		if account.Enabled {
+			report.Usage, report.Err = status.usage.Fetch(ctx, status.accounts.CodexHome(account.ID))
+		}
 		report.State = quotaState(report, status.now())
 		reports = append(reports, report)
 		if ctx.Err() != nil {

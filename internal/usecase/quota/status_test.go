@@ -71,3 +71,37 @@ func TestStatusDefaultsToCurrentAccount(t *testing.T) {
 		t.Fatalf("reports = %+v, err = %v", reports, err)
 	}
 }
+
+type countingUsage struct{ calls int }
+
+func (usage *countingUsage) Fetch(context.Context, string) (quotamodel.Usage, error) {
+	usage.calls++
+	return quotamodel.Usage{}, nil
+}
+
+func TestStatusDoesNotProbeDisabledAccounts(t *testing.T) {
+	disabled := accountentity.Account{ID: "off", Name: "off", Enabled: false}
+	usage := &countingUsage{}
+	status := NewStatus(fakeAccounts{accounts: []accountentity.Account{disabled}, current: disabled}, usage)
+	reports, err := status.Run(context.Background(), Options{All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if usage.calls != 0 || len(reports) != 1 || reports[0].State != "disabled" {
+		t.Fatalf("disabled quota reports = %+v, calls = %d", reports, usage.calls)
+	}
+}
+
+func TestStatusReadyUsesQuotaPolicy(t *testing.T) {
+	used := int64(100)
+	reset := time.Unix(1000, 0).Unix()
+	account := accountentity.Account{ID: "one", Name: "one", Enabled: true}
+	status := NewStatus(fakeAccounts{accounts: []accountentity.Account{account}, current: account}, fakeUsage{byHome: map[string]quotamodel.Usage{
+		"/managed/one": {Primary: &quotamodel.Window{UsedPercent: &used, ResetAt: &reset}},
+	}})
+	status.now = func() time.Time { return time.Unix(10, 0) }
+	ready, err := status.Ready(context.Background(), account)
+	if err != nil || ready {
+		t.Fatalf("ready = %t, err = %v", ready, err)
+	}
+}

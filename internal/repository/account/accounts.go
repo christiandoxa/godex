@@ -15,6 +15,7 @@ type Accounts interface {
 	List(ctx context.Context) ([]entity.Account, error)
 	Current(ctx context.Context) (entity.Account, error)
 	Resolve(ctx context.Context, selector string) (entity.Account, error)
+	LaunchCandidates(ctx context.Context, selector string) ([]entity.Account, error)
 	SelectForLaunch(ctx context.Context, selector string) (entity.Account, error)
 	SetActive(ctx context.Context, selector string) (entity.Account, error)
 	Remove(ctx context.Context, selector string) (entity.Account, error)

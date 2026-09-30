@@ -10,6 +10,7 @@ import (
 )
 
 type launchAccounts interface {
+	LaunchCandidates(context.Context, string) ([]accountentity.Account, error)
 	SelectForLaunch(context.Context, string) (accountentity.Account, error)
 	List(context.Context) ([]accountentity.Account, error)
 	CodexHome(string) string
@@ -25,15 +26,24 @@ type proxyCodex interface {
 	RunThroughProxy(context.Context, string, string, []string) error
 }
 
+type quotaPreflight interface {
+	Ready(context.Context, accountentity.Account) (bool, error)
+}
+
 type Runner struct {
 	accounts launchAccounts
 	process  codexProcess
 	newProxy ProxyFactory
+	quota    quotaPreflight
 	upstream string
 }
 
 func NewRunner(accounts launchAccounts, process codexProcess, newProxy ProxyFactory) *Runner {
 	return &Runner{accounts: accounts, process: process, newProxy: newProxy}
+}
+
+func (runner *Runner) SetQuotaPreflight(preflight quotaPreflight) {
+	runner.quota = preflight
 }
 
 func (runner *Runner) SetUpstreamURL(upstream string) {
@@ -43,7 +53,7 @@ func (runner *Runner) SetUpstreamURL(upstream string) {
 }
 
 func (runner *Runner) Run(ctx context.Context, selector string, arguments []string) error {
-	selected, err := runner.accounts.SelectForLaunch(ctx, selector)
+	selected, exhausted, err := runner.selectForLaunch(ctx, selector)
 	if err != nil {
 		return err
 	}
@@ -58,9 +68,7 @@ func (runner *Runner) Run(ctx context.Context, selector string, arguments []stri
 	if err := proxyRunner.CheckProxySupport(ctx); err != nil {
 		return err
 	}
-	// ponytail: snapshot account metadata per launch. Add an owned refresh path
-	// if live state changes must affect a running proxy.
-	profiles, err := runner.proxyAccounts(ctx)
+	profiles, err := runner.proxyAccounts(ctx, exhausted)
 	if err != nil {
 		return err
 	}
@@ -89,7 +97,7 @@ func (runner *Runner) Run(ctx context.Context, selector string, arguments []stri
 	return runErr
 }
 
-func (runner *Runner) proxyAccounts(ctx context.Context) ([]proxyconfig.Account, error) {
+func (runner *Runner) proxyAccounts(ctx context.Context, exhausted map[string]bool) ([]proxyconfig.Account, error) {
 	accounts, err := runner.accounts.List(ctx)
 	if err != nil {
 		return nil, err
@@ -97,7 +105,9 @@ func (runner *Runner) proxyAccounts(ctx context.Context) ([]proxyconfig.Account,
 	profiles := make([]proxyconfig.Account, 0, len(accounts))
 	for _, account := range accounts {
 		profiles = append(profiles, proxyconfig.Account{
-			ID: account.ID, Home: runner.accounts.CodexHome(account.ID), Enabled: account.Enabled,
+			ID:      account.ID,
+			Home:    runner.accounts.CodexHome(account.ID),
+			Enabled: account.Enabled && !exhausted[account.ID],
 		})
 	}
 	return profiles, nil

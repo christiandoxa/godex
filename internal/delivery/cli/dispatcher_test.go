@@ -67,6 +67,10 @@ func (dispatcherAccounts) Remove(_ context.Context, selector string) (accountent
 func (dispatcherAccounts) Prepare() error { return nil }
 func (dispatcherAccounts) Root() string   { return "/synthetic/godex" }
 
+func (dispatcherAccounts) LaunchCandidates(_ context.Context, selector string) ([]accountentity.Account, error) {
+	return []accountentity.Account{{ID: "synthetic", Name: selector, Enabled: true}}, nil
+}
+
 func (dispatcherAccounts) SelectForLaunch(_ context.Context, selector string) (accountentity.Account, error) {
 	return accountentity.Account{ID: "synthetic", Name: selector, Enabled: true}, nil
 }
