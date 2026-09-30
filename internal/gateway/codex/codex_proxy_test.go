@@ -119,6 +119,8 @@ func TestQuotedAndEqualsConfigCannotBypassManagedRouting(t *testing.T) {
 		{"-c", "'cli_auth_credentials_store'='keyring'"}, {"-c", "model_providers={evil=true}"},
 		{"-c", `profiles.work.model_provider="evil"`}, {"-c", `"model_providers".'godex-openai'.base_url="https://example.test"`},
 		{"--oss"}, {"--oss=true"}, {"--local-provider", "ollama"}, {"--local-provider=lmstudio"},
+		{"--remote", "ws://127.0.0.1:1"}, {"--remote=ws://127.0.0.1:1"},
+		{"--remote-auth-token-env", "SYNTHETIC_REMOTE_TOKEN"}, {"--remote-auth-token-env=SYNTHETIC_REMOTE_TOKEN"},
 		{"exec", "resume", "thread", "--config", "cli_auth_credentials_store=keyring"},
 	} {
 		if _, err := proxyArguments("http://127.0.0.1:1", args); err == nil {

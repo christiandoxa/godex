@@ -100,6 +100,9 @@ func containsProxyOverride(arguments []string) bool {
 		if argument == "--oss" || strings.HasPrefix(argument, "--oss=") || argument == "--local-provider" || strings.HasPrefix(argument, "--local-provider=") {
 			return true
 		}
+		if argument == "--remote" || strings.HasPrefix(argument, "--remote=") || argument == "--remote-auth-token-env" || strings.HasPrefix(argument, "--remote-auth-token-env=") {
+			return true
+		}
 		value, consumed, ok := configArgument(arguments, index)
 		if ok && ownedConfigKey(value) {
 			return true

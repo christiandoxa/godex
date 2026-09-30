@@ -115,17 +115,17 @@ func (features runtimeFeatures) arguments() ([]string, error) {
 			fmt.Sprintf("features.rollout_budget.limit_tokens=%d", limit),
 			"features.rollout_budget.reminder_at_remaining_tokens=["+formatUintList(normalizeReminders(limit, features.rolloutReminders))+"]",
 		)
-		if validWeight(features.samplingWeight) {
+		if features.samplingWeight != nil {
 			overrides = append(overrides, "features.rollout_budget.sampling_token_weight="+formatFloat(*features.samplingWeight))
 		}
-		if validWeight(features.prefillWeight) {
+		if features.prefillWeight != nil {
 			overrides = append(overrides, "features.rollout_budget.prefill_token_weight="+formatFloat(*features.prefillWeight))
 		}
 	}
 	if features.currentTime || features.currentInterval != nil || features.currentClock != "" {
 		overrides = append(overrides, "features.current_time_reminder.enabled=true")
 		if features.currentInterval != nil && *features.currentInterval > 0 {
-			overrides = append(overrides, fmt.Sprintf("features.current_time_reminder.reminder_interval_model_requests=%d", *features.currentInterval))
+			overrides = append(overrides, fmt.Sprintf("features.current_time_reminder.reminder_interval_seconds=%d", *features.currentInterval))
 		}
 		if features.currentClock != "" {
 			overrides = append(overrides, "features.current_time_reminder.clock_source="+strconv.Quote(features.currentClock))
@@ -165,7 +165,7 @@ func parseUintFeature(name, value string, prior error) (uint64, error) {
 		return 0, prior
 	}
 	parsed, err := strconv.ParseUint(value, 10, 64)
-	if err != nil {
+	if err != nil || parsed > math.MaxInt64 {
 		return 0, fmt.Errorf("invalid %s value %q", name, value)
 	}
 	return parsed, nil
@@ -192,7 +192,7 @@ func parseFloatFeature(name, value string, prior error) (float64, error) {
 		return 0, prior
 	}
 	parsed, err := strconv.ParseFloat(value, 64)
-	if err != nil {
+	if err != nil || parsed < 0 || math.IsNaN(parsed) || math.IsInf(parsed, 0) {
 		return 0, fmt.Errorf("invalid %s value %q", name, value)
 	}
 	return parsed, nil
@@ -227,14 +227,7 @@ func normalizeReminders(limit uint64, configured []uint64) []uint64 {
 }
 
 func percentOf(value, percent uint64) uint64 {
-	if value > math.MaxUint64/percent {
-		return math.MaxUint64 / 100
-	}
-	return value * percent / 100
-}
-
-func validWeight(value *float64) bool {
-	return value != nil && *value >= 0 && !math.IsNaN(*value) && !math.IsInf(*value, 0)
+	return value/100*percent + value%100*percent/100
 }
 
 func formatUintList(values []uint64) string {

@@ -72,6 +72,12 @@ strict-config probe uses a temporary home and `exec-server` with stdio EOF, so
 configuration is validated without accepting execution or model work. No shared
 helper or new application boundary is needed for this protocol-specific parsing.
 
+Runtime CLI delivery translates supported wrapper features into native config.
+Codex 0.159.2's reminder interval uses seconds, unlike Prodex 0.434.2's older
+request-count field. Delivery validates finite nonnegative weights and signed
+TOML integer bounds before launch; percentage defaults remain correct for large
+valid token limits. These flag conversions remain private to CLI runtime.
+
 ### Quota gateway and preflight
 
 The OpenAI quota client is a narrow outbound adapter for the ChatGPT usage

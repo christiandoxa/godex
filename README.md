@@ -119,6 +119,11 @@ Supported wrapper flags are `--web-search`, `--rollout-budget-tokens`,
 `--respect-system-proxy`, and `--no-respect-system-proxy`. Put them before the
 first Codex argument, or use `--` to end Godex option parsing.
 
+With Codex 0.159.2, `--current-time-reminder-interval N` is measured in seconds
+and emits `reminder_interval_seconds`. Prodex 0.434.2's older request-count
+config field is not accepted by that Codex version. Numeric config values must
+fit signed TOML integers; token weights must be finite and nonnegative.
+
 Find sessions across managed profiles, or only sessions for this directory:
 
 ~~~bash
@@ -190,6 +195,8 @@ control, backups, bug reports, or fixtures.
 - [Architecture](docs/ARCHITECTURE.md) — package ownership and runtime design.
 - [Runtime rotation and affinity](docs/ROTATION.md) — selection, retries,
   commitment, streaming, and forwarding rules.
+- [Core parity audit](docs/PARITY.md) — Prodex 0.434.2 equivalents, deliberate
+  differences, and validation limits.
 - [AGENTS.md](AGENTS.md) — engineering invariants for contributors.
 
 ## Build from source
@@ -243,7 +250,7 @@ never replayed on another account.
 Managed config is applied in the innermost `exec`, `exec resume`, `exec fork`,
 or `exec review` scope. Other Codex overrides retain their order and precedence.
 Routing and credential-store overrides, including quoted keys and whole provider
-tables, and `--oss`/`--local-provider` are rejected before the Codex child starts.
+tables, `--oss`/`--local-provider`, and remote app-server routing flags are rejected before the Codex child starts.
 Arguments after Codex's `--` delimiter remain literal. Launch capability checks
 validate strict config through `exec-server --listen stdio` with closed stdin
 and an empty temporary home; they do not submit a model request.
