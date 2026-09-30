@@ -18,7 +18,7 @@ func (writer failingWriter) Write([]byte) (int, error) { return 0, writer.err }
 
 func TestDispatcherVersion(t *testing.T) {
 	var output bytes.Buffer
-	if err := New(nil, nil, nil, nil, nil, &output).Run(context.Background(), []string{"--version"}); err != nil {
+	if err := New(nil, nil, nil, nil, nil, nil, &output).Run(context.Background(), []string{"--version"}); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(output.String(), "godex") {
@@ -30,7 +30,7 @@ func TestDispatcherPassesUnknownCommandToCodex(t *testing.T) {
 	accounts := dispatcherAccounts{}
 	process := &dispatcherProcess{}
 	runner := runtimeusecase.NewRunner(accounts, process, nil)
-	if err := New(nil, nil, accounts, runner, nil, &bytes.Buffer{}).Run(context.Background(), []string{"remote-control", "--help"}); err != nil {
+	if err := New(nil, nil, accounts, runner, nil, nil, &bytes.Buffer{}).Run(context.Background(), []string{"remote-control", "--help"}); err != nil {
 		t.Fatal(err)
 	}
 	if got := strings.Join(process.arguments, " "); got != "remote-control --help" {
@@ -40,7 +40,7 @@ func TestDispatcherPassesUnknownCommandToCodex(t *testing.T) {
 
 func TestDispatcherReturnsHelpOutputError(t *testing.T) {
 	errSynthetic := errors.New("synthetic output failure")
-	err := New(nil, nil, nil, nil, nil, failingWriter{err: errSynthetic}).Run(context.Background(), []string{"help"})
+	err := New(nil, nil, nil, nil, nil, nil, failingWriter{err: errSynthetic}).Run(context.Background(), []string{"help"})
 	if !errors.Is(err, errSynthetic) {
 		t.Fatalf("help error = %v", err)
 	}
@@ -112,7 +112,7 @@ func TestDispatcherRoutesCommandDomains(t *testing.T) {
 	login := authusecase.NewLogin(dispatcherLoginAccounts{}, dispatcherLoginCodex{})
 	importer := authusecase.NewImportCurrent(dispatcherLoginAccounts{}, dispatcherLoginCodex{}, "/synthetic/current")
 	var output bytes.Buffer
-	app := New(login, importer, accounts, runner, doctor, &output)
+	app := New(login, importer, accounts, runner, doctor, nil, &output)
 	commands := [][]string{
 		{"accounts"}, {"current"}, {"account", "list"}, {"profile", "current"}, {"account", "use", "work"}, {"account", "remove", "work"}, {"profile", "import-current", "imported"},
 		{"use", "work"}, {"remove", "work"}, {"run", "--account", "work", "--", "--model", "synthetic"},

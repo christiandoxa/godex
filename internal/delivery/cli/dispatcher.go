@@ -7,8 +7,10 @@ import (
 
 	accountcli "github.com/christiandoxa/godex/internal/delivery/cli/account"
 	authcli "github.com/christiandoxa/godex/internal/delivery/cli/auth"
+	quotacli "github.com/christiandoxa/godex/internal/delivery/cli/quota"
 	runtimecli "github.com/christiandoxa/godex/internal/delivery/cli/runtime"
 	authusecase "github.com/christiandoxa/godex/internal/usecase/auth"
+	quotausecase "github.com/christiandoxa/godex/internal/usecase/quota"
 	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
 	"github.com/christiandoxa/godex/internal/version"
 )
@@ -19,11 +21,23 @@ type App struct {
 	accounts accountcli.Commands
 	runtime  *runtimeusecase.Runner
 	doctor   *runtimeusecase.Doctor
+	quota    *quotausecase.Status
 	out      io.Writer
 }
 
-func New(login *authusecase.Login, importer *authusecase.ImportCurrent, accounts accountcli.Commands, runtime *runtimeusecase.Runner, doctor *runtimeusecase.Doctor, stdout io.Writer) *App {
-	return &App{login: login, importer: importer, accounts: accounts, runtime: runtime, doctor: doctor, out: stdout}
+func New(
+	login *authusecase.Login,
+	importer *authusecase.ImportCurrent,
+	accounts accountcli.Commands,
+	runtime *runtimeusecase.Runner,
+	doctor *runtimeusecase.Doctor,
+	quota *quotausecase.Status,
+	stdout io.Writer,
+) *App {
+	return &App{
+		login: login, importer: importer, accounts: accounts,
+		runtime: runtime, doctor: doctor, quota: quota, out: stdout,
+	}
 }
 
 func (app *App) Run(ctx context.Context, arguments []string) error {
@@ -48,6 +62,11 @@ func (app *App) Run(ctx context.Context, arguments []string) error {
 		return accountcli.Remove(ctx, app.accounts, app.out, arguments[1:])
 	case "run":
 		return runtimecli.Run(ctx, app.runtime, arguments[1:])
+	case "quota":
+		if app.quota == nil {
+			return fmt.Errorf("quota support is not configured")
+		}
+		return quotacli.Show(ctx, app.quota, app.out, arguments[1:])
 	case "doctor":
 		return runtimecli.Doctor(ctx, app.doctor, app.out, arguments[1:])
 	case "version", "--version", "-version":
@@ -79,6 +98,8 @@ Usage:
                                Import the current Codex ChatGPT login
   godex account use <selector>  Choose the first account for the next launch
   godex account remove <sel>    Remove an account
+  godex quota [--all] [--once] [selector]
+                               Show ChatGPT quota for managed accounts
   godex run [--account SEL] -- [codex args...]
   godex doctor
   godex --version

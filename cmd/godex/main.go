@@ -16,6 +16,7 @@ import (
 	proxyconfig "github.com/christiandoxa/godex/internal/model/proxy"
 	"github.com/christiandoxa/godex/internal/repository/account"
 	authusecase "github.com/christiandoxa/godex/internal/usecase/auth"
+	quotausecase "github.com/christiandoxa/godex/internal/usecase/quota"
 	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
 )
 
@@ -42,12 +43,18 @@ func run() int {
 	login := authusecase.NewLogin(store, process)
 	importer := authusecase.NewImportCurrent(store, process, settings.CurrentCodexHome)
 	doctor := runtimeusecase.NewDoctor(store, process)
+	quotaClient, err := openai.NewQuotaClient(settings.UpstreamURL, nil)
+	if err != nil {
+		_, _ = fmt.Fprintln(os.Stderr, "godex:", err)
+		return 1
+	}
+	quotaStatus := quotausecase.NewStatus(store, quotaClient)
 	factory := runtimeusecase.ProxyFactory(func(config proxyconfig.Config) (runtimeusecase.Proxy, error) {
 		return openai.NewProxyFromModel(config)
 	})
 	runner := runtimeusecase.NewRunner(store, process, factory)
 	runner.SetUpstreamURL(settings.UpstreamURL)
-	application := cli.New(login, importer, store, runner, doctor, os.Stdout)
+	application := cli.New(login, importer, store, runner, doctor, quotaStatus, os.Stdout)
 
 	if err := application.Run(ctx, os.Args[1:]); err != nil {
 		return exitCode(ctx, err)

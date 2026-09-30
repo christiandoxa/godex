@@ -21,7 +21,9 @@ OAuth, store credentials in state.json, or require a daemon, database,
 dashboard, or remote service.
 
 Fresh requests may rotate between eligible accounts. Existing conversations
-stay with their account, and an established stream is never replayed. The
+stay with their account, and an established stream is never replayed. `godex quota`
+provides a bounded one-shot view of OpenAI/Codex 5-hour and weekly usage windows;
+it intentionally does not add Prodex's live dashboard or multi-provider quota surface. The
 runtime details are documented in [Runtime rotation and affinity](docs/ROTATION.md).
 
 ## Requirements
@@ -86,6 +88,7 @@ List accounts and launch the normal Codex experience:
 ~~~bash
 godex accounts
 godex current
+godex quota --all --once
 godex
 ~~~
 
@@ -128,6 +131,7 @@ Available account commands:
 | godex account list | Alias for godex accounts. |
 | godex current | Show the active managed account. |
 | godex profile import-current [NAME] | Import the ChatGPT login from the current Codex home. |
+| godex quota [--all] [--once] [SELECTOR] | Show a one-shot OpenAI/Codex quota snapshot. |
 | godex account use SELECTOR | Set the preferred account. |
 | godex account remove SELECTOR | Remove an account. |
 
