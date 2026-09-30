@@ -35,19 +35,15 @@ func TestPrepareCodexHomeWritesPrivateFileStoreConfig(t *testing.T) {
 	}
 }
 
-func TestRuntimeConfigArgumentsValidateURLs(t *testing.T) {
-	arguments, err := (RuntimeConfig{
-		ChatGPTBaseURL: "http://127.0.0.1:8080/backend-api",
-		OpenAIBaseURL:  "https://example.test/v1",
-	}).arguments()
-	if err != nil {
-		t.Fatal(err)
+func TestManagedArgumentsValidateURLs(t *testing.T) {
+	args, err := proxyArguments("http://127.0.0.1:1234", nil)
+	if err != nil || !strings.Contains(strings.Join(args, " "), `base_url="http://127.0.0.1:1234/backend-api/prodex"`) {
+		t.Fatalf("managed URL arguments invalid")
 	}
-	if strings.Join(arguments, " ") != `-c chatgpt_base_url="http://127.0.0.1:8080/backend-api" -c openai_base_url="https://example.test/v1"` {
-		t.Fatalf("arguments = %q", arguments)
-	}
-	if _, err := (RuntimeConfig{ChatGPTBaseURL: "https://user:pass@example.test"}).arguments(); err == nil {
-		t.Fatal("expected credentialed URL rejection")
+	for _, url := range []string{"https://user:pass@example.test", "file:///tmp/path", "https://example.test?secret=value"} {
+		if _, err := proxyArguments(url, nil); err == nil {
+			t.Fatal("invalid runtime URL accepted")
+		}
 	}
 }
 

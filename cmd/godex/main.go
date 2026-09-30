@@ -11,6 +11,7 @@ import (
 
 	"github.com/christiandoxa/godex/internal/config"
 	"github.com/christiandoxa/godex/internal/delivery/cli"
+	proxyhttp "github.com/christiandoxa/godex/internal/delivery/http/proxy"
 	"github.com/christiandoxa/godex/internal/gateway/codex"
 	"github.com/christiandoxa/godex/internal/gateway/openai"
 	proxyconfig "github.com/christiandoxa/godex/internal/model/proxy"
@@ -18,6 +19,7 @@ import (
 	sessionrepo "github.com/christiandoxa/godex/internal/repository/session"
 	authusecase "github.com/christiandoxa/godex/internal/usecase/auth"
 	quotausecase "github.com/christiandoxa/godex/internal/usecase/quota"
+	routingusecase "github.com/christiandoxa/godex/internal/usecase/routing"
 	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
 	sessionusecase "github.com/christiandoxa/godex/internal/usecase/session"
 )
@@ -45,14 +47,22 @@ func run() int {
 	login := authusecase.NewLogin(store, process)
 	importer := authusecase.NewImportCurrent(store, process, settings.CurrentCodexHome)
 	doctor := runtimeusecase.NewDoctor(store, process)
-	quotaClient, err := openai.NewQuotaClient(settings.UpstreamURL, nil)
+	quotaClient, err := openai.NewQuotaClient(settings.UpstreamURL, nil, process)
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, "godex:", err)
 		return 1
 	}
 	quotaStatus := quotausecase.NewStatus(store, quotaClient)
 	factory := runtimeusecase.ProxyFactory(func(config proxyconfig.Config) (runtimeusecase.Proxy, error) {
-		return openai.NewProxyFromModel(config)
+		transport, err := openai.NewTransport(config.UpstreamURL, nil, process)
+		if err != nil {
+			return nil, err
+		}
+		router, err := routingusecase.NewRouter(routingusecase.Config{Gateway: transport, Accounts: config.Accounts, PreferredAccount: config.PreferredAccount})
+		if err != nil {
+			return nil, err
+		}
+		return proxyhttp.NewProxy(proxyhttp.Config{Router: router})
 	})
 	runner := runtimeusecase.NewRunner(store, process, factory)
 	runner.SetQuotaPreflight(quotaStatus)

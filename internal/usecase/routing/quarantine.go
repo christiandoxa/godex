@@ -1,10 +1,10 @@
-package openai
+package routing
 
 import "time"
 
 const maxQuarantinedAccounts = 4096
 
-func (proxy *Proxy) isQuarantined(accountID string, now time.Time) bool {
+func (proxy *Router) isQuarantined(accountID string, now time.Time) bool {
 	proxy.mu.Lock()
 	defer proxy.mu.Unlock()
 	until, ok := proxy.quarantine[accountID]
@@ -15,7 +15,7 @@ func (proxy *Proxy) isQuarantined(accountID string, now time.Time) bool {
 	return true
 }
 
-func (proxy *Proxy) quarantineAccount(accountID string, duration time.Duration) {
+func (proxy *Router) quarantineAccount(accountID string, duration time.Duration) {
 	if duration <= 0 {
 		duration = time.Second
 	}
@@ -40,7 +40,7 @@ func (proxy *Proxy) quarantineAccount(accountID string, duration time.Duration) 
 	proxy.quarantine[accountID] = until
 }
 
-func (proxy *Proxy) pruneQuarantineLocked(now time.Time) {
+func (proxy *Router) pruneQuarantineLocked(now time.Time) {
 	for accountID, until := range proxy.quarantine {
 		if !until.After(now) {
 			delete(proxy.quarantine, accountID)

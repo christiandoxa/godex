@@ -261,3 +261,22 @@ session argument forms and invokes the session use case, which resolves ownershi
 and preserves the remaining arguments. Native local commands use runtime's local
 launch path without proxy or quota orchestration. Explicit runtime selectors
 restrict the entire upstream pool. No delivery package accesses an adapter.
+
+## HTTP model request boundary
+
+`delivery/http/proxy` owns the loopback listener, bounded input capture, HTTP
+presentation, flushing, trailers, and downstream aborts. It invokes
+`usecase/routing` with `model/proxy` request data. Routing owns deterministic
+selection, hard affinity, quarantine, retry classification, auth reload decisions,
+and the precommit attempt cycle. It calls a consumed transport port;
+`gateway/openai` replaces selected-account authentication and forwards upstream
+HTTP bytes. Codex authentication reading is injected at the composition root;
+the OpenAI adapter does not import the Codex adapter. The quota gateway uses the
+same narrow auth port. The stateless `helper/httpheader` package shares RFC
+hop-header policy between the two concrete HTTP boundaries, with focused tests.
+The sole integration root remains `cmd/godex`.
+
+Responses cannot re-enter routing after delivery commits headers. Truncated
+upstream streams abort downstream HTTP using `http.ErrAbortHandler`; they are
+not closed as successful chunked responses and are never replayed. Unexpected
+WebSocket upgrades are rejected explicitly; HTTP/SSE is Godex's model transport.

@@ -55,7 +55,7 @@ printf '%s\n' "$@" > "$GODEX_PROXY_RECORD.args"`)
 		t.Fatalf("child home = %q, err = %v", childHome, err)
 	}
 	arguments, err := os.ReadFile(record + ".args")
-	if err != nil || !strings.Contains(string(arguments), `chatgpt_base_url="http://127.0.0.1:1234/backend-api"`) || !strings.Contains(string(arguments), "--model\nsynthetic") {
+	if err != nil || !strings.Contains(string(arguments), `model_providers.godex-openai.base_url="http://127.0.0.1:1234/backend-api/prodex"`) || !strings.Contains(string(arguments), "--model\nsynthetic") {
 		t.Fatalf("child arguments = %q, err = %v", arguments, err)
 	}
 	if err := NewCodexProcess(script, Terminal{}).RunThroughProxy(context.Background(), home, "http://127.0.0.1:1234", []string{"-c", "openai_base_url=https://outside"}); err == nil {
@@ -73,4 +73,20 @@ func writeProxyHelper(t *testing.T, body string) string {
 		t.Fatal(err)
 	}
 	return path
+}
+
+func TestManagedTransportCannotBeOverridden(t *testing.T) {
+	for _, key := range []string{"model_provider", "model_providers.evil.base_url", "model_providers.godex-openai.supports_websockets", "cli_auth_credentials_store"} {
+		if _, err := proxyArguments("http://127.0.0.1:1234", []string{"-c", key + "=true"}); err == nil {
+			t.Fatalf("override accepted: %s", key)
+		}
+	}
+	args, err := proxyArguments("http://127.0.0.1:1234", []string{"exec", "synthetic prompt"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := strings.Join(args, " ")
+	if strings.Contains(text, "chatgpt_base_url=") || !strings.Contains(text, "supports_websockets=false") {
+		t.Fatalf("native bootstrap or HTTP transport not preserved")
+	}
 }

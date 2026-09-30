@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 )
 
@@ -29,13 +30,7 @@ func (process *CodexProcess) CheckProxySupport(ctx context.Context) error {
 	defer func(path string) {
 		_ = os.RemoveAll(path)
 	}(home)
-	configArguments, err := (RuntimeConfig{
-		ChatGPTBaseURL: "http://127.0.0.1:1/backend-api",
-		OpenAIBaseURL:  "http://127.0.0.1:1/backend-api/prodex",
-	}).arguments()
-	if err != nil {
-		return err
-	}
+	configArguments := managedModelArguments("http://127.0.0.1:1/backend-api/prodex")
 	arguments := append([]string{"--strict-config"}, configArguments...)
 	arguments = append(arguments, "--version")
 	command := exec.CommandContext(ctx, binary, arguments...)
@@ -85,14 +80,10 @@ func proxyArguments(endpoint string, arguments []string) ([]string, error) {
 	if containsProxyOverride(arguments) {
 		return nil, errors.New("codex arguments cannot override Godex proxy base URLs")
 	}
-	configArguments, err := (RuntimeConfig{
-		ChatGPTBaseURL: endpoint + "/backend-api",
-		OpenAIBaseURL:  endpoint + "/backend-api/prodex",
-	}).arguments()
-	if err != nil {
+	if err := validateRuntimeURL(endpoint); err != nil {
 		return nil, err
 	}
-	return append(configArguments, arguments...), nil
+	return append(managedModelArguments(endpoint+"/backend-api/prodex"), arguments...), nil
 }
 
 func containsProxyOverride(arguments []string) bool {
@@ -112,9 +103,28 @@ func containsProxyOverride(arguments []string) bool {
 		}
 		key, _, _ := strings.Cut(strings.TrimSpace(value), "=")
 		key = strings.TrimSpace(key)
-		if key == "chatgpt_base_url" || key == "openai_base_url" {
+		if key == "chatgpt_base_url" || key == "openai_base_url" || key == "model_provider" || strings.HasPrefix(key, "model_providers.") || key == "cli_auth_credentials_store" {
 			return true
 		}
 	}
 	return false
+}
+
+// Proxy only model traffic; native Codex account/bootstrap endpoints remain HTTPS.
+func managedModelArguments(baseURL string) []string {
+	values := []string{
+		`cli_auth_credentials_store="file"`,
+		`model_provider="godex-openai"`,
+		`model_providers.godex-openai.name="OpenAI through Godex"`,
+		"model_providers.godex-openai.base_url=" + strconv.Quote(baseURL),
+		`model_providers.godex-openai.wire_api="responses"`,
+		`model_providers.godex-openai.requires_openai_auth=true`,
+		`model_providers.godex-openai.supports_websockets=false`,
+		`model_providers.godex-openai.supports_standalone_web_search=true`,
+	}
+	arguments := make([]string, 0, 2*len(values))
+	for _, value := range values {
+		arguments = append(arguments, "-c", value)
+	}
+	return arguments
 }

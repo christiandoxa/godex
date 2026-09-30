@@ -2,6 +2,7 @@ package openai
 
 import (
 	"context"
+	"github.com/christiandoxa/godex/internal/gateway/codex"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -34,7 +35,7 @@ func TestQuotaClientFetchesManagedChatGPTUsage(t *testing.T) {
 	defer server.Close()
 
 	home := writeQuotaAuth(t, "synthetic-token", "account-123")
-	client, err := NewQuotaClient(server.URL+"/backend-api", nil)
+	client, err := NewQuotaClient(server.URL+"/backend-api", nil, codex.NewCodexProcess("", codex.Terminal{}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +73,7 @@ func TestQuotaClientDoesNotEchoErrorBody(t *testing.T) {
 		_, _ = writer.Write([]byte(`{"secret":"must-not-escape"}`))
 	}))
 	defer server.Close()
-	client, err := NewQuotaClient(server.URL+"/backend-api", nil)
+	client, err := NewQuotaClient(server.URL+"/backend-api", nil, codex.NewCodexProcess("", codex.Terminal{}))
 	if err != nil {
 		t.Fatal(err)
 	}

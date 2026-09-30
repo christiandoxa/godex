@@ -1,4 +1,4 @@
-package openai
+package proxy
 
 type requestPhase uint8
 

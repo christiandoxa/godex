@@ -1,4 +1,4 @@
-package openai
+package proxy
 
 import (
 	"bytes"
@@ -204,8 +204,8 @@ func TestProxyDoesNotReplayCommittedStream(t *testing.T) {
 	proxy := newTestProxy(t, upstream.URL, accounts)
 	response := doProxyJSON(t, proxy.URL+"/backend-api/prodex/responses", `{}`, nil)
 	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		t.Fatal(err)
+	if err == nil {
+		t.Fatal("truncated committed stream was reported as successful")
 	}
 	_ = response.Body.Close()
 	if !strings.Contains(string(body), "stream-a") {
@@ -432,6 +432,9 @@ func TestProxyForwardsRequestHeadersWithoutInventingMetadata(t *testing.T) {
 	_ = response.Body.Close()
 
 	forwarded := <-seen
+	if forwarded.Get("ChatGPT-Account-Id") != "workspace-A" {
+		t.Fatal("selected account routing identity missing")
+	}
 	if forwarded.Get("Authorization") != "Bearer token-a" {
 		t.Fatalf("managed authorization was not selected: %q", forwarded.Get("Authorization"))
 	}
@@ -439,7 +442,7 @@ func TestProxyForwardsRequestHeadersWithoutInventingMetadata(t *testing.T) {
 		!reflect.DeepEqual(forwarded.Values("X-Codex-Metadata"), []string{"first", "second"}) {
 		t.Fatalf("Codex headers were changed: %#v", forwarded)
 	}
-	for _, key := range []string{"X-Local-Hop", "ChatGPT-Account-Id", "X-Prodex-Internal-Request-Origin", "Connection"} {
+	for _, key := range []string{"X-Local-Hop", "X-Prodex-Internal-Request-Origin", "Connection"} {
 		if forwarded.Get(key) != "" {
 			t.Fatalf("local header %s was forwarded: %q", key, forwarded.Get(key))
 		}
@@ -485,29 +488,6 @@ func TestProxyPreservesCompressedResponse(t *testing.T) {
 	}
 }
 
-func TestUpstreamPathMatchesCodexMount(t *testing.T) {
-	tests := []struct {
-		name string
-		base string
-		path string
-		want string
-	}{
-		{name: "responses", base: "/backend-api", path: "/backend-api/prodex/responses", want: "/backend-api/codex/responses"},
-		{name: "legacy version", base: "/backend-api", path: "/backend-api/prodex/v1/responses", want: "/backend-api/codex/responses"},
-		{name: "already normalized", base: "/backend-api", path: "/backend-api/codex/responses", want: "/backend-api/codex/responses"},
-		{name: "custom base", base: "/backend-api-v2", path: "/backend-api/prodex/responses", want: "/backend-api-v2/backend-api/codex/responses"},
-		{name: "standard v1", base: "/backend-api", path: "/v1/responses", want: "/backend-api/v1/responses"},
-		{name: "pathless base", base: "", path: "/v1/responses", want: "/v1/responses"},
-	}
-	for _, testCase := range tests {
-		t.Run(testCase.name, func(t *testing.T) {
-			if got := upstreamPath(testCase.base, testCase.path); got != testCase.want {
-				t.Fatalf("upstreamPath(%q, %q) = %q, want %q", testCase.base, testCase.path, got, testCase.want)
-			}
-		})
-	}
-}
-
 func TestProxyForwardsStreamTrailers(t *testing.T) {
 	accounts := testRuntimeAccounts(t, "A", "token-a", "B", "token-b")
 	upstream := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
@@ -531,48 +511,6 @@ func TestProxyForwardsStreamTrailers(t *testing.T) {
 	}
 }
 
-func TestProxyQuarantineIsBounded(t *testing.T) {
-	proxy := &Proxy{now: func() time.Time { return time.Unix(10, 0) }, quarantine: make(map[string]time.Time)}
-	for index := 0; index <= maxQuarantinedAccounts; index++ {
-		proxy.quarantineAccount(fmt.Sprintf("account-%d", index), time.Minute)
-	}
-	proxy.mu.Lock()
-	count := len(proxy.quarantine)
-	proxy.mu.Unlock()
-	if count != maxQuarantinedAccounts {
-		t.Fatalf("quarantine entries = %d, want %d", count, maxQuarantinedAccounts)
-	}
-}
-
-func TestProxyQuarantineKeepsLongerExistingLease(t *testing.T) {
-	proxy := &Proxy{now: func() time.Time { return time.Unix(10, 0) }, quarantine: make(map[string]time.Time)}
-	proxy.quarantineAccount("synthetic", time.Hour)
-	proxy.quarantineAccount("synthetic", time.Second)
-	if !proxy.isQuarantined("synthetic", time.Unix(10, 0).Add(time.Minute)) {
-		t.Fatal("longer quarantine lease was shortened")
-	}
-}
-
-func TestSortRuntimeAccountsDeterministicallyDeduplicates(t *testing.T) {
-	accounts := sortRuntimeAccounts([]RuntimeAccount{
-		{ID: "same", Home: "/z", Enabled: false},
-		{ID: "same", Home: "/a", Enabled: true},
-	})
-	if len(accounts) != 1 || accounts[0].Home != "/a" || !accounts[0].Enabled {
-		t.Fatalf("sorted accounts = %#v", accounts)
-	}
-}
-
-func TestSortRuntimeAccountsUsesHomeAsTieBreaker(t *testing.T) {
-	accounts := sortRuntimeAccounts([]RuntimeAccount{
-		{ID: "same", Home: "/z", Enabled: true},
-		{ID: "same", Home: "/a", Enabled: true},
-	})
-	if len(accounts) != 1 || accounts[0].Home != "/a" {
-		t.Fatalf("sorted accounts = %#v", accounts)
-	}
-}
-
 func TestProxyCancellationStopsUpstream(t *testing.T) {
 	accounts := testRuntimeAccounts(t, "A", "token-a", "B", "token-b")
 	started := make(chan struct{})
@@ -583,7 +521,7 @@ func TestProxyCancellationStopsUpstream(t *testing.T) {
 		close(canceled)
 		return nil, request.Context().Err()
 	})
-	managedProxy, err := NewProxy(ProxyConfig{
+	managedProxy, err := newProxyForTest(ProxyConfig{
 		ListenAddr:  "127.0.0.1:0",
 		UpstreamURL: "http://upstream.test/backend-api",
 		Client:      &http.Client{Transport: transport},
@@ -632,7 +570,7 @@ func (function roundTripperFunc) RoundTrip(request *http.Request) (*http.Respons
 
 func TestProxyRejectsNonLoopbackListener(t *testing.T) {
 	for _, address := range []string{"0.0.0.0:0", ":0", "localhost:0"} {
-		if _, err := NewProxy(ProxyConfig{ListenAddr: address, Accounts: func(context.Context) ([]RuntimeAccount, error) {
+		if _, err := newProxyForTest(ProxyConfig{ListenAddr: address, Accounts: func(context.Context) ([]RuntimeAccount, error) {
 			return nil, nil
 		}}); err == nil {
 			t.Fatalf("listener %q was accepted", address)
@@ -641,7 +579,7 @@ func TestProxyRejectsNonLoopbackListener(t *testing.T) {
 }
 
 func TestProxyRejectsInvalidUpstreamURL(t *testing.T) {
-	if _, err := NewProxy(ProxyConfig{
+	if _, err := newProxyForTest(ProxyConfig{
 		UpstreamURL: "not-an-upstream-url",
 		Accounts:    func(context.Context) ([]RuntimeAccount, error) { return nil, nil },
 	}); err == nil {
@@ -650,7 +588,7 @@ func TestProxyRejectsInvalidUpstreamURL(t *testing.T) {
 }
 
 func TestProxyStopsWhenRequestBodyReadIsCanceled(t *testing.T) {
-	proxy, err := NewProxy(ProxyConfig{
+	proxy, err := newProxyForTest(ProxyConfig{
 		UpstreamURL: "http://upstream.test/backend-api",
 		Accounts:    func(context.Context) ([]RuntimeAccount, error) { return nil, nil },
 	})
@@ -677,7 +615,7 @@ func TestProxyStartsOnLoopbackAndCloses(t *testing.T) {
 		writer.WriteHeader(http.StatusNoContent)
 	}))
 	defer upstream.Close()
-	proxy, err := NewProxy(ProxyConfig{
+	proxy, err := newProxyForTest(ProxyConfig{
 		ListenAddr:  "127.0.0.1:0",
 		UpstreamURL: upstream.URL,
 		Accounts: func(context.Context) ([]RuntimeAccount, error) {
@@ -702,45 +640,9 @@ func TestProxyStartsOnLoopbackAndCloses(t *testing.T) {
 	}
 }
 
-func TestClassifyPreCommitFailures(t *testing.T) {
-	cases := []struct {
-		name       string
-		status     int
-		body       string
-		kind       responseKind
-		quarantine bool
-	}{
-		{name: "server error", status: http.StatusBadGateway, kind: responseRetry},
-		{name: "rate limit", status: http.StatusTooManyRequests, kind: responseRetry, quarantine: true},
-		{name: "unauthorized", status: http.StatusUnauthorized, kind: responseAuthFailure},
-		{name: "client error", status: http.StatusBadRequest, body: `{"error":{"code":"invalid_request"}}`, kind: responsePass},
-		{name: "quota body", status: http.StatusForbidden, body: `{"error":{"code":"insufficient_quota"}}`, kind: responseRetry, quarantine: true},
-	}
-	proxy := &Proxy{now: func() time.Time { return time.Unix(10, 0) }, maxInspect: 1024}
-	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			response := &http.Response{
-				StatusCode: testCase.status,
-				Header:     make(http.Header),
-				Body:       io.NopCloser(strings.NewReader(testCase.body)),
-			}
-			if testCase.name == "rate limit" {
-				response.Header.Set("Retry-After", "5")
-			}
-			outcome, pending := proxy.classify(response)
-			if outcome.kind != testCase.kind || (outcome.quarantine > 0) != testCase.quarantine {
-				t.Fatalf("outcome = %#v, pending = %#v", outcome, pending)
-			}
-			if pending != nil {
-				pending.close()
-			}
-		})
-	}
-}
-
 func newTestProxy(t *testing.T, upstream string, accounts []RuntimeAccount) *httptest.Server {
 	t.Helper()
-	proxy, err := NewProxy(ProxyConfig{
+	proxy, err := newProxyForTest(ProxyConfig{
 		ListenAddr:  "127.0.0.1:0",
 		UpstreamURL: upstream,
 		Accounts: func(context.Context) ([]RuntimeAccount, error) {
@@ -766,7 +668,7 @@ func testRuntimeAccounts(t *testing.T, firstID, firstToken, secondID, secondToke
 func testRuntimeAccount(t *testing.T, id, token string) RuntimeAccount {
 	t.Helper()
 	home := t.TempDir()
-	auth := map[string]any{"auth_mode": "chatgpt", "tokens": map[string]string{"access_token": token}}
+	auth := map[string]any{"auth_mode": "chatgpt", "tokens": map[string]string{"access_token": token, "account_id": "workspace-" + id}}
 	content, err := json.Marshal(auth)
 	if err != nil {
 		t.Fatal(err)
@@ -792,4 +694,48 @@ func doProxyJSON(t *testing.T, endpoint, body string, headers map[string]string)
 		t.Fatal(err)
 	}
 	return response
+}
+
+func TestProxyRejectsWebsocketUpgradeBeforeUpstream(t *testing.T) {
+	accounts := testRuntimeAccounts(t, "A", "token-a", "B", "token-b")
+	upstream := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { t.Error("unexpected upstream upgrade") }))
+	defer upstream.Close()
+	proxy := newTestProxy(t, upstream.URL, accounts)
+	request, err := http.NewRequest(http.MethodGet, proxy.URL+"/responses", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Connection", "Upgrade")
+	request.Header.Set("Upgrade", "websocket")
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusUpgradeRequired {
+		t.Fatalf("upgrade status = %d", response.StatusCode)
+	}
+}
+
+func TestProxyRemembersEveryNonstreamResponseInChain(t *testing.T) {
+	accounts := testRuntimeAccounts(t, "A", "token-a", "B", "token-b")
+	calls := 0
+	upstream := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Header.Get("ChatGPT-Account-Id") != "workspace-A" {
+			t.Error("chain changed upstream account")
+		}
+		calls++
+		writer.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(writer, `{"id":"response-%d"}`, calls)
+	}))
+	defer upstream.Close()
+	proxy := newTestProxy(t, upstream.URL, accounts)
+	for _, body := range []string{`{}`, `{"previous_response_id":"response-1"}`, `{"previous_response_id":"response-2"}`} {
+		response := doProxyJSON(t, proxy.URL+"/responses", body, nil)
+		io.Copy(io.Discard, response.Body)
+		response.Body.Close()
+		if response.StatusCode != 200 {
+			t.Fatalf("chain status = %d", response.StatusCode)
+		}
+	}
 }

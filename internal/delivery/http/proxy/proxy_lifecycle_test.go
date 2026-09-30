@@ -1,4 +1,4 @@
-package openai
+package proxy
 
 import "testing"
 

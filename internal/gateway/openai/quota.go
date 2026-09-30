@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/christiandoxa/godex/internal/gateway/codex"
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
 
@@ -19,9 +18,10 @@ const maxQuotaResponseBytes = 1 << 20
 type QuotaClient struct {
 	client   *http.Client
 	upstream *url.URL
+	auth     authReader
 }
 
-func NewQuotaClient(upstream string, client *http.Client) (*QuotaClient, error) {
+func NewQuotaClient(upstream string, client *http.Client, auth authReader) (*QuotaClient, error) {
 	if strings.TrimSpace(upstream) == "" {
 		upstream = DefaultUpstreamURL
 	}
@@ -36,11 +36,14 @@ func NewQuotaClient(upstream string, client *http.Client) (*QuotaClient, error) 
 	if quotaClient.Timeout == 0 {
 		quotaClient.Timeout = 20 * time.Second
 	}
-	return &QuotaClient{client: quotaClient, upstream: parsed}, nil
+	if auth == nil {
+		return nil, errors.New("quota authentication reader is required")
+	}
+	return &QuotaClient{client: quotaClient, upstream: parsed, auth: auth}, nil
 }
 
 func (client *QuotaClient) Fetch(ctx context.Context, codexHome string) (quotamodel.Usage, error) {
-	auth, err := codex.ReadUsageAuth(codexHome)
+	auth, err := client.auth.ReadAuth(ctx, codexHome)
 	if err != nil {
 		return quotamodel.Usage{}, err
 	}

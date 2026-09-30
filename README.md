@@ -224,3 +224,10 @@ across managed profiles. A conflicting explicit account fails. A bare full UUID
 is shorthand for `session resume`. Native names, `--last`, and interactive pickers
 remain scoped to the active or explicitly selected profile. Local native commands
 such as `mcp`, `features`, and `completion` bypass quota and rotation.
+
+Model traffic uses an explicit HTTP/SSE OpenAI Responses configuration; native
+Codex account/bootstrap and authentication endpoints retain their normal HTTPS
+transport. Godex rejects unexpected WebSocket upgrades and routing/auth-store
+config overrides. It supplies both the chosen bearer credential and its ChatGPT
+account routing header. A broken committed stream fails downstream HTTP and is
+never replayed on another account.
