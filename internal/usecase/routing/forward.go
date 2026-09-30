@@ -56,7 +56,7 @@ func (router *Router) forwardFresh(ctx context.Context, request proxymodel.Reque
 			last = nil
 		}
 		if outcome.kind == responsePass {
-			return proxymodel.Forwarded{Response: response, Prefix: pending.prefix, AccountID: account.ID}, nil
+			return proxymodel.Forwarded{Response: response, Prefix: pending.prefix, AccountID: account.ID, Failed: outcome.failed}, nil
 		}
 		if outcome.kind == responseAuthFailure {
 			router.quarantineAccount(account.ID, 60e9)
@@ -67,7 +67,7 @@ func (router *Router) forwardFresh(ctx context.Context, request proxymodel.Reque
 		last = pending
 	}
 	if last != nil {
-		result := proxymodel.Forwarded{Response: last.response, Prefix: last.prefix, AccountID: last.accountID}
+		result := proxymodel.Forwarded{Response: last.response, Prefix: last.prefix, AccountID: last.accountID, Failed: true}
 		last = nil
 		return result, nil
 	}

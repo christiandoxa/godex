@@ -307,6 +307,15 @@ same narrow auth port. The stateless `helper/httpheader` package shares RFC
 hop-header policy between the two concrete HTTP boundaries, with focused tests.
 The sole integration root remains `cmd/godex`.
 
+Fresh-stream startup quota classification belongs to `usecase/routing`; HTTP
+delivery still owns commitment, byte forwarding, and incremental ownership
+observation. Both reuse `helper/sse` for bounded SSE framing only. It has no
+routing policy or I/O, and focused tests cover chunk boundaries, multiline data,
+line endings, and recovery after oversized events. Startup failures cross the
+boundary through `model/proxy.Forwarded.Failed`, preventing failed attempts from
+claiming durable ownership. Read failures during bounded non-stream inspection
+propagate before commitment rather than becoming successful truncated bodies.
+
 Responses cannot re-enter routing after delivery commits headers. Truncated
 upstream streams abort downstream HTTP using `http.ErrAbortHandler`; they are
 not closed as successful chunked responses and are never replayed. Unexpected

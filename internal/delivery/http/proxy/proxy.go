@@ -119,6 +119,9 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 	}
 	defer exchange.Close()
 	result := exchange.Result
+	if result.Failed {
+		result.AccountID = ""
+	}
 	proxy.forwardResponse(request.Context(), writer, result.Response, result.Prefix, result.AccountID, &requestLifecycle{})
 }
 func readLimited(reader io.ReadCloser, limit int64) ([]byte, error) {

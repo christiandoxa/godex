@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"github.com/christiandoxa/godex/internal/helper/sse"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	"io"
 	"net/http"
@@ -61,7 +62,7 @@ func (proxy *Proxy) forwardStream(ctx context.Context, writer http.ResponseWrite
 		writer:    writer,
 		accountID: accountID,
 		headers:   headers,
-		seen:      make([]byte, 0, len(prefix)),
+		decoder:   sse.NewDecoder(int(proxy.maxInspect)),
 	}
 	return forwarder.forward(ctx, body, prefix)
 }
@@ -71,7 +72,7 @@ type streamForwarder struct {
 	writer    http.ResponseWriter
 	accountID string
 	headers   http.Header
-	seen      []byte
+	decoder   *sse.Decoder
 }
 
 func (forwarder *streamForwarder) forward(ctx context.Context, body io.Reader, prefix []byte) bool {
@@ -105,16 +106,13 @@ func (forwarder *streamForwarder) write(ctx context.Context, chunk []byte) error
 }
 
 func (forwarder *streamForwarder) remember(ctx context.Context, chunk []byte) {
-	if len(forwarder.seen) >= int(forwarder.proxy.maxInspect) {
+	if forwarder.accountID == "" {
 		return
 	}
-	remaining := int(forwarder.proxy.maxInspect) - len(forwarder.seen)
-	if len(chunk) > remaining {
-		chunk = chunk[:remaining]
-	}
-	forwarder.seen = append(forwarder.seen, chunk...)
-	if err := forwarder.proxy.router.Observe(ctx, forwarder.accountID, forwarder.headers, forwarder.seen, true); err != nil {
-		panic(http.ErrAbortHandler)
+	for _, data := range forwarder.decoder.Feed(chunk) {
+		if err := forwarder.proxy.router.Observe(ctx, forwarder.accountID, forwarder.headers, data, false); err != nil {
+			panic(http.ErrAbortHandler)
+		}
 	}
 }
 

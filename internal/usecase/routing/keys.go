@@ -1,8 +1,8 @@
 package routing
 
 import (
-	"bufio"
 	"encoding/json"
+	"github.com/christiandoxa/godex/internal/helper/sse"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	"net/http"
 	"strings"
@@ -38,14 +38,10 @@ func responseAffinity(headers http.Header, body []byte, stream bool) affinityKey
 		return keys
 	}
 	if stream {
-		scanner := bufio.NewScanner(strings.NewReader(string(body)))
-		for scanner.Scan() {
-			line := strings.TrimSpace(scanner.Text())
-			if !strings.HasPrefix(line, "data:") {
-				continue
-			}
+		decoder := sse.NewDecoder(len(body))
+		for _, data := range decoder.Feed(body) {
 			var object map[string]any
-			if json.Unmarshal([]byte(strings.TrimSpace(strings.TrimPrefix(line, "data:"))), &object) == nil {
+			if json.Unmarshal(data, &object) == nil {
 				keys = mergeAffinityKeys(keys, responseObjectAffinity(object))
 			}
 		}

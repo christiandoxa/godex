@@ -8,6 +8,7 @@ import (
 	"github.com/christiandoxa/godex/internal/gateway/codex"
 	"github.com/christiandoxa/godex/internal/gateway/openai"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
+	routingrepo "github.com/christiandoxa/godex/internal/repository/routing"
 	routingusecase "github.com/christiandoxa/godex/internal/usecase/routing"
 )
 
@@ -20,6 +21,7 @@ type ProxyConfig struct {
 	Client                                    *http.Client
 	Now                                       func() time.Time
 	MaxRequestBytes, MaxInspectBytes          int64
+	Bindings                                  *routingrepo.Store
 }
 
 func newProxyForTest(config ProxyConfig) (*Proxy, error) {
@@ -27,7 +29,11 @@ func newProxyForTest(config ProxyConfig) (*Proxy, error) {
 	if err != nil {
 		return nil, err
 	}
-	router, err := routingusecase.NewRouter(routingusecase.Config{Gateway: transport, Accounts: config.Accounts, PreferredAccount: config.PreferredAccount, Now: config.Now, MaxInspectBytes: config.MaxInspectBytes})
+	routingConfig := routingusecase.Config{Gateway: transport, Accounts: config.Accounts, PreferredAccount: config.PreferredAccount, Now: config.Now, MaxInspectBytes: config.MaxInspectBytes}
+	if config.Bindings != nil {
+		routingConfig.Bindings = config.Bindings
+	}
+	router, err := routingusecase.NewRouter(routingConfig)
 	if err != nil {
 		return nil, err
 	}

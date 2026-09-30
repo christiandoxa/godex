@@ -75,10 +75,24 @@ than forwarding response headers or the first response bytes. After commitment,
 Godex may propagate the failure but must not replay the request on another
 account.
 
+Fresh HTTP 200 SSE responses defer `response.created` and `response.in_progress`
+metadata within a 64 KiB startup buffer. A structured quota failure before output
+quarantines the account and may rotate within the original bounded attempt cycle.
+An output event, unknown event, or the inspection ceiling ends this guard and
+forwards the original stream. Bound continuations never rotate. If every attempt
+fails, the last upstream status, headers, and SSE bytes are preserved; a failed
+startup does not claim new conversation ownership.
+
 Streams use bounded buffers, flush promptly when the downstream supports
 flushing, and are never buffered in full. A stream that emits one event and
 then fails is never replayed on a second account. New continuity bindings are persisted before their output bytes. Known bindings
 are not written again per chunk; streams remain bounded.
+
+SSE ownership is decoded incrementally throughout forwarding, including multiline
+data and CR/LF framing. The parser retains only incomplete event data, bounded to
+64 KiB per event. Oversized events are forwarded unchanged but skipped for
+metadata; parsing resumes at the next event. Later valid ownership metadata still
+survives restart. Compressed bytes remain untouched and are not inspected as SSE.
 
 ## Forwarding
 

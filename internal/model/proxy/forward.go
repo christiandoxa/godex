@@ -20,6 +20,7 @@ type Forwarded struct {
 	Response  *Response
 	Prefix    []byte
 	AccountID string
+	Failed    bool
 }
 type Auth struct {
 	AccessToken string `json:"-"`

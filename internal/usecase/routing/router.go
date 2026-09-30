@@ -109,7 +109,7 @@ func (router *Router) Forward(ctx context.Context, request proxymodel.Request) (
 	if err != nil {
 		return nil, err
 	}
-	if result.Response.StatusCode < 400 {
+	if !result.Failed && result.Response.StatusCode < 400 {
 		stream := strings.Contains(strings.ToLower(result.Response.Header.Get("Content-Type")), "text/event-stream")
 		if result.Prefix == nil && !stream {
 			result.Prefix, _, err = inspectResponse(result.Response.Body, router.maxInspect)

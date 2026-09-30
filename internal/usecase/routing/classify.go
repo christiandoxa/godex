@@ -21,6 +21,7 @@ const (
 type responseOutcome struct {
 	kind       responseKind
 	quarantine time.Duration
+	failed     bool
 }
 
 type pendingResponse struct {
@@ -37,6 +38,9 @@ func (pending *pendingResponse) close() {
 
 func (proxy *Router) classify(response *proxymodel.Response) (responseOutcome, *pendingResponse, error) {
 	pending := &pendingResponse{response: response}
+	if response.StatusCode == http.StatusOK && strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream") && response.Header.Get("Content-Encoding") == "" {
+		return proxy.inspectStream(response, pending)
+	}
 	switch {
 	case response.StatusCode == http.StatusUnauthorized:
 		return responseOutcome{kind: responseAuthFailure}, pending, nil
