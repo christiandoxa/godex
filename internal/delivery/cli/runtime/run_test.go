@@ -7,7 +7,9 @@ import (
 	"testing"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
+	sessionentity "github.com/christiandoxa/godex/internal/entity/session"
 	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
+	sessionusecase "github.com/christiandoxa/godex/internal/usecase/session"
 )
 
 type fakeRunnerAccounts struct {
@@ -23,7 +25,9 @@ func (accounts *fakeRunnerAccounts) SelectForLaunch(_ context.Context, selector 
 	return accountentity.Account{ID: "synthetic-account", Enabled: true}, nil
 }
 
-func (fakeRunnerAccounts) List(context.Context) ([]accountentity.Account, error) { return nil, nil }
+func (fakeRunnerAccounts) List(context.Context) ([]accountentity.Account, error) {
+	return []accountentity.Account{{ID: "synthetic-account", Enabled: true}}, nil
+}
 
 func (fakeRunnerAccounts) CodexHome(string) string { return "/synthetic/codex" }
 
@@ -87,3 +91,62 @@ func TestDoctorRendersReport(t *testing.T) {
 type failingWriter struct{}
 
 func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("synthetic output failure") }
+
+func (accounts *fakeRunnerAccounts) Current(context.Context) (accountentity.Account, error) {
+	return accountentity.Account{ID: "synthetic-account", Enabled: true}, nil
+}
+func (accounts *fakeRunnerAccounts) Resolve(ctx context.Context, selector string) (accountentity.Account, error) {
+	return accounts.Current(ctx)
+}
+
+func TestNativeLocalDispatchRecognizesRootAndWrapperOptions(t *testing.T) {
+	for _, args := range [][]string{
+		{"--current-time-reminder", "features", "list"},
+		{"--", "--model", "synthetic", "mcp", "list"},
+		{"--", "--config=model=synthetic", "login", "status"},
+		{"--", "--version"},
+	} {
+		accounts := &fakeRunnerAccounts{selected: "unchanged"}
+		process := &fakeRunnerProcess{}
+		runner := runtimeusecase.NewRunner(accounts, process, nil)
+		if err := Run(t.Context(), runner, nil, args); err != nil {
+			t.Fatalf("%v: %v", args, err)
+		}
+		if accounts.selected != "unchanged" || len(process.arguments) == 0 {
+			t.Fatalf("local command used fresh selection: %v", args)
+		}
+	}
+}
+
+func TestPassthroughCannotMutateManagedCredentials(t *testing.T) {
+	for _, args := range [][]string{{"--", "logout"}, {"--current-time-reminder", "logout"}, {"--", "--model", "synthetic", "login"}, {"--", "login", "--device-auth"}} {
+		if err := Run(t.Context(), nil, nil, args); err == nil || !strings.Contains(err.Error(), "use godex") {
+			t.Fatalf("unsafe auth passthrough %v: %v", args, err)
+		}
+	}
+}
+
+type nativeSessionReader struct{}
+
+func (nativeSessionReader) List(context.Context, string) ([]sessionentity.Session, error) {
+	return []sessionentity.Session{{ID: "00000000-0000-4000-8000-000000000001"}}, nil
+}
+
+func TestNativeSessionDeliveryPreservesOptionsAndResolvesPrefix(t *testing.T) {
+	for _, args := range [][]string{
+		{"--", "--model", "synthetic", "exec", "--json", "resume", "0000", "prompt"},
+		{"--", "--model", "synthetic", "exec", "fork", "0000", "prompt"},
+		{"--", "-c", "model=synthetic", "delete", "--force", "0000"},
+	} {
+		accounts := &fakeRunnerAccounts{selected: "unchanged"}
+		process := &fakeRunnerProcess{}
+		runner := runtimeusecase.NewRunner(accounts, process, nil)
+		catalog := sessionusecase.NewCatalog(accounts, nativeSessionReader{}, runner)
+		if err := Run(t.Context(), runner, catalog, args); err != nil {
+			t.Fatalf("%v: %v", args, err)
+		}
+		if accounts.selected != "unchanged" || !strings.Contains(strings.Join(process.arguments, " "), "00000000-0000-4000-8000-000000000001") {
+			t.Fatalf("native session lost its owner: %v", process.arguments)
+		}
+	}
+}

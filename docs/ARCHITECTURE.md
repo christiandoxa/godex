@@ -184,22 +184,37 @@ internal/delivery/cli/account/
 internal/delivery/cli/auth/
 internal/delivery/cli/runtime/
 internal/delivery/cli/quota/
+internal/delivery/cli/session/
+internal/delivery/http/proxy/
 internal/entity/account/
+internal/entity/routing/
+internal/entity/session/
 internal/model/account/
 internal/model/proxy/
 internal/model/quota/
+internal/model/session/
 internal/gateway/codex/
 internal/gateway/openai/
 internal/repository/account/
+internal/repository/routing/
+internal/repository/session/
 internal/usecase/account/
+internal/usecase/auth/
 internal/usecase/runtime/
 internal/usecase/quota/
+internal/usecase/routing/
+internal/usecase/session/
+internal/helper/fileutil/
+internal/helper/httpheader/
+internal/helper/lockfile/
 internal/version/
 ```
 
 The gateway split follows concrete integration ownership: Codex process and
-profile operations live under `gateway/codex`, while the OpenAI-compatible
-request proxy lives under `gateway/openai`. Account metadata and persistence
+profile operations live under `gateway/codex`, while outbound OpenAI HTTP
+transport lives under `gateway/openai`. HTTP delivery lives under
+`delivery/http/proxy`; retry and affinity policy lives under `usecase/routing`.
+Account metadata and persistence
 remain separate domain packages. The CLI root only dispatches to command
 domains; command parsing and rendering live beside the command they serve.
 
@@ -261,8 +276,8 @@ commitment, or finish cleanup after commitment. Native OS file locks serialize
 commands and release on process death; the legacy directory lock remains for
 compatibility and checks process liveness before reclamation. Profile-use leases
 prevent removal or credential replacement while a managed child is running.
-Locking code stays local to the account repository until another domain consumes
-that exact technical contract. Account IDs and backup paths are validated before
+Profile lease policy stays local to the account repository; shared OS locking
+lives under `helper/lockfile`. Account IDs and backup paths are validated before
 recovery; credential contents never enter the journal.
 
 Native status/logout are auth use cases with consumed account and process ports;
@@ -304,12 +319,30 @@ and refuses new conversations if protected bindings fill the store. Opaque
 entries expire after 30 days. Conflicting concurrent ownership updates fail.
 Per-conversation guards serialize first requests through downstream completion.
 
+The routing repository also exposes a first-owner OS guard to the routing use
+case. Independent processes re-read ownership under that guard before an upstream
+attempt and commit the binding before releasing it. The guard is global only for
+unbound conversations; established ownership remains cached. The cache loads
+requested bindings instead of evicting the requested owner while importing a
+larger durable snapshot. OS locking reuses `helper/lockfile`; no new helper or
+background worker is needed.
+
 Native `thread-id` identifies durable Codex ownership. Session resolution looks
 up its upstream owner independently of the profile holding the rollout. Resume
 keeps that rollout home while fixing upstream traffic to its owner, bypassing
 fresh-work quota selection. Legacy/imported sessions without a known binding
 use their containing profile; unknown opaque continuations still fail closed.
 Removed or disabled upstream owners cause a continuity-preserving error.
+
+Runtime delivery locates native commands after root config and value-taking
+options. It passes explicit local-session intent through `model/session.Launch`,
+so the session use case does not parse CLI command placement. Runtime's picker
+launch preserves the active rollout home separately from the upstream pool and
+bypasses fresh-work quota selection. Explicit account selection still restricts
+the pool. Credential-mutating auth passthrough is rejected at delivery; the auth
+use cases remain the owners of registered login and exclusive logout workflows.
+Argument helpers stay private to CLI runtime delivery because they describe that
+transport's command grammar, not a generic technical concern.
 
 The stateless `helper/lockfile` and `helper/fileutil` packages now have two real
 persistence consumers, account and routing, and own only OS locks and durable

@@ -123,6 +123,10 @@ func (process *CodexProcess) resolveBinary() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("official Codex CLI %q was not found; install Codex first or set GODEX_CODEX_BIN", candidate)
 	}
+	binary, err = filepath.Abs(binary)
+	if err != nil {
+		return "", fmt.Errorf("resolve official Codex CLI path: %w", err)
+	}
 	info, err := os.Stat(binary)
 	if err != nil {
 		return "", fmt.Errorf("inspect official Codex CLI %q: %w", candidate, err)

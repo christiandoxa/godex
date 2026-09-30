@@ -219,11 +219,19 @@ use the active account by default and run native Codex without quota preflight
 or rotation. Logout retains the managed account, settings, and sessions.
 `--account` fixes both the launch home and the runtime account pool.
 Explicit UUIDs and hexadecimal prefixes of at least four characters in native
-`resume`, `exec resume`, `fork`, `delete`, `archive`, and `unarchive` commands resolve
+`resume`, `exec resume`, `fork`, `exec fork`, `delete`, `archive`, and `unarchive` commands resolve
 across managed profiles. A conflicting explicit account fails. A bare full UUID
 is shorthand for `session resume`. Native names, `--last`, and interactive pickers
 remain scoped to the active or explicitly selected profile. Local native commands
 such as `mcp`, `features`, and `completion` bypass quota and rotation.
+
+Native command recognition preserves root options and wrapper-generated config.
+Picker/name/`--last` resumes keep the selected rollout home and retain the enabled
+upstream owner pool, without fresh-work quota selection. An explicit `--account`
+still restricts that pool. Passthrough `login` mutations and `logout` are rejected
+with guidance to use `godex login`/`godex logout`, whose managed workflows enforce
+identity registration and exclusive credential mutation. `login status` stays
+read-only. Local session deletion/archive commands also bypass quota and routing.
 
 Model traffic uses an explicit HTTP/SSE OpenAI Responses configuration; native
 Codex account/bootstrap and authentication endpoints retain their normal HTTPS
@@ -247,6 +255,9 @@ account that served it, even if the first request rotated accounts. Unknown
 opaque continuations fail clearly. Native/imported sessions without an existing
 binding use their containing profile. Stable ownership is retained; the store
 refuses new conversations if its 8,192 protected-binding ceiling is reached.
+Looking up an older durable owner does not depend on the 4,096-entry cache.
+Independent managed processes serialize first-owner selection until the binding
+is committed, then release the OS guard before forwarding the response stream.
 
 Launch quota exhaustion is temporary: accounts become eligible for a fresh
 upstream attempt at their observed reset deadline. When the reset is unknown,

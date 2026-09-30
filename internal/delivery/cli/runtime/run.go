@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 
+	sessionmodel "github.com/christiandoxa/godex/internal/model/session"
 	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
 	sessionusecase "github.com/christiandoxa/godex/internal/usecase/session"
 )
@@ -23,11 +24,20 @@ func Run(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionus
 		if sessions == nil {
 			return errors.New("session support is not configured")
 		}
-		return sessions.ResumeArguments(ctx, selector, args[index], index, args)
+		command := nativeCommandIndex(args)
+		local := command >= 0 && (args[command] == "delete" || args[command] == "archive" || args[command] == "unarchive")
+		return sessions.ResumeArguments(ctx, sessionmodel.Launch{AccountSelector: selector, SessionSelector: args[index], IDIndex: index, Arguments: args, Local: local})
 	}
-	if len(codexArguments) > 0 {
-		switch codexArguments[0] {
-		case "mcp", "features", "completion", "debug", "config", "login", "logout", "--version", "version":
+	if index := nativeCommandIndex(codexArguments); index >= 0 {
+		switch codexArguments[index] {
+		case "logout":
+			return errors.New("use godex logout to safely mutate managed credentials")
+		case "login":
+			if status := nextCommandWord(codexArguments, index+1); status < 0 || codexArguments[status] != "status" {
+				return errors.New("use godex login to register and safely update managed credentials")
+			}
+			return runner.RunLocal(ctx, selector, codexArguments)
+		case "mcp", "features", "completion", "debug", "config", "delete", "archive", "unarchive", "version", "--version":
 			return runner.RunLocal(ctx, selector, codexArguments)
 		case "resume", "fork":
 			return runner.RunCurrent(ctx, selector, codexArguments)

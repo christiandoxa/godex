@@ -38,6 +38,7 @@ func (process *CodexProcess) CheckProxySupport(ctx context.Context) error {
 	// Stdio EOF validates configuration and exits without accepting any work.
 	arguments = append(arguments, "exec-server", "--listen", "stdio")
 	command := exec.CommandContext(ctx, binary, arguments...)
+	command.Dir = home
 	command.Env = environmentWith("CODEX_HOME", home)
 	command.Stdout = io.Discard
 	command.Stderr = io.Discard

@@ -28,6 +28,7 @@ func (f readerFake) List(_ context.Context, home string) ([]sessionentity.Sessio
 
 type launcherFake struct {
 	account string
+	local   bool
 	args    []string
 }
 
@@ -96,23 +97,35 @@ func TestResumeResolvesPrefixAndPreservesOwner(t *testing.T) {
 }
 
 func (f *launcherFake) RunLocal(ctx context.Context, account string, args []string) error {
+	f.local = true
 	return f.Run(ctx, account, args)
 }
 
 func TestNativeSessionPreservesArgumentsAndRejectsSelectorConflict(t *testing.T) {
 	catalog, launcher := testCatalog()
 	args := []string{"exec", "resume", "b1", "continue", "--json"}
-	if err := catalog.ResumeArguments(context.Background(), "work", "b1", 2, args); err != nil {
+	if err := catalog.ResumeArguments(context.Background(), sessionmodel.Launch{AccountSelector: "work", SessionSelector: "b1", IDIndex: 2, Arguments: args}); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(launcher.args, []string{"exec", "resume", "b111", "continue", "--json"}) {
 		t.Fatalf("arguments = %v", launcher.args)
 	}
-	if err := catalog.ResumeArguments(context.Background(), "personal", "b1", 2, args); err == nil {
+	if err := catalog.ResumeArguments(context.Background(), sessionmodel.Launch{AccountSelector: "personal", SessionSelector: "b1", IDIndex: 2, Arguments: args}); err == nil {
 		t.Fatal("conflicting account accepted")
 	}
 }
 
 func (f *launcherFake) RunSession(ctx context.Context, home, owner string, args []string) error {
 	return f.Run(ctx, home, args)
+}
+
+func TestSessionLocalIntentSurvivesRootOptions(t *testing.T) {
+	catalog, launcher := testCatalog()
+	input := sessionmodel.Launch{SessionSelector: "b1", IDIndex: 4, Arguments: []string{"--model", "synthetic", "delete", "--force", "b1"}, Local: true}
+	if err := catalog.ResumeArguments(t.Context(), input); err != nil {
+		t.Fatal(err)
+	}
+	if !launcher.local || launcher.account != "two" || launcher.args[4] != "b111" {
+		t.Fatalf("local session launch = %#v", launcher)
+	}
 }

@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestCheckProxySupportAcceptsAndRejectsCapability(t *testing.T) {
@@ -16,11 +17,13 @@ func TestCheckProxySupportAcceptsAndRejectsCapability(t *testing.T) {
 		t.Skip("helper uses a POSIX executable")
 	}
 	for _, test := range []struct {
-		name    string
-		exit    string
-		wantErr bool
+		name     string
+		exit     string
+		wantErr  bool
+		relative bool
 	}{
 		{name: "supported", exit: "0"},
+		{name: "relative executable", exit: "0", relative: true},
 		{name: "unsupported", exit: "1", wantErr: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -33,7 +36,18 @@ shift
 while [ "$1" = "-c" ]; do shift 2; done
 [ "$*" = "exec-server --listen stdio" ] || exit 2
 [ ! -f "$CODEX_HOME/auth.json" ] || exit 2
+[ "$PWD" = "$CODEX_HOME" ] || exit 2
 exit `+test.exit)
+			if test.relative {
+				cwd, err := os.Getwd()
+				if err != nil {
+					t.Fatal(err)
+				}
+				script, err = filepath.Rel(cwd, script)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
 			err := NewCodexProcess(script, Terminal{}).CheckProxySupport(context.Background())
 			if (err != nil) != test.wantErr {
 				t.Fatalf("capability error = %v", err)
@@ -149,8 +163,10 @@ func TestInstalledCodexConfigSmoke(t *testing.T) {
 	if binary == "" {
 		t.Skip("set GODEX_TEST_CODEX_BIN for a local parser smoke")
 	}
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
 	process := NewCodexProcess(binary, Terminal{})
-	if err := process.CheckProxySupport(context.Background()); err != nil {
+	if err := process.CheckProxySupport(ctx); err != nil {
 		t.Fatal(err)
 	}
 	for _, command := range [][]string{
@@ -161,7 +177,7 @@ func TestInstalledCodexConfigSmoke(t *testing.T) {
 		var diagnostic bytes.Buffer
 		process := NewCodexProcess(binary, Terminal{Stderr: &diagnostic})
 		arguments := append([]string{"--strict-config", "-c", "godex_probe_unknown=true"}, command...)
-		err := process.RunThroughProxy(context.Background(), t.TempDir(), "http://127.0.0.1:1", arguments)
+		err := process.RunThroughProxy(ctx, t.TempDir(), "http://127.0.0.1:1", arguments)
 		if err == nil || !strings.Contains(diagnostic.String(), "unknown configuration field `godex_probe_unknown`") {
 			t.Fatalf("%v did not stop at strict config validation: %v, %s", command, err, diagnostic.String())
 		}

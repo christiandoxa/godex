@@ -41,10 +41,26 @@ func (runner *Runner) RunLocal(ctx context.Context, selector string, args []stri
 	return runner.process.Run(ctx, runner.accounts.CodexHome(account.ID), args)
 }
 
-func (runner *Runner) RunCurrent(ctx context.Context, selector string, args []string) error {
+func (runner *Runner) RunCurrent(ctx context.Context, selector string, args []string) (err error) {
 	account, err := runner.activeAccount(ctx, selector)
 	if err != nil {
 		return err
 	}
-	return runner.Run(ctx, account.ID, args)
+	if !account.Enabled {
+		return errors.New("selected account is disabled")
+	}
+	profiles, err := runner.proxyAccounts(ctx, nil, selector, account.ID)
+	if err != nil {
+		return err
+	}
+	ids := []string{account.ID}
+	for _, profile := range profiles {
+		ids = append(ids, profile.ID)
+	}
+	release, err := runner.pinProfiles(ctx, ids)
+	if err != nil {
+		return err
+	}
+	defer func() { err = errors.Join(err, release()) }()
+	return runner.launch(ctx, account.ID, account.ID, profiles, args)
 }

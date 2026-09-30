@@ -12,38 +12,34 @@ func sessionArgument(arguments []string) (int, []string) {
 	if len(args) == 1 && sessionentity.ValidID(args[0]) {
 		return 1, []string{"resume", args[0]}
 	}
+	command := nativeCommandIndex(args)
 	start := -1
-	for i := 0; i < len(args); i++ {
-		if args[i] == "-c" || args[i] == "--config" {
-			i++
-			continue
-		}
-		if strings.HasPrefix(args[i], "-") {
-			continue
-		}
-		if args[i] == "exec" && i+1 < len(args) && args[i+1] == "resume" {
-			start = i + 2
-			break
-		}
-		switch args[i] {
+	if command >= 0 {
+		switch args[command] {
 		case "resume", "fork", "delete", "archive", "unarchive":
-			start = i + 1
+			start = command + 1
 		}
-		break
 	}
 	if start < 0 {
 		return -1, args
 	}
+	options := true
 	for i := start; i < len(args); i++ {
-		switch args[i] {
-		case "--last":
-			return -1, args
-		case "-c", "--config", "-m", "--model", "-C", "--cd", "-i", "--image", "--enable", "--disable":
-			i++
-			continue
-		}
-		if strings.HasPrefix(args[i], "-") {
-			continue
+		if options {
+			if args[i] == "--" {
+				options = false
+				continue
+			}
+			if args[i] == "--last" {
+				return -1, args
+			}
+			if nativeOptionTakesValue(args[i]) {
+				i++
+				continue
+			}
+			if strings.HasPrefix(args[i], "-") {
+				continue
+			}
 		}
 		if len(args[i]) < 4 {
 			return -1, args
@@ -56,4 +52,46 @@ func sessionArgument(arguments []string) (int, []string) {
 		return i, args
 	}
 	return -1, args
+}
+
+// Root option values and prompt text must not be mistaken for native commands.
+func nativeCommandIndex(arguments []string) int {
+	index := nextCommandWord(arguments, 0)
+	if index < 0 || (arguments[index] != "exec" && arguments[index] != "e") {
+		return index
+	}
+	nested := nextCommandWord(arguments, index+1)
+	if nested >= 0 {
+		switch arguments[nested] {
+		case "resume", "fork", "review":
+			return nested
+		}
+	}
+	return index
+}
+
+func nextCommandWord(arguments []string, start int) int {
+	for i := start; i < len(arguments); i++ {
+		if arguments[i] == "--" {
+			return -1
+		}
+		if !strings.HasPrefix(arguments[i], "-") {
+			return i
+		}
+		if arguments[i] == "--version" {
+			return i
+		}
+		if nativeOptionTakesValue(arguments[i]) {
+			i++
+		}
+	}
+	return -1
+}
+
+func nativeOptionTakesValue(argument string) bool {
+	switch argument {
+	case "-c", "--config", "-m", "--model", "-C", "--cd", "-i", "--image", "-p", "--profile", "-s", "--sandbox", "-a", "--ask-for-approval", "--enable", "--disable", "--add-dir", "--color", "-o", "--output-last-message", "--output-schema", "--thread-source", "--local-provider":
+		return true
+	}
+	return false
 }

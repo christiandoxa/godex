@@ -9,7 +9,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/christiandoxa/godex/internal/gateway/codex"
 	"github.com/christiandoxa/godex/internal/gateway/openai"
@@ -79,5 +81,91 @@ func TestRotatedConversationSurvivesProxyRestart(t *testing.T) {
 		if strings.Contains(string(snapshot), raw) {
 			t.Fatal("raw continuity or credential data persisted")
 		}
+	}
+}
+
+type observedBindingStore struct {
+	*routingrepo.Store
+	locking chan struct{}
+}
+
+func (store observedBindingStore) AcquireConversation(ctx context.Context) (func() error, error) {
+	store.locking <- struct{}{}
+	return store.Store.AcquireConversation(ctx)
+}
+
+type firstOwnerGateway struct {
+	mu               sync.Mutex
+	owners           []string
+	started, proceed chan struct{}
+}
+
+func (gateway *firstOwnerGateway) Execute(ctx context.Context, _ proxymodel.Request, account proxymodel.Account) (*proxymodel.Response, error) {
+	gateway.mu.Lock()
+	gateway.owners = append(gateway.owners, account.ID)
+	first := len(gateway.owners) == 1
+	gateway.mu.Unlock()
+	if first {
+		close(gateway.started)
+		select {
+		case <-gateway.proceed:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+	return &proxymodel.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(`{}`))}, nil
+}
+
+func TestIndependentRoutersSerializeFirstConversationOwner(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	store := observedBindingStore{routingrepo.NewStore(t.TempDir()), make(chan struct{}, 2)}
+	gateway := &firstOwnerGateway{started: make(chan struct{}), proceed: make(chan struct{})}
+	var once sync.Once
+	unblock := func() { once.Do(func() { close(gateway.proceed) }) }
+	defer unblock()
+	accounts := []proxymodel.Account{{ID: strings.Repeat("a", 32), Home: "synthetic-a", Enabled: true}, {ID: strings.Repeat("b", 32), Home: "synthetic-b", Enabled: true}}
+	results := make(chan error, 2)
+	start := func(preferred string) {
+		router, err := routingusecase.NewRouter(routingusecase.Config{Gateway: gateway, Bindings: store, PreferredAccount: preferred, Accounts: func(context.Context) ([]proxymodel.Account, error) { return accounts, nil }})
+		if err != nil {
+			t.Fatal(err)
+		}
+		go func() {
+			exchange, err := router.Forward(ctx, proxymodel.Request{Header: http.Header{"Thread-Id": []string{"shared-thread"}}})
+			if err == nil {
+				err = exchange.Close()
+			}
+			results <- err
+		}()
+	}
+	start(accounts[0].ID)
+	select {
+	case <-gateway.started:
+	case <-ctx.Done():
+		t.Fatal("first upstream request did not start")
+	}
+	<-store.locking
+	start(accounts[1].ID)
+	select {
+	case <-store.locking:
+	case <-ctx.Done():
+		t.Fatal("second router did not acquire the durable conversation guard")
+	}
+	unblock()
+	for i := 0; i < 2; i++ {
+		select {
+		case err := <-results:
+			if err != nil {
+				t.Fatal(err)
+			}
+		case <-ctx.Done():
+			t.Fatal("routers did not complete")
+		}
+	}
+	gateway.mu.Lock()
+	defer gateway.mu.Unlock()
+	if len(gateway.owners) != 2 || gateway.owners[0] != gateway.owners[1] {
+		t.Fatalf("conversation split: %v", gateway.owners)
 	}
 }

@@ -14,6 +14,14 @@ func TestNativeSessionArgumentForms(t *testing.T) {
 		{[]string{id}, 1}, {[]string{"resume", id}, 1}, {[]string{"exec", "resume", id, "prompt"}, 2},
 		{[]string{"fork", "--model", "synthetic", id}, 3}, {[]string{"delete", "--force", id}, 2},
 		{[]string{"-c", "features.current_time_reminder=true", "resume", id}, 3},
+		{[]string{"--model", "synthetic", "resume", id}, 3},
+		{[]string{"-C", "/synthetic/project", "exec", "--json", "resume", id}, 5},
+		{[]string{"--config=model=synthetic", "e", "fork", id}, 3},
+		{[]string{"resume", "--profile", "abcd", id}, 3},
+		{[]string{"resume", "--", id}, 2},
+		{[]string{"--", "resume", id}, -1},
+		{[]string{"exec", "--", "resume", id}, -1},
+		{[]string{"exec", "prompt", "resume", id}, -1},
 		{[]string{"resume", "--last", "prompt"}, -1}, {[]string{"resume", "thread name"}, -1}, {[]string{"exec", id}, -1},
 	} {
 		index, args := sessionArgument(test.args)

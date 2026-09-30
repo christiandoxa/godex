@@ -22,3 +22,12 @@ type Query struct {
 	LimitSet   bool
 	ParentOnly bool
 }
+
+// Launch carries the resolved transport intent without reparsing CLI arguments.
+type Launch struct {
+	AccountSelector string
+	SessionSelector string
+	IDIndex         int
+	Arguments       []string
+	Local           bool
+}

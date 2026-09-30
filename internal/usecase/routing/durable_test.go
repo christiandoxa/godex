@@ -2,6 +2,7 @@ package routing
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -20,6 +21,29 @@ type bindingsFake struct {
 
 func (f *bindingsFake) Load(context.Context) ([]routingentity.Binding, error) {
 	return append([]routingentity.Binding(nil), f.values...), nil
+}
+func (f *bindingsFake) AcquireConversation(context.Context) (func() error, error) {
+	return func() error { return nil }, nil
+}
+
+func TestDurableOwnerBeyondCacheCapacity(t *testing.T) {
+	now := time.Now()
+	repository := &bindingsFake{}
+	for i := 0; i <= affinityMaxValues; i++ {
+		entry := affinityKeys{thread: fmt.Sprintf("thread-%d", i)}.entries()[0]
+		entry.AccountID, entry.UpdatedUnix = "owner", now.Unix()-int64(i)
+		repository.values = append(repository.values, entry)
+	}
+	store := newAffinityStore()
+	store.repository = repository
+	keys := affinityKeys{thread: fmt.Sprintf("thread-%d", affinityMaxValues)}
+	owner, err := store.owner(context.Background(), keys, now)
+	if err != nil || owner != "owner" {
+		t.Fatalf("oldest durable owner = %q, %v", owner, err)
+	}
+	if len(store.values) > affinityMaxValues {
+		t.Fatal("affinity cache exceeded its bound")
+	}
 }
 func (f *bindingsFake) Merge(_ context.Context, updates []routingentity.Binding) ([]routingentity.Binding, error) {
 	f.writes++

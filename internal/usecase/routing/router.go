@@ -85,6 +85,18 @@ func (router *Router) Forward(ctx context.Context, request proxymodel.Request) (
 	if err != nil {
 		return nil, &proxymodel.Error{StatusCode: 409, Message: "request contains conflicting conversation affinity"}
 	}
+	if owner == "" && router.affinity.repository != nil && (keys.thread != "" || keys.session != "") {
+		unlock, err := router.affinity.repository.AcquireConversation(ctx)
+		if err != nil {
+			return nil, err
+		}
+		defer unlock()
+		// Another process may have committed ownership while this request waited.
+		owner, err = router.affinity.owner(ctx, keys, router.now())
+		if err != nil {
+			return nil, err
+		}
+	}
 	if owner == "" && (keys.previous != "" || keys.turn != "") {
 		return nil, &proxymodel.Error{StatusCode: 409, Message: "continuation owner is unknown; continuity was preserved"}
 	}

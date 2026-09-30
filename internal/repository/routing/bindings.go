@@ -21,6 +21,16 @@ type snapshot struct {
 }
 
 func NewStore(root string) *Store { return &Store{root: root} }
+
+// AcquireConversation serializes first-owner selection across managed processes.
+func (store *Store) AcquireConversation(ctx context.Context) (func() error, error) {
+	if err := store.prepare(); err != nil {
+		return nil, err
+	}
+	// ponytail: one first-owner lock; use bounded lock shards if contention matters.
+	return lockfile.Acquire(ctx, filepath.Join(store.root, "routing-conversation.guard"))
+}
+
 func (store *Store) Load(ctx context.Context) ([]routingentity.Binding, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err

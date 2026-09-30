@@ -44,10 +44,11 @@ func (service *Catalog) Resolve(ctx context.Context, selector string) (sessionmo
 }
 
 func (catalog *Catalog) Resume(ctx context.Context, selector string) error {
-	return catalog.ResumeArguments(ctx, "", selector, 1, []string{"resume", selector})
+	return catalog.ResumeArguments(ctx, sessionmodel.Launch{SessionSelector: selector, IDIndex: 1, Arguments: []string{"resume", selector}})
 }
 
-func (catalog *Catalog) ResumeArguments(ctx context.Context, accountSelector, selector string, idIndex int, arguments []string) error {
+func (catalog *Catalog) ResumeArguments(ctx context.Context, input sessionmodel.Launch) error {
+	accountSelector, selector, idIndex, arguments := input.AccountSelector, input.SessionSelector, input.IDIndex, input.Arguments
 	if catalog.launcher == nil {
 		return fmt.Errorf("session resume launcher is not configured")
 	}
@@ -78,8 +79,7 @@ func (catalog *Catalog) ResumeArguments(ctx context.Context, accountSelector, se
 	}
 	args := append([]string(nil), arguments...)
 	args[idIndex] = report.ID
-	switch args[0] {
-	case "delete", "archive", "unarchive":
+	if input.Local {
 		return catalog.launcher.RunLocal(ctx, report.AccountID, args)
 	}
 	return catalog.launcher.RunSession(ctx, report.AccountID, report.UpstreamAccountID, args)

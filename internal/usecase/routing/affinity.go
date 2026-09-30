@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -55,6 +56,7 @@ type affinityValue struct {
 type bindingRepository interface {
 	Load(context.Context) ([]routingentity.Binding, error)
 	Merge(context.Context, []routingentity.Binding) ([]routingentity.Binding, error)
+	AcquireConversation(context.Context) (func() error, error)
 }
 
 type affinityStore struct {
@@ -85,7 +87,7 @@ func (store *affinityStore) owner(ctx context.Context, keys affinityKeys, now ti
 			if err != nil {
 				return "", err
 			}
-			store.loadLocked(bindings, now)
+			store.loadLocked(bindings, keys.values(), now)
 		}
 	}
 	owner := ""
@@ -132,7 +134,7 @@ func (store *affinityStore) remember(ctx context.Context, accountID string, keys
 			if err != nil {
 				return err
 			}
-			store.loadLocked(bindings, now)
+			store.loadLocked(bindings, keyValues, now)
 		}
 	}
 	for _, key := range keyValues {
@@ -171,9 +173,12 @@ func (store *affinityStore) pruneLocked(now time.Time) {
 	}
 }
 
-func (store *affinityStore) loadLocked(bindings []routingentity.Binding, now time.Time) {
+func (store *affinityStore) loadLocked(bindings []routingentity.Binding, keys []string, now time.Time) {
 	for i := len(bindings) - 1; i >= 0; i-- {
 		binding := bindings[i]
+		if !slices.Contains(keys, binding.Key) {
+			continue
+		}
 		store.sequence++
 		store.values[binding.Key] = affinityValue{accountID: binding.AccountID, expires: now.Add(affinityTTL), sequence: store.sequence, persistedAt: time.Unix(binding.UpdatedUnix, 0)}
 	}
