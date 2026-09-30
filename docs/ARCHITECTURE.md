@@ -254,3 +254,10 @@ prevent removal or credential replacement while a managed child is running.
 Locking code stays local to the account repository until another domain consumes
 that exact technical contract. Account IDs and backup paths are validated before
 recovery; credential contents never enter the journal.
+
+Native status/logout are auth use cases with consumed account and process ports;
+CLI auth delivery parses their selectors. Runtime delivery recognizes native
+session argument forms and invokes the session use case, which resolves ownership
+and preserves the remaining arguments. Native local commands use runtime's local
+launch path without proxy or quota orchestration. Explicit runtime selectors
+restrict the entire upstream pool. No delivery package accesses an adapter.

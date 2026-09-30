@@ -18,6 +18,7 @@ type reader interface {
 
 type launcher interface {
 	Run(context.Context, string, []string) error
+	RunLocal(context.Context, string, []string) error
 }
 
 type Catalog struct {

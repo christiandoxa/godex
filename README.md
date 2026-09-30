@@ -213,3 +213,14 @@ Managed profiles are pinned while Codex runs. Login updates or removal of a
 profile in use fail clearly. Interrupted profile transactions recover on the next
 account read or mutation. Do not run older Godex versions concurrently: earlier
 versions used time-only lock reclamation and cannot enforce profile-use leases.
+
+`godex login status [--account SELECTOR]` and `godex logout [--account SELECTOR]`
+use the active account by default and run native Codex without quota preflight
+or rotation. Logout retains the managed account, settings, and sessions.
+`--account` fixes both the launch home and the runtime account pool.
+Explicit UUIDs and hexadecimal prefixes of at least four characters in native
+`resume`, `exec resume`, `fork`, `delete`, `archive`, and `unarchive` commands resolve
+across managed profiles. A conflicting explicit account fails. A bare full UUID
+is shorthand for `session resume`. Native names, `--last`, and interactive pickers
+remain scoped to the active or explicitly selected profile. Local native commands
+such as `mcp`, `features`, and `completion` bypass quota and rotation.

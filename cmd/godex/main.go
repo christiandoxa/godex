@@ -59,6 +59,7 @@ func run() int {
 	runner.SetUpstreamURL(settings.UpstreamURL)
 	application := cli.New(login, importer, store, runner, doctor, quotaStatus, os.Stdout)
 
+	application.SetNativeAuth(authusecase.NewNative(store, process))
 	application.SetSessions(sessionusecase.NewCatalog(store, sessionrepo.NewReader(), runner))
 	if err := application.Run(ctx, os.Args[1:]); err != nil {
 		return exitCode(ctx, err)

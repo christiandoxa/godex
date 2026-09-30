@@ -18,14 +18,15 @@ import (
 )
 
 type App struct {
-	login    *authusecase.Login
-	importer *authusecase.ImportCurrent
-	accounts accountcli.Commands
-	runtime  *runtimeusecase.Runner
-	doctor   *runtimeusecase.Doctor
-	quota    *quotausecase.Status
-	sessions *sessionusecase.Catalog
-	out      io.Writer
+	login      *authusecase.Login
+	importer   *authusecase.ImportCurrent
+	accounts   accountcli.Commands
+	runtime    *runtimeusecase.Runner
+	doctor     *runtimeusecase.Doctor
+	quota      *quotausecase.Status
+	nativeAuth *authusecase.Native
+	sessions   *sessionusecase.Catalog
+	out        io.Writer
 }
 
 func New(
@@ -50,7 +51,12 @@ func (app *App) Run(ctx context.Context, arguments []string) error {
 
 	switch arguments[0] {
 	case "login":
+		if len(arguments) > 1 && arguments[1] == "status" {
+			return authcli.Native(ctx, app.nativeAuth, false, arguments[2:])
+		}
 		return authcli.Login(ctx, app.login, app.out, arguments[1:])
+	case "logout":
+		return authcli.Native(ctx, app.nativeAuth, true, arguments[1:])
 	case "accounts":
 		return accountcli.List(ctx, app.accounts, app.out, arguments[1:])
 	case "current":
@@ -64,7 +70,7 @@ func (app *App) Run(ctx context.Context, arguments []string) error {
 	case "remove":
 		return accountcli.Remove(ctx, app.accounts, app.out, arguments[1:])
 	case "run":
-		return runtimecli.Run(ctx, app.runtime, arguments[1:])
+		return runtimecli.Run(ctx, app.runtime, app.sessions, arguments[1:])
 	case "quota":
 		if app.quota == nil {
 			return fmt.Errorf("quota support is not configured")
@@ -83,7 +89,7 @@ func (app *App) Run(ctx context.Context, arguments []string) error {
 	case "help", "--help", "-h":
 		return printHelp(app.out)
 	default:
-		return runtimecli.Run(ctx, app.runtime, arguments)
+		return runtimecli.Run(ctx, app.runtime, app.sessions, arguments)
 	}
 }
 
@@ -100,6 +106,8 @@ func printHelp(out io.Writer) error {
 Usage:
   godex                         Launch Codex with the next managed account
   godex login [options]         Sign in with ChatGPT through Codex
+  godex login status [--account SEL]
+  godex logout [--account SEL]   Remove authentication, retaining native state
   godex accounts                List accounts
   godex current                 Show the active account
   godex profile import-current [name]
@@ -132,3 +140,5 @@ Login options:
 }
 
 func (app *App) SetSessions(catalog *sessionusecase.Catalog) { app.sessions = catalog }
+
+func (app *App) SetNativeAuth(native *authusecase.Native) { app.nativeAuth = native }

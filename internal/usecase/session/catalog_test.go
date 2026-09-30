@@ -94,3 +94,21 @@ func TestResumeResolvesPrefixAndPreservesOwner(t *testing.T) {
 		t.Fatalf("missing launcher = %v", err)
 	}
 }
+
+func (f *launcherFake) RunLocal(ctx context.Context, account string, args []string) error {
+	return f.Run(ctx, account, args)
+}
+
+func TestNativeSessionPreservesArgumentsAndRejectsSelectorConflict(t *testing.T) {
+	catalog, launcher := testCatalog()
+	args := []string{"exec", "resume", "b1", "continue", "--json"}
+	if err := catalog.ResumeArguments(context.Background(), "work", "b1", 2, args); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(launcher.args, []string{"exec", "resume", "b111", "continue", "--json"}) {
+		t.Fatalf("arguments = %v", launcher.args)
+	}
+	if err := catalog.ResumeArguments(context.Background(), "personal", "b1", 2, args); err == nil {
+		t.Fatal("conflicting account accepted")
+	}
+}

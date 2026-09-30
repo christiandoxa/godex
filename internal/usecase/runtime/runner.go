@@ -85,7 +85,7 @@ func (runner *Runner) Run(ctx context.Context, selector string, arguments []stri
 	if err := proxyRunner.CheckProxySupport(ctx); err != nil {
 		return err
 	}
-	profiles, err := runner.proxyAccounts(ctx, exhausted)
+	profiles, err := runner.proxyAccounts(ctx, exhausted, selector, selected.ID)
 	if err != nil {
 		return err
 	}
@@ -114,13 +114,16 @@ func (runner *Runner) Run(ctx context.Context, selector string, arguments []stri
 	return runErr
 }
 
-func (runner *Runner) proxyAccounts(ctx context.Context, exhausted map[string]bool) ([]proxyconfig.Account, error) {
+func (runner *Runner) proxyAccounts(ctx context.Context, exhausted map[string]bool, selector, selectedID string) ([]proxyconfig.Account, error) {
 	accounts, err := runner.accounts.List(ctx)
 	if err != nil {
 		return nil, err
 	}
 	profiles := make([]proxyconfig.Account, 0, len(accounts))
 	for _, account := range accounts {
+		if selector != "" && account.ID != selectedID {
+			continue
+		}
 		profiles = append(profiles, proxyconfig.Account{
 			ID:      account.ID,
 			Home:    runner.accounts.CodexHome(account.ID),

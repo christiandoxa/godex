@@ -40,7 +40,7 @@ func TestRunAndLaunchDelegateToRunner(t *testing.T) {
 	accounts := &fakeRunnerAccounts{}
 	process := &fakeRunnerProcess{}
 	runner := runtimeusecase.NewRunner(accounts, process, nil)
-	if err := Run(context.Background(), runner, []string{"--account", "work", "--", "--model", "synthetic"}); err != nil {
+	if err := Run(context.Background(), runner, nil, []string{"--account", "work", "--", "--model", "synthetic"}); err != nil {
 		t.Fatal(err)
 	}
 	if accounts.selected != "work" || strings.Join(process.arguments, " ") != "--model synthetic" {

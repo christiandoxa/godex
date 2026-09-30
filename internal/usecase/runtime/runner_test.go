@@ -399,3 +399,18 @@ func TestRunPreflightSnapshotsAccountsAfterFirstReady(t *testing.T) {
 		t.Fatalf("quota snapshot = %#v", managed)
 	}
 }
+
+func TestExplicitAccountRestrictsEveryProxyRequest(t *testing.T) {
+	accounts := &fakeLaunchAccounts{accounts: []accountentity.Account{{ID: "one", Name: "one", Enabled: true}, {ID: "two", Name: "two", Enabled: true}}, homes: map[string]string{"one": "/one", "two": "/two"}}
+	var config proxyconfig.Config
+	runner := NewRunner(accounts, &fakeProxyProcess{}, func(got proxyconfig.Config) (Proxy, error) { config = got; return &fakeProxy{}, nil })
+	if err := runner.Run(context.Background(), "two", nil); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 2; i++ {
+		profiles, err := config.Accounts(context.Background())
+		if err != nil || len(profiles) != 1 || profiles[0].ID != "two" {
+			t.Fatalf("fixed pool = %#v, %v", profiles, err)
+		}
+	}
+}
