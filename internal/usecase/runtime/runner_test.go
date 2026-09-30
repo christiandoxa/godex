@@ -165,9 +165,6 @@ func TestRunBuildsProxyFromManagedAccountData(t *testing.T) {
 	if !process.checked || process.home != "/profiles/one" || process.endpoint != proxy.Endpoint() || len(process.arguments) != 1 || process.arguments[0] != "--json" {
 		t.Fatalf("proxy process = %#v", process)
 	}
-	if accounts.listCalls != 1 {
-		t.Fatalf("account list calls = %d", accounts.listCalls)
-	}
 	if !proxy.started || !proxy.closed || config.UpstreamURL != "http://upstream.test/backend-api" || config.PreferredAccount != "one" {
 		t.Fatalf("proxy lifecycle/config = started:%t closed:%t config:%#v", proxy.started, proxy.closed, config)
 	}

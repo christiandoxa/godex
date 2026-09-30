@@ -16,6 +16,26 @@ func (runner *Runner) pinProfiles(ctx context.Context, ids []string) (func() err
 	return func() error { return nil }, nil
 }
 
+// Leases prevent further mutations; refresh eligibility after acquiring them.
+func (runner *Runner) pinnedAccounts(ctx context.Context, preferredID string, profiles []proxymodel.Account) ([]proxymodel.Account, error) {
+	accounts, err := runner.accounts.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	enabled := make(map[string]bool, len(accounts))
+	for _, account := range accounts {
+		enabled[account.ID] = account.Enabled
+	}
+	if !enabled[preferredID] {
+		return nil, errors.New("selected upstream account is unavailable; retry account selection")
+	}
+	profiles = append([]proxymodel.Account(nil), profiles...)
+	for i := range profiles {
+		profiles[i].Enabled = enabled[profiles[i].ID]
+	}
+	return profiles, nil
+}
+
 // The rollout home and upstream account can differ after precommit rotation.
 func (runner *Runner) RunSession(ctx context.Context, homeID, ownerID string, args []string) (err error) {
 	accounts, err := runner.accounts.List(ctx)

@@ -74,6 +74,10 @@ func (runner *Runner) Run(ctx context.Context, selector string, arguments []stri
 }
 
 func (runner *Runner) launch(ctx context.Context, homeID, preferredID string, profiles []proxyconfig.Account, arguments []string) (runErr error) {
+	profiles, err := runner.pinnedAccounts(ctx, preferredID, profiles)
+	if err != nil {
+		return err
+	}
 	home := runner.accounts.CodexHome(homeID)
 	proxyRunner, ok := runner.process.(proxyCodex)
 	if !ok {
