@@ -50,3 +50,7 @@ func TestNativeAuthUsesActiveOrExplicitAccountWithoutQuotaOrRotation(t *testing.
 		}
 	}
 }
+
+func (f *nativeAccountsFake) AcquireProfileMutation(ctx context.Context, id string) (func() error, error) {
+	return f.AcquireProfiles(ctx, []string{id})
+}

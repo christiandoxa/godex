@@ -1,0 +1,100 @@
+package routing
+
+import (
+	"context"
+	"io"
+	"net/http"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
+	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
+)
+
+type bindingsFake struct {
+	values []routingentity.Binding
+	writes int
+}
+
+func (f *bindingsFake) Load(context.Context) ([]routingentity.Binding, error) {
+	return append([]routingentity.Binding(nil), f.values...), nil
+}
+func (f *bindingsFake) Merge(_ context.Context, updates []routingentity.Binding) ([]routingentity.Binding, error) {
+	f.writes++
+	f.values = append(f.values, updates...)
+	return f.values, nil
+}
+func TestDurableAffinityRecoversAfterExpiryAndDoesNotWritePerChunk(t *testing.T) {
+	repository := &bindingsFake{}
+	store := newAffinityStore()
+	store.repository = repository
+	now := time.Now()
+	keys := affinityKeys{thread: "synthetic-thread", previous: "synthetic-response", turn: "synthetic-opaque-state"}
+	account := strings.Repeat("a", 32)
+	if err := store.remember(context.Background(), account, keys, now); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 10; i++ {
+		if err := store.remember(context.Background(), account, keys, now); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if repository.writes != 1 {
+		t.Fatalf("writes per observation = %d", repository.writes)
+	}
+	store = newAffinityStore()
+	store.repository = repository
+	owner, err := store.owner(context.Background(), keys, now.Add(affinityTTL))
+	if err != nil || owner != account {
+		t.Fatalf("recovered owner = %q, %v", owner, err)
+	}
+	for _, binding := range repository.values {
+		if strings.Contains(binding.Key, "synthetic") {
+			t.Fatal("raw continuity metadata persisted")
+		}
+	}
+}
+
+type countingGateway struct {
+	mu     sync.Mutex
+	owners []string
+}
+
+func (f *countingGateway) Execute(_ context.Context, _ proxymodel.Request, account proxymodel.Account) (*proxymodel.Response, error) {
+	f.mu.Lock()
+	f.owners = append(f.owners, account.ID)
+	f.mu.Unlock()
+	return &proxymodel.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{}`))}, nil
+}
+func TestConcurrentFirstCallsReserveOneConversationOwner(t *testing.T) {
+	gateway := &countingGateway{}
+	router, err := NewRouter(Config{Gateway: gateway, Accounts: func(context.Context) ([]proxymodel.Account, error) {
+		return []proxymodel.Account{{ID: "one", Home: "one", Enabled: true}, {ID: "two", Home: "two", Enabled: true}}, nil
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var group sync.WaitGroup
+	for i := 0; i < 2; i++ {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			exchange, err := router.Forward(context.Background(), proxymodel.Request{Header: http.Header{"Thread-Id": []string{"same-thread"}}})
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			exchange.Close()
+		}()
+	}
+	group.Wait()
+	if len(gateway.owners) != 2 || gateway.owners[0] != gateway.owners[1] {
+		t.Fatalf("conversation split = %v", gateway.owners)
+	}
+	exchange, err := router.Forward(context.Background(), proxymodel.Request{Header: make(http.Header), Body: []byte(`{"previous_response_id":"unknown"}`)})
+	if exchange != nil || err == nil {
+		t.Fatal("unknown continuation was treated as fresh")
+	}
+}

@@ -1,16 +1,17 @@
 package session
 
 type Report struct {
-	ID             string `json:"id"`
-	ThreadName     string `json:"thread_name,omitempty"`
-	UpdatedAt      string `json:"updated_at,omitempty"`
-	CWD            string `json:"cwd,omitempty"`
-	Profile        string `json:"profile"`
-	AccountID      string `json:"-"`
-	ModelProvider  string `json:"model_provider,omitempty"`
-	Path           string `json:"path"`
-	ParentThreadID string `json:"parent_thread_id,omitempty"`
-	UpdatedUnix    int64  `json:"-"`
+	ID                string `json:"id"`
+	ThreadName        string `json:"thread_name,omitempty"`
+	UpdatedAt         string `json:"updated_at,omitempty"`
+	CWD               string `json:"cwd,omitempty"`
+	Profile           string `json:"profile"`
+	UpstreamAccountID string `json:"-"`
+	AccountID         string `json:"-"`
+	ModelProvider     string `json:"model_provider,omitempty"`
+	Path              string `json:"path"`
+	ParentThreadID    string `json:"parent_thread_id,omitempty"`
+	UpdatedUnix       int64  `json:"-"`
 }
 
 type Query struct {

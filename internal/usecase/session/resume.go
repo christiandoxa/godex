@@ -29,13 +29,13 @@ func (service *Catalog) Resolve(ctx context.Context, selector string) (sessionmo
 		}
 	}
 	if len(exact) == 1 {
-		return exact[0], nil
+		return service.withOwner(ctx, exact[0])
 	}
 	if len(exact) > 1 {
 		return sessionmodel.Report{}, fmt.Errorf("session id %q is ambiguous", selector)
 	}
 	if len(prefix) == 1 {
-		return prefix[0], nil
+		return service.withOwner(ctx, prefix[0])
 	}
 	if len(prefix) > 1 {
 		return sessionmodel.Report{}, fmt.Errorf("session id prefix %q is ambiguous", selector)
@@ -82,5 +82,19 @@ func (catalog *Catalog) ResumeArguments(ctx context.Context, accountSelector, se
 	case "delete", "archive", "unarchive":
 		return catalog.launcher.RunLocal(ctx, report.AccountID, args)
 	}
-	return catalog.launcher.Run(ctx, report.AccountID, args)
+	return catalog.launcher.RunSession(ctx, report.AccountID, report.UpstreamAccountID, args)
+}
+
+func (catalog *Catalog) withOwner(ctx context.Context, report sessionmodel.Report) (sessionmodel.Report, error) {
+	report.UpstreamAccountID = report.AccountID
+	if catalog.ownerLookup != nil {
+		owner, err := catalog.ownerLookup(ctx, report.ID)
+		if err != nil {
+			return sessionmodel.Report{}, err
+		}
+		if owner != "" {
+			report.UpstreamAccountID = owner
+		}
+	}
+	return report, nil
 }

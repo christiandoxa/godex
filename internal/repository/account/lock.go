@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/christiandoxa/godex/internal/helper/lockfile"
 
 	"os"
 	"path/filepath"
@@ -24,7 +25,7 @@ func (store *FileStore) withLock(ctx context.Context, operation func() error) er
 	if err := store.Prepare(); err != nil {
 		return err
 	}
-	unlock, err := acquireFileLock(ctx, filepath.Join(store.root, "state.guard"))
+	unlock, err := lockfile.Acquire(ctx, filepath.Join(store.root, "state.guard"))
 	if err != nil {
 		return err
 	}

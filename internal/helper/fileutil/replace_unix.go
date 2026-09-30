@@ -1,14 +1,14 @@
 //go:build !windows
 
-package account
+package fileutil
 
 import "os"
 
-func replaceFile(source, destination string) error {
+func Replace(source, destination string) error {
 	return os.Rename(source, destination)
 }
 
-func syncDirectory(path string) error {
+func SyncDirectory(path string) error {
 	directory, err := os.Open(path)
 	if err != nil {
 		return err

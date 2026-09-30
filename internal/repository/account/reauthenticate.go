@@ -3,6 +3,7 @@ package account
 import (
 	"errors"
 	"fmt"
+	"github.com/christiandoxa/godex/internal/helper/fileutil"
 	"io"
 	"os"
 	"path/filepath"
@@ -24,7 +25,7 @@ func (store *FileStore) replaceAuthentication(accountID, stagedHome, backup stri
 	}
 	rollback := func() error {
 		if hadAuth {
-			return replaceFile(backup, auth)
+			return fileutil.Replace(backup, auth)
 		}
 		err := os.Remove(auth)
 		if errors.Is(err, os.ErrNotExist) {
@@ -32,11 +33,11 @@ func (store *FileStore) replaceAuthentication(accountID, stagedHome, backup stri
 		}
 		return err
 	}
-	if err := replaceFile(filepath.Join(stagedHome, "auth.json"), auth); err != nil {
+	if err := fileutil.Replace(filepath.Join(stagedHome, "auth.json"), auth); err != nil {
 		_ = os.Remove(backup)
 		return "", nil, fmt.Errorf("replace account authentication: %w", err)
 	}
-	if err := syncDirectory(home); err != nil {
+	if err := fileutil.SyncDirectory(home); err != nil {
 		return "", nil, rollbackProfileError(err, rollback)
 	}
 	if !hadAuth {
@@ -76,10 +77,10 @@ func backupAuthentication(auth, backup string) (bool, error) {
 	if count > 1<<20 {
 		return false, errors.New("account authentication exceeds size limit")
 	}
-	if err := replaceFile(target.Name(), backup); err != nil {
+	if err := fileutil.Replace(target.Name(), backup); err != nil {
 		return false, err
 	}
-	if err := syncDirectory(filepath.Dir(backup)); err != nil {
+	if err := fileutil.SyncDirectory(filepath.Dir(backup)); err != nil {
 		return false, err
 	}
 	return true, nil

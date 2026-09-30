@@ -57,24 +57,24 @@ func (runner *Runner) Run(ctx context.Context, selector string, arguments []stri
 	if err != nil {
 		return err
 	}
-	if leases, ok := runner.accounts.(interface {
-		AcquireProfiles(context.Context, []string) (func() error, error)
-	}); ok {
-		candidates, err := runner.accounts.LaunchCandidates(ctx, selector)
-		if err != nil {
-			return err
-		}
-		ids := make([]string, 0, len(candidates))
-		for _, account := range candidates {
-			ids = append(ids, account.ID)
-		}
-		release, err := leases.AcquireProfiles(ctx, ids)
-		if err != nil {
-			return err
-		}
-		defer func() { runErr = errors.Join(runErr, release()) }()
+	profiles, err := runner.proxyAccounts(ctx, exhausted, selector, selected.ID)
+	if err != nil {
+		return err
 	}
-	home := runner.accounts.CodexHome(selected.ID)
+	ids := make([]string, 0, len(profiles))
+	for _, profile := range profiles {
+		ids = append(ids, profile.ID)
+	}
+	release, err := runner.pinProfiles(ctx, ids)
+	if err != nil {
+		return err
+	}
+	defer func() { runErr = errors.Join(runErr, release()) }()
+	return runner.launch(ctx, selected.ID, selected.ID, profiles, arguments)
+}
+
+func (runner *Runner) launch(ctx context.Context, homeID, preferredID string, profiles []proxyconfig.Account, arguments []string) (runErr error) {
+	home := runner.accounts.CodexHome(homeID)
 	proxyRunner, ok := runner.process.(proxyCodex)
 	if !ok {
 		return runner.process.Run(ctx, home, arguments)
@@ -85,13 +85,9 @@ func (runner *Runner) Run(ctx context.Context, selector string, arguments []stri
 	if err := proxyRunner.CheckProxySupport(ctx); err != nil {
 		return err
 	}
-	profiles, err := runner.proxyAccounts(ctx, exhausted, selector, selected.ID)
-	if err != nil {
-		return err
-	}
 	proxy, err := runner.newProxy(proxyconfig.Config{
 		UpstreamURL:      runner.upstream,
-		PreferredAccount: selected.ID,
+		PreferredAccount: preferredID,
 		Accounts: func(ctx context.Context) ([]proxyconfig.Account, error) {
 			if err := ctx.Err(); err != nil {
 				return nil, err

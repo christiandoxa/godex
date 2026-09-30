@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/christiandoxa/godex/internal/helper/fileutil"
 	"io"
 	"os"
 	"path/filepath"
@@ -91,10 +92,10 @@ func (store *FileStore) writeState(state stateFile) (bool, error) {
 	if err := temporary.Close(); err != nil {
 		return false, fmt.Errorf("close temporary state: %w", err)
 	}
-	if err := replaceFile(temporaryPath, store.statePath()); err != nil {
+	if err := fileutil.Replace(temporaryPath, store.statePath()); err != nil {
 		return false, fmt.Errorf("replace Godex state: %w", err)
 	}
-	if err := syncDirectory(filepath.Dir(store.statePath())); err != nil {
+	if err := fileutil.SyncDirectory(filepath.Dir(store.statePath())); err != nil {
 		return true, fmt.Errorf("sync Godex state directory: %w", err)
 	}
 	return true, nil

@@ -16,6 +16,7 @@ import (
 	"github.com/christiandoxa/godex/internal/gateway/openai"
 	proxyconfig "github.com/christiandoxa/godex/internal/model/proxy"
 	"github.com/christiandoxa/godex/internal/repository/account"
+	routingrepo "github.com/christiandoxa/godex/internal/repository/routing"
 	sessionrepo "github.com/christiandoxa/godex/internal/repository/session"
 	authusecase "github.com/christiandoxa/godex/internal/usecase/auth"
 	quotausecase "github.com/christiandoxa/godex/internal/usecase/quota"
@@ -53,12 +54,13 @@ func run() int {
 		return 1
 	}
 	quotaStatus := quotausecase.NewStatus(store, quotaClient)
+	bindings := routingrepo.NewStore(settings.Home)
 	factory := runtimeusecase.ProxyFactory(func(config proxyconfig.Config) (runtimeusecase.Proxy, error) {
 		transport, err := openai.NewTransport(config.UpstreamURL, nil, process)
 		if err != nil {
 			return nil, err
 		}
-		router, err := routingusecase.NewRouter(routingusecase.Config{Gateway: transport, Accounts: config.Accounts, PreferredAccount: config.PreferredAccount})
+		router, err := routingusecase.NewRouter(routingusecase.Config{Gateway: transport, Accounts: config.Accounts, PreferredAccount: config.PreferredAccount, Bindings: bindings})
 		if err != nil {
 			return nil, err
 		}
@@ -70,7 +72,11 @@ func run() int {
 	application := cli.New(login, importer, store, runner, doctor, quotaStatus, os.Stdout)
 
 	application.SetNativeAuth(authusecase.NewNative(store, process))
-	application.SetSessions(sessionusecase.NewCatalog(store, sessionrepo.NewReader(), runner))
+	sessions := sessionusecase.NewCatalog(store, sessionrepo.NewReader(), runner)
+	sessions.SetOwnerLookup(func(ctx context.Context, id string) (string, error) {
+		return routingusecase.SessionOwner(ctx, bindings, id)
+	})
+	application.SetSessions(sessions)
 	if err := application.Run(ctx, os.Args[1:]); err != nil {
 		return exitCode(ctx, err)
 	}

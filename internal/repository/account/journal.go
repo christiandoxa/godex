@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/christiandoxa/godex/internal/helper/fileutil"
 	"io"
 	"os"
 	"path/filepath"
@@ -54,10 +55,10 @@ func (store *FileStore) beginTransaction(kind, id, backup string, next stateFile
 	if err != nil {
 		return transaction, err
 	}
-	if err := replaceFile(file.Name(), store.journalPath()); err != nil {
+	if err := fileutil.Replace(file.Name(), store.journalPath()); err != nil {
 		return transaction, err
 	}
-	return transaction, syncDirectory(store.root)
+	return transaction, fileutil.SyncDirectory(store.root)
 }
 
 func (store *FileStore) journalPath() string {
@@ -135,7 +136,7 @@ func (store *FileStore) recoverTransaction() error {
 	if err := os.Remove(store.journalPath()); err != nil {
 		return err
 	}
-	return syncDirectory(store.root)
+	return fileutil.SyncDirectory(store.root)
 }
 
 func (store *FileStore) rollbackTransaction(tx profileTransaction) error {
@@ -157,7 +158,7 @@ func (store *FileStore) rollbackTransaction(tx profileTransaction) error {
 		return errors.New("transaction backup must not be a symbolic link")
 	}
 	if tx.Kind == "auth" {
-		return replaceFile(tx.Backup, original)
+		return fileutil.Replace(tx.Backup, original)
 	}
 	if tx.Kind == "profile" {
 		if err := os.RemoveAll(original); err != nil {
@@ -167,7 +168,7 @@ func (store *FileStore) rollbackTransaction(tx profileTransaction) error {
 	if err := os.Rename(tx.Backup, original); err != nil {
 		return err
 	}
-	return syncDirectory(store.accountsDir())
+	return fileutil.SyncDirectory(store.accountsDir())
 }
 
 func (store *FileStore) readSnapshot(ctx context.Context) (state stateFile, err error) {

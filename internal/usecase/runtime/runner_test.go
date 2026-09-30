@@ -414,3 +414,21 @@ func TestExplicitAccountRestrictsEveryProxyRequest(t *testing.T) {
 		}
 	}
 }
+
+func TestResumedSessionKeepsRolloutHomeAndRotatedUpstreamOwner(t *testing.T) {
+	accounts := &fakeLaunchAccounts{accounts: []accountentity.Account{{ID: "home", Enabled: true}, {ID: "owner", Enabled: true}}, homes: map[string]string{"home": "/rollouts", "owner": "/credentials"}}
+	process := &fakeProxyProcess{}
+	var config proxyconfig.Config
+	runner := NewRunner(accounts, process, func(got proxyconfig.Config) (Proxy, error) { config = got; return &fakeProxy{}, nil })
+	runner.SetQuotaPreflight(&fakeQuotaPreflight{ready: map[string]bool{}})
+	if err := runner.RunSession(context.Background(), "home", "owner", []string{"resume", "thread"}); err != nil {
+		t.Fatal(err)
+	}
+	profiles, err := config.Accounts(context.Background())
+	if err != nil || process.home != "/rollouts" || config.PreferredAccount != "owner" || len(profiles) != 1 || profiles[0].Home != "/credentials" {
+		t.Fatalf("home/owner lost: %s, %v, %v", process.home, profiles, err)
+	}
+	if err := runner.RunSession(context.Background(), "home", "missing", nil); err == nil {
+		t.Fatal("missing upstream owner rotated")
+	}
+}

@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"context"
 	"reflect"
 	"testing"
 	"time"
@@ -10,19 +11,19 @@ func TestAffinityExpiresAndRejectsConflicts(t *testing.T) {
 	store := newAffinityStore()
 	now := time.Unix(100, 0)
 	keys := affinityKeys{previous: "response-1", turn: "turn-1", session: "session-1"}
-	if err := store.remember("account-a", keys, now); err != nil {
+	if err := store.remember(context.Background(), "account-a", keys, now); err != nil {
 		t.Fatal(err)
 	}
-	if owner, err := store.owner(keys, now.Add(affinityTTL-time.Second)); err != nil || owner != "account-a" {
+	if owner, err := store.owner(context.Background(), keys, now.Add(affinityTTL-time.Second)); err != nil || owner != "account-a" {
 		t.Fatalf("owner before expiry = %q, %v", owner, err)
 	}
-	if owner, err := store.owner(keys, now.Add(affinityTTL)); err != nil || owner != "" {
+	if owner, err := store.owner(context.Background(), keys, now.Add(affinityTTL)); err != nil || owner != "" {
 		t.Fatalf("owner at expiry = %q, %v", owner, err)
 	}
-	if err := store.remember("account-a", keys, now); err != nil {
+	if err := store.remember(context.Background(), "account-a", keys, now); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.remember("account-b", affinityKeys{previous: "response-1"}, now); err == nil {
+	if err := store.remember(context.Background(), "account-b", affinityKeys{previous: "response-1"}, now); err == nil {
 		t.Fatal("expected affinity conflict")
 	}
 }

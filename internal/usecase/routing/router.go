@@ -20,6 +20,7 @@ type Config struct {
 	Now              func() time.Time
 	MaxInspectBytes  int64
 	Gateway          gateway
+	Bindings         bindingRepository
 }
 
 type Router struct {
@@ -33,6 +34,7 @@ type Router struct {
 	cursor        int
 	preferredUsed bool
 	quarantine    map[string]time.Time
+	conversations map[string]*conversationLock
 }
 
 func NewRouter(config Config) (*Router, error) {
@@ -45,23 +47,46 @@ func NewRouter(config Config) (*Router, error) {
 	if config.MaxInspectBytes <= 0 {
 		config.MaxInspectBytes = 64 << 10
 	}
-	return &Router{source: config.Accounts, gateway: config.Gateway, preferred: strings.TrimSpace(config.PreferredAccount), now: config.Now, maxInspect: config.MaxInspectBytes, affinity: newAffinityStore(), quarantine: make(map[string]time.Time)}, nil
+	router := &Router{source: config.Accounts, gateway: config.Gateway, preferred: strings.TrimSpace(config.PreferredAccount), now: config.Now, maxInspect: config.MaxInspectBytes, affinity: newAffinityStore(), quarantine: make(map[string]time.Time)}
+	router.affinity.repository = config.Bindings
+	return router, nil
 }
 
-type Exchange struct{ Result proxymodel.Forwarded }
+type Exchange struct {
+	Result  proxymodel.Forwarded
+	release func()
+}
 
-func (exchange *Exchange) Close() error { return exchange.Result.Response.Body.Close() }
+func (exchange *Exchange) Close() error {
+	if exchange.release != nil {
+		exchange.release()
+	}
+	return exchange.Result.Response.Body.Close()
+}
 
 func (router *Router) Forward(ctx context.Context, request proxymodel.Request) (*Exchange, error) {
 	keys := requestAffinity(request, request.Body)
+	release, err := router.acquireConversation(ctx, keys)
+	if err != nil {
+		return nil, err
+	}
+	transferred := false
+	defer func() {
+		if !transferred {
+			release()
+		}
+	}()
 	accounts, err := router.source(ctx)
 	if err != nil {
 		return nil, &proxymodel.Error{StatusCode: 503, Message: "cannot load managed accounts"}
 	}
 	accounts = sortRuntimeAccounts(accounts)
-	owner, err := router.affinity.owner(keys, router.now())
+	owner, err := router.affinity.owner(ctx, keys, router.now())
 	if err != nil {
 		return nil, &proxymodel.Error{StatusCode: 409, Message: "request contains conflicting conversation affinity"}
+	}
+	if owner == "" && (keys.previous != "" || keys.turn != "") {
+		return nil, &proxymodel.Error{StatusCode: 409, Message: "continuation owner is unknown; continuity was preserved"}
 	}
 	var result proxymodel.Forwarded
 	if owner != "" {
@@ -77,20 +102,21 @@ func (router *Router) Forward(ctx context.Context, request proxymodel.Request) (
 		if result.Prefix == nil && !stream {
 			result.Prefix, _ = inspectResponse(result.Response.Body, router.maxInspect)
 		}
-		if err := router.affinity.remember(result.AccountID, keys, router.now()); err != nil {
+		if err := router.affinity.remember(ctx, result.AccountID, keys, router.now()); err != nil {
 			result.Response.Body.Close()
 			return nil, err
 		}
-		if err := router.Observe(result.AccountID, result.Response.Header, result.Prefix, stream); err != nil {
+		if err := router.Observe(ctx, result.AccountID, result.Response.Header, result.Prefix, stream); err != nil {
 			result.Response.Body.Close()
 			return nil, err
 		}
 	}
-	return &Exchange{Result: result}, nil
+	transferred = true
+	return &Exchange{Result: result, release: release}, nil
 }
 
-func (router *Router) Observe(accountID string, headers http.Header, body []byte, stream bool) error {
-	return router.affinity.remember(accountID, responseAffinity(headers, body, stream), router.now())
+func (router *Router) Observe(ctx context.Context, accountID string, headers http.Header, body []byte, stream bool) error {
+	return router.affinity.remember(ctx, accountID, responseAffinity(headers, body, stream), router.now())
 }
 
 func (router *Router) execute(ctx context.Context, request proxymodel.Request, account proxymodel.Account) (*proxymodel.Response, error) {

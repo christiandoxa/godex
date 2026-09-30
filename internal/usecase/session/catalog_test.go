@@ -112,3 +112,7 @@ func TestNativeSessionPreservesArgumentsAndRejectsSelectorConflict(t *testing.T)
 		t.Fatal("conflicting account accepted")
 	}
 }
+
+func (f *launcherFake) RunSession(ctx context.Context, home, owner string, args []string) error {
+	return f.Run(ctx, home, args)
+}

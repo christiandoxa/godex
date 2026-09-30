@@ -19,14 +19,20 @@ type reader interface {
 type launcher interface {
 	Run(context.Context, string, []string) error
 	RunLocal(context.Context, string, []string) error
+	RunSession(context.Context, string, string, []string) error
 }
 
 type Catalog struct {
-	accounts accountStore
-	reader   reader
-	launcher launcher
+	accounts    accountStore
+	reader      reader
+	launcher    launcher
+	ownerLookup func(context.Context, string) (string, error)
 }
 
 func NewCatalog(accounts accountStore, reader reader, launcher launcher) *Catalog {
 	return &Catalog{accounts: accounts, reader: reader, launcher: launcher}
+}
+
+func (catalog *Catalog) SetOwnerLookup(lookup func(context.Context, string) (string, error)) {
+	catalog.ownerLookup = lookup
 }

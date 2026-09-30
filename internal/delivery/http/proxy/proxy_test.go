@@ -406,10 +406,14 @@ func TestProxyForwardsRequestHeadersWithoutInventingMetadata(t *testing.T) {
 	seen := make(chan http.Header, 1)
 	upstream := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		seen <- request.Header.Clone()
+		writer.Header().Set("X-Codex-Turn-State", "turn-value")
 		writer.WriteHeader(http.StatusNoContent)
 	}))
 	defer upstream.Close()
 	proxy := newTestProxy(t, upstream.URL, accounts)
+	prime := doProxyJSON(t, proxy.URL+"/responses", `{}`, nil)
+	prime.Body.Close()
+	<-seen
 
 	request, err := http.NewRequest(http.MethodPost, proxy.URL+"/backend-api/prodex/responses", strings.NewReader(`{}`))
 	if err != nil {

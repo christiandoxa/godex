@@ -10,6 +10,7 @@ import (
 
 func requestAffinity(request proxymodel.Request, body []byte) affinityKeys {
 	keys := affinityKeys{
+		thread:  firstHeader(request.Header, "thread-id", "x-codex-thread-id"),
 		turn:    strings.TrimSpace(request.Header.Get("x-codex-turn-state")),
 		session: firstHeader(request.Header, "x-codex-session-id", "x-session-id", "session-id"),
 	}
@@ -29,6 +30,7 @@ func requestAffinity(request proxymodel.Request, body []byte) affinityKeys {
 
 func responseAffinity(headers http.Header, body []byte, stream bool) affinityKeys {
 	keys := affinityKeys{
+		thread:  firstHeader(headers, "thread-id", "x-codex-thread-id"),
 		turn:    strings.TrimSpace(headers.Get("x-codex-turn-state")),
 		session: firstHeader(headers, "x-codex-session-id", "x-session-id", "session-id"),
 	}

@@ -3,6 +3,7 @@ package account
 import (
 	"errors"
 	"fmt"
+	"github.com/christiandoxa/godex/internal/helper/fileutil"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -62,7 +63,7 @@ func (store *FileStore) promoteProfile(accountDirectory, codexHome, stagedCodexH
 	if err := secureCodexHome(codexHome); err != nil {
 		return rollbackProfileError(err, rollback)
 	}
-	if err := syncDirectory(store.accountsDir()); err != nil {
+	if err := fileutil.SyncDirectory(store.accountsDir()); err != nil {
 		return fmt.Errorf("sync promoted account profile: %w", rollbackProfileError(err, rollback))
 	}
 	return nil
@@ -85,7 +86,7 @@ func (store *FileStore) rollbackProfile(accountDirectory, backup string, hadExis
 			rollbackErr = errors.Join(rollbackErr, fmt.Errorf("restore previous account profile: %w", err))
 		}
 	}
-	if err := syncDirectory(store.accountsDir()); err != nil {
+	if err := fileutil.SyncDirectory(store.accountsDir()); err != nil {
 		rollbackErr = errors.Join(rollbackErr, fmt.Errorf("sync account profile rollback: %w", err))
 	}
 	return rollbackErr
@@ -99,10 +100,10 @@ func (store *FileStore) stageRemoval(accountID, trash string) (string, func() er
 		}
 		return "", func() error { return nil }, fmt.Errorf("stage account removal: %w", err)
 	}
-	if err := syncDirectory(store.accountsDir()); err != nil {
+	if err := fileutil.SyncDirectory(store.accountsDir()); err != nil {
 		restoreErr := os.Rename(trash, accountDirectory)
 		if restoreErr == nil {
-			restoreErr = syncDirectory(store.accountsDir())
+			restoreErr = fileutil.SyncDirectory(store.accountsDir())
 		}
 		if restoreErr != nil {
 			return "", func() error { return nil }, errors.Join(
@@ -116,7 +117,7 @@ func (store *FileStore) stageRemoval(accountID, trash string) (string, func() er
 		if err := os.Rename(trash, accountDirectory); err != nil {
 			return err
 		}
-		return syncDirectory(store.accountsDir())
+		return fileutil.SyncDirectory(store.accountsDir())
 	}, nil
 }
 

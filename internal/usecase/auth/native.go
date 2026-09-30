@@ -13,6 +13,7 @@ type nativeAccounts interface {
 	Resolve(context.Context, string) (accountentity.Account, error)
 	CodexHome(string) string
 	AcquireProfiles(context.Context, []string) (func() error, error)
+	AcquireProfileMutation(context.Context, string) (func() error, error)
 }
 type nativeProcess interface {
 	Run(context.Context, string, []string) error
@@ -37,7 +38,12 @@ func (native *Native) Run(ctx context.Context, input authmodel.Command) (err err
 	if err != nil {
 		return err
 	}
-	release, err := native.accounts.AcquireProfiles(ctx, []string{account.ID})
+	var release func() error
+	if input.Logout {
+		release, err = native.accounts.AcquireProfileMutation(ctx, account.ID)
+	} else {
+		release, err = native.accounts.AcquireProfiles(ctx, []string{account.ID})
+	}
 	if err != nil {
 		return err
 	}

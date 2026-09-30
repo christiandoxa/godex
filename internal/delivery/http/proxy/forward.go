@@ -1,13 +1,14 @@
 package proxy
 
 import (
+	"context"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	"io"
 	"net/http"
 	"strings"
 )
 
-func (proxy *Proxy) forwardResponse(writer http.ResponseWriter, response *proxymodel.Response, prefix []byte, accountID string, lifecycle *requestLifecycle) {
+func (proxy *Proxy) forwardResponse(ctx context.Context, writer http.ResponseWriter, response *proxymodel.Response, prefix []byte, accountID string, lifecycle *requestLifecycle) {
 	if response == nil {
 		return
 	}
@@ -25,7 +26,7 @@ func (proxy *Proxy) forwardResponse(writer http.ResponseWriter, response *proxym
 	lifecycle.commit()
 	writer.WriteHeader(response.StatusCode)
 	if stream {
-		complete := proxy.forwardStream(writer, response.Body, prefix, accountID, response.Header)
+		complete := proxy.forwardStream(ctx, writer, response.Body, prefix, accountID, response.Header)
 		copyTrailers(writer.Header(), response.Header, response.Trailer)
 		if complete {
 			lifecycle.complete()
@@ -49,7 +50,7 @@ func (proxy *Proxy) forwardResponse(writer http.ResponseWriter, response *proxym
 	lifecycle.complete()
 }
 
-func (proxy *Proxy) forwardStream(writer http.ResponseWriter, body io.Reader, prefix []byte, accountID string, headers http.Header) bool {
+func (proxy *Proxy) forwardStream(ctx context.Context, writer http.ResponseWriter, body io.Reader, prefix []byte, accountID string, headers http.Header) bool {
 	forwarder := streamForwarder{
 		proxy:     proxy,
 		writer:    writer,
@@ -57,7 +58,7 @@ func (proxy *Proxy) forwardStream(writer http.ResponseWriter, body io.Reader, pr
 		headers:   headers,
 		seen:      make([]byte, 0, len(prefix)),
 	}
-	return forwarder.forward(body, prefix)
+	return forwarder.forward(ctx, body, prefix)
 }
 
 type streamForwarder struct {
@@ -68,14 +69,14 @@ type streamForwarder struct {
 	seen      []byte
 }
 
-func (forwarder *streamForwarder) forward(body io.Reader, prefix []byte) bool {
-	if forwarder.write(prefix) != nil {
+func (forwarder *streamForwarder) forward(ctx context.Context, body io.Reader, prefix []byte) bool {
+	if forwarder.write(ctx, prefix) != nil {
 		return false
 	}
 	buffer := make([]byte, 32*1024)
 	for {
 		read, err := body.Read(buffer)
-		if read > 0 && forwarder.write(buffer[:read]) != nil {
+		if read > 0 && forwarder.write(ctx, buffer[:read]) != nil {
 			return false
 		}
 		if err != nil {
@@ -84,11 +85,11 @@ func (forwarder *streamForwarder) forward(body io.Reader, prefix []byte) bool {
 	}
 }
 
-func (forwarder *streamForwarder) write(chunk []byte) error {
+func (forwarder *streamForwarder) write(ctx context.Context, chunk []byte) error {
 	if len(chunk) == 0 {
 		return nil
 	}
-	forwarder.remember(chunk)
+	forwarder.remember(ctx, chunk)
 	if _, err := forwarder.writer.Write(chunk); err != nil {
 		return err
 	}
@@ -98,7 +99,7 @@ func (forwarder *streamForwarder) write(chunk []byte) error {
 	return nil
 }
 
-func (forwarder *streamForwarder) remember(chunk []byte) {
+func (forwarder *streamForwarder) remember(ctx context.Context, chunk []byte) {
 	if len(forwarder.seen) >= int(forwarder.proxy.maxInspect) {
 		return
 	}
@@ -107,7 +108,7 @@ func (forwarder *streamForwarder) remember(chunk []byte) {
 		chunk = chunk[:remaining]
 	}
 	forwarder.seen = append(forwarder.seen, chunk...)
-	if err := forwarder.proxy.router.Observe(forwarder.accountID, forwarder.headers, forwarder.seen, true); err != nil {
+	if err := forwarder.proxy.router.Observe(ctx, forwarder.accountID, forwarder.headers, forwarder.seen, true); err != nil {
 		panic(http.ErrAbortHandler)
 	}
 }

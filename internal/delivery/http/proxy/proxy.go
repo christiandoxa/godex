@@ -119,7 +119,7 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 	}
 	defer exchange.Close()
 	result := exchange.Result
-	proxy.forwardResponse(writer, result.Response, result.Prefix, result.AccountID, &requestLifecycle{})
+	proxy.forwardResponse(request.Context(), writer, result.Response, result.Prefix, result.AccountID, &requestLifecycle{})
 }
 func readLimited(reader io.ReadCloser, limit int64) ([]byte, error) {
 	if reader == nil {

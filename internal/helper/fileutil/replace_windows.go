@@ -1,6 +1,6 @@
 //go:build windows
 
-package account
+package fileutil
 
 import (
 	"fmt"
@@ -15,7 +15,7 @@ const (
 
 var moveFileExW = syscall.NewLazyDLL("kernel32.dll").NewProc("MoveFileExW")
 
-func replaceFile(source, destination string) error {
+func Replace(source, destination string) error {
 	sourcePointer, err := syscall.UTF16PtrFromString(source)
 	if err != nil {
 		return err
@@ -38,6 +38,6 @@ func replaceFile(source, destination string) error {
 	return fmt.Errorf("MoveFileExW failed")
 }
 
-func syncDirectory(string) error {
+func SyncDirectory(string) error {
 	return nil
 }

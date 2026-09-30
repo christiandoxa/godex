@@ -231,3 +231,11 @@ transport. Godex rejects unexpected WebSocket upgrades and routing/auth-store
 config overrides. It supplies both the chosen bearer credential and its ChatGPT
 account routing header. A broken committed stream fails downstream HTTP and is
 never replayed on another account.
+
+Upstream conversation ownership survives process restarts in a bounded
+`routing.json` containing hashes and account metadata, never raw continuation
+secrets or credentials. A resumed session keeps its rollout home and uses the
+account that served it, even if the first request rotated accounts. Unknown
+opaque continuations fail clearly. Native/imported sessions without an existing
+binding use their containing profile. Stable ownership is retained; the store
+refuses new conversations if its 8,192 protected-binding ceiling is reached.

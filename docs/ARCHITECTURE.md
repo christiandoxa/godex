@@ -280,3 +280,29 @@ Responses cannot re-enter routing after delivery commits headers. Truncated
 upstream streams abort downstream HTTP using `http.ErrAbortHandler`; they are
 not closed as successful chunked responses and are never replayed. Unexpected
 WebSocket upgrades are rejected explicitly; HTTP/SSE is Godex's model transport.
+
+## Durable upstream ownership
+
+`repository/routing` stores a bounded, versioned `routing.json` containing only
+SHA-256 continuity-key digests, account IDs, key kinds, and timestamps. Routing
+use cases persist new bindings before forwarding their associated output bytes.
+Known bindings avoid repeated writes, including stream chunks. In-memory expiry
+reloads durable ownership; unknown opaque previous-response/turn-state tokens
+fail closed. Stable thread/session bindings never expire or get evicted. The
+snapshot allows 8,192 total bindings; it evicts old opaque response/turn digests
+and refuses new conversations if protected bindings fill the store. Opaque
+entries expire after 30 days. Conflicting concurrent ownership updates fail.
+Per-conversation guards serialize first requests through downstream completion.
+
+Native `thread-id` identifies durable Codex ownership. Session resolution looks
+up its upstream owner independently of the profile holding the rollout. Resume
+keeps that rollout home while fixing upstream traffic to its owner, bypassing
+fresh-work quota selection. Legacy/imported sessions without a known binding
+use their containing profile; unknown opaque continuations still fail closed.
+Removed or disabled upstream owners cause a continuity-preserving error.
+
+The stateless `helper/lockfile` and `helper/fileutil` packages now have two real
+persistence consumers, account and routing, and own only OS locks and durable
+private atomic writes. Running Codex children hold shared profile leases;
+credential mutation/removal requires an exclusive lease. Concurrent native
+children can share a profile without weakening mutation exclusion.

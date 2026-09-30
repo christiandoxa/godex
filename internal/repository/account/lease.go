@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/christiandoxa/godex/internal/helper/lockfile"
 	"path/filepath"
 )
 
@@ -22,6 +23,9 @@ func (store *FileStore) AcquireProfiles(ctx context.Context, ids []string) (func
 		if err != nil {
 			return err
 		}
+		if err := ensurePrivateDirectory(filepath.Join(store.root, "leases")); err != nil {
+			return err
+		}
 		seen := make(map[string]bool, len(ids))
 		for _, id := range ids {
 			if seen[id] {
@@ -31,7 +35,7 @@ func (store *FileStore) AcquireProfiles(ctx context.Context, ids []string) (func
 			if _, err := resolveIndex(state.Accounts, id); err != nil {
 				return err
 			}
-			unlock, err := store.acquireProfile(id)
+			unlock, err := lockfile.TryRead(filepath.Join(store.root, "leases", id+".lock"))
 			if err != nil {
 				return err
 			}
@@ -50,9 +54,25 @@ func (store *FileStore) acquireProfile(id string) (func() error, error) {
 	if err := ensurePrivateDirectory(directory); err != nil {
 		return nil, err
 	}
-	release, err := tryFileLock(filepath.Join(directory, id+".lock"))
-	if errors.Is(err, errFileBusy) {
+	release, err := lockfile.TryAcquire(filepath.Join(directory, id+".lock"))
+	if errors.Is(err, lockfile.ErrBusy) {
 		return nil, fmt.Errorf("account %q is in use by another command", id)
 	}
+	return release, err
+}
+
+func (store *FileStore) AcquireProfileMutation(ctx context.Context, id string) (func() error, error) {
+	var release func() error
+	err := store.withLock(ctx, func() error {
+		state, err := store.readState()
+		if err != nil {
+			return err
+		}
+		if _, err := resolveIndex(state.Accounts, id); err != nil {
+			return err
+		}
+		release, err = store.acquireProfile(id)
+		return err
+	})
 	return release, err
 }
