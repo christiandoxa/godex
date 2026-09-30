@@ -18,7 +18,7 @@ func (writer failingWriter) Write([]byte) (int, error) { return 0, writer.err }
 
 func TestDispatcherVersion(t *testing.T) {
 	var output bytes.Buffer
-	if err := New(nil, nil, nil, nil, &output).Run(context.Background(), []string{"--version"}); err != nil {
+	if err := New(nil, nil, nil, nil, nil, &output).Run(context.Background(), []string{"--version"}); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(output.String(), "godex") {
@@ -26,16 +26,21 @@ func TestDispatcherVersion(t *testing.T) {
 	}
 }
 
-func TestDispatcherRejectsUnknownCommand(t *testing.T) {
-	err := New(nil, nil, nil, nil, &bytes.Buffer{}).Run(context.Background(), []string{"unknown"})
-	if err == nil || !strings.Contains(err.Error(), "unknown command") {
-		t.Fatalf("error = %v", err)
+func TestDispatcherPassesUnknownCommandToCodex(t *testing.T) {
+	accounts := dispatcherAccounts{}
+	process := &dispatcherProcess{}
+	runner := runtimeusecase.NewRunner(accounts, process, nil)
+	if err := New(nil, nil, accounts, runner, nil, &bytes.Buffer{}).Run(context.Background(), []string{"remote-control", "--help"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(process.arguments, " "); got != "remote-control --help" {
+		t.Fatalf("passthrough arguments = %q", got)
 	}
 }
 
 func TestDispatcherReturnsHelpOutputError(t *testing.T) {
 	errSynthetic := errors.New("synthetic output failure")
-	err := New(nil, nil, nil, nil, failingWriter{err: errSynthetic}).Run(context.Background(), []string{"help"})
+	err := New(nil, nil, nil, nil, nil, failingWriter{err: errSynthetic}).Run(context.Background(), []string{"help"})
 	if !errors.Is(err, errSynthetic) {
 		t.Fatalf("help error = %v", err)
 	}
@@ -45,6 +50,10 @@ type dispatcherAccounts struct{}
 
 func (dispatcherAccounts) List(context.Context) ([]accountentity.Account, error) {
 	return []accountentity.Account{{ID: "synthetic", Name: "work", Email: "work@example.com", Enabled: true}}, nil
+}
+
+func (dispatcherAccounts) Current(context.Context) (accountentity.Account, error) {
+	return accountentity.Account{ID: "synthetic", Name: "work", Email: "<redacted>", Enabled: true}, nil
 }
 
 func (dispatcherAccounts) SetActive(_ context.Context, selector string) (accountentity.Account, error) {
@@ -91,16 +100,21 @@ func (dispatcherLoginCodex) Login(context.Context, string, bool) (accountentity.
 	return accountentity.Identity{Email: "login@example.com", ChatGPTAccountID: "login-account"}, nil
 }
 
+func (dispatcherLoginCodex) ImportCurrent(context.Context, string, string) (accountentity.Identity, error) {
+	return accountentity.Identity{Email: "<redacted>", ChatGPTAccountID: "<redacted>"}, nil
+}
+
 func TestDispatcherRoutesCommandDomains(t *testing.T) {
 	accounts := dispatcherAccounts{}
 	process := &dispatcherProcess{}
 	runner := runtimeusecase.NewRunner(accounts, process, nil)
 	doctor := runtimeusecase.NewDoctor(accounts, process)
 	login := authusecase.NewLogin(dispatcherLoginAccounts{}, dispatcherLoginCodex{})
+	importer := authusecase.NewImportCurrent(dispatcherLoginAccounts{}, dispatcherLoginCodex{}, "/synthetic/current")
 	var output bytes.Buffer
-	app := New(login, accounts, runner, doctor, &output)
+	app := New(login, importer, accounts, runner, doctor, &output)
 	commands := [][]string{
-		{"accounts"}, {"account", "list"}, {"account", "use", "work"}, {"account", "remove", "work"},
+		{"accounts"}, {"current"}, {"account", "list"}, {"profile", "current"}, {"account", "use", "work"}, {"account", "remove", "work"}, {"profile", "import-current", "imported"},
 		{"use", "work"}, {"remove", "work"}, {"run", "--account", "work", "--", "--model", "synthetic"},
 		{"login", "--name", "work"}, {}, {"doctor"},
 	}

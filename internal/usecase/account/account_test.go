@@ -19,6 +19,13 @@ func (fake *fakeAccounts) List(context.Context) ([]accountentity.Account, error)
 	return fake.accounts, fake.err
 }
 
+func (fake *fakeAccounts) Current(context.Context) (accountentity.Account, error) {
+	if fake.err != nil {
+		return accountentity.Account{}, fake.err
+	}
+	return accountentity.Account{Name: "current"}, nil
+}
+
 func (fake *fakeAccounts) SetActive(_ context.Context, selector string) (accountentity.Account, error) {
 	fake.selected = selector
 	return accountentity.Account{Name: selector}, fake.err

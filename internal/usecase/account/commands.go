@@ -8,6 +8,7 @@ import (
 
 type AccountStore interface {
 	List(context.Context) ([]accountentity.Account, error)
+	Current(context.Context) (accountentity.Account, error)
 	SetActive(context.Context, string) (accountentity.Account, error)
 	Remove(context.Context, string) (accountentity.Account, error)
 }

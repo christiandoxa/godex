@@ -40,13 +40,14 @@ func run() int {
 		Stderr: os.Stderr,
 	})
 	login := authusecase.NewLogin(store, process)
+	importer := authusecase.NewImportCurrent(store, process, settings.CurrentCodexHome)
 	doctor := runtimeusecase.NewDoctor(store, process)
 	factory := runtimeusecase.ProxyFactory(func(config proxyconfig.Config) (runtimeusecase.Proxy, error) {
 		return openai.NewProxyFromModel(config)
 	})
 	runner := runtimeusecase.NewRunner(store, process, factory)
 	runner.SetUpstreamURL(settings.UpstreamURL)
-	application := cli.New(login, store, runner, doctor, os.Stdout)
+	application := cli.New(login, importer, store, runner, doctor, os.Stdout)
 
 	if err := application.Run(ctx, os.Args[1:]); err != nil {
 		return exitCode(ctx, err)

@@ -19,6 +19,13 @@ func (accounts testAccounts) List(context.Context) ([]accountentity.Account, err
 	return accounts.listed, nil
 }
 
+func (accounts *testAccounts) Current(context.Context) (accountentity.Account, error) {
+	if len(accounts.listed) == 0 {
+		return accountentity.Account{}, errors.New("no active account")
+	}
+	return accounts.listed[0], nil
+}
+
 func (accounts *testAccounts) SetActive(_ context.Context, selector string) (accountentity.Account, error) {
 	accounts.selected = selector
 	return accountentity.Account{Name: selector}, nil

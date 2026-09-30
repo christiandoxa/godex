@@ -13,6 +13,7 @@ type Accounts interface {
 	CodexHome(accountID string) string
 	CommitLogin(ctx context.Context, candidate entity.Account, stagedCodexHome string, rename bool) (entity.Account, error)
 	List(ctx context.Context) ([]entity.Account, error)
+	Current(ctx context.Context) (entity.Account, error)
 	Resolve(ctx context.Context, selector string) (entity.Account, error)
 	SelectForLaunch(ctx context.Context, selector string) (entity.Account, error)
 	SetActive(ctx context.Context, selector string) (entity.Account, error)

@@ -67,9 +67,10 @@ GitHub release metadata.
 
 ## Usage
 
-Log in once for each ChatGPT account:
+Import an existing Codex login, or log in once for each ChatGPT account:
 
 ~~~bash
+godex profile import-current main
 godex login --name personal
 godex login --name work
 ~~~
@@ -84,6 +85,7 @@ List accounts and launch the normal Codex experience:
 
 ~~~bash
 godex accounts
+godex current
 godex
 ~~~
 
@@ -107,11 +109,14 @@ Available account commands:
 | --- | --- |
 | godex accounts | List managed accounts. |
 | godex account list | Alias for godex accounts. |
+| godex current | Show the active managed account. |
+| godex profile import-current [NAME] | Import the ChatGPT login from the current Codex home. |
 | godex account use SELECTOR | Set the preferred account. |
 | godex account remove SELECTOR | Remove an account. |
 
 Selectors match an exact account ID, friendly name, or email. Ambiguous
-selectors fail. Repeating login for an existing ChatGPT account updates its
+selectors fail. Unknown top-level commands are treated as Codex subcommands and
+run through the same managed account runtime. Repeating login for an existing ChatGPT account updates its
 profile instead of creating a duplicate.
 
 ## Configuration
@@ -121,6 +126,7 @@ profile instead of creating a duplicate.
 | GODEX_HOME | ~/.godex | State, profiles, locks, and staging files. |
 | GODEX_CODEX_BIN | codex | Codex executable to invoke. |
 | GODEX_UPSTREAM_URL | https://chatgpt.com/backend-api | Upstream URL for compatible test environments. |
+| CODEX_HOME | ~/.codex | Source profile used only by `godex profile import-current`; managed launches use isolated homes. |
 
 Treat each profile's auth.json like a password. Do not copy it into source
 control, backups, bug reports, or fixtures.
