@@ -9,9 +9,12 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func (process *CodexProcess) CheckProxySupport(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
 	version, err := process.Version(ctx)
 	if err != nil {
 		return err
@@ -32,7 +35,8 @@ func (process *CodexProcess) CheckProxySupport(ctx context.Context) error {
 	}(home)
 	configArguments := managedModelArguments("http://127.0.0.1:1/backend-api/prodex")
 	arguments := append([]string{"--strict-config"}, configArguments...)
-	arguments = append(arguments, "--version")
+	// Stdio EOF validates configuration and exits without accepting any work.
+	arguments = append(arguments, "exec-server", "--listen", "stdio")
 	command := exec.CommandContext(ctx, binary, arguments...)
 	command.Env = environmentWith("CODEX_HOME", home)
 	command.Stdout = io.Discard
@@ -78,34 +82,28 @@ func proxyArguments(endpoint string, arguments []string) ([]string, error) {
 		return nil, errors.New("proxy endpoint is required")
 	}
 	if containsProxyOverride(arguments) {
-		return nil, errors.New("codex arguments cannot override Godex proxy base URLs")
+		return nil, errors.New("codex arguments cannot override Godex routing or credential storage")
 	}
 	if err := validateRuntimeURL(endpoint); err != nil {
 		return nil, err
 	}
-	return append(managedModelArguments(endpoint+"/backend-api/prodex"), arguments...), nil
+	return scopeModelArguments(arguments, managedModelArguments(endpoint+"/backend-api/prodex")), nil
 }
 
 func containsProxyOverride(arguments []string) bool {
-	for index, argument := range arguments {
-		value := ""
-		switch {
-		case argument == "-c" || argument == "--config":
-			if index+1 < len(arguments) {
-				value = arguments[index+1]
-			}
-		case strings.HasPrefix(argument, "-c"):
-			value = strings.TrimPrefix(argument, "-c")
-		case strings.HasPrefix(argument, "--config="):
-			value = strings.TrimPrefix(argument, "--config=")
-		default:
-			continue
+	for index := 0; index < len(arguments); {
+		argument := arguments[index]
+		if argument == "--" {
+			return false
 		}
-		key, _, _ := strings.Cut(strings.TrimSpace(value), "=")
-		key = strings.TrimSpace(key)
-		if key == "chatgpt_base_url" || key == "openai_base_url" || key == "model_provider" || strings.HasPrefix(key, "model_providers.") || key == "cli_auth_credentials_store" {
+		if argument == "--oss" || strings.HasPrefix(argument, "--oss=") || argument == "--local-provider" || strings.HasPrefix(argument, "--local-provider=") {
 			return true
 		}
+		value, consumed, ok := configArgument(arguments, index)
+		if ok && ownedConfigKey(value) {
+			return true
+		}
+		index += consumed
 	}
 	return false
 }

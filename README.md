@@ -232,6 +232,14 @@ config overrides. It supplies both the chosen bearer credential and its ChatGPT
 account routing header. A broken committed stream fails downstream HTTP and is
 never replayed on another account.
 
+Managed config is applied in the innermost `exec`, `exec resume`, `exec fork`,
+or `exec review` scope. Other Codex overrides retain their order and precedence.
+Routing and credential-store overrides, including quoted keys and whole provider
+tables, and `--oss`/`--local-provider` are rejected before the Codex child starts.
+Arguments after Codex's `--` delimiter remain literal. Launch capability checks
+validate strict config through `exec-server --listen stdio` with closed stdin
+and an empty temporary home; they do not submit a model request.
+
 Upstream conversation ownership survives process restarts in a bounded
 `routing.json` containing hashes and account metadata, never raw continuation
 secrets or credentials. A resumed session keeps its rollout home and uses the

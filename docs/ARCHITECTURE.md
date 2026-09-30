@@ -65,6 +65,13 @@ The Codex gateway owns:
 
 Godex does not implement OAuth or refresh-token exchange.
 
+The Codex gateway keeps argument recognition and config scoping private to
+`gateway/codex`. Managed overrides enter the innermost exec command scope;
+routing and credential-store bypasses fail before process execution. A bounded
+strict-config probe uses a temporary home and `exec-server` with stdio EOF, so
+configuration is validated without accepting execution or model work. No shared
+helper or new application boundary is needed for this protocol-specific parsing.
+
 ### Quota gateway and preflight
 
 The OpenAI quota client is a narrow outbound adapter for the ChatGPT usage
