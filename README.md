@@ -151,6 +151,11 @@ godex doctor
 godex --version
 ~~~
 
+`doctor` checks the supported Codex version and managed HTTP/SSE configuration
+with the same isolated, ten-second capability probe used before launch. An
+unsupported runtime fails with an upgrade error. The probe does not log in or
+submit a model request.
+
 Available account commands:
 
 | Command | Purpose |

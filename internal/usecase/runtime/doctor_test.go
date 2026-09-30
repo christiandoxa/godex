@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
@@ -23,9 +24,11 @@ func (fake *fakeDoctorAccounts) List(context.Context) ([]accountentity.Account, 
 	return fake.accounts, nil
 }
 
-type fakeVersionedCodex struct{}
+type fakeVersionedCodex struct{ supportErr error }
 
 func (fakeVersionedCodex) Version(context.Context) (string, error) { return "codex synthetic", nil }
+
+func (fake fakeVersionedCodex) CheckProxySupport(context.Context) error { return fake.supportErr }
 
 func TestDoctorReportsAccountHealth(t *testing.T) {
 	accounts := &fakeDoctorAccounts{accounts: []accountentity.Account{
@@ -38,5 +41,13 @@ func TestDoctorReportsAccountHealth(t *testing.T) {
 	}
 	if !accounts.prepared || report.GodexHome != "/godex" || report.CodexVersion != "codex synthetic" || report.AccountCount != 2 || report.EnabledCount != 1 {
 		t.Fatalf("doctor report = %#v, prepared = %t", report, accounts.prepared)
+	}
+}
+
+func TestDoctorRejectsUnsupportedCodex(t *testing.T) {
+	want := errors.New("unsupported Codex runtime")
+	report, err := NewDoctor(&fakeDoctorAccounts{}, fakeVersionedCodex{supportErr: want}).Run(t.Context())
+	if !errors.Is(err, want) || report.CodexVersion != "" {
+		t.Fatalf("doctor report = %#v, error = %v", report, err)
 	}
 }

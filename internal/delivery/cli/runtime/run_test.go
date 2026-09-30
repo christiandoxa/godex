@@ -70,6 +70,8 @@ type fakeVersionedCodex struct{}
 
 func (fakeVersionedCodex) Version(context.Context) (string, error) { return "codex synthetic", nil }
 
+func (fakeVersionedCodex) CheckProxySupport(context.Context) error { return nil }
+
 func TestDoctorRendersReport(t *testing.T) {
 	doctor := runtimeusecase.NewDoctor(fakeDoctorAccounts{}, fakeVersionedCodex{})
 	var output strings.Builder

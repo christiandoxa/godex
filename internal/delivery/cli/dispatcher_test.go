@@ -90,6 +90,8 @@ func (process *dispatcherProcess) Run(_ context.Context, _ string, arguments []s
 
 func (dispatcherProcess) Version(context.Context) (string, error) { return "codex synthetic", nil }
 
+func (dispatcherProcess) CheckProxySupport(context.Context) error { return nil }
+
 type dispatcherLoginAccounts struct{}
 
 func (dispatcherLoginAccounts) CreateStagedHome() (string, error) { return "/synthetic/staged", nil }

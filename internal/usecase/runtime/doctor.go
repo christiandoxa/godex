@@ -15,6 +15,7 @@ type doctorAccounts interface {
 
 type versionedCodex interface {
 	Version(context.Context) (string, error)
+	CheckProxySupport(context.Context) error
 }
 
 type Doctor struct {
@@ -28,6 +29,9 @@ func NewDoctor(accounts doctorAccounts, codex versionedCodex) *Doctor {
 
 func (doctor *Doctor) Run(ctx context.Context) (accountmodel.DoctorReport, error) {
 	if err := doctor.accounts.Prepare(); err != nil {
+		return accountmodel.DoctorReport{}, err
+	}
+	if err := doctor.codex.CheckProxySupport(ctx); err != nil {
 		return accountmodel.DoctorReport{}, err
 	}
 	codexVersion, err := doctor.codex.Version(ctx)
