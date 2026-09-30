@@ -51,7 +51,13 @@ func (store *FileStore) commitLoginLocked(candidate entity.Account, stagedCodexH
 		return entity.Account{}, err
 	}
 
-	backup, rollback, err := store.replaceProfile(candidate.ID, stagedCodexHome)
+	var backup string
+	var rollback func() error
+	if existingIndex >= 0 {
+		backup, rollback, err = store.replaceAuthentication(candidate.ID, stagedCodexHome)
+	} else {
+		backup, rollback, err = store.replaceProfile(candidate.ID, stagedCodexHome)
+	}
 	if err != nil {
 		return entity.Account{}, err
 	}

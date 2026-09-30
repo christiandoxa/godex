@@ -236,3 +236,10 @@ and text/JSON presentation. These packages follow the repository's layer-first,
 domain-second layout. Session helpers remain private to their owning packages.
 The composition root injects the runtime launcher through a narrow consumed
 interface; session workflows do not import the runtime use-case implementation.
+
+Repeat login and auth-only import update only the existing profile's `auth.json`.
+The account repository backs up credentials privately, atomically replaces them,
+and restores the backup when the metadata write fails before commitment. Native
+configuration, sessions, history, and Codex-owned databases remain in place.
+New accounts still promote their complete staged home. No generic file-copy
+helper is needed for this account-specific credential transaction.

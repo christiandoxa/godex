@@ -170,7 +170,8 @@ contents. The command remains one-shot, with or without `--once`. Without
 Selectors match an exact account ID, friendly name, or email. Ambiguous
 selectors fail. Unknown top-level commands are treated as Codex subcommands and
 run through the same managed account runtime. Repeating login for an existing ChatGPT account updates its
-profile instead of creating a duplicate.
+profile credentials instead of creating a duplicate. Existing sessions, history,
+and Codex configuration survive repeat login and import-current.
 
 ## Configuration
 
