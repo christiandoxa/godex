@@ -237,6 +237,12 @@ is shorthand for `session resume`. Native names, `--last`, and interactive picke
 remain scoped to the active or explicitly selected profile. Local native commands
 such as `mcp`, `features`, and `completion` bypass quota and rotation.
 
+`queue --thread UUID_OR_PREFIX --message TEXT` also resolves the owning profile;
+the `--thread=VALUE` form is preserved. Named queue targets stay profile-local.
+Native `debug app-server`, `app-server daemon`, and `app-server proxy` are rejected
+because they discard managed configuration or escape the profile lease and proxy
+lifetime. Use `godex exec` or a foreground `godex app-server` for managed work.
+
 Native command recognition preserves root options and wrapper-generated config.
 Picker/name/`--last` resumes keep the selected rollout home and retain the enabled
 upstream owner pool, without fresh-work quota selection. An explicit `--account`

@@ -120,6 +120,26 @@ func TestNativeLocalDispatchRecognizesRootAndWrapperOptions(t *testing.T) {
 	}
 }
 
+func TestNativeCommandsCannotDiscardManagedRouting(t *testing.T) {
+	for _, args := range [][]string{
+		{"debug", "app-server", "send-message-v2", "message"},
+		{"--current-time-reminder", "debug", "-c", "model=synthetic", "app-server", "send-message-v2", "message"},
+		{"--", "--model", "synthetic", "app-server", "proxy"},
+		{"app-server", "daemon", "start"},
+		{"app-server", "--listen", "stdio", "proxy"},
+	} {
+		if err := Run(t.Context(), nil, nil, args); err == nil || !strings.Contains(err.Error(), "bypasses Godex routing") {
+			t.Fatalf("unsafe native command accepted: %v, %v", args, err)
+		}
+	}
+	for _, args := range [][]string{{"debug", "models"}, {"exec", "debug app-server"}, {"--", "debug", "app-server"}, {"app-server", "generate-json-schema"}} {
+		index := nativeCommandIndex(args)
+		if index >= 0 && unsafeNativeCommand(args, index) {
+			t.Fatalf("safe native command rejected: %v", args)
+		}
+	}
+}
+
 func TestPassthroughCannotMutateManagedCredentials(t *testing.T) {
 	for _, args := range [][]string{{"--", "logout"}, {"--current-time-reminder", "logout"}, {"--", "--model", "synthetic", "login"}, {"--", "login", "--device-auth"}} {
 		if err := Run(t.Context(), nil, nil, args); err == nil || !strings.Contains(err.Error(), "use godex") {
@@ -139,6 +159,8 @@ func TestNativeSessionDeliveryPreservesOptionsAndResolvesPrefix(t *testing.T) {
 		{"--", "--model", "synthetic", "exec", "--json", "resume", "0000", "prompt"},
 		{"--", "--model", "synthetic", "exec", "fork", "0000", "prompt"},
 		{"--", "-c", "model=synthetic", "delete", "--force", "0000"},
+		{"--", "queue", "--thread", "0000", "--message", "message"},
+		{"--", "queue", "--message", "message", "--thread=0000"},
 	} {
 		accounts := &fakeRunnerAccounts{selected: "unchanged"}
 		process := &fakeRunnerProcess{}

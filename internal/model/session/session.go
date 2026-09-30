@@ -28,6 +28,7 @@ type Launch struct {
 	AccountSelector string
 	SessionSelector string
 	IDIndex         int
+	IDPrefix        string
 	Arguments       []string
 	Local           bool
 }

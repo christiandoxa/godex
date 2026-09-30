@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	sessionmodel "github.com/christiandoxa/godex/internal/model/session"
 	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
@@ -26,9 +27,16 @@ func Run(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionus
 		}
 		command := nativeCommandIndex(args)
 		local := command >= 0 && (args[command] == "delete" || args[command] == "archive" || args[command] == "unarchive")
-		return sessions.ResumeArguments(ctx, sessionmodel.Launch{AccountSelector: selector, SessionSelector: args[index], IDIndex: index, Arguments: args, Local: local})
+		prefix, sessionSelector := "", args[index]
+		if value, ok := strings.CutPrefix(sessionSelector, "--thread="); ok {
+			prefix, sessionSelector = "--thread=", value
+		}
+		return sessions.ResumeArguments(ctx, sessionmodel.Launch{AccountSelector: selector, SessionSelector: sessionSelector, IDIndex: index, IDPrefix: prefix, Arguments: args, Local: local})
 	}
 	if index := nativeCommandIndex(codexArguments); index >= 0 {
+		if unsafeNativeCommand(codexArguments, index) {
+			return errors.New("native command bypasses Godex routing; use godex exec or godex app-server without daemon/proxy")
+		}
 		switch codexArguments[index] {
 		case "logout":
 			return errors.New("use godex logout to safely mutate managed credentials")
@@ -39,11 +47,25 @@ func Run(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionus
 			return runner.RunLocal(ctx, selector, codexArguments)
 		case "mcp", "features", "completion", "debug", "config", "delete", "archive", "unarchive", "version", "--version":
 			return runner.RunLocal(ctx, selector, codexArguments)
-		case "resume", "fork":
+		case "resume", "fork", "queue":
 			return runner.RunCurrent(ctx, selector, codexArguments)
 		}
 	}
 	return runner.Run(ctx, selector, codexArguments)
+}
+
+func unsafeNativeCommand(args []string, command int) bool {
+	nested := nextCommandWord(args, command+1)
+	if nested < 0 {
+		return false
+	}
+	switch args[command] {
+	case "debug":
+		return args[nested] == "app-server"
+	case "app-server":
+		return args[nested] == "daemon" || args[nested] == "proxy"
+	}
+	return false
 }
 
 func Doctor(ctx context.Context, doctor *runtimeusecase.Doctor, out io.Writer, arguments []string) error {

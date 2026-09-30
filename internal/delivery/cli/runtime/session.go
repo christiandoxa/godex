@@ -18,6 +18,8 @@ func sessionArgument(arguments []string) (int, []string) {
 		switch args[command] {
 		case "resume", "fork", "delete", "archive", "unarchive":
 			start = command + 1
+		case "queue":
+			return queueArgument(args, command+1), args
 		}
 	}
 	if start < 0 {
@@ -41,17 +43,42 @@ func sessionArgument(arguments []string) (int, []string) {
 				continue
 			}
 		}
-		if len(args[i]) < 4 {
+		if !explicitSessionSelector(args[i]) {
 			return -1, args
-		}
-		for _, r := range strings.ToLower(args[i]) {
-			if !strings.ContainsRune("0123456789abcdef-", r) {
-				return -1, args
-			}
 		}
 		return i, args
 	}
 	return -1, args
+}
+
+func explicitSessionSelector(value string) bool {
+	if len(value) < 4 {
+		return false
+	}
+	for _, r := range strings.ToLower(value) {
+		if !strings.ContainsRune("0123456789abcdef-", r) {
+			return false
+		}
+	}
+	return true
+}
+
+func queueArgument(args []string, start int) int {
+	for i := start; i < len(args); i++ {
+		if args[i] == "--" {
+			break
+		}
+		if args[i] == "--thread" && i+1 < len(args) && explicitSessionSelector(args[i+1]) {
+			return i + 1
+		}
+		if value, ok := strings.CutPrefix(args[i], "--thread="); ok && explicitSessionSelector(value) {
+			return i
+		}
+		if args[i] == "--message" || nativeOptionTakesValue(args[i]) {
+			i++
+		}
+	}
+	return -1
 }
 
 // Root option values and prompt text must not be mistaken for native commands.
@@ -90,7 +117,7 @@ func nextCommandWord(arguments []string, start int) int {
 
 func nativeOptionTakesValue(argument string) bool {
 	switch argument {
-	case "-c", "--config", "-m", "--model", "-C", "--cd", "-i", "--image", "-p", "--profile", "-s", "--sandbox", "-a", "--ask-for-approval", "--enable", "--disable", "--add-dir", "--color", "-o", "--output-last-message", "--output-schema", "--thread-source", "--local-provider":
+	case "-c", "--config", "-m", "--model", "-C", "--cd", "-i", "--image", "-p", "--profile", "-s", "--sandbox", "-a", "--ask-for-approval", "--enable", "--disable", "--add-dir", "--color", "-o", "--output-last-message", "--output-schema", "--thread-source", "--local-provider", "--listen", "--code-mode-host":
 		return true
 	}
 	return false

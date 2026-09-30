@@ -78,7 +78,7 @@ func (catalog *Catalog) ResumeArguments(ctx context.Context, input sessionmodel.
 		return fmt.Errorf("session argument index is invalid")
 	}
 	args := append([]string(nil), arguments...)
-	args[idIndex] = report.ID
+	args[idIndex] = input.IDPrefix + report.ID
 	if input.Local {
 		return catalog.launcher.RunLocal(ctx, report.AccountID, args)
 	}

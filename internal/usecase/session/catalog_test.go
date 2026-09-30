@@ -129,3 +129,21 @@ func TestSessionLocalIntentSurvivesRootOptions(t *testing.T) {
 		t.Fatalf("local session launch = %#v", launcher)
 	}
 }
+
+func TestQueueKeepsOwningProfileAndArgumentForm(t *testing.T) {
+	for _, selector := range []string{"", "work", "personal"} {
+		catalog, launcher := testCatalog()
+		args := []string{"queue", "--thread=b1", "--message", "message"}
+		input := sessionmodel.Launch{AccountSelector: selector, SessionSelector: "b1", IDIndex: 1, IDPrefix: "--thread=", Arguments: args}
+		err := catalog.ResumeArguments(t.Context(), input)
+		if selector == "personal" {
+			if err == nil || launcher.account != "" {
+				t.Fatal("conflicting account queued a message")
+			}
+			continue
+		}
+		if err != nil || launcher.account != "two" || !reflect.DeepEqual(launcher.args, []string{"queue", "--thread=b111", "--message", "message"}) || args[1] != "--thread=b1" {
+			t.Fatalf("queue lost owning profile or arguments: %#v, %v", launcher, err)
+		}
+	}
+}
