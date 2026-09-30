@@ -367,3 +367,35 @@ func TestRunExplicitQuotaExhaustedAccountDoesNotSilentlyRotate(t *testing.T) {
 		t.Fatalf("explicit quota preflight calls = %#v", preflight.calls)
 	}
 }
+
+func TestRunPreflightSnapshotsAccountsAfterFirstReady(t *testing.T) {
+	accounts := &fakeLaunchAccounts{
+		accounts: []accountentity.Account{
+			{ID: "one", Name: "one", Enabled: true},
+			{ID: "two", Name: "two", Enabled: true},
+		},
+		homes: map[string]string{"one": "/profiles/one", "two": "/profiles/two"},
+	}
+	preflight := &fakeQuotaPreflight{ready: map[string]bool{"one": true, "two": false}}
+	process := &fakeProxyProcess{}
+	proxy := &fakeProxy{}
+	var config proxyconfig.Config
+	runner := NewRunner(accounts, process, func(got proxyconfig.Config) (Proxy, error) {
+		config = got
+		return proxy, nil
+	})
+	runner.SetQuotaPreflight(preflight)
+	if err := runner.Run(context.Background(), "", nil); err != nil {
+		t.Fatal(err)
+	}
+	if process.home != "/profiles/one" || strings.Join(preflight.calls, ",") != "one,two" {
+		t.Fatalf("selected home/calls = %q / %#v", process.home, preflight.calls)
+	}
+	managed, err := config.Accounts(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(managed) != 2 || !managed[0].Enabled || managed[1].Enabled {
+		t.Fatalf("quota snapshot = %#v", managed)
+	}
+}

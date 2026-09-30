@@ -18,6 +18,7 @@ func (runner *Runner) selectForLaunch(ctx context.Context, selector string) (acc
 		return accountentity.Account{}, nil, err
 	}
 	exhausted := make(map[string]bool)
+	var firstReady *accountentity.Account
 	var firstUnknown *accountentity.Account
 	for _, candidate := range candidates {
 		ready, probeErr := runner.quota.Ready(ctx, candidate)
@@ -35,7 +36,13 @@ func (runner *Runner) selectForLaunch(ctx context.Context, selector string) (acc
 			exhausted[candidate.ID] = true
 			continue
 		}
-		selected, err := runner.accounts.SelectForLaunch(ctx, candidate.ID)
+		if firstReady == nil {
+			copy := candidate
+			firstReady = &copy
+		}
+	}
+	if firstReady != nil {
+		selected, err := runner.accounts.SelectForLaunch(ctx, firstReady.ID)
 		return selected, exhausted, err
 	}
 	if firstUnknown != nil {
