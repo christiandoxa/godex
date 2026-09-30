@@ -84,6 +84,14 @@ Usage:
   godex --version
   godex <codex-subcommand> ...  Run an unknown Codex command through Godex
 
+Run options (before the Codex command/flags):
+  --account SEL                     Choose a managed account
+  --web-search MODE                 disabled, cached, indexed, or live
+  --rollout-budget-tokens N         Enable Codex rollout-budget reminders
+  --current-time-reminder           Enable Codex current-time reminders
+  --respect-system-proxy            Enable Codex system-proxy support
+  --no-respect-system-proxy         Disable Codex system-proxy support
+
 Login options:
   --name NAME      Friendly account name
   --device-auth    Use Codex device authentication

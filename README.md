@@ -26,7 +26,7 @@ runtime details are documented in [Runtime rotation and affinity](docs/ROTATION.
 
 ## Requirements
 
-- The official Codex CLI available as codex.
+- The official Codex CLI 0.153.2 or newer available as `codex`.
 - Linux, macOS, or Windows on amd64 or arm64 for release binaries.
 - Go 1.27.1 or newer only when building from source.
 
@@ -95,6 +95,23 @@ Choose an account explicitly:
 godex account use work
 godex run --account work -- --model MODEL
 ~~~
+
+Prodex-compatible Codex runtime feature flags are translated to Codex `-c`
+overrides before the remaining Codex arguments. Explicit later Codex `-c`
+arguments still win:
+
+~~~bash
+godex run --web-search indexed exec "review this repository"
+godex run --rollout-budget-tokens 100000 exec "work on this repository"
+godex run --current-time-reminder --respect-system-proxy
+~~~
+
+Supported wrapper flags are `--web-search`, `--rollout-budget-tokens`,
+`--rollout-budget-reminders`, `--rollout-budget-sampling-weight`,
+`--rollout-budget-prefill-weight`, `--current-time-reminder`,
+`--current-time-reminder-interval`, `--current-time-clock-source`,
+`--respect-system-proxy`, and `--no-respect-system-proxy`. Put them before the
+first Codex argument, or use `--` to end Godex option parsing.
 
 Inspect the installation:
 

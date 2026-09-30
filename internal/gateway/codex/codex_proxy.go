@@ -11,6 +11,13 @@ import (
 )
 
 func (process *CodexProcess) CheckProxySupport(ctx context.Context) error {
+	version, err := process.Version(ctx)
+	if err != nil {
+		return err
+	}
+	if err := requireSupportedVersion(version); err != nil {
+		return err
+	}
 	binary, err := process.resolveBinary()
 	if err != nil {
 		return err

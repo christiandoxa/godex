@@ -22,7 +22,11 @@ func TestCheckProxySupportAcceptsAndRejectsCapability(t *testing.T) {
 		{name: "unsupported", exit: "1", wantErr: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			script := writeProxyHelper(t, "exit "+test.exit)
+			script := writeProxyHelper(t, `if [ "$#" -eq 1 ] && [ "$1" = "--version" ]; then
+  printf 'codex-cli 0.159.2\n'
+  exit 0
+fi
+exit `+test.exit)
 			err := NewCodexProcess(script, Terminal{}).CheckProxySupport(context.Background())
 			if (err != nil) != test.wantErr {
 				t.Fatalf("capability error = %v", err)
