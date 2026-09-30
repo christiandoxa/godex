@@ -314,3 +314,9 @@ Retained deactivation belongs to the account domain: CLI enable/disable commands
 invoke account use cases, and the account repository updates enablement and
 repairs deterministic selection under the mutation lock. No home files move.
 Existing remove remains destructive; logout remains native credential removal.
+
+Profile transaction journal version 2 includes the previous metadata snapshot.
+Recovery distinguishes an unchanged metadata update from a committed change;
+normal successful operations explicitly remove the journal. Version 1 journals
+remain readable under their original recovery contract. Managed account/home
+paths and OS lock paths reject symlinks before credential access or mutation.

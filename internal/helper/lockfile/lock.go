@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -16,7 +17,19 @@ func TryAcquire(path string) (func() error, error) { return tryAcquire(path, fal
 func TryRead(path string) (func() error, error) { return tryAcquire(path, true) }
 
 func tryAcquire(path string, shared bool) (func() error, error) {
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0600)
+	info, err := os.Lstat(path)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	if err == nil && !info.Mode().IsRegular() {
+		return nil, errors.New("lock path must be a regular file")
+	}
+	root, err := os.OpenRoot(filepath.Dir(path))
+	if err != nil {
+		return nil, err
+	}
+	defer root.Close()
+	file, err := root.OpenFile(filepath.Base(path), os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
 		return nil, err
 	}

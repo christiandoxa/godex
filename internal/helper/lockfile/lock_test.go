@@ -3,6 +3,7 @@ package lockfile
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -47,5 +48,20 @@ func TestSharedReadersExcludeMutation(t *testing.T) {
 	defer second()
 	if _, err := TryAcquire(path); !errors.Is(err, ErrBusy) {
 		t.Fatalf("mutation entered shared home: %v", err)
+	}
+}
+
+func TestLockRejectsSymbolicLinks(t *testing.T) {
+	home := t.TempDir()
+	target := filepath.Join(t.TempDir(), "target")
+	if err := os.WriteFile(target, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(home, "guard")
+	if err := os.Symlink(target, link); err != nil {
+		t.Skip(err)
+	}
+	if _, err := TryAcquire(link); err == nil {
+		t.Fatal("symlink lock accepted")
 	}
 }

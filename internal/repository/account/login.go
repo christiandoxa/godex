@@ -80,7 +80,7 @@ func (store *FileStore) commitLoginLocked(candidate entity.Account, stagedCodexH
 	if err := store.persistLoginState(state, backup, rollback); err != nil {
 		return entity.Account{}, err
 	}
-	if err := store.recoverTransaction(); err != nil {
+	if err := store.finishTransaction(); err != nil {
 		return entity.Account{}, err
 	}
 	return candidate, nil

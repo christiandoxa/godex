@@ -51,7 +51,7 @@ func (store *FileStore) removeLocked(selector string) (entity.Account, error) {
 	if err := store.finishRemoval(state, trash, restore); err != nil {
 		return removed, err
 	}
-	if err := store.recoverTransaction(); err != nil {
+	if err := store.finishTransaction(); err != nil {
 		return removed, err
 	}
 	return removed, nil

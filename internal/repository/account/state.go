@@ -56,6 +56,9 @@ func (store *FileStore) readState() (stateFile, error) {
 	if err := validateState(state); err != nil {
 		return stateFile{}, err
 	}
+	if err := store.validateProfileDirectories(state.Accounts); err != nil {
+		return stateFile{}, err
+	}
 	return state, nil
 }
 
@@ -145,6 +148,24 @@ func validateState(state stateFile) error {
 	}
 	if !activeFound {
 		return fmt.Errorf("active account %q does not exist", state.ActiveAccountID)
+	}
+	return nil
+}
+
+func (store *FileStore) validateProfileDirectories(accounts []entity.Account) error {
+	for _, account := range accounts {
+		for _, path := range []string{store.accountDir(account.ID), store.CodexHome(account.ID)} {
+			info, err := os.Lstat(path)
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			if err != nil {
+				return errors.New("inspect managed profile directories")
+			}
+			if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+				return errors.New("managed profile paths must be real directories")
+			}
+		}
 	}
 	return nil
 }

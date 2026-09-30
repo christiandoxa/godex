@@ -16,12 +16,13 @@ import (
 )
 
 type profileTransaction struct {
-	Version     int       `json:"version"`
-	Kind        string    `json:"kind"`
-	AccountID   string    `json:"account_id"`
-	Backup      string    `json:"backup"`
-	HadExisting bool      `json:"had_existing"`
-	Next        stateFile `json:"next"`
+	Version     int        `json:"version"`
+	Kind        string     `json:"kind"`
+	AccountID   string     `json:"account_id"`
+	Backup      string     `json:"backup"`
+	HadExisting bool       `json:"had_existing"`
+	Before      *stateFile `json:"before,omitempty"`
+	Next        stateFile  `json:"next"`
 }
 
 func (store *FileStore) beginTransaction(kind, id, backup string, next stateFile) (profileTransaction, error) {
@@ -33,7 +34,11 @@ func (store *FileStore) beginTransaction(kind, id, backup string, next stateFile
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return profileTransaction{}, err
 	}
-	transaction := profileTransaction{Version: 1, Kind: kind, AccountID: id, Backup: backup, HadExisting: err == nil, Next: next}
+	before, err := store.readState()
+	if err != nil {
+		return profileTransaction{}, err
+	}
+	transaction := profileTransaction{Version: 2, Before: &before, Kind: kind, AccountID: id, Backup: backup, HadExisting: err == nil, Next: next}
 	next.Version = stateVersion
 	transaction.Next = next
 	if err := store.validateTransaction(transaction); err != nil {
@@ -66,8 +71,16 @@ func (store *FileStore) journalPath() string {
 }
 
 func (store *FileStore) validateTransaction(tx profileTransaction) error {
-	if tx.Version != 1 {
+	if tx.Version != 1 && tx.Version != 2 {
 		return errors.New("unsupported profile transaction version")
+	}
+	if tx.Version == 2 {
+		if tx.Before == nil {
+			return errors.New("profile transaction has no previous state")
+		}
+		if err := validateState(*tx.Before); err != nil {
+			return err
+		}
 	}
 	if err := validateState(tx.Next); err != nil {
 		return err
@@ -126,17 +139,14 @@ func (store *FileStore) recoverTransaction() error {
 	if err != nil {
 		return err
 	}
-	if reflect.DeepEqual(state, tx.Next) {
+	if reflect.DeepEqual(state, tx.Next) && (tx.Before == nil || !reflect.DeepEqual(state, *tx.Before)) {
 		if err := os.RemoveAll(tx.Backup); err != nil {
 			return err
 		}
 	} else if err := store.rollbackTransaction(tx); err != nil {
 		return fmt.Errorf("recover profile transaction: %w", err)
 	}
-	if err := os.Remove(store.journalPath()); err != nil {
-		return err
-	}
-	return fileutil.SyncDirectory(store.root)
+	return store.finishTransaction()
 }
 
 func (store *FileStore) rollbackTransaction(tx profileTransaction) error {
@@ -174,4 +184,11 @@ func (store *FileStore) rollbackTransaction(tx profileTransaction) error {
 func (store *FileStore) readSnapshot(ctx context.Context) (state stateFile, err error) {
 	err = store.withLock(ctx, func() error { var readErr error; state, readErr = store.readState(); return readErr })
 	return state, err
+}
+
+func (store *FileStore) finishTransaction() error {
+	if err := os.Remove(store.journalPath()); err != nil {
+		return err
+	}
+	return fileutil.SyncDirectory(store.root)
 }

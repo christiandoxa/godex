@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/christiandoxa/godex/internal/helper/lockfile"
+	"os"
 	"path/filepath"
 )
 
@@ -50,6 +51,13 @@ func (store *FileStore) AcquireProfiles(ctx context.Context, ids []string) (func
 }
 
 func (store *FileStore) acquireProfile(id string) (func() error, error) {
+	info, err := os.Lstat(store.accountDir(id))
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	if err == nil && (!info.IsDir() || info.Mode()&os.ModeSymlink != 0) {
+		return nil, errors.New("managed profile must be a real directory")
+	}
 	directory := filepath.Join(store.root, "leases")
 	if err := ensurePrivateDirectory(directory); err != nil {
 		return nil, err
