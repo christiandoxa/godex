@@ -127,6 +127,7 @@ func TestNativeCommandsCannotDiscardManagedRouting(t *testing.T) {
 		{"--", "--model", "synthetic", "app-server", "proxy"},
 		{"app-server", "daemon", "start"},
 		{"app-server", "--listen", "stdio", "proxy"},
+		{"app-server", "--ws-auth", "capability-token", "--ws-token-file", "/synthetic/token", "proxy"},
 	} {
 		if err := Run(t.Context(), nil, nil, args); err == nil || !strings.Contains(err.Error(), "bypasses Godex routing") {
 			t.Fatalf("unsafe native command accepted: %v, %v", args, err)

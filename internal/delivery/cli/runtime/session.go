@@ -119,6 +119,8 @@ func nativeOptionTakesValue(argument string) bool {
 	switch argument {
 	case "-c", "--config", "-m", "--model", "-C", "--cd", "-i", "--image", "-p", "--profile", "-s", "--sandbox", "-a", "--ask-for-approval", "--enable", "--disable", "--add-dir", "--color", "-o", "--output-last-message", "--output-schema", "--thread-source", "--local-provider", "--listen", "--code-mode-host":
 		return true
+	case "--ws-auth", "--ws-token-file", "--ws-token-sha256", "--ws-shared-secret-file", "--ws-issuer", "--ws-audience", "--ws-max-clock-skew-seconds":
+		return true
 	}
 	return false
 }
