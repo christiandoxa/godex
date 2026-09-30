@@ -61,7 +61,7 @@ func (store *FileStore) List(ctx context.Context) ([]entity.Account, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	state, err := store.readState()
+	state, err := store.readSnapshot(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func (store *FileStore) Resolve(ctx context.Context, selector string) (entity.Ac
 	if err := ctx.Err(); err != nil {
 		return entity.Account{}, err
 	}
-	state, err := store.readState()
+	state, err := store.readSnapshot(ctx)
 	if err != nil {
 		return entity.Account{}, err
 	}

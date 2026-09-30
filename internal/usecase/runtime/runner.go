@@ -52,10 +52,27 @@ func (runner *Runner) SetUpstreamURL(upstream string) {
 	}
 }
 
-func (runner *Runner) Run(ctx context.Context, selector string, arguments []string) error {
+func (runner *Runner) Run(ctx context.Context, selector string, arguments []string) (runErr error) {
 	selected, exhausted, err := runner.selectForLaunch(ctx, selector)
 	if err != nil {
 		return err
+	}
+	if leases, ok := runner.accounts.(interface {
+		AcquireProfiles(context.Context, []string) (func() error, error)
+	}); ok {
+		candidates, err := runner.accounts.LaunchCandidates(ctx, selector)
+		if err != nil {
+			return err
+		}
+		ids := make([]string, 0, len(candidates))
+		for _, account := range candidates {
+			ids = append(ids, account.ID)
+		}
+		release, err := leases.AcquireProfiles(ctx, ids)
+		if err != nil {
+			return err
+		}
+		defer func() { runErr = errors.Join(runErr, release()) }()
 	}
 	home := runner.accounts.CodexHome(selected.ID)
 	proxyRunner, ok := runner.process.(proxyCodex)
@@ -88,7 +105,7 @@ func (runner *Runner) Run(ctx context.Context, selector string, arguments []stri
 	if err := proxy.Start(); err != nil {
 		return err
 	}
-	runErr := proxyRunner.RunThroughProxy(ctx, home, proxy.Endpoint(), arguments)
+	runErr = proxyRunner.RunThroughProxy(ctx, home, proxy.Endpoint(), arguments)
 	closeContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
 	if closeErr := proxy.Close(closeContext); runErr == nil {

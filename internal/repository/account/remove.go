@@ -29,14 +29,29 @@ func (store *FileStore) removeLocked(selector string) (entity.Account, error) {
 		return entity.Account{}, err
 	}
 	removed := state.Accounts[index]
-	nextID := cursorAccountID(state)
-	trash, restore, err := store.stageRemoval(removed.ID)
+	release, err := store.acquireProfile(removed.ID)
 	if err != nil {
 		return entity.Account{}, err
 	}
+	defer release()
+	nextID := cursorAccountID(state)
 	state.Accounts = append(state.Accounts[:index], state.Accounts[index+1:]...)
 	repairSelectionAfterRemove(&state, removed.ID, nextID)
+	trash, err := store.transactionPath(store.accountDir(removed.ID), "remove")
+	if err != nil {
+		return entity.Account{}, err
+	}
+	if _, err := store.beginTransaction("remove", removed.ID, trash, state); err != nil {
+		return entity.Account{}, err
+	}
+	trash, restore, err := store.stageRemoval(removed.ID, trash)
+	if err != nil {
+		return entity.Account{}, err
+	}
 	if err := store.finishRemoval(state, trash, restore); err != nil {
+		return removed, err
+	}
+	if err := store.recoverTransaction(); err != nil {
 		return removed, err
 	}
 	return removed, nil

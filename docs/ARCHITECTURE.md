@@ -243,3 +243,14 @@ and restores the backup when the metadata write fails before commitment. Native
 configuration, sessions, history, and Codex-owned databases remain in place.
 New accounts still promote their complete staged home. No generic file-copy
 helper is needed for this account-specific credential transaction.
+
+Profile mutations write a versioned, metadata-only transaction journal before
+changing a home or credentials. Reads and mutations recover an interrupted
+transaction under the state lock: restore its previous files before metadata
+commitment, or finish cleanup after commitment. Native OS file locks serialize
+commands and release on process death; the legacy directory lock remains for
+compatibility and checks process liveness before reclamation. Profile-use leases
+prevent removal or credential replacement while a managed child is running.
+Locking code stays local to the account repository until another domain consumes
+that exact technical contract. Account IDs and backup paths are validated before
+recovery; credential contents never enter the journal.

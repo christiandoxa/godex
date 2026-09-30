@@ -8,12 +8,8 @@ import (
 	"path/filepath"
 )
 
-func (store *FileStore) replaceProfile(accountID, stagedCodexHome string) (string, func() error, error) {
+func (store *FileStore) replaceProfile(accountID, stagedCodexHome, backup string) (string, func() error, error) {
 	accountDirectory := store.accountDir(accountID)
-	backup, err := store.transactionPath(accountDirectory, "backup")
-	if err != nil {
-		return "", func() error { return nil }, err
-	}
 	if err := validateStagedProfile(stagedCodexHome); err != nil {
 		return "", func() error { return nil }, err
 	}
@@ -95,12 +91,8 @@ func (store *FileStore) rollbackProfile(accountDirectory, backup string, hadExis
 	return rollbackErr
 }
 
-func (store *FileStore) stageRemoval(accountID string) (string, func() error, error) {
+func (store *FileStore) stageRemoval(accountID, trash string) (string, func() error, error) {
 	accountDirectory := store.accountDir(accountID)
-	trash, err := store.transactionPath(accountDirectory, "remove")
-	if err != nil {
-		return "", func() error { return nil }, err
-	}
 	if err := os.Rename(accountDirectory, trash); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return "", func() error { return nil }, nil

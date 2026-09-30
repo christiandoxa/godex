@@ -4,15 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 )
 
 const (
 	lockPollInterval = 25 * time.Millisecond
-	// ponytail: fixed lease; add owner heartbeat/liveness checks if profile operations can exceed two minutes.
-	staleLockAge = 2 * time.Minute
+	staleLockAge     = 2 * time.Minute
 )
 
 func (store *FileStore) withLock(ctx context.Context, operation func() error) error {
@@ -22,12 +24,20 @@ func (store *FileStore) withLock(ctx context.Context, operation func() error) er
 	if err := store.Prepare(); err != nil {
 		return err
 	}
+	unlock, err := acquireFileLock(ctx, filepath.Join(store.root, "state.guard"))
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	lockPath := filepath.Join(store.root, "state.lock")
 	token, err := store.acquireLock(ctx, lockPath)
 	if err != nil {
 		return err
 	}
 	defer releaseLock(lockPath, token)
+	if err := store.recoverTransaction(); err != nil {
+		return err
+	}
 	return operation()
 }
 
@@ -91,6 +101,18 @@ func (store *FileStore) lockIsStale(path string) (bool, error) {
 	}
 	if err != nil {
 		return false, fmt.Errorf("inspect Godex state lock: %w", err)
+	}
+	owner, readErr := os.ReadFile(filepath.Join(path, "owner"))
+	if readErr == nil {
+		value, _, _ := strings.Cut(string(owner), "-")
+		pid, err := strconv.Atoi(value)
+		if err != nil || pid <= 0 {
+			return false, errors.New("invalid Godex state lock owner")
+		}
+		return !processAlive(pid), nil
+	}
+	if !errors.Is(readErr, os.ErrNotExist) {
+		return false, readErr
 	}
 	return store.now().Sub(info.ModTime()) > staleLockAge, nil
 }

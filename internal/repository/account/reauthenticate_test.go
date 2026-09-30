@@ -49,7 +49,7 @@ func TestAuthenticationReplacementCanRollback(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(staged, "auth.json"), []byte("new"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	_, rollback, err := store.replaceAuthentication(account.ID, staged)
+	_, rollback, err := store.replaceAuthentication(account.ID, staged, auth+".backup-test")
 	if err != nil {
 		t.Fatal(err)
 	}

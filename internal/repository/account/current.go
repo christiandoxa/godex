@@ -11,7 +11,7 @@ func (store *FileStore) Current(ctx context.Context) (entity.Account, error) {
 	if err := ctx.Err(); err != nil {
 		return entity.Account{}, err
 	}
-	state, err := store.readState()
+	state, err := store.readSnapshot(ctx)
 	if err != nil {
 		return entity.Account{}, err
 	}

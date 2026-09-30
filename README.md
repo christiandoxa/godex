@@ -208,3 +208,8 @@ make verify
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
+
+Managed profiles are pinned while Codex runs. Login updates or removal of a
+profile in use fail clearly. Interrupted profile transactions recover on the next
+account read or mutation. Do not run older Godex versions concurrently: earlier
+versions used time-only lock reclamation and cannot enforce profile-use leases.

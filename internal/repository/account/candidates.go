@@ -15,7 +15,7 @@ func (store *FileStore) LaunchCandidates(ctx context.Context, selector string) (
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	state, err := store.readState()
+	state, err := store.readSnapshot(ctx)
 	if err != nil {
 		return nil, err
 	}

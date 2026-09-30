@@ -9,7 +9,7 @@ import (
 )
 
 // Reauthentication replaces credentials only; Codex history and settings remain.
-func (store *FileStore) replaceAuthentication(accountID, stagedHome string) (string, func() error, error) {
+func (store *FileStore) replaceAuthentication(accountID, stagedHome, backup string) (string, func() error, error) {
 	home := store.CodexHome(accountID)
 	if err := ownerOnlyDirectory(home); err != nil {
 		return "", nil, err
@@ -18,10 +18,6 @@ func (store *FileStore) replaceAuthentication(accountID, stagedHome string) (str
 		return "", nil, err
 	}
 	auth := filepath.Join(home, "auth.json")
-	backup, err := store.transactionPath(auth, "backup")
-	if err != nil {
-		return "", nil, err
-	}
 	hadAuth, err := backupAuthentication(auth, backup)
 	if err != nil {
 		return "", nil, err
@@ -65,15 +61,25 @@ func backupAuthentication(auth, backup string) (bool, error) {
 		return false, err
 	}
 	defer source.Close()
-	target, err := os.OpenFile(backup, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	target, err := os.CreateTemp(filepath.Dir(backup), ".auth-backup-*")
 	if err != nil {
 		return false, err
 	}
-	_, copyErr := io.Copy(target, io.LimitReader(source, (1<<20)+1))
+	defer os.Remove(target.Name())
+	count, copyErr := io.Copy(target, io.LimitReader(source, (1<<20)+1))
 	syncErr := target.Sync()
 	closeErr := target.Close()
 	if err := errors.Join(copyErr, syncErr, closeErr); err != nil {
 		_ = os.Remove(backup)
+		return false, err
+	}
+	if count > 1<<20 {
+		return false, errors.New("account authentication exceeds size limit")
+	}
+	if err := replaceFile(target.Name(), backup); err != nil {
+		return false, err
+	}
+	if err := syncDirectory(filepath.Dir(backup)); err != nil {
 		return false, err
 	}
 	return true, nil

@@ -51,18 +51,36 @@ func (store *FileStore) commitLoginLocked(candidate entity.Account, stagedCodexH
 		return entity.Account{}, err
 	}
 
-	var backup string
+	release, err := store.acquireProfile(candidate.ID)
+	if err != nil {
+		return entity.Account{}, err
+	}
+	defer release()
+	updateLoginState(&state, candidate, existingIndex, nextID, hadEnabled)
+	kind, base := "profile", store.accountDir(candidate.ID)
+	if existingIndex >= 0 {
+		kind, base = "auth", store.CodexHome(candidate.ID)+string(os.PathSeparator)+"auth.json"
+	}
+	backup, err := store.transactionPath(base, "backup")
+	if err != nil {
+		return entity.Account{}, err
+	}
+	if _, err := store.beginTransaction(kind, candidate.ID, backup, state); err != nil {
+		return entity.Account{}, err
+	}
 	var rollback func() error
 	if existingIndex >= 0 {
-		backup, rollback, err = store.replaceAuthentication(candidate.ID, stagedCodexHome)
+		backup, rollback, err = store.replaceAuthentication(candidate.ID, stagedCodexHome, backup)
 	} else {
-		backup, rollback, err = store.replaceProfile(candidate.ID, stagedCodexHome)
+		backup, rollback, err = store.replaceProfile(candidate.ID, stagedCodexHome, backup)
 	}
 	if err != nil {
 		return entity.Account{}, err
 	}
-	updateLoginState(&state, candidate, existingIndex, nextID, hadEnabled)
 	if err := store.persistLoginState(state, backup, rollback); err != nil {
+		return entity.Account{}, err
+	}
+	if err := store.recoverTransaction(); err != nil {
 		return entity.Account{}, err
 	}
 	return candidate, nil

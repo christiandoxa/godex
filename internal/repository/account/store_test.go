@@ -605,7 +605,7 @@ func TestPromotionFailureRestoresExistingProfile(t *testing.T) {
 func TestStagedRemovalCanRestoreProfile(t *testing.T) {
 	store := newTestStore(t)
 	account := commitTestAccount(t, store, "work", "person@example.com", "account-1")
-	trash, restore, err := store.stageRemoval(account.ID)
+	trash, restore, err := store.stageRemoval(account.ID, store.accountDir(account.ID)+".remove-test")
 	if err != nil {
 		t.Fatal(err)
 	}
