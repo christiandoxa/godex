@@ -239,3 +239,17 @@ account that served it, even if the first request rotated accounts. Unknown
 opaque continuations fail clearly. Native/imported sessions without an existing
 binding use their containing profile. Stable ownership is retained; the store
 refuses new conversations if its 8,192 protected-binding ceiling is reached.
+
+Launch quota exhaustion is temporary: accounts become eligible for a fresh
+upstream attempt at their observed reset deadline. When the reset is unknown,
+Godex retries eligibility after one minute. Upstream quota responses still
+quarantine the account before output commitment. Hard conversation ownership
+bypasses fresh-work quota selection and is never rotated at a quota reset.
+
+`godex account disable SELECTOR` retains credentials, configuration, and sessions
+while excluding the account from new launches and routing. `godex account enable
+SELECTOR` restores eligibility. Both fail if Codex currently uses the profile.
+Use disable for retained deactivation, logout to remove only credentials, and
+`account remove` to delete the entire managed profile and its native state.
+Godex deliberately keeps the existing destructive remove contract; it does not
+silently change the default or add a second archive tree.

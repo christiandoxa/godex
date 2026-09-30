@@ -300,7 +300,7 @@ func TestRunQuotaPreflightRotatesBeforeCommittingSelection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(managed) != 2 || managed[0].Enabled || !managed[1].Enabled {
+	if len(managed) != 2 || !managed[0].Enabled || managed[0].EligibleAfter.IsZero() || !managed[1].EligibleAfter.IsZero() {
 		t.Fatalf("quota-filtered accounts = %#v", managed)
 	}
 	if strings.Join(preflight.calls, ",") != "one,two" {
@@ -395,7 +395,7 @@ func TestRunPreflightSnapshotsAccountsAfterFirstReady(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(managed) != 2 || !managed[0].Enabled || managed[1].Enabled {
+	if len(managed) != 2 || !managed[0].Enabled || managed[1].EligibleAfter.IsZero() {
 		t.Fatalf("quota snapshot = %#v", managed)
 	}
 }

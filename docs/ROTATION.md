@@ -19,7 +19,8 @@ Only an **uncommitted** request may move to another account.
 
 Before starting Codex, Godex previews the account store's deterministic
 round-robin order and probes each enabled candidate once. Confirmed exhausted
-accounts are excluded from fresh-work eligibility for that launch. Probe
+accounts are excluded from fresh-work eligibility until their observed reset
+deadline, or for one minute when the deadline is unknown. Probe
 failures are treated as unknown rather than exhausted. Godex selects the first
 known-ready candidate; if none are known ready, it falls back to the first
 unknown candidate. An explicit selector is never silently replaced by another
@@ -38,9 +39,11 @@ Once Codex is running:
 
 If a continuation's owner is disabled, unavailable, or no longer registered,
 Godex returns a continuity-preserving error. It does not silently move that
-conversation to another account. Quota preflight is launch-scoped: it does not
-probe per request, per retry, or per stream chunk, and it never changes hard
-continuation affinity.
+conversation to another account. Quota probing is launch-scoped. The snapshot carries a temporary eligibility
+deadline separately from account enablement. The next fresh request after that
+deadline may attempt the account upstream; a continuing quota failure is handled
+by the normal precommit retry/quarantine policy. There are no background probes
+or per-chunk checks, and hard continuation affinity always wins.
 
 ## Failure policy
 

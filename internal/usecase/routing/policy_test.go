@@ -87,3 +87,20 @@ func TestClassifyPreCommitFailures(t *testing.T) {
 		})
 	}
 }
+
+func TestLaunchQuotaExclusionRecoversAtItsDeadline(t *testing.T) {
+	now := time.Unix(100, 0)
+	router := &Router{now: func() time.Time { return now }, quarantine: make(map[string]time.Time)}
+	accounts := []proxymodel.Account{{ID: "exhausted", Home: "home", Enabled: true, EligibleAfter: now.Add(time.Minute)}}
+	if got := router.candidates(accounts, now); len(got) != 0 {
+		t.Fatal("exhausted account admitted early")
+	}
+	now = now.Add(time.Minute)
+	if got := router.candidates(accounts, now); len(got) != 1 {
+		t.Fatal("quota account remained disabled after reset")
+	}
+	accounts[0].Enabled = false
+	if got := router.candidates(accounts, now); len(got) != 0 {
+		t.Fatal("business-disabled account admitted at quota reset")
+	}
+}

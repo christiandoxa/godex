@@ -75,7 +75,10 @@ through a narrow interface, so it does not import the quota use-case package.
 
 Before proxy startup, Godex probes enabled launch candidates once. Confirmed
 exhaustion removes an account from fresh-work eligibility for that launch; a
-transport or auth probe failure is treated as unknown and remains eligible. The
+transport or auth probe failure is treated as unknown and remains eligible.
+Quota use cases also expose an eligibility deadline; runtime models keep it
+separate from account enablement. Routing re-admits the account at the deadline
+without a daemon or repeated quota probes. Unknown resets use one minute. The
 quota command is intentionally a one-shot OpenAI/Codex view. Live dashboards,
 provider-wide quota catalogs, and background quota daemons remain outside
 Godex's scope.
@@ -306,3 +309,8 @@ persistence consumers, account and routing, and own only OS locks and durable
 private atomic writes. Running Codex children hold shared profile leases;
 credential mutation/removal requires an exclusive lease. Concurrent native
 children can share a profile without weakening mutation exclusion.
+
+Retained deactivation belongs to the account domain: CLI enable/disable commands
+invoke account use cases, and the account repository updates enablement and
+repairs deterministic selection under the mutation lock. No home files move.
+Existing remove remains destructive; logout remains native credential removal.

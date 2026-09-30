@@ -113,6 +113,8 @@ Usage:
   godex profile import-current [name]
                                Import the current Codex ChatGPT login
   godex account use <selector>  Choose the first account for the next launch
+  godex account enable/disable <sel>
+                               Retain a profile while controlling eligibility
   godex account remove <sel>    Remove an account
   godex quota [--all] [--detail] [--once] [selector]
                                Show ChatGPT quota for managed accounts

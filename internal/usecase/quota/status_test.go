@@ -105,3 +105,24 @@ func TestStatusReadyUsesQuotaPolicy(t *testing.T) {
 		t.Fatalf("ready = %t, err = %v", ready, err)
 	}
 }
+
+func TestAvailabilityUsesObservedResetAndFiniteUnknownRetry(t *testing.T) {
+	now := time.Unix(100, 0)
+	reset := now.Add(15 * time.Second).Unix()
+	used := int64(100)
+	account := accountentity.Account{ID: "one", Enabled: true}
+	for _, test := range []struct {
+		usage    quotamodel.Usage
+		deadline time.Time
+	}{
+		{quotamodel.Usage{Primary: &quotamodel.Window{UsedPercent: &used, ResetAt: &reset}}, time.Unix(reset, 0)},
+		{quotamodel.Usage{Primary: &quotamodel.Window{UsedPercent: &used}}, now.Add(time.Minute)},
+	} {
+		status := NewStatus(fakeAccounts{}, fakeUsage{byHome: map[string]quotamodel.Usage{"/managed/one": test.usage}})
+		status.now = func() time.Time { return now }
+		availability, err := status.Availability(context.Background(), account)
+		if err != nil || availability.Ready || !availability.RetryAt.Equal(test.deadline) {
+			t.Fatalf("availability = %v, %v", availability, err)
+		}
+	}
+}

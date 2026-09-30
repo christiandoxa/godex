@@ -100,3 +100,28 @@ func TestAccountCommandRejectsInvalidArguments(t *testing.T) {
 		}
 	}
 }
+
+type enabledAccounts struct {
+	testAccounts
+	enabled bool
+}
+
+func (accounts *enabledAccounts) SetEnabled(_ context.Context, selector string, enabled bool) (accountentity.Account, error) {
+	accounts.enabled = enabled
+	return accountentity.Account{Name: selector, Enabled: enabled}, nil
+}
+func TestEnableAndDisableDelivery(t *testing.T) {
+	accounts := &enabledAccounts{}
+	var out bytes.Buffer
+	for _, action := range []string{"enable", "disable"} {
+		if err := Run(context.Background(), accounts, &out, []string{action, "work"}); err != nil {
+			t.Fatal(err)
+		}
+		if accounts.enabled != (action == "enable") {
+			t.Fatal("enablement flag was lost")
+		}
+	}
+	if err := Run(context.Background(), accounts, &out, []string{"disable"}); err == nil {
+		t.Fatal("missing selector accepted")
+	}
+}

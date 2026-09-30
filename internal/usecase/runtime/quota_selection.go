@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
+	"time"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
 )
 
-func (runner *Runner) selectForLaunch(ctx context.Context, selector string) (accountentity.Account, map[string]bool, error) {
+func (runner *Runner) selectForLaunch(ctx context.Context, selector string) (accountentity.Account, map[string]time.Time, error) {
 	if runner.quota == nil {
 		selected, err := runner.accounts.SelectForLaunch(ctx, selector)
 		return selected, nil, err
@@ -17,11 +19,23 @@ func (runner *Runner) selectForLaunch(ctx context.Context, selector string) (acc
 	if err != nil {
 		return accountentity.Account{}, nil, err
 	}
-	exhausted := make(map[string]bool)
+	exhausted := make(map[string]time.Time)
 	var firstReady *accountentity.Account
 	var firstUnknown *accountentity.Account
 	for _, candidate := range candidates {
-		ready, probeErr := runner.quota.Ready(ctx, candidate)
+		ready, probeErr := false, error(nil)
+		retryAt := time.Now().Add(time.Minute)
+		if quota, ok := runner.quota.(interface {
+			Availability(context.Context, accountentity.Account) (quotamodel.Availability, error)
+		}); ok {
+			availability, err := quota.Availability(ctx, candidate)
+			ready, probeErr = availability.Ready, err
+			if !availability.RetryAt.IsZero() {
+				retryAt = availability.RetryAt
+			}
+		} else {
+			ready, probeErr = runner.quota.Ready(ctx, candidate)
+		}
 		if ctx.Err() != nil {
 			return accountentity.Account{}, nil, ctx.Err()
 		}
@@ -33,7 +47,7 @@ func (runner *Runner) selectForLaunch(ctx context.Context, selector string) (acc
 			continue
 		}
 		if !ready {
-			exhausted[candidate.ID] = true
+			exhausted[candidate.ID] = retryAt
 			continue
 		}
 		if firstReady == nil {

@@ -110,7 +110,7 @@ func (runner *Runner) launch(ctx context.Context, homeID, preferredID string, pr
 	return runErr
 }
 
-func (runner *Runner) proxyAccounts(ctx context.Context, exhausted map[string]bool, selector, selectedID string) ([]proxyconfig.Account, error) {
+func (runner *Runner) proxyAccounts(ctx context.Context, exhausted map[string]time.Time, selector, selectedID string) ([]proxyconfig.Account, error) {
 	accounts, err := runner.accounts.List(ctx)
 	if err != nil {
 		return nil, err
@@ -121,9 +121,10 @@ func (runner *Runner) proxyAccounts(ctx context.Context, exhausted map[string]bo
 			continue
 		}
 		profiles = append(profiles, proxyconfig.Account{
-			ID:      account.ID,
-			Home:    runner.accounts.CodexHome(account.ID),
-			Enabled: account.Enabled && !exhausted[account.ID],
+			ID:            account.ID,
+			Home:          runner.accounts.CodexHome(account.ID),
+			Enabled:       account.Enabled,
+			EligibleAfter: exhausted[account.ID],
 		})
 	}
 	return profiles, nil

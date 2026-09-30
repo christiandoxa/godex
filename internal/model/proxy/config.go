@@ -1,11 +1,15 @@
 package proxy
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 type Account struct {
-	ID      string
-	Home    string
-	Enabled bool
+	ID            string
+	Home          string
+	Enabled       bool
+	EligibleAfter time.Time
 }
 
 type Config struct {

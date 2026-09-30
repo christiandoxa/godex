@@ -36,15 +36,8 @@ func NewStatus(accounts accountStore, usage usageGateway) *Status {
 }
 
 func (status *Status) Ready(ctx context.Context, account accountentity.Account) (bool, error) {
-	if !account.Enabled {
-		return false, nil
-	}
-	usage, err := status.usage.Fetch(ctx, status.accounts.CodexHome(account.ID))
-	if err != nil {
-		return false, err
-	}
-	report := quotamodel.Report{Enabled: true, Usage: usage}
-	return quotaState(report, status.now()) != "exhausted", nil
+	availability, err := status.Availability(ctx, account)
+	return availability.Ready, err
 }
 
 func (status *Status) Run(ctx context.Context, options Options) ([]quotamodel.Report, error) {
