@@ -34,11 +34,12 @@ func (store *FileStore) beginTransaction(kind, id, backup string, next stateFile
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return profileTransaction{}, err
 	}
+	hadExisting := err == nil
 	before, err := store.readState()
 	if err != nil {
 		return profileTransaction{}, err
 	}
-	transaction := profileTransaction{Version: 2, Before: &before, Kind: kind, AccountID: id, Backup: backup, HadExisting: err == nil, Next: next}
+	transaction := profileTransaction{Version: 2, Before: &before, Kind: kind, AccountID: id, Backup: backup, HadExisting: hadExisting, Next: next}
 	next.Version = stateVersion
 	transaction.Next = next
 	if err := store.validateTransaction(transaction); err != nil {

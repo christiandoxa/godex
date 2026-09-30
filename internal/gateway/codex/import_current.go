@@ -27,15 +27,16 @@ func (process *CodexProcess) ImportCurrent(
 	}
 
 	authPath := filepath.Join(sourceHome, "auth.json")
-	identity, err := readChatGPTIdentity(authPath)
-	if err != nil {
-		return entity.Identity{}, fmt.Errorf("read current Codex login: %w", err)
-	}
 	content, err := readPrivateAuthFile(authPath)
 	if err != nil {
 		return entity.Identity{}, err
 	}
 	defer clear(content)
+	// Metadata and staged credentials must describe the same native snapshot.
+	identity, err := chatGPTIdentity(content)
+	if err != nil {
+		return entity.Identity{}, fmt.Errorf("read current Codex login: %w", err)
+	}
 
 	if err := prepareCodexHome(stagedHome); err != nil {
 		return entity.Identity{}, err

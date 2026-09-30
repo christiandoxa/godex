@@ -30,6 +30,10 @@ func TestImportCurrentCopiesOnlyChatGPTAuthentication(t *testing.T) {
 	if identity.Email != "person@example.com" || identity.ChatGPTAccountID != "account-123" {
 		t.Fatalf("identity = %+v", identity)
 	}
+	stagedIdentity, err := readChatGPTIdentity(filepath.Join(stagedHome, "auth.json"))
+	if err != nil || stagedIdentity != identity {
+		t.Fatalf("staged identity differs from metadata: %v", err)
+	}
 	if _, err := ReadAccessToken(filepath.Join(stagedHome, "auth.json")); err != nil {
 		t.Fatalf("staged auth: %v", err)
 	}
@@ -38,6 +42,26 @@ func TestImportCurrentCopiesOnlyChatGPTAuthentication(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(stagedHome, "history.jsonl")); !os.IsNotExist(err) {
 		t.Fatalf("history was copied or returned unexpected error: %v", err)
+	}
+}
+
+func TestIdentityUsesSnapshotAfterNativeCredentialReplacement(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "auth.json")
+	old := []byte(`{"auth_mode":"chatgpt","tokens":{"access_token":"synthetic-old","account_id":"old-account"}}`)
+	if err := os.WriteFile(path, old, 0600); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := readPrivateAuthFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clear(snapshot)
+	if err := os.WriteFile(path, []byte(`{"auth_mode":"chatgpt","tokens":{"access_token":"synthetic-new","account_id":"new-account"}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	identity, err := chatGPTIdentity(snapshot)
+	if err != nil || identity.ChatGPTAccountID != "old-account" {
+		t.Fatalf("identity did not follow credential snapshot: %v", err)
 	}
 }
 

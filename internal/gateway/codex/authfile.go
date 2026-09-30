@@ -55,6 +55,10 @@ func readChatGPTIdentity(path string) (entity.Identity, error) {
 	}
 	defer clear(content)
 
+	return chatGPTIdentity(content)
+}
+
+func chatGPTIdentity(content []byte) (entity.Identity, error) {
 	var auth codexAuthFile
 	if err := json.Unmarshal(content, &auth); err != nil {
 		return entity.Identity{}, errors.New("decode Codex auth profile")
