@@ -33,10 +33,23 @@ func exportProfiles(ctx context.Context, catalog *profileusecase.Catalog, out io
 }
 
 func importProfiles(ctx context.Context, catalog *profileusecase.Catalog, out io.Writer, arguments []string) error {
-	if len(arguments) != 1 || strings.HasPrefix(arguments[0], "-") {
-		return errors.New("usage: godex profile import PATH")
+	options, err := parseImport(arguments)
+	if err != nil {
+		return err
 	}
-	request := profilemodel.ImportRequest{Path: arguments[0], Password: os.Getenv(importPasswordEnv)}
+	if builtinImportSource(options.path) {
+		result, err := catalog.ImportBuiltin(ctx, profilemodel.BuiltinImportRequest{
+			Source: options.path, Name: options.name, Activate: options.activate, Insecure: options.insecure,
+		})
+		if err != nil {
+			return err
+		}
+		return writeBuiltinImportResult(out, result)
+	}
+	if options.name != "" || options.activate {
+		return errors.New("--name and --activate are only supported for built-in import sources such as `claude`, `copilot`, or `kiro`")
+	}
+	request := profilemodel.ImportRequest{Path: options.path, Password: os.Getenv(importPasswordEnv)}
 	result, err := catalog.Import(ctx, request)
 	if err != nil && request.Password == "" && importRequiresPassword(err) {
 		password, promptErr := resolveImportPassword(ctx)
@@ -50,6 +63,74 @@ func importProfiles(ctx context.Context, catalog *profileusecase.Catalog, out io
 		return err
 	}
 	_, err = fmt.Fprintf(out, "Imported %d profile(s); updated %d existing profile(s).\nPath: %s\nEncrypted: %t\n", result.ImportedCount, result.UpdatedCount, result.Path, result.Encrypted)
+	return err
+}
+
+type importCLIOptions struct {
+	path     string
+	name     string
+	activate bool
+	insecure bool
+}
+
+func parseImport(arguments []string) (importCLIOptions, error) {
+	options := importCLIOptions{}
+	for index := 0; index < len(arguments); index++ {
+		argument := arguments[index]
+		switch {
+		case argument == "--activate":
+			options.activate = true
+		case argument == "--insecure":
+			options.insecure = true
+		case argument == "--name" || strings.HasPrefix(argument, "--name="):
+			value, next, valueErr := profileImportOptionValue(arguments, index, "--name")
+			if valueErr != nil {
+				return importCLIOptions{}, valueErr
+			}
+			options.name, index = value, next
+		case strings.HasPrefix(argument, "-"):
+			return importCLIOptions{}, fmt.Errorf("unknown profile import option %q", argument)
+		case options.path == "":
+			options.path = argument
+		default:
+			return importCLIOptions{}, errors.New("profile import accepts exactly one path or built-in source")
+		}
+	}
+	if options.path == "" {
+		return importCLIOptions{}, errors.New("usage: godex profile import PATH_OR_SOURCE [--name NAME] [--activate] [--insecure]")
+	}
+	return options, nil
+}
+
+func profileImportOptionValue(arguments []string, index int, name string) (string, int, error) {
+	argument := arguments[index]
+	if argument == name {
+		if index+1 >= len(arguments) || strings.TrimSpace(arguments[index+1]) == "" {
+			return "", index, fmt.Errorf("%s requires a value", name)
+		}
+		return arguments[index+1], index + 1, nil
+	}
+	value := strings.TrimSpace(strings.TrimPrefix(argument, name+"="))
+	if value == "" {
+		return "", index, fmt.Errorf("%s requires a value", name)
+	}
+	return value, index, nil
+}
+
+func builtinImportSource(path string) bool {
+	if path != "claude" && path != "copilot" && path != "kiro" {
+		return false
+	}
+	_, err := os.Lstat(path)
+	return errors.Is(err, os.ErrNotExist)
+}
+
+func writeBuiltinImportResult(out io.Writer, result profilemodel.BuiltinImportResult) error {
+	verb := "Created"
+	if result.Updated {
+		verb = "Updated"
+	}
+	_, err := fmt.Fprintf(out, "%s %s profile %q.\nProvider: %s\nActive: %t\n", verb, result.Provider, result.Profile, result.Provider, result.Active)
 	return err
 }
 

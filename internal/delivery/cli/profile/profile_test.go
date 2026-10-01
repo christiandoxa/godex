@@ -215,3 +215,44 @@ func TestImportPasswordRetryOnlyRecognizesPasswordErrors(t *testing.T) {
 		t.Fatal("unrelated import error unexpectedly requested a password")
 	}
 }
+
+func TestProfileImportArgumentParsingSupportsBuiltInSources(t *testing.T) {
+	options, err := parseImport([]string{"claude", "--name", "work", "--activate", "--insecure"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if options.path != "claude" || options.name != "work" || !options.activate || !options.insecure {
+		t.Fatalf("options = %+v", options)
+	}
+	for _, arguments := range [][]string{
+		nil,
+		{"claude", "other"},
+		{"claude", "--name"},
+		{"claude", "--unknown"},
+	} {
+		if _, err := parseImport(arguments); err == nil {
+			t.Fatalf("arguments %#v unexpectedly accepted", arguments)
+		}
+	}
+}
+
+func TestBuiltInImportSourceDoesNotShadowExistingFile(t *testing.T) {
+	old, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(old)
+	if builtinImportSource("claude") != true {
+		t.Fatal("missing claude path should resolve built-in source")
+	}
+	if err := os.WriteFile("claude", []byte("bundle"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if builtinImportSource("claude") {
+		t.Fatal("existing file named claude was shadowed by built-in source")
+	}
+}

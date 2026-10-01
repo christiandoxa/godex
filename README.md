@@ -118,8 +118,15 @@ terminal, omitting both protection flags opens a Bubble Tea protection prompt;
 protected export/import passwords are entered through a masked Bubble Tea prompt
 when the matching `PRODEX_PROFILE_*_PASSWORD` environment variable is unset.
 Non-TTY workflows remain fail-closed and require explicit flags/environment.
-OpenAI profiles are supported in this checkpoint; provider-specific secret files
-are rejected until their provider import paths are implemented.
+
+`godex profile import claude` imports an existing Claude Code OAuth credential
+from `CLAUDE_CONFIG_DIR` or `~/.claude/.credentials.json`. The source is read as
+a bounded regular file, symlinked roots/files are rejected, and the managed copy
+is written owner-only. Without `--name`, a matching Anthropic identity updates
+the existing profile; otherwise a Prodex-compatible unique `claude-*` name is
+created. `--name` forces a distinct profile and `--activate` makes it active.
+Copilot/Kiro built-in imports and non-OpenAI bundle secret-file round trips remain
+part of the 0.434.3 parity backlog.
 
 Prodex-compatible Codex runtime feature flags are translated to Codex `-c`
 overrides before the remaining Codex arguments. Explicit later Codex `-c`
@@ -195,7 +202,7 @@ Available profile, account, and runtime commands:
 | godex profile add NAME [--codex-home PATH\|--copy-from PATH\|--copy-current] [--activate] [--insecure] | Add a managed or external Codex profile. |
 | godex profile list | List account-backed and standalone profiles. |
 | godex profile export [-p NAME]... [--password-protect\|--no-password] [PATH] | Export a Prodex-compatible OpenAI profile bundle. |
-| godex profile import PATH | Import a Prodex-compatible OpenAI profile bundle. |
+| godex profile import PATH_OR_SOURCE [--name NAME] [--activate] [--insecure] | Import a Prodex-compatible bundle or built-in source such as `claude`. |
 | godex current | Show the active profile and its `CODEX_HOME`. |
 | godex use NAME | Set the active profile. |
 | godex profile remove NAME [--delete-home] | Unregister a profile; managed home deletion is explicit. |

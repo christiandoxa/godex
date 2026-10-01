@@ -198,7 +198,8 @@ Usage:
   godex profile list            List configured profiles
   godex profile export [options] [PATH]
                                Export a Prodex-compatible profile bundle
-  godex profile import PATH    Import a Prodex-compatible profile bundle
+  godex profile import PATH_OR_SOURCE [--name NAME] [--activate] [--insecure]
+                               Import a bundle or built-in source such as claude
   godex profile use --profile NAME
                                Set the active profile
   godex profile remove NAME [--delete-home]

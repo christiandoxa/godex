@@ -32,6 +32,9 @@ type repository interface {
 	DecodeBundle([]byte, string) (profilemodel.BundlePayload, bool, error)
 	WriteBundle(string, []byte) error
 	ReadBundle(string) ([]byte, error)
+	ImportProvider(context.Context, profileentity.Profile, map[string]string, bool) error
+	ReplaceProvider(context.Context, string, string, profileentity.Provider, map[string]string, bool) error
+	ReadProviderSecret(string, string) (string, error)
 }
 
 type accountStore interface {
@@ -58,17 +61,24 @@ type quotaAuthInspector interface {
 	InspectQuotaAuth(context.Context, string) (profilemodel.QuotaAuthSummary, error)
 }
 
+type claudeSource interface {
+	Load(context.Context) (profilemodel.BuiltinCredential, error)
+}
+
 type Catalog struct {
 	profiles         repository
 	accounts         accountStore
 	auth             authInspector
 	quotaAuth        quotaAuthInspector
+	claude           claudeSource
 	currentCodexHome string
 }
 
 func NewCatalog(profiles repository, accounts accountStore, currentCodexHome string) *Catalog {
 	return &Catalog{profiles: profiles, accounts: accounts, currentCodexHome: currentCodexHome}
 }
+
+func (catalog *Catalog) SetClaudeSource(source claudeSource) { catalog.claude = source }
 
 func (catalog *Catalog) SetAuthInspector(inspector authInspector) {
 	catalog.auth = inspector

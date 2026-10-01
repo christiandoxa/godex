@@ -102,6 +102,15 @@ introduce direct ANSI screen-clearing loops or another TUI framework. Profile
 export/import protection and masked password entry now follow this rule as well;
 the remaining login/provider menu must use Bubble Tea when added.
 
+
+Built-in provider imports use outbound gateways rather than reading external CLI
+state from delivery or use cases. `gateway/claude` resolves Claude Code's config
+root, reads `.credentials.json` through bounded regular-file checks, and returns
+a transport-neutral provider credential model. `usecase/profile` owns identity
+deduplication, Prodex-compatible profile naming, activation, and create-vs-update
+policy. `repository/profile` owns private provider-secret persistence and rollback
+of failed metadata updates.
+
 ### Quota gateway and preflight
 
 The OpenAI quota client is a narrow outbound adapter for the ChatGPT usage

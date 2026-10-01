@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	profileentity "github.com/christiandoxa/godex/internal/entity/profile"
@@ -128,5 +129,41 @@ func TestRemoveWaitsForProfileLease(t *testing.T) {
 	}
 	if _, err := store.Remove(context.Background(), value.Name, true); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestProviderProfileCreateUpdateAndSecretRead(t *testing.T) {
+	store := NewStore(t.TempDir())
+	value := profileentity.Profile{
+		Name: "claude", CodexHome: store.ManagedHome("claude"), Managed: true,
+		Email: "person@example.test", Provider: profileentity.Provider{Kind: profileentity.ProviderAnthropic, Account: "person@example.test", AuthMethod: "claude-ai-oauth:pro"},
+	}
+	if err := store.ImportProvider(context.Background(), value, map[string]string{".credentials.json": `{"accessToken":"old"}`}, true); err != nil {
+		t.Fatal(err)
+	}
+	secret, err := store.ReadProviderSecret(value.CodexHome, ".credentials.json")
+	if err != nil || !strings.Contains(secret, "old") {
+		t.Fatalf("secret = %q, err = %v", secret, err)
+	}
+	if err := store.ReplaceProvider(context.Background(), value.Name, "new@example.test", profileentity.Provider{Kind: profileentity.ProviderAnthropic, Account: "new@example.test", AuthMethod: "claude-ai-oauth:max"}, map[string]string{".credentials.json": `{"accessToken":"new"}`}, true); err != nil {
+		t.Fatal(err)
+	}
+	updated, err := store.Resolve(context.Background(), value.Name)
+	if err != nil || updated.Email != "new@example.test" || updated.Provider.Account != "new@example.test" || updated.Provider.AuthMethod != "claude-ai-oauth:max" {
+		t.Fatalf("updated = %#v, err = %v", updated, err)
+	}
+	secret, err = store.ReadProviderSecret(value.CodexHome, ".credentials.json")
+	if err != nil || !strings.Contains(secret, "new") {
+		t.Fatalf("updated secret = %q, err = %v", secret, err)
+	}
+}
+
+func TestProviderSecretNamesAreSafe(t *testing.T) {
+	store := NewStore(t.TempDir())
+	value := profileentity.Profile{Name: "claude", CodexHome: store.ManagedHome("claude"), Managed: true, Provider: profileentity.Provider{Kind: profileentity.ProviderAnthropic}}
+	for _, name := range []string{"", ".", "..", "../secret", "nested/secret", `nested\\secret`} {
+		if err := store.ImportProvider(context.Background(), value, map[string]string{name: "value"}, false); err == nil {
+			t.Fatalf("unsafe secret name %q accepted", name)
+		}
 	}
 }
