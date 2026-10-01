@@ -54,6 +54,16 @@ func (source *Source) Load(ctx context.Context) (profilemodel.BuiltinCredential,
 	if err != nil {
 		return profilemodel.BuiltinCredential{}, err
 	}
+	return source.InspectCredential(ctx, text)
+}
+
+func (source *Source) InspectCredential(ctx context.Context, text string) (profilemodel.BuiltinCredential, error) {
+	if err := ctx.Err(); err != nil {
+		return profilemodel.BuiltinCredential{}, err
+	}
+	if len(text) == 0 || len(text) > credentialsMaxBytes {
+		return profilemodel.BuiltinCredential{}, errors.New("Claude credentials are empty or exceed the safe size limit")
+	}
 	account, authMethod, err := parseCredential(text)
 	if err != nil {
 		return profilemodel.BuiltinCredential{}, err
@@ -68,12 +78,9 @@ func (source *Source) Load(ctx context.Context) (profilemodel.BuiltinCredential,
 		provider.AuthMethod = &copy
 	}
 	return profilemodel.BuiltinCredential{
-		Provider: provider,
-		Email:    account,
-		SecretFiles: []profilemodel.ExportedSecretFile{{
-			Path: CredentialsFile,
-			Text: text,
-		}},
+		Provider:    provider,
+		Email:       account,
+		SecretFiles: []profilemodel.ExportedSecretFile{{Path: CredentialsFile, Text: text}},
 	}, nil
 }
 

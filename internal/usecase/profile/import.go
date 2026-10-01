@@ -19,10 +19,11 @@ type importPlan struct {
 }
 
 type importAction struct {
-	source   profilemodel.ExportedProfile
-	target   Report
-	identity accountentity.Identity
-	create   bool
+	source      profilemodel.ExportedProfile
+	target      Report
+	identity    accountentity.Identity
+	identityKey string
+	create      bool
 }
 
 func (catalog *Catalog) Import(ctx context.Context, request profilemodel.ImportRequest) (profilemodel.ImportResult, error) {
@@ -30,9 +31,6 @@ func (catalog *Catalog) Import(ctx context.Context, request profilemodel.ImportR
 		return profilemodel.ImportResult{}, errors.New("profile import path is required")
 	}
 	request.Path = cleanBundlePath(request.Path)
-	if catalog.auth == nil {
-		return profilemodel.ImportResult{}, errors.New("profile auth inspection is not configured")
-	}
 	content, err := catalog.profiles.ReadBundle(request.Path)
 	if err != nil {
 		return profilemodel.ImportResult{}, err
@@ -69,8 +67,8 @@ func (catalog *Catalog) planImport(ctx context.Context, payload profilemodel.Bun
 		}
 		plan.actions = append(plan.actions, action)
 		plan.resolvedNames[source.Name] = action.target.Profile.Name
-		if key := importIdentityKey(action.identity); key != "" {
-			identityTargets[key] = action.target
+		if action.identityKey != "" {
+			identityTargets[action.identityKey] = action.target
 		}
 	}
 	if payload.ActiveProfile != nil {
@@ -92,11 +90,8 @@ func (catalog *Catalog) indexImportTargets(ctx context.Context, listed []Report)
 	for _, report := range listed {
 		byName[report.Profile.Name] = report
 		keepActive = keepActive || report.Active
-		identity, err := catalog.existingIdentity(ctx, report)
-		if err != nil {
-			continue
-		}
-		if key := importIdentityKey(identity); key != "" {
+		key, err := catalog.existingImportIdentityKey(ctx, report)
+		if err == nil && key != "" {
 			byIdentity[key] = report
 		}
 	}
@@ -109,84 +104,119 @@ func (catalog *Catalog) planImportedProfile(
 	existingByName map[string]Report,
 	identityTargets map[string]Report,
 ) (importAction, error) {
-	if err := validateImportedProfile(source); err != nil {
+	if err := catalog.validateImportedProfile(ctx, source); err != nil {
 		return importAction{}, err
 	}
-	identity, err := catalog.importedIdentity(ctx, source)
+	identity, identityKey, err := catalog.importedIdentity(ctx, source)
 	if err != nil {
 		return importAction{}, err
 	}
-	key := importIdentityKey(identity)
 	if existing, ok := existingByName[source.Name]; ok {
-		if err := catalog.validateNamedImportTarget(ctx, source.Name, key, existing); err != nil {
+		if err := catalog.validateNamedImportTarget(ctx, source, identityKey, existing); err != nil {
 			return importAction{}, err
 		}
-		return importAction{source: source, target: existing, identity: identity}, nil
+		return importAction{source: source, target: existing, identity: identity, identityKey: identityKey}, nil
 	}
-	if existing, ok := identityTargets[key]; key != "" && ok {
-		return importAction{source: source, target: existing, identity: identity}, nil
+	if existing, ok := identityTargets[identityKey]; identityKey != "" && ok {
+		return importAction{source: source, target: existing, identity: identity, identityKey: identityKey}, nil
 	}
 	profile, err := catalog.newImportedProfile(source, identity)
 	if err != nil {
 		return importAction{}, err
 	}
-	return importAction{source: source, target: Report{Profile: profile}, identity: identity, create: true}, nil
+	return importAction{source: source, target: Report{Profile: profile}, identity: identity, identityKey: identityKey, create: true}, nil
 }
 
-func (catalog *Catalog) importedIdentity(ctx context.Context, source profilemodel.ExportedProfile) (accountentity.Identity, error) {
+func (catalog *Catalog) importedIdentity(ctx context.Context, source profilemodel.ExportedProfile) (accountentity.Identity, string, error) {
+	if sourceProviderKind(source) != profileentity.ProviderOpenAI {
+		return accountentity.Identity{}, "", nil
+	}
+	if catalog.auth == nil {
+		return accountentity.Identity{}, "", errors.New("profile auth inspection is not configured")
+	}
 	authBytes := []byte(source.AuthJSON)
 	defer clearBundleBytes(authBytes)
 	identity, err := catalog.auth.InspectAuthJSON(ctx, authBytes)
 	if err != nil {
-		return accountentity.Identity{}, fmt.Errorf("profile %q has invalid OpenAI authentication", source.Name)
+		return accountentity.Identity{}, "", fmt.Errorf("profile %q has invalid OpenAI authentication", source.Name)
 	}
-	return identity, nil
+	return identity, importIdentityKey(identity), nil
 }
 
-func (catalog *Catalog) validateNamedImportTarget(ctx context.Context, sourceName, key string, existing Report) error {
-	if existing.Profile.Provider.Kind != profileentity.ProviderOpenAI {
-		return fmt.Errorf("profile %q already exists with an incompatible provider", sourceName)
+func (catalog *Catalog) validateNamedImportTarget(ctx context.Context, source profilemodel.ExportedProfile, key string, existing Report) error {
+	sourceKind := sourceProviderKind(source)
+	if existing.Profile.Provider.Kind != sourceKind {
+		return fmt.Errorf(
+			"profile %q already exists with provider %q and cannot be imported as %q",
+			source.Name, existing.Profile.Provider.Kind, sourceKind,
+		)
+	}
+	if sourceKind != profileentity.ProviderOpenAI {
+		return nil
 	}
 	existingIdentity, err := catalog.existingIdentity(ctx, existing)
 	if err != nil || key == "" || importIdentityKey(existingIdentity) != key {
-		return fmt.Errorf("profile %q already exists with a different or unverifiable identity", sourceName)
+		return fmt.Errorf("profile %q already exists with a different or unverifiable identity", source.Name)
 	}
 	return nil
 }
 
 func (catalog *Catalog) newImportedProfile(source profilemodel.ExportedProfile, identity accountentity.Identity) (profileentity.Profile, error) {
-	email := strings.TrimSpace(identity.Email)
-	if email == "" && source.Email != nil {
-		email = strings.TrimSpace(*source.Email)
-	}
+	kind := sourceProviderKind(source)
 	profile := profileentity.Profile{
-		Name: source.Name, CodexHome: catalog.profiles.ManagedHome(source.Name), Managed: true, Email: email,
-		Provider: profileentity.Provider{Kind: profileentity.ProviderOpenAI},
+		Name: source.Name, CodexHome: catalog.profiles.ManagedHome(source.Name), Managed: true,
+		Email: importedProfileEmail(source, identity), Provider: providerFromSnapshot(source.Provider),
 	}
+	profile.Provider.Kind = kind
 	return profile, profileentity.Validate(profile)
 }
 
-func validateImportedProfile(source profilemodel.ExportedProfile) error {
+func importedProfileEmail(source profilemodel.ExportedProfile, identity accountentity.Identity) string {
+	if email := strings.TrimSpace(identity.Email); email != "" {
+		return email
+	}
+	if source.Email != nil {
+		return strings.TrimSpace(*source.Email)
+	}
+	return ""
+}
+
+func (catalog *Catalog) validateImportedProfile(ctx context.Context, source profilemodel.ExportedProfile) error {
 	if err := profileentity.ValidateName(source.Name); err != nil {
 		return err
 	}
-	provider := source.Provider.Kind
-	if provider == "" {
-		provider = string(profileentity.ProviderOpenAI)
+	switch sourceProviderKind(source) {
+	case profileentity.ProviderOpenAI:
+		if len(source.SecretFiles) != 0 {
+			return fmt.Errorf("profile %q contains unexpected provider secret files", source.Name)
+		}
+		if strings.TrimSpace(source.AuthJSON) == "" {
+			return fmt.Errorf("profile %q has no OpenAI authentication", source.Name)
+		}
+		return nil
+	case profileentity.ProviderAnthropic:
+		_, err := catalog.inspectAnthropicSecret(ctx, source)
+		return err
+	default:
+		return fmt.Errorf("profile provider %q import is not implemented yet", sourceProviderKind(source))
 	}
-	if provider != string(profileentity.ProviderOpenAI) {
-		return fmt.Errorf("profile provider %q import is not implemented yet", provider)
+}
+
+func (catalog *Catalog) existingImportIdentityKey(ctx context.Context, report Report) (string, error) {
+	if !providerSupportsCodexRuntime(report.Profile.Provider.Kind) {
+		return "", nil
 	}
-	if len(source.SecretFiles) != 0 {
-		return fmt.Errorf("profile %q contains provider secret files that are not supported yet", source.Name)
+	identity, err := catalog.existingIdentity(ctx, report)
+	if err != nil {
+		return "", err
 	}
-	if strings.TrimSpace(source.AuthJSON) == "" {
-		return fmt.Errorf("profile %q has no OpenAI authentication", source.Name)
-	}
-	return nil
+	return importIdentityKey(identity), nil
 }
 
 func (catalog *Catalog) existingIdentity(ctx context.Context, report Report) (accountentity.Identity, error) {
+	if catalog.auth == nil {
+		return accountentity.Identity{}, errors.New("profile auth inspection is not configured")
+	}
 	authJSON, err := catalog.profiles.ReadAuthJSON(report.Profile.CodexHome)
 	if err != nil {
 		return accountentity.Identity{}, err

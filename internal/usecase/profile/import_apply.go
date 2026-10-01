@@ -3,7 +3,10 @@ package profile
 import (
 	"context"
 	"errors"
+	"fmt"
 
+	accountentity "github.com/christiandoxa/godex/internal/entity/account"
+	profileentity "github.com/christiandoxa/godex/internal/entity/profile"
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 )
 
@@ -34,19 +37,47 @@ func (catalog *Catalog) applyImport(ctx context.Context, plan importPlan) (profi
 }
 
 func (catalog *Catalog) applyImportAction(ctx context.Context, action importAction) (importMutation, error) {
+	switch sourceProviderKind(action.source) {
+	case profileentity.ProviderOpenAI:
+		return catalog.applyOpenAIImportAction(ctx, action)
+	case profileentity.ProviderAnthropic:
+		return catalog.applyAnthropicImportAction(ctx, action)
+	default:
+		return importMutation{}, fmt.Errorf("profile provider %q import is not implemented yet", sourceProviderKind(action.source))
+	}
+}
+
+func (catalog *Catalog) applyOpenAIImportAction(ctx context.Context, action importAction) (importMutation, error) {
 	authBytes := []byte(action.source.AuthJSON)
 	defer clearBundleBytes(authBytes)
 	if action.create {
 		if err := catalog.profiles.ImportOpenAI(ctx, action.target.Profile, authBytes, false); err != nil {
 			return importMutation{}, err
 		}
-		name := action.target.Profile.Name
-		return importMutation{imported: 1, rollback: func() error {
-			_, err := catalog.profiles.Remove(context.WithoutCancel(ctx), name, true)
-			return err
-		}}, nil
+		return newProfileImportMutation(ctx, catalog, action.target.Profile.Name), nil
 	}
 	return catalog.updateImportedAuth(ctx, action.target, authBytes)
+}
+
+func (catalog *Catalog) applyAnthropicImportAction(ctx context.Context, action importAction) (importMutation, error) {
+	secrets, err := providerSecrets(action.source)
+	if err != nil {
+		return importMutation{}, err
+	}
+	if action.create {
+		if err := catalog.profiles.ImportProvider(ctx, action.target.Profile, secrets, false); err != nil {
+			return importMutation{}, err
+		}
+		return newProfileImportMutation(ctx, catalog, action.target.Profile.Name), nil
+	}
+	return catalog.updateImportedProvider(ctx, action.target, action.source, secrets)
+}
+
+func newProfileImportMutation(ctx context.Context, catalog *Catalog, name string) importMutation {
+	return importMutation{imported: 1, rollback: func() error {
+		_, err := catalog.profiles.Remove(context.WithoutCancel(ctx), name, true)
+		return err
+	}}
 }
 
 func (catalog *Catalog) updateImportedAuth(ctx context.Context, target Report, authBytes []byte) (importMutation, error) {
@@ -68,6 +99,44 @@ func (catalog *Catalog) updateImportedAuth(ctx context.Context, target Report, a
 		},
 		cleanup: func() { clearBundleBytes(backup) },
 	}, nil
+}
+
+func (catalog *Catalog) updateImportedProvider(
+	ctx context.Context,
+	target Report,
+	source profilemodel.ExportedProfile,
+	secrets map[string]string,
+) (importMutation, error) {
+	previousSecret, err := catalog.profiles.ReadProviderSecret(target.Profile.CodexHome, claudeCredentialFile)
+	if err != nil {
+		return importMutation{}, err
+	}
+	previousProfile := target.Profile
+	provider := providerFromSnapshot(source.Provider)
+	provider.Kind = sourceProviderKind(source)
+	email := importedProfileEmail(source, accountentity.Identity{})
+	if err := catalog.profiles.ReplaceProvider(ctx, target.Profile.Name, email, provider, secrets, false); err != nil {
+		return importMutation{}, err
+	}
+	backup := []byte(previousSecret)
+	return importMutation{
+		updated: 1,
+		rollback: func() error {
+			defer clearBundleBytes(backup)
+			return catalog.profiles.ReplaceProvider(
+				context.WithoutCancel(ctx), previousProfile.Name, previousProfile.Email, previousProfile.Provider,
+				map[string]string{claudeCredentialFile: string(backup)}, false,
+			)
+		},
+		cleanup: func() { clearBundleBytes(backup) },
+	}, nil
+}
+
+func (catalog *Catalog) replaceImportedAuth(ctx context.Context, target Report, authJSON []byte) error {
+	if target.AccountID != "" {
+		return catalog.accounts.ReplaceImportedAuth(ctx, target.AccountID, authJSON)
+	}
+	return catalog.profiles.ReplaceAuth(ctx, target.Profile.Name, authJSON)
 }
 
 func (catalog *Catalog) finalizeImportActive(ctx context.Context, plan importPlan, result *profilemodel.ImportResult) error {
@@ -92,13 +161,6 @@ func (catalog *Catalog) finalizeImportActive(ctx context.Context, plan importPla
 		}
 	}
 	return nil
-}
-
-func (catalog *Catalog) replaceImportedAuth(ctx context.Context, target Report, authJSON []byte) error {
-	if target.AccountID != "" {
-		return catalog.accounts.ReplaceImportedAuth(ctx, target.AccountID, authJSON)
-	}
-	return catalog.profiles.ReplaceAuth(ctx, target.Profile.Name, authJSON)
 }
 
 func rollbackImport(mutations []importMutation, cause error) error {

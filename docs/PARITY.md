@@ -140,11 +140,14 @@ and eligibility validation stays in the runtime use case.
 - Built-in Claude import is implemented with `CLAUDE_CONFIG_DIR`/`~/.claude`
   source resolution, bounded regular-file checks, Anthropic identity deduplication,
   Prodex-compatible unique naming, private managed `.credentials.json`, and
-  create/update/activate semantics. Copilot/Kiro built-in imports and provider
-  secret-file bundle payloads remain. Process-crash lifecycle-journal recovery
-  for multi-profile imports also remains to match Prodex exactly. OpenAI
-  plain/encrypted bundle wire formats, Bubble Tea protection/password prompts,
-  and identity-safe runtime rollback are implemented.
+  create/update/activate semantics. Anthropic bundle export/import now also
+  matches the 0.434.3 wire contract: empty `auth_json`, provider metadata, and a
+  validated `.credentials.json` provider secret file survive plain/encrypted
+  round trips; update rollback restores prior provider metadata and credentials.
+  Copilot/Kiro built-in imports and their provider secret payloads remain.
+  Process-crash lifecycle-journal recovery for multi-profile imports also remains
+  to match Prodex exactly. OpenAI plain/encrypted bundle wire formats, Bubble Tea
+  protection/password prompts, and identity-safe runtime rollback are implemented.
 - HTTP/SSE model transport is explicit; Godex does not implement Prodex's
   WebSocket/Realtime forwarding. Unexpected upgrades fail before upstream work.
 - Import-current is auth-only, not full native-home migration. Existing native

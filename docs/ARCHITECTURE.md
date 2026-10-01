@@ -109,7 +109,10 @@ root, reads `.credentials.json` through bounded regular-file checks, and returns
 a transport-neutral provider credential model. `usecase/profile` owns identity
 deduplication, Prodex-compatible profile naming, activation, and create-vs-update
 policy. `repository/profile` owns private provider-secret persistence and rollback
-of failed metadata updates.
+of failed metadata updates. Bundle export/import consumes that same boundary:
+Anthropic exports carry `.credentials.json` as a validated provider secret with
+empty `auth_json`, while `usecase/profile` keeps provider-specific validation and
+create/update planning outside envelope crypto/persistence.
 
 ### Quota gateway and preflight
 
@@ -335,11 +338,11 @@ No access token, ID token, refresh token, or API token belongs in this file.
 
 The verified OpenAI/Codex core remains the stability baseline while Godex expands
 toward feature-for-feature Prodex 0.434.3 parity. Multi-provider bridges, Super,
-gateway, richer diagnostics, provider-specific profile bundle secrets, and
+gateway, richer diagnostics, remaining provider-specific bundle secrets, and
 built-in imports remain implementation backlog rather than permanent exclusions.
 Manual redeem, `ping openai`, explicit self-update, and the best-effort cached
-update notice are now implemented reference surfaces. OpenAI bundle encoding/decoding is now
-owned by `repository/profile`: the repository owns private bounded file I/O and
+update notice are now implemented reference surfaces. OpenAI/Anthropic bundle
+encoding/decoding is now owned by `repository/profile`: the repository owns private bounded file I/O and
 Prodex-compatible envelope crypto, while `usecase/profile` owns profile selection,
 identity matching, update/create planning, and rollback. New infrastructure is added only when required by a concrete
 reference feature and must still satisfy the architecture rules in `AGENTS.md`.

@@ -63,6 +63,7 @@ type quotaAuthInspector interface {
 
 type claudeSource interface {
 	Load(context.Context) (profilemodel.BuiltinCredential, error)
+	InspectCredential(context.Context, string) (profilemodel.BuiltinCredential, error)
 }
 
 type Catalog struct {

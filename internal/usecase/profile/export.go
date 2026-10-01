@@ -18,9 +18,6 @@ func (catalog *Catalog) Export(ctx context.Context, request profilemodel.ExportR
 		return profilemodel.ExportResult{}, errors.New("profile export output path is required")
 	}
 	request.OutputPath = cleanBundlePath(request.OutputPath)
-	if catalog.auth == nil {
-		return profilemodel.ExportResult{}, errors.New("profile auth inspection is not configured")
-	}
 	listed, err := catalog.List(ctx)
 	if err != nil {
 		return profilemodel.ExportResult{}, err
@@ -64,8 +61,19 @@ func (catalog *Catalog) buildExportPayload(ctx context.Context, selected []Repor
 }
 
 func (catalog *Catalog) exportProfile(ctx context.Context, report Report) (profilemodel.ExportedProfile, error) {
-	if report.Profile.Provider.Kind != profileentity.ProviderOpenAI {
+	switch report.Profile.Provider.Kind {
+	case profileentity.ProviderOpenAI:
+		return catalog.exportOpenAIProfile(ctx, report)
+	case profileentity.ProviderAnthropic:
+		return catalog.exportAnthropicProfile(ctx, report)
+	default:
 		return profilemodel.ExportedProfile{}, fmt.Errorf("profile provider %q export is not implemented yet", report.Profile.Provider.Kind)
+	}
+}
+
+func (catalog *Catalog) exportOpenAIProfile(ctx context.Context, report Report) (profilemodel.ExportedProfile, error) {
+	if catalog.auth == nil {
+		return profilemodel.ExportedProfile{}, errors.New("profile auth inspection is not configured")
 	}
 	authJSON, err := catalog.profiles.ReadAuthJSON(report.Profile.CodexHome)
 	if err != nil {
@@ -80,14 +88,28 @@ func (catalog *Catalog) exportProfile(ctx context.Context, report Report) (profi
 	if email == "" {
 		email = strings.TrimSpace(report.Profile.Email)
 	}
-	var emailPointer *string
-	if email != "" {
-		emailPointer = &email
-	}
 	return profilemodel.ExportedProfile{
-		Name: report.Profile.Name, Email: emailPointer, SourceManaged: report.Profile.Managed,
+		Name: report.Profile.Name, Email: optionalString(email), SourceManaged: report.Profile.Managed,
 		Provider: profilemodel.ProviderSnapshot{Kind: string(profileentity.ProviderOpenAI)},
 		AuthJSON: string(authJSON), SecretFiles: []profilemodel.ExportedSecretFile{},
+	}, nil
+}
+
+func (catalog *Catalog) exportAnthropicProfile(ctx context.Context, report Report) (profilemodel.ExportedProfile, error) {
+	secret, err := catalog.profiles.ReadProviderSecret(report.Profile.CodexHome, claudeCredentialFile)
+	if err != nil {
+		return profilemodel.ExportedProfile{}, fmt.Errorf("export profile %q: %w", report.Profile.Name, err)
+	}
+	if catalog.claude == nil {
+		return profilemodel.ExportedProfile{}, errors.New("Claude profile export support is not configured")
+	}
+	if _, err := catalog.claude.InspectCredential(ctx, secret); err != nil {
+		return profilemodel.ExportedProfile{}, fmt.Errorf("export profile %q: Claude credentials are invalid", report.Profile.Name)
+	}
+	return profilemodel.ExportedProfile{
+		Name: report.Profile.Name, Email: optionalString(strings.TrimSpace(report.Profile.Email)),
+		SourceManaged: report.Profile.Managed, Provider: providerSnapshotFromEntity(report.Profile.Provider),
+		AuthJSON: "", SecretFiles: []profilemodel.ExportedSecretFile{{Path: claudeCredentialFile, Text: secret}},
 	}, nil
 }
 

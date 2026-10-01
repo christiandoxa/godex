@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
+	profileentity "github.com/christiandoxa/godex/internal/entity/profile"
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 	profilerepo "github.com/christiandoxa/godex/internal/repository/profile"
 )
@@ -152,4 +153,178 @@ func boolLabel(value bool) string {
 		return "encrypted"
 	}
 	return "plain"
+}
+
+type bundleClaudeInspector struct {
+	credentials map[string]profilemodel.BuiltinCredential
+}
+
+func (inspector bundleClaudeInspector) Load(context.Context) (profilemodel.BuiltinCredential, error) {
+	return profilemodel.BuiltinCredential{}, errors.New("external Claude source should not be used by bundle tests")
+}
+
+func (inspector bundleClaudeInspector) InspectCredential(_ context.Context, text string) (profilemodel.BuiltinCredential, error) {
+	credential, ok := inspector.credentials[text]
+	if !ok {
+		return profilemodel.BuiltinCredential{}, errors.New("invalid Claude credential fixture")
+	}
+	return credential, nil
+}
+
+func TestAnthropicBundleRoundTripPlainAndEncrypted(t *testing.T) {
+	for _, password := range []string{"", "bundle-password"} {
+		t.Run(boolLabel(password != ""), func(t *testing.T) {
+			assertAnthropicBundleRoundTrip(t, password)
+		})
+	}
+}
+
+func assertAnthropicBundleRoundTrip(t *testing.T, password string) {
+	t.Helper()
+	const secret = `{"claudeAiOauth":{"accessToken":"fixture-access","subscriptionType":"pro","email":"person@example.test"}}`
+	account := "person@example.test"
+	method := "claude-ai-oauth:pro"
+	inspector := bundleClaudeInspector{credentials: map[string]profilemodel.BuiltinCredential{
+		secret: {
+			Provider:    profilemodel.ProviderSnapshot{Kind: "anthropic", Account: &account, AuthMethod: &method},
+			Email:       account,
+			SecretFiles: []profilemodel.ExportedSecretFile{{Path: claudeCredentialFile, Text: secret}},
+		},
+	}}
+
+	exportRepo := profilerepo.NewStore(t.TempDir())
+	exportCatalog := NewCatalog(exportRepo, &fakeAccounts{}, t.TempDir())
+	exportCatalog.SetClaudeSource(inspector)
+	profile := profileentity.Profile{
+		Name: "claude", CodexHome: exportRepo.ManagedHome("claude"), Managed: true, Email: account,
+		Provider: profileentity.Provider{Kind: profileentity.ProviderAnthropic, Account: account, AuthMethod: method},
+	}
+	if err := exportRepo.ImportProvider(context.Background(), profile, map[string]string{claudeCredentialFile: secret}, true); err != nil {
+		t.Fatal(err)
+	}
+	bundleDir := privateTempDir(t)
+	path := filepath.Join(bundleDir, "anthropic-"+boolLabel(password != "")+".json")
+	result, err := exportCatalog.Export(context.Background(), profilemodel.ExportRequest{OutputPath: path, Password: password})
+	if err != nil || result.ProfileCount != 1 || result.ActiveProfile != "claude" {
+		t.Fatalf("export = %+v, err = %v", result, err)
+	}
+	content, err := exportRepo.ReadBundle(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload, encrypted, err := exportRepo.DecodeBundle(content, password)
+	if err != nil || encrypted != (password != "") || len(payload.Profiles) != 1 {
+		t.Fatalf("payload/encrypted/err = %+v / %t / %v", payload, encrypted, err)
+	}
+	exported := payload.Profiles[0]
+	if exported.AuthJSON != "" || exported.Provider.Kind != "anthropic" || len(exported.SecretFiles) != 1 || exported.SecretFiles[0].Path != claudeCredentialFile || exported.SecretFiles[0].Text != secret {
+		t.Fatalf("exported Anthropic profile = %#v", exported)
+	}
+
+	importRepo := profilerepo.NewStore(t.TempDir())
+	importCatalog := NewCatalog(importRepo, &fakeAccounts{}, t.TempDir())
+	importCatalog.SetClaudeSource(inspector)
+	imported, err := importCatalog.Import(context.Background(), profilemodel.ImportRequest{Path: path, Password: password})
+	if err != nil || imported.ImportedCount != 1 || imported.UpdatedCount != 0 || imported.ActiveProfile != "claude" {
+		t.Fatalf("import = %+v, err = %v", imported, err)
+	}
+	stored, err := importRepo.Resolve(context.Background(), "claude")
+	if err != nil || stored.Provider.Kind != profileentity.ProviderAnthropic || stored.Provider.Account != account || stored.Provider.AuthMethod != method || stored.Email != account {
+		t.Fatalf("stored = %#v, err = %v", stored, err)
+	}
+	storedSecret, err := importRepo.ReadProviderSecret(stored.CodexHome, claudeCredentialFile)
+	if err != nil || storedSecret != secret {
+		t.Fatalf("stored secret = %q, err = %v", storedSecret, err)
+	}
+}
+
+func TestAnthropicBundleUpdateRollsBackWhenLaterProfileFails(t *testing.T) {
+	const oldSecret = `{"accessToken":"old","email":"person@example.test"}`
+	const newSecret = `{"accessToken":"new","email":"person@example.test"}`
+	const newProfileSecret = `{"accessToken":"new-profile","email":"new@example.test"}`
+	account := "person@example.test"
+	newAccount := "new@example.test"
+	method := "claude-ai-oauth"
+	inspector := bundleClaudeInspector{credentials: map[string]profilemodel.BuiltinCredential{
+		oldSecret:        {Provider: profilemodel.ProviderSnapshot{Kind: "anthropic", Account: &account, AuthMethod: &method}, Email: account},
+		newSecret:        {Provider: profilemodel.ProviderSnapshot{Kind: "anthropic", Account: &account, AuthMethod: &method}, Email: account},
+		newProfileSecret: {Provider: profilemodel.ProviderSnapshot{Kind: "anthropic", Account: &newAccount, AuthMethod: &method}, Email: newAccount},
+	}}
+	repo := profilerepo.NewStore(t.TempDir())
+	catalog := NewCatalog(repo, &fakeAccounts{}, t.TempDir())
+	catalog.SetClaudeSource(inspector)
+	original := profileentity.Profile{
+		Name: "claude", CodexHome: repo.ManagedHome("claude"), Managed: true, Email: account,
+		Provider: profileentity.Provider{Kind: profileentity.ProviderAnthropic, Account: account, AuthMethod: method},
+	}
+	if err := repo.ImportProvider(context.Background(), original, map[string]string{claudeCredentialFile: oldSecret}, true); err != nil {
+		t.Fatal(err)
+	}
+	orphan := repo.ManagedHome("new-profile")
+	if err := os.MkdirAll(orphan, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(orphan, "occupied"), []byte("fixture"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	bundleDir := privateTempDir(t)
+	path := filepath.Join(bundleDir, "rollback.json")
+	payload := profilemodel.BundlePayload{
+		ExportedAt: "2026-10-01T00:00:00Z", SourceProdexVersion: "0.434.3",
+		Profiles: []profilemodel.ExportedProfile{
+			{
+				Name: "claude", Email: &account, SourceManaged: true,
+				Provider:    profilemodel.ProviderSnapshot{Kind: "anthropic", Account: &account, AuthMethod: &method},
+				SecretFiles: []profilemodel.ExportedSecretFile{{Path: claudeCredentialFile, Text: newSecret}},
+			},
+			{
+				Name: "new-profile", Email: &newAccount, SourceManaged: true,
+				Provider:    profilemodel.ProviderSnapshot{Kind: "anthropic", Account: &newAccount, AuthMethod: &method},
+				SecretFiles: []profilemodel.ExportedSecretFile{{Path: claudeCredentialFile, Text: newProfileSecret}},
+			},
+		},
+	}
+	content, err := repo.EncodeBundle(payload, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.WriteBundle(path, content); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := catalog.Import(context.Background(), profilemodel.ImportRequest{Path: path}); err == nil {
+		t.Fatal("import unexpectedly succeeded despite occupied managed home")
+	}
+	secret, err := repo.ReadProviderSecret(original.CodexHome, claudeCredentialFile)
+	if err != nil || secret != oldSecret {
+		t.Fatalf("rollback secret = %q, err = %v", secret, err)
+	}
+	stored, err := repo.Resolve(context.Background(), "claude")
+	if err != nil || stored.Email != original.Email || stored.Provider != original.Provider {
+		t.Fatalf("rollback profile = %#v, err = %v", stored, err)
+	}
+}
+
+func TestAnthropicBundleRejectsMissingUnexpectedOrInvalidSecret(t *testing.T) {
+	account := "person@example.test"
+	method := "claude-ai-oauth"
+	valid := `{"accessToken":"valid"}`
+	inspector := bundleClaudeInspector{credentials: map[string]profilemodel.BuiltinCredential{
+		valid: {Provider: profilemodel.ProviderSnapshot{Kind: "anthropic", Account: &account, AuthMethod: &method}, Email: account},
+	}}
+	catalog := NewCatalog(profilerepo.NewStore(t.TempDir()), &fakeAccounts{}, t.TempDir())
+	catalog.SetClaudeSource(inspector)
+	for _, files := range [][]profilemodel.ExportedSecretFile{
+		nil,
+		{{Path: "unexpected.json", Text: valid}},
+		{{Path: claudeCredentialFile, Text: "invalid"}},
+		{{Path: claudeCredentialFile, Text: valid}, {Path: claudeCredentialFile, Text: valid}},
+	} {
+		source := profilemodel.ExportedProfile{
+			Name: "claude", Provider: profilemodel.ProviderSnapshot{Kind: "anthropic", Account: &account, AuthMethod: &method}, SecretFiles: files,
+		}
+		if err := catalog.validateImportedProfile(context.Background(), source); err == nil {
+			t.Fatalf("secret files %#v unexpectedly accepted", files)
+		}
+	}
 }

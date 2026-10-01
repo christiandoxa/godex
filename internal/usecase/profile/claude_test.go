@@ -19,6 +19,10 @@ func (fake fakeClaudeSource) Load(context.Context) (profilemodel.BuiltinCredenti
 	return fake.credential, fake.err
 }
 
+func (fake fakeClaudeSource) InspectCredential(context.Context, string) (profilemodel.BuiltinCredential, error) {
+	return fake.credential, fake.err
+}
+
 func TestImportBuiltinClaudeCreatesUpdatesAndSupportsNamedDuplicate(t *testing.T) {
 	repo := profilerepo.NewStore(t.TempDir())
 	catalog := NewCatalog(repo, &fakeAccounts{}, filepath.Join(t.TempDir(), "current"))
