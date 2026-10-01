@@ -152,8 +152,11 @@ and eligibility validation stays in the runtime use case.
   normalized model snapshots, and non-fatal catalog-refresh warnings. Copilot
   bundle metadata is also implemented with Prodex's empty `auth_json` / no-secret
   wire contract while preserving host/login/API/SKU/plan metadata and profile
-  email. Built-in Copilot import remains. Process-crash lifecycle-journal recovery
-  for multi-profile imports also remains
+  email. Built-in Copilot import is implemented with commented-config parsing,
+  config/keytar/libsecret/SDK credential fallback, bounded user-info enrichment,
+  trimmed host+config-login identity matching, Prodex-compatible naming, and
+  tokenless profile persistence. Process-crash lifecycle-journal recovery for
+  multi-profile imports also remains
   to match Prodex exactly. OpenAI plain/encrypted bundle wire formats, Bubble Tea
   protection/password prompts, and identity-safe runtime rollback are implemented.
 - HTTP/SSE model transport is explicit; Godex does not implement Prodex's

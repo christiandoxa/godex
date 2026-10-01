@@ -77,6 +77,10 @@ type kiroSource interface {
 	Load(context.Context) (profilemodel.BuiltinCredential, error)
 }
 
+type copilotSource interface {
+	Load(context.Context) (profilemodel.BuiltinCredential, error)
+}
+
 type Catalog struct {
 	profiles         repository
 	accounts         accountStore
@@ -85,6 +89,7 @@ type Catalog struct {
 	claude           claudeSource
 	kiro             kiroInspector
 	kiroImport       kiroSource
+	copilot          copilotSource
 	currentCodexHome string
 }
 
@@ -97,6 +102,8 @@ func (catalog *Catalog) SetClaudeSource(source claudeSource) { catalog.claude = 
 func (catalog *Catalog) SetKiroInspector(inspector kiroInspector) { catalog.kiro = inspector }
 
 func (catalog *Catalog) SetKiroSource(source kiroSource) { catalog.kiroImport = source }
+
+func (catalog *Catalog) SetCopilotSource(source copilotSource) { catalog.copilot = source }
 
 func (catalog *Catalog) SetAuthInspector(inspector authInspector) {
 	catalog.auth = inspector

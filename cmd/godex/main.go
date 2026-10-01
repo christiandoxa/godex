@@ -15,6 +15,7 @@ import (
 	proxyhttp "github.com/christiandoxa/godex/internal/delivery/http/proxy"
 	claudegateway "github.com/christiandoxa/godex/internal/gateway/claude"
 	"github.com/christiandoxa/godex/internal/gateway/codex"
+	copilotgateway "github.com/christiandoxa/godex/internal/gateway/copilot"
 	githubgateway "github.com/christiandoxa/godex/internal/gateway/github"
 	kirogateway "github.com/christiandoxa/godex/internal/gateway/kiro"
 	"github.com/christiandoxa/godex/internal/gateway/openai"
@@ -95,6 +96,7 @@ func run() int {
 	kiroSource := kirogateway.NewSource()
 	profiles.SetKiroInspector(kiroSource)
 	profiles.SetKiroSource(kiroSource)
+	profiles.SetCopilotSource(copilotgateway.NewSource(nil))
 	application.SetProfiles(profiles)
 	activity.SetProfiles(profiles)
 	quotaStatus.SetProfiles(profiles)

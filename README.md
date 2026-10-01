@@ -145,9 +145,14 @@ non-fatal and shown as a warning. Re-import updates the matching
 `auth_key + profile ARN/name` identity, and a different `--name` is rejected.
 Copilot profiles also round-trip in Prodex's metadata-only bundle form: provider
 host/login/API/SKU/plan and profile email are preserved while `auth_json` stays
-empty and no token or secret file is bundled. Copilot tokens remain owned by the
-external Copilot config/keychain store. Built-in `profile import copilot` remains
-part of the 0.434.3 parity backlog.
+empty and no token or secret file is bundled. `godex profile import copilot`
+now mirrors Prodex's external credential discovery: it parses `COPILOT_HOME` or
+`~/.copilot/config.json` (including `//` comments), tries config token, keytar,
+libsecret, then Copilot SDK credential backends, and queries the bounded
+`/copilot_internal/user` endpoint for provider metadata. Tokens remain external
+and are never persisted in Godex profile state or bundle payloads. Identity
+matching uses trimmed host + config login, default names use `copilot-<login>`,
+and a different `--name` is rejected when that account is already imported.
 
 Prodex-compatible Codex runtime feature flags are translated to Codex `-c`
 overrides before the remaining Codex arguments. Explicit later Codex `-c`
@@ -307,6 +312,9 @@ must use the same framework when multi-provider login parity lands.
 | GODEX_HOME | ~/.godex | State, profiles, locks, and staging files. |
 | GODEX_CODEX_BIN | codex | Codex executable to invoke. |
 | PRODEX_KIRO_BIN | auto-detect `kiro-cli-chat` / `kiro-cli` | Kiro CLI executable used for built-in import metadata. |
+| COPILOT_HOME | ~/.copilot | Copilot CLI config root used by `profile import copilot`. |
+| COPILOT_CACHE_HOME | platform cache | Optional Copilot package-cache override for keytar/SDK credential fallback. |
+| PRODEX_COPILOT_BIN | copilot | Copilot CLI executable used by the SDK credential fallback. |
 | KIRO_DATA_DIR / Q_CLI_DATA_DIR | platform Kiro local-data directory | Optional Kiro source-data override for `profile import kiro`. |
 | GODEX_UPSTREAM_URL | https://chatgpt.com/backend-api | Upstream URL for compatible test environments. |
 | CODEX_HOME | ~/.codex | Source profile for `profile import-current` and `profile add --copy-current`; managed launches use isolated homes. |

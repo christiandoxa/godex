@@ -124,7 +124,10 @@ planning outside envelope crypto/persistence, while repository rollback tracks
 whether each optional secret existed before replacement. Copilot bundle handling
 uses the same provider-metadata path with no provider secret files: host/login/API
 and plan metadata are persisted in Godex, while the actual Copilot token remains
-owned by the external Copilot config/keychain boundary.
+owned by the external Copilot config/keychain boundary. `gateway/copilot` owns
+built-in Copilot discovery and is the only layer allowed to touch `config.json`,
+keytar/libsecret/SDK credential fallbacks, or the authenticated user-info request;
+it returns only tokenless provider metadata to `usecase/profile`.
 
 ### Quota gateway and preflight
 
@@ -350,8 +353,9 @@ No access token, ID token, refresh token, or API token belongs in this file.
 
 The verified OpenAI/Codex core remains the stability baseline while Godex expands
 toward feature-for-feature Prodex 0.434.3 parity. Multi-provider bridges, Super,
-gateway, richer diagnostics, remaining provider-specific bundle secrets, and
-built-in imports remain implementation backlog rather than permanent exclusions.
+gateway, richer diagnostics, remaining provider runtime bridges, and any still-
+missing provider-specific import/bundle surfaces remain implementation backlog
+rather than permanent exclusions.
 Manual redeem, `ping openai`, explicit self-update, and the best-effort cached
 update notice are now implemented reference surfaces. OpenAI/Anthropic/Kiro/Copilot bundle
 encoding/decoding is now owned by `repository/profile`: the repository owns private bounded file I/O and
