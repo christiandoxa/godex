@@ -121,7 +121,10 @@ transport-neutral credential snapshot plus an optional warning; SQL paths, raw
 command execution, and token JSON never escape the gateway. `usecase/profile`
 keeps provider-specific identity matching, naming, activation, and create/update
 planning outside envelope crypto/persistence, while repository rollback tracks
-whether each optional secret existed before replacement.
+whether each optional secret existed before replacement. Copilot bundle handling
+uses the same provider-metadata path with no provider secret files: host/login/API
+and plan metadata are persisted in Godex, while the actual Copilot token remains
+owned by the external Copilot config/keychain boundary.
 
 ### Quota gateway and preflight
 
@@ -350,7 +353,7 @@ toward feature-for-feature Prodex 0.434.3 parity. Multi-provider bridges, Super,
 gateway, richer diagnostics, remaining provider-specific bundle secrets, and
 built-in imports remain implementation backlog rather than permanent exclusions.
 Manual redeem, `ping openai`, explicit self-update, and the best-effort cached
-update notice are now implemented reference surfaces. OpenAI/Anthropic/Kiro bundle
+update notice are now implemented reference surfaces. OpenAI/Anthropic/Kiro/Copilot bundle
 encoding/decoding is now owned by `repository/profile`: the repository owns private bounded file I/O and
 Prodex-compatible envelope crypto, while `usecase/profile` owns profile selection,
 identity matching, update/create planning, and rollback. New infrastructure is added only when required by a concrete

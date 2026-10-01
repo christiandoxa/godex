@@ -68,6 +68,8 @@ func (catalog *Catalog) exportProfile(ctx context.Context, report Report) (profi
 		return catalog.exportAnthropicProfile(ctx, report)
 	case profileentity.ProviderKiro:
 		return catalog.exportKiroProfile(ctx, report)
+	case profileentity.ProviderCopilot:
+		return exportMetadataProfile(report), nil
 	default:
 		return profilemodel.ExportedProfile{}, fmt.Errorf("profile provider %q export is not implemented yet", report.Profile.Provider.Kind)
 	}
@@ -142,6 +144,14 @@ func (catalog *Catalog) exportKiroProfile(ctx context.Context, report Report) (p
 		SourceManaged: report.Profile.Managed, Provider: providerSnapshotFromEntity(report.Profile.Provider),
 		AuthJSON: "", SecretFiles: secrets,
 	}, nil
+}
+
+func exportMetadataProfile(report Report) profilemodel.ExportedProfile {
+	return profilemodel.ExportedProfile{
+		Name: report.Profile.Name, Email: optionalString(strings.TrimSpace(report.Profile.Email)),
+		SourceManaged: report.Profile.Managed, Provider: providerSnapshotFromEntity(report.Profile.Provider),
+		AuthJSON: "", SecretFiles: []profilemodel.ExportedSecretFile{},
+	}
 }
 
 func selectExportProfiles(listed []Report, requested []string) ([]Report, error) {

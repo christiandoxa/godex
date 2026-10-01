@@ -103,7 +103,7 @@ godex account use work
 godex run --account work -- --model MODEL
 ~~~
 
-Export or import OpenAI/Anthropic/Kiro profile bundles compatible with Prodex `0.434.3`:
+Export or import OpenAI/Anthropic/Kiro/Copilot profile bundles compatible with Prodex `0.434.3`:
 
 ~~~bash
 PRODEX_PROFILE_EXPORT_PASSWORD=... godex profile export --password-protect profiles.json
@@ -143,7 +143,11 @@ auth-key priority, derives Kiro provider identity/state, and snapshots
 metadata calls enrich identity/catalog data; model-catalog refresh failure is
 non-fatal and shown as a warning. Re-import updates the matching
 `auth_key + profile ARN/name` identity, and a different `--name` is rejected.
-Copilot built-in import/bundle metadata remains part of the 0.434.3 parity backlog.
+Copilot profiles also round-trip in Prodex's metadata-only bundle form: provider
+host/login/API/SKU/plan and profile email are preserved while `auth_json` stays
+empty and no token or secret file is bundled. Copilot tokens remain owned by the
+external Copilot config/keychain store. Built-in `profile import copilot` remains
+part of the 0.434.3 parity backlog.
 
 Prodex-compatible Codex runtime feature flags are translated to Codex `-c`
 overrides before the remaining Codex arguments. Explicit later Codex `-c`
@@ -218,7 +222,7 @@ Available profile, account, and runtime commands:
 | --- | --- |
 | godex profile add NAME [--codex-home PATH\|--copy-from PATH\|--copy-current] [--activate] [--insecure] | Add a managed or external Codex profile. |
 | godex profile list | List account-backed and standalone profiles. |
-| godex profile export [-p NAME]... [--password-protect\|--no-password] [PATH] | Export a Prodex-compatible OpenAI/Anthropic/Kiro profile bundle. |
+| godex profile export [-p NAME]... [--password-protect\|--no-password] [PATH] | Export a Prodex-compatible OpenAI/Anthropic/Kiro/Copilot profile bundle. |
 | godex profile import PATH_OR_SOURCE [--name NAME] [--activate] [--insecure] | Import a Prodex-compatible bundle or built-in source such as `claude`. |
 | godex current | Show the active profile and its `CODEX_HOME`. |
 | godex use NAME | Set the active profile. |

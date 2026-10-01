@@ -150,8 +150,10 @@ and eligibility validation stays in the runtime use case.
   current read-only Kiro/Amazon Q SQLite state, with Prodex auth-key priority,
   profile identity matching, bounded `whoami`/model-list metadata calls,
   normalized model snapshots, and non-fatal catalog-refresh warnings. Copilot
-  built-in import/bundle metadata remains. Process-crash lifecycle-journal
-  recovery for multi-profile imports also remains
+  bundle metadata is also implemented with Prodex's empty `auth_json` / no-secret
+  wire contract while preserving host/login/API/SKU/plan metadata and profile
+  email. Built-in Copilot import remains. Process-crash lifecycle-journal recovery
+  for multi-profile imports also remains
   to match Prodex exactly. OpenAI plain/encrypted bundle wire formats, Bubble Tea
   protection/password prompts, and identity-safe runtime rollback are implemented.
 - HTTP/SSE model transport is explicit; Godex does not implement Prodex's

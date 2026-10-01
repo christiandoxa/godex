@@ -200,6 +200,11 @@ func (catalog *Catalog) validateImportedProfile(ctx context.Context, source prof
 	case profileentity.ProviderKiro:
 		_, err := catalog.inspectKiroSecrets(ctx, source)
 		return err
+	case profileentity.ProviderCopilot:
+		if len(source.SecretFiles) != 0 {
+			return fmt.Errorf("profile %q contains unexpected provider secret files", source.Name)
+		}
+		return nil
 	default:
 		return fmt.Errorf("profile provider %q import is not implemented yet", sourceProviderKind(source))
 	}
