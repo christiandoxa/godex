@@ -22,6 +22,7 @@ const (
 	anthropicAPIVersion    = "2023-06-01"
 	anthropicOAuthBeta     = "oauth-2025-04-20"
 	anthropicBodyMaxBytes  = 8 << 20
+	contentTypeHeader      = "Content-Type"
 )
 
 type RuntimeTransport struct {
@@ -59,9 +60,6 @@ func (transport *RuntimeTransport) Execute(ctx context.Context, input proxymodel
 	}
 	if route.kind == routeModelsList || route.kind == routeModelsSingle {
 		return anthropicModelsResponse(input.Method, route)
-	}
-	if route.kind == routeCompact {
-		return compactgateway.LocalFallback(input.Body, "anthropic", "local-policy")
 	}
 	if route.kind == routeCompact {
 		return compactgateway.LocalFallback(input.Body, "anthropic", "local-policy")
@@ -145,7 +143,7 @@ func applyAnthropicHeaders(destination, source http.Header, accessToken string, 
 	destination.Set("Authorization", "Bearer "+accessToken)
 	destination.Del("ChatGPT-Account-Id")
 	destination.Set("anthropic-beta", anthropicOAuthBeta)
-	destination.Set("Content-Type", "application/json")
+	destination.Set(contentTypeHeader, "application/json")
 	destination.Set("Accept-Encoding", "identity")
 	destination.Set("Accept", "text/event-stream, application/json")
 	if nativeMessages {
@@ -171,7 +169,7 @@ func copyAnthropicRequestHeaders(destination, source http.Header) {
 }
 
 func translateAnthropicProxyResponse(response *proxymodel.Response) (*proxymodel.Response, error) {
-	contentType := strings.ToLower(response.Header.Get("Content-Type"))
+	contentType := strings.ToLower(response.Header.Get(contentTypeHeader))
 	if strings.Contains(contentType, "text/event-stream") {
 		header := translatedAnthropicHeaders(response.Header, "text/event-stream")
 		return &proxymodel.Response{StatusCode: response.StatusCode, Header: header, Body: chatcompat.ChatSSE(response.Body), Trailer: response.Trailer}, nil
@@ -229,7 +227,7 @@ func translatedAnthropicHeaders(source http.Header, contentType string) http.Hea
 	header := source.Clone()
 	header.Del("Content-Length")
 	header.Del("Content-Encoding")
-	header.Set("Content-Type", contentType)
+	header.Set(contentTypeHeader, contentType)
 	return header
 }
 
