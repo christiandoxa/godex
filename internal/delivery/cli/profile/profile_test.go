@@ -3,12 +3,14 @@ package profile
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	accountrepo "github.com/christiandoxa/godex/internal/repository/account"
 	profilerepo "github.com/christiandoxa/godex/internal/repository/profile"
 	profileusecase "github.com/christiandoxa/godex/internal/usecase/profile"
@@ -140,5 +142,76 @@ func TestProfileExportArgumentParsing(t *testing.T) {
 		if _, err := parseExport(arguments); err == nil {
 			t.Fatalf("arguments %#v unexpectedly accepted", arguments)
 		}
+	}
+}
+
+func TestPasswordModeTUIUsesProdexDefaults(t *testing.T) {
+	for _, test := range []struct {
+		key     tea.KeyMsg
+		protect bool
+	}{
+		{tea.KeyMsg{Type: tea.KeyEnter}, true},
+		{tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}}, true},
+		{tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'N'}}, false},
+		{tea.KeyMsg{Type: tea.KeyEsc}, false},
+	} {
+		updated, command := (passwordModeModel{}).Update(test.key)
+		model := updated.(passwordModeModel)
+		if command == nil || !model.done || model.protect != test.protect {
+			t.Fatalf("key %q = %+v, command=%v", test.key.String(), model, command)
+		}
+	}
+	view := (passwordModeModel{}).View()
+	if !strings.Contains(view, "Password-protect") || !strings.Contains(view, "y/enter protect") {
+		t.Fatalf("mode view = %q", view)
+	}
+}
+
+func TestPasswordEntryTUIAlwaysMasksInput(t *testing.T) {
+	model := passwordEntryModel{title: "Profile Export", label: "Export password", detail: "Enter password"}
+	for _, ch := range "super-secret-value" {
+		updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{ch}})
+		model = updated.(passwordEntryModel)
+	}
+	view := model.View()
+	if strings.Contains(view, "super-secret-value") || !strings.Contains(view, strings.Repeat("*", len([]rune("super-secret-value")))) {
+		t.Fatalf("password view leaked or failed to mask: %q", view)
+	}
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	model = updated.(passwordEntryModel)
+	if len(model.password) != len([]rune("super-secret-value"))-1 {
+		t.Fatalf("backspace length = %d", len(model.password))
+	}
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(passwordEntryModel)
+	if command == nil || !model.accepted || model.cancelled {
+		t.Fatalf("enter model = %+v command=%v", model, command)
+	}
+	cancelled, command := (passwordEntryModel{}).Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if command == nil || !cancelled.(passwordEntryModel).cancelled {
+		t.Fatal("escape did not cancel password entry")
+	}
+}
+
+func TestProfilePasswordPoliciesRemainFailClosedWithoutTTYOrEnv(t *testing.T) {
+	t.Setenv(exportPasswordEnv, "")
+	t.Setenv(importPasswordEnv, "")
+	if _, err := parseExport([]string{"bundle.json"}); err == nil || !strings.Contains(err.Error(), "non-interactive") {
+		t.Fatalf("missing export mode error = %v", err)
+	}
+	if _, err := parseExport([]string{"--password-protect", "bundle.json"}); err == nil || !strings.Contains(err.Error(), exportPasswordEnv) {
+		t.Fatalf("missing export password error = %v", err)
+	}
+	if _, err := resolveImportPassword(context.Background()); err == nil || !strings.Contains(err.Error(), importPasswordEnv) {
+		t.Fatalf("missing import password error = %v", err)
+	}
+}
+
+func TestImportPasswordRetryOnlyRecognizesPasswordErrors(t *testing.T) {
+	if !importRequiresPassword(errors.New("profile export password must contain bytes")) {
+		t.Fatal("password error was not recognized")
+	}
+	if importRequiresPassword(errors.New("failed to parse bundle")) {
+		t.Fatal("unrelated import error unexpectedly requested a password")
 	}
 }

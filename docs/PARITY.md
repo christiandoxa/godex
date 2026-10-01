@@ -131,16 +131,17 @@ and eligibility validation stays in the runtime use case.
   supports install checks, bounded runtime tails, quota summaries, runtime JSON,
   and redacted private bundles; import-journal repair, full session-index repair,
   and policy suggestions remain. Existing status/quota/log, doctor panels, and
-  redeem-confirmation and human session-list TUIs use Bubble Tea; login/password
-  TUIs remain to be implemented with Bubble Tea as the mandatory framework.
+  redeem-confirmation, human session-list, and profile bundle password TUIs use
+  Bubble Tea; the login/provider menu remains to be implemented with Bubble Tea
+  once multi-provider login bridges land.
 - Explicit self-update, best-effort cached update notices on eligible commands,
   manual reset-credit redemption, and cost-bearing `ping openai` diagnostics are
   implemented.
 - Built-in non-OpenAI profile import sources (Claude, Copilot, Kiro) and provider
-  secret-file bundle payloads. Interactive password-selection/password-entry TUI
-  and process-crash lifecycle-journal recovery for multi-profile imports also
-  remain to match Prodex exactly. OpenAI plain/encrypted bundle wire formats and
-  identity-safe runtime rollback are implemented.
+  secret-file bundle payloads. Process-crash lifecycle-journal recovery for
+  multi-profile imports remains to match Prodex exactly. OpenAI plain/encrypted
+  bundle wire formats, Bubble Tea protection/password prompts, and identity-safe
+  runtime rollback are implemented.
 - HTTP/SSE model transport is explicit; Godex does not implement Prodex's
   WebSocket/Realtime forwarding. Unexpected upgrades fail before upstream work.
 - Import-current is auth-only, not full native-home migration. Existing native
@@ -150,6 +151,12 @@ and eligibility validation stays in the runtime use case.
   retained deactivation; no second archive tree or changed removal default.
 - Native names/pickers/last remain profile-local rather than a shared-session UI.
   Explicit UUIDs/prefixes provide the cross-profile workflow.
+- Profile bundle protection/password interaction now matches the Prodex terminal
+  split with Bubble Tea: export protection defaults to protected on Enter, masked
+  password + confirmation are required when no export-password env value exists,
+  and encrypted import prompts only after the bundle requires a password. Non-TTY
+  mode still requires explicit flags/environment and never silently writes plain
+  reusable credentials.
 - Human `session list/current` now follows the Prodex TUI split using Bubble Tea:
   short terminal lists render inline and return; longer terminal lists use a
   scrollable alternate screen with j/k, arrows, PgUp/PgDn, Home/End, and

@@ -113,9 +113,13 @@ godex profile export --no-password profiles.json
 
 Encrypted exports use Prodex v2 Argon2id + AES-256-GCM-SIV envelopes; imports
 also accept legacy Prodex v1 PBKDF2-SHA256 encrypted envelopes. Plain exports
-use the Prodex v1 envelope. Bundle files are private and bounded. OpenAI profiles
-are supported in this checkpoint; provider-specific secret files are rejected
-until their provider import paths are implemented.
+use the Prodex v1 envelope. Bundle files are private and bounded. In an interactive
+terminal, omitting both protection flags opens a Bubble Tea protection prompt;
+protected export/import passwords are entered through a masked Bubble Tea prompt
+when the matching `PRODEX_PROFILE_*_PASSWORD` environment variable is unset.
+Non-TTY workflows remain fail-closed and require explicit flags/environment.
+OpenAI profiles are supported in this checkpoint; provider-specific secret files
+are rejected until their provider import paths are implemented.
 
 Prodex-compatible Codex runtime feature flags are translated to Codex `-c`
 overrides before the remaining Codex arguments. Explicit later Codex `-c`
@@ -263,9 +267,10 @@ and Codex configuration survive repeat login and import-current.
 Interactive terminal surfaces that correspond to Prodex TUIs use
 [Bubble Tea](https://github.com/charmbracelet/bubbletea). Current Bubble Tea
 surfaces include live `status`, live `quota`, interactive `log stream/upstream`,
-and the manual redeem confirmation. Non-TTY and machine-readable modes keep
-plain output for scripts and pipes. Future session/login/password TUI parity must
-use the same framework.
+human session lists, doctor panels, manual redeem confirmation, and profile
+export/import protection/password prompts. Non-TTY and machine-readable modes
+keep plain output for scripts and pipes. The remaining login/provider menu TUI
+must use the same framework when multi-provider login parity lands.
 
 ## Configuration
 

@@ -20,7 +20,7 @@ const (
 )
 
 func exportProfiles(ctx context.Context, catalog *profileusecase.Catalog, out io.Writer, arguments []string) error {
-	request, err := parseExport(arguments)
+	request, err := parseExportWithContext(ctx, arguments)
 	if err != nil {
 		return err
 	}
@@ -38,14 +38,40 @@ func importProfiles(ctx context.Context, catalog *profileusecase.Catalog, out io
 	}
 	request := profilemodel.ImportRequest{Path: arguments[0], Password: os.Getenv(importPasswordEnv)}
 	result, err := catalog.Import(ctx, request)
-	if err != nil {
-		if request.Password == "" && strings.Contains(err.Error(), "password") {
-			return fmt.Errorf("profile export bundle is password-protected; set %s", importPasswordEnv)
+	if err != nil && request.Password == "" && importRequiresPassword(err) {
+		password, promptErr := resolveImportPassword(ctx)
+		if promptErr != nil {
+			return promptErr
 		}
+		request.Password = password
+		result, err = catalog.Import(ctx, request)
+	}
+	if err != nil {
 		return err
 	}
 	_, err = fmt.Fprintf(out, "Imported %d profile(s); updated %d existing profile(s).\nPath: %s\nEncrypted: %t\n", result.ImportedCount, result.UpdatedCount, result.Path, result.Encrypted)
 	return err
+}
+
+func importRequiresPassword(err error) bool {
+	return err != nil && strings.Contains(strings.ToLower(err.Error()), "password")
+}
+
+func resolveImportPassword(ctx context.Context) (string, error) {
+	if password := os.Getenv(importPasswordEnv); strings.TrimSpace(password) != "" {
+		return password, nil
+	}
+	if !profilePasswordTUIAvailable() {
+		return "", fmt.Errorf("profile export bundle is password-protected; set %s or rerun in a terminal", importPasswordEnv)
+	}
+	password, err := runPasswordEntryTUI(ctx, "Profile Import", "Export password", "Enter the password for this encrypted profile bundle.")
+	if err != nil {
+		return "", err
+	}
+	if password == "" {
+		return "", errors.New("import password cannot be empty")
+	}
+	return password, nil
 }
 
 type exportParseState struct {
@@ -55,6 +81,10 @@ type exportParseState struct {
 }
 
 func parseExport(arguments []string) (profilemodel.ExportRequest, error) {
+	return parseExportWithContext(context.Background(), arguments)
+}
+
+func parseExportWithContext(ctx context.Context, arguments []string) (profilemodel.ExportRequest, error) {
 	state := exportParseState{}
 	for index := 0; index < len(arguments); index++ {
 		next, err := state.consume(arguments, index)
@@ -63,7 +93,7 @@ func parseExport(arguments []string) (profilemodel.ExportRequest, error) {
 		}
 		index = next
 	}
-	return state.finish()
+	return state.finish(ctx)
 }
 
 func (state *exportParseState) consume(arguments []string, index int) (int, error) {
@@ -90,27 +120,65 @@ func (state *exportParseState) consume(arguments []string, index int) (int, erro
 	return index, nil
 }
 
-func (state exportParseState) finish() (profilemodel.ExportRequest, error) {
-	if state.passwordProtect && state.noPassword {
-		return profilemodel.ExportRequest{}, errors.New("--password-protect cannot be combined with --no-password")
+func (state exportParseState) finish(ctx context.Context) (profilemodel.ExportRequest, error) {
+	protect, err := resolveExportPasswordMode(ctx, state)
+	if err != nil {
+		return profilemodel.ExportRequest{}, err
 	}
-	if !state.passwordProtect && !state.noPassword {
-		return profilemodel.ExportRequest{}, fmt.Errorf("profile export requires --password-protect with %s set, or --no-password", exportPasswordEnv)
-	}
-	if state.passwordProtect {
-		state.request.Password = os.Getenv(exportPasswordEnv)
-		if strings.TrimSpace(state.request.Password) == "" {
-			return profilemodel.ExportRequest{}, fmt.Errorf("password protection requested; set %s", exportPasswordEnv)
+	if protect {
+		state.request.Password, err = resolveExportPassword(ctx)
+		if err != nil {
+			return profilemodel.ExportRequest{}, err
 		}
 	}
 	if state.request.OutputPath == "" {
-		path, err := defaultExportPath()
-		if err != nil {
-			return profilemodel.ExportRequest{}, err
+		path, pathErr := defaultExportPath()
+		if pathErr != nil {
+			return profilemodel.ExportRequest{}, pathErr
 		}
 		state.request.OutputPath = path
 	}
 	return state.request, nil
+}
+
+func resolveExportPasswordMode(ctx context.Context, state exportParseState) (bool, error) {
+	if state.passwordProtect && state.noPassword {
+		return false, errors.New("--password-protect cannot be combined with --no-password")
+	}
+	if state.passwordProtect {
+		return true, nil
+	}
+	if state.noPassword {
+		return false, nil
+	}
+	if !profilePasswordTUIAvailable() {
+		return false, fmt.Errorf("non-interactive profile export requires --password-protect with %s set, or --no-password to write an unencrypted bundle", exportPasswordEnv)
+	}
+	return runPasswordModeTUI(ctx)
+}
+
+func resolveExportPassword(ctx context.Context) (string, error) {
+	if password := os.Getenv(exportPasswordEnv); strings.TrimSpace(password) != "" {
+		return password, nil
+	}
+	if !profilePasswordTUIAvailable() {
+		return "", fmt.Errorf("password protection requested but no interactive terminal is available; set %s", exportPasswordEnv)
+	}
+	password, err := runPasswordEntryTUI(ctx, "Profile Export", "Export password", "Enter a password for the encrypted profile bundle.")
+	if err != nil {
+		return "", err
+	}
+	if password == "" {
+		return "", errors.New("export password cannot be empty")
+	}
+	confirmation, err := runPasswordEntryTUI(ctx, "Profile Export", "Confirm export password", "Enter the same password again.")
+	if err != nil {
+		return "", err
+	}
+	if password != confirmation {
+		return "", errors.New("export passwords did not match")
+	}
+	return password, nil
 }
 
 func isExportProfileOption(argument string) bool {

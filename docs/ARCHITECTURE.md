@@ -98,8 +98,9 @@ rendering stay in the owning `internal/delivery/cli/<domain>` package; business
 state still comes from use cases. Live `status`, `quota`, and `log`, human session lists, doctor panels, plus
 redeem confirmation use Bubble Tea only when the required terminal streams are
 available. Non-TTY paths retain deterministic line-oriented output. Do not
-introduce direct ANSI screen-clearing loops or another TUI framework. Login-menu
-and profile password TUI parity must follow this rule when added.
+introduce direct ANSI screen-clearing loops or another TUI framework. Profile
+export/import protection and masked password entry now follow this rule as well;
+the remaining login/provider menu must use Bubble Tea when added.
 
 ### Quota gateway and preflight
 
