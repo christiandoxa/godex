@@ -92,19 +92,188 @@ func TestRuntimeTransportMapsCompactAndLegacyPaths(t *testing.T) {
 	}
 }
 
-func TestRuntimeTransportRejectsNonResponsesAndUnsafeURL(t *testing.T) {
-	for _, upstream := range []string{"file:///tmp/copilot", "https://user:secret@example.test", "https://example.test?token=secret"} {
-		if _, err := NewRuntimeTransport(upstream, RuntimeAuth{apiKey: "runtime-fixture"}, nil); err == nil || strings.Contains(err.Error(), "secret") {
+func TestCopilotRuntimeRouteMatchesProdexV1SurfaceExactly(t *testing.T) {
+	for _, fixture := range []struct {
+		path string
+		want string
+	}{
+		{"/backend-api/prodex/responses", "/responses"},
+		{"/backend-api/prodex/v1/responses", "/responses"},
+		{"/backend-api/prodex/responses/compact", "/responses/compact"},
+		{"/backend-api/prodex/v1/chat/completions", "/chat/completions"},
+		{"/backend-api/prodex/v1/messages", "/messages"},
+	} {
+		route, err := copilotRuntimeRoute(fixture.path)
+		if err != nil || route.kind != copilotRouteUpstream || route.upstreamPath != fixture.want {
+			t.Fatalf("route %q = %#v, err=%v; want upstream %q", fixture.path, route, err, fixture.want)
+		}
+	}
+	for _, path := range []string{
+		"/backend-api/prodex/v2/responses",
+		"/backend-api/prodex/v1.2/responses",
+		"/backend-api/prodex/v1/responses/compact/",
+		"/backend-api/prodex/v1//responses",
+		"/backend-api/prodex/v1/%2e%2e/responses",
+		"/backend-api/prodex/tenant/v1/responses",
+	} {
+		if _, err := copilotRuntimeRoute(path); err == nil {
+			t.Fatalf("unsupported route %q unexpectedly accepted", path)
+		}
+	}
+}
+
+func TestRuntimeTransportRejectsUnsupportedRoutesAndUnsafeURL(t *testing.T) {
+	for _, upstream := range []string{"file:///tmp/copilot", "https://user:secret@example.test", "https://example.test?token=<redacted>"} {
+		if _, err := NewRuntimeTransport(upstream, RuntimeAuth{apiKey: "<redacted>"}, nil); err == nil || strings.Contains(err.Error(), "secret") {
 			t.Fatalf("upstream %q error = %v", upstream, err)
 		}
 	}
-	transport, err := NewRuntimeTransport("https://example.test", RuntimeAuth{apiKey: "runtime-fixture"}, http.DefaultClient)
+	transport, err := NewRuntimeTransport("https://example.test", RuntimeAuth{apiKey: "<redacted>"}, http.DefaultClient)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := transport.Execute(context.Background(), proxymodel.Request{Method: http.MethodPost, Path: "/backend-api/prodex/chat/completions", Body: []byte(`{}`)}, proxymodel.Account{}); err == nil {
-		t.Fatal("non-Responses route unexpectedly accepted")
+	if _, err := transport.Execute(context.Background(), proxymodel.Request{
+		Method: http.MethodPost, Path: "/backend-api/prodex/embeddings", Body: []byte(`{}`),
+	}, proxymodel.Account{}); err == nil {
+		t.Fatal("unsupported embeddings route unexpectedly accepted")
 	}
+}
+
+func TestRuntimeTransportPassesThroughChatAndMessages(t *testing.T) {
+	type upstreamRequest struct {
+		path   string
+		header http.Header
+		body   []byte
+	}
+	requests := make(chan upstreamRequest, 2)
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		body, _ := io.ReadAll(request.Body)
+		requests <- upstreamRequest{path: request.URL.Path, header: request.Header.Clone(), body: body}
+		_, _ = writer.Write([]byte(`{"ok":true}`))
+	}))
+	defer server.Close()
+	transport, err := NewRuntimeTransport(server.URL, RuntimeAuth{apiKey: "<redacted>"}, server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	trace := http.Header{
+		"Traceparent": {"00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"},
+		"Tracestate":  {"prodex=test"},
+		"Baggage":     {"tenant_tier=premium"},
+	}
+	for _, request := range []proxymodel.Request{
+		{
+			Method: http.MethodPost, Path: "/backend-api/prodex/v1/chat/completions", Header: trace,
+			Body: []byte(`{"model":"codex","messages":[{"role":"assistant","reasoning":{"encrypted_content":"drop"}}]}`),
+		},
+		{
+			Method: http.MethodPost, Path: "/backend-api/prodex/messages",
+			Body: []byte(`{"model":"gpt-5.4","messages":[{"role":"user","content":"hello"}]}`),
+		},
+	} {
+		response, err := transport.Execute(context.Background(), request, proxymodel.Account{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = response.Body.Close()
+	}
+	chat := <-requests
+	messages := <-requests
+	if chat.path != "/chat/completions" || messages.path != "/messages" {
+		t.Fatalf("upstream paths = %q / %q", chat.path, messages.path)
+	}
+	for name, want := range map[string]string{
+		"Traceparent": trace.Get("Traceparent"), "Tracestate": trace.Get("Tracestate"), "Baggage": trace.Get("Baggage"),
+	} {
+		if chat.header.Get(name) != want {
+			t.Fatalf("trace header %s = %q, want %q", name, chat.header.Get(name), want)
+		}
+	}
+	var chatBody map[string]any
+	if err := json.Unmarshal(chat.body, &chatBody); err != nil {
+		t.Fatal(err)
+	}
+	if chatBody["model"] != defaultRuntimeModel {
+		t.Fatalf("chat model = %#v", chatBody["model"])
+	}
+	reasoning := chatBody["messages"].([]any)[0].(map[string]any)["reasoning"].(map[string]any)
+	if _, ok := reasoning["encrypted_content"]; ok {
+		t.Fatalf("chat encrypted content remained: %#v", chatBody)
+	}
+}
+
+func TestRuntimeTransportEmulatesModelsEndpointsLocally(t *testing.T) {
+	upstreamCalls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		upstreamCalls++
+		http.Error(writer, "models should be local", http.StatusInternalServerError)
+	}))
+	defer server.Close()
+	dynamic := map[string]any{
+		"id": "Dynamic-X", "object": "model", "owned_by": "github-copilot",
+		"display_name": "Dynamic X", "context_window": uint64(321000),
+	}
+	transport, err := NewRuntimeTransport(server.URL, RuntimeAuth{
+		apiKey: "<redacted>", modelCatalog: []map[string]any{dynamic},
+	}, server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	list, err := transport.Execute(context.Background(), proxymodel.Request{
+		Method: http.MethodGet, Path: "/backend-api/prodex/v1/models",
+	}, proxymodel.Account{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer list.Body.Close()
+	var listBody struct {
+		Object string           `json:"object"`
+		Data   []map[string]any `json:"data"`
+	}
+	if err := json.NewDecoder(list.Body).Decode(&listBody); err != nil {
+		t.Fatal(err)
+	}
+	if list.StatusCode != http.StatusOK || listBody.Object != "list" || upstreamCalls != 0 {
+		t.Fatalf("models list = status:%d object:%q upstream:%d", list.StatusCode, listBody.Object, upstreamCalls)
+	}
+	if !catalogHasModel(listBody.Data, defaultRuntimeModel) || !catalogHasModel(listBody.Data, "Dynamic-X") {
+		t.Fatalf("models list missing static/dynamic entries: %#v", listBody.Data)
+	}
+
+	single, err := transport.Execute(context.Background(), proxymodel.Request{
+		Method: http.MethodGet, Path: "/backend-api/prodex/models/dynamic-x",
+	}, proxymodel.Account{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer single.Body.Close()
+	var singleBody map[string]any
+	if err := json.NewDecoder(single.Body).Decode(&singleBody); err != nil {
+		t.Fatal(err)
+	}
+	if single.StatusCode != http.StatusOK || singleBody["id"] != "Dynamic-X" || upstreamCalls != 0 {
+		t.Fatalf("single model = status:%d body:%#v upstream:%d", single.StatusCode, singleBody, upstreamCalls)
+	}
+
+	missing, err := transport.Execute(context.Background(), proxymodel.Request{
+		Method: http.MethodGet, Path: "/backend-api/prodex/models/ Dynamic-X ",
+	}, proxymodel.Account{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer missing.Body.Close()
+	if missing.StatusCode != http.StatusNotFound || upstreamCalls != 0 {
+		t.Fatalf("trimmed model lookup unexpectedly matched: status=%d upstream=%d", missing.StatusCode, upstreamCalls)
+	}
+}
+
+func catalogHasModel(models []map[string]any, id string) bool {
+	for _, model := range models {
+		if value, _ := model["id"].(string); strings.EqualFold(value, id) {
+			return true
+		}
+	}
+	return false
 }
 
 func TestRuntimeTransportFallsBackToNextModelBeforeCommit(t *testing.T) {

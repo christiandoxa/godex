@@ -34,6 +34,14 @@ func NewRuntimeTransport(upstream string, auth RuntimeAuth, client *http.Client)
 	if strings.TrimSpace(auth.apiKey) == "" {
 		return nil, errors.New("Copilot runtime credential is unavailable")
 	}
+	staticCatalog, err := proxymodel.CopilotProviderCatalogJSON()
+	if err != nil {
+		return nil, err
+	}
+	auth.modelCatalog, err = mergeRuntimeCatalog(staticCatalog, auth.modelCatalog)
+	if err != nil {
+		return nil, err
+	}
 	return &RuntimeTransport{client: cloneRuntimeClient(client), upstream: parsed, auth: auth}, nil
 }
 
@@ -42,17 +50,20 @@ func (transport *RuntimeTransport) ModelCatalog() []map[string]any {
 }
 
 func (transport *RuntimeTransport) Execute(ctx context.Context, input proxymodel.Request, _ proxymodel.Account) (*proxymodel.Response, error) {
-	path, err := copilotUpstreamPath(input.Path)
+	route, err := copilotRuntimeRoute(input.Path)
 	if err != nil {
 		return nil, err
 	}
+	if route.kind != copilotRouteUpstream {
+		return transport.modelsResponse(input.Method, route)
+	}
 	target := *transport.upstream
-	target.Path = strings.TrimRight(target.Path, "/") + path
+	target.Path = strings.TrimRight(target.Path, "/") + route.upstreamPath
 	target.RawPath = ""
 	target.RawQuery = input.RawQuery
 	models := copilotModelFallbackChain(input.Body)
 	for index, model := range models {
-		response, err := transport.executeModel(ctx, input.Method, target.String(), input.Body, model)
+		response, err := transport.executeModel(ctx, input.Method, target.String(), input.Header, input.Body, model)
 		if err != nil {
 			return nil, err
 		}
@@ -74,6 +85,7 @@ func (transport *RuntimeTransport) Execute(ctx context.Context, input proxymodel
 func (transport *RuntimeTransport) executeModel(
 	ctx context.Context,
 	method, target string,
+	sourceHeader http.Header,
 	originalBody []byte,
 	model string,
 ) (*http.Response, error) {
@@ -82,6 +94,7 @@ func (transport *RuntimeTransport) executeModel(
 	if err != nil {
 		return nil, errors.New("create Copilot upstream request")
 	}
+	copyCopilotTraceHeaders(request.Header, sourceHeader)
 	applyCopilotHeaders(request.Header, body, transport.auth.apiKey)
 	return transport.client.Do(request)
 }
@@ -150,26 +163,20 @@ func applyCopilotHeaders(header http.Header, body []byte, apiKey string) {
 	}
 }
 
+func copyCopilotTraceHeaders(destination, source http.Header) {
+	for _, name := range []string{"traceparent", "tracestate", "baggage"} {
+		if value := source.Get(name); value != "" {
+			destination.Set(name, value)
+		}
+	}
+}
+
 func copilotRequestID() string {
 	var value [16]byte
 	if _, err := rand.Read(value[:]); err != nil {
 		return "godex-runtime"
 	}
 	return "godex-" + hex.EncodeToString(value[:])
-}
-
-func copilotUpstreamPath(path string) (string, error) {
-	suffix, ok := strings.CutPrefix(path, copilotMountPath)
-	if !ok || (suffix != "" && !strings.HasPrefix(suffix, "/")) {
-		return "", errors.New("Copilot runtime received an unsupported proxy path")
-	}
-	if legacy, rest, ok := splitLegacyRuntimeVersion(suffix); ok && legacy {
-		suffix = rest
-	}
-	if suffix == "/responses" || suffix == "/responses/compact" {
-		return suffix, nil
-	}
-	return "", errors.New("Copilot runtime currently supports Responses endpoints only")
 }
 
 func splitLegacyRuntimeVersion(suffix string) (bool, string, bool) {

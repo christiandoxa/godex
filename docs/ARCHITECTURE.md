@@ -147,6 +147,15 @@ its original status, headers, trailers, and body before returning it, while
 successful/SSE responses remain live and unbuffered. Account rotation and durable
 conversation affinity continue to belong exclusively to `usecase/routing`.
 
+
+Copilot route planning is explicit in `gateway/copilot`: the 0.434.3 supported
+surface is Responses, Responses Compact, Chat Completions, Messages, and Models.
+The four model-traffic routes share the same auth/header/model-fallback transport;
+GET Models list/single is answered locally from the already bounded merged runtime
+catalog, so model discovery never creates a second upstream credential path.
+Incoming traceparent/tracestate/baggage are the only caller trace headers copied
+to Copilot passthrough requests; caller authorization is never forwarded.
+
 ### Quota gateway and preflight
 
 The OpenAI quota client is a narrow outbound adapter for the ChatGPT usage

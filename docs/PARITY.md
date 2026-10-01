@@ -137,8 +137,11 @@ and eligibility validation stays in the runtime use case.
   error bodies are preserved. The reference resolves Copilot runtime auth at
   launch rather than refreshing it per request, so that is not a remaining gap.
   The reference custom-instruction merge helper is test-only for the native
-  Responses flow and is likewise not a production parity gap. Non-Responses /
-  chat-compatible Copilot endpoint parity remains.
+  Responses flow and is likewise not a production parity gap. Copilot endpoint
+  parity now matches the registry as well: Responses is native, compact/chat/
+  messages are passthrough through the same bounded transport/fallback policy,
+  and GET models list/single are locally emulated from the merged static/dynamic
+  catalog with exact case-folded, no-trim identity lookup.
 - Super mode and its hidden expose/broker/MCP bridge/sub-agent execution stack,
   including optional Presidio integration.
 - The standalone gateway surface, remaining live TUI parity, process/resource
