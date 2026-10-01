@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/url"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	_ "modernc.org/sqlite"
@@ -67,13 +68,29 @@ func readSourceDatabase(ctx context.Context, path string) (sourceSnapshot, error
 }
 
 func readOnlySQLiteDSN(path string) string {
-	uri := url.URL{Scheme: "file", Path: filepath.ToSlash(path)}
+	return readOnlySQLiteDSNForOS(path, runtime.GOOS)
+}
+
+func readOnlySQLiteDSNForOS(path, goos string) string {
+	normalized := filepath.ToSlash(path)
+	if goos == "windows" {
+		normalized = strings.ReplaceAll(path, "\\", "/")
+		if windowsDrivePath(normalized) {
+			normalized = "/" + normalized
+		}
+	}
+	uri := url.URL{Scheme: "file", Path: normalized}
 	query := uri.Query()
 	query.Set("mode", "ro")
 	query.Add("_pragma", "query_only(1)")
 	query.Add("_pragma", "busy_timeout(2000)")
 	uri.RawQuery = query.Encode()
 	return uri.String()
+}
+
+func windowsDrivePath(path string) bool {
+	return len(path) >= 3 && path[1] == ':' && path[2] == '/' &&
+		((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z'))
 }
 
 func readKiroAuthToken(ctx context.Context, database *sql.DB) (string, string, error) {

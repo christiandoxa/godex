@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+const kiroDatabaseFileName = "data.sqlite3"
+
 func (source *Source) discoverDatabasePath() (string, error) {
 	if path := source.explicitDatabasePath(); path != "" {
 		return path, nil
@@ -29,7 +31,7 @@ func (source *Source) explicitDatabasePath() string {
 		if root == "" {
 			continue
 		}
-		candidate := filepath.Join(root, "data.sqlite3")
+		candidate := filepath.Join(root, kiroDatabaseFileName)
 		if regularSourceFile(candidate) {
 			return filepath.Clean(candidate)
 		}
@@ -41,8 +43,8 @@ func (source *Source) defaultDatabaseCandidates() []string {
 	candidates := make([]string, 0, 6)
 	if local := strings.TrimSpace(source.dataLocalDir()); local != "" {
 		candidates = append(candidates,
-			filepath.Join(local, "kiro-cli", "data.sqlite3"),
-			filepath.Join(local, "amazon-q", "data.sqlite3"),
+			filepath.Join(local, "kiro-cli", kiroDatabaseFileName),
+			filepath.Join(local, "amazon-q", kiroDatabaseFileName),
 		)
 	}
 	home, err := source.homeDir()
@@ -50,7 +52,7 @@ func (source *Source) defaultDatabaseCandidates() []string {
 		return candidates
 	}
 	for _, name := range []string{"kiro-cli", "amazon-q"} {
-		candidates = append(candidates, filepath.Join(home, ".local", "share", name, "data.sqlite3"))
+		candidates = append(candidates, filepath.Join(home, ".local", "share", name, kiroDatabaseFileName))
 	}
 	return candidates
 }
