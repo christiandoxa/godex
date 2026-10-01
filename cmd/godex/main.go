@@ -22,6 +22,7 @@ import (
 	runtimerepo "github.com/christiandoxa/godex/internal/repository/runtime"
 	sessionrepo "github.com/christiandoxa/godex/internal/repository/session"
 	authusecase "github.com/christiandoxa/godex/internal/usecase/auth"
+	pingusecase "github.com/christiandoxa/godex/internal/usecase/ping"
 	profileusecase "github.com/christiandoxa/godex/internal/usecase/profile"
 	quotausecase "github.com/christiandoxa/godex/internal/usecase/quota"
 	routingusecase "github.com/christiandoxa/godex/internal/usecase/routing"
@@ -84,6 +85,7 @@ func run() int {
 	activity.SetProfiles(profiles)
 	quotaStatus.SetProfiles(profiles)
 	application.SetRedeemer(quotausecase.NewRedeemer(profiles, quotaClient))
+	application.SetPing(pingusecase.NewOpenAI(profiles, process))
 
 	application.SetNativeAuth(authusecase.NewNative(store, process))
 	application.SetActivity(activity)

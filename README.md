@@ -188,6 +188,7 @@ Available profile, account, and runtime commands:
 | godex account remove SELECTOR | Remove a managed account and its isolated home. |
 | godex quota [-p NAME] [--all] [--detail] [--raw] [--once] [--base-url URL] | Watch OpenAI/Codex quota or render a single snapshot. |
 | godex redeem PROFILE [-y|--yes] [--base-url URL] [--no-proxy] | Manually redeem one OpenAI/Codex reset credit. |
+| godex ping openai [-p NAME] [--model MODEL] [--base-url URL] [--no-proxy] [--json] | Run the Prodex-compatible OpenAI application diagnostic. |
 | godex info [--json] [--tokens] | Show profile/runtime/Codex information. |
 | godex status [--once] [--interval SECONDS] | Show or watch the runtime snapshot. |
 | godex log [stream\|last\|upstream] [--json] | Follow persisted, redacted runtime request events. |
@@ -213,6 +214,13 @@ it checks current usage first, asks for confirmation when the nearest 5-hour or
 weekly reset is within one hour, then consumes one reset credit with a stable
 idempotency request ID. `--yes` skips only that confirmation; `--no-proxy`
 disables environment proxy routing for the usage and consume requests.
+
+`godex ping openai` is intentionally cost-bearing: it submits the minimal `hello`
+turn through official Codex for each selected OpenAI profile. It uses a private
+diagnostic working directory, a 45-second per-profile timeout, up to four workers,
+and strips provider API-key environment variables before launch. Human output
+streams profile results as workers finish; `--json` emits one stable aggregate
+object. Failure details are bounded and secret-redacted. No ping runs implicitly.
 
 Selectors match an exact account ID, friendly name, or email. Ambiguous
 selectors fail. Unknown top-level commands are treated as Codex subcommands and

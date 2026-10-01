@@ -198,6 +198,7 @@ internal/delivery/cli/                 dispatcher only
 internal/delivery/cli/account/
 internal/delivery/cli/auth/
 internal/delivery/cli/profile/
+internal/delivery/cli/ping/
 internal/delivery/cli/runtime/
 internal/delivery/cli/quota/
 internal/delivery/cli/session/
@@ -208,6 +209,7 @@ internal/entity/routing/
 internal/entity/session/
 internal/model/account/
 internal/model/profile/
+internal/model/ping/
 internal/model/proxy/
 internal/model/quota/
 internal/model/runtime/
@@ -222,6 +224,7 @@ internal/repository/session/
 internal/usecase/account/
 internal/usecase/auth/
 internal/usecase/profile/
+internal/usecase/ping/
 internal/usecase/runtime/
 internal/usecase/quota/
 internal/usecase/routing/
@@ -231,6 +234,14 @@ internal/helper/httpheader/
 internal/helper/lockfile/
 internal/version/
 ```
+
+
+OpenAI ping follows the same boundary split: `delivery/cli/ping` owns argument and
+output formatting, `usecase/ping` owns target selection, bounded concurrency and
+status classification, and `gateway/codex` owns the cost-bearing child process.
+The gateway runs Codex in a private temporary directory, strips provider secret
+environment variables, bounds captured output, and reports cleanup failure.
+No diagnostic is scheduled or run implicitly.
 
 The gateway split follows concrete integration ownership: Codex process and
 profile operations live under `gateway/codex`, while outbound OpenAI HTTP
@@ -273,9 +284,9 @@ No access token, ID token, refresh token, or API token belongs in this file.
 
 The verified OpenAI/Codex core remains the stability baseline while Godex expands
 toward feature-for-feature Prodex 0.434.2 parity. Multi-provider bridges, Super,
-gateway, richer diagnostics, live quota/status surfaces, update/redeem/ping, and
-provider-specific profile bundle secrets and built-in imports remain implementation
-backlog rather than permanent exclusions. OpenAI bundle encoding/decoding is now
+gateway, richer diagnostics, self-update, provider-specific profile bundle
+secrets, and built-in imports remain implementation backlog rather than permanent
+exclusions. Manual redeem and `ping openai` are now implemented reference surfaces. OpenAI bundle encoding/decoding is now
 owned by `repository/profile`: the repository owns private bounded file I/O and
 Prodex-compatible envelope crypto, while `usecase/profile` owns profile selection,
 identity matching, update/create planning, and rollback. New infrastructure is added only when required by a concrete

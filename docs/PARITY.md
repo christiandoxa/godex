@@ -119,7 +119,7 @@ and eligibility validation stays in the runtime use case.
   including optional Presidio integration.
 - The standalone gateway surface, full live TUI parity, process/resource metrics,
   audit-log backend, and the richer runtime-policy/diagnostic bundle surfaces.
-- Self-update, reset-credit redemption, and cost-bearing `ping openai` diagnostics.
+- Self-update remains a 1:1 gap. Manual reset-credit redemption and cost-bearing `ping openai` diagnostics are implemented.
 - Built-in non-OpenAI profile import sources (Claude, Copilot, Kiro) and provider
   secret-file bundle payloads. Interactive password-selection/password-entry TUI
   and process-crash lifecycle-journal recovery for multi-profile imports also
@@ -134,6 +134,13 @@ and eligibility validation stays in the runtime use case.
   retained deactivation; no second archive tree or changed removal default.
 - Native names/pickers/last remain profile-local rather than a shared-session UI.
   Explicit UUIDs/prefixes provide the cross-profile workflow.
+- `ping openai` now matches Prodex's explicit cost-bearing diagnostic surface:
+  profile/model/base-URL/no-proxy/JSON options, 45-second timeout, four-worker
+  cap, completion-order human rows, stable nullable JSON fields, failure taxonomy,
+  private diagnostic CWD, provider-secret environment stripping, and bounded
+  redacted failure detail. It is never invoked implicitly. Large-model context
+  enrichment remains part of the wider provider/runtime parity work rather than
+  a ping-specific duplicate implementation.
 - Quota now matches Prodex's default five-second watch cadence, `--once`, raw,
   detail, profile selection, command-scoped base-URL override, and aggregate
   `--auth`/`--provider` filtering. The catalog includes standalone profiles and

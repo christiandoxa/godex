@@ -7,11 +7,13 @@ import (
 
 	accountcli "github.com/christiandoxa/godex/internal/delivery/cli/account"
 	authcli "github.com/christiandoxa/godex/internal/delivery/cli/auth"
+	pingcli "github.com/christiandoxa/godex/internal/delivery/cli/ping"
 	profilecli "github.com/christiandoxa/godex/internal/delivery/cli/profile"
 	quotacli "github.com/christiandoxa/godex/internal/delivery/cli/quota"
 	runtimecli "github.com/christiandoxa/godex/internal/delivery/cli/runtime"
 	sessioncli "github.com/christiandoxa/godex/internal/delivery/cli/session"
 	authusecase "github.com/christiandoxa/godex/internal/usecase/auth"
+	pingusecase "github.com/christiandoxa/godex/internal/usecase/ping"
 	profileusecase "github.com/christiandoxa/godex/internal/usecase/profile"
 	quotausecase "github.com/christiandoxa/godex/internal/usecase/quota"
 	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
@@ -30,6 +32,7 @@ type App struct {
 	activity   *runtimeusecase.Activity
 	quota      *quotausecase.Status
 	redeemer   *quotausecase.Redeemer
+	ping       *pingusecase.OpenAI
 	profiles   *profileusecase.Catalog
 	nativeAuth *authusecase.Native
 	sessions   *sessionusecase.Catalog
@@ -93,6 +96,8 @@ func (app *App) Run(ctx context.Context, arguments []string) error {
 		return quotacli.Show(ctx, app.quota, app.out, arguments[1:])
 	case "redeem":
 		return quotacli.Redeem(ctx, app.redeemer, app.out, arguments[1:])
+	case "ping":
+		return pingcli.Run(ctx, app.ping, app.out, arguments[1:])
 	case "session":
 		if app.sessions == nil {
 			return fmt.Errorf("session support is not configured")
@@ -170,6 +175,8 @@ Usage:
                                Watch or snapshot filtered profile quota
   godex redeem PROFILE [-y|--yes] [--base-url URL] [--no-proxy]
                                Redeem one OpenAI reset credit manually
+  godex ping openai [-p NAME] [--model MODEL] [--base-url URL] [--no-proxy] [--json]
+                               Run a cost-bearing OpenAI application diagnostic
   godex run [--account SEL] -- [codex args...]
   godex session list/current [--json|--id-only|--resume-command]
                                Find sessions across managed profiles
@@ -201,6 +208,8 @@ func (app *App) SetSessions(catalog *sessionusecase.Catalog) { app.sessions = ca
 func (app *App) SetProfiles(catalog *profileusecase.Catalog) { app.profiles = catalog }
 
 func (app *App) SetRedeemer(redeemer *quotausecase.Redeemer) { app.redeemer = redeemer }
+
+func (app *App) SetPing(ping *pingusecase.OpenAI) { app.ping = ping }
 
 func (app *App) SetNativeAuth(native *authusecase.Native) { app.nativeAuth = native }
 
