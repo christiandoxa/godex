@@ -2,6 +2,7 @@ package openai
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -43,13 +44,36 @@ func NewQuotaClient(upstream string, client *http.Client, auth authReader) (*Quo
 }
 
 func (client *QuotaClient) Fetch(ctx context.Context, codexHome string) (quotamodel.Usage, error) {
-	auth, err := client.auth.ReadAuth(ctx, codexHome)
+	body, err := client.fetchBody(ctx, codexHome)
 	if err != nil {
 		return quotamodel.Usage{}, err
 	}
+	usage, err := decodeQuotaUsage(body)
+	if err != nil {
+		return quotamodel.Usage{}, err
+	}
+	return usage, nil
+}
+
+func (client *QuotaClient) FetchRaw(ctx context.Context, codexHome string) ([]byte, error) {
+	body, err := client.fetchBody(ctx, codexHome)
+	if err != nil {
+		return nil, err
+	}
+	if !json.Valid(body) {
+		return nil, errors.New("decode quota response")
+	}
+	return body, nil
+}
+
+func (client *QuotaClient) fetchBody(ctx context.Context, codexHome string) ([]byte, error) {
+	auth, err := client.auth.ReadAuth(ctx, codexHome)
+	if err != nil {
+		return nil, err
+	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, client.usageURL(), nil)
 	if err != nil {
-		return quotamodel.Usage{}, fmt.Errorf("create quota request: %w", err)
+		return nil, fmt.Errorf("create quota request: %w", err)
 	}
 	request.Header.Set("Authorization", "Bearer "+auth.AccessToken)
 	request.Header.Set("Accept", "application/json")
@@ -61,24 +85,20 @@ func (client *QuotaClient) Fetch(ctx context.Context, codexHome string) (quotamo
 
 	response, err := client.do(request)
 	if err != nil {
-		return quotamodel.Usage{}, err
+		return nil, err
 	}
 	defer response.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(response.Body, maxQuotaResponseBytes+1))
 	if err != nil {
-		return quotamodel.Usage{}, fmt.Errorf("read quota response: %w", err)
+		return nil, fmt.Errorf("read quota response: %w", err)
 	}
 	if len(body) > maxQuotaResponseBytes {
-		return quotamodel.Usage{}, errors.New("quota response exceeded safe size limit")
+		return nil, errors.New("quota response exceeded safe size limit")
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return quotamodel.Usage{}, fmt.Errorf("quota endpoint returned HTTP %d", response.StatusCode)
+		return nil, fmt.Errorf("quota endpoint returned HTTP %d", response.StatusCode)
 	}
-	usage, err := decodeQuotaUsage(body)
-	if err != nil {
-		return quotamodel.Usage{}, err
-	}
-	return usage, nil
+	return body, nil
 }
 
 func (client *QuotaClient) do(request *http.Request) (*http.Response, error) {

@@ -126,3 +126,33 @@ func TestAvailabilityUsesObservedResetAndFiniteUnknownRetry(t *testing.T) {
 		}
 	}
 }
+
+type fakeRawUsage struct {
+	home string
+	body []byte
+}
+
+func (fake *fakeRawUsage) Fetch(context.Context, string) (quotamodel.Usage, error) {
+	return quotamodel.Usage{}, nil
+}
+
+func (fake *fakeRawUsage) FetchRaw(_ context.Context, home string) ([]byte, error) {
+	fake.home = home
+	return append([]byte(nil), fake.body...), nil
+}
+
+func TestStatusRawUsesCurrentAndSelectedAccountHomes(t *testing.T) {
+	first := accountentity.Account{ID: "one", Name: "one", Enabled: true}
+	second := accountentity.Account{ID: "two", Name: "two", Enabled: false}
+	usage := &fakeRawUsage{body: []byte(`{"plan_type":"plus"}`)}
+	status := NewStatus(fakeAccounts{accounts: []accountentity.Account{first, second}, current: first}, usage)
+
+	body, err := status.Raw(context.Background(), "")
+	if err != nil || string(body) != `{"plan_type":"plus"}` || usage.home != "/managed/one" {
+		t.Fatalf("current raw = %q, home = %q, err = %v", body, usage.home, err)
+	}
+	body, err = status.Raw(context.Background(), "two")
+	if err != nil || string(body) != `{"plan_type":"plus"}` || usage.home != "/managed/two" {
+		t.Fatalf("selected raw = %q, home = %q, err = %v", body, usage.home, err)
+	}
+}

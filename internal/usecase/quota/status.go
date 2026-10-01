@@ -20,6 +20,10 @@ type usageGateway interface {
 	Fetch(context.Context, string) (quotamodel.Usage, error)
 }
 
+type rawUsageGateway interface {
+	FetchRaw(context.Context, string) ([]byte, error)
+}
+
 type Options struct {
 	All      bool
 	Selector string
@@ -33,6 +37,24 @@ type Status struct {
 
 func NewStatus(accounts accountStore, usage usageGateway) *Status {
 	return &Status{accounts: accounts, usage: usage, now: time.Now}
+}
+
+func (status *Status) Raw(ctx context.Context, selector string) ([]byte, error) {
+	raw, ok := status.usage.(rawUsageGateway)
+	if !ok {
+		return nil, errors.New("raw quota output is not supported")
+	}
+	var account accountentity.Account
+	var err error
+	if selector != "" {
+		account, err = status.accounts.Resolve(ctx, selector)
+	} else {
+		account, err = status.accounts.Current(ctx)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return raw.FetchRaw(ctx, status.accounts.CodexHome(account.ID))
 }
 
 func (status *Status) Ready(ctx context.Context, account accountentity.Account) (bool, error) {

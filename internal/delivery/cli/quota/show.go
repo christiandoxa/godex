@@ -1,7 +1,9 @@
 package quota
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -15,16 +17,31 @@ import (
 
 type statusRunner interface {
 	Run(context.Context, quotausecase.Options) ([]quotamodel.Report, error)
+	Raw(context.Context, string) ([]byte, error)
 }
 
 type showOptions struct {
 	quotausecase.Options
 	detail bool
+	raw    bool
 }
 
 func Show(ctx context.Context, status statusRunner, out io.Writer, arguments []string) error {
 	options, err := parseArguments(arguments)
 	if err != nil {
+		return err
+	}
+	if options.raw {
+		body, err := status.Raw(ctx, options.Selector)
+		if err != nil {
+			return err
+		}
+		var pretty bytes.Buffer
+		if err := json.Indent(&pretty, body, "", "  "); err != nil {
+			return errors.New("decode quota response")
+		}
+		pretty.WriteByte('\n')
+		_, err = out.Write(pretty.Bytes())
 		return err
 	}
 	reports, err := status.Run(ctx, options.Options)
@@ -54,10 +71,12 @@ func parseArguments(arguments []string) (showOptions, error) {
 			options.All = true
 		case "--detail":
 			options.detail = true
+		case "--raw":
+			options.raw = true
 		case "--once":
 			// Godex quota output is intentionally one-shot; accept Prodex's explicit spelling.
 		case "--help", "-h":
-			return showOptions{}, errors.New("usage: godex quota [--all] [--detail] [--once] [selector]")
+			return showOptions{}, errors.New("usage: godex quota [--all] [--detail|--raw] [--once] [selector]")
 		default:
 			if strings.HasPrefix(argument, "-") {
 				return showOptions{}, fmt.Errorf("unknown quota option %q", argument)
@@ -70,6 +89,12 @@ func parseArguments(arguments []string) (showOptions, error) {
 	}
 	if options.All && options.Selector != "" {
 		return showOptions{}, errors.New("quota selector cannot be combined with --all")
+	}
+	if options.raw && options.All {
+		return showOptions{}, errors.New("quota --raw cannot be combined with --all")
+	}
+	if options.raw && options.detail {
+		return showOptions{}, errors.New("quota --raw cannot be combined with --detail")
 	}
 	return options, nil
 }

@@ -92,3 +92,21 @@ func writeQuotaAuth(t *testing.T, token, accountID string) string {
 	}
 	return home
 }
+
+func TestQuotaClientFetchRawPreservesValidJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		_, _ = writer.Write([]byte(`{"plan_type":"plus","extra":{"future":true}}`))
+	}))
+	defer server.Close()
+	client, err := NewQuotaClient(server.URL+"/backend-api", nil, codex.NewCodexProcess("", codex.Terminal{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := client.FetchRaw(context.Background(), writeQuotaAuth(t, "synthetic-token", "account-123"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(body) != `{"plan_type":"plus","extra":{"future":true}}` {
+		t.Fatalf("raw body = %q", body)
+	}
+}

@@ -116,7 +116,7 @@ Usage:
   godex account enable/disable <sel>
                                Retain a profile while controlling eligibility
   godex account remove <sel>    Remove an account
-  godex quota [--all] [--detail] [--once] [selector]
+  godex quota [--all] [--detail|--raw] [--once] [selector]
                                Show ChatGPT quota for managed accounts
   godex run [--account SEL] -- [codex args...]
   godex session list/current [--json|--id-only|--resume-command]
