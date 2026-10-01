@@ -51,38 +51,47 @@ func runProviderSelection(
 		return err
 	}
 	if len(keys) > 0 {
-		return runProviderAPIKeySelection(ctx, runner, profiles, selection, target, found, keys, arguments)
+		return runProviderAPIKeySelection(ctx, runner, providerAPIKeyRequest{
+			profiles: profiles, selection: selection, target: target, found: found,
+			keys: keys, arguments: arguments,
+		})
 	}
 	return runProviderOAuthSelection(ctx, runner, profiles, selection, target, found, arguments)
+}
+
+type providerAPIKeyRequest struct {
+	profiles  launchProfiles
+	selection runtimemodel.Selection
+	target    profilemodel.LaunchTarget
+	found     bool
+	keys      []string
+	arguments []string
 }
 
 func runProviderAPIKeySelection(
 	ctx context.Context,
 	runner *runtimeusecase.Runner,
-	profiles launchProfiles,
-	selection runtimemodel.Selection,
-	target profilemodel.LaunchTarget,
-	found bool,
-	keys []string,
-	arguments []string,
+	request providerAPIKeyRequest,
 ) (runErr error) {
 	home := ""
 	name := "anthropic-api-key"
-	if found {
-		home, name = target.CodexHome, target.Name
-		if target.Name != "" && target.AccountID == "" {
-			release, err := profiles.AcquireLaunch(ctx, target.Name)
+	if request.found {
+		home, name = request.target.CodexHome, request.target.Name
+		if request.target.Name != "" && request.target.AccountID == "" {
+			release, err := request.profiles.AcquireLaunch(ctx, request.target.Name)
 			if err != nil {
 				return err
 			}
 			defer func() { runErr = errors.Join(runErr, release()) }()
 		}
 	}
-	provider := runtimeusecase.AnthropicProvider(name, selection.BaseURL)
-	if found && target.AccountID != "" {
-		return runner.RunProviderAPIKeysAccount(ctx, target.AccountID, provider, keys, arguments)
+	provider := runtimeusecase.AnthropicProvider(name, request.selection.BaseURL)
+	if request.found && request.target.AccountID != "" {
+		return runner.RunProviderAPIKeysAccount(
+			ctx, request.target.AccountID, provider, request.keys, request.arguments,
+		)
 	}
-	return runner.RunProviderAPIKeys(ctx, home, provider, keys, arguments)
+	return runner.RunProviderAPIKeys(ctx, home, provider, request.keys, request.arguments)
 }
 
 func runProviderOAuthSelection(
@@ -108,5 +117,8 @@ func runProviderOAuthSelection(
 	if err != nil {
 		return err
 	}
-	return runProviderPool(ctx, runner, profiles, target, provider, pool, arguments, selection.BaseURL)
+	return runProviderPool(ctx, runner, providerPoolRequest{
+		profiles: profiles, selected: target, provider: provider, pool: pool,
+		arguments: arguments, apiURLOverride: selection.BaseURL,
+	})
 }

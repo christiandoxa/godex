@@ -116,7 +116,9 @@ func runLaunchTarget(
 		if err != nil {
 			return err
 		}
-		return runProviderPool(ctx, runner, profiles, target, provider, pool, arguments, "")
+		return runProviderPool(ctx, runner, providerPoolRequest{
+			profiles: profiles, selected: target, provider: provider, pool: pool, arguments: arguments,
+		})
 	}
 	release, err := profiles.AcquireLaunch(ctx, target.Name)
 	if err != nil {
@@ -126,28 +128,32 @@ func runLaunchTarget(
 	return runStandaloneProfile(ctx, runner, target.CodexHome, provider, arguments)
 }
 
+type providerPoolRequest struct {
+	profiles       launchProfiles
+	selected       profilemodel.LaunchTarget
+	provider       proxymodel.Provider
+	pool           []profilemodel.LaunchTarget
+	arguments      []string
+	apiURLOverride string
+}
+
 func runProviderPool(
 	ctx context.Context,
 	runner *runtimeusecase.Runner,
-	profiles launchProfiles,
-	selected profilemodel.LaunchTarget,
-	provider proxymodel.Provider,
-	pool []profilemodel.LaunchTarget,
-	arguments []string,
-	apiURLOverride string,
+	request providerPoolRequest,
 ) (runErr error) {
-	names := make([]string, 0, len(pool))
-	runtimeProfiles := make([]proxymodel.ProviderProfile, 0, len(pool))
-	for _, target := range pool {
+	names := make([]string, 0, len(request.pool))
+	runtimeProfiles := make([]proxymodel.ProviderProfile, 0, len(request.pool))
+	for _, target := range request.pool {
 		currentProvider, err := launchRuntimeProvider(target)
 		if err != nil {
 			return err
 		}
-		if currentProvider.Kind != provider.Kind {
+		if currentProvider.Kind != request.provider.Kind {
 			continue
 		}
-		if apiURLOverride != "" {
-			currentProvider.APIURL = apiURLOverride
+		if request.apiURLOverride != "" {
+			currentProvider.APIURL = request.apiURLOverride
 		}
 		names = append(names, target.Name)
 		runtimeProfiles = append(runtimeProfiles, proxymodel.ProviderProfile{
@@ -157,12 +163,14 @@ func runProviderPool(
 	if len(runtimeProfiles) == 0 {
 		return errors.New("runtime provider pool is empty")
 	}
-	release, err := profiles.AcquireLaunchPool(ctx, names)
+	release, err := request.profiles.AcquireLaunchPool(ctx, names)
 	if err != nil {
 		return err
 	}
 	defer func() { runErr = errors.Join(runErr, release()) }()
-	return runner.RunProviderProfiles(ctx, selected.CodexHome, provider, runtimeProfiles, arguments)
+	return runner.RunProviderProfiles(
+		ctx, request.selected.CodexHome, request.provider, runtimeProfiles, request.arguments,
+	)
 }
 
 func launchRuntimeProvider(target profilemodel.LaunchTarget) (proxymodel.Provider, error) {
