@@ -133,8 +133,17 @@ rollback restores the prior provider metadata and secret if a later bundle actio
 fails. Kiro profiles also round-trip with required `kiro_auth.json` and optional
 `kiro_model_catalog.json`; auth/provider metadata is preserved and both secret
 files are validated before import/export. Rollback removes an imported optional
-catalog when the previous profile did not have one. Built-in Kiro discovery and
-Copilot built-in import/bundle metadata remain part of the 0.434.3 parity backlog.
+catalog when the previous profile did not have one.
+
+`godex profile import kiro` now mirrors Prodex built-in Kiro discovery. It reads
+the current Kiro/Amazon Q `data.sqlite3` read-only (honoring `KIRO_DATA_DIR` /
+`Q_CLI_DATA_DIR` before the standard local-data locations), selects the same
+auth-key priority, derives Kiro provider identity/state, and snapshots
+`kiro_auth.json`. Bounded `kiro whoami` and `chat --list-models --format json`
+metadata calls enrich identity/catalog data; model-catalog refresh failure is
+non-fatal and shown as a warning. Re-import updates the matching
+`auth_key + profile ARN/name` identity, and a different `--name` is rejected.
+Copilot built-in import/bundle metadata remains part of the 0.434.3 parity backlog.
 
 Prodex-compatible Codex runtime feature flags are translated to Codex `-c`
 overrides before the remaining Codex arguments. Explicit later Codex `-c`
@@ -293,6 +302,8 @@ must use the same framework when multi-provider login parity lands.
 | --- | --- | --- |
 | GODEX_HOME | ~/.godex | State, profiles, locks, and staging files. |
 | GODEX_CODEX_BIN | codex | Codex executable to invoke. |
+| PRODEX_KIRO_BIN | auto-detect `kiro-cli-chat` / `kiro-cli` | Kiro CLI executable used for built-in import metadata. |
+| KIRO_DATA_DIR / Q_CLI_DATA_DIR | platform Kiro local-data directory | Optional Kiro source-data override for `profile import kiro`. |
 | GODEX_UPSTREAM_URL | https://chatgpt.com/backend-api | Upstream URL for compatible test environments. |
 | CODEX_HOME | ~/.codex | Source profile for `profile import-current` and `profile add --copy-current`; managed launches use isolated homes. |
 | PRODEX_PROFILE_EXPORT_PASSWORD | unset | Password used by `profile export --password-protect` for Prodex-compatible bundles. |

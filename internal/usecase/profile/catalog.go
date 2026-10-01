@@ -73,6 +73,10 @@ type kiroInspector interface {
 	ValidateModelCatalog(context.Context, string) error
 }
 
+type kiroSource interface {
+	Load(context.Context) (profilemodel.BuiltinCredential, error)
+}
+
 type Catalog struct {
 	profiles         repository
 	accounts         accountStore
@@ -80,6 +84,7 @@ type Catalog struct {
 	quotaAuth        quotaAuthInspector
 	claude           claudeSource
 	kiro             kiroInspector
+	kiroImport       kiroSource
 	currentCodexHome string
 }
 
@@ -90,6 +95,8 @@ func NewCatalog(profiles repository, accounts accountStore, currentCodexHome str
 func (catalog *Catalog) SetClaudeSource(source claudeSource) { catalog.claude = source }
 
 func (catalog *Catalog) SetKiroInspector(inspector kiroInspector) { catalog.kiro = inspector }
+
+func (catalog *Catalog) SetKiroSource(source kiroSource) { catalog.kiroImport = source }
 
 func (catalog *Catalog) SetAuthInspector(inspector authInspector) {
 	catalog.auth = inspector

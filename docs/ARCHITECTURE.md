@@ -114,7 +114,12 @@ Anthropic exports carry `.credentials.json` as a validated provider secret with
 empty `auth_json`. Kiro exports follow the same adapter boundary with required
 `kiro_auth.json` plus optional `kiro_model_catalog.json`; `gateway/kiro` validates
 the nested auth JSON and accepted model-catalog shapes without owning profile
-persistence. `usecase/profile` keeps provider-specific validation and create/update
+persistence. The same gateway owns built-in Kiro source discovery: it opens the
+external `data.sqlite3` read-only through pure-Go SQLite, resolves auth/state with
+Prodex key precedence, and runs bounded Kiro metadata commands. It returns only a
+transport-neutral credential snapshot plus an optional warning; SQL paths, raw
+command execution, and token JSON never escape the gateway. `usecase/profile`
+keeps provider-specific identity matching, naming, activation, and create/update
 planning outside envelope crypto/persistence, while repository rollback tracks
 whether each optional secret existed before replacement.
 

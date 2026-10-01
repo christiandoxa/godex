@@ -11,6 +11,7 @@ type BuiltinCredential struct {
 	Provider    ProviderSnapshot
 	Email       string
 	SecretFiles []ExportedSecretFile
+	Warning     string
 }
 
 type BuiltinImportResult struct {
@@ -18,4 +19,5 @@ type BuiltinImportResult struct {
 	Provider string
 	Updated  bool
 	Active   bool
+	Warning  string
 }

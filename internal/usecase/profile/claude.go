@@ -17,6 +17,8 @@ func (catalog *Catalog) ImportBuiltin(ctx context.Context, request profilemodel.
 	switch strings.ToLower(strings.TrimSpace(request.Source)) {
 	case "claude":
 		return catalog.importClaude(ctx, request)
+	case "kiro":
+		return catalog.importKiro(ctx, request)
 	default:
 		return profilemodel.BuiltinImportResult{}, fmt.Errorf("unsupported built-in profile source %q", request.Source)
 	}

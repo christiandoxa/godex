@@ -83,22 +83,42 @@ func (inspector *Inspector) ValidateModelCatalog(ctx context.Context, text strin
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	_, err := normalizeModelCatalogText(text)
+	return err
+}
+
+func normalizeModelCatalogText(text string) (string, error) {
 	if len(text) == 0 || len(text) > secretMaxBytes {
-		return errors.New("Kiro model catalog is empty or exceeds the safe size limit")
+		return "", errors.New("Kiro model catalog is empty or exceeds the safe size limit")
 	}
 	var value any
 	if err := json.Unmarshal([]byte(text), &value); err != nil {
-		return errors.New("failed to parse Kiro model catalog JSON")
+		return "", errors.New("failed to parse Kiro model catalog JSON")
 	}
 	models, ok := findModels(value)
 	if !ok {
-		return errors.New("Kiro model catalog is missing models array")
+		return "", errors.New("Kiro model catalog is missing models array")
 	}
 	if len(models) > catalogHardLimit {
-		return fmt.Errorf("Kiro model catalog exceeds the hard limit of %d entries", catalogHardLimit)
+		return "", fmt.Errorf("Kiro model catalog exceeds the hard limit of %d entries", catalogHardLimit)
 	}
+	normalized := normalizeModels(models)
+	if len(normalized) == 0 {
+		return "", errors.New("Kiro model catalog returned no usable models")
+	}
+	content, err := json.MarshalIndent(map[string]any{"models": normalized}, "", "  ")
+	if err != nil {
+		return "", errors.New("failed to serialize Kiro model catalog")
+	}
+	if len(content) > secretMaxBytes {
+		return "", errors.New("Kiro model catalog exceeds the safe size limit")
+	}
+	return string(content), nil
+}
+
+func normalizeModels(models []any) []map[string]any {
 	seen := make(map[string]bool, len(models))
-	usable := 0
+	result := make([]map[string]any, 0, len(models))
 	for _, raw := range models {
 		model, ok := raw.(map[string]any)
 		if !ok {
@@ -109,12 +129,39 @@ func (inspector *Inspector) ValidateModelCatalog(ctx context.Context, text strin
 			continue
 		}
 		seen[id] = true
-		usable++
+		name := firstString(model, "name", "model_name", "modelName")
+		if name == "" {
+			name = id
+		}
+		item := map[string]any{
+			"id": id, "name": name, "object": "model", "owned_by": "kiro-cli",
+		}
+		if description := firstString(model, "description"); description != "" {
+			item["description"] = description
+		}
+		if contextWindow := firstPositiveUint64(model, "context_window_tokens", "contextWindowTokens"); contextWindow > 0 {
+			item["context_window_tokens"] = contextWindow
+		}
+		result = append(result, item)
 	}
-	if usable == 0 {
-		return errors.New("Kiro model catalog returned no usable models")
+	return result
+}
+
+func firstPositiveUint64(object map[string]any, keys ...string) uint64 {
+	for _, key := range keys {
+		switch value := object[key].(type) {
+		case float64:
+			if value > 0 && value == float64(uint64(value)) {
+				return uint64(value)
+			}
+		case json.Number:
+			parsed, err := value.Int64()
+			if err == nil && parsed > 0 {
+				return uint64(parsed)
+			}
+		}
 	}
-	return nil
+	return 0
 }
 
 func findModels(value any) ([]any, bool) {

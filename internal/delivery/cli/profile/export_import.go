@@ -130,8 +130,14 @@ func writeBuiltinImportResult(out io.Writer, result profilemodel.BuiltinImportRe
 	if result.Updated {
 		verb = "Updated"
 	}
-	_, err := fmt.Fprintf(out, "%s %s profile %q.\nProvider: %s\nActive: %t\n", verb, result.Provider, result.Profile, result.Provider, result.Active)
-	return err
+	if _, err := fmt.Fprintf(out, "%s %s profile %q.\nProvider: %s\nActive: %t\n", verb, result.Provider, result.Profile, result.Provider, result.Active); err != nil {
+		return err
+	}
+	if strings.TrimSpace(result.Warning) != "" {
+		_, err := fmt.Fprintf(out, "Warning: %s\n", result.Warning)
+		return err
+	}
+	return nil
 }
 
 func importRequiresPassword(err error) bool {

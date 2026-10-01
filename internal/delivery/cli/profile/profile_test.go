@@ -14,6 +14,8 @@ import (
 	accountrepo "github.com/christiandoxa/godex/internal/repository/account"
 	profilerepo "github.com/christiandoxa/godex/internal/repository/profile"
 	profileusecase "github.com/christiandoxa/godex/internal/usecase/profile"
+
+	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 )
 
 func newProfileCatalog(t *testing.T) (*profileusecase.Catalog, string) {
@@ -254,5 +256,22 @@ func TestBuiltInImportSourceDoesNotShadowExistingFile(t *testing.T) {
 	}
 	if builtinImportSource("claude") {
 		t.Fatal("existing file named claude was shadowed by built-in source")
+	}
+}
+
+func TestBuiltinImportResultRendersWarning(t *testing.T) {
+	var output bytes.Buffer
+	err := writeBuiltinImportResult(&output, profilemodel.BuiltinImportResult{
+		Profile: "kiro-main", Provider: "kiro", Updated: true, Active: true,
+		Warning: "Kiro model catalog refresh failed; re-import this profile to retry.",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rendered := output.String()
+	for _, expected := range []string{"Updated kiro profile", "Active: true", "Warning: Kiro model catalog refresh failed"} {
+		if !strings.Contains(rendered, expected) {
+			t.Fatalf("output missing %q: %q", expected, rendered)
+		}
 	}
 }
