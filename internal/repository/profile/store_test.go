@@ -106,3 +106,27 @@ func TestProfileCopyRejectsSymlink(t *testing.T) {
 		t.Fatal("symlink source unexpectedly copied")
 	}
 }
+
+func TestRemoveWaitsForProfileLease(t *testing.T) {
+	store := NewStore(t.TempDir())
+	value := profileentity.Profile{
+		Name: "leased", CodexHome: store.ManagedHome("leased"), Managed: true,
+		Provider: profileentity.Provider{Kind: profileentity.ProviderOpenAI},
+	}
+	if err := store.Create(context.Background(), value, "", false, true); err != nil {
+		t.Fatal(err)
+	}
+	release, err := store.Acquire(context.Background(), value.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Remove(context.Background(), value.Name, true); err == nil {
+		t.Fatal("leased profile was removed")
+	}
+	if err := release(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Remove(context.Background(), value.Name, true); err != nil {
+		t.Fatal(err)
+	}
+}

@@ -78,7 +78,9 @@ func run() int {
 	runner.SetUpstreamURL(settings.UpstreamURL)
 	application := cli.New(login, importer, store, runner, doctor, quotaStatus, os.Stdout)
 	profileStore := profilerepo.NewStore(settings.Home)
-	application.SetProfiles(profileusecase.NewCatalog(profileStore, store, settings.CurrentCodexHome))
+	profiles := profileusecase.NewCatalog(profileStore, store, settings.CurrentCodexHome)
+	application.SetProfiles(profiles)
+	activity.SetProfiles(profiles)
 
 	application.SetNativeAuth(authusecase.NewNative(store, process))
 	application.SetActivity(activity)

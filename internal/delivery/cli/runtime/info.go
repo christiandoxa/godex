@@ -27,8 +27,8 @@ func Info(ctx context.Context, activity *runtimeusecase.Activity, out io.Writer,
 	if jsonOutput {
 		value := map[string]any{
 			"version":               version.String(),
-			"active_profile":        overview.ActiveAccount,
-			"profile_count":         overview.AccountCount,
+			"active_profile":        overview.ActiveProfile,
+			"profile_count":         overview.ProfileCount,
 			"provider":              "openai",
 			"runtime_process_count": boolToInt(overview.Inflight > 0),
 			"runtime_load": map[string]any{
@@ -45,8 +45,8 @@ func Info(ctx context.Context, activity *runtimeusecase.Activity, out io.Writer,
 		return encoder.Encode(value)
 	}
 	fields := [][2]string{
-		{"Profiles", fmt.Sprint(overview.AccountCount)},
-		{"Active profile", valueOrDash(overview.ActiveAccount)},
+		{"Profiles", fmt.Sprint(overview.ProfileCount)},
+		{"Active profile", valueOrDash(overview.ActiveProfile)},
 		{"Provider", "openai"},
 		{"Enabled profiles", fmt.Sprint(overview.EnabledCount)},
 		{"Runtime inflight", fmt.Sprint(overview.Inflight)},

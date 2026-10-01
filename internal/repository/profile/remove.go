@@ -15,9 +15,13 @@ import (
 func (store *Store) Remove(ctx context.Context, name string, deleteHome bool) (profileentity.Profile, error) {
 	var removed profileentity.Profile
 	err := store.withLock(ctx, func() error {
-		var removeErr error
-		removed, removeErr = store.removeLocked(name, deleteHome)
-		return removeErr
+		release, err := store.acquireMutation(name)
+		if err != nil {
+			return err
+		}
+		defer release()
+		removed, err = store.removeLocked(name, deleteHome)
+		return err
 	})
 	return removed, err
 }

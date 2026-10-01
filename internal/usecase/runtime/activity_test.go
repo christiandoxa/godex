@@ -7,6 +7,7 @@ import (
 	"time"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
+	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 	runtimemodel "github.com/christiandoxa/godex/internal/model/runtime"
 )
 
@@ -86,5 +87,26 @@ func TestActivityRejectsEmptyEventKind(t *testing.T) {
 	activity := NewActivity("/managed", &activityMemoryLog{}, activityTestAccounts{}, activityVersion("codex"))
 	if err := activity.Record(context.Background(), runtimemodel.Event{}); err == nil {
 		t.Fatal("empty runtime event unexpectedly accepted")
+	}
+}
+
+type activityTestProfiles struct{ summary profilemodel.Summary }
+
+func (profiles activityTestProfiles) Summary(context.Context) (profilemodel.Summary, error) {
+	return profiles.summary, nil
+}
+
+func TestActivityOverviewUsesMergedProfileSummary(t *testing.T) {
+	current := accountentity.Account{ID: "one", Name: "account", Enabled: true}
+	activity := NewActivity("/managed", &activityMemoryLog{}, activityTestAccounts{
+		accounts: []accountentity.Account{current}, current: current,
+	}, activityVersion("codex-cli 0.159.2"))
+	activity.SetProfiles(activityTestProfiles{summary: profilemodel.Summary{Count: 3, Active: "standalone"}})
+	overview, err := activity.Overview(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if overview.AccountCount != 1 || overview.ProfileCount != 3 || overview.ActiveProfile != "standalone" || overview.ActiveAccount != "account" {
+		t.Fatalf("overview = %#v", overview)
 	}
 }

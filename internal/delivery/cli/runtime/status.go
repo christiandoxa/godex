@@ -112,8 +112,8 @@ func writeStatusSnapshot(ctx context.Context, activity *runtimeusecase.Activity,
 
 func statusFields(overview runtimemodel.Overview) [][2]string {
 	fields := [][2]string{
-		{"Active profile", valueOrDash(overview.ActiveAccount)},
-		{"Profiles", fmt.Sprint(overview.AccountCount)},
+		{"Active profile", valueOrDash(overview.ActiveProfile)},
+		{"Profiles", fmt.Sprint(overview.ProfileCount)},
 		{"Enabled", fmt.Sprint(overview.EnabledCount)},
 		{"Inflight", fmt.Sprint(overview.Inflight)},
 		{"Recent events", fmt.Sprint(overview.RecentEvents)},

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
+	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 	runtimemodel "github.com/christiandoxa/godex/internal/model/runtime"
 )
 
@@ -24,16 +25,25 @@ type versionReader interface {
 	Version(context.Context) (string, error)
 }
 
+type activityProfiles interface {
+	Summary(context.Context) (profilemodel.Summary, error)
+}
+
 type Activity struct {
 	home     string
 	log      activityLog
 	accounts activityAccounts
 	codex    versionReader
+	profiles activityProfiles
 	now      func() time.Time
 }
 
 func NewActivity(home string, log activityLog, accounts activityAccounts, codex versionReader) *Activity {
 	return &Activity{home: home, log: log, accounts: accounts, codex: codex, now: time.Now}
+}
+
+func (activity *Activity) SetProfiles(profiles activityProfiles) {
+	activity.profiles = profiles
 }
 
 func (activity *Activity) Record(ctx context.Context, event runtimemodel.Event) error {
@@ -74,11 +84,21 @@ func (activity *Activity) Overview(ctx context.Context) (runtimemodel.Overview, 
 		GodexHome:    activity.home,
 		CodexVersion: version,
 		AccountCount: len(accounts),
+		ProfileCount: len(accounts),
 		RecentEvents: len(events),
 		Inflight:     inflightCount(events),
 	}
 	if currentErr == nil {
 		overview.ActiveAccount = current.Name
+		overview.ActiveProfile = current.Name
+	}
+	if activity.profiles != nil {
+		summary, err := activity.profiles.Summary(ctx)
+		if err != nil {
+			return runtimemodel.Overview{}, err
+		}
+		overview.ProfileCount = summary.Count
+		overview.ActiveProfile = summary.Active
 	}
 	for _, account := range accounts {
 		if account.Enabled {

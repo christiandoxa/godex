@@ -16,8 +16,10 @@ type Overview struct {
 	GodexHome     string `json:"godex_home"`
 	CodexVersion  string `json:"codex_version"`
 	AccountCount  int    `json:"account_count"`
+	ProfileCount  int    `json:"profile_count"`
 	EnabledCount  int    `json:"enabled_count"`
 	ActiveAccount string `json:"active_account"`
+	ActiveProfile string `json:"active_profile"`
 	RecentEvents  int    `json:"recent_events"`
 	Inflight      int    `json:"inflight"`
 	LastEvent     *Event `json:"last_event,omitempty"`
