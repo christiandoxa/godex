@@ -71,13 +71,14 @@ func run() int {
 	quotaStatus := quotausecase.NewStatus(store, quotaClient)
 	bindings := routingrepo.NewStore(settings.Home)
 	copilotSource := copilotgateway.NewSource(nil)
+	claudeSource := claudegateway.NewSource()
 	providerCatalogs := runtimerepo.NewProviderCatalogStore()
 	activity := runtimeusecase.NewActivity(settings.Home, runtimerepo.NewLog(filepath.Join(settings.Home, "logs")), store, process)
 	doctor.SetActivity(activity)
 	doctor.SetQuota(quotaStatus)
 	doctor.SetBundleStore(runtimerepo.NewDoctorBundleStore())
 	factory := runtimeusecase.ProxyFactory(func(config proxyconfig.Config) (runtimeusecase.Proxy, error) {
-		router, err := newRuntimeRouter(config, process, copilotSource, providerCatalogs, bindings)
+		router, err := newRuntimeRouter(config, process, copilotSource, claudeSource, providerCatalogs, bindings)
 		if err != nil {
 			return nil, err
 		}
@@ -91,7 +92,7 @@ func run() int {
 	profileStore := profilerepo.NewStore(settings.Home)
 	profiles := profileusecase.NewCatalog(profileStore, store, settings.CurrentCodexHome)
 	profiles.SetAuthInspector(process)
-	profiles.SetClaudeSource(claudegateway.NewSource())
+	profiles.SetClaudeSource(claudeSource)
 	kiroSource := kirogateway.NewSource()
 	profiles.SetKiroInspector(kiroSource)
 	profiles.SetKiroSource(kiroSource)
@@ -128,10 +129,11 @@ func newRuntimeRouter(
 	config proxyconfig.Config,
 	process *codex.CodexProcess,
 	copilotSource *copilotgateway.Source,
+	claudeSource *claudegateway.Source,
 	providerCatalogs *runtimerepo.ProviderCatalogStore,
 	bindings *routingrepo.Store,
 ) (*routingusecase.Router, error) {
-	gateway, err := newRuntimeGateway(config, process, copilotSource, providerCatalogs)
+	gateway, err := newRuntimeGateway(config, process, copilotSource, claudeSource, providerCatalogs)
 	if err != nil {
 		return nil, err
 	}
@@ -145,6 +147,7 @@ func newRuntimeGateway(
 	config proxyconfig.Config,
 	process *codex.CodexProcess,
 	copilotSource *copilotgateway.Source,
+	claudeSource *claudegateway.Source,
 	providerCatalogs *runtimerepo.ProviderCatalogStore,
 ) (runtimeGateway, error) {
 	switch config.Provider.Kind {
@@ -152,9 +155,31 @@ func newRuntimeGateway(
 		return openai.NewTransport(config.UpstreamURL, nil, process)
 	case "copilot":
 		return newCopilotRuntimeGateway(config, copilotSource, providerCatalogs)
+	case "anthropic":
+		return newAnthropicRuntimeGateway(config, claudeSource)
 	default:
 		return nil, fmt.Errorf("runtime provider %q is not implemented", config.Provider.Kind)
 	}
+}
+
+func newAnthropicRuntimeGateway(
+	config proxyconfig.Config,
+	source *claudegateway.Source,
+) (runtimeGateway, error) {
+	if source == nil {
+		return nil, errors.New("Anthropic runtime source is not configured")
+	}
+	if config.Context == nil {
+		config.Context = context.Background()
+	}
+	if config.Accounts == nil {
+		return nil, errors.New("Anthropic runtime account source is not configured")
+	}
+	accounts, err := config.Accounts(config.Context)
+	if err != nil {
+		return nil, err
+	}
+	return source.NewRuntimePool(config.Context, accounts)
 }
 
 func newCopilotRuntimeGateway(

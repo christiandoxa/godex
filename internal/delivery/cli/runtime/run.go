@@ -104,7 +104,7 @@ func runLaunchTarget(
 	if err != nil {
 		return err
 	}
-	if provider.Kind == "copilot" {
+	if provider.Kind == "copilot" || provider.Kind == "anthropic" {
 		pool, err := profiles.ProviderLaunchPool(ctx, target.Name, target.Provider, allowRotate)
 		if err != nil {
 			return err
@@ -163,6 +163,11 @@ func launchRuntimeProvider(target profilemodel.LaunchTarget) (proxymodel.Provide
 			target.Name,
 			optionalProviderValue(target.ProviderConfig.Host),
 			optionalProviderValue(target.ProviderConfig.Login),
+			optionalProviderValue(target.ProviderConfig.APIURL),
+		), nil
+	case "anthropic":
+		return runtimeusecase.AnthropicProvider(
+			target.Name,
 			optionalProviderValue(target.ProviderConfig.APIURL),
 		), nil
 	default:

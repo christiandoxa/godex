@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"context"
 	"fmt"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	"io"
@@ -77,7 +78,7 @@ func TestClassifyPreCommitFailures(t *testing.T) {
 			if testCase.name == "rate limit" {
 				response.Header.Set("Retry-After", "5")
 			}
-			outcome, pending, err := proxy.classify(response)
+			outcome, pending, err := proxy.classify(response, "")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -105,5 +106,115 @@ func TestLaunchQuotaExclusionRecoversAtItsDeadline(t *testing.T) {
 	accounts[0].Enabled = false
 	if got := router.candidates(accounts, now); len(got) != 0 {
 		t.Fatal("business-disabled account admitted at quota reset")
+	}
+}
+
+func TestExternalProviderClassifyUsesStructured429Policy(t *testing.T) {
+	proxy := &Router{now: func() time.Time { return time.Unix(10, 0) }, maxInspect: 1024}
+	fixtures := []struct {
+		name   string
+		status int
+		body   string
+		kind   responseKind
+	}{
+		{"bare 429", http.StatusTooManyRequests, "{\"error\":{\"message\":\"too many requests\"}}", responsePass},
+		{"rate 429", http.StatusTooManyRequests, "{\"error\":{\"code\":\"rate_limit_exceeded\"}}", responseRetry},
+		{"quota 429", http.StatusTooManyRequests, "{\"error\":{\"type\":\"quota_exhausted\"}}", responseRetry},
+		{"forbidden auth", http.StatusForbidden, "{\"error\":{\"code\":\"quota_exhausted\"}}", responseAuthFailure},
+		{"not found terminal", http.StatusNotFound, "{\"error\":{\"code\":\"model_not_supported\"}}", responsePass},
+	}
+	for _, fixture := range fixtures {
+		t.Run(fixture.name, func(t *testing.T) {
+			response := &proxymodel.Response{
+				StatusCode: fixture.status,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(strings.NewReader(fixture.body)),
+			}
+			outcome, pending, err := proxy.classify(response, "anthropic")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if outcome.kind != fixture.kind {
+				t.Fatalf("outcome = %#v", outcome)
+			}
+			if pending == nil || string(pending.prefix) != fixture.body {
+				t.Fatalf("pending prefix = %#v", pending)
+			}
+			pending.close()
+		})
+	}
+}
+
+type externalRetryGateway struct {
+	responses map[string]struct {
+		status int
+		body   string
+	}
+	calls []string
+}
+
+func (gateway *externalRetryGateway) Execute(
+	_ context.Context,
+	_ proxymodel.Request,
+	account proxymodel.Account,
+) (*proxymodel.Response, error) {
+	gateway.calls = append(gateway.calls, account.ID)
+	fixture := gateway.responses[account.ID]
+	return &proxymodel.Response{
+		StatusCode: fixture.status,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(fixture.body)),
+	}, nil
+}
+
+func TestExternalProviderRoutingRotatesOnlyStructuredRetryableFailures(t *testing.T) {
+	accounts := []proxymodel.Account{
+		{ID: "account-a", Home: "/a", Enabled: true, Provider: proxymodel.Provider{Kind: "anthropic"}},
+		{ID: "account-b", Home: "/b", Enabled: true, Provider: proxymodel.Provider{Kind: "anthropic"}},
+	}
+	cases := []struct {
+		name      string
+		firstCode int
+		firstBody string
+		wantCalls string
+		wantCode  int
+	}{
+		{"bare 429 stays terminal", http.StatusTooManyRequests, `{"error":{"message":"too many requests"}}`, "account-a", http.StatusTooManyRequests},
+		{"quota rotates", http.StatusTooManyRequests, `{"error":{"code":"quota_exhausted"}}`, "account-a,account-b", http.StatusOK},
+		{"auth rotates", http.StatusUnauthorized, `{"error":{"type":"authentication_error"}}`, "account-a,account-b", http.StatusOK},
+		{"not found stays terminal", http.StatusNotFound, `{"error":{"code":"model_not_supported"}}`, "account-a", http.StatusNotFound},
+	}
+	for _, fixture := range cases {
+		t.Run(fixture.name, func(t *testing.T) {
+			gateway := &externalRetryGateway{responses: map[string]struct {
+				status int
+				body   string
+			}{
+				"account-a": {fixture.firstCode, fixture.firstBody},
+				"account-b": {http.StatusOK, `{}`},
+			}}
+			router, err := NewRouter(Config{
+				Gateway: gateway,
+				Accounts: func(context.Context) ([]proxymodel.Account, error) {
+					return accounts, nil
+				},
+				PreferredAccount: "account-a",
+				MaxInspectBytes:  1024,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			exchange, err := router.Forward(context.Background(), proxymodel.Request{Header: make(http.Header)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer exchange.Close()
+			if got := strings.Join(gateway.calls, ","); got != fixture.wantCalls {
+				t.Fatalf("calls = %q, want %q", got, fixture.wantCalls)
+			}
+			if exchange.Result.Response.StatusCode != fixture.wantCode {
+				t.Fatalf("status = %d, want %d", exchange.Result.Response.StatusCode, fixture.wantCode)
+			}
+		})
 	}
 }

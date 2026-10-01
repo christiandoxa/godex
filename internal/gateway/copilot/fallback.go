@@ -4,11 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"strings"
-)
 
-const (
-	copilotFallbackLegacyCodex = "gpt-5.1-codex"
-	copilotFallbackGPT4O       = "gpt-4o"
+	providerentity "github.com/christiandoxa/godex/internal/entity/provider"
 )
 
 func copilotModelFallbackChain(body []byte) []string {
@@ -17,27 +14,7 @@ func copilotModelFallbackChain(body []byte) []string {
 		return []string{defaultRuntimeModel}
 	}
 	model, _ := object["model"].(string)
-	trimmed := strings.TrimSpace(model)
-	switch strings.ToLower(trimmed) {
-	case "", "auto", "default", "codex":
-		return []string{defaultRuntimeModel, copilotFallbackLegacyCodex, copilotFallbackGPT4O}
-	case "gpt-5.5":
-		return []string{"gpt-5.5", defaultRuntimeModel, copilotFallbackLegacyCodex, copilotFallbackGPT4O}
-	case "gpt-5.4":
-		return []string{"gpt-5.4", defaultRuntimeModel, copilotFallbackLegacyCodex, copilotFallbackGPT4O}
-	case "gpt-5.3-codex":
-		return []string{defaultRuntimeModel, copilotFallbackLegacyCodex, copilotFallbackGPT4O}
-	case "sonnet":
-		return []string{"claude-sonnet-4-6", defaultRuntimeModel, copilotFallbackLegacyCodex}
-	case "gemini":
-		return []string{"gemini-3.1-pro-preview", defaultRuntimeModel, copilotFallbackLegacyCodex}
-	default:
-		canonical := canonicalCopilotModel(trimmed)
-		if canonical == "" {
-			canonical = defaultRuntimeModel
-		}
-		return []string{canonical}
-	}
+	return providerentity.ModelFallbackChain("copilot", model)
 }
 
 func copilotRequestBodyWithModel(body []byte, model string) []byte {

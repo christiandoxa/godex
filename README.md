@@ -182,6 +182,27 @@ this native Responses path. The Copilot endpoint contract now also matches the
 emulated locally from the merged static/account catalog. Trace context is preserved
 for passthrough routes and unsupported Copilot endpoints remain fail-closed.
 
+Managed Anthropic/Claude profiles now have a foreground runtime bridge against the
+same local Codex Responses provider boundary. Godex reads each profile's private
+Claude OAuth .credentials.json, refreshes an expired token through bounded
+claude auth status --json, and never persists the bearer outside the profile
+secret. Default or active launches form a selected-first multi-profile pool;
+unusable credentials are excluded, explicit --profile stays hard-affinity, and
+the generic router retains durable conversation ownership and pre-commit
+credential rotation.
+
+For /responses, Godex translates the 0.434.3 lossless Responses subset to
+OpenAI Chat Completions, applies Anthropic's model fallback order before rotating
+credentials, and translates JSON/SSE output back to Responses. Bare 429 and auth
+failures do not advance models. /chat/completions and /messages remain native
+passthrough surfaces with Anthropic OAuth headers, GET /models and /models/{id}
+are emulated from the verified 0.434.3 Anthropic catalog metadata, and
+/responses/compact uses Prodex's bounded local-fallback summary contract without
+an upstream model call. Launch catalogs use the 0.434.3 model IDs, aliases, 200k
+context window, and 180k default auto-compact limit. Raw Anthropic API-key pools
+are still a parity backlog item; this runtime path currently uses managed Claude
+OAuth profiles.
+
 Prodex-compatible Codex runtime feature flags are translated to Codex `-c`
 overrides before the remaining Codex arguments. Explicit later Codex `-c`
 arguments still win:

@@ -177,7 +177,7 @@ func TestNativeSessionDeliveryPreservesOptionsAndResolvesPrefix(t *testing.T) {
 	}
 }
 
-func TestLaunchRuntimeProviderSupportsCopilotOnly(t *testing.T) {
+func TestLaunchRuntimeProviderSupportsCopilotAndAnthropic(t *testing.T) {
 	host, login := "https://github.com", "octocat"
 	apiURL := "https://api.githubcopilot.com"
 	provider, err := launchRuntimeProvider(profilemodel.LaunchTarget{
@@ -194,7 +194,11 @@ func TestLaunchRuntimeProviderSupportsCopilotOnly(t *testing.T) {
 	if err != nil || openAI.Kind != "" {
 		t.Fatalf("OpenAI provider = %#v, err = %v", openAI, err)
 	}
-	if _, err := launchRuntimeProvider(profilemodel.LaunchTarget{Provider: "anthropic"}); err == nil || !strings.Contains(err.Error(), "not implemented") {
+	anthropic, err := launchRuntimeProvider(profilemodel.LaunchTarget{Name: "claude-work", Provider: "anthropic"})
+	if err != nil || anthropic.Kind != "anthropic" || anthropic.Name != "claude-work" || anthropic.APIURL != "https://api.anthropic.com/v1" || anthropic.DefaultModel != "claude-sonnet-4-6" || anthropic.ContextWindow != 200000 || anthropic.AutoCompactLimit != 180000 {
+		t.Fatalf("Anthropic provider = %#v, err = %v", anthropic, err)
+	}
+	if _, err := launchRuntimeProvider(profilemodel.LaunchTarget{Provider: "kiro"}); err == nil || !strings.Contains(err.Error(), "not implemented") {
 		t.Fatalf("unsupported provider error = %v", err)
 	}
 }

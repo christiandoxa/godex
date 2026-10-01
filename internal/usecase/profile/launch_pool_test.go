@@ -18,7 +18,8 @@ func TestProviderLaunchPoolKeepsSelectedFirstAndFiltersProvider(t *testing.T) {
 	}{
 		{"copilot-b", profileentity.ProviderCopilot, false},
 		{"copilot-a", profileentity.ProviderCopilot, true},
-		{"claude", profileentity.ProviderAnthropic, false},
+		{"claude-b", profileentity.ProviderAnthropic, false},
+		{"claude-a", profileentity.ProviderAnthropic, false},
 	} {
 		profile := profileentity.Profile{
 			Name: fixture.name, CodexHome: repo.ManagedHome(fixture.name), Managed: true,
@@ -42,5 +43,13 @@ func TestProviderLaunchPoolKeepsSelectedFirstAndFiltersProvider(t *testing.T) {
 	}
 	if _, err := catalog.ProviderLaunchPool(context.Background(), "copilot-a", "anthropic", true); err == nil {
 		t.Fatal("provider mismatch unexpectedly accepted")
+	}
+	claudePool, err := catalog.ProviderLaunchPool(context.Background(), "claude-a", "anthropic", true)
+	if err != nil || len(claudePool) != 2 || claudePool[0].Name != "claude-a" || claudePool[1].Name != "claude-b" {
+		t.Fatalf("Anthropic rotating pool = %#v, err = %v", claudePool, err)
+	}
+	claudeExplicit, err := catalog.ProviderLaunchPool(context.Background(), "claude-a", "anthropic", false)
+	if err != nil || len(claudeExplicit) != 1 || claudeExplicit[0].Name != "claude-a" {
+		t.Fatalf("Anthropic explicit pool = %#v, err = %v", claudeExplicit, err)
 	}
 }

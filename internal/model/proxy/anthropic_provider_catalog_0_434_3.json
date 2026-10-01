@@ -1,0 +1,253 @@
+[
+  {
+    "provider": "anthropic",
+    "owned_by": "anthropic",
+    "id": "auto",
+    "display_name": "Anthropic Auto",
+    "description": "Anthropic alias routed through provider fallback.",
+    "context_window_tokens": 200000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [
+      "default"
+    ],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": false,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "anthropic",
+    "owned_by": "anthropic",
+    "id": "opus",
+    "display_name": "Claude Opus",
+    "description": "Anthropic Opus alias routed through provider fallback.",
+    "context_window_tokens": 200000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [
+      "best"
+    ],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": false,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "anthropic",
+    "owned_by": "anthropic",
+    "id": "sonnet",
+    "display_name": "Claude Sonnet",
+    "description": "Anthropic Sonnet alias routed through provider fallback.",
+    "context_window_tokens": 200000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [
+      "pro"
+    ],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": false,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "anthropic",
+    "owned_by": "anthropic",
+    "id": "haiku",
+    "display_name": "Claude Haiku",
+    "description": "Anthropic Haiku alias routed through provider fallback.",
+    "context_window_tokens": 200000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [
+      "flash"
+    ],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": false,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "anthropic",
+    "owned_by": "anthropic",
+    "id": "claude-opus-4-8",
+    "display_name": "Claude Opus 4.8",
+    "description": "Anthropic model exposed through Prodex.",
+    "context_window_tokens": 200000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": false,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "anthropic",
+    "owned_by": "anthropic",
+    "id": "claude-sonnet-4-6",
+    "display_name": "Claude Sonnet 4.6",
+    "description": "Anthropic model exposed through Prodex.",
+    "context_window_tokens": 200000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": false,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "anthropic",
+    "owned_by": "anthropic",
+    "id": "claude-haiku-4-5",
+    "display_name": "Claude Haiku 4.5",
+    "description": "Anthropic model exposed through Prodex.",
+    "context_window_tokens": 200000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": false,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "anthropic",
+    "owned_by": "anthropic",
+    "id": "claude-opus-4-6",
+    "display_name": "Claude Opus 4.6",
+    "description": "Anthropic compatibility model exposed through Prodex.",
+    "context_window_tokens": 200000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": false,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "anthropic",
+    "owned_by": "anthropic",
+    "id": "claude-opus-4-20250514",
+    "display_name": "Claude Opus 4",
+    "description": "Anthropic compatibility model exposed through Prodex.",
+    "context_window_tokens": 200000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": false,
+      "reasoning": true
+    },
+    "pricing_known": false
+  }
+]

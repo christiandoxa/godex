@@ -57,7 +57,7 @@ func (router *Router) freshAttempt(ctx context.Context, request proxymodel.Reque
 		}
 		return nil, nil, nil
 	}
-	outcome, pending, err := router.classify(response)
+	outcome, pending, err := router.classify(response, account.Provider.Kind)
 	if err != nil {
 		if pending != nil {
 			pending.close()

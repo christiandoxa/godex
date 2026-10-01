@@ -24,7 +24,7 @@ var copilotProviderCatalogSource []byte
 //go:embed copilot_external_catalog_0_434_3.json
 var copilotExternalCatalogSource []byte
 
-type CopilotProviderCatalogEntry struct {
+type ProviderCatalogEntry struct {
 	Provider                     string            `json:"provider"`
 	OwnedBy                      string            `json:"owned_by"`
 	ID                           string            `json:"id"`
@@ -51,8 +51,8 @@ type CopilotExternalCatalogSeed struct {
 	Description string `json:"description"`
 }
 
-func CopilotProviderCatalog() ([]CopilotProviderCatalogEntry, error) {
-	var entries []CopilotProviderCatalogEntry
+func CopilotProviderCatalog() ([]ProviderCatalogEntry, error) {
+	var entries []ProviderCatalogEntry
 	if err := json.Unmarshal(copilotProviderCatalogSource, &entries); err != nil {
 		return nil, errors.New("parse embedded Copilot provider catalog")
 	}
@@ -67,6 +67,10 @@ func CopilotProviderCatalogJSON() ([]map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	return providerCatalogJSON(entries), nil
+}
+
+func providerCatalogJSON(entries []ProviderCatalogEntry) []map[string]any {
 	result := make([]map[string]any, 0, len(entries))
 	for _, entry := range entries {
 		result = append(result, map[string]any{
@@ -91,7 +95,7 @@ func CopilotProviderCatalogJSON() ([]map[string]any, error) {
 			"pricing_known":                    entry.PricingKnown,
 		})
 	}
-	return result, nil
+	return result
 }
 
 func CopilotExternalCatalogSeeds() ([]CopilotExternalCatalogSeed, error) {

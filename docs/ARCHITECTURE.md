@@ -156,6 +156,27 @@ catalog, so model discovery never creates a second upstream credential path.
 Incoming traceparent/tracestate/baggage are the only caller trace headers copied
 to Copilot passthrough requests; caller authorization is never forwarded.
 
+Anthropic runtime follows the same account-routing boundary but uses
+gateway/claude for managed Claude OAuth. Each routing account owns its own
+transport and credential; a runtime pool exposes only accounts whose private
+.credentials.json can be resolved. Expired OAuth is refreshed by a bounded
+Claude auth-status probe with provider credential environment variables removed.
+gateway/chatcompat owns the reusable Responses-to-Chat request transform and Chat
+JSON/SSE-to-Responses transform. It contains no credential or routing policy.
+entity/provider owns provider error classification and static fallback-chain
+policy, so bare 429, structured quota/rate errors, auth failures, model-not-found,
+and transient failures are interpreted consistently by Anthropic and Copilot.
+
+Anthropic Responses exhaust legal model fallbacks inside the gateway before a
+response returns to usecase/routing; only then may routing rotate credentials.
+Chat Completions and Messages remain passthrough and are not model-rewritten.
+gateway/compact owns the bounded deterministic local compaction fallback used by
+translated providers: at most 24 recent snippets, 768 bytes per snippet, and
+24 KiB total summary, with the reference x-prodex-compact-* degradation metadata.
+It performs no model call. Anthropic Models responses are local and derive from
+the embedded 0.434.3 model IDs/aliases/context/endpoint metadata, while
+usecase/runtime owns the Codex launch catalog and user-override precedence.
+
 ### Quota gateway and preflight
 
 The OpenAI quota client is a narrow outbound adapter for the ChatGPT usage

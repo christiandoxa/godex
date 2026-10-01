@@ -2,6 +2,7 @@ package routing
 
 import (
 	"encoding/json"
+	providerentity "github.com/christiandoxa/godex/internal/entity/provider"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	"io"
 	"net/http"
@@ -36,10 +37,13 @@ func (pending *pendingResponse) close() {
 	}
 }
 
-func (proxy *Router) classify(response *proxymodel.Response) (responseOutcome, *pendingResponse, error) {
+func (proxy *Router) classify(response *proxymodel.Response, providerKind string) (responseOutcome, *pendingResponse, error) {
 	pending := &pendingResponse{response: response}
 	if response.StatusCode == http.StatusOK && strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream") && response.Header.Get("Content-Encoding") == "" {
 		return proxy.inspectStream(response, pending)
+	}
+	if externalProviderKind(providerKind) && response.StatusCode >= http.StatusBadRequest {
+		return proxy.classifyExternalProvider(response, pending)
 	}
 	switch {
 	case response.StatusCode == http.StatusUnauthorized:
@@ -152,4 +156,33 @@ func quotaCode(value string) bool {
 	default:
 		return false
 	}
+}
+
+func (proxy *Router) classifyExternalProvider(
+	response *proxymodel.Response,
+	pending *pendingResponse,
+) (responseOutcome, *pendingResponse, error) {
+	prefix, complete, err := inspectResponse(response.Body, proxy.maxInspect)
+	pending.prefix = prefix
+	if err != nil {
+		return responseOutcome{}, pending, err
+	}
+	classificationBody := prefix
+	if !complete {
+		classificationBody = nil
+	}
+	classification := providerentity.ClassifyError(response.StatusCode, classificationBody)
+	switch classification.Class {
+	case providerentity.ErrorAuth:
+		return responseOutcome{kind: responseAuthFailure}, pending, nil
+	case providerentity.ErrorQuota, providerentity.ErrorRateLimit, providerentity.ErrorTransient:
+		return responseOutcome{kind: responseRetry, quarantine: classification.Cooldown}, pending, nil
+	default:
+		return responseOutcome{kind: responsePass}, pending, nil
+	}
+}
+
+func externalProviderKind(kind string) bool {
+	kind = strings.ToLower(strings.TrimSpace(kind))
+	return kind != "" && kind != "openai"
 }

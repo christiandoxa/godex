@@ -180,6 +180,9 @@ func (router *Router) execute(ctx context.Context, request proxymodel.Request, a
 	if router.gateway == nil {
 		return nil, errors.New("routing gateway is not configured")
 	}
+	if externalProviderKind(account.Provider.Kind) {
+		return router.gateway.Execute(ctx, request, account)
+	}
 	for reload := 0; reload < 2; reload++ {
 		response, err := router.gateway.Execute(ctx, request, account)
 		if err != nil {

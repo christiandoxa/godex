@@ -37,10 +37,19 @@ func prepareProviderRuntimeArguments(
 		return arguments, nil
 	}
 	defaults := providerDefaultArguments(provider)
-	if provider.Kind != "copilot" || store == nil || func() bool { _, found := providerConfigValue(arguments, "model_catalog_json"); return found }() {
+	if store == nil || func() bool { _, found := providerConfigValue(arguments, "model_catalog_json"); return found }() {
 		return append(defaults, arguments...), nil
 	}
-	models, err := buildCopilotExternalCatalog(store, home, provider, arguments)
+	var models []map[string]any
+	var err error
+	switch provider.Kind {
+	case "copilot":
+		models, err = buildCopilotExternalCatalog(store, home, provider, arguments)
+	case "anthropic":
+		models, err = buildAnthropicExternalCatalog(provider, arguments)
+	default:
+		return append(defaults, arguments...), nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +122,7 @@ func buildCopilotExternalCatalog(
 		if modelContext > 0 && modelCompact >= modelContext {
 			modelCompact = modelContext - 1
 		}
-		models = append(models, copilotCodexCatalogModel(
+		models = append(models, externalCodexCatalogModel(
 			candidate.slug, displayName, description, len(models)+1,
 			modelContext, modelCompact, providerEntries,
 		))
@@ -217,11 +226,11 @@ func copilotCatalogMetadata(
 	return displayName, description
 }
 
-func copilotCodexCatalogModel(
+func externalCodexCatalogModel(
 	slug, displayName, description string,
 	priority int,
 	contextWindow, autoCompact uint64,
-	providerEntries []proxymodel.CopilotProviderCatalogEntry,
+	providerEntries []proxymodel.ProviderCatalogEntry,
 ) map[string]any {
 	efforts, defaultEffort := copilotReasoningLevels(slug, providerEntries)
 	return map[string]any{
@@ -262,7 +271,7 @@ func copilotCodexCatalogModel(
 
 func copilotReasoningLevels(
 	slug string,
-	entries []proxymodel.CopilotProviderCatalogEntry,
+	entries []proxymodel.ProviderCatalogEntry,
 ) ([]map[string]any, string) {
 	labels := []string{"low", "medium", "high", "xhigh"}
 	defaultEffort := "high"
@@ -284,9 +293,9 @@ func copilotReasoningLevels(
 }
 
 func copilotProviderCatalogEntry(
-	entries []proxymodel.CopilotProviderCatalogEntry,
+	entries []proxymodel.ProviderCatalogEntry,
 	slug string,
-) *proxymodel.CopilotProviderCatalogEntry {
+) *proxymodel.ProviderCatalogEntry {
 	for index := range entries {
 		if strings.EqualFold(entries[index].ID, slug) {
 			return &entries[index]

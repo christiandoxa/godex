@@ -121,8 +121,21 @@ and eligibility validation stays in the runtime use case.
 - All Godex equivalents of Prodex TUI surfaces must use Bubble Tea. Live status,
   quota watch, log stream/upstream, and redeem confirmation have been migrated;
   non-TTY fallbacks remain line-oriented.
-- Multi-provider runtime/login parity remains incomplete for Gemini,
-  Anthropic/Claude, Kiro, DeepSeek/local/AGY where present in Prodex. Copilot now
+- Multi-provider runtime/login parity remains incomplete for Gemini, Kiro,
+  DeepSeek/local/AGY, and Anthropic raw API-key pools where present in Prodex.
+  Managed Anthropic/Claude OAuth profiles now have a foreground runtime bridge:
+  the private .credentials.json token is resolved per profile, expired OAuth is
+  refreshed through bounded claude auth status --json, default launches form a
+  selected-first credential pool, unusable profiles are filtered, and explicit
+  profile selection remains hard-affinity. Responses use the shared 0.434.3
+  Responses-to-Chat compatibility contract with exact Anthropic alias/fallback
+  ordering before credential rotation; auth failures and bare 429s do not advance
+  models. Buffered JSON and live SSE are translated back to Responses, Chat and
+  Messages stay passthrough, Models list/single are locally emulated from the
+  verified 0.434.3 IDs/aliases/context/endpoint metadata, and Responses Compact
+  uses the same bounded local-fallback summary and degraded headers as the
+  reference without an upstream model call. Raw Anthropic API-key pools remain a
+  gap; the current managed runtime path is Claude OAuth only. Copilot now
   has a foreground Responses bridge with external credential resolution,
   direct/legacy runtime auth, Prodex-compatible request/header policy, private
   model catalogs built from the exact 0.434.3 static provider data plus account

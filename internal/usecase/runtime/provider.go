@@ -10,15 +10,32 @@ import (
 )
 
 const (
-	copilotDefaultModel     = "gpt-5.3-codex"
-	copilotContextWindow    = int64(272_000)
-	copilotAutoCompactLimit = int64(258_400)
+	copilotDefaultModel       = "gpt-5.3-codex"
+	copilotContextWindow      = int64(272_000)
+	copilotAutoCompactLimit   = int64(258_400)
+	anthropicDefaultModel     = "claude-sonnet-4-6"
+	anthropicContextWindow    = int64(200_000)
+	anthropicAutoCompactLimit = int64(180_000)
+	anthropicDefaultAPIURL    = "https://api.anthropic.com/v1"
 )
 
 func CopilotProvider(name, host, login, apiURL string) proxymodel.Provider {
 	return proxymodel.Provider{
 		Kind: "copilot", Name: name, Host: strings.TrimSpace(host), Login: strings.TrimSpace(login), APIURL: strings.TrimSpace(apiURL),
 		DefaultModel: copilotDefaultModel, ContextWindow: copilotContextWindow, AutoCompactLimit: copilotAutoCompactLimit,
+	}
+}
+
+func AnthropicProvider(name, apiURL string) proxymodel.Provider {
+	apiURL = strings.TrimSpace(apiURL)
+	if apiURL == "" {
+		apiURL = anthropicDefaultAPIURL
+	}
+	return proxymodel.Provider{
+		Kind: "anthropic", Name: name, APIURL: apiURL,
+		DefaultModel:     anthropicDefaultModel,
+		ContextWindow:    anthropicContextWindow,
+		AutoCompactLimit: anthropicAutoCompactLimit,
 	}
 }
 
