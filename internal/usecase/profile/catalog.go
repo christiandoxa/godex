@@ -35,6 +35,8 @@ type repository interface {
 	ImportProvider(context.Context, profileentity.Profile, map[string]string, bool) error
 	ReplaceProvider(context.Context, string, string, profileentity.Provider, map[string]string, bool) error
 	ReadProviderSecret(string, string) (string, error)
+	ReadOptionalProviderSecret(string, string) (string, bool, error)
+	RestoreProvider(context.Context, string, string, profileentity.Provider, map[string]*string) error
 }
 
 type accountStore interface {
@@ -66,12 +68,18 @@ type claudeSource interface {
 	InspectCredential(context.Context, string) (profilemodel.BuiltinCredential, error)
 }
 
+type kiroInspector interface {
+	InspectAuthSecret(context.Context, string) (profilemodel.BuiltinCredential, error)
+	ValidateModelCatalog(context.Context, string) error
+}
+
 type Catalog struct {
 	profiles         repository
 	accounts         accountStore
 	auth             authInspector
 	quotaAuth        quotaAuthInspector
 	claude           claudeSource
+	kiro             kiroInspector
 	currentCodexHome string
 }
 
@@ -80,6 +88,8 @@ func NewCatalog(profiles repository, accounts accountStore, currentCodexHome str
 }
 
 func (catalog *Catalog) SetClaudeSource(source claudeSource) { catalog.claude = source }
+
+func (catalog *Catalog) SetKiroInspector(inspector kiroInspector) { catalog.kiro = inspector }
 
 func (catalog *Catalog) SetAuthInspector(inspector authInspector) {
 	catalog.auth = inspector
@@ -348,51 +358,4 @@ func removalTargets(listed []Report, request profilemodel.RemoveRequest) ([]Repo
 		}
 	}
 	return nil, fmt.Errorf(profileNotFoundFormat, request.Name)
-}
-
-func (catalog *Catalog) ActiveStandalone(ctx context.Context) (profileentity.Profile, bool, error) {
-	hasActive, err := catalog.profiles.HasActive(ctx)
-	if err != nil {
-		return profileentity.Profile{}, false, err
-	}
-	if !hasActive {
-		return profileentity.Profile{}, false, nil
-	}
-	current, err := catalog.profiles.Current(ctx)
-	if err != nil {
-		return profileentity.Profile{}, false, err
-	}
-	return current, true, nil
-}
-
-func (catalog *Catalog) ResolveLaunch(ctx context.Context, name string) (profilemodel.LaunchTarget, error) {
-	listed, err := catalog.List(ctx)
-	if err != nil {
-		return profilemodel.LaunchTarget{}, err
-	}
-	for _, report := range listed {
-		if report.Profile.Name == name {
-			return launchTarget(report), nil
-		}
-	}
-	return profilemodel.LaunchTarget{}, fmt.Errorf(profileNotFoundFormat, name)
-}
-
-func launchTarget(report Report) profilemodel.LaunchTarget {
-	return profilemodel.LaunchTarget{
-		Name: report.Profile.Name, CodexHome: report.Profile.CodexHome,
-		AccountID: report.AccountID, Provider: string(report.Profile.Provider.Kind),
-	}
-}
-
-func (catalog *Catalog) AcquireLaunch(ctx context.Context, name string) (func() error, error) {
-	return catalog.profiles.Acquire(ctx, name)
-}
-
-func (catalog *Catalog) ActiveLaunch(ctx context.Context) (profilemodel.LaunchTarget, bool, error) {
-	profile, active, err := catalog.ActiveStandalone(ctx)
-	if err != nil || !active {
-		return profilemodel.LaunchTarget{}, active, err
-	}
-	return profilemodel.LaunchTarget{Name: profile.Name, CodexHome: profile.CodexHome, Provider: string(profile.Provider.Kind)}, true, nil
 }

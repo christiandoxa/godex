@@ -147,13 +147,21 @@ func (catalog *Catalog) claudeImportName(listed []Report, requested, account str
 
 func providerFromSnapshot(snapshot profilemodel.ProviderSnapshot) profileentity.Provider {
 	return profileentity.Provider{
-		Kind:       profileentity.ProviderKind(snapshot.Kind),
-		Account:    optionalSnapshotValue(snapshot.Account),
-		AuthMethod: optionalSnapshotValue(snapshot.AuthMethod),
-		ProjectID:  optionalSnapshotValue(snapshot.ProjectID),
-		Host:       optionalSnapshotValue(snapshot.Host),
-		Login:      optionalSnapshotValue(snapshot.Login),
-		APIURL:     optionalSnapshotValue(snapshot.APIURL),
+		Kind:          profileentity.ProviderKind(snapshot.Kind),
+		ProjectID:     optionalSnapshotValue(snapshot.ProjectID),
+		Account:       optionalSnapshotValue(snapshot.Account),
+		AuthMethod:    optionalSnapshotValue(snapshot.AuthMethod),
+		Host:          optionalSnapshotValue(snapshot.Host),
+		Login:         optionalSnapshotValue(snapshot.Login),
+		APIURL:        optionalSnapshotValue(snapshot.APIURL),
+		AccessTypeSKU: optionalSnapshotValue(snapshot.AccessTypeSKU),
+		CopilotPlan:   optionalSnapshotValue(snapshot.CopilotPlan),
+		AuthKey:       optionalSnapshotValue(snapshot.AuthKey),
+		AuthKind:      optionalSnapshotValue(snapshot.AuthKind),
+		ProfileARN:    optionalSnapshotValue(snapshot.ProfileARN),
+		ProfileName:   optionalSnapshotValue(snapshot.ProfileName),
+		StartURL:      optionalSnapshotValue(snapshot.StartURL),
+		Region:        optionalSnapshotValue(snapshot.Region),
 	}
 }
 

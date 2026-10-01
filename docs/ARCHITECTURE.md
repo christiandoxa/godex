@@ -111,8 +111,12 @@ deduplication, Prodex-compatible profile naming, activation, and create-vs-updat
 policy. `repository/profile` owns private provider-secret persistence and rollback
 of failed metadata updates. Bundle export/import consumes that same boundary:
 Anthropic exports carry `.credentials.json` as a validated provider secret with
-empty `auth_json`, while `usecase/profile` keeps provider-specific validation and
-create/update planning outside envelope crypto/persistence.
+empty `auth_json`. Kiro exports follow the same adapter boundary with required
+`kiro_auth.json` plus optional `kiro_model_catalog.json`; `gateway/kiro` validates
+the nested auth JSON and accepted model-catalog shapes without owning profile
+persistence. `usecase/profile` keeps provider-specific validation and create/update
+planning outside envelope crypto/persistence, while repository rollback tracks
+whether each optional secret existed before replacement.
 
 ### Quota gateway and preflight
 
@@ -341,7 +345,7 @@ toward feature-for-feature Prodex 0.434.3 parity. Multi-provider bridges, Super,
 gateway, richer diagnostics, remaining provider-specific bundle secrets, and
 built-in imports remain implementation backlog rather than permanent exclusions.
 Manual redeem, `ping openai`, explicit self-update, and the best-effort cached
-update notice are now implemented reference surfaces. OpenAI/Anthropic bundle
+update notice are now implemented reference surfaces. OpenAI/Anthropic/Kiro bundle
 encoding/decoding is now owned by `repository/profile`: the repository owns private bounded file I/O and
 Prodex-compatible envelope crypto, while `usecase/profile` owns profile selection,
 identity matching, update/create planning, and rollback. New infrastructure is added only when required by a concrete

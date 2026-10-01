@@ -30,8 +30,11 @@ type Provider struct {
 	APIURL        string       `json:"api_url,omitempty"`
 	AccessTypeSKU string       `json:"access_type_sku,omitempty"`
 	CopilotPlan   string       `json:"copilot_plan,omitempty"`
+	AuthKey       string       `json:"auth_key,omitempty"`
 	AuthKind      string       `json:"auth_kind,omitempty"`
+	ProfileARN    string       `json:"profile_arn,omitempty"`
 	ProfileName   string       `json:"profile_name,omitempty"`
+	StartURL      string       `json:"start_url,omitempty"`
 	Region        string       `json:"region,omitempty"`
 }
 

@@ -66,6 +66,8 @@ func (catalog *Catalog) exportProfile(ctx context.Context, report Report) (profi
 		return catalog.exportOpenAIProfile(ctx, report)
 	case profileentity.ProviderAnthropic:
 		return catalog.exportAnthropicProfile(ctx, report)
+	case profileentity.ProviderKiro:
+		return catalog.exportKiroProfile(ctx, report)
 	default:
 		return profilemodel.ExportedProfile{}, fmt.Errorf("profile provider %q export is not implemented yet", report.Profile.Provider.Kind)
 	}
@@ -110,6 +112,35 @@ func (catalog *Catalog) exportAnthropicProfile(ctx context.Context, report Repor
 		Name: report.Profile.Name, Email: optionalString(strings.TrimSpace(report.Profile.Email)),
 		SourceManaged: report.Profile.Managed, Provider: providerSnapshotFromEntity(report.Profile.Provider),
 		AuthJSON: "", SecretFiles: []profilemodel.ExportedSecretFile{{Path: claudeCredentialFile, Text: secret}},
+	}, nil
+}
+
+func (catalog *Catalog) exportKiroProfile(ctx context.Context, report Report) (profilemodel.ExportedProfile, error) {
+	if catalog.kiro == nil {
+		return profilemodel.ExportedProfile{}, errors.New("Kiro profile export support is not configured")
+	}
+	auth, err := catalog.profiles.ReadProviderSecret(report.Profile.CodexHome, kiroCredentialFile)
+	if err != nil {
+		return profilemodel.ExportedProfile{}, fmt.Errorf("export profile %q: %w", report.Profile.Name, err)
+	}
+	if _, err := catalog.kiro.InspectAuthSecret(ctx, auth); err != nil {
+		return profilemodel.ExportedProfile{}, fmt.Errorf("export profile %q: Kiro credentials are invalid", report.Profile.Name)
+	}
+	secrets := []profilemodel.ExportedSecretFile{{Path: kiroCredentialFile, Text: auth}}
+	modelCatalog, found, err := catalog.profiles.ReadOptionalProviderSecret(report.Profile.CodexHome, kiroModelCatalogFile)
+	if err != nil {
+		return profilemodel.ExportedProfile{}, fmt.Errorf("export profile %q: %w", report.Profile.Name, err)
+	}
+	if found {
+		if err := catalog.kiro.ValidateModelCatalog(ctx, modelCatalog); err != nil {
+			return profilemodel.ExportedProfile{}, fmt.Errorf("export profile %q: Kiro model catalog is invalid", report.Profile.Name)
+		}
+		secrets = append(secrets, profilemodel.ExportedSecretFile{Path: kiroModelCatalogFile, Text: modelCatalog})
+	}
+	return profilemodel.ExportedProfile{
+		Name: report.Profile.Name, Email: optionalString(strings.TrimSpace(report.Profile.Email)),
+		SourceManaged: report.Profile.Managed, Provider: providerSnapshotFromEntity(report.Profile.Provider),
+		AuthJSON: "", SecretFiles: secrets,
 	}, nil
 }
 

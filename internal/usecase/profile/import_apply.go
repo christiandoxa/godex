@@ -40,8 +40,8 @@ func (catalog *Catalog) applyImportAction(ctx context.Context, action importActi
 	switch sourceProviderKind(action.source) {
 	case profileentity.ProviderOpenAI:
 		return catalog.applyOpenAIImportAction(ctx, action)
-	case profileentity.ProviderAnthropic:
-		return catalog.applyAnthropicImportAction(ctx, action)
+	case profileentity.ProviderAnthropic, profileentity.ProviderKiro:
+		return catalog.applyProviderImportAction(ctx, action)
 	default:
 		return importMutation{}, fmt.Errorf("profile provider %q import is not implemented yet", sourceProviderKind(action.source))
 	}
@@ -59,7 +59,7 @@ func (catalog *Catalog) applyOpenAIImportAction(ctx context.Context, action impo
 	return catalog.updateImportedAuth(ctx, action.target, authBytes)
 }
 
-func (catalog *Catalog) applyAnthropicImportAction(ctx context.Context, action importAction) (importMutation, error) {
+func (catalog *Catalog) applyProviderImportAction(ctx context.Context, action importAction) (importMutation, error) {
 	secrets, err := providerSecrets(action.source)
 	if err != nil {
 		return importMutation{}, err
@@ -107,29 +107,51 @@ func (catalog *Catalog) updateImportedProvider(
 	source profilemodel.ExportedProfile,
 	secrets map[string]string,
 ) (importMutation, error) {
-	previousSecret, err := catalog.profiles.ReadProviderSecret(target.Profile.CodexHome, claudeCredentialFile)
+	previousProfile := target.Profile
+	previousSecrets, err := catalog.snapshotProviderSecrets(target.Profile.CodexHome, secrets)
 	if err != nil {
 		return importMutation{}, err
 	}
-	previousProfile := target.Profile
 	provider := providerFromSnapshot(source.Provider)
 	provider.Kind = sourceProviderKind(source)
 	email := importedProfileEmail(source, accountentity.Identity{})
 	if err := catalog.profiles.ReplaceProvider(ctx, target.Profile.Name, email, provider, secrets, false); err != nil {
 		return importMutation{}, err
 	}
-	backup := []byte(previousSecret)
 	return importMutation{
 		updated: 1,
 		rollback: func() error {
-			defer clearBundleBytes(backup)
-			return catalog.profiles.ReplaceProvider(
-				context.WithoutCancel(ctx), previousProfile.Name, previousProfile.Email, previousProfile.Provider,
-				map[string]string{claudeCredentialFile: string(backup)}, false,
+			return catalog.profiles.RestoreProvider(
+				context.WithoutCancel(ctx), previousProfile.Name, previousProfile.Email, previousProfile.Provider, previousSecrets,
 			)
 		},
-		cleanup: func() { clearBundleBytes(backup) },
+		cleanup: func() { clearProviderSecretSnapshot(previousSecrets) },
 	}, nil
+}
+
+func (catalog *Catalog) snapshotProviderSecrets(codexHome string, next map[string]string) (map[string]*string, error) {
+	previous := make(map[string]*string, len(next))
+	for name := range next {
+		text, found, err := catalog.profiles.ReadOptionalProviderSecret(codexHome, name)
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			previous[name] = nil
+			continue
+		}
+		copy := text
+		previous[name] = &copy
+	}
+	return previous, nil
+}
+
+func clearProviderSecretSnapshot(values map[string]*string) {
+	for _, value := range values {
+		if value != nil {
+			*value = ""
+		}
+	}
 }
 
 func (catalog *Catalog) replaceImportedAuth(ctx context.Context, target Report, authJSON []byte) error {

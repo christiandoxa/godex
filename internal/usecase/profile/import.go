@@ -197,6 +197,9 @@ func (catalog *Catalog) validateImportedProfile(ctx context.Context, source prof
 	case profileentity.ProviderAnthropic:
 		_, err := catalog.inspectAnthropicSecret(ctx, source)
 		return err
+	case profileentity.ProviderKiro:
+		_, err := catalog.inspectKiroSecrets(ctx, source)
+		return err
 	default:
 		return fmt.Errorf("profile provider %q import is not implemented yet", sourceProviderKind(source))
 	}

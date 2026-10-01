@@ -16,6 +16,7 @@ import (
 	claudegateway "github.com/christiandoxa/godex/internal/gateway/claude"
 	"github.com/christiandoxa/godex/internal/gateway/codex"
 	githubgateway "github.com/christiandoxa/godex/internal/gateway/github"
+	kirogateway "github.com/christiandoxa/godex/internal/gateway/kiro"
 	"github.com/christiandoxa/godex/internal/gateway/openai"
 	updategateway "github.com/christiandoxa/godex/internal/gateway/update"
 	proxyconfig "github.com/christiandoxa/godex/internal/model/proxy"
@@ -91,6 +92,7 @@ func run() int {
 	profiles := profileusecase.NewCatalog(profileStore, store, settings.CurrentCodexHome)
 	profiles.SetAuthInspector(process)
 	profiles.SetClaudeSource(claudegateway.NewSource())
+	profiles.SetKiroInspector(kirogateway.NewInspector())
 	application.SetProfiles(profiles)
 	activity.SetProfiles(profiles)
 	quotaStatus.SetProfiles(profiles)

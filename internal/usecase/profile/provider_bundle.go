@@ -10,6 +10,11 @@ import (
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 )
 
+const (
+	kiroCredentialFile   = "kiro_auth.json"
+	kiroModelCatalogFile = "kiro_model_catalog.json"
+)
+
 func providerSnapshotFromEntity(provider profileentity.Provider) profilemodel.ProviderSnapshot {
 	return profilemodel.ProviderSnapshot{
 		Kind:          string(provider.Kind),
@@ -21,8 +26,11 @@ func providerSnapshotFromEntity(provider profileentity.Provider) profilemodel.Pr
 		APIURL:        optionalString(provider.APIURL),
 		AccessTypeSKU: optionalString(provider.AccessTypeSKU),
 		CopilotPlan:   optionalString(provider.CopilotPlan),
+		AuthKey:       optionalString(provider.AuthKey),
 		AuthKind:      optionalString(provider.AuthKind),
+		ProfileARN:    optionalString(provider.ProfileARN),
 		ProfileName:   optionalString(provider.ProfileName),
+		StartURL:      optionalString(provider.StartURL),
 		Region:        optionalString(provider.Region),
 	}
 }
@@ -66,6 +74,58 @@ func (catalog *Catalog) inspectAnthropicSecret(ctx context.Context, source profi
 		return profilemodel.BuiltinCredential{}, fmt.Errorf("profile %q has incompatible Claude credentials", source.Name)
 	}
 	return credential, nil
+}
+
+func (catalog *Catalog) inspectKiroSecrets(ctx context.Context, source profilemodel.ExportedProfile) (profilemodel.BuiltinCredential, error) {
+	if catalog.kiro == nil {
+		return profilemodel.BuiltinCredential{}, errors.New("Kiro profile import support is not configured")
+	}
+	auth, catalogText, err := kiroSecretFiles(source.SecretFiles)
+	if err != nil {
+		return profilemodel.BuiltinCredential{}, fmt.Errorf("profile %q: %w", source.Name, err)
+	}
+	credential, err := catalog.kiro.InspectAuthSecret(ctx, auth.Text)
+	if err != nil {
+		return profilemodel.BuiltinCredential{}, fmt.Errorf("profile %q has invalid Kiro credentials", source.Name)
+	}
+	if credential.Provider.Kind != string(profileentity.ProviderKiro) {
+		return profilemodel.BuiltinCredential{}, fmt.Errorf("profile %q has incompatible Kiro credentials", source.Name)
+	}
+	if catalogText != nil {
+		if err := catalog.kiro.ValidateModelCatalog(ctx, catalogText.Text); err != nil {
+			return profilemodel.BuiltinCredential{}, fmt.Errorf("profile %q has invalid Kiro model catalog", source.Name)
+		}
+	}
+	return credential, nil
+}
+
+func kiroSecretFiles(files []profilemodel.ExportedSecretFile) (profilemodel.ExportedSecretFile, *profilemodel.ExportedSecretFile, error) {
+	var auth profilemodel.ExportedSecretFile
+	var modelCatalog *profilemodel.ExportedSecretFile
+	seen := make(map[string]bool, len(files))
+	for index := range files {
+		file := files[index]
+		if seen[file.Path] {
+			return profilemodel.ExportedSecretFile{}, nil, fmt.Errorf("duplicate provider secret file %q", file.Path)
+		}
+		seen[file.Path] = true
+		if strings.TrimSpace(file.Text) == "" {
+			return profilemodel.ExportedSecretFile{}, nil, fmt.Errorf("provider secret file %q is empty", file.Path)
+		}
+		switch file.Path {
+		case kiroCredentialFile:
+			auth = file
+		case kiroModelCatalogFile:
+			copy := file
+			modelCatalog = &copy
+		default:
+			return profilemodel.ExportedSecretFile{}, nil, fmt.Errorf("unexpected provider secret file %q", file.Path)
+		}
+	}
+	if auth.Path == "" {
+		return profilemodel.ExportedSecretFile{}, nil, fmt.Errorf("provider requires secret file %q", kiroCredentialFile)
+	}
+	return auth, modelCatalog, nil
 }
 
 func requiredSecretFile(files []profilemodel.ExportedSecretFile, required string) (profilemodel.ExportedSecretFile, error) {

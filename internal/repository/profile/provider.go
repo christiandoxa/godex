@@ -109,27 +109,94 @@ func (store *Store) ReplaceProvider(
 }
 
 func (store *Store) ReadProviderSecret(codexHome, name string) (string, error) {
-	if err := validateSecretName(name); err != nil {
+	text, found, err := store.ReadOptionalProviderSecret(codexHome, name)
+	if err != nil {
 		return "", err
+	}
+	if !found {
+		return "", errors.New("provider secret file is unavailable")
+	}
+	return text, nil
+}
+
+func (store *Store) ReadOptionalProviderSecret(codexHome, name string) (string, bool, error) {
+	if err := validateSecretName(name); err != nil {
+		return "", false, err
 	}
 	path := filepath.Join(codexHome, name)
 	info, err := os.Lstat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", false, nil
+	}
 	if err != nil {
-		return "", errors.New("provider secret file is unavailable")
+		return "", false, errors.New("provider secret file is unavailable")
 	}
 	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || info.Size() > providerSecretMaxBytes {
-		return "", errors.New("provider secret must be a bounded regular file")
+		return "", false, errors.New("provider secret must be a bounded regular file")
 	}
 	file, err := os.Open(path)
 	if err != nil {
-		return "", errors.New("provider secret file is unavailable")
+		return "", false, errors.New("provider secret file is unavailable")
 	}
 	defer file.Close()
 	content, err := io.ReadAll(io.LimitReader(file, providerSecretMaxBytes+1))
 	if err != nil || len(content) > providerSecretMaxBytes {
-		return "", errors.New("provider secret file is unavailable")
+		return "", false, errors.New("provider secret file is unavailable")
 	}
-	return string(content), nil
+	return string(content), true, nil
+}
+
+func (store *Store) RestoreProvider(
+	ctx context.Context,
+	name, email string,
+	provider profileentity.Provider,
+	secrets map[string]*string,
+) error {
+	return store.withLock(ctx, func() error {
+		release, err := store.acquireMutation(name)
+		if err != nil {
+			return err
+		}
+		defer release()
+		state, err := store.readState()
+		if err != nil {
+			return err
+		}
+		index := profileIndex(state.Profiles, name)
+		if index < 0 {
+			return fmt.Errorf(profileDoesNotExistFormat, name)
+		}
+		if err := restoreProviderSecretMap(state.Profiles[index].CodexHome, secrets); err != nil {
+			return err
+		}
+		state.Profiles[index].Email = email
+		state.Profiles[index].Provider = provider
+		return store.writeState(state)
+	})
+}
+
+func restoreProviderSecretMap(home string, secrets map[string]*string) error {
+	var restoreErr error
+	for name, text := range secrets {
+		if err := validateSecretName(name); err != nil {
+			restoreErr = errors.Join(restoreErr, err)
+			continue
+		}
+		path := filepath.Join(home, name)
+		if text == nil {
+			if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+				restoreErr = errors.Join(restoreErr, err)
+			}
+			continue
+		}
+		if len(*text) == 0 || len(*text) > providerSecretMaxBytes {
+			restoreErr = errors.Join(restoreErr, fmt.Errorf("provider secret %q is empty or exceeds safe size limit", name))
+			continue
+		}
+		_, err := fileutil.AtomicWrite(path, []byte(*text))
+		restoreErr = errors.Join(restoreErr, err)
+	}
+	return restoreErr
 }
 
 func (store *Store) stageProviderHome(secrets map[string]string) (string, error) {

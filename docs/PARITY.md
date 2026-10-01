@@ -144,8 +144,11 @@ and eligibility validation stays in the runtime use case.
   matches the 0.434.3 wire contract: empty `auth_json`, provider metadata, and a
   validated `.credentials.json` provider secret file survive plain/encrypted
   round trips; update rollback restores prior provider metadata and credentials.
-  Copilot/Kiro built-in imports and their provider secret payloads remain.
-  Process-crash lifecycle-journal recovery for multi-profile imports also remains
+  Kiro bundle export/import now also preserves the full provider identity fields,
+  required `kiro_auth.json`, optional validated `kiro_model_catalog.json`, and
+  absent-file rollback semantics. Built-in Kiro discovery and Copilot built-in
+  import/bundle metadata remain. Process-crash lifecycle-journal recovery for
+  multi-profile imports also remains
   to match Prodex exactly. OpenAI plain/encrypted bundle wire formats, Bubble Tea
   protection/password prompts, and identity-safe runtime rollback are implemented.
 - HTTP/SSE model transport is explicit; Godex does not implement Prodex's
