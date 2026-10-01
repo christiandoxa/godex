@@ -2,7 +2,9 @@ package profile
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"sort"
 
 	profileentity "github.com/christiandoxa/godex/internal/entity/profile"
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
@@ -57,4 +59,63 @@ func (catalog *Catalog) ActiveLaunch(ctx context.Context) (profilemodel.LaunchTa
 		Name: profile.Name, CodexHome: profile.CodexHome, Provider: string(profile.Provider.Kind),
 		ProviderConfig: providerSnapshotFromEntity(profile.Provider),
 	}, true, nil
+}
+
+func (catalog *Catalog) ProviderLaunchPool(
+	ctx context.Context,
+	selectedName, provider string,
+	allowRotate bool,
+) ([]profilemodel.LaunchTarget, error) {
+	selected, err := catalog.ResolveLaunch(ctx, selectedName)
+	if err != nil {
+		return nil, err
+	}
+	if selected.Provider != provider {
+		return nil, fmt.Errorf("profile %q does not use provider %q", selectedName, provider)
+	}
+	if !allowRotate {
+		return []profilemodel.LaunchTarget{selected}, nil
+	}
+	listed, err := catalog.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := []profilemodel.LaunchTarget{selected}
+	for _, report := range listed {
+		if report.Profile.Name == selectedName || report.AccountID != "" ||
+			string(report.Profile.Provider.Kind) != provider {
+			continue
+		}
+		result = append(result, launchTarget(report))
+	}
+	sort.Slice(result[1:], func(i, j int) bool {
+		return result[i+1].Name < result[j+1].Name
+	})
+	return result, nil
+}
+
+func (catalog *Catalog) AcquireLaunchPool(
+	ctx context.Context,
+	names []string,
+) (func() error, error) {
+	names = append([]string(nil), names...)
+	sort.Strings(names)
+	releases := make([]func() error, 0, len(names))
+	for _, name := range names {
+		release, err := catalog.profiles.Acquire(ctx, name)
+		if err != nil {
+			for index := len(releases) - 1; index >= 0; index-- {
+				_ = releases[index]()
+			}
+			return nil, err
+		}
+		releases = append(releases, release)
+	}
+	return func() error {
+		var releaseErr error
+		for index := len(releases) - 1; index >= 0; index-- {
+			releaseErr = errors.Join(releaseErr, releases[index]())
+		}
+		return releaseErr
+	}, nil
 }

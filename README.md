@@ -166,10 +166,14 @@ provider/static catalog is merged with account `/models` metadata, per-model
 prompt/context limits drive Codex context and auto-compaction budgets, and an
 explicit user `model_catalog_json` override always wins.
 
-This checkpoint is deliberately single-profile. Copilot multi-profile credential
-rotation and continuation affinity, in-process credential refresh, pre-commit
-model fallback retries, and chat-compatible/custom-instruction surfaces remain
-part of the `0.434.3` runtime parity backlog.
+Copilot runtime now supports a managed multi-profile credential pool for default
+or active-profile launches. The selected profile is preferred for the first fresh
+request, profiles whose runtime credential cannot be prepared are filtered out,
+and the existing routing layer performs bounded pre-commit rotation and durable
+conversation affinity. Explicit `--profile` launches remain single-profile hard
+affinity. In-process credential refresh, pre-commit model fallback retries, and
+chat-compatible/custom-instruction surfaces remain part of the `0.434.3` runtime
+parity backlog.
 
 Prodex-compatible Codex runtime feature flags are translated to Codex `-c`
 overrides before the remaining Codex arguments. Explicit later Codex `-c`

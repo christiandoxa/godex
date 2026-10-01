@@ -502,3 +502,41 @@ func TestProviderRuntimeArgumentsLeaveOpenAIUntouched(t *testing.T) {
 		t.Fatalf("OpenAI arguments = %#v", got)
 	}
 }
+
+func TestRunProviderProfilesBuildsRotatingProviderPool(t *testing.T) {
+	process := &fakeProxyProcess{}
+	proxy := &fakeProxy{}
+	var config proxyconfig.Config
+	runner := NewRunner(&fakeLaunchAccounts{}, process, func(got proxyconfig.Config) (Proxy, error) {
+		config = got
+		return proxy, nil
+	})
+	runner.SetProviderCatalogStore(runtimerepo.NewProviderCatalogStore())
+	selectedHome, otherHome := t.TempDir(), t.TempDir()
+	selected := CopilotProvider("copilot-a", "https://github-a.example.test", "alpha", "https://api-a.example.test")
+	other := CopilotProvider("copilot-b", "https://github-b.example.test", "beta", "https://api-b.example.test")
+	profiles := []proxyconfig.ProviderProfile{
+		{Name: "copilot-a", Home: selectedHome, Provider: selected, Enabled: true},
+		{Name: "copilot-b", Home: otherHome, Provider: other, Enabled: true},
+	}
+	if err := runner.RunProviderProfiles(context.Background(), selectedHome, selected, profiles, []string{"exec", "hello"}); err != nil {
+		t.Fatal(err)
+	}
+	accounts, err := config.Accounts(context.Background())
+	if err != nil || len(accounts) != 2 {
+		t.Fatalf("provider accounts = %#v, err = %v", accounts, err)
+	}
+	byHome := map[string]proxyconfig.Account{}
+	for _, account := range accounts {
+		byHome[account.Home] = account
+	}
+	if byHome[selectedHome].Provider != selected || byHome[otherHome].Provider != other {
+		t.Fatalf("provider metadata lost: %#v", accounts)
+	}
+	if config.PreferredAccount == "" || config.PreferredAccount != byHome[selectedHome].ID {
+		t.Fatalf("preferred account = %q, selected = %#v", config.PreferredAccount, byHome[selectedHome])
+	}
+	if process.home != selectedHome || !proxy.started || !proxy.closed {
+		t.Fatalf("provider pool lifecycle = process:%#v proxy:%#v", process, proxy)
+	}
+}

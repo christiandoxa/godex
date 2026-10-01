@@ -123,12 +123,16 @@ and eligibility validation stays in the runtime use case.
   non-TTY fallbacks remain line-oriented.
 - Multi-provider runtime/login parity remains incomplete for Gemini,
   Anthropic/Claude, Kiro, DeepSeek/local/AGY where present in Prodex. Copilot now
-  has a single-profile foreground Responses bridge with external credential
-  resolution, direct/legacy runtime auth, Prodex-compatible request/header policy,
-  and private model catalogs built from the exact 0.434.3 static provider data
-  plus account `/models` metadata. Copilot still lacks multi-profile credential
-  rotation/continuation affinity, in-process auth refresh, pre-commit model
-  fallback retries, and chat-compatible/custom-instruction surfaces.
+  has a foreground Responses bridge with external credential resolution,
+  direct/legacy runtime auth, Prodex-compatible request/header policy, private
+  model catalogs built from the exact 0.434.3 static provider data plus account
+  `/models` metadata, and managed multi-profile credential rotation. Default or
+  active-profile launches prefer the selected profile first, filter unusable
+  credential profiles, rotate only before commitment, and retain durable
+  continuation affinity through the existing routing layer; explicit profile
+  selection remains single-profile hard affinity. Copilot still lacks in-process
+  auth refresh, pre-commit model fallback retries, and
+  chat-compatible/custom-instruction surfaces.
 - Super mode and its hidden expose/broker/MCP bridge/sub-agent execution stack,
   including optional Presidio integration.
 - The standalone gateway surface, remaining live TUI parity, process/resource

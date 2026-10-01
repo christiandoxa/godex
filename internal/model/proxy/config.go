@@ -10,6 +10,7 @@ type Account struct {
 	Home          string
 	Enabled       bool
 	EligibleAfter time.Time
+	Provider      Provider
 }
 
 type Config struct {

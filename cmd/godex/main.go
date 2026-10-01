@@ -136,7 +136,7 @@ func newRuntimeRouter(
 		return nil, err
 	}
 	return routingusecase.NewRouter(routingusecase.Config{
-		Gateway: gateway, Accounts: config.Accounts,
+		Gateway: gateway, Accounts: runtimeAccountSource(config.Accounts, gateway),
 		PreferredAccount: config.PreferredAccount, Bindings: bindings,
 	})
 }
@@ -168,23 +168,57 @@ func newCopilotRuntimeGateway(
 	if config.Context == nil {
 		config.Context = context.Background()
 	}
-	transport, err := source.NewRuntimeTransport(
-		config.Context, config.Provider.Host, config.Provider.Login, config.Provider.APIURL,
-	)
+	if config.Accounts == nil {
+		return nil, errors.New("Copilot runtime account source is not configured")
+	}
+	accounts, err := config.Accounts(config.Context)
 	if err != nil {
 		return nil, err
 	}
-	if catalogs == nil || len(transport.ModelCatalog()) == 0 {
-		return transport, nil
+	pool, err := source.NewRuntimePool(config.Context, accounts)
+	if err != nil {
+		return nil, err
+	}
+	if catalogs == nil || len(pool.ModelCatalog()) == 0 {
+		return pool, nil
 	}
 	home, err := runtimeProviderHome(config)
 	if err != nil {
+		pool.Close()
 		return nil, err
 	}
-	if _, err := catalogs.WriteCopilotRuntime(home, transport.ModelCatalog()); err != nil {
+	if _, err := catalogs.WriteCopilotRuntime(home, pool.ModelCatalog()); err != nil {
+		pool.Close()
 		return nil, err
 	}
-	return transport, nil
+	return pool, nil
+}
+
+type runtimeAccountAvailability interface {
+	AvailableAccount(string) bool
+}
+
+func runtimeAccountSource(
+	source func(context.Context) ([]proxyconfig.Account, error),
+	gateway runtimeGateway,
+) func(context.Context) ([]proxyconfig.Account, error) {
+	available, ok := gateway.(runtimeAccountAvailability)
+	if !ok || source == nil {
+		return source
+	}
+	return func(ctx context.Context) ([]proxyconfig.Account, error) {
+		accounts, err := source(ctx)
+		if err != nil {
+			return nil, err
+		}
+		filtered := make([]proxyconfig.Account, 0, len(accounts))
+		for _, account := range accounts {
+			if available.AvailableAccount(account.ID) {
+				filtered = append(filtered, account)
+			}
+		}
+		return filtered, nil
+	}
 }
 
 func runtimeProviderHome(config proxyconfig.Config) (string, error) {

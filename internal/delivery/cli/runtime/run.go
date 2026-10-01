@@ -22,6 +22,8 @@ type launchProfiles interface {
 	ResolveLaunch(context.Context, string) (profilemodel.LaunchTarget, error)
 	ActiveLaunch(context.Context) (profilemodel.LaunchTarget, bool, error)
 	AcquireLaunch(context.Context, string) (func() error, error)
+	ProviderLaunchPool(context.Context, string, string, bool) ([]profilemodel.LaunchTarget, error)
+	AcquireLaunchPool(context.Context, []string) (func() error, error)
 }
 
 func Run(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionusecase.Catalog, arguments []string) error {
@@ -66,7 +68,7 @@ func runProfileSelection(ctx context.Context, runner *runtimeusecase.Runner, ses
 		if err != nil {
 			return err
 		}
-		return runLaunchTarget(ctx, runner, sessions, profiles, target, codexArguments)
+		return runLaunchTarget(ctx, runner, sessions, profiles, target, codexArguments, false)
 	}
 	if selection.Account != "" {
 		return runParsed(ctx, runner, sessions, selection.Account, codexArguments)
@@ -77,7 +79,7 @@ func runProfileSelection(ctx context.Context, runner *runtimeusecase.Runner, ses
 			return err
 		}
 		if active {
-			return runLaunchTarget(ctx, runner, sessions, profiles, target, codexArguments)
+			return runLaunchTarget(ctx, runner, sessions, profiles, target, codexArguments, true)
 		}
 	}
 	return runParsed(ctx, runner, sessions, "", codexArguments)
@@ -90,6 +92,7 @@ func runLaunchTarget(
 	profiles launchProfiles,
 	target profilemodel.LaunchTarget,
 	arguments []string,
+	allowRotate bool,
 ) (runErr error) {
 	if target.AccountID != "" {
 		return runParsed(ctx, runner, sessions, target.AccountID, arguments)
@@ -101,12 +104,54 @@ func runLaunchTarget(
 	if err != nil {
 		return err
 	}
+	if provider.Kind == "copilot" {
+		pool, err := profiles.ProviderLaunchPool(ctx, target.Name, target.Provider, allowRotate)
+		if err != nil {
+			return err
+		}
+		return runProviderPool(ctx, runner, profiles, target, provider, pool, arguments)
+	}
 	release, err := profiles.AcquireLaunch(ctx, target.Name)
 	if err != nil {
 		return err
 	}
 	defer func() { runErr = errors.Join(runErr, release()) }()
 	return runStandaloneProfile(ctx, runner, target.CodexHome, provider, arguments)
+}
+
+func runProviderPool(
+	ctx context.Context,
+	runner *runtimeusecase.Runner,
+	profiles launchProfiles,
+	selected profilemodel.LaunchTarget,
+	provider proxymodel.Provider,
+	pool []profilemodel.LaunchTarget,
+	arguments []string,
+) (runErr error) {
+	names := make([]string, 0, len(pool))
+	runtimeProfiles := make([]proxymodel.ProviderProfile, 0, len(pool))
+	for _, target := range pool {
+		currentProvider, err := launchRuntimeProvider(target)
+		if err != nil {
+			return err
+		}
+		if currentProvider.Kind != provider.Kind {
+			continue
+		}
+		names = append(names, target.Name)
+		runtimeProfiles = append(runtimeProfiles, proxymodel.ProviderProfile{
+			Name: target.Name, Home: target.CodexHome, Provider: currentProvider, Enabled: true,
+		})
+	}
+	if len(runtimeProfiles) == 0 {
+		return errors.New("runtime provider pool is empty")
+	}
+	release, err := profiles.AcquireLaunchPool(ctx, names)
+	if err != nil {
+		return err
+	}
+	defer func() { runErr = errors.Join(runErr, release()) }()
+	return runner.RunProviderProfiles(ctx, selected.CodexHome, provider, runtimeProfiles, arguments)
 }
 
 func launchRuntimeProvider(target profilemodel.LaunchTarget) (proxymodel.Provider, error) {

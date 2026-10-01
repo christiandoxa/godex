@@ -90,3 +90,27 @@ func TestRuntimeProviderHomeUsesSingleProfileFallbackAndRejectsAmbiguity(t *test
 		t.Fatal("ambiguous provider pool unexpectedly resolved a home")
 	}
 }
+
+type fakeRuntimeAvailability struct {
+	available map[string]bool
+}
+
+func (fake fakeRuntimeAvailability) Execute(context.Context, proxyconfig.Request, proxyconfig.Account) (*proxyconfig.Response, error) {
+	return nil, nil
+}
+
+func (fake fakeRuntimeAvailability) AvailableAccount(id string) bool { return fake.available[id] }
+
+func TestRuntimeAccountSourceFiltersUnavailableProviderProfiles(t *testing.T) {
+	source := func(context.Context) ([]proxyconfig.Account, error) {
+		return []proxyconfig.Account{
+			{ID: "ready", Home: "/profiles/ready", Enabled: true},
+			{ID: "broken", Home: "/profiles/broken", Enabled: true},
+		}, nil
+	}
+	filtered := runtimeAccountSource(source, fakeRuntimeAvailability{available: map[string]bool{"ready": true}})
+	accounts, err := filtered(context.Background())
+	if err != nil || len(accounts) != 1 || accounts[0].ID != "ready" {
+		t.Fatalf("filtered accounts = %#v, err = %v", accounts, err)
+	}
+}

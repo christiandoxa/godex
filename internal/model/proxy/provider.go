@@ -10,3 +10,10 @@ type Provider struct {
 	ContextWindow    int64
 	AutoCompactLimit int64
 }
+
+type ProviderProfile struct {
+	Name     string
+	Home     string
+	Provider Provider
+	Enabled  bool
+}
