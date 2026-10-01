@@ -26,17 +26,27 @@ type proxyCodex interface {
 	RunThroughProxy(context.Context, string, string, []string) error
 }
 
+type providerProxyCodex interface {
+	RunThroughProxyProvider(context.Context, string, string, []string, string) error
+}
+
 type quotaPreflight interface {
 	Ready(context.Context, accountentity.Account) (bool, error)
 }
 
+type providerCredentialResolver interface {
+	AnthropicAPIKeys(string) ([]string, error)
+}
+
 type Runner struct {
-	accounts launchAccounts
-	process  codexProcess
-	newProxy ProxyFactory
-	quota    quotaPreflight
-	catalog  providerCatalogStore
-	upstream string
+	accounts    launchAccounts
+	process     codexProcess
+	newProxy    ProxyFactory
+	quota       quotaPreflight
+	catalog     providerCatalogStore
+	upstream    string
+	currentHome string
+	credentials providerCredentialResolver
 }
 
 func NewRunner(accounts launchAccounts, process codexProcess, newProxy ProxyFactory) *Runner {
@@ -55,6 +65,28 @@ func (runner *Runner) SetUpstreamURL(upstream string) {
 	if upstream != "" {
 		runner.upstream = upstream
 	}
+}
+
+func (runner *Runner) SetCurrentCodexHome(home string) {
+	runner.currentHome = home
+}
+
+func (runner *Runner) SetProviderCredentialResolver(resolver providerCredentialResolver) {
+	runner.credentials = resolver
+}
+
+func (runner *Runner) ProviderAPIKeys(provider, explicit string) ([]string, error) {
+	if provider != "anthropic" {
+		return nil, errors.New("runtime provider API-key shortcut is not implemented")
+	}
+	if runner.credentials == nil {
+		return nil, errors.New("runtime provider credential resolver is not configured")
+	}
+	return runner.credentials.AnthropicAPIKeys(explicit)
+}
+
+func (runner *Runner) CurrentCodexHome() string {
+	return runner.currentHome
 }
 
 func (runner *Runner) Run(ctx context.Context, selector string, arguments []string) (runErr error) {
@@ -83,13 +115,14 @@ func (runner *Runner) launch(ctx context.Context, homeID, preferredID string, pr
 	if err != nil {
 		return err
 	}
-	return runner.launchHome(ctx, runner.accounts.CodexHome(homeID), preferredID, proxyconfig.Provider{}, profiles, arguments)
+	return runner.launchHome(ctx, runner.accounts.CodexHome(homeID), preferredID, proxyconfig.Provider{}, nil, profiles, arguments)
 }
 
 func (runner *Runner) launchHome(
 	ctx context.Context,
 	home, preferredID string,
 	provider proxyconfig.Provider,
+	credentials []proxyconfig.ProviderCredential,
 	profiles []proxyconfig.Account,
 	arguments []string,
 ) (runErr error) {
@@ -104,10 +137,11 @@ func (runner *Runner) launchHome(
 		return err
 	}
 	proxy, err := runner.newProxy(proxyconfig.Config{
-		Context:          ctx,
-		UpstreamURL:      runner.upstream,
-		PreferredAccount: preferredID,
-		Provider:         provider,
+		Context:             ctx,
+		UpstreamURL:         runner.upstream,
+		PreferredAccount:    preferredID,
+		Provider:            provider,
+		ProviderCredentials: append([]proxyconfig.ProviderCredential(nil), credentials...),
 		Accounts: func(ctx context.Context) ([]proxyconfig.Account, error) {
 			if err := ctx.Err(); err != nil {
 				return nil, err
@@ -125,7 +159,15 @@ func (runner *Runner) launchHome(
 	if err := proxy.Start(); err != nil {
 		return err
 	}
-	runErr = proxyRunner.RunThroughProxy(ctx, home, proxy.Endpoint(), runtimeArguments)
+	if provider.Kind != "" {
+		if isolated, ok := runner.process.(providerProxyCodex); ok {
+			runErr = isolated.RunThroughProxyProvider(ctx, home, proxy.Endpoint(), runtimeArguments, provider.Kind)
+		} else {
+			runErr = proxyRunner.RunThroughProxy(ctx, home, proxy.Endpoint(), runtimeArguments)
+		}
+	} else {
+		runErr = proxyRunner.RunThroughProxy(ctx, home, proxy.Endpoint(), runtimeArguments)
+	}
 	closeContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
 	if closeErr := proxy.Close(closeContext); runErr == nil {

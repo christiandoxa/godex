@@ -199,9 +199,19 @@ passthrough surfaces with Anthropic OAuth headers, GET /models and /models/{id}
 are emulated from the verified 0.434.3 Anthropic catalog metadata, and
 /responses/compact uses Prodex's bounded local-fallback summary contract without
 an upstream model call. Launch catalogs use the 0.434.3 model IDs, aliases, 200k
-context window, and 180k default auto-compact limit. Raw Anthropic API-key pools
-are still a parity backlog item; this runtime path currently uses managed Claude
-OAuth profiles.
+context window, and 180k default auto-compact limit.
+
+The same bridge now supports Prodex-compatible raw Anthropic API-key launches:
+`godex run --provider anthropic` resolves `--api-key`, then
+`ANTHROPIC_API_KEYS`, then `ANTHROPIC_API_KEY`; plural keys accept comma,
+semicolon, or newline separators and rotate selected-first across fresh requests.
+`--base-url` accepts only absolute credential-free HTTP(S) URLs and may override
+the Anthropic endpoint. API-key Responses exhaust the model fallback chain before
+credential rotation; native `/messages` uses `x-api-key` while chat-compatible
+routes use bearer auth, matching 0.434.3. Provider secret environment variables
+are removed from the Codex child process and raw keys are never persisted in
+profile metadata, routing bindings, or bundles. Without API keys, the same
+`--provider anthropic` shortcut resolves managed Claude OAuth profiles.
 
 Prodex-compatible Codex runtime feature flags are translated to Codex `-c`
 overrides before the remaining Codex arguments. Explicit later Codex `-c`

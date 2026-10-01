@@ -61,6 +61,41 @@ func (catalog *Catalog) ActiveLaunch(ctx context.Context) (profilemodel.LaunchTa
 	}, true, nil
 }
 
+func (catalog *Catalog) ResolveProviderLaunch(
+	ctx context.Context,
+	provider, requested string,
+) (profilemodel.LaunchTarget, bool, error) {
+	if requested != "" {
+		target, err := catalog.ResolveLaunch(ctx, requested)
+		return target, err == nil, err
+	}
+	active, activeFound, err := catalog.ActiveLaunch(ctx)
+	if err != nil {
+		return profilemodel.LaunchTarget{}, false, err
+	}
+	if activeFound && active.Provider == provider {
+		return active, true, nil
+	}
+	listed, err := catalog.List(ctx)
+	if err != nil {
+		return profilemodel.LaunchTarget{}, false, err
+	}
+	for _, report := range listed {
+		if report.AccountID == "" && report.Enabled && string(report.Profile.Provider.Kind) == provider {
+			return launchTarget(report), true, nil
+		}
+	}
+	if activeFound {
+		return active, true, nil
+	}
+	for _, report := range listed {
+		if report.AccountID == "" && report.Enabled && report.Profile.CodexHome != "" {
+			return launchTarget(report), true, nil
+		}
+	}
+	return profilemodel.LaunchTarget{}, false, nil
+}
+
 func (catalog *Catalog) ProviderLaunchPool(
 	ctx context.Context,
 	selectedName, provider string,

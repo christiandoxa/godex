@@ -52,6 +52,24 @@ func (process *CodexProcess) CheckProxySupport(ctx context.Context) error {
 }
 
 func (process *CodexProcess) RunThroughProxy(ctx context.Context, codexHome, endpoint string, arguments []string) error {
+	return process.runThroughProxy(ctx, codexHome, endpoint, arguments, "")
+}
+
+func (process *CodexProcess) RunThroughProxyProvider(
+	ctx context.Context,
+	codexHome, endpoint string,
+	arguments []string,
+	provider string,
+) error {
+	return process.runThroughProxy(ctx, codexHome, endpoint, arguments, provider)
+}
+
+func (process *CodexProcess) runThroughProxy(
+	ctx context.Context,
+	codexHome, endpoint string,
+	arguments []string,
+	provider string,
+) error {
 	binary, err := process.resolveBinary()
 	if err != nil {
 		return err
@@ -64,7 +82,7 @@ func (process *CodexProcess) RunThroughProxy(ctx context.Context, codexHome, end
 		return err
 	}
 	command := exec.CommandContext(ctx, binary, arguments...)
-	command.Env = environmentWith("CODEX_HOME", codexHome)
+	command.Env = proxyChildEnvironment(codexHome, provider)
 	command.Stdin = process.terminal.Stdin
 	command.Stdout = process.terminal.Stdout
 	command.Stderr = process.terminal.Stderr
@@ -75,6 +93,36 @@ func (process *CodexProcess) RunThroughProxy(ctx context.Context, codexHome, end
 		return err
 	}
 	return nil
+}
+
+func proxyChildEnvironment(codexHome, provider string) []string {
+	environment := environmentWith("CODEX_HOME", codexHome)
+	if strings.TrimSpace(provider) == "" {
+		return environment
+	}
+	blocked := map[string]bool{
+		"OPENAI_API_KEYS":         true,
+		"OPENAI_API_KEY":          true,
+		"ANTHROPIC_API_KEYS":      true,
+		"ANTHROPIC_API_KEY":       true,
+		"DEEPSEEK_API_KEYS":       true,
+		"DEEPSEEK_API_KEY":        true,
+		"GEMINI_API_KEYS":         true,
+		"GEMINI_API_KEY":          true,
+		"GOOGLE_API_KEYS":         true,
+		"GOOGLE_API_KEY":          true,
+		"GITHUB_COPILOT_API_KEYS": true,
+		"GITHUB_COPILOT_API_KEY":  true,
+	}
+	filtered := make([]string, 0, len(environment))
+	for _, entry := range environment {
+		key, _, found := strings.Cut(entry, "=")
+		if found && blocked[strings.ToUpper(key)] {
+			continue
+		}
+		filtered = append(filtered, entry)
+	}
+	return filtered
 }
 
 func proxyArguments(endpoint string, arguments []string) ([]string, error) {

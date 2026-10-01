@@ -88,6 +88,8 @@ func run() int {
 	runner.SetProviderCatalogStore(providerCatalogs)
 	runner.SetQuotaPreflight(quotaStatus)
 	runner.SetUpstreamURL(settings.UpstreamURL)
+	runner.SetCurrentCodexHome(settings.CurrentCodexHome)
+	runner.SetProviderCredentialResolver(claudeSource)
 	application := cli.New(login, importer, store, runner, doctor, quotaStatus, os.Stdout)
 	profileStore := profilerepo.NewStore(settings.Home)
 	profiles := profileusecase.NewCatalog(profileStore, store, settings.CurrentCodexHome)
@@ -171,6 +173,9 @@ func newAnthropicRuntimeGateway(
 	}
 	if config.Context == nil {
 		config.Context = context.Background()
+	}
+	if len(config.ProviderCredentials) > 0 {
+		return claudegateway.NewRuntimeAPIKeyPool(config.Provider.APIURL, config.ProviderCredentials, nil)
 	}
 	if config.Accounts == nil {
 		return nil, errors.New("Anthropic runtime account source is not configured")

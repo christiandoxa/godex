@@ -540,3 +540,125 @@ func TestRunProviderProfilesBuildsRotatingProviderPool(t *testing.T) {
 		t.Fatalf("provider pool lifecycle = process:%#v proxy:%#v", process, proxy)
 	}
 }
+
+func TestRunProviderAPIKeysBuildsSecretOnlySyntheticPool(t *testing.T) {
+	process := &fakeProxyProcess{}
+	proxy := &fakeProxy{}
+	var config proxyconfig.Config
+	runner := NewRunner(&fakeLaunchAccounts{}, process, func(got proxyconfig.Config) (Proxy, error) {
+		config = got
+		return proxy, nil
+	})
+	runner.SetProviderCatalogStore(runtimerepo.NewProviderCatalogStore())
+	home := t.TempDir()
+	runner.SetCurrentCodexHome(home)
+	provider := AnthropicProvider("anthropic-api-key", "https://api.example.test/v1")
+	keys := []string{"key with space", "second-key", "second-key"}
+	if err := runner.RunProviderAPIKeys(context.Background(), "", provider, keys, []string{"exec", "hello"}); err != nil {
+		t.Fatal(err)
+	}
+	assertProviderAPIKeyPool(t, process, proxy, config, provider, home)
+}
+
+func assertProviderAPIKeyPool(
+	t *testing.T,
+	process *fakeProxyProcess,
+	proxy *fakeProxy,
+	config proxyconfig.Config,
+	provider proxyconfig.Provider,
+	home string,
+) {
+	t.Helper()
+	if process.home != home || !proxy.started || !proxy.closed {
+		t.Fatalf("synthetic key lifecycle = process:%#v proxy:%#v", process, proxy)
+	}
+	accounts, err := config.Accounts(context.Background())
+	if err != nil || len(accounts) != 2 || len(config.ProviderCredentials) != 2 {
+		t.Fatalf("synthetic pool = accounts:%#v credential_count:%d err:%v", accounts, len(config.ProviderCredentials), err)
+	}
+	assertProviderCredentialIdentities(t, accounts, config.ProviderCredentials, provider, home)
+	if config.ProviderCredentials[0].Secret != "key with space" || config.ProviderCredentials[1].Secret != "second-key" {
+		t.Fatal("provider credential order mismatch")
+	}
+	if config.PreferredAccount != config.ProviderCredentials[0].ID {
+		t.Fatalf("preferred account = %q", config.PreferredAccount)
+	}
+	stable := providerCredentialRoutingID(provider, "second-key")
+	if stable != config.ProviderCredentials[1].ID || stable != providerCredentialRoutingID(provider, "second-key") {
+		t.Fatalf("provider key routing ID is unstable: %q", stable)
+	}
+}
+
+func assertProviderCredentialIdentities(
+	t *testing.T,
+	accounts []proxyconfig.Account,
+	credentials []proxyconfig.ProviderCredential,
+	provider proxyconfig.Provider,
+	home string,
+) {
+	t.Helper()
+	for index, credential := range credentials {
+		if credential.ID == "" || len(credential.ID) != 32 ||
+			strings.Contains(credential.ID, "key") || credential.ID != accounts[index].ID {
+			t.Fatalf("synthetic credential identity drifted: id=%q account=%#v", credential.ID, accounts[index])
+		}
+		if accounts[index].Provider != provider || accounts[index].Home != home || !accounts[index].Enabled {
+			t.Fatalf("synthetic account = %#v", accounts[index])
+		}
+	}
+}
+
+type fakeProviderCredentialResolver struct {
+	keys []string
+	err  error
+}
+
+func (fake fakeProviderCredentialResolver) AnthropicAPIKeys(string) ([]string, error) {
+	return append([]string(nil), fake.keys...), fake.err
+}
+
+func TestProviderAPIKeysUsesInjectedResolverAndRejectsUnsupportedProviders(t *testing.T) {
+	runner := NewRunner(&fakeLaunchAccounts{}, &fakeProcess{}, nil)
+	runner.SetProviderCredentialResolver(fakeProviderCredentialResolver{keys: []string{"one", "two"}})
+	keys, err := runner.ProviderAPIKeys("anthropic", "ignored-by-fake")
+	if err != nil || strings.Join(keys, ",") != "one,two" {
+		t.Fatalf("resolved keys = %#v, err=%v", keys, err)
+	}
+	if _, err := runner.ProviderAPIKeys("gemini", "secret"); err == nil {
+		t.Fatal("unsupported provider API-key shortcut unexpectedly accepted")
+	}
+}
+
+type fakeLeasedLaunchAccounts struct {
+	fakeLaunchAccounts
+	acquired []string
+	released bool
+}
+
+func (fake *fakeLeasedLaunchAccounts) AcquireProfiles(_ context.Context, ids []string) (func() error, error) {
+	fake.acquired = append([]string(nil), ids...)
+	return func() error {
+		fake.released = true
+		return nil
+	}, nil
+}
+
+func TestRunProviderAPIKeysAccountPinsManagedHome(t *testing.T) {
+	home := t.TempDir()
+	accounts := &fakeLeasedLaunchAccounts{fakeLaunchAccounts: fakeLaunchAccounts{
+		accounts: []accountentity.Account{{ID: "managed", Name: "managed", Enabled: true}},
+		homes:    map[string]string{"managed": home},
+	}}
+	process := &fakeProcess{}
+	runner := NewRunner(accounts, process, nil)
+	provider := AnthropicProvider("raw-anthropic", "")
+	if err := runner.RunProviderAPIKeysAccount(context.Background(), "managed", provider, []string{"fixture-key"}, []string{"exec", "hello"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(accounts.acquired) != 1 || accounts.acquired[0] != "managed" || !accounts.released {
+		t.Fatalf("managed lease = acquired:%#v released:%t", accounts.acquired, accounts.released)
+	}
+	if len(process.homes) != 1 || process.homes[0] != home {
+		t.Fatalf("provider raw-key home = %#v", process.homes)
+	}
+}

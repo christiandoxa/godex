@@ -218,3 +218,17 @@ func TestExternalProviderRoutingRotatesOnlyStructuredRetryableFailures(t *testin
 		})
 	}
 }
+
+func TestSortRuntimeAccountsPreservesExplicitProviderRouteOrder(t *testing.T) {
+	accounts := sortRuntimeAccounts([]proxymodel.Account{
+		{ID: "hash-a", Home: "/third", Enabled: true, RouteOrder: 3},
+		{ID: "hash-z", Home: "/first", Enabled: true, RouteOrder: 1},
+		{ID: "hash-m", Home: "/second", Enabled: true, RouteOrder: 2},
+	})
+	if len(accounts) != 3 ||
+		accounts[0].Home != "/first" ||
+		accounts[1].Home != "/second" ||
+		accounts[2].Home != "/third" {
+		t.Fatalf("provider route order = %#v", accounts)
+	}
+}

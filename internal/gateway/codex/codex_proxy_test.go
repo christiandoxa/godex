@@ -201,3 +201,49 @@ func TestInstalledCodexConfigSmoke(t *testing.T) {
 		}
 	}
 }
+
+func TestProxyChildEnvironmentScrubsProviderAPISecretsForExternalProviders(t *testing.T) {
+	secretEnvironment := map[string]string{
+		"OPENAI_API_KEYS":         "openai-many",
+		"OPENAI_API_KEY":          "openai-one",
+		"ANTHROPIC_API_KEYS":      "anthropic-many",
+		"ANTHROPIC_API_KEY":       "anthropic-one",
+		"DEEPSEEK_API_KEYS":       "deepseek-many",
+		"DEEPSEEK_API_KEY":        "deepseek-one",
+		"GEMINI_API_KEYS":         "gemini-many",
+		"GEMINI_API_KEY":          "gemini-one",
+		"GOOGLE_API_KEYS":         "google-many",
+		"GOOGLE_API_KEY":          "google-one",
+		"GITHUB_COPILOT_API_KEYS": "copilot-many",
+		"GITHUB_COPILOT_API_KEY":  "copilot-one",
+	}
+	for key, value := range secretEnvironment {
+		t.Setenv(key, value)
+	}
+	t.Setenv("ANTHROPIC_AUTH_TOKEN", "keep-auth-token")
+	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "keep-oauth-token")
+	t.Setenv("GODEX_UNRELATED_ENV", "keep-me")
+	home := t.TempDir()
+
+	external := strings.Join(proxyChildEnvironment(home, "anthropic"), "\n")
+	for key := range secretEnvironment {
+		if strings.Contains(external, key+"=") {
+			t.Fatalf("external-provider secret environment %q leaked", key)
+		}
+	}
+	for _, value := range []string{
+		"CODEX_HOME=" + home,
+		"GODEX_UNRELATED_ENV=keep-me",
+		"ANTHROPIC_AUTH_TOKEN=keep-auth-token",
+		"CLAUDE_CODE_OAUTH_TOKEN=keep-oauth-token",
+	} {
+		if !strings.Contains(external, value) {
+			t.Fatalf("external-provider child environment lost safe value %q", value)
+		}
+	}
+
+	openAI := strings.Join(proxyChildEnvironment(home, ""), "\n")
+	if !strings.Contains(openAI, "ANTHROPIC_API_KEY=anthropic-one") {
+		t.Fatal("managed OpenAI child environment was unexpectedly scrubbed")
+	}
+}

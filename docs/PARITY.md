@@ -122,8 +122,9 @@ and eligibility validation stays in the runtime use case.
   quota watch, log stream/upstream, and redeem confirmation have been migrated;
   non-TTY fallbacks remain line-oriented.
 - Multi-provider runtime/login parity remains incomplete for Gemini, Kiro,
-  DeepSeek/local/AGY, and Anthropic raw API-key pools where present in Prodex.
-  Managed Anthropic/Claude OAuth profiles now have a foreground runtime bridge:
+  DeepSeek/local/AGY where present in Prodex. Anthropic now has both managed
+  Claude OAuth and raw API-key runtime paths. The OAuth path has a foreground
+  runtime bridge:
   the private .credentials.json token is resolved per profile, expired OAuth is
   refreshed through bounded claude auth status --json, default launches form a
   selected-first credential pool, unusable profiles are filtered, and explicit
@@ -134,8 +135,13 @@ and eligibility validation stays in the runtime use case.
   Messages stay passthrough, Models list/single are locally emulated from the
   verified 0.434.3 IDs/aliases/context/endpoint metadata, and Responses Compact
   uses the same bounded local-fallback summary and degraded headers as the
-  reference without an upstream model call. Raw Anthropic API-key pools remain a
-  gap; the current managed runtime path is Claude OAuth only. Copilot now
+  reference without an upstream model call. Raw Anthropic API-key parity is also
+  implemented: `--api-key` overrides `ANTHROPIC_API_KEYS`, which overrides
+  `ANTHROPIC_API_KEY`; plural keys preserve reference separators and rotate via
+  stable synthetic routing identities, custom `--base-url` is credential-free
+  HTTP(S)-validated, provider secret env is scrubbed from the Codex child, and
+  native Messages uses `x-api-key` while translated/chat routes use bearer auth.
+  Copilot now
   has a foreground Responses bridge with external credential resolution,
   direct/legacy runtime auth, Prodex-compatible request/header policy, private
   model catalogs built from the exact 0.434.3 static provider data plus account

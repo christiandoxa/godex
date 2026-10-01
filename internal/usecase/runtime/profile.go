@@ -11,6 +11,8 @@ import (
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
+const runtimeProviderKindRequired = "runtime provider kind is required"
+
 // RunProfile launches model-capable Codex work in an explicit profile home.
 // The routing ID is local metadata only; OpenAI credentials and workspace IDs
 // continue to come from Codex-owned auth.json in the profile home.
@@ -20,7 +22,7 @@ func (runner *Runner) RunProfile(ctx context.Context, codexHome string, args []s
 		return err
 	}
 	profileID := profileRoutingID(home)
-	return runner.launchHome(ctx, home, profileID, proxymodel.Provider{}, []proxymodel.Account{{ID: profileID, Home: home, Enabled: true}}, args)
+	return runner.launchHome(ctx, home, profileID, proxymodel.Provider{}, nil, []proxymodel.Account{{ID: profileID, Home: home, Enabled: true}}, args)
 }
 
 func (runner *Runner) RunProviderProfile(ctx context.Context, codexHome string, provider proxymodel.Provider, args []string) error {
@@ -29,10 +31,10 @@ func (runner *Runner) RunProviderProfile(ctx context.Context, codexHome string, 
 		return err
 	}
 	if strings.TrimSpace(provider.Kind) == "" {
-		return errors.New("runtime provider kind is required")
+		return errors.New(runtimeProviderKindRequired)
 	}
 	profileID := profileRoutingID(provider.Kind + ":" + home)
-	return runner.launchHome(ctx, home, profileID, provider, []proxymodel.Account{{ID: profileID, Home: home, Enabled: true, Provider: provider}}, args)
+	return runner.launchHome(ctx, home, profileID, provider, nil, []proxymodel.Account{{ID: profileID, Home: home, Enabled: true, Provider: provider}}, args)
 }
 
 func (runner *Runner) RunProviderProfiles(
@@ -47,7 +49,7 @@ func (runner *Runner) RunProviderProfiles(
 		return err
 	}
 	if strings.TrimSpace(provider.Kind) == "" {
-		return errors.New("runtime provider kind is required")
+		return errors.New(runtimeProviderKindRequired)
 	}
 	accounts := make([]proxymodel.Account, 0, len(profiles))
 	preferredID := ""
@@ -61,7 +63,8 @@ func (runner *Runner) RunProviderProfiles(
 		}
 		id := profileRoutingID(provider.Kind + ":" + currentHome)
 		accounts = append(accounts, proxymodel.Account{
-			ID: id, Home: currentHome, Enabled: profile.Enabled, Provider: profile.Provider,
+			ID: id, Home: currentHome, Enabled: profile.Enabled,
+			RouteOrder: len(accounts) + 1, Provider: profile.Provider,
 		})
 		if profile.Name == provider.Name && currentHome == home {
 			preferredID = id
@@ -70,7 +73,80 @@ func (runner *Runner) RunProviderProfiles(
 	if preferredID == "" {
 		return errors.New("selected runtime provider profile is missing from the launch pool")
 	}
-	return runner.launchHome(ctx, home, preferredID, provider, accounts, args)
+	return runner.launchHome(ctx, home, preferredID, provider, nil, accounts, args)
+}
+
+func (runner *Runner) RunProviderAPIKeys(
+	ctx context.Context,
+	codexHome string,
+	provider proxymodel.Provider,
+	apiKeys []string,
+	args []string,
+) error {
+	if strings.TrimSpace(provider.Kind) == "" {
+		return errors.New(runtimeProviderKindRequired)
+	}
+	if len(apiKeys) == 0 {
+		return errors.New("runtime provider API key pool is empty")
+	}
+	if strings.TrimSpace(codexHome) == "" {
+		codexHome = runner.currentHome
+	}
+	home, err := validateRuntimeHome(codexHome)
+	if err != nil {
+		return err
+	}
+	accounts := make([]proxymodel.Account, 0, len(apiKeys))
+	credentials := make([]proxymodel.ProviderCredential, 0, len(apiKeys))
+	seen := make(map[string]bool, len(apiKeys))
+	preferredID := ""
+	for _, apiKey := range apiKeys {
+		if apiKey == "" {
+			return errors.New("runtime provider API key cannot be empty")
+		}
+		id := providerCredentialRoutingID(provider, apiKey)
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		if preferredID == "" {
+			preferredID = id
+		}
+		accounts = append(accounts, proxymodel.Account{
+			ID: id, Home: home, Enabled: true,
+			RouteOrder: len(accounts) + 1, Provider: provider,
+		})
+		credentials = append(credentials, proxymodel.ProviderCredential{ID: id, Secret: apiKey})
+	}
+	if preferredID == "" {
+		return errors.New("runtime provider API key pool is empty")
+	}
+	return runner.launchHome(ctx, home, preferredID, provider, credentials, accounts, args)
+}
+
+func (runner *Runner) RunProviderAPIKeysAccount(
+	ctx context.Context,
+	accountID string,
+	provider proxymodel.Provider,
+	apiKeys []string,
+	args []string,
+) (runErr error) {
+	accountID = strings.TrimSpace(accountID)
+	if accountID == "" {
+		return errors.New("managed account ID is required for provider API-key launch")
+	}
+	release, err := runner.pinProfiles(ctx, []string{accountID})
+	if err != nil {
+		return err
+	}
+	defer func() { runErr = errors.Join(runErr, release()) }()
+	home := runner.accounts.CodexHome(accountID)
+	return runner.RunProviderAPIKeys(ctx, home, provider, apiKeys, args)
+}
+
+func providerCredentialRoutingID(provider proxymodel.Provider, secret string) string {
+	digest := sha256.Sum256([]byte("provider:" + provider.Kind + "\x00" + provider.APIURL + "\x00" + secret))
+	return hex.EncodeToString(digest[:16])
 }
 
 func validateRuntimeHome(codexHome string) (string, error) {

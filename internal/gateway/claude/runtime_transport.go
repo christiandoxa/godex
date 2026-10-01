@@ -23,12 +23,18 @@ const (
 	anthropicOAuthBeta     = "oauth-2025-04-20"
 	anthropicBodyMaxBytes  = 8 << 20
 	contentTypeHeader      = "Content-Type"
+	authorizationHeader    = "Authorization"
 )
+
+type runtimeAuth struct {
+	secret string
+	apiKey bool
+}
 
 type RuntimeTransport struct {
 	client   *http.Client
 	upstream *url.URL
-	auth     RuntimeOAuth
+	auth     runtimeAuth
 }
 
 func (source *Source) NewRuntimeTransport(ctx context.Context, home, apiURL string, client *http.Client) (*RuntimeTransport, error) {
@@ -43,12 +49,20 @@ func (source *Source) NewRuntimeTransport(ctx context.Context, home, apiURL stri
 }
 
 func newRuntimeTransport(apiURL string, auth RuntimeOAuth, client *http.Client) (*RuntimeTransport, error) {
+	return newRuntimeTransportAuth(apiURL, runtimeAuth{secret: auth.accessToken}, client)
+}
+
+func newRuntimeAPIKeyTransport(apiURL, apiKey string, client *http.Client) (*RuntimeTransport, error) {
+	return newRuntimeTransportAuth(apiURL, runtimeAuth{secret: apiKey, apiKey: true}, client)
+}
+
+func newRuntimeTransportAuth(apiURL string, auth runtimeAuth, client *http.Client) (*RuntimeTransport, error) {
 	parsed, err := validateAnthropicRuntimeURL(apiURL)
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(auth.accessToken) == "" {
-		return nil, errors.New("Anthropic runtime OAuth credential is unavailable")
+	if strings.TrimSpace(auth.secret) == "" {
+		return nil, errors.New("Anthropic runtime credential is unavailable")
 	}
 	return &RuntimeTransport{client: cloneAnthropicClient(client), upstream: parsed, auth: auth}, nil
 }
@@ -118,7 +132,7 @@ func (transport *RuntimeTransport) executeUpstream(
 	if err != nil {
 		return nil, errors.New("create Anthropic upstream request")
 	}
-	applyAnthropicHeaders(request.Header, input.Header, transport.auth.accessToken, route.kind == routeMessages)
+	applyAnthropicRuntimeHeaders(request.Header, input.Header, transport.auth, route.kind == routeMessages)
 	response, err := transport.client.Do(request)
 	if err != nil {
 		return nil, err
@@ -138,11 +152,22 @@ func (transport *RuntimeTransport) target(route runtimeRoute, rawQuery string) s
 	return target.String()
 }
 
-func applyAnthropicHeaders(destination, source http.Header, accessToken string, nativeMessages bool) {
+func applyAnthropicRuntimeHeaders(destination, source http.Header, auth runtimeAuth, nativeMessages bool) {
 	copyAnthropicRequestHeaders(destination, source)
-	destination.Set("Authorization", "Bearer "+accessToken)
+	destination.Del(authorizationHeader)
+	destination.Del("x-api-key")
+	destination.Del("anthropic-beta")
 	destination.Del("ChatGPT-Account-Id")
-	destination.Set("anthropic-beta", anthropicOAuthBeta)
+	if auth.apiKey {
+		if nativeMessages {
+			destination.Set("x-api-key", auth.secret)
+		} else {
+			destination.Set(authorizationHeader, "Bearer "+auth.secret)
+		}
+	} else {
+		destination.Set(authorizationHeader, "Bearer "+auth.secret)
+		destination.Set("anthropic-beta", anthropicOAuthBeta)
+	}
 	destination.Set(contentTypeHeader, "application/json")
 	destination.Set("Accept-Encoding", "identity")
 	destination.Set("Accept", "text/event-stream, application/json")

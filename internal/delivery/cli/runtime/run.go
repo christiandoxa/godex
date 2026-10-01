@@ -23,6 +23,7 @@ type launchProfiles interface {
 	ActiveLaunch(context.Context) (profilemodel.LaunchTarget, bool, error)
 	AcquireLaunch(context.Context, string) (func() error, error)
 	ProviderLaunchPool(context.Context, string, string, bool) ([]profilemodel.LaunchTarget, error)
+	ResolveProviderLaunch(context.Context, string, string) (profilemodel.LaunchTarget, bool, error)
 	AcquireLaunchPool(context.Context, []string) (func() error, error)
 }
 
@@ -33,6 +34,9 @@ func Run(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionus
 	}
 	if selection.Profile != "" {
 		return errors.New("--profile requires profile-aware runtime dispatch")
+	}
+	if selection.Provider != "" {
+		return runProfilelessProviderSelection(ctx, runner, selection, codexArguments)
 	}
 	return runParsed(ctx, runner, sessions, selection.Account, codexArguments)
 }
@@ -60,6 +64,9 @@ func RunHome(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessi
 }
 
 func runProfileSelection(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionusecase.Catalog, profiles launchProfiles, selection runtimemodel.Selection, codexArguments []string) error {
+	if selection.Provider != "" {
+		return runProviderSelection(ctx, runner, profiles, selection, codexArguments)
+	}
 	if selection.Profile != "" {
 		if profiles == nil {
 			return errors.New("profile support is not configured")
@@ -109,7 +116,7 @@ func runLaunchTarget(
 		if err != nil {
 			return err
 		}
-		return runProviderPool(ctx, runner, profiles, target, provider, pool, arguments)
+		return runProviderPool(ctx, runner, profiles, target, provider, pool, arguments, "")
 	}
 	release, err := profiles.AcquireLaunch(ctx, target.Name)
 	if err != nil {
@@ -127,6 +134,7 @@ func runProviderPool(
 	provider proxymodel.Provider,
 	pool []profilemodel.LaunchTarget,
 	arguments []string,
+	apiURLOverride string,
 ) (runErr error) {
 	names := make([]string, 0, len(pool))
 	runtimeProfiles := make([]proxymodel.ProviderProfile, 0, len(pool))
@@ -137,6 +145,9 @@ func runProviderPool(
 		}
 		if currentProvider.Kind != provider.Kind {
 			continue
+		}
+		if apiURLOverride != "" {
+			currentProvider.APIURL = apiURLOverride
 		}
 		names = append(names, target.Name)
 		runtimeProfiles = append(runtimeProfiles, proxymodel.ProviderProfile{

@@ -9,6 +9,10 @@ import (
 func sortRuntimeAccounts(accounts []proxymodel.Account) []proxymodel.Account {
 	accounts = append([]proxymodel.Account(nil), accounts...)
 	sort.Slice(accounts, func(i, j int) bool {
+		if accounts[i].RouteOrder > 0 && accounts[j].RouteOrder > 0 &&
+			accounts[i].RouteOrder != accounts[j].RouteOrder {
+			return accounts[i].RouteOrder < accounts[j].RouteOrder
+		}
 		if accounts[i].ID != accounts[j].ID {
 			return accounts[i].ID < accounts[j].ID
 		}

@@ -270,3 +270,56 @@ func TestRuntimeOAuthReadsManagedCredential(t *testing.T) {
 		t.Fatalf("auth = %#v, err=%v", auth, err)
 	}
 }
+
+func TestAnthropicAPIKeyHeadersMatchProdexNativeAndChatModes(t *testing.T) {
+	type captured struct {
+		path   string
+		header http.Header
+	}
+	requests := make(chan captured, 3)
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		requests <- captured{path: request.URL.Path, header: request.Header.Clone()}
+		writer.Header().Set("Content-Type", "application/json")
+		if request.URL.Path == "/v1/chat/completions" {
+			_, _ = writer.Write([]byte(`{"id":"chat","choices":[{"message":{"role":"assistant","content":"ok"}}]}`))
+			return
+		}
+		_, _ = writer.Write([]byte(`{"ok":true}`))
+	}))
+	defer server.Close()
+	transport, err := newRuntimeAPIKeyTransport(server.URL+"/v1", "fixture-api-key", server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer transport.Close()
+	for _, request := range []proxymodel.Request{
+		{Method: http.MethodPost, Path: anthropicMountPath + "/responses", Body: []byte(`{"input":"hello"}`)},
+		{Method: http.MethodPost, Path: anthropicMountPath + "/chat/completions", Body: []byte(`{"model":"claude-sonnet-4-6","messages":[]}`)},
+		{Method: http.MethodPost, Path: anthropicMountPath + "/messages", Body: []byte(`{"model":"claude-sonnet-4-6","messages":[]}`)},
+	} {
+		response, err := transport.Execute(context.Background(), request, proxymodel.Account{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		response.Body.Close()
+	}
+	for index := 0; index < 3; index++ {
+		got := <-requests
+		assertAnthropicAPIKeyHeaders(t, got.path, got.header)
+	}
+}
+
+func assertAnthropicAPIKeyHeaders(t *testing.T, path string, header http.Header) {
+	t.Helper()
+	if path == "/v1/messages" {
+		if header.Get("x-api-key") != "fixture-api-key" || header.Get("Authorization") != "" ||
+			header.Get("anthropic-beta") != "" || header.Get("anthropic-version") != anthropicAPIVersion {
+			t.Fatalf("native Messages API-key headers = %v", header)
+		}
+		return
+	}
+	if header.Get("Authorization") != "Bearer fixture-api-key" || header.Get("x-api-key") != "" ||
+		header.Get("anthropic-beta") != "" || header.Get("anthropic-version") != "" {
+		t.Fatalf("chat-compatible API-key headers = %v", header)
+	}
+}

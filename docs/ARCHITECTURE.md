@@ -170,6 +170,14 @@ and transient failures are interpreted consistently by Anthropic and Copilot.
 Anthropic Responses exhaust legal model fallbacks inside the gateway before a
 response returns to usecase/routing; only then may routing rotate credentials.
 Chat Completions and Messages remain passthrough and are not model-rewritten.
+Anthropic raw API-key launches reuse the same routing/account abstraction without
+turning secrets into profiles. `gateway/claude` resolves request/environment key
+precedence, `usecase/runtime` assigns stable hashed credential IDs and keeps raw
+keys only in the invocation-local proxy config, and `gateway/claude.RuntimePool`
+binds one transport to each credential ID. `gateway/codex` removes all provider
+API-key environment variables from external-provider child processes. This keeps
+conversation affinity stable without persisting or logging raw provider secrets.
+
 gateway/compact owns the bounded deterministic local compaction fallback used by
 translated providers: at most 24 recent snippets, 768 bytes per snippet, and
 24 KiB total summary, with the reference x-prodex-compact-* degradation metadata.

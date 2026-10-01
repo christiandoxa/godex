@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"sort"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
@@ -63,4 +64,31 @@ func (pool *RuntimePool) Close() {
 	for _, transport := range pool.transports {
 		transport.Close()
 	}
+}
+
+func NewRuntimeAPIKeyPool(
+	apiURL string,
+	credentials []proxymodel.ProviderCredential,
+	client *http.Client,
+) (*RuntimePool, error) {
+	pool := &RuntimePool{transports: make(map[string]*RuntimeTransport, len(credentials))}
+	for _, credential := range credentials {
+		if credential.ID == "" || credential.Secret == "" {
+			pool.Close()
+			return nil, errors.New("Anthropic runtime API-key credential is incomplete")
+		}
+		transport, err := newRuntimeAPIKeyTransport(apiURL, credential.Secret, client)
+		if err != nil {
+			pool.Close()
+			return nil, err
+		}
+		if previous := pool.transports[credential.ID]; previous != nil {
+			previous.Close()
+		}
+		pool.transports[credential.ID] = transport
+	}
+	if len(pool.transports) == 0 {
+		return nil, errors.New("Anthropic runtime API-key pool is empty")
+	}
+	return pool, nil
 }
