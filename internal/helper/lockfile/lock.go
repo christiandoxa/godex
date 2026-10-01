@@ -17,19 +17,7 @@ func TryAcquire(path string) (func() error, error) { return tryAcquire(path, fal
 func TryRead(path string) (func() error, error) { return tryAcquire(path, true) }
 
 func tryAcquire(path string, shared bool) (func() error, error) {
-	info, err := os.Lstat(path)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return nil, err
-	}
-	if err == nil && !info.Mode().IsRegular() {
-		return nil, errors.New("lock path must be a regular file")
-	}
-	root, err := os.OpenRoot(filepath.Dir(path))
-	if err != nil {
-		return nil, err
-	}
-	defer root.Close()
-	file, err := root.OpenFile(filepath.Base(path), os.O_CREATE|os.O_RDWR, 0600)
+	file, err := openLockFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -38,6 +26,44 @@ func tryAcquire(path string, shared bool) (func() error, error) {
 		return nil, err
 	}
 	return file.Close, nil
+}
+
+func openLockFile(path string) (*os.File, error) {
+	root, err := os.OpenRoot(filepath.Dir(path))
+	if err != nil {
+		return nil, err
+	}
+	defer root.Close()
+	name := filepath.Base(path)
+	for attempt := 0; attempt < 4; attempt++ {
+		file, retry, err := openLockFileAttempt(root, name)
+		if !retry {
+			return file, err
+		}
+	}
+	return nil, errors.New("lock file changed while opening")
+}
+
+func openLockFileAttempt(root *os.Root, name string) (*os.File, bool, error) {
+	info, err := root.Lstat(name)
+	if errors.Is(err, os.ErrNotExist) {
+		file, createErr := root.OpenFile(name, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0o600)
+		if errors.Is(createErr, os.ErrExist) || errors.Is(createErr, os.ErrNotExist) {
+			return nil, true, nil
+		}
+		return file, false, createErr
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, false, errors.New("lock path must be a regular file")
+	}
+	file, openErr := root.OpenFile(name, os.O_RDWR, 0o600)
+	if errors.Is(openErr, os.ErrNotExist) {
+		return nil, true, nil
+	}
+	return file, false, openErr
 }
 
 func Acquire(ctx context.Context, path string) (func() error, error) {

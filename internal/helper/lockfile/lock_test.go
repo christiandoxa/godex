@@ -65,3 +65,50 @@ func TestLockRejectsSymbolicLinks(t *testing.T) {
 		t.Fatal("symlink lock accepted")
 	}
 }
+
+func TestConcurrentFirstAcquireCreatesPersistentLockFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "guard")
+	const workers = 16
+	type result struct {
+		release func() error
+		err     error
+	}
+	start := make(chan struct{})
+	results := make(chan result, workers)
+	for range workers {
+		go func() {
+			<-start
+			release, err := TryAcquire(path)
+			results <- result{release: release, err: err}
+		}()
+	}
+	close(start)
+	acquired := 0
+	var releases []func() error
+	for range workers {
+		result := <-results
+		if result.err != nil {
+			if !errors.Is(result.err, ErrBusy) {
+				t.Fatalf("unexpected acquire error: %v", result.err)
+			}
+			continue
+		}
+		acquired++
+		releases = append(releases, result.release)
+	}
+	for _, release := range releases {
+		if err := release(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if acquired != 1 {
+		t.Fatalf("exclusive acquire count = %d, want 1", acquired)
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !info.Mode().IsRegular() {
+		t.Fatalf("lock mode = %v", info.Mode())
+	}
+}
