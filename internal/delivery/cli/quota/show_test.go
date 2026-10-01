@@ -39,7 +39,7 @@ func (fake *fakeStatus) Run(_ context.Context, options quotausecase.Options) ([]
 	}
 	used := int64(20)
 	return []quotamodel.Report{{
-		AccountName: "work", Active: true, Enabled: true, State: "ready",
+		AccountName: "work", Provider: "openai", Auth: "chatgpt", Active: true, Enabled: true, State: "ready",
 		Usage: quotamodel.Usage{PlanType: "plus", Primary: &quotamodel.Window{UsedPercent: &used}},
 	}}, nil
 }
@@ -50,7 +50,7 @@ func TestShowRendersOneShotQuotaTable(t *testing.T) {
 	if err := Show(context.Background(), status, &output, []string{"--all", "--once"}); err != nil {
 		t.Fatal(err)
 	}
-	const want = "ACCOUNT\tCURRENT\tSTATE\tPLAN\t5H\tWEEKLY\nwork\t*\tready\tplus\t80%\t-\n"
+	const want = "PROFILE\tCURRENT\tPROVIDER\tAUTH\tSTATE\tPLAN\t5H\tWEEKLY\nwork\t*\topenai\tchatgpt\tready\tplus\t80%\t-\n"
 	if !status.options.All || output.String() != want {
 		t.Fatalf("options/output = %+v / %q", status.options, output.String())
 	}
@@ -106,13 +106,39 @@ func TestShowDefaultsToWatchUntilContextStops(t *testing.T) {
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("watch error = %v", err)
 	}
-	if status.calls < 2 || strings.Count(output.String(), "ACCOUNT\tCURRENT") < 2 {
+	if status.calls < 2 || strings.Count(output.String(), "PROFILE\tCURRENT") < 2 {
 		t.Fatalf("watch calls/output = %d / %q", status.calls, output.String())
 	}
 }
 
 func TestShowRejectsWatchConflicts(t *testing.T) {
 	for _, arguments := range [][]string{{"--watch", "--once"}, {"--watch", "--raw"}, {"--all", "--profile", "work"}} {
+		if err := Show(context.Background(), &fakeStatus{}, &strings.Builder{}, arguments); err == nil {
+			t.Fatalf("arguments %v unexpectedly accepted", arguments)
+		}
+	}
+}
+
+func TestShowSupportsAuthAndProviderFilters(t *testing.T) {
+	status := &fakeStatus{}
+	var output strings.Builder
+	arguments := []string{"--all", "--auth", "quota-compatible", "--provider", "openai", "--once"}
+	if err := Show(context.Background(), status, &output, arguments); err != nil {
+		t.Fatal(err)
+	}
+	want := quotausecase.Options{All: true, AuthFilter: "quota-compatible", ProviderFilter: "openai"}
+	if status.options != want {
+		t.Fatalf("options = %+v, want %+v", status.options, want)
+	}
+}
+
+func TestShowRejectsFilterConflictsAndUnknownProvider(t *testing.T) {
+	for _, arguments := range [][]string{
+		{"--profile", "work", "--auth", "chatgpt", "--once"},
+		{"--profile", "work", "--provider", "openai", "--once"},
+		{"--raw", "--auth", "chatgpt"},
+		{"--provider", "unknown", "--all", "--once"},
+	} {
 		if err := Show(context.Background(), &fakeStatus{}, &strings.Builder{}, arguments); err == nil {
 			t.Fatalf("arguments %v unexpectedly accepted", arguments)
 		}

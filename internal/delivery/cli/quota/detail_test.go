@@ -25,19 +25,19 @@ func TestShowDetailedQuota(t *testing.T) {
 		row    string
 	}{
 		{"both windows", quotamodel.Report{AccountName: "work", Active: true, Enabled: true, State: "exhausted", Usage: usage},
-			"work\t*\texhausted\tplus\t80%\t0%\t2026-10-01T00:00:00Z\t18000\t2026-10-08T00:00:00Z\t604800\n"},
+			"work\t*\t-\t-\texhausted\tplus\t80%\t0%\t2026-10-01T00:00:00Z\t18000\t2026-10-08T00:00:00Z\t604800\n"},
 		{"missing windows", quotamodel.Report{AccountName: "work", Enabled: true, State: "ready"},
-			"work\t\tready\t-\t-\t-\t-\t-\t-\t-\n"},
+			"work\t\t-\t-\tready\t-\t-\t-\t-\t-\t-\t-\n"},
 		{"partial window", quotamodel.Report{AccountName: "work", Enabled: true, State: "ready", Usage: quotamodel.Usage{Primary: &quotamodel.Window{ResetAt: &reset}}},
-			"work\t\tready\t-\t-\t-\t2026-10-01T00:00:00Z\t-\t-\t-\n"},
+			"work\t\t-\t-\tready\t-\t-\t-\t2026-10-01T00:00:00Z\t-\t-\t-\n"},
 		{"zero values", quotamodel.Report{AccountName: "work", Enabled: true, State: "ready", Usage: quotamodel.Usage{Secondary: &quotamodel.Window{ResetAt: &zero, LimitWindowSeconds: &zero}}},
-			"work\t\tready\t-\t-\t-\t-\t-\t1970-01-01T00:00:00Z\t0\n"},
+			"work\t\t-\t-\tready\t-\t-\t-\t-\t-\t1970-01-01T00:00:00Z\t0\n"},
 		{"probe failure", quotamodel.Report{AccountName: "work", Enabled: true, State: "error", Usage: usage, Err: errors.New("synthetic-secret-must-not-be-displayed")},
-			"work\t\terror\t-\t-\t-\t-\t-\t-\t-\n"},
+			"work\t\t-\t-\terror\t-\t-\t-\t-\t-\t-\t-\n"},
 		{"disabled account", quotamodel.Report{AccountName: "work", State: "disabled"},
-			"work\t\tdisabled\t-\t-\t-\t-\t-\t-\t-\n"},
+			"work\t\t-\t-\tdisabled\t-\t-\t-\t-\t-\t-\t-\n"},
 	}
-	const header = "ACCOUNT\tCURRENT\tSTATE\tPLAN\t5H\tWEEKLY\t5H_RESET_AT\t5H_WINDOW_SECONDS\tWEEKLY_RESET_AT\tWEEKLY_WINDOW_SECONDS\n"
+	const header = "PROFILE\tCURRENT\tPROVIDER\tAUTH\tSTATE\tPLAN\t5H\tWEEKLY\t5H_RESET_AT\t5H_WINDOW_SECONDS\tWEEKLY_RESET_AT\tWEEKLY_WINDOW_SECONDS\n"
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			status := &fakeStatus{reports: []quotamodel.Report{test.report}}

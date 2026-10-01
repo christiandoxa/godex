@@ -16,6 +16,9 @@ type Usage struct {
 
 type Report struct {
 	AccountName string
+	ProfileName string
+	Provider    string
+	Auth        string
 	Email       string
 	Active      bool
 	Enabled     bool

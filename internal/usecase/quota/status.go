@@ -6,6 +6,7 @@ import (
 	"time"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
+	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
 
@@ -14,6 +15,10 @@ type accountStore interface {
 	Current(context.Context) (accountentity.Account, error)
 	Resolve(context.Context, string) (accountentity.Account, error)
 	CodexHome(string) string
+}
+
+type profileSource interface {
+	QuotaTargets(context.Context) ([]profilemodel.QuotaTarget, error)
 }
 
 type usageGateway interface {
@@ -33,13 +38,16 @@ type rawOverrideUsageGateway interface {
 }
 
 type Options struct {
-	All      bool
-	Selector string
-	BaseURL  string
+	All            bool
+	Selector       string
+	BaseURL        string
+	AuthFilter     string
+	ProviderFilter string
 }
 
 type Status struct {
 	accounts accountStore
+	profiles profileSource
 	usage    usageGateway
 	now      func() time.Time
 }
@@ -48,18 +56,27 @@ func NewStatus(accounts accountStore, usage usageGateway) *Status {
 	return &Status{accounts: accounts, usage: usage, now: time.Now}
 }
 
+func (status *Status) SetProfiles(profiles profileSource) { status.profiles = profiles }
+
 func (status *Status) Raw(ctx context.Context, selector, baseURL string) ([]byte, error) {
-	var account accountentity.Account
-	var err error
-	if selector != "" {
-		account, err = status.accounts.Resolve(ctx, selector)
-	} else {
-		account, err = status.accounts.Current(ctx)
+	if status.profiles != nil {
+		target, err := status.selectedProfile(ctx, selector)
+		if err != nil {
+			return nil, err
+		}
+		if target.Provider != "openai" || !target.Compatible {
+			return nil, errors.New("raw quota requires a quota-compatible OpenAI profile")
+		}
+		return status.fetchRaw(ctx, target.CodexHome, baseURL)
 	}
+	account, err := status.selectedAccount(ctx, selector)
 	if err != nil {
 		return nil, err
 	}
-	home := status.accounts.CodexHome(account.ID)
+	return status.fetchRaw(ctx, status.accounts.CodexHome(account.ID), baseURL)
+}
+
+func (status *Status) fetchRaw(ctx context.Context, home, baseURL string) ([]byte, error) {
 	if baseURL != "" {
 		raw, ok := status.usage.(rawOverrideUsageGateway)
 		if !ok {
@@ -80,6 +97,9 @@ func (status *Status) Ready(ctx context.Context, account accountentity.Account) 
 }
 
 func (status *Status) Run(ctx context.Context, options Options) ([]quotamodel.Report, error) {
+	if status.profiles != nil {
+		return status.runProfiles(ctx, options)
+	}
 	accounts, err := status.selectedAccounts(ctx, options)
 	if err != nil {
 		return nil, err
@@ -108,8 +128,14 @@ func (status *Status) Run(ctx context.Context, options Options) ([]quotamodel.Re
 	return reports, nil
 }
 
-func (status *Status) fetchUsage(ctx context.Context, account accountentity.Account, baseURL string) (quotamodel.Usage, error) {
-	home := status.accounts.CodexHome(account.ID)
+func (status *Status) selectedAccount(ctx context.Context, selector string) (accountentity.Account, error) {
+	if selector != "" {
+		return status.accounts.Resolve(ctx, selector)
+	}
+	return status.accounts.Current(ctx)
+}
+
+func (status *Status) fetchHomeUsage(ctx context.Context, home, baseURL string) (quotamodel.Usage, error) {
 	if baseURL == "" {
 		return status.usage.Fetch(ctx, home)
 	}
@@ -118,6 +144,10 @@ func (status *Status) fetchUsage(ctx context.Context, account accountentity.Acco
 		return quotamodel.Usage{}, errors.New("quota base URL override is not supported")
 	}
 	return override.FetchAt(ctx, home, baseURL)
+}
+
+func (status *Status) fetchUsage(ctx context.Context, account accountentity.Account, baseURL string) (quotamodel.Usage, error) {
+	return status.fetchHomeUsage(ctx, status.accounts.CodexHome(account.ID), baseURL)
 }
 
 func (status *Status) selectedAccounts(ctx context.Context, options Options) ([]accountentity.Account, error) {

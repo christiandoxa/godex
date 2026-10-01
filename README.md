@@ -200,7 +200,12 @@ usage JSON for one selected or active profile and cannot be combined with
 `--all`, `--detail`, `--watch`, or `--once`. Add `--detail` for exact RFC 3339
 reset timestamps and upstream window lengths. Missing fields, disabled accounts,
 and failed probes display `-`; probe errors never print gateway error contents.
-Auth/provider filters and provider-wide quota rows remain parity work.
+`--auth` supports Prodex labels such as `chatgpt`, `no-auth`, `api-key`,
+`invalid-auth`, `unreadable-auth`, `quota-compatible`, and
+`non-quota-compatible`; `--provider` supports the Prodex provider names and the
+`claude` alias for `anthropic`. Configured non-OpenAI profiles are visible and
+filterable but remain `unsupported` until their provider-specific quota adapters
+are implemented.
 
 Selectors match an exact account ID, friendly name, or email. Ambiguous
 selectors fail. Unknown top-level commands are treated as Codex subcommands and

@@ -94,12 +94,14 @@ separate from account enablement. Routing re-admits the account at the deadline
 without a daemon or repeated quota probes. Unknown resets use one minute. The
 quota command keeps refresh policy in CLI delivery: Prodex-compatible watch mode
 refreshes every five seconds unless `--once` or `--raw` is selected. The quota
-use case remains request-scoped and has no background daemon. Provider-wide
-quota catalogs remain part of the 1:1 parity backlog.
+use case remains request-scoped and has no background daemon. The profile use case supplies a credential-free quota target catalog so aggregate
+`--auth`/`--provider` filtering can include standalone and non-OpenAI profiles
+without turning them into account identities. Provider-specific quota adapters
+remain part of the 1:1 parity backlog.
 
 The CLI quota delivery package owns watch/once cadence, `--detail`, `--profile`,
-and `--base-url` parsing plus rendering of exact UTC reset timestamps and window
-lengths. Endpoint override reaches the OpenAI gateway through a consumed use-case
+`--auth`, `--provider`, and `--base-url` parsing plus rendering of exact UTC
+reset timestamps and window lengths. Endpoint override reaches the OpenAI gateway through a consumed use-case
 capability and does not mutate runtime preflight configuration.
 The presentation flag stays local to delivery; account selection and quota
 classification remain in `usecase/quota`, and fetching remains in

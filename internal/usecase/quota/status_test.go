@@ -7,6 +7,7 @@ import (
 	"time"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
+	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
 
@@ -192,5 +193,78 @@ func TestStatusUsesQuotaBaseURLOverride(t *testing.T) {
 	}
 	if _, err := status.Raw(context.Background(), "one", baseURL); err != nil || usage.baseURL != baseURL {
 		t.Fatalf("raw override baseURL = %q, err = %v", usage.baseURL, err)
+	}
+}
+
+type fakeProfileSource struct {
+	targets []profilemodel.QuotaTarget
+}
+
+func (source fakeProfileSource) QuotaTargets(context.Context) ([]profilemodel.QuotaTarget, error) {
+	return append([]profilemodel.QuotaTarget(nil), source.targets...), nil
+}
+
+type trackingUsage struct {
+	homes   []string
+	rawHome string
+}
+
+func (usage *trackingUsage) Fetch(_ context.Context, home string) (quotamodel.Usage, error) {
+	usage.homes = append(usage.homes, home)
+	return quotamodel.Usage{PlanType: "plus"}, nil
+}
+
+func (usage *trackingUsage) FetchRaw(_ context.Context, home string) ([]byte, error) {
+	usage.rawHome = home
+	return []byte(`{"plan_type":"plus"}`), nil
+}
+
+func TestStatusProfileViewFiltersAuthAndProvider(t *testing.T) {
+	usage := &trackingUsage{}
+	status := NewStatus(fakeAccounts{}, usage)
+	status.SetProfiles(fakeProfileSource{targets: []profilemodel.QuotaTarget{
+		{Name: "main", CodexHome: "/profiles/main", Provider: "openai", Auth: "chatgpt", Active: true, Enabled: true, Compatible: true},
+		{Name: "logged-out", CodexHome: "/profiles/logged-out", Provider: "openai", Auth: "no-auth", Enabled: true},
+		{Name: "claude", CodexHome: "/profiles/claude", Provider: "anthropic", Auth: "claude-oauth", Enabled: true},
+	}})
+
+	reports, err := status.Run(context.Background(), Options{All: true, ProviderFilter: "openai", AuthFilter: "quota-compatible"})
+	if err != nil || len(reports) != 1 || reports[0].ProfileName != "main" || reports[0].State != "ready" {
+		t.Fatalf("filtered reports = %+v, err = %v", reports, err)
+	}
+	if len(usage.homes) != 1 || usage.homes[0] != "/profiles/main" {
+		t.Fatalf("OpenAI quota homes = %#v", usage.homes)
+	}
+
+	usage.homes = nil
+	reports, err = status.Run(context.Background(), Options{All: true, ProviderFilter: "claude"})
+	if err != nil || len(reports) != 1 || reports[0].ProfileName != "claude" || reports[0].State != "unsupported" {
+		t.Fatalf("claude reports = %+v, err = %v", reports, err)
+	}
+	if len(usage.homes) != 0 {
+		t.Fatalf("unsupported provider was probed: %#v", usage.homes)
+	}
+
+	reports, err = status.Run(context.Background(), Options{All: true, AuthFilter: "no-auth"})
+	if err != nil || len(reports) != 1 || reports[0].ProfileName != "logged-out" || reports[0].State != "no-auth" {
+		t.Fatalf("no-auth reports = %+v, err = %v", reports, err)
+	}
+}
+
+func TestStatusProfileViewDefaultsToActiveAndRawUsesProfileHome(t *testing.T) {
+	usage := &trackingUsage{}
+	status := NewStatus(fakeAccounts{}, usage)
+	status.SetProfiles(fakeProfileSource{targets: []profilemodel.QuotaTarget{
+		{Name: "main", CodexHome: "/profiles/main", Provider: "openai", Auth: "chatgpt", Active: true, Enabled: true, Compatible: true},
+		{Name: "other", CodexHome: "/profiles/other", Provider: "openai", Auth: "chatgpt", Enabled: true, Compatible: true},
+	}})
+
+	reports, err := status.Run(context.Background(), Options{})
+	if err != nil || len(reports) != 1 || reports[0].ProfileName != "main" {
+		t.Fatalf("active reports = %+v, err = %v", reports, err)
+	}
+	body, err := status.Raw(context.Background(), "other", "")
+	if err != nil || string(body) != `{"plan_type":"plus"}` || usage.rawHome != "/profiles/other" {
+		t.Fatalf("raw = %q, home = %q, err = %v", body, usage.rawHome, err)
 	}
 }

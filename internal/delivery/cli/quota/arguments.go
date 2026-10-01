@@ -65,6 +65,12 @@ func consumeQuotaValueArgument(arguments []string, index int, options *showOptio
 		options.BaseURL = value
 		return next, nil
 	}
+	if quotaAuthOption(argument) {
+		return consumeQuotaAuth(arguments, index, options)
+	}
+	if quotaProviderOption(argument) {
+		return consumeQuotaProvider(arguments, index, options)
+	}
 	if strings.HasPrefix(argument, "-") {
 		return index, fmt.Errorf("unknown quota option %q", argument)
 	}
@@ -73,6 +79,36 @@ func consumeQuotaValueArgument(arguments []string, index int, options *showOptio
 	}
 	options.Selector = argument
 	return index, nil
+}
+
+func quotaAuthOption(argument string) bool {
+	return argument == "--auth" || strings.HasPrefix(argument, "--auth=")
+}
+
+func consumeQuotaAuth(arguments []string, index int, options *showOptions) (int, error) {
+	value, next, err := quotaOptionValue(arguments, index, arguments[index], "--auth")
+	if err != nil {
+		return index, err
+	}
+	options.AuthFilter = strings.ToLower(strings.TrimSpace(value))
+	return next, nil
+}
+
+func quotaProviderOption(argument string) bool {
+	return argument == "--provider" || strings.HasPrefix(argument, "--provider=")
+}
+
+func consumeQuotaProvider(arguments []string, index int, options *showOptions) (int, error) {
+	value, next, err := quotaOptionValue(arguments, index, arguments[index], "--provider")
+	if err != nil {
+		return index, err
+	}
+	value = strings.ToLower(strings.TrimSpace(value))
+	if !validQuotaProviderFilter(value) {
+		return index, fmt.Errorf("unsupported quota provider filter %q", value)
+	}
+	options.ProviderFilter = value
+	return next, nil
 }
 
 func quotaProfileOption(argument string) bool {
@@ -95,8 +131,11 @@ func (options showOptions) validate() error {
 	if options.All && options.Selector != "" {
 		return errors.New("quota profile selector cannot be combined with --all")
 	}
-	if options.raw && (options.All || options.detail || options.watch || options.once) {
-		return errors.New("quota --raw cannot be combined with --all, --detail, --watch, or --once")
+	if options.raw && (options.All || options.detail || options.watch || options.once || options.AuthFilter != "" || options.ProviderFilter != "") {
+		return errors.New("quota --raw cannot be combined with --all, --detail, --watch, --once, --auth, or --provider")
+	}
+	if options.Selector != "" && (options.AuthFilter != "" || options.ProviderFilter != "") {
+		return errors.New("quota profile selector cannot be combined with --auth or --provider")
 	}
 	if options.watch && options.once {
 		return errors.New("quota --watch cannot be combined with --once")
@@ -106,6 +145,15 @@ func (options showOptions) validate() error {
 
 func (options showOptions) watchEnabled() bool {
 	return !options.raw && !options.once
+}
+
+func validQuotaProviderFilter(value string) bool {
+	switch value {
+	case "all", "openai", "gemini", "anthropic", "claude", "copilot", "kiro", "deepseek", "local", "agy":
+		return true
+	default:
+		return false
+	}
 }
 
 func quotaOptionValue(arguments []string, index int, argument string, names ...string) (string, int, error) {
@@ -128,4 +176,4 @@ func quotaOptionValue(arguments []string, index int, argument string, names ...s
 	return "", index, errors.New("quota option requires a value")
 }
 
-const quotaUsage = "usage: godex quota [-p NAME|selector] [--all] [--detail] [--raw] [--once|--watch] [--base-url URL]"
+const quotaUsage = "usage: godex quota [-p NAME|selector] [--all] [--auth AUTH] [--provider PROVIDER] [--detail] [--raw] [--once|--watch] [--base-url URL]"

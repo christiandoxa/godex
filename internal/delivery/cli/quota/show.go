@@ -53,7 +53,7 @@ func showRaw(ctx context.Context, status statusRunner, out io.Writer, options sh
 }
 
 func writeQuotaReports(out io.Writer, reports []quotamodel.Report, detail bool) error {
-	header := "ACCOUNT\tCURRENT\tSTATE\tPLAN\t5H\tWEEKLY"
+	header := "PROFILE\tCURRENT\tPROVIDER\tAUTH\tSTATE\tPLAN\t5H\tWEEKLY"
 	if detail {
 		header += "\t5H_RESET_AT\t5H_WINDOW_SECONDS\tWEEKLY_RESET_AT\tWEEKLY_WINDOW_SECONDS"
 	}
@@ -79,7 +79,11 @@ func writeReport(out io.Writer, report quotamodel.Report, detail bool) error {
 		state = "error"
 		usage = quotamodel.Usage{}
 	}
-	fields := []string{report.AccountName, current, state, valueOrDash(usage.PlanType), formatWindow(usage.Primary), formatWindow(usage.Secondary)}
+	name := report.ProfileName
+	if name == "" {
+		name = report.AccountName
+	}
+	fields := []string{name, current, valueOrDash(report.Provider), valueOrDash(report.Auth), state, valueOrDash(usage.PlanType), formatWindow(usage.Primary), formatWindow(usage.Secondary)}
 	if detail {
 		for _, window := range []*quotamodel.Window{usage.Primary, usage.Secondary} {
 			reset, seconds := formatWindowDetails(window)

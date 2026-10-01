@@ -46,6 +46,7 @@ type accountStore interface {
 type Report struct {
 	Profile   profileentity.Profile
 	Active    bool
+	Enabled   bool
 	AccountID string
 }
 
@@ -53,10 +54,15 @@ type authInspector interface {
 	InspectAuthJSON(context.Context, []byte) (accountentity.Identity, error)
 }
 
+type quotaAuthInspector interface {
+	InspectQuotaAuth(context.Context, string) (profilemodel.QuotaAuthSummary, error)
+}
+
 type Catalog struct {
 	profiles         repository
 	accounts         accountStore
 	auth             authInspector
+	quotaAuth        quotaAuthInspector
 	currentCodexHome string
 }
 
@@ -64,7 +70,12 @@ func NewCatalog(profiles repository, accounts accountStore, currentCodexHome str
 	return &Catalog{profiles: profiles, accounts: accounts, currentCodexHome: currentCodexHome}
 }
 
-func (catalog *Catalog) SetAuthInspector(inspector authInspector) { catalog.auth = inspector }
+func (catalog *Catalog) SetAuthInspector(inspector authInspector) {
+	catalog.auth = inspector
+	if quotaInspector, ok := inspector.(quotaAuthInspector); ok {
+		catalog.quotaAuth = quotaInspector
+	}
+}
 
 func (catalog *Catalog) List(ctx context.Context) ([]Report, error) {
 	stored, err := catalog.profiles.List(ctx)
@@ -79,13 +90,13 @@ func (catalog *Catalog) List(ctx context.Context) ([]Report, error) {
 	byName := make(map[string]Report, len(stored)+len(accounts))
 	for _, current := range accounts {
 		profile := accountProfile(current, catalog.accounts.CodexHome(current.ID))
-		byName[profile.Name] = Report{Profile: profile, Active: profile.Name == activeName, AccountID: current.ID}
+		byName[profile.Name] = Report{Profile: profile, Active: profile.Name == activeName, Enabled: current.Enabled, AccountID: current.ID}
 	}
 	for _, current := range stored {
 		if _, exists := byName[current.Name]; exists {
 			return nil, fmt.Errorf("profile %q conflicts with a managed account", current.Name)
 		}
-		byName[current.Name] = Report{Profile: current, Active: current.Name == activeName}
+		byName[current.Name] = Report{Profile: current, Active: current.Name == activeName, Enabled: true}
 	}
 	result := make([]Report, 0, len(byName))
 	for _, current := range byName {
@@ -105,13 +116,13 @@ func (catalog *Catalog) Current(ctx context.Context) (Report, error) {
 		if err != nil {
 			return Report{}, err
 		}
-		return Report{Profile: current, Active: true}, nil
+		return Report{Profile: current, Active: true, Enabled: true}, nil
 	}
 	account, err := catalog.accounts.Current(ctx)
 	if err != nil {
 		return Report{}, errors.New("no active profile")
 	}
-	return Report{Profile: accountProfile(account, catalog.accounts.CodexHome(account.ID)), Active: true, AccountID: account.ID}, nil
+	return Report{Profile: accountProfile(account, catalog.accounts.CodexHome(account.ID)), Active: true, Enabled: account.Enabled, AccountID: account.ID}, nil
 }
 
 func (catalog *Catalog) Add(ctx context.Context, request profilemodel.AddRequest) (Report, error) {
@@ -140,13 +151,13 @@ func (catalog *Catalog) Add(ctx context.Context, request profilemodel.AddRequest
 	if err := catalog.profiles.Create(ctx, value, source, request.Insecure, activate); err != nil {
 		return Report{}, err
 	}
-	return Report{Profile: value, Active: activate}, nil
+	return Report{Profile: value, Active: activate, Enabled: true}, nil
 }
 
 func (catalog *Catalog) Use(ctx context.Context, name string) (Report, error) {
 	if current, err := catalog.profiles.Resolve(ctx, name); err == nil {
 		selected, setErr := catalog.profiles.SetActive(ctx, current.Name)
-		return Report{Profile: selected, Active: setErr == nil}, setErr
+		return Report{Profile: selected, Active: setErr == nil, Enabled: true}, setErr
 	}
 	accounts, err := catalog.accounts.List(ctx)
 	if err != nil {
@@ -168,7 +179,7 @@ func (catalog *Catalog) Use(ctx context.Context, name string) (Report, error) {
 			return Report{}, err
 		}
 		profile := accountProfile(selected, catalog.accounts.CodexHome(selected.ID))
-		return Report{Profile: profile, Active: true, AccountID: selected.ID}, nil
+		return Report{Profile: profile, Active: true, Enabled: selected.Enabled, AccountID: selected.ID}, nil
 	}
 	return Report{}, fmt.Errorf(profileNotFoundFormat, name)
 }

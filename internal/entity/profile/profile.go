@@ -15,6 +15,8 @@ const (
 	ProviderAnthropic ProviderKind = "anthropic"
 	ProviderCopilot   ProviderKind = "copilot"
 	ProviderKiro      ProviderKind = "kiro"
+	ProviderDeepSeek  ProviderKind = "deepseek"
+	ProviderLocal     ProviderKind = "local"
 	ProviderAgy       ProviderKind = "agy"
 )
 
@@ -114,7 +116,7 @@ func ShouldActivate(activeExists, requested bool) bool {
 
 func validProvider(kind ProviderKind) bool {
 	switch kind {
-	case ProviderOpenAI, ProviderGemini, ProviderAnthropic, ProviderCopilot, ProviderKiro, ProviderAgy:
+	case ProviderOpenAI, ProviderGemini, ProviderAnthropic, ProviderCopilot, ProviderKiro, ProviderDeepSeek, ProviderLocal, ProviderAgy:
 		return true
 	default:
 		return false
