@@ -189,6 +189,7 @@ Available profile, account, and runtime commands:
 | godex quota [-p NAME] [--all] [--detail] [--raw] [--once] [--base-url URL] | Watch OpenAI/Codex quota or render a single snapshot. |
 | godex redeem PROFILE [-y|--yes] [--base-url URL] [--no-proxy] | Manually redeem one OpenAI/Codex reset credit. |
 | godex ping openai [-p NAME] [--model MODEL] [--base-url URL] [--no-proxy] [--json] | Run the Prodex-compatible OpenAI application diagnostic. |
+| godex update | Update the running Godex installation from the latest verified GitHub release. |
 | godex info [--json] [--tokens] | Show profile/runtime/Codex information. |
 | godex status [--once] [--interval SECONDS] | Show or watch the runtime snapshot. |
 | godex log [stream\|last\|upstream] [--json] | Follow persisted, redacted runtime request events. |
@@ -221,6 +222,16 @@ diagnostic working directory, a 45-second per-profile timeout, up to four worker
 and strips provider API-key environment variables before launch. Human output
 streams profile results as workers finish; `--json` emits one stable aggregate
 object. Failure details are bounded and secret-redacted. No ping runs implicitly.
+
+`godex update` resolves the latest stable GitHub release with a five-minute private
+cache, takes an exclusive install lock, re-checks the actual running binary under
+the lock, and never downgrades a newer local version. When an update is needed,
+it runs the installer embedded in the current binary against that executable's
+directory. The installer keeps the normal release verification path: archive
+download, `checksums.txt` SHA-256 verification, staged `--version` check, then
+replacement. Installer output is bounded, control-character filtered, and
+secret-redacted. `GODEX_REPOSITORY` and `GODEX_RELEASE_BASE_URL` remain available
+for the existing release/mirror workflow.
 
 Selectors match an exact account ID, friendly name, or email. Ambiguous
 selectors fail. Unknown top-level commands are treated as Codex subcommands and

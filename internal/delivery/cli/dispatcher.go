@@ -12,12 +12,14 @@ import (
 	quotacli "github.com/christiandoxa/godex/internal/delivery/cli/quota"
 	runtimecli "github.com/christiandoxa/godex/internal/delivery/cli/runtime"
 	sessioncli "github.com/christiandoxa/godex/internal/delivery/cli/session"
+	updatecli "github.com/christiandoxa/godex/internal/delivery/cli/update"
 	authusecase "github.com/christiandoxa/godex/internal/usecase/auth"
 	pingusecase "github.com/christiandoxa/godex/internal/usecase/ping"
 	profileusecase "github.com/christiandoxa/godex/internal/usecase/profile"
 	quotausecase "github.com/christiandoxa/godex/internal/usecase/quota"
 	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
 	sessionusecase "github.com/christiandoxa/godex/internal/usecase/session"
+	updateusecase "github.com/christiandoxa/godex/internal/usecase/update"
 	"github.com/christiandoxa/godex/internal/version"
 )
 
@@ -33,10 +35,12 @@ type App struct {
 	quota      *quotausecase.Status
 	redeemer   *quotausecase.Redeemer
 	ping       *pingusecase.OpenAI
+	updater    *updateusecase.Updater
 	profiles   *profileusecase.Catalog
 	nativeAuth *authusecase.Native
 	sessions   *sessionusecase.Catalog
 	out        io.Writer
+	errOut     io.Writer
 }
 
 func New(
@@ -50,7 +54,7 @@ func New(
 ) *App {
 	return &App{
 		login: login, importer: importer, accounts: accounts,
-		runtime: runtime, doctor: doctor, quota: quota, out: stdout,
+		runtime: runtime, doctor: doctor, quota: quota, out: stdout, errOut: io.Discard,
 	}
 }
 
@@ -98,6 +102,8 @@ func (app *App) Run(ctx context.Context, arguments []string) error {
 		return quotacli.Redeem(ctx, app.redeemer, app.out, arguments[1:])
 	case "ping":
 		return pingcli.Run(ctx, app.ping, app.out, arguments[1:])
+	case "update":
+		return updatecli.Run(ctx, app.updater, app.out, app.errOut, arguments[1:])
 	case "session":
 		if app.sessions == nil {
 			return fmt.Errorf("session support is not configured")
@@ -177,6 +183,7 @@ Usage:
                                Redeem one OpenAI reset credit manually
   godex ping openai [-p NAME] [--model MODEL] [--base-url URL] [--no-proxy] [--json]
                                Run a cost-bearing OpenAI application diagnostic
+  godex update                  Update from the latest verified GitHub release
   godex run [--account SEL] -- [codex args...]
   godex session list/current [--json|--id-only|--resume-command]
                                Find sessions across managed profiles
@@ -210,6 +217,13 @@ func (app *App) SetProfiles(catalog *profileusecase.Catalog) { app.profiles = ca
 func (app *App) SetRedeemer(redeemer *quotausecase.Redeemer) { app.redeemer = redeemer }
 
 func (app *App) SetPing(ping *pingusecase.OpenAI) { app.ping = ping }
+
+func (app *App) SetUpdate(updater *updateusecase.Updater, stderr io.Writer) {
+	app.updater = updater
+	if stderr != nil {
+		app.errOut = stderr
+	}
+}
 
 func (app *App) SetNativeAuth(native *authusecase.Native) { app.nativeAuth = native }
 
