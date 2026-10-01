@@ -17,6 +17,7 @@ import (
 const (
 	defaultDoctorTailBytes = 128 << 10
 	maxDoctorTailBytes     = 8 << 20
+	doctorBundlePrefix     = "--bundle="
 )
 
 type doctorOptions struct {
@@ -131,7 +132,7 @@ func consumeDoctorValueArgument(arguments []string, index int, options *doctorOp
 		options.tailBytes = parsed
 		return next, nil
 	}
-	if argument == "--bundle" || strings.HasPrefix(argument, "--bundle=") {
+	if argument == "--bundle" || strings.HasPrefix(argument, doctorBundlePrefix) {
 		value, next, err := doctorBundleValue(arguments, index, argument)
 		if err != nil {
 			return index, err
@@ -189,8 +190,8 @@ func doctorOptionValue(arguments []string, index int, argument, name string) (st
 }
 
 func doctorBundleValue(arguments []string, index int, argument string) (string, int, error) {
-	if strings.HasPrefix(argument, "--bundle=") {
-		value := strings.TrimSpace(strings.TrimPrefix(argument, "--bundle="))
+	if strings.HasPrefix(argument, doctorBundlePrefix) {
+		value := strings.TrimSpace(strings.TrimPrefix(argument, doctorBundlePrefix))
 		if value == "" {
 			return "", index, errors.New("--bundle path must not be empty")
 		}
