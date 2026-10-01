@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -26,23 +27,42 @@ func Log(ctx context.Context, activity *runtimeusecase.Activity, out io.Writer, 
 	if activity == nil {
 		return errors.New("runtime activity is not configured")
 	}
-	events, err := activity.Events(ctx, 256)
+	events, err := initialLogEvents(ctx, activity, options)
 	if err != nil {
 		return err
 	}
-	events = filterLogEvents(events, options.mode)
 	if options.mode == "last" {
-		if len(events) == 0 {
-			return nil
-		}
-		return writeLogEvent(out, events[len(events)-1], options.json)
+		return writeLastLogEvent(out, events, options.json)
 	}
-	seen := make(map[string]bool, len(events))
-	for _, event := range events {
-		if err := writeLogEvent(out, event, options.json); err != nil {
-			return err
-		}
-		seen[eventFingerprint(event)] = true
+	if logTUIEnabled(options, out) {
+		return runLogTUI(ctx, activity, out, options)
+	}
+	return followLogPlain(ctx, activity, out, options, events)
+}
+
+func initialLogEvents(ctx context.Context, activity *runtimeusecase.Activity, options logOptions) ([]runtimemodel.Event, error) {
+	events, err := activity.Events(ctx, 256)
+	if err != nil {
+		return nil, err
+	}
+	return filterLogEvents(events, options.mode), nil
+}
+
+func writeLastLogEvent(out io.Writer, events []runtimemodel.Event, jsonOutput bool) error {
+	if len(events) == 0 {
+		return nil
+	}
+	return writeLogEvent(out, events[len(events)-1], jsonOutput)
+}
+
+func logTUIEnabled(options logOptions, out io.Writer) bool {
+	return !options.json && writerIsTerminal(os.Stdin) && writerIsTerminal(out)
+}
+
+func followLogPlain(ctx context.Context, activity *runtimeusecase.Activity, out io.Writer, options logOptions, events []runtimemodel.Event) error {
+	seen, err := writeInitialLogEvents(out, events, options.json)
+	if err != nil {
+		return err
 	}
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
@@ -56,6 +76,17 @@ func Log(ctx context.Context, activity *runtimeusecase.Activity, out io.Writer, 
 			}
 		}
 	}
+}
+
+func writeInitialLogEvents(out io.Writer, events []runtimemodel.Event, jsonOutput bool) (map[string]bool, error) {
+	seen := make(map[string]bool, len(events))
+	for _, event := range events {
+		if err := writeLogEvent(out, event, jsonOutput); err != nil {
+			return nil, err
+		}
+		seen[eventFingerprint(event)] = true
+	}
+	return seen, nil
 }
 
 func parseLogArguments(arguments []string) (logOptions, error) {
@@ -129,9 +160,13 @@ func writeLogEvent(out io.Writer, event runtimemodel.Event, jsonOutput bool) err
 	if jsonOutput {
 		return json.NewEncoder(out).Encode(event)
 	}
+	_, err := fmt.Fprintln(out, formatLogEvent(event))
+	return err
+}
+
+func formatLogEvent(event runtimemodel.Event) string {
 	when := time.UnixMilli(event.TimestampUnixMilli).Format(time.RFC3339Nano)
-	_, err := fmt.Fprintf(out, "%s\t%s\tstatus=%d\taccount=%s\t%s %s\tduration_ms=%d\t%s\n",
+	return fmt.Sprintf("%s\t%s\tstatus=%d\taccount=%s\t%s %s\tduration_ms=%d\t%s",
 		when, event.Kind, event.StatusCode, valueOrDash(event.AccountID),
 		event.Method, event.Path, event.DurationMillis, event.Message)
-	return err
 }

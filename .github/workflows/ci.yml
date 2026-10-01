@@ -32,6 +32,8 @@ jobs:
         run: go build -trimpath ./cmd/godex
       - name: Source size
         run: ./scripts/check-source-size.sh
+      - name: TUI framework guard
+        run: ./scripts/check-tui-framework.sh
       - name: Shell syntax
         run: sh -n install.sh
       - name: Installer smoke

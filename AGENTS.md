@@ -44,6 +44,18 @@ policy. Keep those responsibilities separate.
 Godex is intentionally narrow. Do not copy the size, provider surface,
 abstraction graph, or accidental complexity of the project it replaces.
 
+### Mandatory TUI framework
+
+All Godex terminal-interactive UI that corresponds to a Prodex TUI surface MUST
+be implemented with `github.com/charmbracelet/bubbletea`. This includes live
+dashboards/watchers, interactive lists or pickers, confirmation prompts, login
+menus, and password-entry flows. Do not implement equivalent TUI behavior with
+ad-hoc ANSI screen clearing, manual terminal event loops, or a second TUI
+framework. Plain line-oriented output remains required as a non-TTY/script
+fallback where the reference command has one. Companion Charm packages may be
+added only when a concrete UI requirement justifies them; Bubble Tea remains the
+program/event-loop owner.
+
 ## Mandatory Clean Architecture
 
 All production code MUST implement the architecture and data-flow principles

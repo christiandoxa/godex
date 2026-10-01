@@ -50,7 +50,7 @@ func redeemWithIO(
 		return err
 	}
 	if plan.NearReset != nil && !options.yes {
-		confirmed, err := confirmRedeem(in, errOut, interactive, plan.Profile, *plan.NearReset)
+		confirmed, err := confirmRedeem(ctx, in, errOut, interactive, plan.Profile, *plan.NearReset)
 		if err != nil {
 			return err
 		}
@@ -97,10 +97,13 @@ func parseRedeemArguments(arguments []string) (redeemOptions, error) {
 	return options, nil
 }
 
-func confirmRedeem(in io.Reader, errOut io.Writer, interactive bool, profile string, near quotamodel.NearReset) (bool, error) {
+func confirmRedeem(ctx context.Context, in io.Reader, errOut io.Writer, interactive bool, profile string, near quotamodel.NearReset) (bool, error) {
 	resetTime := time.Unix(near.ResetAt, 0).UTC().Format(time.RFC3339)
 	if !interactive {
 		return false, fmt.Errorf("profile %q has a %s reset near at %s; rerun in a terminal to confirm or pass --yes", profile, near.Label, resetTime)
+	}
+	if input, output, ok := redeemTerminalIO(in, errOut); ok {
+		return runRedeemPromptTUI(ctx, input, output, profile, near.Label, resetTime)
 	}
 	if _, err := fmt.Fprintf(errOut, "Profile %q has a %s reset near at %s.\n", profile, near.Label, resetTime); err != nil {
 		return false, err

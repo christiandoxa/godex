@@ -31,7 +31,7 @@ Multi-provider quota remains part of the 1:1 parity backlog. The runtime details
 
 ## Requirements
 
-- The official Codex CLI 0.153.2 or newer available as `codex`.
+- The official Codex CLI 0.153.2 or newer available as `codex` (audited compatibility target: Codex 0.159.3).
 - Linux, macOS, or Windows on amd64 or arm64 for release binaries.
 - Go 1.27.1 or newer only when building from source.
 
@@ -103,7 +103,7 @@ godex account use work
 godex run --account work -- --model MODEL
 ~~~
 
-Export or import OpenAI profile bundles compatible with Prodex `0.434.2`:
+Export or import OpenAI profile bundles compatible with Prodex `0.434.3`:
 
 ~~~bash
 PRODEX_PROFILE_EXPORT_PASSWORD=... godex profile export --password-protect profiles.json
@@ -134,8 +134,8 @@ Supported wrapper flags are `--web-search`, `--rollout-budget-tokens`,
 `--respect-system-proxy`, and `--no-respect-system-proxy`. Put them before the
 first Codex argument, or use `--` to end Godex option parsing.
 
-With Codex 0.159.2, `--current-time-reminder-interval N` is measured in seconds
-and emits `reminder_interval_seconds`. Prodex 0.434.2's older request-count
+With Codex 0.159.3, `--current-time-reminder-interval N` is measured in seconds
+and emits `reminder_interval_seconds`. Prodex 0.434.3 still exposes its older request-count
 config field is not accepted by that Codex version. Numeric config values must
 fit signed TOML integers; token weights must be finite and nonnegative.
 
@@ -195,7 +195,7 @@ Available profile, account, and runtime commands:
 | godex log [stream\|last\|upstream] [--json] | Follow persisted, redacted runtime request events. |
 
 Quota output stays compact by default. Without `--once` or `--raw`, the command
-refreshes every five seconds like Prodex 0.434.2; `--watch` is also accepted as
+refreshes every five seconds like Prodex 0.434.3; `--watch` is also accepted as
 the explicit hidden spelling. `-p/--profile NAME` selects one managed OpenAI
 profile, while `--all` shows the managed pool. `--base-url URL` overrides the
 ChatGPT quota endpoint for that command only. `--raw` prints bounded upstream
@@ -245,6 +245,14 @@ run through the same managed account runtime. Repeating login for an existing Ch
 profile credentials instead of creating a duplicate. Existing sessions, history,
 and Codex configuration survive repeat login and import-current.
 
+
+Interactive terminal surfaces that correspond to Prodex TUIs use
+[Bubble Tea](https://github.com/charmbracelet/bubbletea). Current Bubble Tea
+surfaces include live `status`, live `quota`, interactive `log stream/upstream`,
+and the manual redeem confirmation. Non-TTY and machine-readable modes keep
+plain output for scripts and pipes. Future session/login/password TUI parity must
+use the same framework.
+
 ## Configuration
 
 | Variable | Default | Use |
@@ -264,7 +272,7 @@ control, backups, bug reports, or fixtures.
 - [Architecture](docs/ARCHITECTURE.md) — package ownership and runtime design.
 - [Runtime rotation and affinity](docs/ROTATION.md) — selection, retries,
   commitment, streaming, and forwarding rules.
-- [Parity audit](docs/PARITY.md) — Prodex 0.434.2 implemented equivalents,
+- [Parity audit](docs/PARITY.md) — Prodex 0.434.3 implemented equivalents,
   remaining 1:1 gaps, and validation limits.
 - [AGENTS.md](AGENTS.md) — engineering invariants for contributors.
 

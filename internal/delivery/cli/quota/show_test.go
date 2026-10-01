@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 	quotausecase "github.com/christiandoxa/godex/internal/usecase/quota"
 )
@@ -142,5 +143,31 @@ func TestShowRejectsFilterConflictsAndUnknownProvider(t *testing.T) {
 		if err := Show(context.Background(), &fakeStatus{}, &strings.Builder{}, arguments); err == nil {
 			t.Fatalf("arguments %v unexpectedly accepted", arguments)
 		}
+	}
+}
+
+func TestQuotaTUIViewAndKeys(t *testing.T) {
+	used := int64(20)
+	model := newQuotaTUIModel(context.Background(), &fakeStatus{}, showOptions{detail: true})
+	updated, command := model.Update(quotaSnapshotMsg{reports: []quotamodel.Report{{
+		ProfileName: "work", Provider: "openai", Auth: "chatgpt", Active: true, Enabled: true, State: "ready",
+		Usage: quotamodel.Usage{PlanType: "plus", Primary: &quotamodel.Window{UsedPercent: &used}},
+	}}})
+	model = updated.(quotaTUIModel)
+	if command != nil {
+		t.Fatal("snapshot unexpectedly returned command")
+	}
+	for _, expected := range []string{"Godex Quota", "PROFILE", "work", "q/esc quit", "u/r refresh"} {
+		if !strings.Contains(model.View(), expected) {
+			t.Fatalf("view missing %q: %q", expected, model.View())
+		}
+	}
+	_, quit := model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if quit == nil {
+		t.Fatal("esc did not quit")
+	}
+	refreshed, refresh := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'u'}})
+	if refresh == nil || !refreshed.(quotaTUIModel).loading {
+		t.Fatal("u did not refresh")
 	}
 }

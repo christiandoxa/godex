@@ -24,6 +24,7 @@ jobs:
           go mod tidy
           git diff --exit-code -- go.mod go.sum
           ./scripts/check-source-size.sh
+          ./scripts/check-tui-framework.sh
           go vet ./...
           go test -race -shuffle=on -count=1 ./...
           go build -trimpath ./cmd/godex

@@ -27,24 +27,10 @@ func Status(ctx context.Context, activity *runtimeusecase.Activity, out io.Write
 	if activity == nil {
 		return errors.New("runtime activity is not configured")
 	}
-	if options.once || !writerIsTerminal(out) {
+	if options.once || !writerIsTerminal(os.Stdin) || !writerIsTerminal(out) {
 		return writeStatusSnapshot(ctx, activity, out)
 	}
-	if err := writeLiveStatusSnapshot(ctx, activity, out); err != nil {
-		return err
-	}
-	ticker := time.NewTicker(options.interval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-ticker.C:
-			if err := writeLiveStatusSnapshot(ctx, activity, out); err != nil {
-				return err
-			}
-		}
-	}
+	return runStatusTUI(ctx, activity, out, options.interval)
 }
 
 func parseStatusArguments(arguments []string) (statusOptions, error) {
@@ -85,13 +71,6 @@ func parseStatusInterval(value string) (int64, error) {
 		return 0, fmt.Errorf("invalid --interval value %q", value)
 	}
 	return seconds, nil
-}
-
-func writeLiveStatusSnapshot(ctx context.Context, activity *runtimeusecase.Activity, out io.Writer) error {
-	if _, err := io.WriteString(out, "\x1b[H\x1b[2J"); err != nil {
-		return err
-	}
-	return writeStatusSnapshot(ctx, activity, out)
 }
 
 func writeStatusSnapshot(ctx context.Context, activity *runtimeusecase.Activity, out io.Writer) error {

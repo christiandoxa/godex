@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"time"
 
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
@@ -12,6 +13,9 @@ import (
 var quotaWatchInterval = 5 * time.Second
 
 func watchQuota(ctx context.Context, status statusRunner, out io.Writer, options showOptions) error {
+	if terminalFile(os.Stdin) && quotaTerminalWriter(out) {
+		return runQuotaTUI(ctx, status, out, options)
+	}
 	var previous []quotamodel.Report
 	for {
 		var err error

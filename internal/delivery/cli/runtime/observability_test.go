@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
 	runtimemodel "github.com/christiandoxa/godex/internal/model/runtime"
 	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
@@ -130,5 +131,33 @@ func TestObservabilityArgumentsRejectInvalidInput(t *testing.T) {
 		if err := test(); err == nil {
 			t.Fatal("invalid observability arguments unexpectedly accepted")
 		}
+	}
+}
+
+func TestLogTUIStateUsesBubbleTeaControls(t *testing.T) {
+	model := newLogTUIModel(context.Background(), newCLIActivity(), logOptions{mode: "stream"})
+	updated, command := model.Update(logSnapshotMsg{events: []runtimemodel.Event{
+		{TimestampUnixMilli: 1000, Kind: "request_started", RequestID: "a", Path: "/responses", Message: "alpha"},
+		{TimestampUnixMilli: 2000, Kind: "request_completed", RequestID: "b", Path: "/responses", Message: "beta"},
+	}})
+	model = updated.(logTUIModel)
+	if command != nil || !strings.Contains(model.View(), "Godex Log") || !strings.Contains(model.View(), "beta") {
+		t.Fatalf("initial log TUI = %q, command=%v", model.View(), command)
+	}
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	model = updated.(logTUIModel)
+	for _, ch := range "alpha" {
+		updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{ch}})
+		model = updated.(logTUIModel)
+	}
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(logTUIModel)
+	if !strings.Contains(model.View(), "alpha") || strings.Contains(model.View(), "beta") {
+		t.Fatalf("search view = %q", model.View())
+	}
+	_, quit := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	if quit == nil {
+		t.Fatal("q did not quit log TUI")
 	}
 }

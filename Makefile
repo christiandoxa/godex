@@ -1,7 +1,7 @@
 GO ?= go
 BINARY ?= bin/godex
 
-.PHONY: build test race vet fmt format-check source-size verify clean snapshot
+.PHONY: build test race vet fmt format-check source-size tui-framework verify clean snapshot
 
 build:
 	mkdir -p $(dir $(BINARY))
@@ -25,7 +25,10 @@ format-check:
 source-size:
 	./scripts/check-source-size.sh
 
-verify: format-check source-size vet race build
+tui-framework:
+	./scripts/check-tui-framework.sh
+
+verify: format-check source-size tui-framework vet race build
 
 snapshot: verify
 	goreleaser release --snapshot --clean

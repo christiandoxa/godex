@@ -1,16 +1,17 @@
 # OpenAI/Codex core parity audit
 
-Reference: exact Prodex tag `0.434.2`, commit
-`82b3f9585f4b1356057243f23f2edb2687fa22cd`. The tag's `Cargo.toml`
-declares `0.434.2`. Comparison reads used tagged Git objects, rather than the
-newer Prodex working checkout. This audit covers Godex's declared OpenAI/Codex
-core after the preserved `6aae186` baseline, the `93db608` checkpoints, and the
-final closure below. It does not claim feature-for-feature Prodex parity.
+Reference: exact Prodex tag `0.434.3`, commit
+`8e0451647f63848a57b8ca3a9adfbca717a6a42f`. The tag's `Cargo.toml` declares
+`0.434.3`, and its audited Codex compatibility target is `rust-v0.159.3` at
+commit `01fc69f4026735edfdf6789820549727a4867b11`. Comparison reads use tagged
+Git objects rather than the mutable Prodex checkout. Historical core-closure
+evidence below that names `0.434.2`/`0.159.2` remains evidence for that earlier
+checkpoint, not the current parity target.
 
 
 ## 1:1 parity expansion
 
-The project target is now feature-for-feature parity with Prodex `0.434.2`, not
+The project target is now feature-for-feature parity with Prodex `0.434.3`, not
 only the historical OpenAI/Codex core boundary. The core closure below remains a
 verified baseline while additional surfaces are implemented. Current expansion
 checkpoints add standalone/external profile registration and copy workflows,
@@ -25,9 +26,10 @@ and covered by local verification; a command-name stub does not count as parity.
 ## Final closure decision
 
 Practical parity is reached for the declared OpenAI/Codex account, isolated
-profile, session, and foreground managed HTTP/SSE runtime scope. The final audit
-read the exact tagged Prodex source alongside Godex production code, callers,
-tests, and local Codex 0.159.2 source. It found and closed these remaining gaps:
+profile, session, and foreground managed HTTP/SSE runtime scope. The preserved core audit read the then-current tagged Prodex source alongside
+Godex production code, callers, tests, and Codex 0.159.2. The active expansion
+baseline is now Prodex 0.434.3 / Codex 0.159.3; the historical audit found and
+closed these gaps:
 
 - Import identity now comes from the same credential snapshot that is staged,
   so concurrent native credential replacement cannot associate another account's
@@ -112,13 +114,23 @@ and eligibility validation stays in the runtime use case.
 
 ## Remaining 1:1 parity gaps
 
+- Prodex `0.434.3` is now the exact parity baseline. Its Codex compatibility
+  target is `rust-v0.159.3`; the accepted minimum remains 0.153.2. The 0.159.3
+  delta adds the account-security setup reminder on Codex-owned authenticated
+  ChatGPT bootstrap traffic, which must stay outside Godex model-account rotation.
+- All Godex equivalents of Prodex TUI surfaces must use Bubble Tea. Live status,
+  quota watch, log stream/upstream, and redeem confirmation have been migrated;
+  non-TTY fallbacks remain line-oriented.
 - Multi-provider runtime/login bridges (Gemini, Anthropic/Claude, Copilot, Kiro,
   DeepSeek/local/AGY where present in Prodex), including provider catalogs and
   provider-specific auth/routing semantics.
 - Super mode and its hidden expose/broker/MCP bridge/sub-agent execution stack,
   including optional Presidio integration.
-- The standalone gateway surface, full live TUI parity, process/resource metrics,
-  audit-log backend, and the richer runtime-policy/diagnostic bundle surfaces.
+- The standalone gateway surface, remaining live TUI parity, process/resource
+  metrics, audit-log backend, and richer runtime-policy/diagnostic bundle
+  surfaces. Existing live status/quota/log and redeem-confirmation TUIs now use
+  Bubble Tea; session/login/password TUIs remain to be implemented with Bubble
+  Tea as the mandatory framework.
 - Explicit self-update, best-effort cached update notices on eligible commands,
   manual reset-credit redemption, and cost-bearing `ping openai` diagnostics are
   implemented.
@@ -189,11 +201,15 @@ Tagged Prodex sources inspected include:
 Local Codex source at `a04940cb` supplied queue grammar and the native debug,
 app-server proxy, and daemon branches that discard CLI overrides or detach.
 
-Installed `codex-cli 0.159.2` was exercised with local parser/capability smokes.
-Strict validation accepts managed provider configuration and actual wrapper
-feature output. Deliberately unknown strict-config fields stop exec, nested
-resume/fork/review, and direct resume/fork/review before model work. No live
-login, quota endpoint, refresh exchange, or model request was performed.
+An ephemeral official npm package `@openai/codex@0.159.3` was exercised with the
+opt-in parser/capability smokes without replacing the developer's global Codex
+installation. It reported `codex-cli 0.159.3`; managed provider strict-config and
+runtime-feature smoke tests passed. Deliberately unknown strict-config fields stop
+exec, nested resume/fork/review, and direct resume/fork/review before model work.
+No live login, quota endpoint, refresh exchange, or model request was performed.
+The managed model configuration leaves `chatgpt_base_url` unset and Codex-owned,
+so the 0.159.3 account-security setup request remains outside Godex model-account
+rotation as required by the Prodex 0.434.3 compatibility audit.
 
 ## Verification and limits
 

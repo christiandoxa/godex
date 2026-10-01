@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
 
@@ -81,5 +82,31 @@ func TestParseRedeemConfirmation(t *testing.T) {
 	}
 	if _, valid := parseRedeemConfirmation("wat"); valid {
 		t.Fatal("invalid confirmation accepted")
+	}
+}
+
+func TestRedeemPromptTUIUsesReferenceConfirmationKeys(t *testing.T) {
+	base := redeemPromptModel{profile: "work", label: "5-hour", resetTime: "2026-10-01T12:00:00Z"}
+	for _, test := range []struct {
+		key       tea.KeyMsg
+		confirmed bool
+	}{
+		{tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}}, true},
+		{tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'Y'}}, true},
+		{tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}}, false},
+		{tea.KeyMsg{Type: tea.KeyEnter}, false},
+		{tea.KeyMsg{Type: tea.KeyEsc}, false},
+	} {
+		updated, command := base.Update(test.key)
+		model := updated.(redeemPromptModel)
+		if command == nil || model.confirmed != test.confirmed {
+			t.Fatalf("key %q = confirmed %t, command=%v", test.key.String(), model.confirmed, command)
+		}
+	}
+	view := base.View()
+	for _, expected := range []string{"Godex Redeem", "Quota reset is near", "work", "y redeem", "enter/esc cancel"} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("redeem TUI missing %q: %q", expected, view)
+		}
 	}
 }

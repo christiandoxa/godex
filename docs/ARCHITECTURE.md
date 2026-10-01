@@ -73,10 +73,22 @@ configuration is validated without accepting execution or model work. No shared
 helper or new application boundary is needed for this protocol-specific parsing.
 
 Runtime CLI delivery translates supported wrapper features into native config.
-Codex 0.159.2's reminder interval uses seconds, unlike Prodex 0.434.2's older
+Codex 0.159.3's reminder interval uses seconds, unlike Prodex 0.434.3's older
 request-count field. Delivery validates finite nonnegative weights and signed
 TOML integer bounds before launch; percentage defaults remain correct for large
 valid token limits. These flag conversions remain private to CLI runtime.
+
+
+### Terminal UI ownership
+
+Bubble Tea (`github.com/charmbracelet/bubbletea`) is the mandatory event-loop
+framework for every Godex UI that corresponds to a Prodex TUI. TUI models and
+rendering stay in the owning `internal/delivery/cli/<domain>` package; business
+state still comes from use cases. Live `status`, `quota`, and `log` plus redeem
+confirmation use Bubble Tea only when the required stdin/stdout or stderr streams
+are terminals. Non-TTY paths retain deterministic line-oriented output. Do not
+introduce direct ANSI screen-clearing loops or another TUI framework. Session,
+login-menu, and profile password TUI parity must follow this rule when added.
 
 ### Quota gateway and preflight
 
@@ -301,7 +313,7 @@ No access token, ID token, refresh token, or API token belongs in this file.
 ## 1:1 expansion boundary
 
 The verified OpenAI/Codex core remains the stability baseline while Godex expands
-toward feature-for-feature Prodex 0.434.2 parity. Multi-provider bridges, Super,
+toward feature-for-feature Prodex 0.434.3 parity. Multi-provider bridges, Super,
 gateway, richer diagnostics, provider-specific profile bundle secrets, and
 built-in imports remain implementation backlog rather than permanent exclusions.
 Manual redeem, `ping openai`, explicit self-update, and the best-effort cached
