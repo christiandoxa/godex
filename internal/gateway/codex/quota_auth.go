@@ -13,6 +13,8 @@ import (
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 )
 
+const unreadableAuthLabel = "unreadable-auth"
+
 func (process *CodexProcess) InspectQuotaAuth(ctx context.Context, codexHome string) (profilemodel.QuotaAuthSummary, error) {
 	if err := ctx.Err(); err != nil {
 		return profilemodel.QuotaAuthSummary{}, err
@@ -23,20 +25,20 @@ func (process *CodexProcess) InspectQuotaAuth(ctx context.Context, codexHome str
 		return quotaAuthSummary("no-auth", false), nil
 	}
 	if err != nil || !info.Mode().IsRegular() || info.Size() > maxAuthFileSize {
-		return quotaAuthSummary("unreadable-auth", false), nil
+		return quotaAuthSummary(unreadableAuthLabel, false), nil
 	}
 	if runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0 {
-		return quotaAuthSummary("unreadable-auth", false), nil
+		return quotaAuthSummary(unreadableAuthLabel, false), nil
 	}
 	file, err := os.Open(path)
 	if err != nil {
-		return quotaAuthSummary("unreadable-auth", false), nil
+		return quotaAuthSummary(unreadableAuthLabel, false), nil
 	}
 	content, readErr := io.ReadAll(io.LimitReader(file, maxAuthFileSize+1))
 	closeErr := file.Close()
 	if readErr != nil || closeErr != nil || len(content) > maxAuthFileSize {
 		clear(content)
-		return quotaAuthSummary("unreadable-auth", false), nil
+		return quotaAuthSummary(unreadableAuthLabel, false), nil
 	}
 	defer clear(content)
 	return summarizeQuotaAuth(content), nil
