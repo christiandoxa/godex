@@ -78,12 +78,12 @@ func TestDoctorRendersReport(t *testing.T) {
 	if err := Doctor(context.Background(), doctor, &output, nil); err != nil {
 		t.Fatal(err)
 	}
-	want := "Godex home: /synthetic/godex\nCodex: codex synthetic\nAccounts: 2 (1 enabled)\n"
+	want := "Doctor\nGodex root: /synthetic/godex\nCodex: codex synthetic\nAccounts: 2 (1 enabled)\n"
 	if output.String() != want {
 		t.Fatalf("doctor output = %q", output.String())
 	}
 	if err := Doctor(context.Background(), doctor, &output, []string{"extra"}); err == nil {
-		t.Fatal("doctor accepted an argument")
+		t.Fatal("doctor accepted an unknown argument")
 	}
 	if err := Doctor(context.Background(), doctor, failingWriter{}, nil); err == nil {
 		t.Fatal("doctor output failure was ignored")

@@ -223,7 +223,8 @@ Usage:
   godex info [--json] [--tokens]
   godex status [--once] [--interval N]
   godex log [stream|last|upstream] [--json]
-  godex doctor
+  godex doctor [--quota] [--runtime] [--install] [--tail-bytes BYTES]
+               [--json] [--bundle [PATH] --redacted]
   godex --version
   godex <codex-subcommand> ...  Run an unknown Codex command through Godex
 

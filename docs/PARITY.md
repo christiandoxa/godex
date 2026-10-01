@@ -127,10 +127,12 @@ and eligibility validation stays in the runtime use case.
 - Super mode and its hidden expose/broker/MCP bridge/sub-agent execution stack,
   including optional Presidio integration.
 - The standalone gateway surface, remaining live TUI parity, process/resource
-  metrics, audit-log backend, and richer runtime-policy/diagnostic bundle
-  surfaces. Existing live status/quota/log and redeem-confirmation TUIs now use
-  Bubble Tea; session/login/password TUIs remain to be implemented with Bubble
-  Tea as the mandatory framework.
+  metrics, audit-log backend, and richer runtime-policy diagnostics. Doctor now
+  supports install checks, bounded runtime tails, quota summaries, runtime JSON,
+  and redacted private bundles; import-journal repair, full session-index repair,
+  and policy suggestions remain. Existing status/quota/log, doctor panels, and
+  redeem-confirmation TUIs use Bubble Tea; session/login/password TUIs remain to
+  be implemented with Bubble Tea as the mandatory framework.
 - Explicit self-update, best-effort cached update notices on eligible commands,
   manual reset-credit redemption, and cost-bearing `ping openai` diagnostics are
   implemented.
@@ -148,6 +150,12 @@ and eligibility validation stays in the runtime use case.
   retained deactivation; no second archive tree or changed removal default.
 - Native names/pickers/last remain profile-local rather than a shared-session UI.
   Explicit UUIDs/prefixes provide the cross-profile workflow.
+- Doctor expansion now covers the observable 0.434.3 diagnostics that have real
+  Godex data sources: `--install`, `--runtime`, `--quota`, 128 KiB default bounded
+  `--tail-bytes`, `--runtime --json`, and `--bundle [PATH] --redacted`. Bundle
+  runtime events omit account IDs, quota diagnostics omit identity/email and raw
+  gateway errors, and file output is private/atomic. Unsupported repair/policy
+  actions fail explicitly until their owning subsystems land.
 - `update` now matches the standalone Prodex self-update contract: five-minute
   latest-release cache, short GitHub redirect probe, semver/no-downgrade decision,
   exclusive install lock with actual-binary re-probe, embedded installer execution,

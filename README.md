@@ -169,7 +169,15 @@ godex --version
 `doctor` checks the supported Codex version and managed HTTP/SSE configuration
 with the same isolated, ten-second capability probe used before launch. An
 unsupported runtime fails with an upgrade error. The probe does not log in or
-submit a model request.
+submit a model request. Add `--install` for install checks, `--runtime` for the
+bounded runtime summary/tail, and `--quota` for per-profile quota readiness.
+`doctor --runtime --json` emits machine-readable diagnostics.
+`doctor --bundle [PATH] --redacted` emits a redacted diagnostic bundle; omitting
+PATH or using `-` writes it to stdout, while file bundles are written privately
+and atomically. `--tail-bytes` defaults to 128 KiB and is capped at 8 MiB.
+Repair-import-journal, full session-index repair, and runtime-policy suggestion
+flags remain explicit parity gaps rather than no-op switches. Interactive human
+doctor panels use Bubble Tea; non-TTY output remains line-oriented.
 
 Available profile, account, and runtime commands:
 
@@ -191,6 +199,7 @@ Available profile, account, and runtime commands:
 | godex ping openai [-p NAME] [--model MODEL] [--base-url URL] [--no-proxy] [--json] | Run the Prodex-compatible OpenAI application diagnostic. |
 | godex update | Update the running Godex installation from the latest verified GitHub release. |
 | godex info [--json] [--tokens] | Show profile/runtime/Codex information. |
+| godex doctor [--install] [--runtime] [--quota] [--json] [--bundle [PATH] --redacted] | Inspect install/runtime/quota health or emit a redacted bundle. |
 | godex status [--once] [--interval SECONDS] | Show or watch the runtime snapshot. |
 | godex log [stream\|last\|upstream] [--json] | Follow persisted, redacted runtime request events. |
 

@@ -68,6 +68,9 @@ func run() int {
 	quotaStatus := quotausecase.NewStatus(store, quotaClient)
 	bindings := routingrepo.NewStore(settings.Home)
 	activity := runtimeusecase.NewActivity(settings.Home, runtimerepo.NewLog(filepath.Join(settings.Home, "logs")), store, process)
+	doctor.SetActivity(activity)
+	doctor.SetQuota(quotaStatus)
+	doctor.SetBundleStore(runtimerepo.NewDoctorBundleStore())
 	factory := runtimeusecase.ProxyFactory(func(config proxyconfig.Config) (runtimeusecase.Proxy, error) {
 		transport, err := openai.NewTransport(config.UpstreamURL, nil, process)
 		if err != nil {

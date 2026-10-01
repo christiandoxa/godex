@@ -79,6 +79,17 @@ TOML integer bounds before launch; percentage defaults remain correct for large
 valid token limits. These flag conversions remain private to CLI runtime.
 
 
+
+Doctor diagnostics remain a runtime-owned orchestration surface.
+`usecase/runtime.Doctor` consumes narrow Activity and quota-report ports, removes
+account identifiers from runtime tail events, and returns transport-neutral
+diagnostics. CLI delivery owns flag relationships plus human/JSON/bundle
+formatting; terminal human panels use Bubble Tea. User-selected bundle files are
+persisted through `repository/runtime.DoctorBundleStore`, which enforces a 4 MiB
+ceiling, rejects non-regular targets, and writes atomically with owner-only mode.
+Repair-journal, full Codex thread-index repair, and policy-suggestion flags fail
+closed until their owning subsystems exist; they are never silently accepted.
+
 ### Terminal UI ownership
 
 Bubble Tea (`github.com/charmbracelet/bubbletea`) is the mandatory event-loop

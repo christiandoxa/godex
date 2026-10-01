@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"strings"
 
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
@@ -217,23 +216,4 @@ func unsafeNativeCommand(args []string, command int) bool {
 		return args[nested] == "daemon" || args[nested] == "proxy"
 	}
 	return false
-}
-
-func Doctor(ctx context.Context, doctor *runtimeusecase.Doctor, out io.Writer, arguments []string) error {
-	if len(arguments) != 0 {
-		return errors.New("doctor does not accept arguments")
-	}
-	report, err := doctor.Run(ctx)
-	if err != nil {
-		return err
-	}
-	_, err = fmt.Fprintf(
-		out,
-		"Godex home: %s\nCodex: %s\nAccounts: %d (%d enabled)\n",
-		report.GodexHome,
-		report.CodexVersion,
-		report.AccountCount,
-		report.EnabledCount,
-	)
-	return err
 }

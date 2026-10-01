@@ -58,6 +58,10 @@ func NewStatus(accounts accountStore, usage usageGateway) *Status {
 
 func (status *Status) SetProfiles(profiles profileSource) { status.profiles = profiles }
 
+func (status *Status) DoctorReports(ctx context.Context) ([]quotamodel.Report, error) {
+	return status.Run(ctx, Options{All: true})
+}
+
 func (status *Status) Raw(ctx context.Context, selector, baseURL string) ([]byte, error) {
 	if status.profiles != nil {
 		target, err := status.selectedProfile(ctx, selector)
