@@ -17,6 +17,23 @@ type listOptions struct {
 
 func parseArguments(current bool, arguments []string) (listOptions, error) {
 	options := listOptions{}
+	flags, includeSubagents := newSessionFlagSet(&options, current)
+	if err := flags.Parse(arguments); err != nil {
+		return options, err
+	}
+	markLimitSet(flags, &options)
+	if err := validateListOptions(flags, options, *includeSubagents); err != nil {
+		return options, err
+	}
+	if current {
+		if err := resolveCurrentDirectory(&options.query); err != nil {
+			return options, err
+		}
+	}
+	return options, nil
+}
+
+func newSessionFlagSet(options *listOptions, current bool) (*flag.FlagSet, *bool) {
 	flags := flag.NewFlagSet("session", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	flags.BoolVar(&options.json, "json", false, "")
@@ -30,42 +47,49 @@ func parseArguments(current bool, arguments []string) (listOptions, error) {
 	if current {
 		flags.StringVar(&options.query.CurrentDir, "cwd", "", "")
 	}
-	if err := flags.Parse(arguments); err != nil {
-		return options, err
-	}
-	flags.Visit(func(f *flag.Flag) {
-		if f.Name == "limit" {
+	return flags, includeSubagents
+}
+
+func markLimitSet(flags *flag.FlagSet, options *listOptions) {
+	flags.Visit(func(current *flag.Flag) {
+		if current.Name == "limit" {
 			options.query.LimitSet = true
 		}
 	})
+}
+
+func validateListOptions(flags *flag.FlagSet, options listOptions, includeSubagents bool) error {
 	if flags.NArg() != 0 {
-		return options, errors.New("session list/current does not accept positional arguments")
+		return errors.New("session list/current does not accept positional arguments")
 	}
 	if options.query.Limit < 0 {
-		return options, errors.New("session limit must not be negative")
+		return errors.New("session limit must not be negative")
 	}
-	if *includeSubagents && options.query.ParentOnly {
-		return options, errors.New("--include-subagents cannot be combined with --parent-only")
+	if includeSubagents && options.query.ParentOnly {
+		return errors.New("--include-subagents cannot be combined with --parent-only")
 	}
+	if selectedOutputModes(options) > 1 {
+		return errors.New("--json, --id-only, and --resume-command cannot be combined")
+	}
+	return nil
+}
+
+func selectedOutputModes(options listOptions) int {
 	modes := 0
 	for _, selected := range []bool{options.json, options.idOnly, options.resumeCommand} {
 		if selected {
 			modes++
 		}
 	}
-	if modes > 1 {
-		return options, errors.New("--json, --id-only, and --resume-command cannot be combined")
+	return modes
+}
+
+func resolveCurrentDirectory(query *sessionmodel.Query) error {
+	var err error
+	if query.CurrentDir == "" {
+		query.CurrentDir, err = os.Getwd()
+	} else {
+		query.CurrentDir, err = filepath.Abs(query.CurrentDir)
 	}
-	if current {
-		var err error
-		if options.query.CurrentDir == "" {
-			options.query.CurrentDir, err = os.Getwd()
-		} else {
-			options.query.CurrentDir, err = filepath.Abs(options.query.CurrentDir)
-		}
-		if err != nil {
-			return options, err
-		}
-	}
-	return options, nil
+	return err
 }

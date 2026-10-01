@@ -15,6 +15,8 @@ import (
 	"strings"
 )
 
+const authFileName = "auth.json"
+
 type profileTransaction struct {
 	Version     int        `json:"version"`
 	Kind        string     `json:"kind"`
@@ -28,7 +30,7 @@ type profileTransaction struct {
 func (store *FileStore) beginTransaction(kind, id, backup string, next stateFile) (profileTransaction, error) {
 	original := store.accountDir(id)
 	if kind == "auth" {
-		original = filepath.Join(store.CodexHome(id), "auth.json")
+		original = filepath.Join(store.CodexHome(id), authFileName)
 	}
 	_, err := os.Lstat(original)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -90,7 +92,7 @@ func (store *FileStore) validateTransaction(tx profileTransaction) error {
 	switch tx.Kind {
 	case "profile", "remove":
 	case "auth":
-		original = filepath.Join(store.CodexHome(tx.AccountID), "auth.json")
+		original = filepath.Join(store.CodexHome(tx.AccountID), authFileName)
 	default:
 		return errors.New("invalid profile transaction kind")
 	}
@@ -105,42 +107,15 @@ func (store *FileStore) validateTransaction(tx profileTransaction) error {
 }
 
 func (store *FileStore) recoverTransaction() error {
-	info, err := os.Lstat(store.journalPath())
-	if errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	if !info.Mode().IsRegular() || info.Size() > 4<<20 {
-		return errors.New("invalid profile transaction journal")
-	}
-	file, err := os.Open(store.journalPath())
-	if err != nil {
-		return err
-	}
-	content, err := io.ReadAll(io.LimitReader(file, (4<<20)+1))
-	err = errors.Join(err, file.Close())
-	if err != nil {
-		return err
-	}
-	decoder := json.NewDecoder(bytes.NewReader(content))
-	decoder.DisallowUnknownFields()
-	var tx profileTransaction
-	if err := decoder.Decode(&tx); err != nil {
-		return errors.New("decode profile transaction journal")
-	}
-	if err := requireJSONEOF(decoder); err != nil {
-		return errors.New("decode trailing profile transaction journal")
-	}
-	if err := store.validateTransaction(tx); err != nil {
+	tx, found, err := store.readTransaction()
+	if err != nil || !found {
 		return err
 	}
 	state, err := store.readState()
 	if err != nil {
 		return err
 	}
-	if reflect.DeepEqual(state, tx.Next) && (tx.Before == nil || !reflect.DeepEqual(state, *tx.Before)) {
+	if transactionCommitted(state, tx) {
 		if err := os.RemoveAll(tx.Backup); err != nil {
 			return err
 		}
@@ -150,10 +125,51 @@ func (store *FileStore) recoverTransaction() error {
 	return store.finishTransaction()
 }
 
+func (store *FileStore) readTransaction() (profileTransaction, bool, error) {
+	info, err := os.Lstat(store.journalPath())
+	if errors.Is(err, os.ErrNotExist) {
+		return profileTransaction{}, false, nil
+	}
+	if err != nil {
+		return profileTransaction{}, false, err
+	}
+	if !info.Mode().IsRegular() || info.Size() > 4<<20 {
+		return profileTransaction{}, false, errors.New("invalid profile transaction journal")
+	}
+	file, err := os.Open(store.journalPath())
+	if err != nil {
+		return profileTransaction{}, false, err
+	}
+	content, readErr := io.ReadAll(io.LimitReader(file, (4<<20)+1))
+	if err := errors.Join(readErr, file.Close()); err != nil {
+		return profileTransaction{}, false, err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(content))
+	decoder.DisallowUnknownFields()
+	var tx profileTransaction
+	if err := decoder.Decode(&tx); err != nil {
+		return profileTransaction{}, false, errors.New("decode profile transaction journal")
+	}
+	if err := requireJSONEOF(decoder); err != nil {
+		return profileTransaction{}, false, errors.New("decode trailing profile transaction journal")
+	}
+	if err := store.validateTransaction(tx); err != nil {
+		return profileTransaction{}, false, err
+	}
+	return tx, true, nil
+}
+
+func transactionCommitted(state stateFile, tx profileTransaction) bool {
+	if !reflect.DeepEqual(state, tx.Next) {
+		return false
+	}
+	return tx.Before == nil || !reflect.DeepEqual(state, *tx.Before)
+}
+
 func (store *FileStore) rollbackTransaction(tx profileTransaction) error {
 	original := store.accountDir(tx.AccountID)
 	if tx.Kind == "auth" {
-		original = filepath.Join(store.CodexHome(tx.AccountID), "auth.json")
+		original = filepath.Join(store.CodexHome(tx.AccountID), authFileName)
 	}
 	backup, err := os.Lstat(tx.Backup)
 	if errors.Is(err, os.ErrNotExist) {

@@ -14,7 +14,7 @@ type conversationLock struct {
 func (router *Router) acquireConversation(ctx context.Context, keys affinityKeys) (func(), error) {
 	keyValues := affinityKeys{thread: keys.thread, session: keys.session}.values()
 	if len(keyValues) == 0 {
-		return func() {}, nil
+		return noConversationRelease, nil
 	}
 	key := keyValues[len(keyValues)-1]
 	router.mu.Lock()
@@ -47,4 +47,8 @@ func (router *Router) acquireConversation(ctx context.Context, keys affinityKeys
 		drop()
 		return nil, ctx.Err()
 	}
+}
+
+func noConversationRelease() {
+	// No stable conversation key means no local conversation lock was acquired.
 }

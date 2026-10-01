@@ -14,34 +14,54 @@ func (proxy *Proxy) forwardResponse(ctx context.Context, writer http.ResponseWri
 		return
 	}
 	stream := strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream")
-	if prefix == nil && !stream {
-		var err error
-		prefix, err = inspectResponse(response.Body, proxy.maxInspect)
-		if err != nil {
-			http.Error(writer, "upstream response failed before commitment", http.StatusBadGateway)
-			return
-		}
+	prepared, ok := proxy.prepareResponsePrefix(writer, response, prefix, stream)
+	if !ok {
+		return
 	}
 	copyResponseHeaders(writer.Header(), response.Header)
-	for _, header := range []string{"Content-Type", "Content-Length", "Date"} {
-		if !hasHeader(response.Header, header) {
-			writer.Header()[header] = nil
-		}
-	}
+	clearMissingStandardHeaders(writer.Header(), response.Header)
 	declareResponseTrailers(writer.Header(), response.Header, response.Trailer)
 	lifecycle.commit()
 	writer.WriteHeader(response.StatusCode)
 	if stream {
-		complete := proxy.forwardStream(ctx, writer, response.Body, prefix, accountID, response.Header)
-		copyTrailers(writer.Header(), response.Header, response.Trailer)
-		if complete {
-			lifecycle.complete()
-		} else {
-			lifecycle.failAfterCommit()
-			panic(http.ErrAbortHandler)
-		}
+		proxy.finishCommittedStream(ctx, writer, response, prepared, accountID, lifecycle)
 		return
 	}
+	proxy.finishCommittedBody(writer, response, prepared, lifecycle)
+}
+
+func (proxy *Proxy) prepareResponsePrefix(writer http.ResponseWriter, response *proxymodel.Response, prefix []byte, stream bool) ([]byte, bool) {
+	if prefix != nil || stream {
+		return prefix, true
+	}
+	prepared, err := inspectResponse(response.Body, proxy.maxInspect)
+	if err != nil {
+		http.Error(writer, "upstream response failed before commitment", http.StatusBadGateway)
+		return nil, false
+	}
+	return prepared, true
+}
+
+func clearMissingStandardHeaders(destination, source http.Header) {
+	for _, header := range []string{"Content-Type", "Content-Length", "Date"} {
+		if !hasHeader(source, header) {
+			destination[header] = nil
+		}
+	}
+}
+
+func (proxy *Proxy) finishCommittedStream(ctx context.Context, writer http.ResponseWriter, response *proxymodel.Response, prefix []byte, accountID string, lifecycle *requestLifecycle) {
+	complete := proxy.forwardStream(ctx, writer, response.Body, prefix, accountID, response.Header)
+	copyTrailers(writer.Header(), response.Header, response.Trailer)
+	if complete {
+		lifecycle.complete()
+		return
+	}
+	lifecycle.failAfterCommit()
+	panic(http.ErrAbortHandler)
+}
+
+func (proxy *Proxy) finishCommittedBody(writer http.ResponseWriter, response *proxymodel.Response, prefix []byte, lifecycle *requestLifecycle) {
 	if len(prefix) > 0 {
 		if _, err := writer.Write(prefix); err != nil {
 			lifecycle.failAfterCommit()

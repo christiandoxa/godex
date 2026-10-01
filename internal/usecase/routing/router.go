@@ -76,59 +76,100 @@ func (router *Router) Forward(ctx context.Context, request proxymodel.Request) (
 			release()
 		}
 	}()
-	accounts, err := router.source(ctx)
+
+	accounts, err := router.loadAccounts(ctx)
 	if err != nil {
-		return nil, &proxymodel.Error{StatusCode: 503, Message: "cannot load managed accounts"}
+		return nil, err
 	}
-	accounts = sortRuntimeAccounts(accounts)
-	owner, err := router.affinity.owner(ctx, keys, router.now())
-	if err != nil {
-		return nil, &proxymodel.Error{StatusCode: 409, Message: "request contains conflicting conversation affinity"}
-	}
-	if owner == "" && router.affinity.repository != nil && (keys.thread != "" || keys.session != "") {
-		unlock, err := router.affinity.repository.AcquireConversation(ctx)
-		if err != nil {
-			return nil, err
-		}
-		defer unlock()
-		// Another process may have committed ownership while this request waited.
-		owner, err = router.affinity.owner(ctx, keys, router.now())
-		if err != nil {
-			return nil, err
-		}
-	}
-	if owner == "" && (keys.previous != "" || keys.turn != "") {
-		return nil, &proxymodel.Error{StatusCode: 409, Message: "continuation owner is unknown; continuity was preserved"}
-	}
-	var result proxymodel.Forwarded
-	if owner != "" {
-		result, err = router.forwardBound(ctx, request, accounts, owner)
-	} else {
-		result, err = router.forwardFresh(ctx, request, accounts)
+	owner, durableRelease, err := router.resolveOwner(ctx, keys)
+	if durableRelease != nil {
+		defer durableRelease()
 	}
 	if err != nil {
 		return nil, err
 	}
-	if !result.Failed && result.Response.StatusCode < 400 {
-		stream := strings.Contains(strings.ToLower(result.Response.Header.Get("Content-Type")), "text/event-stream")
-		if result.Prefix == nil && !stream {
-			result.Prefix, _, err = inspectResponse(result.Response.Body, router.maxInspect)
-			if err != nil {
-				result.Response.Body.Close()
-				return nil, &proxymodel.Error{StatusCode: 502, Message: "upstream response failed before commitment"}
-			}
-		}
-		if err := router.affinity.remember(ctx, result.AccountID, keys, router.now()); err != nil {
-			result.Response.Body.Close()
-			return nil, err
-		}
-		if err := router.Observe(ctx, result.AccountID, result.Response.Header, result.Prefix, stream); err != nil {
-			result.Response.Body.Close()
-			return nil, err
-		}
+	result, err := router.routeRequest(ctx, request, accounts, owner)
+	if err != nil {
+		return nil, err
+	}
+	if err := router.bindSuccessfulResponse(ctx, &result, keys); err != nil {
+		return nil, err
 	}
 	transferred = true
 	return &Exchange{Result: result, release: release}, nil
+}
+
+func (router *Router) loadAccounts(ctx context.Context) ([]proxymodel.Account, error) {
+	accounts, err := router.source(ctx)
+	if err != nil {
+		return nil, &proxymodel.Error{StatusCode: 503, Message: "cannot load managed accounts"}
+	}
+	return sortRuntimeAccounts(accounts), nil
+}
+
+func (router *Router) resolveOwner(ctx context.Context, keys affinityKeys) (string, func() error, error) {
+	owner, err := router.affinity.owner(ctx, keys, router.now())
+	if err != nil {
+		return "", nil, &proxymodel.Error{StatusCode: 409, Message: "request contains conflicting conversation affinity"}
+	}
+	var durableRelease func() error
+	if owner == "" && router.affinity.repository != nil && stableConversation(keys) {
+		durableRelease, err = router.affinity.repository.AcquireConversation(ctx)
+		if err != nil {
+			return "", nil, err
+		}
+		owner, err = router.affinity.owner(ctx, keys, router.now())
+		if err != nil {
+			_ = durableRelease()
+			return "", nil, err
+		}
+	}
+	if owner == "" && opaqueContinuation(keys) {
+		if durableRelease != nil {
+			_ = durableRelease()
+		}
+		return "", nil, &proxymodel.Error{StatusCode: 409, Message: "continuation owner is unknown; continuity was preserved"}
+	}
+	return owner, durableRelease, nil
+}
+
+func stableConversation(keys affinityKeys) bool {
+	return keys.thread != "" || keys.session != ""
+}
+
+func opaqueContinuation(keys affinityKeys) bool {
+	return keys.previous != "" || keys.turn != ""
+}
+
+func (router *Router) routeRequest(ctx context.Context, request proxymodel.Request, accounts []proxymodel.Account, owner string) (proxymodel.Forwarded, error) {
+	if owner != "" {
+		return router.forwardBound(ctx, request, accounts, owner)
+	}
+	return router.forwardFresh(ctx, request, accounts)
+}
+
+func (router *Router) bindSuccessfulResponse(ctx context.Context, result *proxymodel.Forwarded, keys affinityKeys) error {
+	if result.Failed || result.Response.StatusCode >= 400 {
+		return nil
+	}
+	stream := strings.Contains(strings.ToLower(result.Response.Header.Get("Content-Type")), "text/event-stream")
+	if result.Prefix == nil && !stream {
+		prefix, _, err := inspectResponse(result.Response.Body, router.maxInspect)
+		if err != nil {
+			result.Response.Body.Close()
+			return &proxymodel.Error{StatusCode: 502, Message: "upstream response failed before commitment"}
+		}
+		result.Prefix = prefix
+	}
+	if err := router.affinity.remember(ctx, result.AccountID, keys, router.now()); err != nil {
+		result.Response.Body.Close()
+		return err
+	}
+	if err := router.Observe(ctx, result.AccountID, result.Response.Header, result.Prefix, stream); err != nil {
+		result.Response.Body.Close()
+		return err
+	}
+	return nil
 }
 
 func (router *Router) Observe(ctx context.Context, accountID string, headers http.Header, body []byte, stream bool) error {

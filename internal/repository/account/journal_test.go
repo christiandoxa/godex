@@ -2,6 +2,7 @@ package account
 
 import (
 	"context"
+	accountentity "github.com/christiandoxa/godex/internal/entity/account"
 	"os"
 	"path/filepath"
 	"testing"
@@ -100,39 +101,56 @@ func TestCrashRecoveryRestoresAuthentication(t *testing.T) {
 func TestCrashRecoveryRemovesUncommittedFilesWithoutOriginal(t *testing.T) {
 	for _, kind := range []string{"profile", "auth"} {
 		t.Run(kind, func(t *testing.T) {
-			store := newTestStore(t)
-			account := newTestAccount(t, "work", "person@example.com", "account-1", time.Unix(1, 0))
-			original := store.accountDir(account.ID)
-			if kind == "auth" {
-				account = commitTestAccount(t, store, "work", "person@example.com", "account-1")
-				original = filepath.Join(store.CodexHome(account.ID), "auth.json")
-				if err := os.Remove(original); err != nil {
-					t.Fatal(err)
-				}
-			}
-			next, err := store.readState()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if _, err := store.beginTransaction(kind, account.ID, original+".backup-test", next); err != nil {
-				t.Fatal(err)
-			}
-			if kind == "auth" {
-				_, _, err = store.replaceAuthentication(account.ID, stagedHome(t, store), original+".backup-test")
-			} else {
-				_, _, err = store.replaceProfile(account.ID, stagedHome(t, store), original+".backup-test")
-			}
-			if err != nil {
-				t.Fatal(err)
-			}
-			if _, err := NewFileStore(store.Root()).List(t.Context()); err != nil {
-				t.Fatal(err)
-			}
-			if _, err := os.Stat(original); !os.IsNotExist(err) {
-				t.Fatalf("uncommitted %s remains: %v", kind, err)
-			}
+			assertUncommittedFileRemoved(t, kind)
 		})
 	}
+}
+
+func assertUncommittedFileRemoved(t *testing.T, kind string) {
+	t.Helper()
+	store := newTestStore(t)
+	account, original := uncommittedTransactionTarget(t, store, kind)
+	next, err := store.readState()
+	if err != nil {
+		t.Fatal(err)
+	}
+	backup := original + ".backup-test"
+	if _, err := store.beginTransaction(kind, account.ID, backup, next); err != nil {
+		t.Fatal(err)
+	}
+	if err := replaceUncommittedTarget(t, store, kind, account.ID, backup); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewFileStore(store.Root()).List(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(original); !os.IsNotExist(err) {
+		t.Fatalf("uncommitted %s remains: %v", kind, err)
+	}
+}
+
+func uncommittedTransactionTarget(t *testing.T, store *FileStore, kind string) (accountentity.Account, string) {
+	t.Helper()
+	account := newTestAccount(t, "work", "person@example.com", "account-1", time.Unix(1, 0))
+	if kind != "auth" {
+		return account, store.accountDir(account.ID)
+	}
+	account = commitTestAccount(t, store, "work", "person@example.com", "account-1")
+	original := filepath.Join(store.CodexHome(account.ID), authFileName)
+	if err := os.Remove(original); err != nil {
+		t.Fatal(err)
+	}
+	return account, original
+}
+
+func replaceUncommittedTarget(t *testing.T, store *FileStore, kind, accountID, backup string) error {
+	t.Helper()
+	if kind == "auth" {
+		_, _, err := store.replaceAuthentication(accountID, stagedHome(t, store), backup)
+		return err
+	}
+	_, _, err := store.replaceProfile(accountID, stagedHome(t, store), backup)
+	return err
 }
 
 func TestActiveProfileLeaseBlocksMutationAndOldLiveLockIsNotStolen(t *testing.T) {

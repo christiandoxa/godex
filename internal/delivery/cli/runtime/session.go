@@ -13,42 +13,48 @@ func sessionArgument(arguments []string) (int, []string) {
 		return 1, []string{"resume", args[0]}
 	}
 	command := nativeCommandIndex(args)
-	start := -1
-	if command >= 0 {
-		switch args[command] {
-		case "resume", "fork", "delete", "archive", "unarchive":
-			start = command + 1
-		case "queue":
-			return queueArgument(args, command+1), args
-		}
-	}
-	if start < 0 {
+	if command < 0 {
 		return -1, args
 	}
-	options := true
-	for i := start; i < len(args); i++ {
-		if options {
-			if args[i] == "--" {
-				options = false
-				continue
-			}
-			if args[i] == "--last" {
-				return -1, args
-			}
-			if nativeOptionTakesValue(args[i]) {
-				i++
-				continue
-			}
-			if strings.HasPrefix(args[i], "-") {
-				continue
-			}
-		}
-		if !explicitSessionSelector(args[i]) {
-			return -1, args
-		}
-		return i, args
+	switch args[command] {
+	case "queue":
+		return queueArgument(args, command+1), args
+	case "resume", "fork", "delete", "archive", "unarchive":
+		return findExplicitSessionSelector(args, command+1), args
+	default:
+		return -1, args
 	}
-	return -1, args
+}
+
+func findExplicitSessionSelector(args []string, start int) int {
+	for i := start; i < len(args); {
+		if args[i] == "--" {
+			return selectorAfterDelimiter(args, i+1)
+		}
+		if args[i] == "--last" {
+			return -1
+		}
+		if nativeOptionTakesValue(args[i]) {
+			i += 2
+			continue
+		}
+		if strings.HasPrefix(args[i], "-") {
+			i++
+			continue
+		}
+		if explicitSessionSelector(args[i]) {
+			return i
+		}
+		return -1
+	}
+	return -1
+}
+
+func selectorAfterDelimiter(args []string, index int) int {
+	if index < len(args) && explicitSessionSelector(args[index]) {
+		return index
+	}
+	return -1
 }
 
 func explicitSessionSelector(value string) bool {

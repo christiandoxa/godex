@@ -17,31 +17,49 @@ func (router *Router) inspectStream(response *proxymodel.Response, pending *pend
 	buffer := make([]byte, 4096)
 	emptyReads := 0
 	for int64(len(pending.prefix)) < router.maxInspect {
-		remaining := min(int64(len(buffer)), router.maxInspect-int64(len(pending.prefix)))
-		count, err := response.Body.Read(buffer[:remaining])
+		count, readErr := readStreamPrefix(response.Body, buffer, router.maxInspect-int64(len(pending.prefix)))
 		pending.prefix = append(pending.prefix, buffer[:count]...)
-		if err != nil && err != io.EOF {
-			return responseOutcome{}, pending, err
+		if readErr != nil && readErr != io.EOF {
+			return responseOutcome{}, pending, readErr
 		}
-		for _, data := range decoder.Feed(buffer[:count]) {
-			outcome, wait := streamOutcome(data, response.Header, router.now())
-			if !wait {
-				return outcome, pending, nil
-			}
+		if outcome, done := startupStreamOutcome(decoder, buffer[:count], response.Header, router.now()); done {
+			return outcome, pending, nil
 		}
-		if err == io.EOF {
+		if readErr == io.EOF {
 			break
 		}
-		if count == 0 {
-			emptyReads++
-			if emptyReads >= 100 {
-				return responseOutcome{}, pending, io.ErrNoProgress
-			}
-		} else {
-			emptyReads = 0
+		if err := trackEmptyRead(count, &emptyReads); err != nil {
+			return responseOutcome{}, pending, err
 		}
 	}
 	return responseOutcome{kind: responsePass}, pending, nil
+}
+
+func readStreamPrefix(body io.Reader, buffer []byte, remaining int64) (int, error) {
+	limit := min(int64(len(buffer)), remaining)
+	return body.Read(buffer[:limit])
+}
+
+func startupStreamOutcome(decoder *sse.Decoder, chunk []byte, headers http.Header, now time.Time) (responseOutcome, bool) {
+	for _, data := range decoder.Feed(chunk) {
+		outcome, wait := streamOutcome(data, headers, now)
+		if !wait {
+			return outcome, true
+		}
+	}
+	return responseOutcome{}, false
+}
+
+func trackEmptyRead(count int, emptyReads *int) error {
+	if count > 0 {
+		*emptyReads = 0
+		return nil
+	}
+	*emptyReads++
+	if *emptyReads >= 100 {
+		return io.ErrNoProgress
+	}
+	return nil
 }
 
 func streamOutcome(data []byte, headers http.Header, now time.Time) (responseOutcome, bool) {

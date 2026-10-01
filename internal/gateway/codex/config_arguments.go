@@ -62,35 +62,40 @@ func scopeModelArguments(arguments, managed []string) []string {
 }
 
 func execConfigScope(arguments []string) int {
-	scope := 0
-	for i := 0; i < len(arguments); {
-		argument := arguments[i]
-		if argument == "--" {
-			break
+	command := commandAfterOptions(arguments, 0)
+	if command < 0 || (arguments[command] != "exec" && arguments[command] != "e") {
+		return 0
+	}
+	nested := commandAfterOptions(arguments, command+1)
+	if nested >= 0 && nestedExecCommand(arguments[nested]) {
+		return nested + 1
+	}
+	return command + 1
+}
+
+func commandAfterOptions(arguments []string, start int) int {
+	for i := start; i < len(arguments); {
+		if arguments[i] == "--" {
+			return -1
 		}
 		if _, consumed, ok := configArgument(arguments, i); ok {
 			i += consumed
 			continue
 		}
-		if strings.HasPrefix(argument, "-") {
-			if codexOptionTakesValue(argument) {
-				i += 2
-			} else {
-				i++
-			}
-			continue
+		if !strings.HasPrefix(arguments[i], "-") {
+			return i
 		}
-		if scope == 0 && (argument == "exec" || argument == "e") {
-			scope = i + 1
+		if codexOptionTakesValue(arguments[i]) {
+			i += 2
+		} else {
 			i++
-			continue
 		}
-		if scope > 0 && (argument == "resume" || argument == "fork" || argument == "review") {
-			scope = i + 1
-		}
-		break
 	}
-	return scope
+	return -1
+}
+
+func nestedExecCommand(command string) bool {
+	return command == "resume" || command == "fork" || command == "review"
 }
 
 func codexOptionTakesValue(argument string) bool {

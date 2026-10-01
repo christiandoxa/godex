@@ -57,50 +57,26 @@ func (*Reader) List(ctx context.Context, codexHome string) ([]sessionentity.Sess
 }
 
 func collectSessionPaths(ctx context.Context, root string, remaining int) ([]string, error) {
-	info, err := os.Lstat(root)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, nil
+	if err := validateSessionRoot(root); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, err
 	}
-	if err != nil {
-		return nil, fmt.Errorf("inspect Codex sessions: %w", err)
-	}
-	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
-		return nil, fmt.Errorf("codex session root %s must be a real directory", root)
-	}
-
 	paths := make([]string, 0)
-	err = filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		if path == root {
-			return nil
-		}
-		if entry.Type()&os.ModeSymlink != 0 {
-			if entry.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if entry.IsDir() {
-			return nil
-		}
-		if !sessionFileName(entry.Name()) {
-			return nil
-		}
-		info, err := entry.Info()
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
+		include, err := sessionWalkEntry(ctx, root, entry, walkErr)
 		if err != nil {
 			return err
 		}
-		if !info.Mode().IsRegular() {
-			return nil
+		if entry != nil && entry.Type()&os.ModeSymlink != 0 && entry.IsDir() {
+			return filepath.SkipDir
 		}
-		paths = append(paths, path)
-		if len(paths) > remaining {
-			return fmt.Errorf("codex session count exceeds safe limit of %d", maxSessionFiles)
+		if include {
+			paths = append(paths, path)
+			if len(paths) > remaining {
+				return fmt.Errorf("codex session count exceeds safe limit of %d", maxSessionFiles)
+			}
 		}
 		return nil
 	})
@@ -108,6 +84,40 @@ func collectSessionPaths(ctx context.Context, root string, remaining int) ([]str
 		return nil, fmt.Errorf("scan Codex sessions: %w", err)
 	}
 	return paths, nil
+}
+
+func validateSessionRoot(root string) error {
+	info, err := os.Lstat(root)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return os.ErrNotExist
+		}
+		return fmt.Errorf("inspect Codex sessions: %w", err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+		return fmt.Errorf("codex session root %s must be a real directory", root)
+	}
+	return nil
+}
+
+func sessionWalkEntry(ctx context.Context, root string, entry os.DirEntry, walkErr error) (bool, error) {
+	if walkErr != nil {
+		return false, walkErr
+	}
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
+	if entry == nil || entry.Name() == filepath.Base(root) || entry.IsDir() || entry.Type()&os.ModeSymlink != 0 {
+		return false, nil
+	}
+	if !sessionFileName(entry.Name()) {
+		return false, nil
+	}
+	info, err := entry.Info()
+	if err != nil {
+		return false, err
+	}
+	return info.Mode().IsRegular(), nil
 }
 
 func sessionFileName(name string) bool {

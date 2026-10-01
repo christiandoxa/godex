@@ -22,7 +22,7 @@ func (router *Router) forwardBound(ctx context.Context, request proxymodel.Reque
 		if response.StatusCode == http.StatusUnauthorized {
 			router.quarantineAccount(owner, 60e9)
 		}
-		return proxymodel.Forwarded{Response: response, AccountID: owner}, nil
+		return proxymodel.Forwarded{Response: response, AccountID: account.ID}, nil
 	}
 	return proxymodel.Forwarded{}, &proxymodel.Error{StatusCode: 409, Message: "conversation owner is no longer registered; continuity was preserved"}
 }
@@ -33,43 +33,73 @@ func (router *Router) forwardFresh(ctx context.Context, request proxymodel.Reque
 		return proxymodel.Forwarded{}, &proxymodel.Error{StatusCode: 503, Message: "no enabled account is available"}
 	}
 	var last *pendingResponse
-	defer func() {
-		if last != nil {
-			last.close()
-		}
-	}()
+	defer closePending(&last)
 	for _, account := range candidates {
-		response, err := router.execute(ctx, request, account)
+		result, pending, err := router.freshAttempt(ctx, request, account)
 		if err != nil {
-			if ctx.Err() != nil {
-				return proxymodel.Forwarded{}, ctx.Err()
-			}
-			continue
+			return proxymodel.Forwarded{}, err
 		}
-		outcome, pending, err := router.classify(response)
-		if err != nil {
+		if result != nil {
+			return *result, nil
+		}
+		if pending != nil {
+			replacePending(&last, pending)
+		}
+	}
+	return finishFresh(&last)
+}
+
+func (router *Router) freshAttempt(ctx context.Context, request proxymodel.Request, account proxymodel.Account) (*proxymodel.Forwarded, *pendingResponse, error) {
+	response, err := router.execute(ctx, request, account)
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, nil, ctx.Err()
+		}
+		return nil, nil, nil
+	}
+	outcome, pending, err := router.classify(response)
+	if err != nil {
+		if pending != nil {
 			pending.close()
-			return proxymodel.Forwarded{}, &proxymodel.Error{StatusCode: 502, Message: "upstream response failed before commitment"}
 		}
-		if last != nil {
-			last.close()
-			last = nil
-		}
-		if outcome.kind == responsePass {
-			return proxymodel.Forwarded{Response: response, Prefix: pending.prefix, AccountID: account.ID, Failed: outcome.failed}, nil
-		}
-		if outcome.kind == responseAuthFailure {
-			router.quarantineAccount(account.ID, 60e9)
-		} else if outcome.quarantine > 0 {
-			router.quarantineAccount(account.ID, outcome.quarantine)
-		}
-		pending.accountID = account.ID
-		last = pending
+		return nil, nil, &proxymodel.Error{StatusCode: 502, Message: "upstream response failed before commitment"}
 	}
-	if last != nil {
-		result := proxymodel.Forwarded{Response: last.response, Prefix: last.prefix, AccountID: last.accountID, Failed: true}
-		last = nil
-		return result, nil
+	if outcome.kind == responsePass {
+		result := &proxymodel.Forwarded{Response: response, Prefix: pending.prefix, AccountID: account.ID, Failed: outcome.failed}
+		return result, nil, nil
 	}
-	return proxymodel.Forwarded{}, &proxymodel.Error{StatusCode: 502, Message: "all eligible accounts failed before upstream response commitment"}
+	router.applyRetryOutcome(account.ID, outcome)
+	pending.accountID = account.ID
+	return nil, pending, nil
+}
+
+func (router *Router) applyRetryOutcome(accountID string, outcome responseOutcome) {
+	if outcome.kind == responseAuthFailure {
+		router.quarantineAccount(accountID, 60e9)
+		return
+	}
+	if outcome.quarantine > 0 {
+		router.quarantineAccount(accountID, outcome.quarantine)
+	}
+}
+
+func replacePending(last **pendingResponse, pending *pendingResponse) {
+	closePending(last)
+	*last = pending
+}
+
+func closePending(pending **pendingResponse) {
+	if *pending != nil {
+		(*pending).close()
+		*pending = nil
+	}
+}
+
+func finishFresh(last **pendingResponse) (proxymodel.Forwarded, error) {
+	if *last == nil {
+		return proxymodel.Forwarded{}, &proxymodel.Error{StatusCode: 502, Message: "all eligible accounts failed before upstream response commitment"}
+	}
+	pending := *last
+	*last = nil
+	return proxymodel.Forwarded{Response: pending.response, Prefix: pending.prefix, AccountID: pending.accountID, Failed: true}, nil
 }

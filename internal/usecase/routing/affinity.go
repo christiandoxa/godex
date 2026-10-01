@@ -74,22 +74,36 @@ func (store *affinityStore) owner(ctx context.Context, keys affinityKeys, now ti
 	store.mu.Lock()
 	defer store.mu.Unlock()
 	store.pruneLocked(now)
+	if err := store.loadMissingLocked(ctx, keys, now); err != nil {
+		return "", err
+	}
+	return store.ownerLocked(keys)
+}
 
-	if store.repository != nil {
-		missing := false
-		for _, key := range keys.values() {
-			if _, ok := store.values[key]; !ok {
-				missing = true
-			}
-		}
-		if missing {
-			bindings, err := store.repository.Load(ctx)
-			if err != nil {
-				return "", err
-			}
-			store.loadLocked(bindings, keys.values(), now)
+func (store *affinityStore) loadMissingLocked(ctx context.Context, keys affinityKeys, now time.Time) error {
+	if store.repository == nil {
+		return nil
+	}
+	keyValues := keys.values()
+	missing := false
+	for _, key := range keyValues {
+		if _, ok := store.values[key]; !ok {
+			missing = true
+			break
 		}
 	}
+	if !missing {
+		return nil
+	}
+	bindings, err := store.repository.Load(ctx)
+	if err != nil {
+		return err
+	}
+	store.loadLocked(bindings, keyValues, now)
+	return nil
+}
+
+func (store *affinityStore) ownerLocked(keys affinityKeys) (string, error) {
 	owner := ""
 	for _, key := range keys.values() {
 		binding, ok := store.values[key]
@@ -112,46 +126,66 @@ func (store *affinityStore) remember(ctx context.Context, accountID string, keys
 	if len(keyValues) == 0 {
 		return nil
 	}
-
 	store.mu.Lock()
 	defer store.mu.Unlock()
 	store.pruneLocked(now)
-	for _, key := range keyValues {
+	if err := store.checkConflictsLocked(accountID, keyValues); err != nil {
+		return err
+	}
+	if err := store.persistLocked(ctx, accountID, keys, now); err != nil {
+		return err
+	}
+	store.refreshLocked(accountID, keyValues, now)
+	store.pruneLocked(now)
+	return nil
+}
+
+func (store *affinityStore) checkConflictsLocked(accountID string, keys []string) error {
+	for _, key := range keys {
 		if binding, ok := store.values[key]; ok && binding.accountID != accountID {
 			return errors.New("affinity key is already bound to another account")
 		}
 	}
-	if store.repository != nil {
-		updates := make([]routingentity.Binding, 0, len(keyValues))
-		for _, entry := range keys.entries() {
-			key := entry.Key
-			if old, ok := store.values[key]; !ok || old.persistedAt.Before(now.Add(-24*time.Hour)) {
-				updates = append(updates, routingentity.Binding{Key: key, Kind: entry.Kind, AccountID: accountID, UpdatedUnix: now.Unix()})
-			}
-		}
-		if len(updates) > 0 {
-			bindings, err := store.repository.Merge(ctx, updates)
-			if err != nil {
-				return err
-			}
-			store.loadLocked(bindings, keyValues, now)
-		}
+	return nil
+}
+
+func (store *affinityStore) persistLocked(ctx context.Context, accountID string, keys affinityKeys, now time.Time) error {
+	if store.repository == nil {
+		return nil
 	}
-	for _, key := range keyValues {
+	updates := make([]routingentity.Binding, 0, len(keys.values()))
+	for _, entry := range keys.entries() {
+		old, ok := store.values[entry.Key]
+		if ok && !old.persistedAt.Before(now.Add(-24*time.Hour)) {
+			continue
+		}
+		updates = append(updates, routingentity.Binding{
+			Key: entry.Key, Kind: entry.Kind, AccountID: accountID, UpdatedUnix: now.Unix(),
+		})
+	}
+	if len(updates) == 0 {
+		return nil
+	}
+	bindings, err := store.repository.Merge(ctx, updates)
+	if err != nil {
+		return err
+	}
+	store.loadLocked(bindings, keys.values(), now)
+	return nil
+}
+
+func (store *affinityStore) refreshLocked(accountID string, keys []string, now time.Time) {
+	for _, key := range keys {
 		persistedAt := store.values[key].persistedAt
 		if store.repository == nil {
 			persistedAt = time.Time{}
 		}
 		store.sequence++
 		store.values[key] = affinityValue{
-			accountID:   accountID,
-			expires:     now.Add(affinityTTL),
-			sequence:    store.sequence,
-			persistedAt: persistedAt,
+			accountID: accountID, expires: now.Add(affinityTTL),
+			sequence: store.sequence, persistedAt: persistedAt,
 		}
 	}
-	store.pruneLocked(now)
-	return nil
 }
 
 func (store *affinityStore) pruneLocked(now time.Time) {

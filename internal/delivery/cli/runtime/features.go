@@ -22,123 +22,183 @@ type runtimeFeatures struct {
 }
 
 func (features *runtimeFeatures) consume(arguments []string, index int) (next int, handled bool, err error) {
-	argument := arguments[index]
-	if value, consumed, ok, valueErr := featureValue(arguments, index, "--web-search"); ok {
-		if valueErr != nil {
-			return index, true, valueErr
-		}
-		switch value {
-		case "disabled", "cached", "indexed", "live":
-			features.webSearch = value
-			return index + consumed, true, nil
-		default:
-			return index, true, fmt.Errorf("invalid --web-search value %q", value)
-		}
-	}
-	if value, consumed, ok, valueErr := featureValue(arguments, index, "--rollout-budget-tokens"); ok {
-		parsed, parseErr := parseUintFeature("--rollout-budget-tokens", value, valueErr)
-		if parseErr != nil {
-			return index, true, parseErr
-		}
-		features.rolloutLimit = &parsed
-		return index + consumed, true, nil
-	}
-	if value, consumed, ok, valueErr := featureValue(arguments, index, "--rollout-budget-reminders"); ok {
-		parsed, parseErr := parseUintListFeature("--rollout-budget-reminders", value, valueErr)
-		if parseErr != nil {
-			return index, true, parseErr
-		}
-		features.rolloutReminders = parsed
-		return index + consumed, true, nil
-	}
-	if value, consumed, ok, valueErr := featureValue(arguments, index, "--rollout-budget-sampling-weight"); ok {
-		parsed, parseErr := parseFloatFeature("--rollout-budget-sampling-weight", value, valueErr)
-		if parseErr != nil {
-			return index, true, parseErr
-		}
-		features.samplingWeight = &parsed
-		return index + consumed, true, nil
-	}
-	if value, consumed, ok, valueErr := featureValue(arguments, index, "--rollout-budget-prefill-weight"); ok {
-		parsed, parseErr := parseFloatFeature("--rollout-budget-prefill-weight", value, valueErr)
-		if parseErr != nil {
-			return index, true, parseErr
-		}
-		features.prefillWeight = &parsed
-		return index + consumed, true, nil
-	}
-	if argument == "--current-time-reminder" {
+	switch featureName(arguments[index]) {
+	case "--web-search":
+		return features.consumeWebSearch(arguments, index)
+	case "--rollout-budget-tokens":
+		return features.consumeRolloutLimit(arguments, index)
+	case "--rollout-budget-reminders":
+		return features.consumeRolloutReminders(arguments, index)
+	case "--rollout-budget-sampling-weight":
+		return features.consumeSamplingWeight(arguments, index)
+	case "--rollout-budget-prefill-weight":
+		return features.consumePrefillWeight(arguments, index)
+	case "--current-time-reminder":
 		features.currentTime = true
 		return index + 1, true, nil
+	case "--current-time-reminder-interval":
+		return features.consumeCurrentInterval(arguments, index)
+	case "--current-time-clock-source":
+		return features.consumeCurrentClock(arguments, index)
+	case "--respect-system-proxy", "--no-respect-system-proxy":
+		return features.consumeSystemProxy(arguments, index)
+	default:
+		return index, false, nil
 	}
-	if value, consumed, ok, valueErr := featureValue(arguments, index, "--current-time-reminder-interval"); ok {
-		parsed, parseErr := parseUintFeature("--current-time-reminder-interval", value, valueErr)
-		if parseErr != nil {
-			return index, true, parseErr
-		}
-		features.currentInterval = &parsed
+}
+
+func featureName(argument string) string {
+	name, _, _ := strings.Cut(argument, "=")
+	return name
+}
+
+func (features *runtimeFeatures) consumeWebSearch(arguments []string, index int) (int, bool, error) {
+	value, consumed, _, err := featureValue(arguments, index, "--web-search")
+	if err != nil {
+		return index, true, err
+	}
+	switch value {
+	case "disabled", "cached", "indexed", "live":
+		features.webSearch = value
 		return index + consumed, true, nil
+	default:
+		return index, true, fmt.Errorf("invalid --web-search value %q", value)
 	}
-	if value, consumed, ok, valueErr := featureValue(arguments, index, "--current-time-clock-source"); ok {
-		if valueErr != nil {
-			return index, true, valueErr
-		}
-		if value != "system" && value != "external" {
-			return index, true, fmt.Errorf("invalid --current-time-clock-source value %q", value)
-		}
-		features.currentClock = value
-		return index + consumed, true, nil
+}
+
+func (features *runtimeFeatures) consumeRolloutLimit(arguments []string, index int) (int, bool, error) {
+	value, consumed, _, prior := featureValue(arguments, index, "--rollout-budget-tokens")
+	parsed, err := parseUintFeature("--rollout-budget-tokens", value, prior)
+	if err != nil {
+		return index, true, err
 	}
-	if argument == "--respect-system-proxy" || argument == "--no-respect-system-proxy" {
-		value := argument == "--respect-system-proxy"
-		if features.respectSystemProxy != nil && *features.respectSystemProxy != value {
-			return index, true, errors.New("--respect-system-proxy conflicts with --no-respect-system-proxy")
-		}
-		features.respectSystemProxy = &value
-		return index + 1, true, nil
+	features.rolloutLimit = &parsed
+	return index + consumed, true, nil
+}
+
+func (features *runtimeFeatures) consumeRolloutReminders(arguments []string, index int) (int, bool, error) {
+	value, consumed, _, prior := featureValue(arguments, index, "--rollout-budget-reminders")
+	parsed, err := parseUintListFeature("--rollout-budget-reminders", value, prior)
+	if err != nil {
+		return index, true, err
 	}
-	return index, false, nil
+	features.rolloutReminders = parsed
+	return index + consumed, true, nil
+}
+
+func (features *runtimeFeatures) consumeSamplingWeight(arguments []string, index int) (int, bool, error) {
+	value, consumed, _, prior := featureValue(arguments, index, "--rollout-budget-sampling-weight")
+	parsed, err := parseFloatFeature("--rollout-budget-sampling-weight", value, prior)
+	if err != nil {
+		return index, true, err
+	}
+	features.samplingWeight = &parsed
+	return index + consumed, true, nil
+}
+
+func (features *runtimeFeatures) consumePrefillWeight(arguments []string, index int) (int, bool, error) {
+	value, consumed, _, prior := featureValue(arguments, index, "--rollout-budget-prefill-weight")
+	parsed, err := parseFloatFeature("--rollout-budget-prefill-weight", value, prior)
+	if err != nil {
+		return index, true, err
+	}
+	features.prefillWeight = &parsed
+	return index + consumed, true, nil
+}
+
+func (features *runtimeFeatures) consumeCurrentInterval(arguments []string, index int) (int, bool, error) {
+	value, consumed, _, prior := featureValue(arguments, index, "--current-time-reminder-interval")
+	parsed, err := parseUintFeature("--current-time-reminder-interval", value, prior)
+	if err != nil {
+		return index, true, err
+	}
+	features.currentInterval = &parsed
+	return index + consumed, true, nil
+}
+
+func (features *runtimeFeatures) consumeCurrentClock(arguments []string, index int) (int, bool, error) {
+	value, consumed, _, err := featureValue(arguments, index, "--current-time-clock-source")
+	if err != nil {
+		return index, true, err
+	}
+	if value != "system" && value != "external" {
+		return index, true, fmt.Errorf("invalid --current-time-clock-source value %q", value)
+	}
+	features.currentClock = value
+	return index + consumed, true, nil
+}
+
+func (features *runtimeFeatures) consumeSystemProxy(arguments []string, index int) (int, bool, error) {
+	value := arguments[index] == "--respect-system-proxy"
+	if features.respectSystemProxy != nil && *features.respectSystemProxy != value {
+		return index, true, errors.New("--respect-system-proxy conflicts with --no-respect-system-proxy")
+	}
+	features.respectSystemProxy = &value
+	return index + 1, true, nil
 }
 
 func (features runtimeFeatures) arguments() ([]string, error) {
-	if features.rolloutLimit == nil && (len(features.rolloutReminders) > 0 || features.samplingWeight != nil || features.prefillWeight != nil) {
-		return nil, errors.New("rollout budget options require --rollout-budget-tokens")
+	if err := features.validateRolloutOptions(); err != nil {
+		return nil, err
 	}
 	overrides := make([]string, 0, 10)
 	if features.webSearch != "" {
 		overrides = append(overrides, "web_search="+strconv.Quote(features.webSearch))
 	}
-	if features.rolloutLimit != nil && *features.rolloutLimit > 1 {
-		limit := *features.rolloutLimit
-		overrides = append(overrides,
-			"features.rollout_budget.enabled=true",
-			fmt.Sprintf("features.rollout_budget.limit_tokens=%d", limit),
-			"features.rollout_budget.reminder_at_remaining_tokens=["+formatUintList(normalizeReminders(limit, features.rolloutReminders))+"]",
-		)
-		if features.samplingWeight != nil {
-			overrides = append(overrides, "features.rollout_budget.sampling_token_weight="+formatFloat(*features.samplingWeight))
-		}
-		if features.prefillWeight != nil {
-			overrides = append(overrides, "features.rollout_budget.prefill_token_weight="+formatFloat(*features.prefillWeight))
-		}
-	}
-	if features.currentTime || features.currentInterval != nil || features.currentClock != "" {
-		overrides = append(overrides, "features.current_time_reminder.enabled=true")
-		if features.currentInterval != nil && *features.currentInterval > 0 {
-			overrides = append(overrides, fmt.Sprintf("features.current_time_reminder.reminder_interval_seconds=%d", *features.currentInterval))
-		}
-		if features.currentClock != "" {
-			overrides = append(overrides, "features.current_time_reminder.clock_source="+strconv.Quote(features.currentClock))
-		}
-	}
+	overrides = append(overrides, features.rolloutArguments()...)
+	overrides = append(overrides, features.currentTimeArguments()...)
 	if features.respectSystemProxy != nil {
 		overrides = append(overrides, fmt.Sprintf("features.respect_system_proxy=%t", *features.respectSystemProxy))
 	}
+	return configArguments(overrides), nil
+}
+
+func (features runtimeFeatures) validateRolloutOptions() error {
+	if features.rolloutLimit == nil && (len(features.rolloutReminders) > 0 || features.samplingWeight != nil || features.prefillWeight != nil) {
+		return errors.New("rollout budget options require --rollout-budget-tokens")
+	}
+	return nil
+}
+
+func (features runtimeFeatures) rolloutArguments() []string {
+	if features.rolloutLimit == nil || *features.rolloutLimit <= 1 {
+		return nil
+	}
+	limit := *features.rolloutLimit
+	overrides := []string{
+		"features.rollout_budget.enabled=true",
+		fmt.Sprintf("features.rollout_budget.limit_tokens=%d", limit),
+		"features.rollout_budget.reminder_at_remaining_tokens=[" + formatUintList(normalizeReminders(limit, features.rolloutReminders)) + "]",
+	}
+	if features.samplingWeight != nil {
+		overrides = append(overrides, "features.rollout_budget.sampling_token_weight="+formatFloat(*features.samplingWeight))
+	}
+	if features.prefillWeight != nil {
+		overrides = append(overrides, "features.rollout_budget.prefill_token_weight="+formatFloat(*features.prefillWeight))
+	}
+	return overrides
+}
+
+func (features runtimeFeatures) currentTimeArguments() []string {
+	if !features.currentTime && features.currentInterval == nil && features.currentClock == "" {
+		return nil
+	}
+	overrides := []string{"features.current_time_reminder.enabled=true"}
+	if features.currentInterval != nil && *features.currentInterval > 0 {
+		overrides = append(overrides, fmt.Sprintf("features.current_time_reminder.reminder_interval_seconds=%d", *features.currentInterval))
+	}
+	if features.currentClock != "" {
+		overrides = append(overrides, "features.current_time_reminder.clock_source="+strconv.Quote(features.currentClock))
+	}
+	return overrides
+}
+
+func configArguments(overrides []string) []string {
 	arguments := make([]string, 0, len(overrides)*2)
 	for _, override := range overrides {
 		arguments = append(arguments, "-c", override)
 	}
-	return arguments, nil
+	return arguments
 }
 
 func featureValue(arguments []string, index int, name string) (string, int, bool, error) {

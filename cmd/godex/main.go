@@ -25,6 +25,8 @@ import (
 	sessionusecase "github.com/christiandoxa/godex/internal/usecase/session"
 )
 
+const errorPrefix = "godex:"
+
 func main() {
 	os.Exit(run())
 }
@@ -35,7 +37,7 @@ func run() int {
 
 	settings, err := config.Load()
 	if err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, "godex:", err)
+		_, _ = fmt.Fprintln(os.Stderr, errorPrefix, err)
 		return 1
 	}
 
@@ -50,7 +52,7 @@ func run() int {
 	doctor := runtimeusecase.NewDoctor(store, process)
 	quotaClient, err := openai.NewQuotaClient(settings.UpstreamURL, nil, process)
 	if err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, "godex:", err)
+		_, _ = fmt.Fprintln(os.Stderr, errorPrefix, err)
 		return 1
 	}
 	quotaStatus := quotausecase.NewStatus(store, quotaClient)
@@ -93,6 +95,6 @@ func exitCode(ctx context.Context, err error) int {
 	if errors.Is(ctx.Err(), context.Canceled) || errors.Is(err, context.Canceled) {
 		return 130
 	}
-	_, _ = fmt.Fprintln(os.Stderr, "godex:", err)
+	_, _ = fmt.Fprintln(os.Stderr, errorPrefix, err)
 	return 1
 }

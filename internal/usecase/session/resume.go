@@ -48,41 +48,57 @@ func (catalog *Catalog) Resume(ctx context.Context, selector string) error {
 }
 
 func (catalog *Catalog) ResumeArguments(ctx context.Context, input sessionmodel.Launch) error {
-	accountSelector, selector, idIndex, arguments := input.AccountSelector, input.SessionSelector, input.IDIndex, input.Arguments
 	if catalog.launcher == nil {
 		return fmt.Errorf("session resume launcher is not configured")
 	}
-	report, err := catalog.Resolve(ctx, selector)
+	report, err := catalog.Resolve(ctx, input.SessionSelector)
 	if err != nil {
 		return err
 	}
-	if accountSelector != "" {
-		accounts, err := catalog.accounts.List(ctx)
-		if err != nil {
-			return err
-		}
-		matches := 0
-		for _, account := range accounts {
-			if account.Matches(accountSelector) {
-				matches++
-				if account.ID != report.AccountID {
-					return fmt.Errorf("selected account does not own session %q", selector)
-				}
-			}
-		}
-		if matches != 1 {
-			return fmt.Errorf("account selector is missing or ambiguous")
-		}
+	if err := catalog.validateAccountOwner(ctx, input.AccountSelector, report); err != nil {
+		return err
 	}
-	if idIndex < 0 || idIndex >= len(arguments) {
-		return fmt.Errorf("session argument index is invalid")
+	args, err := resolvedSessionArguments(input, report.ID)
+	if err != nil {
+		return err
 	}
-	args := append([]string(nil), arguments...)
-	args[idIndex] = input.IDPrefix + report.ID
 	if input.Local {
 		return catalog.launcher.RunLocal(ctx, report.AccountID, args)
 	}
 	return catalog.launcher.RunSession(ctx, report.AccountID, report.UpstreamAccountID, args)
+}
+
+func (catalog *Catalog) validateAccountOwner(ctx context.Context, selector string, report sessionmodel.Report) error {
+	if selector == "" {
+		return nil
+	}
+	accounts, err := catalog.accounts.List(ctx)
+	if err != nil {
+		return err
+	}
+	matches := 0
+	for _, account := range accounts {
+		if !account.Matches(selector) {
+			continue
+		}
+		matches++
+		if account.ID != report.AccountID {
+			return fmt.Errorf("selected account does not own session %q", report.ID)
+		}
+	}
+	if matches != 1 {
+		return fmt.Errorf("account selector is missing or ambiguous")
+	}
+	return nil
+}
+
+func resolvedSessionArguments(input sessionmodel.Launch, sessionID string) ([]string, error) {
+	if input.IDIndex < 0 || input.IDIndex >= len(input.Arguments) {
+		return nil, fmt.Errorf("session argument index is invalid")
+	}
+	args := append([]string(nil), input.Arguments...)
+	args[input.IDIndex] = input.IDPrefix + sessionID
+	return args, nil
 }
 
 func (catalog *Catalog) withOwner(ctx context.Context, report sessionmodel.Report) (sessionmodel.Report, error) {

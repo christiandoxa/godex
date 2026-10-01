@@ -9,38 +9,38 @@ func parseRunArguments(arguments []string) (string, []string, error) {
 	selector := ""
 	features := runtimeFeatures{}
 	for index := 0; index < len(arguments); {
-		argument := arguments[index]
-		if argument == "--" {
-			featureArguments, err := features.arguments()
-			if err != nil {
-				return "", nil, err
-			}
-			return selector, append(featureArguments, arguments[index+1:]...), nil
+		if arguments[index] == "--" {
+			return finishRunArguments(selector, features, arguments[index+1:])
 		}
-		if value, consumed, ok, err := accountValue(arguments, index); ok {
-			if err != nil {
-				return "", nil, err
-			}
+		value, next, handled, err := consumeWrapperArgument(arguments, index, &features)
+		if err != nil {
+			return "", nil, err
+		}
+		if !handled {
+			return finishRunArguments(selector, features, arguments[index:])
+		}
+		if value != "" {
 			selector = value
-			index += consumed
-			continue
 		}
-		next, handled, err := features.consume(arguments, index)
-		if err != nil {
-			return "", nil, err
-		}
-		if handled {
-			index = next
-			continue
-		}
-		featureArguments, err := features.arguments()
-		if err != nil {
-			return "", nil, err
-		}
-		return selector, append(featureArguments, arguments[index:]...), nil
+		index = next
 	}
+	return finishRunArguments(selector, features, nil)
+}
+
+func consumeWrapperArgument(arguments []string, index int, features *runtimeFeatures) (string, int, bool, error) {
+	if value, consumed, ok, err := accountValue(arguments, index); ok {
+		return value, index + consumed, true, err
+	}
+	next, handled, err := features.consume(arguments, index)
+	return "", next, handled, err
+}
+
+func finishRunArguments(selector string, features runtimeFeatures, remaining []string) (string, []string, error) {
 	featureArguments, err := features.arguments()
-	return selector, featureArguments, err
+	if err != nil {
+		return "", nil, err
+	}
+	return selector, append(featureArguments, remaining...), nil
 }
 
 func accountValue(arguments []string, index int) (string, int, bool, error) {

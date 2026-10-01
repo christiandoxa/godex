@@ -16,7 +16,7 @@ func TestCheckProxySupportAcceptsAndRejectsCapability(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("helper uses a POSIX executable")
 	}
-	for _, test := range []struct {
+	tests := []struct {
 		name     string
 		exit     string
 		wantErr  bool
@@ -25,9 +25,31 @@ func TestCheckProxySupportAcceptsAndRejectsCapability(t *testing.T) {
 		{name: "supported", exit: "0"},
 		{name: "relative executable", exit: "0", relative: true},
 		{name: "unsupported", exit: "1", wantErr: true},
-	} {
+	}
+	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			script := writeProxyHelper(t, `if [ "$#" -eq 1 ] && [ "$1" = "--version" ]; then
+			assertProxySupportCase(t, test.exit, test.wantErr, test.relative)
+		})
+	}
+}
+
+func assertProxySupportCase(t *testing.T, exit string, wantErr, relative bool) {
+	t.Helper()
+	script := writeProxyHelper(t, proxySupportScript(exit))
+	if relative {
+		script = relativeProxyHelperPath(t, script)
+	}
+	err := NewCodexProcess(script, Terminal{}).CheckProxySupport(context.Background())
+	if (err != nil) != wantErr {
+		t.Fatalf("capability error = %v", err)
+	}
+	if wantErr && !strings.Contains(err.Error(), "upgrade Codex") {
+		t.Fatalf("capability error = %v", err)
+	}
+}
+
+func proxySupportScript(exit string) string {
+	return `if [ "$#" -eq 1 ] && [ "$1" = "--version" ]; then
   printf 'codex-cli 0.159.2\n'
   exit 0
 fi
@@ -37,26 +59,20 @@ while [ "$1" = "-c" ]; do shift 2; done
 [ "$*" = "exec-server --listen stdio" ] || exit 2
 [ ! -f "$CODEX_HOME/auth.json" ] || exit 2
 [ "$(pwd -P)" = "$(cd "$CODEX_HOME" && pwd -P)" ] || exit 2
-exit `+test.exit)
-			if test.relative {
-				cwd, err := os.Getwd()
-				if err != nil {
-					t.Fatal(err)
-				}
-				script, err = filepath.Rel(cwd, script)
-				if err != nil {
-					t.Fatal(err)
-				}
-			}
-			err := NewCodexProcess(script, Terminal{}).CheckProxySupport(context.Background())
-			if (err != nil) != test.wantErr {
-				t.Fatalf("capability error = %v", err)
-			}
-			if test.wantErr && !strings.Contains(err.Error(), "upgrade Codex") {
-				t.Fatalf("capability error = %v", err)
-			}
-		})
+exit ` + exit
+}
+
+func relativeProxyHelperPath(t *testing.T, script string) string {
+	t.Helper()
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
 	}
+	relative, err := filepath.Rel(cwd, script)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return relative
 }
 
 func TestRunThroughProxyPreservesArgumentsAndHome(t *testing.T) {

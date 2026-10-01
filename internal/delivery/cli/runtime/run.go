@@ -22,36 +22,68 @@ func Run(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionus
 		return err
 	}
 	if index, args := sessionArgument(codexArguments); index >= 0 {
-		if sessions == nil {
-			return errors.New("session support is not configured")
-		}
-		command := nativeCommandIndex(args)
-		local := command >= 0 && (args[command] == "delete" || args[command] == "archive" || args[command] == "unarchive")
-		prefix, sessionSelector := "", args[index]
-		if value, ok := strings.CutPrefix(sessionSelector, "--thread="); ok {
-			prefix, sessionSelector = "--thread=", value
-		}
-		return sessions.ResumeArguments(ctx, sessionmodel.Launch{AccountSelector: selector, SessionSelector: sessionSelector, IDIndex: index, IDPrefix: prefix, Arguments: args, Local: local})
+		return runSessionArgument(ctx, sessions, selector, args, index)
 	}
 	if index := nativeCommandIndex(codexArguments); index >= 0 {
-		if unsafeNativeCommand(codexArguments, index) {
-			return errors.New("native command bypasses Godex routing; use godex exec or godex app-server without daemon/proxy")
-		}
-		switch codexArguments[index] {
-		case "logout":
-			return errors.New("use godex logout to safely mutate managed credentials")
-		case "login":
-			if status := nextCommandWord(codexArguments, index+1); status < 0 || codexArguments[status] != "status" {
-				return errors.New("use godex login to register and safely update managed credentials")
-			}
-			return runner.RunLocal(ctx, selector, codexArguments)
-		case "mcp", "features", "completion", "debug", "config", "delete", "archive", "unarchive", "version", "--version":
-			return runner.RunLocal(ctx, selector, codexArguments)
-		case "resume", "fork", "queue":
-			return runner.RunCurrent(ctx, selector, codexArguments)
+		if handled, err := runNativeCommand(ctx, runner, selector, codexArguments, index); handled {
+			return err
 		}
 	}
 	return runner.Run(ctx, selector, codexArguments)
+}
+
+func runSessionArgument(ctx context.Context, sessions *sessionusecase.Catalog, selector string, args []string, index int) error {
+	if sessions == nil {
+		return errors.New("session support is not configured")
+	}
+	command := nativeCommandIndex(args)
+	local := command >= 0 && localSessionCommand(args[command])
+	prefix, sessionSelector := splitThreadSelector(args[index])
+	return sessions.ResumeArguments(ctx, sessionmodel.Launch{
+		AccountSelector: selector,
+		SessionSelector: sessionSelector,
+		IDIndex:         index,
+		IDPrefix:        prefix,
+		Arguments:       args,
+		Local:           local,
+	})
+}
+
+func localSessionCommand(command string) bool {
+	return command == "delete" || command == "archive" || command == "unarchive"
+}
+
+func splitThreadSelector(value string) (string, string) {
+	if selector, ok := strings.CutPrefix(value, "--thread="); ok {
+		return "--thread=", selector
+	}
+	return "", value
+}
+
+func runNativeCommand(ctx context.Context, runner *runtimeusecase.Runner, selector string, arguments []string, index int) (bool, error) {
+	if unsafeNativeCommand(arguments, index) {
+		return true, errors.New("native command bypasses Godex routing; use godex exec or godex app-server without daemon/proxy")
+	}
+	switch arguments[index] {
+	case "logout":
+		return true, errors.New("use godex logout to safely mutate managed credentials")
+	case "login":
+		return true, runNativeLoginStatus(ctx, runner, selector, arguments, index)
+	case "mcp", "features", "completion", "debug", "config", "delete", "archive", "unarchive", "version", "--version":
+		return true, runner.RunLocal(ctx, selector, arguments)
+	case "resume", "fork", "queue":
+		return true, runner.RunCurrent(ctx, selector, arguments)
+	default:
+		return false, nil
+	}
+}
+
+func runNativeLoginStatus(ctx context.Context, runner *runtimeusecase.Runner, selector string, arguments []string, index int) error {
+	status := nextCommandWord(arguments, index+1)
+	if status < 0 || arguments[status] != "status" {
+		return errors.New("use godex login to register and safely update managed credentials")
+	}
+	return runner.RunLocal(ctx, selector, arguments)
 }
 
 func unsafeNativeCommand(args []string, command int) bool {
