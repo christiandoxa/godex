@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	sessionmodel "github.com/christiandoxa/godex/internal/model/session"
 )
 
@@ -46,5 +47,56 @@ func TestOutputJSONIDsCommandsAndControlCharacters(t *testing.T) {
 	var out bytes.Buffer
 	if err := printReports(&out, []sessionmodel.Report{}, listOptions{json: true}); err != nil || strings.TrimSpace(out.String()) != "[]" {
 		t.Fatalf("empty = %q, %v", out.String(), err)
+	}
+}
+
+func TestSessionTUIViewAndReferenceScrollKeys(t *testing.T) {
+	reports := []sessionmodel.Report{
+		{ID: "00000000-0000-4000-8000-000000000001", Profile: "work", ThreadName: "first", UpdatedAt: "2026-10-01T00:00:00Z", CWD: "/repo", ModelProvider: "openai"},
+		{ID: "00000000-0000-4000-8000-000000000002", Profile: "work", ThreadName: "second", UpdatedAt: "2026-10-01T00:01:00Z", CWD: "/repo", ModelProvider: "openai"},
+	}
+	model := newSessionTUIModel(reports, true, 8)
+	view := model.View()
+	for _, expected := range []string{"Godex Sessions", "2 session(s)", "first", "j/k/Up/Down", "q/Esc/Enter"} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("view missing %q: %q", expected, view)
+		}
+	}
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	model = updated.(sessionTUIModel)
+	if model.offset == 0 {
+		t.Fatal("j did not scroll down")
+	}
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyHome})
+	model = updated.(sessionTUIModel)
+	if model.offset != 0 {
+		t.Fatalf("home offset = %d", model.offset)
+	}
+	_, quit := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if quit == nil {
+		t.Fatal("enter did not quit")
+	}
+}
+
+func TestSessionTUILinesSanitizeUntrustedMetadata(t *testing.T) {
+	lines := sessionTUILines([]sessionmodel.Report{{
+		ID: "id\x1b[2J", ThreadName: "name\nnext", Profile: "", ModelProvider: "", CWD: "",
+	}})
+	rendered := strings.Join(lines, "\n")
+	if strings.ContainsRune(rendered, '\x1b') || strings.Contains(rendered, "name\nnext") {
+		t.Fatalf("unsafe TUI lines = %q", rendered)
+	}
+	if !strings.Contains(rendered, "profile -  provider -") || !strings.Contains(rendered, "cwd -") {
+		t.Fatalf("missing empty fallbacks: %q", rendered)
+	}
+}
+
+func TestSessionStaticTUIAutoQuits(t *testing.T) {
+	model := newSessionTUIModel(nil, false, 24)
+	if model.Init() == nil {
+		t.Fatal("static TUI did not auto-quit")
+	}
+	if !strings.Contains(model.View(), "No sessions found") {
+		t.Fatalf("empty view = %q", model.View())
 	}
 }

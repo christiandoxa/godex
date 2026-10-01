@@ -131,8 +131,8 @@ and eligibility validation stays in the runtime use case.
   supports install checks, bounded runtime tails, quota summaries, runtime JSON,
   and redacted private bundles; import-journal repair, full session-index repair,
   and policy suggestions remain. Existing status/quota/log, doctor panels, and
-  redeem-confirmation TUIs use Bubble Tea; session/login/password TUIs remain to
-  be implemented with Bubble Tea as the mandatory framework.
+  redeem-confirmation and human session-list TUIs use Bubble Tea; login/password
+  TUIs remain to be implemented with Bubble Tea as the mandatory framework.
 - Explicit self-update, best-effort cached update notices on eligible commands,
   manual reset-credit redemption, and cost-bearing `ping openai` diagnostics are
   implemented.
@@ -150,6 +150,11 @@ and eligibility validation stays in the runtime use case.
   retained deactivation; no second archive tree or changed removal default.
 - Native names/pickers/last remain profile-local rather than a shared-session UI.
   Explicit UUIDs/prefixes provide the cross-profile workflow.
+- Human `session list/current` now follows the Prodex TUI split using Bubble Tea:
+  short terminal lists render inline and return; longer terminal lists use a
+  scrollable alternate screen with j/k, arrows, PgUp/PgDn, Home/End, and
+  q/Esc/Enter exit controls. JSON, ID-only, resume-command, and non-TTY outputs
+  remain unchanged.
 - Doctor expansion now covers the observable 0.434.3 diagnostics that have real
   Godex data sources: `--install`, `--runtime`, `--quota`, 128 KiB default bounded
   `--tail-bytes`, `--runtime --json`, and `--bundle [PATH] --redacted`. Bundle

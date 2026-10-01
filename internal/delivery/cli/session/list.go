@@ -34,6 +34,9 @@ func Run(ctx context.Context, catalog *sessionusecase.Catalog, out io.Writer, ar
 	if err != nil {
 		return err
 	}
+	if sessionTUIEnabled(out, options) {
+		return runSessionTUI(ctx, out, reports)
+	}
 	return printReports(out, reports, options)
 }
 

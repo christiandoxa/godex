@@ -159,6 +159,11 @@ even when another account is active. Listing is read-only and does not expose
 conversation contents or credentials. Oversized stores fail with a bounded-scan
 error; incomplete rollouts without valid metadata are skipped.
 
+Human session lists use Bubble Tea when stdin/stdout are terminals. Short lists
+render inline and exit immediately; longer lists use a scrollable alternate screen
+with `j/k`, arrow keys, PgUp/PgDn, Home/End, and `q`/Esc/Enter to exit. JSON, ID,
+resume-command, and non-TTY outputs remain plain and deterministic.
+
 Inspect the installation:
 
 ~~~bash

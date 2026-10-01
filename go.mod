@@ -6,6 +6,7 @@ require (
 	github.com/agl/gcmsiv v0.0.0-20190418185415-e8dcd2f151dc
 	github.com/charmbracelet/bubbletea v1.3.10
 	golang.org/x/crypto v0.57.0
+	golang.org/x/term v0.46.0
 )
 
 require (
