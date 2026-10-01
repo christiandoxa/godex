@@ -36,7 +36,7 @@ shift
 while [ "$1" = "-c" ]; do shift 2; done
 [ "$*" = "exec-server --listen stdio" ] || exit 2
 [ ! -f "$CODEX_HOME/auth.json" ] || exit 2
-[ "$PWD" = "$CODEX_HOME" ] || exit 2
+[ "$(pwd -P)" = "$(cd "$CODEX_HOME" && pwd -P)" ] || exit 2
 exit `+test.exit)
 			if test.relative {
 				cwd, err := os.Getwd()

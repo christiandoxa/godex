@@ -70,8 +70,10 @@ func TestStagedHomeLifecycleStaysUnderPrivateTempDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if mode := info.Mode(); mode.Perm() != 0o700 {
-		t.Fatalf("staged home mode = %o", mode.Perm())
+	if runtime.GOOS != "windows" {
+		if mode := info.Mode(); mode.Perm() != 0o700 {
+			t.Fatalf("staged home mode = %o", mode.Perm())
+		}
 	}
 	if err := store.RemoveStagedHome(staged); err != nil {
 		t.Fatal(err)

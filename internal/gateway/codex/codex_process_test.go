@@ -27,11 +27,13 @@ func TestPrepareCodexHomeWritesPrivateFileStoreConfig(t *testing.T) {
 	if string(content) != codexFileCredentialConfig {
 		t.Fatalf("config = %q", content)
 	}
-	if mode := fileMode(t, home); mode.Perm() != 0o700 {
-		t.Fatalf("home mode = %o", mode.Perm())
-	}
-	if mode := fileMode(t, filepath.Join(home, "config.toml")); mode.Perm() != 0o600 {
-		t.Fatalf("config mode = %o", mode.Perm())
+	if runtime.GOOS != "windows" {
+		if mode := fileMode(t, home); mode.Perm() != 0o700 {
+			t.Fatalf("home mode = %o", mode.Perm())
+		}
+		if mode := fileMode(t, filepath.Join(home, "config.toml")); mode.Perm() != 0o600 {
+			t.Fatalf("config mode = %o", mode.Perm())
+		}
 	}
 }
 
