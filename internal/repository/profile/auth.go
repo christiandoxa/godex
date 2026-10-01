@@ -16,10 +16,11 @@ import (
 const (
 	maxProfileAuthBytes    = 2 << 20
 	profileAuthUnavailable = "profile authentication is unavailable"
+	profileAuthFileName    = "auth.json"
 )
 
 func (store *Store) ReadAuthJSON(codexHome string) ([]byte, error) {
-	path := filepath.Join(codexHome, "auth.json")
+	path := filepath.Join(codexHome, profileAuthFileName)
 	info, err := os.Lstat(path)
 	if err != nil {
 		return nil, errors.New(profileAuthUnavailable)
@@ -94,7 +95,7 @@ func (store *Store) stageImportedAuthHome(authJSON []byte) (string, error) {
 		_ = os.RemoveAll(staged)
 		return "", err
 	}
-	if _, err := fileutil.AtomicWrite(filepath.Join(staged, "auth.json"), authJSON); err != nil {
+	if _, err := fileutil.AtomicWrite(filepath.Join(staged, profileAuthFileName), authJSON); err != nil {
 		_ = os.RemoveAll(staged)
 		return "", err
 	}
@@ -119,7 +120,7 @@ func (store *Store) ReplaceAuth(ctx context.Context, name string, authJSON []byt
 		if index < 0 {
 			return fmt.Errorf(profileDoesNotExistFormat, name)
 		}
-		_, err = fileutil.AtomicWrite(filepath.Join(state.Profiles[index].CodexHome, "auth.json"), authJSON)
+		_, err = fileutil.AtomicWrite(filepath.Join(state.Profiles[index].CodexHome, profileAuthFileName), authJSON)
 		return err
 	})
 }
