@@ -9,6 +9,14 @@ import (
 	"strings"
 )
 
+const (
+	rolloutBudgetTokensFlag         = "--rollout-budget-tokens"
+	rolloutBudgetRemindersFlag      = "--rollout-budget-reminders"
+	rolloutBudgetSamplingWeightFlag = "--rollout-budget-sampling-weight"
+	rolloutBudgetPrefillWeightFlag  = "--rollout-budget-prefill-weight"
+	currentTimeReminderIntervalFlag = "--current-time-reminder-interval"
+)
+
 type runtimeFeatures struct {
 	webSearch          string
 	rolloutLimit       *uint64
@@ -25,18 +33,18 @@ func (features *runtimeFeatures) consume(arguments []string, index int) (next in
 	switch featureName(arguments[index]) {
 	case "--web-search":
 		return features.consumeWebSearch(arguments, index)
-	case "--rollout-budget-tokens":
+	case rolloutBudgetTokensFlag:
 		return features.consumeRolloutLimit(arguments, index)
-	case "--rollout-budget-reminders":
+	case rolloutBudgetRemindersFlag:
 		return features.consumeRolloutReminders(arguments, index)
-	case "--rollout-budget-sampling-weight":
+	case rolloutBudgetSamplingWeightFlag:
 		return features.consumeSamplingWeight(arguments, index)
-	case "--rollout-budget-prefill-weight":
+	case rolloutBudgetPrefillWeightFlag:
 		return features.consumePrefillWeight(arguments, index)
 	case "--current-time-reminder":
 		features.currentTime = true
 		return index + 1, true, nil
-	case "--current-time-reminder-interval":
+	case currentTimeReminderIntervalFlag:
 		return features.consumeCurrentInterval(arguments, index)
 	case "--current-time-clock-source":
 		return features.consumeCurrentClock(arguments, index)
@@ -67,8 +75,8 @@ func (features *runtimeFeatures) consumeWebSearch(arguments []string, index int)
 }
 
 func (features *runtimeFeatures) consumeRolloutLimit(arguments []string, index int) (int, bool, error) {
-	value, consumed, _, prior := featureValue(arguments, index, "--rollout-budget-tokens")
-	parsed, err := parseUintFeature("--rollout-budget-tokens", value, prior)
+	value, consumed, _, prior := featureValue(arguments, index, rolloutBudgetTokensFlag)
+	parsed, err := parseUintFeature(rolloutBudgetTokensFlag, value, prior)
 	if err != nil {
 		return index, true, err
 	}
@@ -77,8 +85,8 @@ func (features *runtimeFeatures) consumeRolloutLimit(arguments []string, index i
 }
 
 func (features *runtimeFeatures) consumeRolloutReminders(arguments []string, index int) (int, bool, error) {
-	value, consumed, _, prior := featureValue(arguments, index, "--rollout-budget-reminders")
-	parsed, err := parseUintListFeature("--rollout-budget-reminders", value, prior)
+	value, consumed, _, prior := featureValue(arguments, index, rolloutBudgetRemindersFlag)
+	parsed, err := parseUintListFeature(rolloutBudgetRemindersFlag, value, prior)
 	if err != nil {
 		return index, true, err
 	}
@@ -87,8 +95,8 @@ func (features *runtimeFeatures) consumeRolloutReminders(arguments []string, ind
 }
 
 func (features *runtimeFeatures) consumeSamplingWeight(arguments []string, index int) (int, bool, error) {
-	value, consumed, _, prior := featureValue(arguments, index, "--rollout-budget-sampling-weight")
-	parsed, err := parseFloatFeature("--rollout-budget-sampling-weight", value, prior)
+	value, consumed, _, prior := featureValue(arguments, index, rolloutBudgetSamplingWeightFlag)
+	parsed, err := parseFloatFeature(rolloutBudgetSamplingWeightFlag, value, prior)
 	if err != nil {
 		return index, true, err
 	}
@@ -97,8 +105,8 @@ func (features *runtimeFeatures) consumeSamplingWeight(arguments []string, index
 }
 
 func (features *runtimeFeatures) consumePrefillWeight(arguments []string, index int) (int, bool, error) {
-	value, consumed, _, prior := featureValue(arguments, index, "--rollout-budget-prefill-weight")
-	parsed, err := parseFloatFeature("--rollout-budget-prefill-weight", value, prior)
+	value, consumed, _, prior := featureValue(arguments, index, rolloutBudgetPrefillWeightFlag)
+	parsed, err := parseFloatFeature(rolloutBudgetPrefillWeightFlag, value, prior)
 	if err != nil {
 		return index, true, err
 	}
@@ -107,8 +115,8 @@ func (features *runtimeFeatures) consumePrefillWeight(arguments []string, index 
 }
 
 func (features *runtimeFeatures) consumeCurrentInterval(arguments []string, index int) (int, bool, error) {
-	value, consumed, _, prior := featureValue(arguments, index, "--current-time-reminder-interval")
-	parsed, err := parseUintFeature("--current-time-reminder-interval", value, prior)
+	value, consumed, _, prior := featureValue(arguments, index, currentTimeReminderIntervalFlag)
+	parsed, err := parseUintFeature(currentTimeReminderIntervalFlag, value, prior)
 	if err != nil {
 		return index, true, err
 	}
