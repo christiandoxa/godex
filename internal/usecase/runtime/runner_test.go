@@ -439,14 +439,15 @@ func TestRunProfileBuildsSingleHomeProxyPool(t *testing.T) {
 		return proxy, nil
 	})
 	runner.SetUpstreamURL("http://upstream.test/backend-api")
-	if err := runner.RunProfile(context.Background(), "/profiles/standalone", []string{"exec", "hello"}); err != nil {
+	home := t.TempDir()
+	if err := runner.RunProfile(context.Background(), home, []string{"exec", "hello"}); err != nil {
 		t.Fatal(err)
 	}
-	if !process.checked || process.home != "/profiles/standalone" || !proxy.started || !proxy.closed {
+	if !process.checked || process.home != home || !proxy.started || !proxy.closed {
 		t.Fatalf("profile proxy lifecycle = process:%#v proxy:%#v", process, proxy)
 	}
 	profiles, err := config.Accounts(context.Background())
-	if err != nil || len(profiles) != 1 || profiles[0].Home != "/profiles/standalone" || !profiles[0].Enabled {
+	if err != nil || len(profiles) != 1 || profiles[0].Home != home || !profiles[0].Enabled {
 		t.Fatalf("profile pool = %#v, err = %v", profiles, err)
 	}
 	if config.PreferredAccount == "" || config.PreferredAccount != profiles[0].ID || len(config.PreferredAccount) != 32 {

@@ -105,10 +105,11 @@ func TestLaunchRefreshesAlternativeEligibilityAfterLease(t *testing.T) {
 func TestRunHomeUsesExplicitCodexHomeWithoutAccountSelection(t *testing.T) {
 	process := &fakeProcess{}
 	runner := NewRunner(&fakeLaunchAccounts{}, process, nil)
-	if err := runner.RunHome(context.Background(), "/profiles/external", []string{"features", "list"}); err != nil {
+	home := t.TempDir()
+	if err := runner.RunHome(context.Background(), home, []string{"features", "list"}); err != nil {
 		t.Fatal(err)
 	}
-	if len(process.homes) != 1 || process.homes[0] != "/profiles/external" {
+	if len(process.homes) != 1 || process.homes[0] != home {
 		t.Fatalf("homes = %#v", process.homes)
 	}
 	if len(process.args) != 1 || len(process.args[0]) != 2 || process.args[0][0] != "features" {

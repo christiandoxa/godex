@@ -3,6 +3,7 @@ package profile
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -45,7 +46,9 @@ func (fake *fakeAccounts) RemoveProfile(_ context.Context, selector string, _ bo
 	}
 	return accountentity.Account{}, errors.New("not found")
 }
-func (fake *fakeAccounts) CodexHome(id string) string { return filepath.Join("/managed", id, "codex") }
+func (fake *fakeAccounts) CodexHome(id string) string {
+	return filepath.Join(os.TempDir(), "godex-profile-test", id, "codex")
+}
 
 func TestCatalogBridgesAccountProfilesAndNewProfiles(t *testing.T) {
 	repo := profilerepo.NewStore(t.TempDir())
@@ -72,11 +75,11 @@ func TestCatalogBridgesAccountProfilesAndNewProfiles(t *testing.T) {
 func TestCatalogRejectsDuplicateNamesAndHomes(t *testing.T) {
 	repo := profilerepo.NewStore(t.TempDir())
 	accounts := &fakeAccounts{values: []accountentity.Account{{ID: "account-id", Name: "legacy", Enabled: true}}, current: "account-id"}
-	catalog := NewCatalog(repo, accounts, "/managed/account-id/codex")
+	catalog := NewCatalog(repo, accounts, accounts.CodexHome("account-id"))
 	if _, err := catalog.Add(context.Background(), profilemodel.AddRequest{Name: "legacy"}); err == nil {
 		t.Fatal("duplicate name accepted")
 	}
-	if _, err := catalog.Add(context.Background(), profilemodel.AddRequest{Name: "external", CodexHome: "/managed/account-id/codex", Insecure: true}); err == nil {
+	if _, err := catalog.Add(context.Background(), profilemodel.AddRequest{Name: "external", CodexHome: accounts.CodexHome("account-id"), Insecure: true}); err == nil {
 		t.Fatal("duplicate home accepted")
 	}
 }

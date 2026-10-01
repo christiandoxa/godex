@@ -19,6 +19,8 @@ import (
 	"github.com/christiandoxa/godex/internal/version"
 )
 
+const importCurrentCommand = "import-current"
+
 type App struct {
 	login      *authusecase.Login
 	importer   *authusecase.ImportCurrent
@@ -119,14 +121,14 @@ func (app *App) runRuntime(ctx context.Context, arguments []string) error {
 }
 
 func (app *App) runAccountGroup(ctx context.Context, arguments []string) error {
-	if len(arguments) > 0 && arguments[0] == "import-current" {
+	if len(arguments) > 0 && arguments[0] == importCurrentCommand {
 		return authcli.ImportCurrent(ctx, app.importer, app.out, arguments[1:])
 	}
 	return accountcli.Run(ctx, app.accounts, app.out, arguments)
 }
 
 func (app *App) runProfileGroup(ctx context.Context, arguments []string) error {
-	if len(arguments) > 0 && arguments[0] == "import-current" {
+	if len(arguments) > 0 && arguments[0] == importCurrentCommand {
 		return authcli.ImportCurrent(ctx, app.importer, app.out, arguments[1:])
 	}
 	if app.profiles == nil {
