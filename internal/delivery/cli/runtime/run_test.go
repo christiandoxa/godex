@@ -8,6 +8,7 @@ import (
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
 	sessionentity "github.com/christiandoxa/godex/internal/entity/session"
+	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
 	sessionusecase "github.com/christiandoxa/godex/internal/usecase/session"
 )
@@ -173,5 +174,27 @@ func TestNativeSessionDeliveryPreservesOptionsAndResolvesPrefix(t *testing.T) {
 		if accounts.selected != "unchanged" || !strings.Contains(strings.Join(process.arguments, " "), "00000000-0000-4000-8000-000000000001") {
 			t.Fatalf("native session lost its owner: %v", process.arguments)
 		}
+	}
+}
+
+func TestLaunchRuntimeProviderSupportsCopilotOnly(t *testing.T) {
+	host, login := "https://github.com", "octocat"
+	apiURL := "https://api.githubcopilot.com"
+	provider, err := launchRuntimeProvider(profilemodel.LaunchTarget{
+		Name: "copilot-work", Provider: "copilot",
+		ProviderConfig: profilemodel.ProviderSnapshot{Kind: "copilot", Host: &host, Login: &login, APIURL: &apiURL},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if provider.Kind != "copilot" || provider.Name != "copilot-work" || provider.Host != host || provider.Login != login || provider.APIURL != apiURL || provider.DefaultModel != "gpt-5.3-codex" || provider.ContextWindow != 272000 || provider.AutoCompactLimit != 258400 {
+		t.Fatalf("Copilot provider = %#v", provider)
+	}
+	openAI, err := launchRuntimeProvider(profilemodel.LaunchTarget{Provider: "openai"})
+	if err != nil || openAI.Kind != "" {
+		t.Fatalf("OpenAI provider = %#v, err = %v", openAI, err)
+	}
+	if _, err := launchRuntimeProvider(profilemodel.LaunchTarget{Provider: "anthropic"}); err == nil || !strings.Contains(err.Error(), "not implemented") {
+		t.Fatalf("unsupported provider error = %v", err)
 	}
 }

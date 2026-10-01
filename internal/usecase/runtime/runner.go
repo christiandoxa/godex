@@ -35,6 +35,7 @@ type Runner struct {
 	process  codexProcess
 	newProxy ProxyFactory
 	quota    quotaPreflight
+	catalog  providerCatalogStore
 	upstream string
 }
 
@@ -44,6 +45,10 @@ func NewRunner(accounts launchAccounts, process codexProcess, newProxy ProxyFact
 
 func (runner *Runner) SetQuotaPreflight(preflight quotaPreflight) {
 	runner.quota = preflight
+}
+
+func (runner *Runner) SetProviderCatalogStore(store providerCatalogStore) {
+	runner.catalog = store
 }
 
 func (runner *Runner) SetUpstreamURL(upstream string) {
@@ -78,10 +83,16 @@ func (runner *Runner) launch(ctx context.Context, homeID, preferredID string, pr
 	if err != nil {
 		return err
 	}
-	return runner.launchHome(ctx, runner.accounts.CodexHome(homeID), preferredID, profiles, arguments)
+	return runner.launchHome(ctx, runner.accounts.CodexHome(homeID), preferredID, proxyconfig.Provider{}, profiles, arguments)
 }
 
-func (runner *Runner) launchHome(ctx context.Context, home, preferredID string, profiles []proxyconfig.Account, arguments []string) (runErr error) {
+func (runner *Runner) launchHome(
+	ctx context.Context,
+	home, preferredID string,
+	provider proxyconfig.Provider,
+	profiles []proxyconfig.Account,
+	arguments []string,
+) (runErr error) {
 	proxyRunner, ok := runner.process.(proxyCodex)
 	if !ok {
 		return runner.process.Run(ctx, home, arguments)
@@ -93,8 +104,10 @@ func (runner *Runner) launchHome(ctx context.Context, home, preferredID string, 
 		return err
 	}
 	proxy, err := runner.newProxy(proxyconfig.Config{
+		Context:          ctx,
 		UpstreamURL:      runner.upstream,
 		PreferredAccount: preferredID,
+		Provider:         provider,
 		Accounts: func(ctx context.Context) ([]proxyconfig.Account, error) {
 			if err := ctx.Err(); err != nil {
 				return nil, err
@@ -105,10 +118,14 @@ func (runner *Runner) launchHome(ctx context.Context, home, preferredID string, 
 	if err != nil {
 		return err
 	}
+	runtimeArguments, err := prepareProviderRuntimeArguments(runner.catalog, home, provider, arguments)
+	if err != nil {
+		return err
+	}
 	if err := proxy.Start(); err != nil {
 		return err
 	}
-	runErr = proxyRunner.RunThroughProxy(ctx, home, proxy.Endpoint(), arguments)
+	runErr = proxyRunner.RunThroughProxy(ctx, home, proxy.Endpoint(), runtimeArguments)
 	closeContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
 	if closeErr := proxy.Close(closeContext); runErr == nil {

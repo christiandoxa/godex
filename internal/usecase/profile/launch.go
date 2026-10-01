@@ -40,6 +40,7 @@ func launchTarget(report Report) profilemodel.LaunchTarget {
 	return profilemodel.LaunchTarget{
 		Name: report.Profile.Name, CodexHome: report.Profile.CodexHome,
 		AccountID: report.AccountID, Provider: string(report.Profile.Provider.Kind),
+		ProviderConfig: providerSnapshotFromEntity(report.Profile.Provider),
 	}
 }
 
@@ -52,5 +53,8 @@ func (catalog *Catalog) ActiveLaunch(ctx context.Context) (profilemodel.LaunchTa
 	if err != nil || !active {
 		return profilemodel.LaunchTarget{}, active, err
 	}
-	return profilemodel.LaunchTarget{Name: profile.Name, CodexHome: profile.CodexHome, Provider: string(profile.Provider.Kind)}, true, nil
+	return profilemodel.LaunchTarget{
+		Name: profile.Name, CodexHome: profile.CodexHome, Provider: string(profile.Provider.Kind),
+		ProviderConfig: providerSnapshotFromEntity(profile.Provider),
+	}, true, nil
 }

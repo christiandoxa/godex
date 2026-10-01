@@ -1,0 +1,760 @@
+[
+  {
+    "provider": "copilot",
+    "owned_by": "github-copilot",
+    "id": "gpt-5.6-luna",
+    "display_name": "GPT-5.6 Luna",
+    "description": "GPT-5.6 Luna model exposed through GitHub Copilot.",
+    "context_window_tokens": 1000000,
+    "supported_reasoning_efforts": [
+      "none",
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max"
+    ],
+    "default_reasoning_effort": "medium",
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [
+      "luna"
+    ],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "copilot",
+    "owned_by": "github-copilot",
+    "id": "auto",
+    "display_name": "Copilot Auto",
+    "description": "GitHub Copilot alias routed through provider fallback.",
+    "context_window_tokens": 1000000,
+    "supported_reasoning_efforts": [
+      "none",
+      "low",
+      "medium",
+      "high",
+      "xhigh"
+    ],
+    "default_reasoning_effort": "medium",
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [
+      "default"
+    ],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "copilot",
+    "owned_by": "github-copilot",
+    "id": "codex",
+    "display_name": "Copilot Codex",
+    "description": "GitHub Copilot Codex alias routed through provider fallback.",
+    "context_window_tokens": 1000000,
+    "supported_reasoning_efforts": [
+      "none",
+      "low",
+      "medium",
+      "high",
+      "xhigh"
+    ],
+    "default_reasoning_effort": "medium",
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [
+      "pro"
+    ],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "copilot",
+    "owned_by": "github-copilot",
+    "id": "gpt-5.3-codex",
+    "display_name": "GPT-5.3 Codex",
+    "description": "GitHub Copilot model exposed through Prodex.",
+    "context_window_tokens": 1000000,
+    "supported_reasoning_efforts": [
+      "none",
+      "low",
+      "medium",
+      "high",
+      "xhigh"
+    ],
+    "default_reasoning_effort": "medium",
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "copilot",
+    "owned_by": "github-copilot",
+    "id": "gpt-5.5",
+    "display_name": "GPT-5.5",
+    "description": "GitHub Copilot model exposed through Prodex.",
+    "context_window_tokens": 1000000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [
+      "best"
+    ],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "copilot",
+    "owned_by": "github-copilot",
+    "id": "gpt-5.4",
+    "display_name": "GPT-5.4",
+    "description": "GitHub Copilot model exposed through Prodex.",
+    "context_window_tokens": 1000000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "copilot",
+    "owned_by": "github-copilot",
+    "id": "gpt-5.4-mini",
+    "display_name": "GPT-5.4 Mini",
+    "description": "GitHub Copilot model exposed through Prodex.",
+    "context_window_tokens": 400000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [
+      "mini"
+    ],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "copilot",
+    "owned_by": "github-copilot",
+    "id": "gpt-5.4-nano",
+    "display_name": "GPT-5.4 Nano",
+    "description": "GitHub Copilot model exposed through Prodex.",
+    "context_window_tokens": 400000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [
+      "nano"
+    ],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "copilot",
+    "owned_by": "github-copilot",
+    "id": "gpt-5-mini",
+    "display_name": "GPT-5 Mini",
+    "description": "GitHub Copilot model exposed through Prodex.",
+    "context_window_tokens": 400000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "copilot",
+    "owned_by": "github-copilot",
+    "id": "claude-sonnet-4-6",
+    "display_name": "Claude Sonnet 4.6",
+    "description": "GitHub Copilot model exposed through Prodex.",
+    "context_window_tokens": 1000000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [
+      "claude",
+      "sonnet"
+    ],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "copilot",
+    "owned_by": "github-copilot",
+    "id": "claude-opus-4-8",
+    "display_name": "Claude Opus 4.8",
+    "description": "GitHub Copilot model exposed through Prodex.",
+    "context_window_tokens": 1000000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [
+      "opus"
+    ],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "copilot",
+    "owned_by": "github-copilot",
+    "id": "claude-opus-4-7",
+    "display_name": "Claude Opus 4.7",
+    "description": "GitHub Copilot model exposed through Prodex.",
+    "context_window_tokens": 1000000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "copilot",
+    "owned_by": "github-copilot",
+    "id": "claude-opus-4-6-fast",
+    "display_name": "Claude Opus 4.6 Fast",
+    "description": "GitHub Copilot model exposed through Prodex.",
+    "context_window_tokens": 1000000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "copilot",
+    "owned_by": "github-copilot",
+    "id": "claude-opus-4-6",
+    "display_name": "Claude Opus 4.6",
+    "description": "GitHub Copilot model exposed through Prodex.",
+    "context_window_tokens": 1000000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "copilot",
+    "owned_by": "github-copilot",
+    "id": "claude-opus-4-5",
+    "display_name": "Claude Opus 4.5",
+    "description": "GitHub Copilot model exposed through Prodex.",
+    "context_window_tokens": 200000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "copilot",
+    "owned_by": "github-copilot",
+    "id": "claude-fable-5",
+    "display_name": "Claude Fable 5",
+    "description": "GitHub Copilot model exposed through Prodex.",
+    "context_window_tokens": 1000000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "copilot",
+    "owned_by": "github-copilot",
+    "id": "claude-sonnet-4-5",
+    "display_name": "Claude Sonnet 4.5",
+    "description": "GitHub Copilot model exposed through Prodex.",
+    "context_window_tokens": 200000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "copilot",
+    "owned_by": "github-copilot",
+    "id": "claude-haiku-4-5",
+    "display_name": "Claude Haiku 4.5",
+    "description": "GitHub Copilot model exposed through Prodex.",
+    "context_window_tokens": 200000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [
+      "haiku"
+    ],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "copilot",
+    "owned_by": "github-copilot",
+    "id": "gemini-3.1-pro-preview",
+    "display_name": "Gemini 3.1 Pro Preview",
+    "description": "GitHub Copilot model exposed through Prodex.",
+    "context_window_tokens": 1048576,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [
+      "gemini"
+    ],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "copilot",
+    "owned_by": "github-copilot",
+    "id": "gemini-2.5-pro",
+    "display_name": "Gemini 2.5 Pro",
+    "description": "GitHub Copilot model exposed through Prodex.",
+    "context_window_tokens": 1048576,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "copilot",
+    "owned_by": "github-copilot",
+    "id": "gemini-3-flash",
+    "display_name": "Gemini 3 Flash",
+    "description": "GitHub Copilot model exposed through Prodex.",
+    "context_window_tokens": 1048576,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [
+      "flash"
+    ],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "copilot",
+    "owned_by": "github-copilot",
+    "id": "gemini-3.5-flash",
+    "display_name": "Gemini 3.5 Flash",
+    "description": "GitHub Copilot model exposed through Prodex.",
+    "context_window_tokens": 1048576,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "copilot",
+    "owned_by": "github-copilot",
+    "id": "mai-code-1-flash",
+    "display_name": "MAI-Code-1-Flash",
+    "description": "GitHub Copilot model exposed through Prodex.",
+    "context_window_tokens": 400000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "copilot",
+    "owned_by": "github-copilot",
+    "id": "raptor-mini",
+    "display_name": "Raptor Mini",
+    "description": "GitHub Copilot model exposed through Prodex.",
+    "context_window_tokens": 400000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "copilot",
+    "owned_by": "github-copilot",
+    "id": "gpt-5.1-codex",
+    "display_name": "GPT-5.1 Codex",
+    "description": "Legacy GitHub Copilot model kept for compatibility.",
+    "context_window_tokens": 400000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "copilot",
+    "owned_by": "github-copilot",
+    "id": "gpt-4o",
+    "display_name": "GPT-4o",
+    "description": "Legacy GitHub Copilot model kept as a safe fallback.",
+    "context_window_tokens": 400000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  }
+]

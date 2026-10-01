@@ -13,7 +13,9 @@ type Account struct {
 }
 
 type Config struct {
+	Context          context.Context
 	UpstreamURL      string
 	PreferredAccount string
+	Provider         Provider
 	Accounts         func(context.Context) ([]Account, error)
 }

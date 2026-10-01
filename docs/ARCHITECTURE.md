@@ -6,7 +6,7 @@ Godex is a deliberately small orchestration layer around the official Codex CLI.
 
 ## Context
 
-The behavioral reference project grew into a large multi-provider Rust workspace. Godex does not reproduce that design. It preserves only the OpenAI behaviors needed for a maintainable first release.
+The behavioral reference project grew into a large multi-provider Rust workspace. Godex does not reproduce that internal design. It preserves the reference behavior through narrow provider gateways and use-case policies while keeping the verified OpenAI/Codex path as the stability baseline.
 
 ## Dependency direction
 
@@ -128,6 +128,13 @@ owned by the external Copilot config/keychain boundary. `gateway/copilot` owns
 built-in Copilot discovery and is the only layer allowed to touch `config.json`,
 keytar/libsecret/SDK credential fallbacks, or the authenticated user-info request;
 it returns only tokenless provider metadata to `usecase/profile`.
+The same gateway owns the Copilot Responses transport and launch-time runtime-auth
+resolution; bearer credentials never leave that gateway. `repository/runtime`
+owns private bounded runtime/final model-catalog files, while `usecase/runtime`
+owns launch-model/config precedence and converts the exact 0.434.3 Copilot catalog
+snapshots plus account `/models` metadata into Codex `model_catalog_json`. This
+keeps provider HTTP/auth mechanics out of delivery and keeps filesystem policy
+out of the gateway.
 
 ### Quota gateway and preflight
 

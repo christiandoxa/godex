@@ -154,6 +154,23 @@ and are never persisted in Godex profile state or bundle payloads. Identity
 matching uses trimmed host + config login, default names use `copilot-<login>`,
 and a different `--name` is rejected when that account is already imported.
 
+
+Copilot model traffic now has a foreground Responses bridge for a selected or
+active Copilot profile. Godex resolves the external Copilot token at launch,
+prefers direct OAuth `/models` auth with the legacy token exchange as fallback,
+forwards `/responses` and `/responses/compact` with Prodex-compatible headers,
+canonicalizes Copilot model aliases, strips non-compaction encrypted content,
+and detects agent/vision inputs for Copilot request headers. The launch also
+writes private bounded Copilot model catalogs: the exact Prodex `0.434.3`
+provider/static catalog is merged with account `/models` metadata, per-model
+prompt/context limits drive Codex context and auto-compaction budgets, and an
+explicit user `model_catalog_json` override always wins.
+
+This checkpoint is deliberately single-profile. Copilot multi-profile credential
+rotation and continuation affinity, in-process credential refresh, pre-commit
+model fallback retries, and chat-compatible/custom-instruction surfaces remain
+part of the `0.434.3` runtime parity backlog.
+
 Prodex-compatible Codex runtime feature flags are translated to Codex `-c`
 overrides before the remaining Codex arguments. Explicit later Codex `-c`
 arguments still win:

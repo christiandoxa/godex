@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
+	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	runtimemodel "github.com/christiandoxa/godex/internal/model/runtime"
 	sessionmodel "github.com/christiandoxa/godex/internal/model/session"
 	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
@@ -93,24 +94,54 @@ func runLaunchTarget(
 	if target.AccountID != "" {
 		return runParsed(ctx, runner, sessions, target.AccountID, arguments)
 	}
-	if target.Provider != "" && target.Provider != "openai" {
-		return fmt.Errorf("profile provider %q is not implemented yet", target.Provider)
-	}
 	if profiles == nil || target.Name == "" {
 		return errors.New("profile launch metadata is incomplete")
+	}
+	provider, err := launchRuntimeProvider(target)
+	if err != nil {
+		return err
 	}
 	release, err := profiles.AcquireLaunch(ctx, target.Name)
 	if err != nil {
 		return err
 	}
 	defer func() { runErr = errors.Join(runErr, release()) }()
-	return runStandaloneProfile(ctx, runner, target.CodexHome, arguments)
+	return runStandaloneProfile(ctx, runner, target.CodexHome, provider, arguments)
 }
 
-func runStandaloneProfile(ctx context.Context, runner *runtimeusecase.Runner, home string, arguments []string) error {
+func launchRuntimeProvider(target profilemodel.LaunchTarget) (proxymodel.Provider, error) {
+	switch target.Provider {
+	case "", "openai":
+		return proxymodel.Provider{}, nil
+	case "copilot":
+		return runtimeusecase.CopilotProvider(
+			target.Name,
+			optionalProviderValue(target.ProviderConfig.Host),
+			optionalProviderValue(target.ProviderConfig.Login),
+			optionalProviderValue(target.ProviderConfig.APIURL),
+		), nil
+	default:
+		return proxymodel.Provider{}, fmt.Errorf("profile provider %q is not implemented yet", target.Provider)
+	}
+}
+
+func optionalProviderValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return strings.TrimSpace(*value)
+}
+
+func runStandaloneProfile(ctx context.Context, runner *runtimeusecase.Runner, home string, provider proxymodel.Provider, arguments []string) error {
+	runModel := func(args []string) error {
+		if provider.Kind == "" {
+			return runner.RunProfile(ctx, home, args)
+		}
+		return runner.RunProviderProfile(ctx, home, provider, args)
+	}
 	if index, args := sessionArgument(arguments); index >= 0 {
 		_ = index
-		return runner.RunProfile(ctx, home, args)
+		return runModel(args)
 	}
 	if index := nativeCommandIndex(arguments); index >= 0 {
 		if unsafeNativeCommand(arguments, index) {
@@ -124,10 +155,10 @@ func runStandaloneProfile(ctx context.Context, runner *runtimeusecase.Runner, ho
 		case "mcp", "features", "completion", "debug", "config", "delete", "archive", "unarchive", "version", "--version":
 			return runner.RunHome(ctx, home, arguments)
 		case "resume", "fork", "queue":
-			return runner.RunProfile(ctx, home, arguments)
+			return runModel(arguments)
 		}
 	}
-	return runner.RunProfile(ctx, home, arguments)
+	return runModel(arguments)
 }
 
 func runStandaloneLoginStatus(ctx context.Context, runner *runtimeusecase.Runner, home string, arguments []string, index int) error {

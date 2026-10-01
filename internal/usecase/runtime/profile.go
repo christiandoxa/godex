@@ -20,7 +20,19 @@ func (runner *Runner) RunProfile(ctx context.Context, codexHome string, args []s
 		return err
 	}
 	profileID := profileRoutingID(home)
-	return runner.launchHome(ctx, home, profileID, []proxymodel.Account{{ID: profileID, Home: home, Enabled: true}}, args)
+	return runner.launchHome(ctx, home, profileID, proxymodel.Provider{}, []proxymodel.Account{{ID: profileID, Home: home, Enabled: true}}, args)
+}
+
+func (runner *Runner) RunProviderProfile(ctx context.Context, codexHome string, provider proxymodel.Provider, args []string) error {
+	home, err := validateRuntimeHome(codexHome)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(provider.Kind) == "" {
+		return errors.New("runtime provider kind is required")
+	}
+	profileID := profileRoutingID(provider.Kind + ":" + home)
+	return runner.launchHome(ctx, home, profileID, provider, []proxymodel.Account{{ID: profileID, Home: home, Enabled: true}}, args)
 }
 
 func validateRuntimeHome(codexHome string) (string, error) {

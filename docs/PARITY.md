@@ -121,9 +121,14 @@ and eligibility validation stays in the runtime use case.
 - All Godex equivalents of Prodex TUI surfaces must use Bubble Tea. Live status,
   quota watch, log stream/upstream, and redeem confirmation have been migrated;
   non-TTY fallbacks remain line-oriented.
-- Multi-provider runtime/login bridges (Gemini, Anthropic/Claude, Copilot, Kiro,
-  DeepSeek/local/AGY where present in Prodex), including provider catalogs and
-  provider-specific auth/routing semantics.
+- Multi-provider runtime/login parity remains incomplete for Gemini,
+  Anthropic/Claude, Kiro, DeepSeek/local/AGY where present in Prodex. Copilot now
+  has a single-profile foreground Responses bridge with external credential
+  resolution, direct/legacy runtime auth, Prodex-compatible request/header policy,
+  and private model catalogs built from the exact 0.434.3 static provider data
+  plus account `/models` metadata. Copilot still lacks multi-profile credential
+  rotation/continuation affinity, in-process auth refresh, pre-commit model
+  fallback retries, and chat-compatible/custom-instruction surfaces.
 - Super mode and its hidden expose/broker/MCP bridge/sub-agent execution stack,
   including optional Presidio integration.
 - The standalone gateway surface, remaining live TUI parity, process/resource

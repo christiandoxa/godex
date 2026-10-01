@@ -16,10 +16,11 @@ type RemoveRequest struct {
 }
 
 type LaunchTarget struct {
-	Name      string
-	CodexHome string
-	AccountID string
-	Provider  string
+	Name           string
+	CodexHome      string
+	AccountID      string
+	Provider       string
+	ProviderConfig ProviderSnapshot
 }
 
 type Summary struct {

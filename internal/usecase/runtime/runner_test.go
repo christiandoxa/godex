@@ -8,6 +8,7 @@ import (
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
 	proxyconfig "github.com/christiandoxa/godex/internal/model/proxy"
+	runtimerepo "github.com/christiandoxa/godex/internal/repository/runtime"
 )
 
 type fakeLaunchAccounts struct {
@@ -452,5 +453,52 @@ func TestRunProfileBuildsSingleHomeProxyPool(t *testing.T) {
 	}
 	if config.PreferredAccount == "" || config.PreferredAccount != profiles[0].ID || len(config.PreferredAccount) != 32 {
 		t.Fatalf("profile routing id = %q, pool = %#v", config.PreferredAccount, profiles)
+	}
+}
+
+func TestRunProviderProfilePropagatesCopilotConfigAndDefaults(t *testing.T) {
+	process := &fakeProxyProcess{}
+	proxy := &fakeProxy{}
+	var config proxyconfig.Config
+	runner := NewRunner(&fakeLaunchAccounts{}, process, func(got proxyconfig.Config) (Proxy, error) {
+		config = got
+		return proxy, nil
+	})
+	runner.SetProviderCatalogStore(runtimerepo.NewProviderCatalogStore())
+	provider := CopilotProvider("copilot-work", "https://github.com", "octocat", "https://api.githubcopilot.com")
+	home := t.TempDir()
+	ctx := context.WithValue(context.Background(), testContextKey{}, "provider-context")
+	if err := runner.RunProviderProfile(ctx, home, provider, []string{"--model", "custom-model", "exec", "hello"}); err != nil {
+		t.Fatal(err)
+	}
+	if config.Provider != provider || config.Context.Value(testContextKey{}) != "provider-context" {
+		t.Fatalf("provider/config context = %#v / %v", config.Provider, config.Context.Value(testContextKey{}))
+	}
+	if process.home != home || process.endpoint != proxy.Endpoint() || !proxy.started || !proxy.closed {
+		t.Fatalf("provider proxy lifecycle = process:%#v proxy:%#v", process, proxy)
+	}
+	joined := strings.Join(process.arguments, " ")
+	for _, want := range []string{
+		"-c model_catalog_json=",
+		`-c model="gpt-5.3-codex"`,
+		"-c model_context_window=272000",
+		"-c model_auto_compact_token_limit=258400",
+		"--model custom-model exec hello",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("provider arguments missing %q: %#v", want, process.arguments)
+		}
+	}
+	accounts, err := config.Accounts(context.Background())
+	if err != nil || len(accounts) != 1 || accounts[0].Home != home || !accounts[0].Enabled || accounts[0].ID == "" {
+		t.Fatalf("provider accounts = %#v, err = %v", accounts, err)
+	}
+}
+
+func TestProviderRuntimeArgumentsLeaveOpenAIUntouched(t *testing.T) {
+	arguments := []string{"exec", "hello"}
+	got := providerRuntimeArguments(proxyconfig.Provider{}, arguments)
+	if strings.Join(got, " ") != "exec hello" {
+		t.Fatalf("OpenAI arguments = %#v", got)
 	}
 }

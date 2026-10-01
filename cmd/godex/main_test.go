@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/exec"
 	"testing"
+
+	proxyconfig "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
 func TestExitCodePreservesChildStatus(t *testing.T) {
@@ -50,4 +52,41 @@ func TestExitCodeChild(t *testing.T) {
 		return
 	}
 	os.Exit(23)
+}
+
+func TestRuntimeProviderHomePrefersSelectedAccount(t *testing.T) {
+	config := proxyconfig.Config{
+		PreferredAccount: "selected",
+		Accounts: func(context.Context) ([]proxyconfig.Account, error) {
+			return []proxyconfig.Account{
+				{ID: "other", Home: "/profiles/other", Enabled: true},
+				{ID: "selected", Home: "/profiles/selected", Enabled: true},
+			}, nil
+		},
+	}
+	home, err := runtimeProviderHome(config)
+	if err != nil || home != "/profiles/selected" {
+		t.Fatalf("home = %q, err = %v", home, err)
+	}
+}
+
+func TestRuntimeProviderHomeUsesSingleProfileFallbackAndRejectsAmbiguity(t *testing.T) {
+	config := proxyconfig.Config{
+		Accounts: func(context.Context) ([]proxyconfig.Account, error) {
+			return []proxyconfig.Account{{ID: "only", Home: "/profiles/only", Enabled: true}}, nil
+		},
+	}
+	home, err := runtimeProviderHome(config)
+	if err != nil || home != "/profiles/only" {
+		t.Fatalf("single home = %q, err = %v", home, err)
+	}
+	config.Accounts = func(context.Context) ([]proxyconfig.Account, error) {
+		return []proxyconfig.Account{
+			{ID: "one", Home: "/profiles/one", Enabled: true},
+			{ID: "two", Home: "/profiles/two", Enabled: true},
+		}, nil
+	}
+	if _, err := runtimeProviderHome(config); err == nil {
+		t.Fatal("ambiguous provider pool unexpectedly resolved a home")
+	}
 }
