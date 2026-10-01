@@ -147,12 +147,50 @@ func TestStatusRawUsesCurrentAndSelectedAccountHomes(t *testing.T) {
 	usage := &fakeRawUsage{body: []byte(`{"plan_type":"plus"}`)}
 	status := NewStatus(fakeAccounts{accounts: []accountentity.Account{first, second}, current: first}, usage)
 
-	body, err := status.Raw(context.Background(), "")
+	body, err := status.Raw(context.Background(), "", "")
 	if err != nil || string(body) != `{"plan_type":"plus"}` || usage.home != "/managed/one" {
 		t.Fatalf("current raw = %q, home = %q, err = %v", body, usage.home, err)
 	}
-	body, err = status.Raw(context.Background(), "two")
+	body, err = status.Raw(context.Background(), "two", "")
 	if err != nil || string(body) != `{"plan_type":"plus"}` || usage.home != "/managed/two" {
 		t.Fatalf("selected raw = %q, home = %q, err = %v", body, usage.home, err)
+	}
+}
+
+type fakeOverrideUsage struct {
+	baseURL string
+	home    string
+	usage   quotamodel.Usage
+}
+
+func (fake *fakeOverrideUsage) Fetch(context.Context, string) (quotamodel.Usage, error) {
+	return fake.usage, nil
+}
+
+func (fake *fakeOverrideUsage) FetchAt(_ context.Context, home, baseURL string) (quotamodel.Usage, error) {
+	fake.home, fake.baseURL = home, baseURL
+	return fake.usage, nil
+}
+
+func (fake *fakeOverrideUsage) FetchRaw(context.Context, string) ([]byte, error) {
+	return []byte(`{"plan_type":"plus"}`), nil
+}
+
+func (fake *fakeOverrideUsage) FetchRawAt(_ context.Context, home, baseURL string) ([]byte, error) {
+	fake.home, fake.baseURL = home, baseURL
+	return []byte(`{"plan_type":"plus"}`), nil
+}
+
+func TestStatusUsesQuotaBaseURLOverride(t *testing.T) {
+	account := accountentity.Account{ID: "one", Name: "one", Enabled: true}
+	usage := &fakeOverrideUsage{usage: quotamodel.Usage{PlanType: "plus"}}
+	status := NewStatus(fakeAccounts{accounts: []accountentity.Account{account}, current: account}, usage)
+	const baseURL = "https://quota.test/backend-api"
+	reports, err := status.Run(context.Background(), Options{Selector: "one", BaseURL: baseURL})
+	if err != nil || len(reports) != 1 || usage.baseURL != baseURL || usage.home != "/managed/one" {
+		t.Fatalf("reports = %+v, baseURL/home = %q/%q, err = %v", reports, usage.baseURL, usage.home, err)
+	}
+	if _, err := status.Raw(context.Background(), "one", baseURL); err != nil || usage.baseURL != baseURL {
+		t.Fatalf("raw override baseURL = %q, err = %v", usage.baseURL, err)
 	}
 }

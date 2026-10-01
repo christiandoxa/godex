@@ -110,3 +110,29 @@ func TestQuotaClientFetchRawPreservesValidJSON(t *testing.T) {
 		t.Fatalf("raw body = %q", body)
 	}
 }
+
+func TestQuotaClientFetchAtUsesOverrideBaseURL(t *testing.T) {
+	defaultServer := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("default quota endpoint should not be called")
+	}))
+	defer defaultServer.Close()
+	overrideServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/backend-api/wham/usage" {
+			t.Fatalf("override quota path = %q", request.URL.Path)
+		}
+		_, _ = writer.Write([]byte(`{"plan_type":"plus"}`))
+	}))
+	defer overrideServer.Close()
+	client, err := NewQuotaClient(defaultServer.URL+"/backend-api", nil, codex.NewCodexProcess("", codex.Terminal{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	home := writeQuotaAuth(t, "synthetic-token", "account-123")
+	usage, err := client.FetchAt(context.Background(), home, overrideServer.URL+"/backend-api")
+	if err != nil || usage.PlanType != "plus" {
+		t.Fatalf("override usage = %+v, err = %v", usage, err)
+	}
+	if _, err := client.FetchAt(context.Background(), home, "file:///tmp/quota"); err == nil {
+		t.Fatal("non-http quota override unexpectedly accepted")
+	}
+}

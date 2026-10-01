@@ -58,7 +58,7 @@ func TestShowDetailedQuota(t *testing.T) {
 func TestDetailPreservesQuotaSelection(t *testing.T) {
 	for _, selector := range []string{"", "work"} {
 		status := &fakeStatus{}
-		if err := Show(context.Background(), status, &strings.Builder{}, append([]string{"--detail"}, strings.Fields(selector)...)); err != nil {
+		if err := Show(context.Background(), status, &strings.Builder{}, append([]string{"--detail", "--once"}, strings.Fields(selector)...)); err != nil {
 			t.Fatal(err)
 		}
 		if status.options != (quotausecase.Options{Selector: selector}) {
@@ -73,11 +73,11 @@ func (writer failingWriter) Write([]byte) (int, error) { return 0, writer.err }
 
 func TestDetailPropagatesFailures(t *testing.T) {
 	want := errors.New("synthetic failure")
-	if err := Show(context.Background(), &fakeStatus{}, failingWriter{want}, []string{"--detail"}); !errors.Is(err, want) {
+	if err := Show(context.Background(), &fakeStatus{}, failingWriter{want}, []string{"--detail", "--once"}); !errors.Is(err, want) {
 		t.Fatalf("output error = %v", err)
 	}
 	var output strings.Builder
-	if err := Show(context.Background(), &fakeStatus{err: want}, &output, []string{"--detail"}); !errors.Is(err, want) || output.Len() != 0 {
+	if err := Show(context.Background(), &fakeStatus{err: want}, &output, []string{"--detail", "--once"}); !errors.Is(err, want) || output.Len() != 0 {
 		t.Fatalf("status error/output = %v / %q", err, output.String())
 	}
 	for _, arguments := range [][]string{{"--detail", "--all", "work"}, {"--detail", "work", "personal"}, {"--detail=true"}} {

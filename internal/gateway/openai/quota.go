@@ -26,12 +26,9 @@ func NewQuotaClient(upstream string, client *http.Client, auth authReader) (*Quo
 	if strings.TrimSpace(upstream) == "" {
 		upstream = DefaultUpstreamURL
 	}
-	parsed, err := url.Parse(upstream)
-	if err != nil || parsed.Scheme == "" || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
-		return nil, errors.New("quota upstream URL must be an http(s) URL without credentials or query data")
-	}
-	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return nil, errors.New("quota upstream URL must use http or https")
+	parsed, err := parseQuotaUpstream(upstream)
+	if err != nil {
+		return nil, err
 	}
 	quotaClient := cloneHTTPClient(client)
 	if quotaClient.Timeout == 0 {
@@ -44,7 +41,11 @@ func NewQuotaClient(upstream string, client *http.Client, auth authReader) (*Quo
 }
 
 func (client *QuotaClient) Fetch(ctx context.Context, codexHome string) (quotamodel.Usage, error) {
-	body, err := client.fetchBody(ctx, codexHome)
+	return client.FetchAt(ctx, codexHome, "")
+}
+
+func (client *QuotaClient) FetchAt(ctx context.Context, codexHome, upstream string) (quotamodel.Usage, error) {
+	body, err := client.fetchBodyAt(ctx, codexHome, upstream)
 	if err != nil {
 		return quotamodel.Usage{}, err
 	}
@@ -56,7 +57,11 @@ func (client *QuotaClient) Fetch(ctx context.Context, codexHome string) (quotamo
 }
 
 func (client *QuotaClient) FetchRaw(ctx context.Context, codexHome string) ([]byte, error) {
-	body, err := client.fetchBody(ctx, codexHome)
+	return client.FetchRawAt(ctx, codexHome, "")
+}
+
+func (client *QuotaClient) FetchRawAt(ctx context.Context, codexHome, upstream string) ([]byte, error) {
+	body, err := client.fetchBodyAt(ctx, codexHome, upstream)
 	if err != nil {
 		return nil, err
 	}
@@ -66,12 +71,16 @@ func (client *QuotaClient) FetchRaw(ctx context.Context, codexHome string) ([]by
 	return body, nil
 }
 
-func (client *QuotaClient) fetchBody(ctx context.Context, codexHome string) ([]byte, error) {
+func (client *QuotaClient) fetchBodyAt(ctx context.Context, codexHome, upstream string) ([]byte, error) {
 	auth, err := client.auth.ReadAuth(ctx, codexHome)
 	if err != nil {
 		return nil, err
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, client.usageURL(), nil)
+	usageURL, err := client.usageURL(upstream)
+	if err != nil {
+		return nil, err
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, usageURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create quota request: %w", err)
 	}
@@ -117,14 +126,33 @@ func (client *QuotaClient) do(request *http.Request) (*http.Response, error) {
 	return response, nil
 }
 
-func (client *QuotaClient) usageURL() string {
-	target := *client.upstream
-	base := strings.TrimRight(target.Path, "/")
-	if strings.Contains(base, "/backend-api") {
-		target.Path = base + "/wham/usage"
-	} else {
-		target.Path = base + "/api/codex/usage"
+func (client *QuotaClient) usageURL(override string) (string, error) {
+	target := client.upstream
+	if strings.TrimSpace(override) != "" {
+		parsed, err := parseQuotaUpstream(override)
+		if err != nil {
+			return "", err
+		}
+		target = parsed
 	}
-	target.RawPath = ""
-	return target.String()
+	copy := *target
+	base := strings.TrimRight(copy.Path, "/")
+	if strings.Contains(base, "/backend-api") {
+		copy.Path = base + "/wham/usage"
+	} else {
+		copy.Path = base + "/api/codex/usage"
+	}
+	copy.RawPath = ""
+	return copy.String(), nil
+}
+
+func parseQuotaUpstream(value string) (*url.URL, error) {
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return nil, errors.New("quota upstream URL must be an http(s) URL without credentials or query data")
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return nil, errors.New("quota upstream URL must use http or https")
+	}
+	return parsed, nil
 }

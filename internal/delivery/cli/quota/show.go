@@ -17,13 +17,7 @@ import (
 
 type statusRunner interface {
 	Run(context.Context, quotausecase.Options) ([]quotamodel.Report, error)
-	Raw(context.Context, string) ([]byte, error)
-}
-
-type showOptions struct {
-	quotausecase.Options
-	detail bool
-	raw    bool
+	Raw(context.Context, string, string) ([]byte, error)
 }
 
 func Show(ctx context.Context, status statusRunner, out io.Writer, arguments []string) error {
@@ -32,71 +26,46 @@ func Show(ctx context.Context, status statusRunner, out io.Writer, arguments []s
 		return err
 	}
 	if options.raw {
-		body, err := status.Raw(ctx, options.Selector)
-		if err != nil {
-			return err
-		}
-		var pretty bytes.Buffer
-		if err := json.Indent(&pretty, body, "", "  "); err != nil {
-			return errors.New("decode quota response")
-		}
-		pretty.WriteByte('\n')
-		_, err = out.Write(pretty.Bytes())
-		return err
+		return showRaw(ctx, status, out, options)
+	}
+	if options.watchEnabled() {
+		return watchQuota(ctx, status, out, options)
 	}
 	reports, err := status.Run(ctx, options.Options)
 	if err != nil {
 		return err
 	}
+	return writeQuotaReports(out, reports, options.detail)
+}
+
+func showRaw(ctx context.Context, status statusRunner, out io.Writer, options showOptions) error {
+	body, err := status.Raw(ctx, options.Selector, options.BaseURL)
+	if err != nil {
+		return err
+	}
+	var pretty bytes.Buffer
+	if err := json.Indent(&pretty, body, "", "  "); err != nil {
+		return errors.New("decode quota response")
+	}
+	pretty.WriteByte('\n')
+	_, err = out.Write(pretty.Bytes())
+	return err
+}
+
+func writeQuotaReports(out io.Writer, reports []quotamodel.Report, detail bool) error {
 	header := "ACCOUNT\tCURRENT\tSTATE\tPLAN\t5H\tWEEKLY"
-	if options.detail {
+	if detail {
 		header += "\t5H_RESET_AT\t5H_WINDOW_SECONDS\tWEEKLY_RESET_AT\tWEEKLY_WINDOW_SECONDS"
 	}
 	if _, err := fmt.Fprintln(out, header); err != nil {
 		return err
 	}
 	for _, report := range reports {
-		if err := writeReport(out, report, options.detail); err != nil {
+		if err := writeReport(out, report, detail); err != nil {
 			return err
 		}
 	}
 	return nil
-}
-
-func parseArguments(arguments []string) (showOptions, error) {
-	options := showOptions{}
-	for _, argument := range arguments {
-		switch argument {
-		case "--all":
-			options.All = true
-		case "--detail":
-			options.detail = true
-		case "--raw":
-			options.raw = true
-		case "--once":
-			// Godex quota output is intentionally one-shot; accept Prodex's explicit spelling.
-		case "--help", "-h":
-			return showOptions{}, errors.New("usage: godex quota [--all] [--detail|--raw] [--once] [selector]")
-		default:
-			if strings.HasPrefix(argument, "-") {
-				return showOptions{}, fmt.Errorf("unknown quota option %q", argument)
-			}
-			if options.Selector != "" {
-				return showOptions{}, errors.New("quota accepts at most one account selector")
-			}
-			options.Selector = argument
-		}
-	}
-	if options.All && options.Selector != "" {
-		return showOptions{}, errors.New("quota selector cannot be combined with --all")
-	}
-	if options.raw && options.All {
-		return showOptions{}, errors.New("quota --raw cannot be combined with --all")
-	}
-	if options.raw && options.detail {
-		return showOptions{}, errors.New("quota --raw cannot be combined with --detail")
-	}
-	return options, nil
 }
 
 func writeReport(out io.Writer, report quotamodel.Report, detail bool) error {

@@ -24,9 +24,10 @@ Fresh requests may rotate between eligible accounts. Existing conversations
 stay with their account, and an established stream is never replayed. Managed
 launches probe quota once before the local proxy starts: accounts that are
 explicitly exhausted are skipped for fresh work, while a failed quota probe is
-kept eligible rather than being treated as exhaustion. `godex quota` provides a
-bounded one-shot view of OpenAI/Codex 5-hour and weekly usage windows; it intentionally does not add Prodex's live dashboard or multi-provider quota
-surface. The runtime details are documented in [Runtime rotation and affinity](docs/ROTATION.md).
+kept eligible rather than being treated as exhaustion. `godex quota` follows Prodex's live refresh behavior for OpenAI/Codex 5-hour
+and weekly usage windows: it refreshes every five seconds by default, while
+`--once` renders a single snapshot and `--raw` performs one raw JSON fetch.
+Multi-provider quota remains part of the 1:1 parity backlog. The runtime details are documented in [Runtime rotation and affinity](docs/ROTATION.md).
 
 ## Requirements
 
@@ -185,21 +186,21 @@ Available profile, account, and runtime commands:
 | godex accounts | List managed ChatGPT account identities. |
 | godex account use SELECTOR | Set the preferred account for account rotation. |
 | godex account remove SELECTOR | Remove a managed account and its isolated home. |
-| godex quota [--all] [--detail\|--raw] [--once] [SELECTOR] | Show a one-shot OpenAI/Codex quota snapshot. |
+| godex quota [-p NAME] [--all] [--detail] [--raw] [--once] [--base-url URL] | Watch OpenAI/Codex quota or render a single snapshot. |
 | godex info [--json] [--tokens] | Show profile/runtime/Codex information. |
 | godex status [--once] [--interval SECONDS] | Show or watch the runtime snapshot. |
 | godex log [stream\|last\|upstream] [--json] | Follow persisted, redacted runtime request events. |
 
-Quota output stays compact by default. `--raw` prints the bounded upstream usage JSON
-for one selected or active account and cannot be combined with `--all` or
-`--detail`. Add `--detail` for Prodex 0.434.2's
-expanded quota-window view: `5H_RESET_AT` and `WEEKLY_RESET_AT` contain exact
-UTC reset timestamps in RFC 3339 format, while `5H_WINDOW_SECONDS` and
-`WEEKLY_WINDOW_SECONDS` contain the upstream window lengths in seconds.
-Missing fields, disabled accounts, and failed probes display `-` for unavailable
-quota values. Probe failures retain the `error` state without printing error
-contents. The command remains one-shot, with or without `--once`. Without
-`--all` or a selector, it shows the active account.
+Quota output stays compact by default. Without `--once` or `--raw`, the command
+refreshes every five seconds like Prodex 0.434.2; `--watch` is also accepted as
+the explicit hidden spelling. `-p/--profile NAME` selects one managed OpenAI
+profile, while `--all` shows the managed pool. `--base-url URL` overrides the
+ChatGPT quota endpoint for that command only. `--raw` prints bounded upstream
+usage JSON for one selected or active profile and cannot be combined with
+`--all`, `--detail`, `--watch`, or `--once`. Add `--detail` for exact RFC 3339
+reset timestamps and upstream window lengths. Missing fields, disabled accounts,
+and failed probes display `-`; probe errors never print gateway error contents.
+Auth/provider filters and provider-wide quota rows remain parity work.
 
 Selectors match an exact account ID, friendly name, or email. Ambiguous
 selectors fail. Unknown top-level commands are treated as Codex subcommands and

@@ -92,13 +92,15 @@ transport or auth probe failure is treated as unknown and remains eligible.
 Quota use cases also expose an eligibility deadline; runtime models keep it
 separate from account enablement. Routing re-admits the account at the deadline
 without a daemon or repeated quota probes. Unknown resets use one minute. The
-quota command is intentionally a one-shot OpenAI/Codex view. Live dashboards,
-provider-wide quota catalogs, and background quota daemons remain outside
-Godex's scope.
+quota command keeps refresh policy in CLI delivery: Prodex-compatible watch mode
+refreshes every five seconds unless `--once` or `--raw` is selected. The quota
+use case remains request-scoped and has no background daemon. Provider-wide
+quota catalogs remain part of the 1:1 parity backlog.
 
-The CLI quota delivery package owns `--detail` parsing and rendering of exact
-UTC reset timestamps and window lengths from the existing quota models. This
-is the bounded one-shot counterpart of Prodex 0.434.2's detailed quota view.
+The CLI quota delivery package owns watch/once cadence, `--detail`, `--profile`,
+and `--base-url` parsing plus rendering of exact UTC reset timestamps and window
+lengths. Endpoint override reaches the OpenAI gateway through a consumed use-case
+capability and does not mutate runtime preflight configuration.
 The presentation flag stays local to delivery; account selection and quota
 classification remain in `usecase/quota`, and fetching remains in
 `gateway/openai`. Formatting helpers stay private to the delivery package

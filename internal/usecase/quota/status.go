@@ -24,9 +24,18 @@ type rawUsageGateway interface {
 	FetchRaw(context.Context, string) ([]byte, error)
 }
 
+type overrideUsageGateway interface {
+	FetchAt(context.Context, string, string) (quotamodel.Usage, error)
+}
+
+type rawOverrideUsageGateway interface {
+	FetchRawAt(context.Context, string, string) ([]byte, error)
+}
+
 type Options struct {
 	All      bool
 	Selector string
+	BaseURL  string
 }
 
 type Status struct {
@@ -39,11 +48,7 @@ func NewStatus(accounts accountStore, usage usageGateway) *Status {
 	return &Status{accounts: accounts, usage: usage, now: time.Now}
 }
 
-func (status *Status) Raw(ctx context.Context, selector string) ([]byte, error) {
-	raw, ok := status.usage.(rawUsageGateway)
-	if !ok {
-		return nil, errors.New("raw quota output is not supported")
-	}
+func (status *Status) Raw(ctx context.Context, selector, baseURL string) ([]byte, error) {
 	var account accountentity.Account
 	var err error
 	if selector != "" {
@@ -54,7 +59,19 @@ func (status *Status) Raw(ctx context.Context, selector string) ([]byte, error) 
 	if err != nil {
 		return nil, err
 	}
-	return raw.FetchRaw(ctx, status.accounts.CodexHome(account.ID))
+	home := status.accounts.CodexHome(account.ID)
+	if baseURL != "" {
+		raw, ok := status.usage.(rawOverrideUsageGateway)
+		if !ok {
+			return nil, errors.New("quota base URL override is not supported")
+		}
+		return raw.FetchRawAt(ctx, home, baseURL)
+	}
+	raw, ok := status.usage.(rawUsageGateway)
+	if !ok {
+		return nil, errors.New("raw quota output is not supported")
+	}
+	return raw.FetchRaw(ctx, home)
 }
 
 func (status *Status) Ready(ctx context.Context, account accountentity.Account) (bool, error) {
@@ -80,7 +97,7 @@ func (status *Status) Run(ctx context.Context, options Options) ([]quotamodel.Re
 			Enabled:     account.Enabled,
 		}
 		if account.Enabled {
-			report.Usage, report.Err = status.usage.Fetch(ctx, status.accounts.CodexHome(account.ID))
+			report.Usage, report.Err = status.fetchUsage(ctx, account, options.BaseURL)
 		}
 		report.State = quotaState(report, status.now())
 		reports = append(reports, report)
@@ -89,6 +106,18 @@ func (status *Status) Run(ctx context.Context, options Options) ([]quotamodel.Re
 		}
 	}
 	return reports, nil
+}
+
+func (status *Status) fetchUsage(ctx context.Context, account accountentity.Account, baseURL string) (quotamodel.Usage, error) {
+	home := status.accounts.CodexHome(account.ID)
+	if baseURL == "" {
+		return status.usage.Fetch(ctx, home)
+	}
+	override, ok := status.usage.(overrideUsageGateway)
+	if !ok {
+		return quotamodel.Usage{}, errors.New("quota base URL override is not supported")
+	}
+	return override.FetchAt(ctx, home, baseURL)
 }
 
 func (status *Status) selectedAccounts(ctx context.Context, options Options) ([]accountentity.Account, error) {

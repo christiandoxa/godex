@@ -134,9 +134,10 @@ and eligibility validation stays in the runtime use case.
   retained deactivation; no second archive tree or changed removal default.
 - Native names/pickers/last remain profile-local rather than a shared-session UI.
   Explicit UUIDs/prefixes provide the cross-profile workflow.
-- Quota currently has bounded one-shot compact/detail/raw views; Prodex live
-  quota dashboard/watch behavior, automatic credit redemption, and provider-wide
-  quota catalog remain to be implemented for 1:1 parity.
+- Quota now matches Prodex's default five-second watch cadence, `--once`, raw,
+  detail, profile selection, and command-scoped base-URL override for managed
+  OpenAI profiles. Auth/provider filters, automatic credit redemption, and the
+  provider-wide quota catalog remain to be implemented for 1:1 parity.
 - Godex reloads Codex-owned auth on an authentication retry; it does not implement
   OAuth/token refresh, aggressive history rewrites, or silent model relaunch.
 - Native tools, models, approval/sandbox behavior, foreground command servers,
