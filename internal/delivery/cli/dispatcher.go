@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	accountcli "github.com/christiandoxa/godex/internal/delivery/cli/account"
 	authcli "github.com/christiandoxa/godex/internal/delivery/cli/auth"
@@ -59,6 +60,7 @@ func New(
 }
 
 func (app *App) Run(ctx context.Context, arguments []string) error {
+	app.showUpdateNotice(ctx, arguments)
 	if len(arguments) == 0 {
 		return app.runRuntime(ctx, nil)
 	}
@@ -125,6 +127,36 @@ func (app *App) Run(ctx context.Context, arguments []string) error {
 	default:
 		return app.runRuntime(ctx, arguments)
 	}
+}
+
+func (app *App) showUpdateNotice(ctx context.Context, arguments []string) {
+	if app.updater == nil || !shouldShowUpdateNotice(arguments) {
+		return
+	}
+	_ = updatecli.Notice(ctx, app.updater, app.errOut)
+}
+
+func shouldShowUpdateNotice(arguments []string) bool {
+	if len(arguments) == 0 {
+		return true
+	}
+	switch arguments[0] {
+	case "info", "log", "ping", "update", "version", "--version", "-version", "help", "--help", "-h":
+		return false
+	case "quota":
+		for _, argument := range arguments[1:] {
+			if argument == "--raw" {
+				return false
+			}
+		}
+	case "doctor":
+		for _, argument := range arguments[1:] {
+			if argument == "--json" || argument == "--bundle" || strings.HasPrefix(argument, "--bundle=") {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func (app *App) runRuntime(ctx context.Context, arguments []string) error {

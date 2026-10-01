@@ -250,6 +250,9 @@ Self-update keeps release discovery, state, execution, and presentation separate
 `gateway/update` probes the real executable and runs the embedded release installer.
 The embedded installer is the same root `install.sh`/`install.ps1` shipped with
 releases, so self-update does not create a second archive/checksum implementation.
+CLI dispatch owns notice eligibility; it calls the non-mutating updater status path
+best-effort and deliberately ignores check failures so startup cannot be blocked
+by GitHub availability.
 
 OpenAI ping follows the same boundary split: `delivery/cli/ping` owns argument and
 output formatting, `usecase/ping` owns target selection, bounded concurrency and
@@ -301,8 +304,8 @@ The verified OpenAI/Codex core remains the stability baseline while Godex expand
 toward feature-for-feature Prodex 0.434.2 parity. Multi-provider bridges, Super,
 gateway, richer diagnostics, provider-specific profile bundle secrets, and
 built-in imports remain implementation backlog rather than permanent exclusions.
-Manual redeem, `ping openai`, and explicit self-update are now implemented
-reference surfaces; automatic update notices remain separate parity work. OpenAI bundle encoding/decoding is now
+Manual redeem, `ping openai`, explicit self-update, and the best-effort cached
+update notice are now implemented reference surfaces. OpenAI bundle encoding/decoding is now
 owned by `repository/profile`: the repository owns private bounded file I/O and
 Prodex-compatible envelope crypto, while `usecase/profile` owns profile selection,
 identity matching, update/create planning, and rollback. New infrastructure is added only when required by a concrete

@@ -119,7 +119,9 @@ and eligibility validation stays in the runtime use case.
   including optional Presidio integration.
 - The standalone gateway surface, full live TUI parity, process/resource metrics,
   audit-log backend, and the richer runtime-policy/diagnostic bundle surfaces.
-- Explicit self-update, manual reset-credit redemption, and cost-bearing `ping openai` diagnostics are implemented. Automatic update notices before eligible commands remain a 1:1 gap.
+- Explicit self-update, best-effort cached update notices on eligible commands,
+  manual reset-credit redemption, and cost-bearing `ping openai` diagnostics are
+  implemented.
 - Built-in non-OpenAI profile import sources (Claude, Copilot, Kiro) and provider
   secret-file bundle payloads. Interactive password-selection/password-entry TUI
   and process-crash lifecycle-journal recovery for multi-profile imports also
@@ -138,8 +140,9 @@ and eligibility validation stays in the runtime use case.
   latest-release cache, short GitHub redirect probe, semver/no-downgrade decision,
   exclusive install lock with actual-binary re-probe, embedded installer execution,
   and bounded secret-redacted installer output. The embedded Godex installer keeps
-  its release archive/checksum verification path. Automatic pre-command update
-  notices are still separate parity work.
+  its release archive/checksum verification path. Eligible commands also use the
+  same five-minute cache for best-effort update notices; info/log/ping/update,
+  raw quota, and JSON/bundle doctor surfaces suppress them like Prodex.
 - `ping openai` now matches Prodex's explicit cost-bearing diagnostic surface:
   profile/model/base-URL/no-proxy/JSON options, 45-second timeout, four-worker
   cap, completion-order human rows, stable nullable JSON fields, failure taxonomy,

@@ -39,6 +39,17 @@ func NewUpdater(releases releaseSource, state stateStore, installer installer, c
 }
 
 func (updater *Updater) Run(ctx context.Context) (updatemodel.Report, error) {
+	report, err := updater.Status(ctx)
+	if err != nil {
+		return updatemodel.Report{}, err
+	}
+	if report.Status != updatemodel.UpdateAvailable {
+		return report, nil
+	}
+	return updater.installLatest(ctx, report.Latest)
+}
+
+func (updater *Updater) Status(ctx context.Context) (updatemodel.Report, error) {
 	if updater == nil || updater.releases == nil || updater.state == nil || updater.installer == nil {
 		return updatemodel.Report{}, errors.New("Godex update support is not configured")
 	}
@@ -50,10 +61,7 @@ func (updater *Updater) Run(ctx context.Context) (updatemodel.Report, error) {
 	if err != nil {
 		return updatemodel.Report{}, err
 	}
-	if decision != updatemodel.UpdateAvailable {
-		return updatemodel.Report{Installed: updater.currentVersion, Latest: latest, Status: decision}, nil
-	}
-	return updater.installLatest(ctx, latest)
+	return updatemodel.Report{Installed: updater.currentVersion, Latest: latest, Status: decision}, nil
 }
 
 func (updater *Updater) latestVersion(ctx context.Context) (string, error) {

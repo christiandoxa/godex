@@ -163,3 +163,33 @@ func TestDispatcherUsesActiveStandaloneProfileHome(t *testing.T) {
 		t.Fatalf("arguments = %#v", process.arguments)
 	}
 }
+
+func TestUpdateNoticeEligibilityMatchesReadOnlyAndMinimalSurfaces(t *testing.T) {
+	for _, arguments := range [][]string{
+		nil,
+		{"run"},
+		{"quota", "--once"},
+		{"redeem", "work"},
+		{"status", "--once"},
+		{"doctor"},
+	} {
+		if !shouldShowUpdateNotice(arguments) {
+			t.Fatalf("arguments %#v should show update notice", arguments)
+		}
+	}
+	for _, arguments := range [][]string{
+		{"info"},
+		{"log", "last"},
+		{"ping", "openai"},
+		{"update"},
+		{"quota", "--raw", "work"},
+		{"doctor", "--json"},
+		{"doctor", "--bundle", "out.json"},
+		{"help"},
+		{"--version"},
+	} {
+		if shouldShowUpdateNotice(arguments) {
+			t.Fatalf("arguments %#v unexpectedly show update notice", arguments)
+		}
+	}
+}

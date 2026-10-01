@@ -233,6 +233,12 @@ replacement. Installer output is bounded, control-character filtered, and
 secret-redacted. `GODEX_REPOSITORY` and `GODEX_RELEASE_BASE_URL` remain available
 for the existing release/mirror workflow.
 
+Like Prodex, normal interactive/operational commands also perform a best-effort
+update check using that same five-minute cache. A newer release is announced on
+stderr with `godex update`; a failed check never blocks the requested command.
+Read-only/minimal surfaces (`info`, `log`, `ping`, `update`, help/version, raw
+quota, and JSON/bundle doctor modes) suppress the notice.
+
 Selectors match an exact account ID, friendly name, or email. Ambiguous
 selectors fail. Unknown top-level commands are treated as Codex subcommands and
 run through the same managed account runtime. Repeating login for an existing ChatGPT account updates its
