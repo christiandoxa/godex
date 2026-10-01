@@ -12,6 +12,8 @@ import (
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 )
 
+const profileNotFoundFormat = "profile %q does not exist"
+
 type repository interface {
 	ManagedHome(string) string
 	List(context.Context) ([]profileentity.Profile, error)
@@ -23,6 +25,13 @@ type repository interface {
 	ClearActive(context.Context) error
 	Remove(context.Context, string, bool) (profileentity.Profile, error)
 	Acquire(context.Context, string) (func() error, error)
+	ReadAuthJSON(string) ([]byte, error)
+	ImportOpenAI(context.Context, profileentity.Profile, []byte, bool) error
+	ReplaceAuth(context.Context, string, []byte) error
+	EncodeBundle(profilemodel.BundlePayload, string) ([]byte, error)
+	DecodeBundle([]byte, string) (profilemodel.BundlePayload, bool, error)
+	WriteBundle(string, []byte) error
+	ReadBundle(string) ([]byte, error)
 }
 
 type accountStore interface {
@@ -30,6 +39,7 @@ type accountStore interface {
 	Current(context.Context) (accountentity.Account, error)
 	SetActive(context.Context, string) (accountentity.Account, error)
 	RemoveProfile(context.Context, string, bool) (accountentity.Account, error)
+	ReplaceImportedAuth(context.Context, string, []byte) error
 	CodexHome(string) string
 }
 
@@ -39,15 +49,22 @@ type Report struct {
 	AccountID string
 }
 
+type authInspector interface {
+	InspectAuthJSON(context.Context, []byte) (accountentity.Identity, error)
+}
+
 type Catalog struct {
 	profiles         repository
 	accounts         accountStore
+	auth             authInspector
 	currentCodexHome string
 }
 
 func NewCatalog(profiles repository, accounts accountStore, currentCodexHome string) *Catalog {
 	return &Catalog{profiles: profiles, accounts: accounts, currentCodexHome: currentCodexHome}
 }
+
+func (catalog *Catalog) SetAuthInspector(inspector authInspector) { catalog.auth = inspector }
 
 func (catalog *Catalog) List(ctx context.Context) ([]Report, error) {
 	stored, err := catalog.profiles.List(ctx)
@@ -153,7 +170,7 @@ func (catalog *Catalog) Use(ctx context.Context, name string) (Report, error) {
 		profile := accountProfile(selected, catalog.accounts.CodexHome(selected.ID))
 		return Report{Profile: profile, Active: true, AccountID: selected.ID}, nil
 	}
-	return Report{}, fmt.Errorf("profile %q does not exist", name)
+	return Report{}, fmt.Errorf(profileNotFoundFormat, name)
 }
 
 func (catalog *Catalog) Remove(ctx context.Context, request profilemodel.RemoveRequest) ([]Report, error) {
@@ -308,7 +325,7 @@ func removalTargets(listed []Report, request profilemodel.RemoveRequest) ([]Repo
 			return []Report{current}, nil
 		}
 	}
-	return nil, fmt.Errorf("profile %q does not exist", request.Name)
+	return nil, fmt.Errorf(profileNotFoundFormat, request.Name)
 }
 
 func (catalog *Catalog) ActiveStandalone(ctx context.Context) (profileentity.Profile, bool, error) {
@@ -336,7 +353,7 @@ func (catalog *Catalog) ResolveLaunch(ctx context.Context, name string) (profile
 			return launchTarget(report), nil
 		}
 	}
-	return profilemodel.LaunchTarget{}, fmt.Errorf("profile %q does not exist", name)
+	return profilemodel.LaunchTarget{}, fmt.Errorf(profileNotFoundFormat, name)
 }
 
 func launchTarget(report Report) profilemodel.LaunchTarget {

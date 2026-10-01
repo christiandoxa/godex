@@ -12,7 +12,10 @@ import (
 	"github.com/christiandoxa/godex/internal/helper/lockfile"
 )
 
-const stateVersion = 1
+const (
+	stateVersion              = 1
+	profileDoesNotExistFormat = "profile %q does not exist"
+)
 
 var ErrNoActiveProfile = errors.New("no active profile")
 
@@ -78,7 +81,7 @@ func (store *Store) Resolve(ctx context.Context, name string) (profileentity.Pro
 			return current, nil
 		}
 	}
-	return profileentity.Profile{}, fmt.Errorf("profile %q does not exist", name)
+	return profileentity.Profile{}, fmt.Errorf(profileDoesNotExistFormat, name)
 }
 
 func (store *Store) Create(ctx context.Context, value profileentity.Profile, source string, insecure, activate bool) error {
@@ -125,7 +128,7 @@ func (store *Store) SetActive(ctx context.Context, name string) (profileentity.P
 				return store.writeState(state)
 			}
 		}
-		return fmt.Errorf("profile %q does not exist", name)
+		return fmt.Errorf(profileDoesNotExistFormat, name)
 	})
 	return selected, err
 }

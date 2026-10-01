@@ -102,6 +102,20 @@ godex account use work
 godex run --account work -- --model MODEL
 ~~~
 
+Export or import OpenAI profile bundles compatible with Prodex `0.434.2`:
+
+~~~bash
+PRODEX_PROFILE_EXPORT_PASSWORD=... godex profile export --password-protect profiles.json
+PRODEX_PROFILE_IMPORT_PASSWORD=... godex profile import profiles.json
+godex profile export --no-password profiles.json
+~~~
+
+Encrypted exports use Prodex v2 Argon2id + AES-256-GCM-SIV envelopes; imports
+also accept legacy Prodex v1 PBKDF2-SHA256 encrypted envelopes. Plain exports
+use the Prodex v1 envelope. Bundle files are private and bounded. OpenAI profiles
+are supported in this checkpoint; provider-specific secret files are rejected
+until their provider import paths are implemented.
+
 Prodex-compatible Codex runtime feature flags are translated to Codex `-c`
 overrides before the remaining Codex arguments. Explicit later Codex `-c`
 arguments still win:
@@ -162,6 +176,8 @@ Available profile, account, and runtime commands:
 | --- | --- |
 | godex profile add NAME [--codex-home PATH\|--copy-from PATH\|--copy-current] [--activate] [--insecure] | Add a managed or external Codex profile. |
 | godex profile list | List account-backed and standalone profiles. |
+| godex profile export [-p NAME]... [--password-protect\|--no-password] [PATH] | Export a Prodex-compatible OpenAI profile bundle. |
+| godex profile import PATH | Import a Prodex-compatible OpenAI profile bundle. |
 | godex current | Show the active profile and its `CODEX_HOME`. |
 | godex use NAME | Set the active profile. |
 | godex profile remove NAME [--delete-home] | Unregister a profile; managed home deletion is explicit. |
@@ -199,6 +215,8 @@ and Codex configuration survive repeat login and import-current.
 | GODEX_CODEX_BIN | codex | Codex executable to invoke. |
 | GODEX_UPSTREAM_URL | https://chatgpt.com/backend-api | Upstream URL for compatible test environments. |
 | CODEX_HOME | ~/.codex | Source profile for `profile import-current` and `profile add --copy-current`; managed launches use isolated homes. |
+| PRODEX_PROFILE_EXPORT_PASSWORD | unset | Password used by `profile export --password-protect` for Prodex-compatible bundles. |
+| PRODEX_PROFILE_IMPORT_PASSWORD | unset | Password used to decrypt encrypted Prodex-compatible profile bundles. |
 
 Treat each profile's auth.json like a password. Do not copy it into source
 control, backups, bug reports, or fixtures.

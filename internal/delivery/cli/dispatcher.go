@@ -150,6 +150,9 @@ Usage:
   godex profile add NAME [options]
                                Add managed or external CODEX_HOME profile
   godex profile list            List configured profiles
+  godex profile export [options] [PATH]
+                               Export a Prodex-compatible profile bundle
+  godex profile import PATH    Import a Prodex-compatible profile bundle
   godex profile use --profile NAME
                                Set the active profile
   godex profile remove NAME [--delete-home]

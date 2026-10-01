@@ -265,8 +265,11 @@ No access token, ID token, refresh token, or API token belongs in this file.
 The verified OpenAI/Codex core remains the stability baseline while Godex expands
 toward feature-for-feature Prodex 0.434.2 parity. Multi-provider bridges, Super,
 gateway, richer diagnostics, live quota/status surfaces, update/redeem/ping, and
-profile bundle import/export are implementation backlog rather than permanent
-exclusions. New infrastructure is added only when required by a concrete
+provider-specific profile bundle secrets and built-in imports remain implementation
+backlog rather than permanent exclusions. OpenAI bundle encoding/decoding is now
+owned by `repository/profile`: the repository owns private bounded file I/O and
+Prodex-compatible envelope crypto, while `usecase/profile` owns profile selection,
+identity matching, update/create planning, and rollback. New infrastructure is added only when required by a concrete
 reference feature and must still satisfy the architecture rules in `AGENTS.md`.
 
 ## Managed sessions

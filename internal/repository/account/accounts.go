@@ -20,4 +20,5 @@ type Accounts interface {
 	SetActive(ctx context.Context, selector string) (entity.Account, error)
 	Remove(ctx context.Context, selector string) (entity.Account, error)
 	RemoveProfile(ctx context.Context, selector string, deleteHome bool) (entity.Account, error)
+	ReplaceImportedAuth(ctx context.Context, selector string, authJSON []byte) error
 }

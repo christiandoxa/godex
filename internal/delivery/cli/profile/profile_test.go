@@ -117,3 +117,28 @@ func TestProfileCommandsRejectInvalidArguments(t *testing.T) {
 		}
 	}
 }
+
+func TestProfileExportArgumentParsing(t *testing.T) {
+	t.Setenv(exportPasswordEnv, "bundle-test-password")
+	request, err := parseExport([]string{"-p", "one", "--profile=two", "--password-protect", "bundle.json"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(request.Profiles) != 2 || request.Profiles[0] != "one" || request.Profiles[1] != "two" || request.Password == "" || request.OutputPath != "bundle.json" {
+		t.Fatalf("request = %#v", request)
+	}
+	plain, err := parseExport([]string{"--no-password", "bundle.json"})
+	if err != nil || plain.Password != "" {
+		t.Fatalf("plain = %#v, err = %v", plain, err)
+	}
+	for _, arguments := range [][]string{
+		{"bundle.json"},
+		{"--password-protect", "--no-password", "bundle.json"},
+		{"--profile", "--no-password", "bundle.json"},
+		{"--unknown", "--no-password"},
+	} {
+		if _, err := parseExport(arguments); err == nil {
+			t.Fatalf("arguments %#v unexpectedly accepted", arguments)
+		}
+	}
+}

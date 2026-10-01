@@ -33,7 +33,7 @@ func (store *Store) removeLocked(name string, deleteHome bool) (profileentity.Pr
 	}
 	index := profileIndex(state.Profiles, name)
 	if index < 0 {
-		return profileentity.Profile{}, fmt.Errorf("profile %q does not exist", name)
+		return profileentity.Profile{}, fmt.Errorf(profileDoesNotExistFormat, name)
 	}
 	removed := state.Profiles[index]
 	if deleteHome && !removed.Managed {

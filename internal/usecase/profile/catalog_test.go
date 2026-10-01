@@ -46,6 +46,16 @@ func (fake *fakeAccounts) RemoveProfile(_ context.Context, selector string, _ bo
 	}
 	return accountentity.Account{}, errors.New("not found")
 }
+
+func (fake *fakeAccounts) ReplaceImportedAuth(_ context.Context, selector string, authJSON []byte) error {
+	for _, value := range fake.values {
+		if value.ID == selector || value.Name == selector {
+			return nil
+		}
+	}
+	return errors.New("not found")
+}
+
 func (fake *fakeAccounts) CodexHome(id string) string {
 	return filepath.Join(os.TempDir(), "godex-profile-test", id, "codex")
 }

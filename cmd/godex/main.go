@@ -79,6 +79,7 @@ func run() int {
 	application := cli.New(login, importer, store, runner, doctor, quotaStatus, os.Stdout)
 	profileStore := profilerepo.NewStore(settings.Home)
 	profiles := profileusecase.NewCatalog(profileStore, store, settings.CurrentCodexHome)
+	profiles.SetAuthInspector(process)
 	application.SetProfiles(profiles)
 	activity.SetProfiles(profiles)
 

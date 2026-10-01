@@ -17,13 +17,17 @@ func Run(ctx context.Context, catalog *profileusecase.Catalog, out io.Writer, ar
 		return errors.New("profile support is not configured")
 	}
 	if len(arguments) == 0 {
-		return errors.New("profile requires add, list, current, use, remove, or import-current")
+		return errors.New("profile requires add, export, import, list, current, use, remove, or import-current")
 	}
 	switch arguments[0] {
 	case "add":
 		return add(ctx, catalog, out, arguments[1:])
 	case "list":
 		return list(ctx, catalog, out, arguments[1:])
+	case "export":
+		return exportProfiles(ctx, catalog, out, arguments[1:])
+	case "import":
+		return importProfiles(ctx, catalog, out, arguments[1:])
 	case "current":
 		return current(ctx, catalog, out, arguments[1:])
 	case "use":

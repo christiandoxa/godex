@@ -1,0 +1,120 @@
+package profile
+
+import (
+	"context"
+	"errors"
+
+	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
+)
+
+type importMutation struct {
+	imported int
+	updated  int
+	rollback func() error
+	cleanup  func()
+}
+
+func (catalog *Catalog) applyImport(ctx context.Context, plan importPlan) (profilemodel.ImportResult, error) {
+	mutations := make([]importMutation, 0, len(plan.actions))
+	result := profilemodel.ImportResult{}
+	for _, action := range plan.actions {
+		mutation, err := catalog.applyImportAction(ctx, action)
+		if err != nil {
+			return profilemodel.ImportResult{}, rollbackImport(mutations, err)
+		}
+		mutations = append(mutations, mutation)
+		result.ImportedCount += mutation.imported
+		result.UpdatedCount += mutation.updated
+	}
+	if err := catalog.finalizeImportActive(ctx, plan, &result); err != nil {
+		return profilemodel.ImportResult{}, rollbackImport(mutations, err)
+	}
+	cleanupImport(mutations)
+	return result, nil
+}
+
+func (catalog *Catalog) applyImportAction(ctx context.Context, action importAction) (importMutation, error) {
+	authBytes := []byte(action.source.AuthJSON)
+	defer clearBundleBytes(authBytes)
+	if action.create {
+		if err := catalog.profiles.ImportOpenAI(ctx, action.target.Profile, authBytes, false); err != nil {
+			return importMutation{}, err
+		}
+		name := action.target.Profile.Name
+		return importMutation{imported: 1, rollback: func() error {
+			_, err := catalog.profiles.Remove(context.WithoutCancel(ctx), name, true)
+			return err
+		}}, nil
+	}
+	return catalog.updateImportedAuth(ctx, action.target, authBytes)
+}
+
+func (catalog *Catalog) updateImportedAuth(ctx context.Context, target Report, authBytes []byte) (importMutation, error) {
+	previous, err := catalog.profiles.ReadAuthJSON(target.Profile.CodexHome)
+	if err != nil {
+		return importMutation{}, err
+	}
+	if err := catalog.replaceImportedAuth(ctx, target, authBytes); err != nil {
+		clearBundleBytes(previous)
+		return importMutation{}, err
+	}
+	backup := append([]byte(nil), previous...)
+	clearBundleBytes(previous)
+	return importMutation{
+		updated: 1,
+		rollback: func() error {
+			defer clearBundleBytes(backup)
+			return catalog.replaceImportedAuth(context.WithoutCancel(ctx), target, backup)
+		},
+		cleanup: func() { clearBundleBytes(backup) },
+	}, nil
+}
+
+func (catalog *Catalog) finalizeImportActive(ctx context.Context, plan importPlan, result *profilemodel.ImportResult) error {
+	if plan.activeTarget != "" {
+		if _, err := catalog.Use(ctx, plan.activeTarget); err != nil {
+			return err
+		}
+		result.ActiveProfile = plan.activeTarget
+		return nil
+	}
+	if !plan.keepActive {
+		return nil
+	}
+	listed, err := catalog.List(ctx)
+	if err != nil {
+		return err
+	}
+	for _, report := range listed {
+		if report.Active {
+			result.ActiveProfile = report.Profile.Name
+			break
+		}
+	}
+	return nil
+}
+
+func (catalog *Catalog) replaceImportedAuth(ctx context.Context, target Report, authJSON []byte) error {
+	if target.AccountID != "" {
+		return catalog.accounts.ReplaceImportedAuth(ctx, target.AccountID, authJSON)
+	}
+	return catalog.profiles.ReplaceAuth(ctx, target.Profile.Name, authJSON)
+}
+
+func rollbackImport(mutations []importMutation, cause error) error {
+	var rollbackErr error
+	for index := len(mutations) - 1; index >= 0; index-- {
+		if mutations[index].rollback != nil {
+			rollbackErr = errors.Join(rollbackErr, mutations[index].rollback())
+		}
+	}
+	return errors.Join(cause, rollbackErr)
+}
+
+func cleanupImport(mutations []importMutation) {
+	for _, mutation := range mutations {
+		if mutation.cleanup != nil {
+			mutation.cleanup()
+		}
+	}
+}

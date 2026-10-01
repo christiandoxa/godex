@@ -15,7 +15,9 @@ only the historical OpenAI/Codex core boundary. The core closure below remains a
 verified baseline while additional surfaces are implemented. Current expansion
 checkpoints add standalone/external profile registration and copy workflows,
 `--profile` runtime selection, active standalone `CODEX_HOME` launch, and
-persisted redacted runtime activity powering `info`, `status`, and `log`.
+persisted redacted runtime activity powering `info`, `status`, and `log`, plus
+OpenAI profile bundle export/import compatible with Prodex plain v1, encrypted v2
+Argon2id/AES-256-GCM-SIV, and legacy encrypted v1 PBKDF2-SHA256 envelopes.
 
 A feature is counted as closed only when its observable behavior is implemented
 and covered by local verification; a command-name stub does not count as parity.
@@ -118,12 +120,15 @@ and eligibility validation stays in the runtime use case.
 - The standalone gateway surface, full live TUI parity, process/resource metrics,
   audit-log backend, and the richer runtime-policy/diagnostic bundle surfaces.
 - Self-update, reset-credit redemption, and cost-bearing `ping openai` diagnostics.
-- Password-protected profile export/import bundles and built-in non-OpenAI import
-  sources. These are parity work items rather than deliberate exclusions.
+- Built-in non-OpenAI profile import sources (Claude, Copilot, Kiro) and provider
+  secret-file bundle payloads. Interactive password-selection/password-entry TUI
+  and process-crash lifecycle-journal recovery for multi-profile imports also
+  remain to match Prodex exactly. OpenAI plain/encrypted bundle wire formats and
+  identity-safe runtime rollback are implemented.
 - HTTP/SSE model transport is explicit; Godex does not implement Prodex's
   WebSocket/Realtime forwarding. Unexpected upgrades fail before upstream work.
-- Import-current is auth-only, not full native-home migration or encrypted
-  credential bundle import/export. Existing native configuration, rollouts,
+- Import-current is auth-only, not full native-home migration. Existing native
+  configuration, rollouts,
   history, and databases remain owned by Codex; homes are not symlink-shared.
 - Remove keeps its existing destructive contract. Disable and logout provide
   retained deactivation; no second archive tree or changed removal default.
