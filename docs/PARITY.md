@@ -130,9 +130,15 @@ and eligibility validation stays in the runtime use case.
   active-profile launches prefer the selected profile first, filter unusable
   credential profiles, rotate only before commitment, and retain durable
   continuation affinity through the existing routing layer; explicit profile
-  selection remains single-profile hard affinity. Copilot still lacks in-process
-  auth refresh, pre-commit model fallback retries, and
-  chat-compatible/custom-instruction surfaces.
+  selection remains single-profile hard affinity. Copilot model fallback now also
+  matches the 0.434.3 pre-commit policy for the native Responses path: the exact
+  alias chains are bounded, only quota/rate-limit/transient/not-found classes may
+  advance models, bare 429 and auth failures do not, and buffered non-retryable
+  error bodies are preserved. The reference resolves Copilot runtime auth at
+  launch rather than refreshing it per request, so that is not a remaining gap.
+  The reference custom-instruction merge helper is test-only for the native
+  Responses flow and is likewise not a production parity gap. Non-Responses /
+  chat-compatible Copilot endpoint parity remains.
 - Super mode and its hidden expose/broker/MCP bridge/sub-agent execution stack,
   including optional Presidio integration.
 - The standalone gateway surface, remaining live TUI parity, process/resource

@@ -136,6 +136,17 @@ snapshots plus account `/models` metadata into Codex `model_catalog_json`. This
 keeps provider HTTP/auth mechanics out of delivery and keeps filesystem policy
 out of the gateway.
 
+
+Copilot model fallback stays inside `gateway/copilot`, before a response returns
+to generic routing. The gateway derives the exact 0.434.3 fallback chain from the
+request model and buffers only intermediate non-success responses under the same
+8 MiB runtime bound used for Copilot auth responses. Structured provider error
+codes decide whether another model is legal; auth failures and bare 429s do not
+advance the chain. When an intermediate response is not retryable, Godex rebuilds
+its original status, headers, trailers, and body before returning it, while
+successful/SSE responses remain live and unbuffered. Account rotation and durable
+conversation affinity continue to belong exclusively to `usecase/routing`.
+
 ### Quota gateway and preflight
 
 The OpenAI quota client is a narrow outbound adapter for the ChatGPT usage

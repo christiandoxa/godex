@@ -171,9 +171,13 @@ or active-profile launches. The selected profile is preferred for the first fres
 request, profiles whose runtime credential cannot be prepared are filtered out,
 and the existing routing layer performs bounded pre-commit rotation and durable
 conversation affinity. Explicit `--profile` launches remain single-profile hard
-affinity. In-process credential refresh, pre-commit model fallback retries, and
-chat-compatible/custom-instruction surfaces remain part of the `0.434.3` runtime
-parity backlog.
+affinity. Copilot model selection now also follows Prodex's bounded pre-commit
+fallback chains: quota/rate-limit/transient/not-found failures may advance to the
+next model, while auth failures, bare 429 responses, and any committed response do
+not replay. Launch-time auth resolution already matches Prodex 0.434.3; the
+reference does not perform a separate per-request Copilot credential refresh on
+this native Responses path. Non-Responses/chat-compatible Copilot endpoints remain
+part of the `0.434.3` runtime parity backlog.
 
 Prodex-compatible Codex runtime feature flags are translated to Codex `-c`
 overrides before the remaining Codex arguments. Explicit later Codex `-c`

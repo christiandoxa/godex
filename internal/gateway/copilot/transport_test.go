@@ -106,3 +106,137 @@ func TestRuntimeTransportRejectsNonResponsesAndUnsafeURL(t *testing.T) {
 		t.Fatal("non-Responses route unexpectedly accepted")
 	}
 }
+
+func TestRuntimeTransportFallsBackToNextModelBeforeCommit(t *testing.T) {
+	var models []string
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var body map[string]any
+		content, _ := io.ReadAll(request.Body)
+		if err := json.Unmarshal(content, &body); err != nil {
+			t.Fatal(err)
+		}
+		model, _ := body["model"].(string)
+		models = append(models, model)
+		if model == "gpt-5.3-codex" {
+			writer.WriteHeader(http.StatusNotFound)
+			_, _ = writer.Write([]byte(`{"error":{"code":"model_not_supported"}}`))
+			return
+		}
+		_, _ = writer.Write([]byte(`{"id":"response-ok"}`))
+	}))
+	defer server.Close()
+
+	transport, err := NewRuntimeTransport(server.URL, RuntimeAuth{apiKey: "runtime-fixture"}, server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := transport.Execute(context.Background(), proxymodel.Request{
+		Method: http.MethodPost, Path: "/backend-api/prodex/responses", Body: []byte(`{"model":"codex","input":[]}`),
+	}, proxymodel.Account{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK || len(models) != 2 || models[0] != "gpt-5.3-codex" || models[1] != "gpt-5.1-codex" {
+		t.Fatalf("response/models = %d / %#v", response.StatusCode, models)
+	}
+}
+
+func TestRuntimeTransportStructured429FallsBackButBare429DoesNot(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		body     string
+		attempts int
+	}{
+		{"structured", `{"error":{"code":"rate_limit_exceeded"}}`, 2},
+		{"bare", `{"error":{"message":"too many requests"}}`, 1},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			assertRuntime429Attempts(t, test.body, test.attempts)
+		})
+	}
+}
+
+func assertRuntime429Attempts(t *testing.T, errorBody string, wantAttempts int) {
+	t.Helper()
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		calls++
+		if calls == 1 {
+			writer.WriteHeader(http.StatusTooManyRequests)
+			_, _ = writer.Write([]byte(errorBody))
+			return
+		}
+		_, _ = writer.Write([]byte(`{"id":"fallback-ok"}`))
+	}))
+	defer server.Close()
+	transport, err := NewRuntimeTransport(server.URL, RuntimeAuth{apiKey: "runtime-fixture"}, server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := transport.Execute(context.Background(), proxymodel.Request{
+		Method: http.MethodPost, Path: "/backend-api/prodex/responses", Body: []byte(`{"model":"codex","input":[]}`),
+	}, proxymodel.Account{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if calls != wantAttempts {
+		t.Fatalf("calls = %d, want %d", calls, wantAttempts)
+	}
+	if wantAttempts == 1 && response.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("bare 429 status = %d", response.StatusCode)
+	}
+}
+
+func TestRuntimeTransportAuthFailureDoesNotFallbackModels(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		calls++
+		writer.WriteHeader(http.StatusUnauthorized)
+		_, _ = writer.Write([]byte(`{"error":{"code":"invalid_api_key"}}`))
+	}))
+	defer server.Close()
+	transport, err := NewRuntimeTransport(server.URL, RuntimeAuth{apiKey: "runtime-fixture"}, server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := transport.Execute(context.Background(), proxymodel.Request{
+		Method: http.MethodPost, Path: "/backend-api/prodex/responses", Body: []byte(`{"model":"codex","input":[]}`),
+	}, proxymodel.Account{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if calls != 1 || response.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("calls/status = %d / %d", calls, response.StatusCode)
+	}
+}
+
+func TestRuntimeTransportPreservesBufferedNonRetryableErrorBody(t *testing.T) {
+	const payload = `{"error":{"code":"invalid_request","message":"keep this body"}}`
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("X-Upstream-Error", "fixture")
+		writer.WriteHeader(http.StatusBadRequest)
+		_, _ = writer.Write([]byte(payload))
+	}))
+	defer server.Close()
+	transport, err := NewRuntimeTransport(server.URL, RuntimeAuth{apiKey: "runtime-fixture"}, server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := transport.Execute(context.Background(), proxymodel.Request{
+		Method: http.MethodPost, Path: "/backend-api/prodex/responses", Body: []byte(`{"model":"codex","input":[]}`),
+	}, proxymodel.Account{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.StatusCode != http.StatusBadRequest || response.Header.Get("X-Upstream-Error") != "fixture" || string(body) != payload {
+		t.Fatalf("buffered response = %d / %q / %q", response.StatusCode, response.Header.Get("X-Upstream-Error"), body)
+	}
+}

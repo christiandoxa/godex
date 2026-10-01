@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -49,22 +50,82 @@ func (transport *RuntimeTransport) Execute(ctx context.Context, input proxymodel
 	target.Path = strings.TrimRight(target.Path, "/") + path
 	target.RawPath = ""
 	target.RawQuery = input.RawQuery
-	body := canonicalizeCopilotRequest(input.Body)
-	request, err := http.NewRequestWithContext(ctx, input.Method, target.String(), bytes.NewReader(body))
+	models := copilotModelFallbackChain(input.Body)
+	for index, model := range models {
+		response, err := transport.executeModel(ctx, input.Method, target.String(), input.Body, model)
+		if err != nil {
+			return nil, err
+		}
+		if response.StatusCode < 400 || index+1 >= len(models) {
+			return proxyResponse(response), nil
+		}
+		buffered, err := bufferCopilotErrorResponse(response)
+		if err != nil {
+			return nil, err
+		}
+		if copilotModelRetryAllowed(buffered.StatusCode, buffered.body) {
+			continue
+		}
+		return buffered.proxyResponse(), nil
+	}
+	return nil, errors.New("Copilot runtime model fallback produced no attempts")
+}
+
+func (transport *RuntimeTransport) executeModel(
+	ctx context.Context,
+	method, target string,
+	originalBody []byte,
+	model string,
+) (*http.Response, error) {
+	body := copilotRequestBodyWithModel(originalBody, model)
+	request, err := http.NewRequestWithContext(ctx, method, target, bytes.NewReader(body))
 	if err != nil {
 		return nil, errors.New("create Copilot upstream request")
 	}
 	applyCopilotHeaders(request.Header, body, transport.auth.apiKey)
-	response, err := transport.client.Do(request)
-	if err != nil {
-		return nil, err
-	}
+	return transport.client.Do(request)
+}
+
+func proxyResponse(response *http.Response) *proxymodel.Response {
 	return &proxymodel.Response{
 		StatusCode: response.StatusCode,
 		Header:     response.Header,
 		Body:       response.Body,
 		Trailer:    response.Trailer,
+	}
+}
+
+type bufferedCopilotResponse struct {
+	StatusCode int
+	Header     http.Header
+	Trailer    http.Header
+	body       []byte
+}
+
+func bufferCopilotErrorResponse(response *http.Response) (bufferedCopilotResponse, error) {
+	defer response.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(response.Body, runtimeBodyMaxBytes+1))
+	if err != nil {
+		return bufferedCopilotResponse{}, errors.New("failed to read Copilot error response before fallback")
+	}
+	if len(body) > runtimeBodyMaxBytes {
+		return bufferedCopilotResponse{}, errors.New("Copilot error response exceeded the safe read limit")
+	}
+	return bufferedCopilotResponse{
+		StatusCode: response.StatusCode,
+		Header:     response.Header.Clone(),
+		Trailer:    response.Trailer.Clone(),
+		body:       body,
 	}, nil
+}
+
+func (response bufferedCopilotResponse) proxyResponse() *proxymodel.Response {
+	return &proxymodel.Response{
+		StatusCode: response.StatusCode,
+		Header:     response.Header,
+		Body:       io.NopCloser(bytes.NewReader(response.body)),
+		Trailer:    response.Trailer,
+	}
 }
 
 func (transport *RuntimeTransport) Close() { transport.client.CloseIdleConnections() }

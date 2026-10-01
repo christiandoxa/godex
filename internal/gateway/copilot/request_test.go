@@ -86,3 +86,30 @@ func TestCopilotVisionDetectionMatchesReference(t *testing.T) {
 		}
 	}
 }
+
+func TestCopilotModelFallbackChainsMatchProdex(t *testing.T) {
+	for model, want := range map[string][]string{
+		"":             {"gpt-5.3-codex", "gpt-5.1-codex", "gpt-4o"},
+		"AUTO":         {"gpt-5.3-codex", "gpt-5.1-codex", "gpt-4o"},
+		"codex":        {"gpt-5.3-codex", "gpt-5.1-codex", "gpt-4o"},
+		"gpt-5.5":      {"gpt-5.5", "gpt-5.3-codex", "gpt-5.1-codex", "gpt-4o"},
+		"gpt-5.4":      {"gpt-5.4", "gpt-5.3-codex", "gpt-5.1-codex", "gpt-4o"},
+		"sonnet":       {"claude-sonnet-4-6", "gpt-5.3-codex", "gpt-5.1-codex"},
+		"gemini":       {"gemini-3.1-pro-preview", "gpt-5.3-codex", "gpt-5.1-codex"},
+		"custom-model": {"custom-model"},
+	} {
+		body, _ := json.Marshal(map[string]any{"model": model})
+		got := copilotModelFallbackChain(body)
+		if len(got) != len(want) {
+			t.Fatalf("chain(%q) = %#v, want %#v", model, got, want)
+		}
+		for index := range want {
+			if got[index] != want[index] {
+				t.Fatalf("chain(%q) = %#v, want %#v", model, got, want)
+			}
+		}
+	}
+	if got := copilotModelFallbackChain([]byte("not-json")); len(got) != 1 || got[0] != defaultRuntimeModel {
+		t.Fatalf("invalid JSON fallback = %#v", got)
+	}
+}
