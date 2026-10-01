@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
@@ -16,6 +17,7 @@ import (
 
 type Config struct {
 	Router                           *routingusecase.Router
+	Activity                         activityRecorder
 	ListenAddr                       string
 	MaxRequestBytes, MaxInspectBytes int64
 }
@@ -25,6 +27,8 @@ type Proxy struct {
 	listenAddr             string
 	maxRequest, maxInspect int64
 	mu                     sync.Mutex
+	sequence               atomic.Uint64
+	activity               activityRecorder
 	listener               net.Listener
 	done                   chan struct{}
 	endpoint               string
@@ -47,7 +51,7 @@ func NewProxy(config Config) (*Proxy, error) {
 	if config.MaxInspectBytes <= 0 {
 		config.MaxInspectBytes = 64 << 10
 	}
-	proxy := &Proxy{router: config.Router, listenAddr: config.ListenAddr, maxRequest: config.MaxRequestBytes, maxInspect: config.MaxInspectBytes}
+	proxy := &Proxy{router: config.Router, activity: config.Activity, listenAddr: config.ListenAddr, maxRequest: config.MaxRequestBytes, maxInspect: config.MaxInspectBytes}
 	proxy.server = &http.Server{Handler: proxy, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 90 * time.Second}
 	return proxy, nil
 }
@@ -93,20 +97,28 @@ func (proxy *Proxy) Close(ctx context.Context) error {
 	}
 }
 func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	activity := proxy.startActivity(request)
+	activityContext := context.WithoutCancel(request.Context())
+	defer proxy.finishActivity(activityContext, activity)
 	if request.Header.Get("Upgrade") != "" {
+		activity.fail(http.StatusUpgradeRequired, "websocket upgrade is not supported")
 		http.Error(writer, "Godex requires Codex HTTP/SSE model transport", http.StatusUpgradeRequired)
 		return
 	}
 	body, err := readLimited(request.Body, proxy.maxRequest)
 	if err != nil {
 		if request.Context().Err() == nil {
+			activity.fail(http.StatusRequestEntityTooLarge, "request body exceeded safe retry limit")
 			http.Error(writer, "request body is too large for safe retry", http.StatusRequestEntityTooLarge)
+		} else {
+			activity.fail(0, "request canceled")
 		}
 		return
 	}
 	exchange, err := proxy.router.Forward(request.Context(), proxymodel.Request{Method: request.Method, Path: request.URL.Path, RawPath: request.URL.EscapedPath(), RawQuery: request.URL.RawQuery, Header: request.Header.Clone(), Body: body})
 	if err != nil {
 		if request.Context().Err() != nil {
+			activity.fail(0, "request canceled")
 			return
 		}
 		status, message := http.StatusBadGateway, "managed request failed before response commitment"
@@ -114,16 +126,21 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 		if errors.As(err, &presentation) {
 			status, message = presentation.StatusCode, presentation.Message
 		}
+		activity.fail(status, message)
 		http.Error(writer, message, status)
 		return
 	}
 	defer exchange.Close()
 	result := exchange.Result
+	activity.upstream(result.AccountID, result.Response.StatusCode)
 	if result.Failed {
 		result.AccountID = ""
 	}
-	proxy.forwardResponse(request.Context(), writer, result.Response, result.Prefix, result.AccountID, &requestLifecycle{})
+	lifecycle := &requestLifecycle{}
+	defer activity.finishLifecycle(lifecycle)
+	proxy.forwardResponse(request.Context(), writer, result.Response, result.Prefix, result.AccountID, lifecycle)
 }
+
 func readLimited(reader io.ReadCloser, limit int64) ([]byte, error) {
 	if reader == nil {
 		return nil, nil

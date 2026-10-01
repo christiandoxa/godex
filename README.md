@@ -156,17 +156,23 @@ with the same isolated, ten-second capability probe used before launch. An
 unsupported runtime fails with an upgrade error. The probe does not log in or
 submit a model request.
 
-Available account commands:
+Available profile, account, and runtime commands:
 
 | Command | Purpose |
 | --- | --- |
-| godex accounts | List managed accounts. |
-| godex account list | Alias for godex accounts. |
-| godex current | Show the active managed account. |
+| godex profile add NAME [--codex-home PATH\|--copy-from PATH\|--copy-current] [--activate] [--insecure] | Add a managed or external Codex profile. |
+| godex profile list | List account-backed and standalone profiles. |
+| godex current | Show the active profile and its `CODEX_HOME`. |
+| godex use NAME | Set the active profile. |
+| godex profile remove NAME [--delete-home] | Unregister a profile; managed home deletion is explicit. |
 | godex profile import-current [NAME] | Import the ChatGPT login from the current Codex home. |
-| godex quota [--all] [--detail|--raw] [--once] [SELECTOR] | Show a one-shot OpenAI/Codex quota snapshot. |
-| godex account use SELECTOR | Set the preferred account. |
-| godex account remove SELECTOR | Remove an account. |
+| godex accounts | List managed ChatGPT account identities. |
+| godex account use SELECTOR | Set the preferred account for account rotation. |
+| godex account remove SELECTOR | Remove a managed account and its isolated home. |
+| godex quota [--all] [--detail\|--raw] [--once] [SELECTOR] | Show a one-shot OpenAI/Codex quota snapshot. |
+| godex info [--json] [--tokens] | Show profile/runtime/Codex information. |
+| godex status [--once] [--interval SECONDS] | Show or watch the runtime snapshot. |
+| godex log [stream\|last\|upstream] [--json] | Follow persisted, redacted runtime request events. |
 
 Quota output stays compact by default. `--raw` prints the bounded upstream usage JSON
 for one selected or active account and cannot be combined with `--all` or
@@ -192,7 +198,7 @@ and Codex configuration survive repeat login and import-current.
 | GODEX_HOME | ~/.godex | State, profiles, locks, and staging files. |
 | GODEX_CODEX_BIN | codex | Codex executable to invoke. |
 | GODEX_UPSTREAM_URL | https://chatgpt.com/backend-api | Upstream URL for compatible test environments. |
-| CODEX_HOME | ~/.codex | Source profile used only by `godex profile import-current`; managed launches use isolated homes. |
+| CODEX_HOME | ~/.codex | Source profile for `profile import-current` and `profile add --copy-current`; managed launches use isolated homes. |
 
 Treat each profile's auth.json like a password. Do not copy it into source
 control, backups, bug reports, or fixtures.
@@ -202,8 +208,8 @@ control, backups, bug reports, or fixtures.
 - [Architecture](docs/ARCHITECTURE.md) — package ownership and runtime design.
 - [Runtime rotation and affinity](docs/ROTATION.md) — selection, retries,
   commitment, streaming, and forwarding rules.
-- [Core parity audit](docs/PARITY.md) — Prodex 0.434.2 equivalents, deliberate
-  differences, and validation limits.
+- [Parity audit](docs/PARITY.md) — Prodex 0.434.2 implemented equivalents,
+  remaining 1:1 gaps, and validation limits.
 - [AGENTS.md](AGENTS.md) — engineering invariants for contributors.
 
 ## Build from source

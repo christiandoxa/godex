@@ -7,6 +7,19 @@ newer Prodex working checkout. This audit covers Godex's declared OpenAI/Codex
 core after the preserved `6aae186` baseline, the `93db608` checkpoints, and the
 final closure below. It does not claim feature-for-feature Prodex parity.
 
+
+## 1:1 parity expansion
+
+The project target is now feature-for-feature parity with Prodex `0.434.2`, not
+only the historical OpenAI/Codex core boundary. The core closure below remains a
+verified baseline while additional surfaces are implemented. Current expansion
+checkpoints add standalone/external profile registration and copy workflows,
+`--profile` runtime selection, active standalone `CODEX_HOME` launch, and
+persisted redacted runtime activity powering `info`, `status`, and `log`.
+
+A feature is counted as closed only when its observable behavior is implemented
+and covered by local verification; a command-name stub does not count as parity.
+
 ## Final closure decision
 
 Practical parity is reached for the declared OpenAI/Codex account, isolated
@@ -95,13 +108,18 @@ use case; HTTP delivery owns stream commitment and forwarding. Import decoding
 stays private to the Codex gateway, journal recovery stays in account persistence,
 and eligibility validation stays in the runtime use case.
 
-## Deliberate differences and exclusions
+## Remaining 1:1 parity gaps
 
-- OpenAI/ChatGPT through Codex only: no multi-provider bridges, Super mode,
-  dashboard/custom TUI, enterprise gateway, SQL/Redis/Postgres infrastructure,
-  daemon, observability backend, plugin runtime, or self-update.
-  Provider catalogs, Presidio/guardrails, reset-credit redemption, and cost-bearing
-  ping/model-turn diagnostics are also excluded.
+- Multi-provider runtime/login bridges (Gemini, Anthropic/Claude, Copilot, Kiro,
+  DeepSeek/local/AGY where present in Prodex), including provider catalogs and
+  provider-specific auth/routing semantics.
+- Super mode and its hidden expose/broker/MCP bridge/sub-agent execution stack,
+  including optional Presidio integration.
+- The standalone gateway surface, full live TUI parity, process/resource metrics,
+  audit-log backend, and the richer runtime-policy/diagnostic bundle surfaces.
+- Self-update, reset-credit redemption, and cost-bearing `ping openai` diagnostics.
+- Password-protected profile export/import bundles and built-in non-OpenAI import
+  sources. These are parity work items rather than deliberate exclusions.
 - HTTP/SSE model transport is explicit; Godex does not implement Prodex's
   WebSocket/Realtime forwarding. Unexpected upgrades fail before upstream work.
 - Import-current is auth-only, not full native-home migration or encrypted
@@ -111,8 +129,9 @@ and eligibility validation stays in the runtime use case.
   retained deactivation; no second archive tree or changed removal default.
 - Native names/pickers/last remain profile-local rather than a shared-session UI.
   Explicit UUIDs/prefixes provide the cross-profile workflow.
-- Quota is a bounded one-shot view; no live dashboard, background polling,
-  automatic credit redemption, or provider-wide quota catalog.
+- Quota currently has bounded one-shot compact/detail/raw views; Prodex live
+  quota dashboard/watch behavior, automatic credit redemption, and provider-wide
+  quota catalog remain to be implemented for 1:1 parity.
 - Godex reloads Codex-owned auth on an authentication retry; it does not implement
   OAuth/token refresh, aggressive history rewrites, or silent model relaunch.
 - Native tools, models, approval/sandbox behavior, foreground command servers,

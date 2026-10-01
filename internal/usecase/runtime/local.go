@@ -64,3 +64,11 @@ func (runner *Runner) RunCurrent(ctx context.Context, selector string, args []st
 	defer func() { err = errors.Join(err, release()) }()
 	return runner.launch(ctx, account.ID, account.ID, profiles, args)
 }
+
+func (runner *Runner) RunHome(ctx context.Context, codexHome string, args []string) error {
+	home, err := validateRuntimeHome(codexHome)
+	if err != nil {
+		return err
+	}
+	return runner.process.Run(ctx, home, args)
+}

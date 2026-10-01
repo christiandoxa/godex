@@ -19,4 +19,5 @@ type Accounts interface {
 	SelectForLaunch(ctx context.Context, selector string) (entity.Account, error)
 	SetActive(ctx context.Context, selector string) (entity.Account, error)
 	Remove(ctx context.Context, selector string) (entity.Account, error)
+	RemoveProfile(ctx context.Context, selector string, deleteHome bool) (entity.Account, error)
 }

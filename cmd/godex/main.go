@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
 	"github.com/christiandoxa/godex/internal/config"
@@ -16,9 +17,12 @@ import (
 	"github.com/christiandoxa/godex/internal/gateway/openai"
 	proxyconfig "github.com/christiandoxa/godex/internal/model/proxy"
 	"github.com/christiandoxa/godex/internal/repository/account"
+	profilerepo "github.com/christiandoxa/godex/internal/repository/profile"
 	routingrepo "github.com/christiandoxa/godex/internal/repository/routing"
+	runtimerepo "github.com/christiandoxa/godex/internal/repository/runtime"
 	sessionrepo "github.com/christiandoxa/godex/internal/repository/session"
 	authusecase "github.com/christiandoxa/godex/internal/usecase/auth"
+	profileusecase "github.com/christiandoxa/godex/internal/usecase/profile"
 	quotausecase "github.com/christiandoxa/godex/internal/usecase/quota"
 	routingusecase "github.com/christiandoxa/godex/internal/usecase/routing"
 	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
@@ -57,6 +61,7 @@ func run() int {
 	}
 	quotaStatus := quotausecase.NewStatus(store, quotaClient)
 	bindings := routingrepo.NewStore(settings.Home)
+	activity := runtimeusecase.NewActivity(settings.Home, runtimerepo.NewLog(filepath.Join(settings.Home, "logs")), store, process)
 	factory := runtimeusecase.ProxyFactory(func(config proxyconfig.Config) (runtimeusecase.Proxy, error) {
 		transport, err := openai.NewTransport(config.UpstreamURL, nil, process)
 		if err != nil {
@@ -66,14 +71,17 @@ func run() int {
 		if err != nil {
 			return nil, err
 		}
-		return proxyhttp.NewProxy(proxyhttp.Config{Router: router})
+		return proxyhttp.NewProxy(proxyhttp.Config{Router: router, Activity: activity})
 	})
 	runner := runtimeusecase.NewRunner(store, process, factory)
 	runner.SetQuotaPreflight(quotaStatus)
 	runner.SetUpstreamURL(settings.UpstreamURL)
 	application := cli.New(login, importer, store, runner, doctor, quotaStatus, os.Stdout)
+	profileStore := profilerepo.NewStore(settings.Home)
+	application.SetProfiles(profileusecase.NewCatalog(profileStore, store, settings.CurrentCodexHome))
 
 	application.SetNativeAuth(authusecase.NewNative(store, process))
+	application.SetActivity(activity)
 	sessions := sessionusecase.NewCatalog(store, sessionrepo.NewReader(), runner)
 	sessions.SetOwnerLookup(func(ctx context.Context, id string) (string, error) {
 		return routingusecase.SessionOwner(ctx, bindings, id)

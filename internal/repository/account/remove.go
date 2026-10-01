@@ -10,16 +10,20 @@ import (
 )
 
 func (store *FileStore) Remove(ctx context.Context, selector string) (entity.Account, error) {
+	return store.RemoveProfile(ctx, selector, true)
+}
+
+func (store *FileStore) RemoveProfile(ctx context.Context, selector string, deleteHome bool) (entity.Account, error) {
 	var removed entity.Account
 	err := store.withLock(ctx, func() error {
 		var err error
-		removed, err = store.removeLocked(selector)
+		removed, err = store.removeLocked(selector, deleteHome)
 		return err
 	})
 	return removed, err
 }
 
-func (store *FileStore) removeLocked(selector string) (entity.Account, error) {
+func (store *FileStore) removeLocked(selector string, deleteHome bool) (entity.Account, error) {
 	state, err := store.readState()
 	if err != nil {
 		return entity.Account{}, err
@@ -37,6 +41,10 @@ func (store *FileStore) removeLocked(selector string) (entity.Account, error) {
 	nextID := cursorAccountID(state)
 	state.Accounts = append(state.Accounts[:index], state.Accounts[index+1:]...)
 	repairSelectionAfterRemove(&state, removed.ID, nextID)
+	if !deleteHome {
+		_, err := store.writeState(state)
+		return removed, err
+	}
 	trash, err := store.transactionPath(store.accountDir(removed.ID), "remove")
 	if err != nil {
 		return entity.Account{}, err

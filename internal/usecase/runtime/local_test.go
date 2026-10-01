@@ -101,3 +101,20 @@ func TestLaunchRefreshesAlternativeEligibilityAfterLease(t *testing.T) {
 		t.Fatalf("stale alternative eligibility: %v, %v", profiles, err)
 	}
 }
+
+func TestRunHomeUsesExplicitCodexHomeWithoutAccountSelection(t *testing.T) {
+	process := &fakeProcess{}
+	runner := NewRunner(&fakeLaunchAccounts{}, process, nil)
+	if err := runner.RunHome(context.Background(), "/profiles/external", []string{"features", "list"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(process.homes) != 1 || process.homes[0] != "/profiles/external" {
+		t.Fatalf("homes = %#v", process.homes)
+	}
+	if len(process.args) != 1 || len(process.args[0]) != 2 || process.args[0][0] != "features" {
+		t.Fatalf("args = %#v", process.args)
+	}
+	if err := runner.RunHome(context.Background(), " ", nil); err == nil {
+		t.Fatal("empty profile home unexpectedly accepted")
+	}
+}

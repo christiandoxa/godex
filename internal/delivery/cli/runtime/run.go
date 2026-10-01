@@ -7,6 +7,8 @@ import (
 	"io"
 	"strings"
 
+	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
+	runtimemodel "github.com/christiandoxa/godex/internal/model/runtime"
 	sessionmodel "github.com/christiandoxa/godex/internal/model/session"
 	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
 	sessionusecase "github.com/christiandoxa/godex/internal/usecase/session"
@@ -16,11 +18,128 @@ func Launch(ctx context.Context, runner *runtimeusecase.Runner) error {
 	return runner.Run(ctx, "", nil)
 }
 
+type launchProfiles interface {
+	ResolveLaunch(context.Context, string) (profilemodel.LaunchTarget, error)
+	ActiveLaunch(context.Context) (profilemodel.LaunchTarget, bool, error)
+	AcquireLaunch(context.Context, string) (func() error, error)
+}
+
 func Run(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionusecase.Catalog, arguments []string) error {
-	selector, codexArguments, err := parseRunArguments(arguments)
+	selection, codexArguments, err := parseRunArguments(arguments)
 	if err != nil {
 		return err
 	}
+	if selection.Profile != "" {
+		return errors.New("--profile requires profile-aware runtime dispatch")
+	}
+	return runParsed(ctx, runner, sessions, selection.Account, codexArguments)
+}
+
+func RunProfiles(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionusecase.Catalog, profiles launchProfiles, arguments []string) error {
+	selection, codexArguments, err := parseRunArguments(arguments)
+	if err != nil {
+		return err
+	}
+	return runProfileSelection(ctx, runner, sessions, profiles, selection, codexArguments)
+}
+
+func RunHome(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionusecase.Catalog, home string, arguments []string) error {
+	selection, codexArguments, err := parseRunArguments(arguments)
+	if err != nil {
+		return err
+	}
+	if selection.Profile != "" {
+		return errors.New("--profile cannot override an already resolved profile home")
+	}
+	if selection.Account != "" {
+		return runParsed(ctx, runner, sessions, selection.Account, codexArguments)
+	}
+	return runner.RunHome(ctx, home, codexArguments)
+}
+
+func runProfileSelection(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionusecase.Catalog, profiles launchProfiles, selection runtimemodel.Selection, codexArguments []string) error {
+	if selection.Profile != "" {
+		if profiles == nil {
+			return errors.New("profile support is not configured")
+		}
+		target, err := profiles.ResolveLaunch(ctx, selection.Profile)
+		if err != nil {
+			return err
+		}
+		return runLaunchTarget(ctx, runner, sessions, profiles, target, codexArguments)
+	}
+	if selection.Account != "" {
+		return runParsed(ctx, runner, sessions, selection.Account, codexArguments)
+	}
+	if profiles != nil {
+		target, active, err := profiles.ActiveLaunch(ctx)
+		if err != nil {
+			return err
+		}
+		if active {
+			return runLaunchTarget(ctx, runner, sessions, profiles, target, codexArguments)
+		}
+	}
+	return runParsed(ctx, runner, sessions, "", codexArguments)
+}
+
+func runLaunchTarget(
+	ctx context.Context,
+	runner *runtimeusecase.Runner,
+	sessions *sessionusecase.Catalog,
+	profiles launchProfiles,
+	target profilemodel.LaunchTarget,
+	arguments []string,
+) (runErr error) {
+	if target.AccountID != "" {
+		return runParsed(ctx, runner, sessions, target.AccountID, arguments)
+	}
+	if target.Provider != "" && target.Provider != "openai" {
+		return fmt.Errorf("profile provider %q is not implemented yet", target.Provider)
+	}
+	if profiles == nil || target.Name == "" {
+		return errors.New("profile launch metadata is incomplete")
+	}
+	release, err := profiles.AcquireLaunch(ctx, target.Name)
+	if err != nil {
+		return err
+	}
+	defer func() { runErr = errors.Join(runErr, release()) }()
+	return runStandaloneProfile(ctx, runner, target.CodexHome, arguments)
+}
+
+func runStandaloneProfile(ctx context.Context, runner *runtimeusecase.Runner, home string, arguments []string) error {
+	if index, args := sessionArgument(arguments); index >= 0 {
+		_ = index
+		return runner.RunProfile(ctx, home, args)
+	}
+	if index := nativeCommandIndex(arguments); index >= 0 {
+		if unsafeNativeCommand(arguments, index) {
+			return errors.New("native command bypasses Godex routing; use godex exec or godex app-server without daemon/proxy")
+		}
+		switch arguments[index] {
+		case "logout":
+			return errors.New("use godex logout to safely mutate managed credentials")
+		case "login":
+			return runStandaloneLoginStatus(ctx, runner, home, arguments, index)
+		case "mcp", "features", "completion", "debug", "config", "delete", "archive", "unarchive", "version", "--version":
+			return runner.RunHome(ctx, home, arguments)
+		case "resume", "fork", "queue":
+			return runner.RunProfile(ctx, home, arguments)
+		}
+	}
+	return runner.RunProfile(ctx, home, arguments)
+}
+
+func runStandaloneLoginStatus(ctx context.Context, runner *runtimeusecase.Runner, home string, arguments []string, index int) error {
+	status := nextCommandWord(arguments, index+1)
+	if status < 0 || arguments[status] != "status" {
+		return errors.New("use godex login to register and safely update managed credentials")
+	}
+	return runner.RunHome(ctx, home, arguments)
+}
+
+func runParsed(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionusecase.Catalog, selector string, codexArguments []string) error {
 	if index, args := sessionArgument(codexArguments); index >= 0 {
 		return runSessionArgument(ctx, sessions, selector, args, index)
 	}

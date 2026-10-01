@@ -706,3 +706,19 @@ func TestEmailOnlyDuplicateIsRejectedWhenEmailHasMultipleAccounts(t *testing.T) 
 		t.Fatalf("ambiguous email-only login error = %v", err)
 	}
 }
+
+func TestRemoveProfileCanRetainManagedHome(t *testing.T) {
+	store := newTestStore(t)
+	account := commitTestAccount(t, store, "work", "person@example.com", "account-1")
+	home := store.CodexHome(account.ID)
+	if _, err := store.RemoveProfile(context.Background(), account.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(home); err != nil {
+		t.Fatalf("retained profile home: %v", err)
+	}
+	accounts, err := store.List(context.Background())
+	if err != nil || len(accounts) != 0 {
+		t.Fatalf("accounts = %+v, err = %v", accounts, err)
+	}
+}

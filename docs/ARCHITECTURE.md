@@ -188,24 +188,31 @@ internal/config/
 internal/delivery/cli/                 dispatcher only
 internal/delivery/cli/account/
 internal/delivery/cli/auth/
+internal/delivery/cli/profile/
 internal/delivery/cli/runtime/
 internal/delivery/cli/quota/
 internal/delivery/cli/session/
 internal/delivery/http/proxy/
 internal/entity/account/
+internal/entity/profile/
 internal/entity/routing/
 internal/entity/session/
 internal/model/account/
+internal/model/profile/
 internal/model/proxy/
 internal/model/quota/
+internal/model/runtime/
 internal/model/session/
 internal/gateway/codex/
 internal/gateway/openai/
 internal/repository/account/
+internal/repository/profile/
 internal/repository/routing/
+internal/repository/runtime/
 internal/repository/session/
 internal/usecase/account/
 internal/usecase/auth/
+internal/usecase/profile/
 internal/usecase/runtime/
 internal/usecase/quota/
 internal/usecase/routing/
@@ -220,9 +227,13 @@ The gateway split follows concrete integration ownership: Codex process and
 profile operations live under `gateway/codex`, while outbound OpenAI HTTP
 transport lives under `gateway/openai`. HTTP delivery lives under
 `delivery/http/proxy`; retry and affinity policy lives under `usecase/routing`.
-Account metadata and persistence
-remain separate domain packages. The CLI root only dispatches to command
-domains; command parsing and rendering live beside the command they serve.
+Account identity/rotation and profile lifecycle are separate domains. The profile
+repository owns managed/external CODEX_HOME registration and leases; the profile
+use case presents account-backed profiles and standalone profiles as one CLI
+catalog without moving account routing policy into persistence. Runtime activity
+is a separate persisted event stream consumed by info/status/log delivery. The
+CLI root only dispatches to command domains; command parsing and rendering live
+beside the command they serve.
 
 ## Data format
 
@@ -249,9 +260,14 @@ domains; command parsing and rendering live beside the command they serve.
 
 No access token, ID token, refresh token, or API token belongs in this file.
 
-## Deliberate exclusions
+## 1:1 expansion boundary
 
-The first release has no SQL database, browser dashboard, metrics backend, remote daemon, provider abstraction matrix, enterprise policy engine, or plugin runtime. Adding any of these requires a separate product decision after the OpenAI path is stable.
+The verified OpenAI/Codex core remains the stability baseline while Godex expands
+toward feature-for-feature Prodex 0.434.2 parity. Multi-provider bridges, Super,
+gateway, richer diagnostics, live quota/status surfaces, update/redeem/ping, and
+profile bundle import/export are implementation backlog rather than permanent
+exclusions. New infrastructure is added only when required by a concrete
+reference feature and must still satisfy the architecture rules in `AGENTS.md`.
 
 ## Managed sessions
 

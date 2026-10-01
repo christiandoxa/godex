@@ -26,8 +26,8 @@ func TestRunFeatureFlagsRenderCodexOverrides(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if selector != "work" {
-		t.Fatalf("selector = %q", selector)
+	if selector.Account != "work" || selector.Profile != "" {
+		t.Fatalf("selection = %+v", selector)
 	}
 	want := []string{
 		"-c", `web_search="indexed"`,

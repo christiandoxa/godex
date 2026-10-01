@@ -21,6 +21,7 @@ type ProxyConfig struct {
 	Client                                    *http.Client
 	Now                                       func() time.Time
 	MaxRequestBytes, MaxInspectBytes          int64
+	Activity                                  activityRecorder
 	Bindings                                  *routingrepo.Store
 }
 
@@ -37,5 +38,5 @@ func newProxyForTest(config ProxyConfig) (*Proxy, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewProxy(Config{Router: router, ListenAddr: config.ListenAddr, MaxRequestBytes: config.MaxRequestBytes, MaxInspectBytes: config.MaxInspectBytes})
+	return NewProxy(Config{Router: router, Activity: config.Activity, ListenAddr: config.ListenAddr, MaxRequestBytes: config.MaxRequestBytes, MaxInspectBytes: config.MaxInspectBytes})
 }

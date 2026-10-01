@@ -8,7 +8,11 @@ import (
 	"testing"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
+	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
+	accountrepo "github.com/christiandoxa/godex/internal/repository/account"
+	profilerepo "github.com/christiandoxa/godex/internal/repository/profile"
 	authusecase "github.com/christiandoxa/godex/internal/usecase/auth"
+	profileusecase "github.com/christiandoxa/godex/internal/usecase/profile"
 	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
 )
 
@@ -78,12 +82,14 @@ func (dispatcherAccounts) SelectForLaunch(_ context.Context, selector string) (a
 func (dispatcherAccounts) CodexHome(string) string { return "/synthetic/codex" }
 
 type dispatcherProcess struct {
+	home      string
 	arguments []string
 	called    bool
 }
 
-func (process *dispatcherProcess) Run(_ context.Context, _ string, arguments []string) error {
+func (process *dispatcherProcess) Run(_ context.Context, home string, arguments []string) error {
 	process.called = true
+	process.home = home
 	process.arguments = append([]string(nil), arguments...)
 	return nil
 }
@@ -131,5 +137,29 @@ func TestDispatcherRoutesCommandDomains(t *testing.T) {
 	}
 	if !strings.Contains(output.String(), "work") || !process.called {
 		t.Fatalf("dispatcher output/arguments = %q, %#v", output.String(), process.arguments)
+	}
+}
+
+func TestDispatcherUsesActiveStandaloneProfileHome(t *testing.T) {
+	root := t.TempDir()
+	accounts := accountrepo.NewFileStore(root)
+	profiles := profilerepo.NewStore(root)
+	catalog := profileusecase.NewCatalog(profiles, accounts, t.TempDir())
+	report, err := catalog.Add(context.Background(), profilemodel.AddRequest{Name: "standalone"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	process := &dispatcherProcess{}
+	runner := runtimeusecase.NewRunner(accounts, process, nil)
+	app := New(nil, nil, accounts, runner, nil, nil, &bytes.Buffer{})
+	app.SetProfiles(catalog)
+	if err := app.Run(context.Background(), []string{"features", "list"}); err != nil {
+		t.Fatal(err)
+	}
+	if process.home != report.Profile.CodexHome {
+		t.Fatalf("launch home = %q, want %q", process.home, report.Profile.CodexHome)
+	}
+	if strings.Join(process.arguments, " ") != "features list" {
+		t.Fatalf("arguments = %#v", process.arguments)
 	}
 }

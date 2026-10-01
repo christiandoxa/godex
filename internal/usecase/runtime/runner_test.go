@@ -429,3 +429,27 @@ func TestResumedSessionKeepsRolloutHomeAndRotatedUpstreamOwner(t *testing.T) {
 		t.Fatal("missing upstream owner rotated")
 	}
 }
+
+func TestRunProfileBuildsSingleHomeProxyPool(t *testing.T) {
+	process := &fakeProxyProcess{}
+	proxy := &fakeProxy{}
+	var config proxyconfig.Config
+	runner := NewRunner(&fakeLaunchAccounts{}, process, func(got proxyconfig.Config) (Proxy, error) {
+		config = got
+		return proxy, nil
+	})
+	runner.SetUpstreamURL("http://upstream.test/backend-api")
+	if err := runner.RunProfile(context.Background(), "/profiles/standalone", []string{"exec", "hello"}); err != nil {
+		t.Fatal(err)
+	}
+	if !process.checked || process.home != "/profiles/standalone" || !proxy.started || !proxy.closed {
+		t.Fatalf("profile proxy lifecycle = process:%#v proxy:%#v", process, proxy)
+	}
+	profiles, err := config.Accounts(context.Background())
+	if err != nil || len(profiles) != 1 || profiles[0].Home != "/profiles/standalone" || !profiles[0].Enabled {
+		t.Fatalf("profile pool = %#v, err = %v", profiles, err)
+	}
+	if config.PreferredAccount == "" || config.PreferredAccount != profiles[0].ID || len(config.PreferredAccount) != 32 {
+		t.Fatalf("profile routing id = %q, pool = %#v", config.PreferredAccount, profiles)
+	}
+}

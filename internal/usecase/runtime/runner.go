@@ -78,7 +78,10 @@ func (runner *Runner) launch(ctx context.Context, homeID, preferredID string, pr
 	if err != nil {
 		return err
 	}
-	home := runner.accounts.CodexHome(homeID)
+	return runner.launchHome(ctx, runner.accounts.CodexHome(homeID), preferredID, profiles, arguments)
+}
+
+func (runner *Runner) launchHome(ctx context.Context, home, preferredID string, profiles []proxyconfig.Account, arguments []string) (runErr error) {
 	proxyRunner, ok := runner.process.(proxyCodex)
 	if !ok {
 		return runner.process.Run(ctx, home, arguments)
