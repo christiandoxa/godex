@@ -83,6 +83,7 @@ func run() int {
 	application.SetProfiles(profiles)
 	activity.SetProfiles(profiles)
 	quotaStatus.SetProfiles(profiles)
+	application.SetRedeemer(quotausecase.NewRedeemer(profiles, quotaClient))
 
 	application.SetNativeAuth(authusecase.NewNative(store, process))
 	application.SetActivity(activity)

@@ -187,6 +187,7 @@ Available profile, account, and runtime commands:
 | godex account use SELECTOR | Set the preferred account for account rotation. |
 | godex account remove SELECTOR | Remove a managed account and its isolated home. |
 | godex quota [-p NAME] [--all] [--detail] [--raw] [--once] [--base-url URL] | Watch OpenAI/Codex quota or render a single snapshot. |
+| godex redeem PROFILE [-y|--yes] [--base-url URL] [--no-proxy] | Manually redeem one OpenAI/Codex reset credit. |
 | godex info [--json] [--tokens] | Show profile/runtime/Codex information. |
 | godex status [--once] [--interval SECONDS] | Show or watch the runtime snapshot. |
 | godex log [stream\|last\|upstream] [--json] | Follow persisted, redacted runtime request events. |
@@ -206,6 +207,12 @@ and failed probes display `-`; probe errors never print gateway error contents.
 `claude` alias for `anthropic`. Configured non-OpenAI profiles are visible and
 filterable but remain `unsupported` until their provider-specific quota adapters
 are implemented.
+
+`godex redeem PROFILE` performs the same explicit two-step manual flow as Prodex:
+it checks current usage first, asks for confirmation when the nearest 5-hour or
+weekly reset is within one hour, then consumes one reset credit with a stable
+idempotency request ID. `--yes` skips only that confirmation; `--no-proxy`
+disables environment proxy routing for the usage and consume requests.
 
 Selectors match an exact account ID, friendly name, or email. Ambiguous
 selectors fail. Unknown top-level commands are treated as Codex subcommands and

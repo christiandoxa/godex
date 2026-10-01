@@ -138,7 +138,10 @@ and eligibility validation stays in the runtime use case.
   detail, profile selection, command-scoped base-URL override, and aggregate
   `--auth`/`--provider` filtering. The catalog includes standalone profiles and
   reports non-OpenAI profiles as unsupported until provider-specific quota
-  adapters land. Automatic credit redemption and those adapters remain 1:1 gaps.
+  adapters land. Manual `redeem PROFILE` now matches the usage preflight, one-hour
+  reset confirmation guard, idempotent consume endpoint, base-URL override, and
+  no-proxy controls. Runtime `--auto-redeem` policy and provider-specific quota
+  adapters remain 1:1 gaps.
 - Godex reloads Codex-owned auth on an authentication retry; it does not implement
   OAuth/token refresh, aggressive history rewrites, or silent model relaunch.
 - Native tools, models, approval/sandbox behavior, foreground command servers,

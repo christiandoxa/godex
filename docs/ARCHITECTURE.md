@@ -103,6 +103,11 @@ The CLI quota delivery package owns watch/once cadence, `--detail`, `--profile`,
 `--auth`, `--provider`, and `--base-url` parsing plus rendering of exact UTC
 reset timestamps and window lengths. Endpoint override reaches the OpenAI gateway through a consumed use-case
 capability and does not mutate runtime preflight configuration.
+Manual reset-credit redemption is a separate quota use case: it resolves only a
+quota-compatible OpenAI profile, fetches usage before any side effect, applies
+the one-hour confirmation policy, and sends the consume request through the same
+Codex-owned auth reader. Delivery owns prompting; the OpenAI gateway owns HTTP
+and no-proxy transport policy.
 The presentation flag stays local to delivery; account selection and quota
 classification remain in `usecase/quota`, and fetching remains in
 `gateway/openai`. Formatting helpers stay private to the delivery package

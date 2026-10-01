@@ -29,6 +29,7 @@ type App struct {
 	doctor     *runtimeusecase.Doctor
 	activity   *runtimeusecase.Activity
 	quota      *quotausecase.Status
+	redeemer   *quotausecase.Redeemer
 	profiles   *profileusecase.Catalog
 	nativeAuth *authusecase.Native
 	sessions   *sessionusecase.Catalog
@@ -90,6 +91,8 @@ func (app *App) Run(ctx context.Context, arguments []string) error {
 			return fmt.Errorf("quota support is not configured")
 		}
 		return quotacli.Show(ctx, app.quota, app.out, arguments[1:])
+	case "redeem":
+		return quotacli.Redeem(ctx, app.redeemer, app.out, arguments[1:])
 	case "session":
 		if app.sessions == nil {
 			return fmt.Errorf("session support is not configured")
@@ -165,6 +168,8 @@ Usage:
   godex quota [-p NAME] [--all] [--auth AUTH] [--provider PROVIDER]
               [--detail] [--raw] [--once] [--base-url URL]
                                Watch or snapshot filtered profile quota
+  godex redeem PROFILE [-y|--yes] [--base-url URL] [--no-proxy]
+                               Redeem one OpenAI reset credit manually
   godex run [--account SEL] -- [codex args...]
   godex session list/current [--json|--id-only|--resume-command]
                                Find sessions across managed profiles
@@ -194,6 +199,8 @@ Login options:
 func (app *App) SetSessions(catalog *sessionusecase.Catalog) { app.sessions = catalog }
 
 func (app *App) SetProfiles(catalog *profileusecase.Catalog) { app.profiles = catalog }
+
+func (app *App) SetRedeemer(redeemer *quotausecase.Redeemer) { app.redeemer = redeemer }
 
 func (app *App) SetNativeAuth(native *authusecase.Native) { app.nativeAuth = native }
 

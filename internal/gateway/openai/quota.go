@@ -45,7 +45,11 @@ func (client *QuotaClient) Fetch(ctx context.Context, codexHome string) (quotamo
 }
 
 func (client *QuotaClient) FetchAt(ctx context.Context, codexHome, upstream string) (quotamodel.Usage, error) {
-	body, err := client.fetchBodyAt(ctx, codexHome, upstream)
+	return client.FetchAtPolicy(ctx, codexHome, upstream, false)
+}
+
+func (client *QuotaClient) FetchAtPolicy(ctx context.Context, codexHome, upstream string, noProxy bool) (quotamodel.Usage, error) {
+	body, err := client.fetchBodyAtPolicy(ctx, codexHome, upstream, noProxy)
 	if err != nil {
 		return quotamodel.Usage{}, err
 	}
@@ -72,6 +76,10 @@ func (client *QuotaClient) FetchRawAt(ctx context.Context, codexHome, upstream s
 }
 
 func (client *QuotaClient) fetchBodyAt(ctx context.Context, codexHome, upstream string) ([]byte, error) {
+	return client.fetchBodyAtPolicy(ctx, codexHome, upstream, false)
+}
+
+func (client *QuotaClient) fetchBodyAtPolicy(ctx context.Context, codexHome, upstream string, noProxy bool) ([]byte, error) {
 	auth, err := client.auth.ReadAuth(ctx, codexHome)
 	if err != nil {
 		return nil, err
@@ -92,7 +100,11 @@ func (client *QuotaClient) fetchBodyAt(ctx context.Context, codexHome, upstream 
 		request.Header.Set("ChatGPT-Account-Id", auth.AccountID)
 	}
 
-	response, err := client.do(request)
+	httpClient, err := client.clientForPolicy(noProxy)
+	if err != nil {
+		return nil, err
+	}
+	response, err := client.doWithClient(httpClient, request)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +123,11 @@ func (client *QuotaClient) fetchBodyAt(ctx context.Context, codexHome, upstream 
 }
 
 func (client *QuotaClient) do(request *http.Request) (*http.Response, error) {
-	response, err := client.client.Do(request)
+	return client.doWithClient(client.client, request)
+}
+
+func (client *QuotaClient) doWithClient(httpClient *http.Client, request *http.Request) (*http.Response, error) {
+	response, err := httpClient.Do(request)
 	if err == nil {
 		return response, nil
 	}
@@ -119,11 +135,26 @@ func (client *QuotaClient) do(request *http.Request) (*http.Response, error) {
 		return nil, request.Context().Err()
 	}
 	clone := request.Clone(request.Context())
-	response, retryErr := client.client.Do(clone)
+	response, retryErr := httpClient.Do(clone)
 	if retryErr != nil {
 		return nil, fmt.Errorf("request quota endpoint: %w", retryErr)
 	}
 	return response, nil
+}
+
+func (client *QuotaClient) clientForPolicy(noProxy bool) (*http.Client, error) {
+	if !noProxy {
+		return client.client, nil
+	}
+	copy := *client.client
+	transport, ok := copy.Transport.(*http.Transport)
+	if !ok {
+		return nil, errors.New("quota --no-proxy requires an HTTP transport")
+	}
+	transport = transport.Clone()
+	transport.Proxy = nil
+	copy.Transport = transport
+	return &copy, nil
 }
 
 func (client *QuotaClient) usageURL(override string) (string, error) {
