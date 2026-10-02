@@ -126,7 +126,7 @@ func runLaunchTarget(
 	if err != nil {
 		return err
 	}
-	if provider.Kind == "copilot" || provider.Kind == "anthropic" {
+	if provider.Kind == "copilot" || provider.Kind == "anthropic" || provider.Kind == "kiro" {
 		pool, err := profiles.ProviderLaunchPool(ctx, target.Name, target.Provider, allowRotate)
 		if err != nil {
 			return err
@@ -204,6 +204,8 @@ func launchRuntimeProvider(target profilemodel.LaunchTarget) (proxymodel.Provide
 			target.Name,
 			optionalProviderValue(target.ProviderConfig.APIURL),
 		), nil
+	case "kiro":
+		return runtimeusecase.KiroProvider(target.Name), nil
 	default:
 		return proxymodel.Provider{}, fmt.Errorf("profile provider %q is not implemented yet", target.Provider)
 	}

@@ -3,6 +3,7 @@ package compact
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,6 +18,28 @@ const (
 	maxSnippetBytes = 768
 	maxSummaryBytes = 24 * 1024
 )
+
+func Semantic(summary, provider string) (*proxymodel.Response, error) {
+	content, err := json.Marshal(map[string]any{
+		"output": []any{map[string]any{
+			"type": "message", "role": "user",
+			"content": []any{map[string]any{
+				"type": "input_text", "text": SummaryPrefix + "\n\n" + strings.TrimSpace(summary),
+			}},
+		}},
+	})
+	if err != nil {
+		return nil, errors.New("serialize semantic compact response")
+	}
+	header := make(http.Header)
+	header.Set("Content-Type", "application/json; charset=utf-8")
+	header.Set("X-Prodex-Compact-Mode", "semantic")
+	header.Set("X-Prodex-Compact-Provider", provider)
+	return &proxymodel.Response{
+		StatusCode: http.StatusOK, Header: header,
+		Body: io.NopCloser(bytes.NewReader(content)), Trailer: make(http.Header),
+	}, nil
+}
 
 func LocalFallback(body []byte, provider, reason string) (*proxymodel.Response, error) {
 	summary := LocalSummary(body)

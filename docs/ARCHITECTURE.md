@@ -171,6 +171,19 @@ and transient failures are interpreted consistently by Anthropic and Copilot.
 Anthropic Responses exhaust legal model fallbacks inside the gateway before a
 response returns to usecase/routing; only then may routing rotate credentials.
 Chat Completions and Messages remain passthrough and are not model-rewritten.
+Kiro runtime remains inside gateway/kiro, which already owns Kiro credential
+and catalog parsing. The runtime bridge materializes a private per-profile Kiro
+data store, drives the ACP JSON-RPC lifecycle, translates Responses/Chat/Messages,
+serves Models locally, and performs semantic Compact without moving ACP or SQLite
+details into delivery/use cases. Live Responses/Chat streaming uses a bounded
+producer queue and cancels the ACP child when the consumer closes; activity
+metadata is normalized/redacted before it becomes text or response metadata.
+usecase/runtime owns only provider defaults/catalog launch precedence, while
+usecase/profile owns selected-first pool membership and profile leases. A bounded
+in-memory conversation store is scoped by profile and handles
+previous_response_id/tool-call continuation; it is runtime-only and never
+persists conversation content into profile state.
+
 Anthropic raw API-key launches reuse the same routing/account abstraction without
 turning secrets into profiles. `gateway/claude` resolves request/environment key
 precedence, `usecase/runtime` assigns stable hashed credential IDs and keeps raw

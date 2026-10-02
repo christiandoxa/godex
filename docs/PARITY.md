@@ -135,8 +135,8 @@ and eligibility validation stays in the runtime use case.
 - All Godex equivalents of Prodex TUI surfaces must use Bubble Tea. Live status,
   quota watch, log stream/upstream, and redeem confirmation have been migrated;
   non-TTY fallbacks remain line-oriented.
-- Multi-provider runtime/login parity remains incomplete for Gemini, Kiro,
-  and AGY where present in Prodex. DeepSeek now has the 0.435.1 raw-key runtime
+- Multi-provider runtime/login parity remains incomplete for Gemini and AGY where
+  present in Prodex. DeepSeek now has the 0.435.1 raw-key runtime
   plus its dedicated Codex model catalog and advanced request-side Responses
   adapter: exact key precedence/provider defaults/stable key rotation, launch-model
   catalog precedence, reasoning effort, primitive sampling/token controls,
@@ -189,6 +189,19 @@ and eligibility validation stays in the runtime use case.
   messages are passthrough through the same bounded transport/fallback policy,
   and GET models list/single are locally emulated from the merged static/dynamic
   catalog with exact case-folded, no-trim identity lookup.
+  Kiro now also has the 0.435.1 foreground ACP runtime bridge: managed profiles
+  run against isolated private Kiro runtime databases, selected-first profile
+  pools reuse the generic precommit router, and explicit profile selection remains
+  hard-affinity. Responses, Compact, Chat, Messages, and Models routes match the
+  provider registry; the exact tagged canonical catalog is merged with bounded
+  per-profile model metadata. Compact uses semantic ACP compaction with the same
+  local fallback contract. Responses/Chat stream live ACP session/update deltas
+  with bounded 16-chunk backpressure, reader-close cancellation, redacted
+  128-event tool activity, and the 300-second/env-overridable stream-idle policy;
+  Messages intentionally buffers the completed turn before emitting Messages
+  SSE. Bounded conversation replay covers previous_response_id and tool-output
+  call-id recovery. Kiro auth/runtime DB changes remain profile-local and are
+  restored into managed snapshots only under the reference freshness rule.
 - Super mode and its hidden expose/broker/MCP bridge/sub-agent execution stack,
   including optional Presidio integration.
 - The standalone gateway surface, remaining live TUI parity, process/resource

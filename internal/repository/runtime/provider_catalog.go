@@ -32,6 +32,10 @@ func (*ProviderCatalogStore) ReadCopilotRuntime(home string) ([]map[string]any, 
 	return readProviderCatalog(home, proxymodel.CopilotRuntimeCatalogFile)
 }
 
+func (*ProviderCatalogStore) ReadKiroProfile(home string) ([]map[string]any, error) {
+	return readProviderCatalog(home, proxymodel.KiroProfileModelCatalogFile)
+}
+
 func (*ProviderCatalogStore) WriteExternal(home string, models []map[string]any) (string, error) {
 	return writeProviderCatalog(home, proxymodel.ExternalProviderCatalogFile, models)
 }

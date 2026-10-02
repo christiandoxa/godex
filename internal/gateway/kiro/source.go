@@ -17,11 +17,13 @@ import (
 const kiroBuilderStartURL = "https://view.awsapps.com/start"
 
 type Source struct {
-	inspector  *Inspector
-	getenv     func(string) string
-	homeDir    func() (string, error)
-	lookupPath func(string) (string, error)
-	run        metadataRunner
+	inspector     *Inspector
+	getenv        func(string) string
+	homeDir       func() (string, error)
+	lookupPath    func(string) (string, error)
+	run           metadataRunner
+	acp           acpTurnRunner
+	conversations *kiroConversationStore
 }
 
 type sourceSnapshot struct {
@@ -37,7 +39,7 @@ type sourceSnapshot struct {
 func NewSource() *Source {
 	return &Source{
 		inspector: NewInspector(), getenv: os.Getenv, homeDir: os.UserHomeDir,
-		lookupPath: exec.LookPath, run: runMetadataCommand,
+		lookupPath: exec.LookPath, run: runMetadataCommand, conversations: newKiroConversationStore(),
 	}
 }
 

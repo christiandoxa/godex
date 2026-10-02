@@ -242,6 +242,27 @@ DeepSeek-specific response/SSE reasoning/tool shaping and the web-search/beta-ba
 request routes remain the next 0.435.1 parity slice; unsupported web-search
 requests still fail before upstream instead of being silently downgraded.
 
+Kiro profiles now have a foreground ACP runtime bridge matching the 0.435.1
+provider surface. Default or active launches form a selected-first managed Kiro
+pool, explicit profile selection remains hard-affinity, and each profile gets its
+own private runtime data.sqlite3 reconstructed from kiro_auth.json. Runtime
+auth/state updates are restored back into the managed snapshot only when the
+runtime DB is newer, so Kiro remains the credential owner without sharing state
+across profiles.
+
+The bridge supports Responses, Responses Compact, Chat Completions, Messages,
+and local Models list/single. It merges the canonical 0.435.1 Kiro catalog with
+the optional per-profile kiro_model_catalog.json, resolves aliases before launch,
+performs semantic compact through the Kiro ACP session with bounded local
+fallback, and keeps Kiro internal tool activity redacted rather than exposing raw
+tool arguments. Responses and Chat use true live ACP streaming: deltas are
+forwarded as session/update notifications arrive, reader close cancels the ACP
+child, and PRODEX_RUNTIME_PROXY_STREAM_IDLE_TIMEOUT_MS uses the same 300-second
+default as Prodex. Messages intentionally remains buffered-then-SSE like the
+reference. Bounded conversation snapshots implement previous_response_id replay
+and tool-output call-id recovery without persisting conversation contents to
+profile metadata.
+
 Local OpenAI-compatible Responses endpoints now match Prodex's `--url` surface.
 For example:
 

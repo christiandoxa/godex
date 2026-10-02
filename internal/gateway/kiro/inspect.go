@@ -10,6 +10,8 @@ import (
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 )
 
+const kiroModelsField = "models"
+
 const (
 	CredentialsFile  = "kiro_auth.json"
 	ModelCatalogFile = "kiro_model_catalog.json"
@@ -106,7 +108,7 @@ func normalizeModelCatalogText(text string) (string, error) {
 	if len(normalized) == 0 {
 		return "", errors.New("Kiro model catalog returned no usable models")
 	}
-	content, err := json.MarshalIndent(map[string]any{"models": normalized}, "", "  ")
+	content, err := json.MarshalIndent(map[string]any{kiroModelsField: normalized}, "", "  ")
 	if err != nil {
 		return "", errors.New("failed to serialize Kiro model catalog")
 	}
@@ -169,10 +171,10 @@ func findModels(value any) ([]any, bool) {
 	if !ok {
 		return nil, false
 	}
-	if models, ok := firstArray(root, "models", "availableModels", "available_models", "supportedModels", "supported_models"); ok {
+	if models, ok := firstArray(root, kiroModelsField, "availableModels", "available_models", "supportedModels", "supported_models"); ok {
 		return models, true
 	}
-	nested, ok := root["models"].(map[string]any)
+	nested, ok := root[kiroModelsField].(map[string]any)
 	if !ok {
 		return nil, false
 	}

@@ -78,13 +78,14 @@ func run() int {
 	bindings := routingrepo.NewStore(settings.Home)
 	copilotSource := copilotgateway.NewSource(nil)
 	claudeSource := claudegateway.NewSource()
+	kiroSource := kirogateway.NewSource()
 	providerCatalogs := runtimerepo.NewProviderCatalogStore()
 	activity := runtimeusecase.NewActivity(settings.Home, runtimerepo.NewLog(filepath.Join(settings.Home, "logs")), store, process)
 	doctor.SetActivity(activity)
 	doctor.SetQuota(quotaStatus)
 	doctor.SetBundleStore(runtimerepo.NewDoctorBundleStore())
 	factory := runtimeusecase.ProxyFactory(func(config proxyconfig.Config) (runtimeusecase.Proxy, error) {
-		router, err := newRuntimeRouter(config, process, copilotSource, claudeSource, providerCatalogs, bindings, autoRedeemer)
+		router, err := newRuntimeRouter(config, process, copilotSource, claudeSource, kiroSource, providerCatalogs, bindings, autoRedeemer)
 		if err != nil {
 			return nil, err
 		}
@@ -102,7 +103,6 @@ func run() int {
 	profiles.SetAuthInspector(process)
 	profiles.SetClaudeSource(claudeSource)
 	quotaStatus.SetExternalProvider("anthropic", claudeSource)
-	kiroSource := kirogateway.NewSource()
 	profiles.SetKiroInspector(kiroSource)
 	profiles.SetKiroSource(kiroSource)
 	quotaStatus.SetExternalProvider("kiro", kiroSource)
@@ -142,11 +142,12 @@ func newRuntimeRouter(
 	process *codex.CodexProcess,
 	copilotSource *copilotgateway.Source,
 	claudeSource *claudegateway.Source,
+	kiroSource *kirogateway.Source,
 	providerCatalogs *runtimerepo.ProviderCatalogStore,
 	bindings *routingrepo.Store,
 	autoRedeemer *quotausecase.AutoRedeemer,
 ) (*routingusecase.Router, error) {
-	gateway, err := newRuntimeGateway(config, process, copilotSource, claudeSource, providerCatalogs)
+	gateway, err := newRuntimeGateway(config, process, copilotSource, claudeSource, kiroSource, providerCatalogs)
 	if err != nil {
 		return nil, err
 	}
@@ -162,6 +163,7 @@ func newRuntimeGateway(
 	process *codex.CodexProcess,
 	copilotSource *copilotgateway.Source,
 	claudeSource *claudegateway.Source,
+	kiroSource *kirogateway.Source,
 	providerCatalogs *runtimerepo.ProviderCatalogStore,
 ) (runtimeGateway, error) {
 	switch config.Provider.Kind {
@@ -173,9 +175,28 @@ func newRuntimeGateway(
 		return newAnthropicRuntimeGateway(config, claudeSource)
 	case "deepseek":
 		return deepseekgateway.NewRuntimePoolWithOptions(config.Provider.APIURL, config.ProviderCredentials, deepseekgateway.RequestOptions{StrictTools: config.Provider.StrictTools}, nil)
+	case "kiro":
+		return newKiroRuntimeGateway(config, kiroSource)
 	default:
 		return nil, fmt.Errorf("runtime provider %q is not implemented", config.Provider.Kind)
 	}
+}
+
+func newKiroRuntimeGateway(config proxyconfig.Config, source *kirogateway.Source) (runtimeGateway, error) {
+	if source == nil {
+		return nil, errors.New("Kiro runtime source is not configured")
+	}
+	if config.Context == nil {
+		config.Context = context.Background()
+	}
+	if config.Accounts == nil {
+		return nil, errors.New("Kiro runtime account source is not configured")
+	}
+	accounts, err := config.Accounts(config.Context)
+	if err != nil {
+		return nil, err
+	}
+	return source.NewRuntimePool(config.Context, accounts)
 }
 
 func newAnthropicRuntimeGateway(

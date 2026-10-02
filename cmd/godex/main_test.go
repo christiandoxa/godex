@@ -122,7 +122,7 @@ func TestNewRuntimeGatewayBuildsDeepSeekCredentialPool(t *testing.T) {
 			{ID: "key-a", Secret: "secret-a"},
 			{ID: "key-b", Secret: "secret-b"},
 		},
-	}, nil, nil, nil, nil)
+	}, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

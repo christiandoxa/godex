@@ -200,8 +200,9 @@ func TestLaunchRuntimeProviderSupportsCopilotAndAnthropic(t *testing.T) {
 	if err != nil || anthropic.Kind != "anthropic" || anthropic.Name != "claude-work" || anthropic.APIURL != "https://api.anthropic.com/v1" || anthropic.DefaultModel != "claude-sonnet-5-5" || anthropic.ContextWindow != 1000000 || anthropic.AutoCompactLimit != 950000 {
 		t.Fatalf("Anthropic provider = %#v, err = %v", anthropic, err)
 	}
-	if _, err := launchRuntimeProvider(profilemodel.LaunchTarget{Provider: "kiro"}); err == nil || !strings.Contains(err.Error(), "not implemented") {
-		t.Fatalf("unsupported provider error = %v", err)
+	kiro, err := launchRuntimeProvider(profilemodel.LaunchTarget{Name: "kiro-work", Provider: "kiro"})
+	if err != nil || kiro.Kind != "kiro" || kiro.Name != "kiro-work" || kiro.APIURL != "https://kiro.dev" || kiro.DefaultModel != "auto" || kiro.ContextWindow != 1_000_000 || kiro.AutoCompactLimit != 950_000 {
+		t.Fatalf("Kiro provider = %#v, err = %v", kiro, err)
 	}
 }
 

@@ -11,6 +11,7 @@ const (
 	CopilotRuntimeCatalogFile   = "prodex-copilot-runtime-model-catalog.json"
 	ExternalProviderCatalogFile = "prodex-external-provider-model-catalog.json"
 	DeepSeekModelCatalogFile    = "prodex-deepseek-model-catalog.json"
+	KiroProfileModelCatalogFile = "kiro_model_catalog.json"
 	ProviderCatalogMaxItems     = 1024
 	ProviderCatalogMaxBytes     = 1 << 20
 )

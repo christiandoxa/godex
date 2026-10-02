@@ -12,6 +12,7 @@ const catalogDescriptionKey = "description"
 
 type providerCatalogStore interface {
 	ReadCopilotRuntime(string) ([]map[string]any, error)
+	ReadKiroProfile(string) ([]map[string]any, error)
 	WriteExternal(string, []map[string]any) (string, error)
 	WriteDeepSeek(string, []map[string]any) (string, error)
 }
@@ -50,6 +51,8 @@ func prepareProviderRuntimeArguments(
 		models, err = buildAnthropicExternalCatalog(provider, arguments)
 	case "deepseek":
 		models, err = buildDeepSeekCodexCatalog(provider, arguments)
+	case "kiro":
+		models, err = buildKiroExternalCatalog(store, home, provider, arguments)
 	default:
 		return append(defaults, arguments...), nil
 	}

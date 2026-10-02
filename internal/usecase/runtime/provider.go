@@ -21,6 +21,10 @@ const (
 	deepSeekContextWindow     = int64(1_048_576)
 	deepSeekAutoCompactLimit  = int64(900_000)
 	deepSeekDefaultAPIURL     = "https://api.deepseek.com"
+	kiroDefaultModel          = "auto"
+	kiroContextWindow         = int64(1_000_000)
+	kiroAutoCompactLimit      = int64(950_000)
+	kiroDefaultAPIURL         = "https://kiro.dev"
 )
 
 func CopilotProvider(name, host, login, apiURL string) proxymodel.Provider {
@@ -53,6 +57,15 @@ func DeepSeekProvider(name, apiURL string) proxymodel.Provider {
 		DefaultModel:     deepSeekDefaultModel,
 		ContextWindow:    deepSeekContextWindow,
 		AutoCompactLimit: deepSeekAutoCompactLimit,
+	}
+}
+
+func KiroProvider(name string) proxymodel.Provider {
+	return proxymodel.Provider{
+		Kind: "kiro", Name: name, APIURL: kiroDefaultAPIURL,
+		DefaultModel:     kiroDefaultModel,
+		ContextWindow:    kiroContextWindow,
+		AutoCompactLimit: kiroAutoCompactLimit,
 	}
 }
 
