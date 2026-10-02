@@ -106,6 +106,18 @@ business actions stay in auth/profile use cases and provider gateways, while
 guidance-only methods do not mutate state.
 
 
+OpenAI/API-compatible API-key login follows the same separation. Delivery owns
+the Bubble Tea/plain prompts and never forwards the key in child argv. The
+profile use case owns name/base-URL validation and create-vs-update policy;
+`repository/profile` atomically writes the private Codex-owned `auth.json` and
+optional bounded `.prodex-profile.toml`, including rollback and symlink-safe
+replacement. Runtime reads only the profile-local URL metadata and injects the
+`prodex-openai-compatible` Codex `-c` entries before user arguments, so explicit
+user `model_provider` configuration retains final precedence. The Codex process
+uses the managed profile's own `auth.json`; Godex's HTTP routing gateway never
+handles that API key.
+
+
 Built-in provider imports use outbound gateways rather than reading external CLI
 state from delivery or use cases. `gateway/claude` resolves Claude Code's config
 root, reads `.credentials.json` through bounded regular-file checks, and returns

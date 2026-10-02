@@ -244,6 +244,10 @@ func (fake *fakeLocalLaunchProfiles) AcquireLaunchPool(context.Context, []string
 	return nil, errors.New("provider pool lease must not run for --url")
 }
 
+func (fake *fakeLocalLaunchProfiles) OpenAICompatibleBaseURL(context.Context, string) (string, bool, error) {
+	return "", false, nil
+}
+
 func TestRunHomeLocalProviderKeepsResolvedHome(t *testing.T) {
 	process := &fakeRunnerProcess{}
 	runner := runtimeusecase.NewRunner(&fakeRunnerAccounts{}, process, nil)

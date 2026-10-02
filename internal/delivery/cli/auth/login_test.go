@@ -96,3 +96,30 @@ func TestParseLoginOptionsIsSharedByMenuAndDirectLogin(t *testing.T) {
 		t.Fatalf("options = %#v", options)
 	}
 }
+
+func TestParseLoginOptionsSupportsAPIKeyAndBaseURLAliases(t *testing.T) {
+	options, err := ParseLoginOptions([]string{"--with-api-key", "--name", "work", "--base-url", "https://example.test/v1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !options.WithAPIKey || options.Name != "work" || !options.BaseURLSpecified || options.BaseURL != "https://example.test/v1" {
+		t.Fatalf("options = %#v", options)
+	}
+	alias, err := ParseLoginOptions([]string{"--with-api-key", "--openai-base-url=http://localhost:11434/v1"})
+	if err != nil || !alias.BaseURLSpecified || alias.BaseURL != "http://localhost:11434/v1" {
+		t.Fatalf("alias = %#v, err=%v", alias, err)
+	}
+}
+
+func TestLoginPromptEligibilityMatchesAPIKeyReference(t *testing.T) {
+	if ShouldPromptLoginMenu([]string{"--with-api-key"}) {
+		t.Fatal("explicit API-key login unexpectedly opened provider menu")
+	}
+	if !ShouldPromptLoginMenu([]string{"--base-url", "https://example.test/v1"}) {
+		t.Fatal("base URL alone should still allow provider chooser")
+	}
+	login := authusecase.NewLogin(&fakeLoginAccounts{}, fakeLoginCodex{})
+	if err := Login(context.Background(), login, io.Discard, []string{"--base-url", "https://example.test/v1"}); err == nil || !strings.Contains(err.Error(), "only supported for API key") {
+		t.Fatalf("base URL without API-key login error = %v", err)
+	}
+}

@@ -43,6 +43,7 @@ type App struct {
 	sessions   *sessionusecase.Catalog
 	out        io.Writer
 	errOut     io.Writer
+	in         io.Reader
 }
 
 func New(
@@ -56,7 +57,7 @@ func New(
 ) *App {
 	return &App{
 		login: login, importer: importer, accounts: accounts,
-		runtime: runtime, doctor: doctor, quota: quota, out: stdout, errOut: io.Discard,
+		runtime: runtime, doctor: doctor, quota: quota, out: stdout, errOut: io.Discard, in: os.Stdin,
 	}
 }
 
@@ -131,10 +132,17 @@ func (app *App) runLogin(ctx context.Context, arguments []string) error {
 	if len(arguments) > 0 && arguments[0] == "status" {
 		return authcli.Native(ctx, app.nativeAuth, false, arguments[1:])
 	}
-	if !authcli.ShouldPromptLoginMenu(arguments) || !authcli.LoginMenuInteractive(os.Stdin, app.errOut) {
+	options, err := authcli.ParseLoginOptions(arguments)
+	if err != nil {
+		return err
+	}
+	if options.WithAPIKey {
+		return app.runAPIKeyLogin(ctx, options)
+	}
+	if !authcli.ShouldPromptLoginMenu(arguments) || !authcli.LoginMenuInteractive(app.in, app.errOut) {
 		return authcli.Login(ctx, app.login, app.out, arguments)
 	}
-	action, err := authcli.RunLoginMenu(ctx, os.Stdin, app.errOut)
+	action, err := authcli.RunLoginMenu(ctx, app.in, app.errOut)
 	if err != nil {
 		return err
 	}
@@ -153,6 +161,8 @@ func (app *App) runLoginMenuAction(ctx context.Context, action authcli.LoginMenu
 		deviceArguments := append([]string(nil), arguments...)
 		deviceArguments = append(deviceArguments, "--device-auth")
 		return authcli.Login(ctx, app.login, app.out, deviceArguments)
+	case authcli.LoginOpenAIAPIKey:
+		return app.runAPIKeyLogin(ctx, options)
 	case authcli.LoginClaude:
 		return app.runBuiltinLoginImport(ctx, "claude", options.Name)
 	case authcli.LoginCopilotImport:
@@ -160,6 +170,32 @@ func (app *App) runLoginMenuAction(ctx context.Context, action authcli.LoginMenu
 	default:
 		return fmt.Errorf("selected login method is guidance-only in this Godex build")
 	}
+}
+
+func (app *App) runAPIKeyLogin(ctx context.Context, options authcli.LoginOptions) error {
+	if app.profiles == nil {
+		return fmt.Errorf("profile support is not configured")
+	}
+	input, err := authcli.PromptAPIKeyLogin(ctx, app.in, app.errOut, options)
+	if err != nil {
+		return err
+	}
+	result, err := app.profiles.LoginAPIKey(ctx, input)
+	input.APIKey = ""
+	if err != nil {
+		return err
+	}
+	verb := "Updated"
+	if result.Created {
+		verb = "Created"
+	}
+	if _, err := fmt.Fprintf(app.out, "%s API-key profile %q.\n", verb, result.Profile); err != nil {
+		return err
+	}
+	if result.BaseURL != "" {
+		_, err = fmt.Fprintf(app.out, "Base URL: %s\n", result.BaseURL)
+	}
+	return err
 }
 
 func (app *App) runBuiltinLoginImport(ctx context.Context, source, name string) error {
@@ -282,11 +318,20 @@ Run options (before the Codex command/flags):
   --no-respect-system-proxy         Disable Codex system-proxy support
 
 Login options:
-  --name NAME      Friendly account/profile name
-  --device-auth    Use Codex device authentication
+  --name NAME                  Friendly account/profile name
+  --device-auth                Use Codex device authentication
+  --with-api-key               Use OpenAI/OpenAI-compatible API-key login
+  --base-url URL               Store an OpenAI-compatible base URL for API-key login
+  --openai-base-url URL        Alias for --base-url
   Interactive default login opens the Bubble Tea provider chooser.
 `)
 	return err
+}
+
+func (app *App) SetInput(stdin io.Reader) {
+	if stdin != nil {
+		app.in = stdin
+	}
 }
 
 func (app *App) SetErrorOutput(stderr io.Writer) {

@@ -211,9 +211,14 @@ and eligibility validation stays in the runtime use case.
   policy suggestions remain. Existing status/quota/log, doctor panels,
   redeem-confirmation, human session-list, profile bundle password, and
   login/provider-menu TUIs use Bubble Tea. The login menu now mirrors the 0.435.1
-  nine-entry ordering/navigation and preserves the reference TTY-only trigger;
-  persisted OpenAI/API-compatible API-key login, Antigravity execution, and
-  Gemini runtime/login are still action-level parity gaps rather than TUI gaps.
+  nine-entry ordering/navigation and preserves the reference TTY-only trigger.
+  Persisted OpenAI/API-compatible API-key login is implemented end-to-end:
+  `--with-api-key`, `--base-url`/`--openai-base-url`, masked Bubble Tea input,
+  Prodex-compatible `api_key[_host]` profile naming, private `auth.json`,
+  `.prodex-profile.toml` endpoint persistence, repeat-login update/preserve/clear
+  semantics, and direct `prodex-openai-compatible` Codex provider injection with
+  user `model_provider` precedence. Antigravity execution and Gemini runtime/login
+  remain action-level parity gaps rather than TUI gaps.
 - Explicit self-update, best-effort cached update notices on eligible commands,
   manual reset-credit redemption, and cost-bearing `ping openai` diagnostics are
   implemented.

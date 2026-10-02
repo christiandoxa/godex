@@ -9,6 +9,7 @@ import (
 
 	authcli "github.com/christiandoxa/godex/internal/delivery/cli/auth"
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
+	profileentity "github.com/christiandoxa/godex/internal/entity/profile"
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 	accountrepo "github.com/christiandoxa/godex/internal/repository/account"
 	profilerepo "github.com/christiandoxa/godex/internal/repository/profile"
@@ -199,6 +200,7 @@ const (
 	menuLoginNameOption = "--name"
 	menuClaudeProfile   = "claude-menu"
 	menuCopilotProfile  = "copilot-menu"
+	menuAPIKeyProfile   = "api-key-menu"
 )
 
 type dispatcherClaudeSource struct {
@@ -241,11 +243,15 @@ func TestDispatcherLoginMenuActionsUseExistingAuthAndProfileFlows(t *testing.T) 
 	var output bytes.Buffer
 	app := New(login, nil, accounts, nil, nil, nil, &output)
 	app.SetProfiles(catalog)
+	app.SetInput(strings.NewReader("fixture-menu-api-key\n"))
 
 	if err := app.runLoginMenuAction(context.Background(), authcli.LoginChatGPT, []string{menuLoginNameOption, "chatgpt-menu"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := app.runLoginMenuAction(context.Background(), authcli.LoginDeviceCode, []string{menuLoginNameOption, "device-menu"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.runLoginMenuAction(context.Background(), authcli.LoginOpenAIAPIKey, []string{menuLoginNameOption, menuAPIKeyProfile, "--base-url", "http://127.0.0.1:11434/v1"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := app.runLoginMenuAction(context.Background(), authcli.LoginClaude, []string{menuLoginNameOption, menuClaudeProfile}); err != nil {
@@ -262,19 +268,55 @@ func TestDispatcherLoginMenuActionsUseExistingAuthAndProfileFlows(t *testing.T) 
 	for _, report := range listed {
 		found[report.Profile.Name] = true
 	}
-	for _, name := range []string{menuClaudeProfile, menuCopilotProfile} {
+	for _, name := range []string{menuAPIKeyProfile, menuClaudeProfile, menuCopilotProfile} {
 		if !found[name] {
 			t.Fatalf("login menu profile %q missing from %#v", name, found)
 		}
 	}
-	if !strings.Contains(output.String(), "Logged in as chatgpt-menu") || !strings.Contains(output.String(), "Logged in as device-menu") || !strings.Contains(output.String(), `profile "`+menuClaudeProfile+`"`) || !strings.Contains(output.String(), `profile "`+menuCopilotProfile+`"`) {
+	if !strings.Contains(output.String(), "Logged in as chatgpt-menu") || !strings.Contains(output.String(), "Logged in as device-menu") || !strings.Contains(output.String(), "API-key profile \""+menuAPIKeyProfile+"\"") || !strings.Contains(output.String(), "profile \""+menuClaudeProfile+"\"") || !strings.Contains(output.String(), "profile \""+menuCopilotProfile+"\"") {
 		t.Fatalf("login menu output = %q", output.String())
+	}
+	if strings.Contains(output.String(), "fixture-menu-api-key") {
+		t.Fatalf("API key leaked into dispatcher output: %q", output.String())
+	}
+	apiBaseURL, foundBaseURL, err := profiles.ReadOpenAICompatibleBaseURL(profiles.ManagedHome(menuAPIKeyProfile))
+	if err != nil || !foundBaseURL || apiBaseURL != "http://127.0.0.1:11434/v1" {
+		t.Fatalf("menu API-key base URL = %q found=%t err=%v", apiBaseURL, foundBaseURL, err)
 	}
 }
 
 func TestDispatcherLoginMenuUnsupportedMethodFailsExplicitly(t *testing.T) {
 	app := New(nil, nil, nil, nil, nil, nil, &bytes.Buffer{})
-	if err := app.runLoginMenuAction(context.Background(), authcli.LoginOpenAIAPIKey, nil); err == nil || !strings.Contains(err.Error(), "guidance-only") {
+	if err := app.runLoginMenuAction(context.Background(), authcli.LoginGeminiAPIKeyGuidance, nil); err == nil || !strings.Contains(err.Error(), "guidance-only") {
 		t.Fatalf("unsupported login action error = %v", err)
+	}
+}
+
+func TestDispatcherDirectAPIKeyLoginCreatesOpenAICompatibleProfile(t *testing.T) {
+	root := t.TempDir()
+	accounts := accountrepo.NewFileStore(root)
+	profiles := profilerepo.NewStore(root)
+	catalog := profileusecase.NewCatalog(profiles, accounts, t.TempDir())
+	var output bytes.Buffer
+	app := New(nil, nil, accounts, nil, nil, nil, &output)
+	app.SetProfiles(catalog)
+	app.SetInput(strings.NewReader("fixture-direct-api-key\n"))
+	err := app.runLogin(context.Background(), []string{"--with-api-key", "--name", "direct-api-key", "--openai-base-url", "https://example.test/v1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	profile, err := profiles.Resolve(context.Background(), "direct-api-key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if profile.Provider.Kind != profileentity.ProviderOpenAI || !profile.Managed {
+		t.Fatalf("profile = %#v", profile)
+	}
+	baseURL, found, err := profiles.ReadOpenAICompatibleBaseURL(profile.CodexHome)
+	if err != nil || !found || baseURL != "https://example.test/v1" {
+		t.Fatalf("base URL = %q found=%t err=%v", baseURL, found, err)
+	}
+	if strings.Contains(output.String(), "fixture-direct-api-key") {
+		t.Fatalf("API key leaked into direct login output: %q", output.String())
 	}
 }

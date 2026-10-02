@@ -119,3 +119,17 @@ func TestRunLoginMenuRejectsCancelledContext(t *testing.T) {
 func keyRunes(value rune) tea.KeyMsg {
 	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{value}}
 }
+
+func TestLoginMenuAPIKeyEntryIsSelectableNotGuidance(t *testing.T) {
+	entries := loginMenuEntries()
+	if len(entries) < 3 || entries[2].action != LoginOpenAIAPIKey || entries[2].guidance {
+		t.Fatalf("API-key entry = %#v", entries[2])
+	}
+	model := newLoginMenuModel(entries, 24)
+	model.selected = 2
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	final := updated.(loginMenuModel)
+	if command == nil || final.chosen == nil || *final.chosen != LoginOpenAIAPIKey || final.guidance {
+		t.Fatalf("API-key selection = %#v command=%v", final, command)
+	}
+}

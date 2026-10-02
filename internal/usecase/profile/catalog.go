@@ -28,6 +28,8 @@ type repository interface {
 	ReadAuthJSON(string) ([]byte, error)
 	ImportOpenAI(context.Context, profileentity.Profile, []byte, bool) error
 	ReplaceAuth(context.Context, string, []byte) error
+	LoginOpenAIAPIKey(context.Context, profileentity.Profile, []byte, *string, bool, bool) (profileentity.Profile, bool, error)
+	ReadOpenAICompatibleBaseURL(string) (string, bool, error)
 	EncodeBundle(profilemodel.BundlePayload, string) ([]byte, error)
 	DecodeBundle([]byte, string) (profilemodel.BundlePayload, bool, error)
 	WriteBundle(string, []byte) error

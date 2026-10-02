@@ -154,3 +154,14 @@ func (catalog *Catalog) AcquireLaunchPool(
 		return releaseErr
 	}, nil
 }
+
+func (catalog *Catalog) OpenAICompatibleBaseURL(ctx context.Context, profileName string) (string, bool, error) {
+	profile, err := catalog.profiles.Resolve(ctx, profileName)
+	if err != nil {
+		return "", false, err
+	}
+	if profile.Provider.Kind != profileentity.ProviderOpenAI {
+		return "", false, nil
+	}
+	return catalog.profiles.ReadOpenAICompatibleBaseURL(profile.CodexHome)
+}

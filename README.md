@@ -284,6 +284,20 @@ Codex home for session state but run Codex directly against the local endpoint;
 they do not enter Godex's quota gate, upstream account rotation, or provider
 credential proxy.
 
+Persisted API-key profiles use the complementary Prodex `0.435.1` profile-local
+surface. For example:
+
+~~~bash
+godex login --with-api-key --name local-lab --base-url http://127.0.0.1:11434/v1
+godex run --account local-lab exec "review this repository"
+~~~
+
+At launch, Godex reads the profile-local base URL and prepends the exact
+`prodex-openai-compatible` Codex provider configuration (`wire_api=responses`,
+`requires_openai_auth=true`, WebSockets disabled), while a later user
+`model_provider` override still wins. These launches run Codex directly in that
+managed home and do not route the API key through Godex's HTTP proxy.
+
 Prodex-compatible Codex runtime feature flags are translated to Codex `-c`
 overrides before the remaining Codex arguments. Explicit later Codex `-c`
 arguments still win:
@@ -498,10 +512,15 @@ are terminals, the 0.435.1 nine-entry provider menu is shown with j/k, arrows,
 PgUp/PgDn, Home/End, digit shortcuts, Enter, and q/Esc cancellation. Non-TTY and
 machine-readable modes keep plain output for scripts and pipes.
 
-The menu dispatches existing ChatGPT/device login plus Claude and Copilot import
-flows. Runtime-only Gemini/Anthropic/DeepSeek API-key entries stay guidance-only.
-Persisted OpenAI/API-compatible API-key login and Antigravity login execution are
-still separate parity work; the menu never reports those actions as completed.
+The menu dispatches ChatGPT/device login, persisted OpenAI/API-compatible API-key
+login, plus Claude and Copilot import flows. Selecting the API-key entry opens a
+Bubble Tea sequence for the masked key, optional OpenAI-compatible base URL, and
+managed profile name; `godex login --with-api-key` uses the same flow directly.
+`--base-url` and `--openai-base-url` are aliases, and an empty prompted URL keeps
+the default OpenAI endpoint. The key is stored only in the managed profile's
+private `auth.json`; an optional custom endpoint is stored separately in
+`.prodex-profile.toml`. Runtime-only Gemini/Anthropic/DeepSeek API-key entries
+remain guidance-only, and Antigravity login execution remains separate parity work.
 
 ## Configuration
 

@@ -25,6 +25,7 @@ type launchProfiles interface {
 	ProviderLaunchPool(context.Context, string, string, bool) ([]profilemodel.LaunchTarget, error)
 	ResolveProviderLaunch(context.Context, string, string) (profilemodel.LaunchTarget, bool, error)
 	AcquireLaunchPool(context.Context, []string) (func() error, error)
+	OpenAICompatibleBaseURL(context.Context, string) (string, bool, error)
 }
 
 func Run(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionusecase.Catalog, arguments []string) error {
@@ -140,6 +141,15 @@ func runLaunchTarget(
 		return err
 	}
 	defer func() { runErr = errors.Join(runErr, release()) }()
+	if target.Provider == "openai" {
+		baseURL, compatible, err := profiles.OpenAICompatibleBaseURL(ctx, target.Name)
+		if err != nil {
+			return err
+		}
+		if compatible {
+			return runner.RunOpenAICompatibleProfile(ctx, target.CodexHome, baseURL, arguments)
+		}
+	}
 	return runStandaloneProfile(ctx, runner, target.CodexHome, provider, arguments)
 }
 
