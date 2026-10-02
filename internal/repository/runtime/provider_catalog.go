@@ -36,6 +36,10 @@ func (*ProviderCatalogStore) WriteExternal(home string, models []map[string]any)
 	return writeProviderCatalog(home, proxymodel.ExternalProviderCatalogFile, models)
 }
 
+func (*ProviderCatalogStore) WriteDeepSeek(home string, models []map[string]any) (string, error) {
+	return writeProviderCatalog(home, proxymodel.DeepSeekModelCatalogFile, models)
+}
+
 func writeProviderCatalog(home, name string, models []map[string]any) (string, error) {
 	if len(models) == 0 || len(models) > proxymodel.ProviderCatalogMaxItems {
 		return "", fmt.Errorf("provider model catalog must contain 1..=%d models", proxymodel.ProviderCatalogMaxItems)

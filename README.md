@@ -213,23 +213,31 @@ are removed from the Codex child process and raw keys are never persisted in
 profile metadata, routing bindings, or bundles. Without API keys, the same
 `--provider anthropic` shortcut resolves managed Claude OAuth profiles.
 
-DeepSeek now has the same bounded provider-runtime skeleton for its raw API-key
-surface. `godex run --provider deepseek` resolves `--api-key`, then
-`DEEPSEEK_API_KEYS`, then `DEEPSEEK_API_KEY`; plural keys use Prodex's
-comma/semicolon/newline parsing and rotate through stable synthetic routing IDs.
-The 0.434.3 defaults are `deepseek-v4-pro`, `https://api.deepseek.com`,
-1,048,576 advertised context tokens, and a 900,000-token auto-compact threshold.
-Simple Responses requests are translated to `/chat/completions` and follow the
-`pro -> flash` / `flash -> pro` fallback chain before credential rotation.
-Chat Completions and native Messages stay passthrough, with Messages normalized to
-DeepSeek's `/anthropic/v1/messages` endpoint and `x-api-key` auth. Models
-list/single is emulated from the exact four 0.434.3 DeepSeek catalog entries and
-Responses Compact uses the local bounded fallback without an upstream model call.
+DeepSeek now has the bounded 0.434.3 raw-key runtime plus the advanced
+request-side Responses adapter. `godex run --provider deepseek` resolves
+`--api-key`, then `DEEPSEEK_API_KEYS`, then `DEEPSEEK_API_KEY`; plural keys
+use Prodex's comma/semicolon/newline parsing and rotate through stable synthetic
+routing IDs. The launch path writes the dedicated
+`prodex-deepseek-model-catalog.json` used by Prodex (launch model first, then
+`auto/pro/flash` and the current DeepSeek model IDs), while later user
+`model_catalog_json` overrides still win. The 0.434.3 defaults remain
+`deepseek-v4-pro`, `https://api.deepseek.com`, 1,048,576 advertised context
+tokens, and a 900,000-token automatic-compaction threshold.
 
-This is intentionally a basic DeepSeek bridge checkpoint: reasoning metadata,
-strict-tools schema normalization, DeepSeek web-search modes, beta-base routing,
-and DeepSeek-specific response/SSE reasoning/tool shaping remain fail-closed or
-unimplemented until the advanced translator checkpoint lands.
+Responses requests now map DeepSeek reasoning effort, primitive sampling/token
+controls, stop sequences, logprobs, user IDs, JSON mode, message/tool replay,
+local shell/tool calls, named tool choice, and strict function schemas before
+`/chat/completions`. `deepseek.strict_tools` is resolved from the active
+Codex `config.toml` before `PRODEX_DEEPSEEK_STRICT_TOOLS`, matching Prodex;
+invalid strict schemas fail before upstream. Tool replay shares the same RTK
+normalization used by chat-compatible responses. `pro -> flash` /
+`flash -> pro` model fallback still precedes credential rotation. Chat
+Completions and native Messages stay passthrough, Models list/single remains local,
+and Responses Compact remains the bounded local fallback with no model call.
+
+DeepSeek-specific response/SSE reasoning/tool shaping and the web-search/beta-base
+request routes remain the next 0.434.3 parity slice; unsupported web-search
+requests still fail before upstream instead of being silently downgraded.
 
 Local OpenAI-compatible Responses endpoints now match Prodex's `--url` surface.
 For example:

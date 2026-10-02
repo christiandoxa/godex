@@ -9,6 +9,9 @@ type Provider struct {
 	DefaultModel     string
 	ContextWindow    int64
 	AutoCompactLimit int64
+	StrictTools      bool
+	WebSearchMode    string
+	BetaBaseURL      string
 }
 
 type ProviderProfile struct {

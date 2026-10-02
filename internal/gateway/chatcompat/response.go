@@ -108,7 +108,7 @@ func responseToolItems(message map[string]any) []any {
 		}
 		name, _ := function["name"].(string)
 		arguments, _ := function["arguments"].(string)
-		arguments = wrapRTKArguments(name, arguments)
+		arguments = WrapRTKArguments(name, arguments)
 		namespace, short := splitToolName(name)
 		item := map[string]any{
 			"type": "function_call", "call_id": stringOr(call["id"], ""),

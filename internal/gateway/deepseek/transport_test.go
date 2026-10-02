@@ -106,7 +106,58 @@ func TestDeepSeekResponsesTranslateFallbackAndHeaders(t *testing.T) {
 	}
 }
 
-func TestDeepSeekAdvancedResponsesFailClosedBeforeUpstream(t *testing.T) {
+func TestDeepSeekAdvancedResponsesTranslateBeforeUpstream(t *testing.T) {
+	var bodies []map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		content, _ := io.ReadAll(request.Body)
+		var body map[string]any
+		if err := json.Unmarshal(content, &body); err != nil {
+			t.Fatalf("upstream body = %s, err = %v", content, err)
+		}
+		bodies = append(bodies, body)
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"id":"chat_ok","model":"deepseek-v4-pro","choices":[{"message":{"role":"assistant","content":"ok"}}]}`))
+	}))
+	defer server.Close()
+	transport, err := NewRuntimeTransport(server.URL, "fixture-key", server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer transport.Close()
+
+	for _, body := range []string{
+		`{"input":"hello","reasoning":{"effort":"high"}}`,
+		`{"input":"hello","response_format":{"type":"json_object"}}`,
+	} {
+		response, err := transport.Execute(context.Background(), proxymodel.Request{
+			Method: http.MethodPost, Path: mountPath + "/responses", Body: []byte(body),
+		}, proxymodel.Account{})
+		if err != nil {
+			t.Fatalf("advanced request %s error = %v", body, err)
+		}
+		response.Body.Close()
+	}
+	if len(bodies) != 2 {
+		t.Fatalf("advanced requests reaching upstream = %d", len(bodies))
+	}
+	if bodies[0]["reasoning_effort"] != "high" {
+		t.Fatalf("reasoning request = %#v", bodies[0])
+	}
+	thinking, ok := bodies[0]["thinking"].(map[string]any)
+	if !ok || thinking["type"] != "enabled" {
+		t.Fatalf("thinking request = %#v", bodies[0])
+	}
+	if format, ok := bodies[1]["response_format"].(map[string]any); !ok || format["type"] != "json_object" {
+		t.Fatalf("JSON response format = %#v", bodies[1])
+	}
+	messages := bodies[1]["messages"].([]any)
+	if len(messages) < 2 || messages[0].(map[string]any)["content"] != "Respond with valid JSON only." {
+		t.Fatalf("JSON prompt messages = %#v", messages)
+	}
+
+}
+
+func TestDeepSeekUnsupportedWebSearchFailsBeforeUpstream(t *testing.T) {
 	calls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { calls++ }))
 	defer server.Close()
@@ -115,18 +166,15 @@ func TestDeepSeekAdvancedResponsesFailClosedBeforeUpstream(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer transport.Close()
-	for _, body := range []string{
-		`{"input":"hello","reasoning":{"effort":"high"}}`,
-		`{"input":"hello","web_search_options":{}}`,
-		`{"input":"hello","response_format":{"type":"json_object"}}`,
-	} {
-		_, err := transport.Execute(context.Background(), proxymodel.Request{Method: http.MethodPost, Path: mountPath + "/responses", Body: []byte(body)}, proxymodel.Account{})
-		if err == nil || !strings.Contains(err.Error(), "DeepSeek") && !strings.Contains(err.Error(), "chat-compat") {
-			t.Fatalf("advanced request %s error = %v", body, err)
-		}
+	_, err = transport.Execute(context.Background(), proxymodel.Request{
+		Method: http.MethodPost, Path: mountPath + "/responses",
+		Body: []byte(`{"input":"hello","web_search_options":{}}`),
+	}, proxymodel.Account{})
+	if err == nil || !strings.Contains(err.Error(), "web_search_options") {
+		t.Fatalf("web-search request error = %v", err)
 	}
 	if calls != 0 {
-		t.Fatalf("advanced unsupported requests reached upstream %d time(s)", calls)
+		t.Fatalf("unsupported web-search request reached upstream %d time(s)", calls)
 	}
 }
 

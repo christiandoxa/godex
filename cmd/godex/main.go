@@ -162,7 +162,7 @@ func newRuntimeGateway(
 	case "anthropic":
 		return newAnthropicRuntimeGateway(config, claudeSource)
 	case "deepseek":
-		return deepseekgateway.NewRuntimePool(config.Provider.APIURL, config.ProviderCredentials, nil)
+		return deepseekgateway.NewRuntimePoolWithOptions(config.Provider.APIURL, config.ProviderCredentials, deepseekgateway.RequestOptions{StrictTools: config.Provider.StrictTools}, nil)
 	default:
 		return nil, fmt.Errorf("runtime provider %q is not implemented", config.Provider.Kind)
 	}

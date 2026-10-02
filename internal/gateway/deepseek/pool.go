@@ -13,13 +13,17 @@ type RuntimePool struct {
 }
 
 func NewRuntimePool(apiURL string, credentials []proxymodel.ProviderCredential, client *http.Client) (*RuntimePool, error) {
+	return NewRuntimePoolWithOptions(apiURL, credentials, RequestOptions{}, client)
+}
+
+func NewRuntimePoolWithOptions(apiURL string, credentials []proxymodel.ProviderCredential, options RequestOptions, client *http.Client) (*RuntimePool, error) {
 	pool := &RuntimePool{transports: make(map[string]*RuntimeTransport, len(credentials))}
 	for _, credential := range credentials {
 		if credential.ID == "" || credential.Secret == "" {
 			pool.Close()
 			return nil, errors.New("DeepSeek runtime API-key credential is incomplete")
 		}
-		transport, err := NewRuntimeTransport(apiURL, credential.Secret, client)
+		transport, err := NewRuntimeTransportWithOptions(apiURL, credential.Secret, options, client)
 		if err != nil {
 			pool.Close()
 			return nil, err

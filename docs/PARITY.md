@@ -122,14 +122,16 @@ and eligibility validation stays in the runtime use case.
   quota watch, log stream/upstream, and redeem confirmation have been migrated;
   non-TTY fallbacks remain line-oriented.
 - Multi-provider runtime/login parity remains incomplete for Gemini, Kiro,
-  and AGY where present in Prodex. DeepSeek now has a basic raw-API-key runtime
-  bridge with the exact 0.434.3 key precedence, provider defaults, stable key
-  rotation identities, Responses-to-Chat basic translation, `pro/flash` model
-  fallback, Chat/Messages passthrough, native DeepSeek Messages URL/auth,
-  local Models emulation from the four 0.434.3 catalog entries, and local Compact
-  fallback. Advanced DeepSeek reasoning metadata, strict-tools schema handling,
-  web-search modes, beta-base routing, and DeepSeek-specific JSON/SSE
-  reasoning/tool shaping remain parity gaps. The Prodex local OpenAI-compatible
+  and AGY where present in Prodex. DeepSeek now has the 0.434.3 raw-key runtime
+  plus its dedicated Codex model catalog and advanced request-side Responses
+  adapter: exact key precedence/provider defaults/stable key rotation, launch-model
+  catalog precedence, reasoning effort, primitive sampling/token controls,
+  stop/logprobs/user normalization, JSON mode, message/tool replay, RTK tool
+  arguments, strict-schema normalization with config.toml-over-env precedence,
+  named tool choice, `pro/flash` model fallback, Chat/Messages passthrough,
+  native DeepSeek Messages URL/auth, local Models emulation, and local Compact
+  fallback are implemented. DeepSeek-specific response/SSE reasoning/tool shaping,
+  web-search modes, and beta-base routing remain parity gaps. The Prodex local OpenAI-compatible
   `--url` runtime surface is implemented: Godex validates credential-free
   HTTP(S) endpoints, normalizes root URLs to `/v1`, generates the exact
   `prodex-local` Responses provider config/default model/context/compact

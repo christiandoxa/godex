@@ -13,6 +13,7 @@ const catalogDescriptionKey = "description"
 type providerCatalogStore interface {
 	ReadCopilotRuntime(string) ([]map[string]any, error)
 	WriteExternal(string, []map[string]any) (string, error)
+	WriteDeepSeek(string, []map[string]any) (string, error)
 }
 
 type dynamicCopilotModel struct {
@@ -47,13 +48,20 @@ func prepareProviderRuntimeArguments(
 		models, err = buildCopilotExternalCatalog(store, home, provider, arguments)
 	case "anthropic":
 		models, err = buildAnthropicExternalCatalog(provider, arguments)
+	case "deepseek":
+		models, err = buildDeepSeekCodexCatalog(provider, arguments)
 	default:
 		return append(defaults, arguments...), nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	path, err := store.WriteExternal(home, models)
+	var path string
+	if provider.Kind == "deepseek" {
+		path, err = store.WriteDeepSeek(home, models)
+	} else {
+		path, err = store.WriteExternal(home, models)
+	}
 	if err != nil {
 		return nil, err
 	}

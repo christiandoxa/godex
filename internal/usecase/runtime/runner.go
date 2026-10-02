@@ -122,7 +122,7 @@ func (runner *Runner) launchHome(
 	credentials []proxyconfig.ProviderCredential,
 	profiles []proxyconfig.Account,
 	arguments []string,
-) (runErr error) {
+) error {
 	proxyRunner, ok := runner.process.(proxyCodex)
 	if !ok {
 		return runner.process.Run(ctx, home, arguments)
@@ -133,19 +133,11 @@ func (runner *Runner) launchHome(
 	if err := proxyRunner.CheckProxySupport(ctx); err != nil {
 		return err
 	}
-	proxy, err := runner.newProxy(proxyconfig.Config{
-		Context:             ctx,
-		UpstreamURL:         runner.upstream,
-		PreferredAccount:    preferredID,
-		Provider:            provider,
-		ProviderCredentials: append([]proxyconfig.ProviderCredential(nil), credentials...),
-		Accounts: func(ctx context.Context) ([]proxyconfig.Account, error) {
-			if err := ctx.Err(); err != nil {
-				return nil, err
-			}
-			return append([]proxyconfig.Account(nil), profiles...), nil
-		},
-	})
+	provider, profiles, err := runner.prepareProviderLaunch(home, provider, profiles)
+	if err != nil {
+		return err
+	}
+	proxy, err := runner.newProxy(runtimeProxyConfig(ctx, runner.upstream, preferredID, provider, credentials, profiles))
 	if err != nil {
 		return err
 	}
@@ -156,19 +148,72 @@ func (runner *Runner) launchHome(
 	if err := proxy.Start(); err != nil {
 		return err
 	}
-	if provider.Kind != "" {
-		if isolated, ok := runner.process.(providerProxyCodex); ok {
-			runErr = isolated.RunThroughProxyProvider(ctx, home, proxy.Endpoint(), runtimeArguments, provider.Kind)
-		} else {
-			runErr = proxyRunner.RunThroughProxy(ctx, home, proxy.Endpoint(), runtimeArguments)
-		}
-	} else {
-		runErr = proxyRunner.RunThroughProxy(ctx, home, proxy.Endpoint(), runtimeArguments)
+	runErr := runner.runThroughRuntimeProxy(ctx, proxyRunner, home, proxy.Endpoint(), runtimeArguments, provider.Kind)
+	return closeRuntimeProxy(ctx, proxy, runErr)
+}
+
+func (runner *Runner) prepareProviderLaunch(
+	home string,
+	provider proxyconfig.Provider,
+	profiles []proxyconfig.Account,
+) (proxyconfig.Provider, []proxyconfig.Account, error) {
+	if provider.Kind != "deepseek" {
+		return provider, profiles, nil
 	}
+	if err := applyDeepSeekRuntimeSettings(home, &provider); err != nil {
+		return proxyconfig.Provider{}, nil, err
+	}
+	result := append([]proxyconfig.Account(nil), profiles...)
+	for index := range result {
+		result[index].Provider.StrictTools = provider.StrictTools
+		result[index].Provider.WebSearchMode = provider.WebSearchMode
+		result[index].Provider.BetaBaseURL = provider.BetaBaseURL
+	}
+	return provider, result, nil
+}
+
+func runtimeProxyConfig(
+	ctx context.Context,
+	upstream, preferredID string,
+	provider proxyconfig.Provider,
+	credentials []proxyconfig.ProviderCredential,
+	profiles []proxyconfig.Account,
+) proxyconfig.Config {
+	return proxyconfig.Config{
+		Context:             ctx,
+		UpstreamURL:         upstream,
+		PreferredAccount:    preferredID,
+		Provider:            provider,
+		ProviderCredentials: append([]proxyconfig.ProviderCredential(nil), credentials...),
+		Accounts: func(ctx context.Context) ([]proxyconfig.Account, error) {
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
+			return append([]proxyconfig.Account(nil), profiles...), nil
+		},
+	}
+}
+
+func (runner *Runner) runThroughRuntimeProxy(
+	ctx context.Context,
+	proxyRunner proxyCodex,
+	home, endpoint string,
+	arguments []string,
+	providerKind string,
+) error {
+	if providerKind != "" {
+		if isolated, ok := runner.process.(providerProxyCodex); ok {
+			return isolated.RunThroughProxyProvider(ctx, home, endpoint, arguments, providerKind)
+		}
+	}
+	return proxyRunner.RunThroughProxy(ctx, home, endpoint, arguments)
+}
+
+func closeRuntimeProxy(ctx context.Context, proxy Proxy, runErr error) error {
 	closeContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
 	if closeErr := proxy.Close(closeContext); runErr == nil {
-		runErr = closeErr
+		return closeErr
 	}
 	return runErr
 }

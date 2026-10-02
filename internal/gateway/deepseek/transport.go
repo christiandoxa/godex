@@ -28,9 +28,14 @@ type RuntimeTransport struct {
 	client   *http.Client
 	upstream *url.URL
 	apiKey   string
+	options  RequestOptions
 }
 
 func NewRuntimeTransport(apiURL, apiKey string, client *http.Client) (*RuntimeTransport, error) {
+	return NewRuntimeTransportWithOptions(apiURL, apiKey, RequestOptions{}, client)
+}
+
+func NewRuntimeTransportWithOptions(apiURL, apiKey string, options RequestOptions, client *http.Client) (*RuntimeTransport, error) {
 	if strings.TrimSpace(apiURL) == "" {
 		apiURL = defaultAPIURL
 	}
@@ -68,7 +73,7 @@ func (transport *RuntimeTransport) executeResponses(ctx context.Context, input p
 		models = []string{"deepseek-v4-pro", "deepseek-v4-flash"}
 	}
 	for index, candidate := range models {
-		body, err := chatcompat.ResponsesRequest(input.Body, "deepseek-v4-pro", candidate)
+		body, err := ResponsesRequest(input.Body, RequestOptions{Model: candidate, StrictTools: transport.options.StrictTools})
 		if err != nil {
 			return nil, &proxymodel.Error{StatusCode: http.StatusBadRequest, Message: err.Error()}
 		}

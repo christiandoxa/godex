@@ -1,0 +1,96 @@
+package runtime
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestDeepSeekRuntimeSettingsPreferConfigOverEnvironment(t *testing.T) {
+	home := t.TempDir()
+	content := `[deepseek]
+strict_tools = true
+web_search_mode = "off"
+beta_base_url = "https://deepseek.example.test/beta/"
+`
+	if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	lookup := func(key string) (string, bool) {
+		values := map[string]string{
+			"PRODEX_DEEPSEEK_STRICT_TOOLS":    "false",
+			"PRODEX_DEEPSEEK_WEB_SEARCH_MODE": "auto",
+			"PRODEX_DEEPSEEK_BETA_BASE_URL":   "https://env.example.test/beta",
+		}
+		value, ok := values[key]
+		return value, ok
+	}
+	settings, err := deepSeekRuntimeSettings(home, lookup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !settings.strictTools || settings.webSearchMode != "off" || settings.betaBaseURL != "https://deepseek.example.test/beta" {
+		t.Fatalf("settings = %#v", settings)
+	}
+}
+
+func TestDeepSeekRuntimeSettingsEnvironmentAndDefaultsMatchProdex(t *testing.T) {
+	empty := func(string) (string, bool) { return "", false }
+	settings, err := deepSeekRuntimeSettings(t.TempDir(), empty)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if settings.strictTools || settings.webSearchMode != "auto" || settings.betaBaseURL != "https://api.deepseek.com/beta" {
+		t.Fatalf("default settings = %#v", settings)
+	}
+
+	values := map[string]string{
+		"PRODEX_DEEPSEEK_STRICT_TOOLS":    "YES",
+		"PRODEX_DEEPSEEK_WEB_SEARCH_MODE": "openai_chat",
+		"PRODEX_DEEPSEEK_BETA_BASE_URL":   "https://env.example.test/beta/",
+	}
+	settings, err = deepSeekRuntimeSettings(t.TempDir(), func(key string) (string, bool) {
+		value, ok := values[key]
+		return value, ok
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !settings.strictTools || settings.webSearchMode != "openai_chat" || settings.betaBaseURL != "https://env.example.test/beta" {
+		t.Fatalf("environment settings = %#v", settings)
+	}
+}
+
+func TestDeepSeekRuntimeSettingsRejectInvalidValues(t *testing.T) {
+	fixtures := []struct {
+		key, value, want string
+	}{
+		{"PRODEX_DEEPSEEK_STRICT_TOOLS", " true ", "must not contain whitespace"},
+		{"PRODEX_DEEPSEEK_STRICT_TOOLS", "maybe", "must be true or false"},
+		{"PRODEX_DEEPSEEK_WEB_SEARCH_MODE", "enabled", "must be auto, off, openai_chat, or anthropic"},
+		{"PRODEX_DEEPSEEK_BETA_BASE_URL", "https://user:pass@example.test", "must be an http(s) URL"},
+	}
+	for _, fixture := range fixtures {
+		_, err := deepSeekRuntimeSettings(t.TempDir(), func(key string) (string, bool) {
+			if key == fixture.key {
+				return fixture.value, true
+			}
+			return "", false
+		})
+		if err == nil || !strings.Contains(err.Error(), fixture.want) {
+			t.Fatalf("%s=%q error = %v", fixture.key, fixture.value, err)
+		}
+	}
+}
+
+func TestDeepSeekStrictToolsRejectsNonBooleanConfig(t *testing.T) {
+	home := t.TempDir()
+	if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte("[deepseek]\nstrict_tools = []\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err := deepSeekRuntimeSettings(home, func(string) (string, bool) { return "true", true })
+	if err == nil || !strings.Contains(err.Error(), "deepseek.strict_tools must be a boolean") {
+		t.Fatalf("error = %v", err)
+	}
+}

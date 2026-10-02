@@ -78,7 +78,7 @@ func TranslateChatSSEData(data []byte) ([]byte, bool, error) {
 		arguments, ok := function["arguments"].(string)
 		if ok {
 			name, _ := function["name"].(string)
-			arguments = wrapRTKArguments(name, arguments)
+			arguments = WrapRTKArguments(name, arguments)
 			payload := map[string]any{"type": "response.function_call_arguments.delta", "delta": arguments}
 			if id, ok := tool["id"].(string); ok && id != "" {
 				payload["call_id"] = id

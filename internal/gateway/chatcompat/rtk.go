@@ -19,12 +19,12 @@ var rtkNoisyCommands = map[string]map[string]bool{
 	"pytest":         {}, "rg": {}, "find": {}, "ls": {}, "tree": {}, "echo": {},
 }
 
-func wrapRTKArguments(name, arguments string) string {
+func WrapRTKArguments(name, arguments string) string {
 	baseName := name
 	if _, suffix, ok := strings.Cut(name, "."); ok {
 		baseName = suffix
 	}
-	if baseName != "shell" && baseName != "exec_command" {
+	if baseName != "shell" && baseName != "exec_command" && baseName != "exec" {
 		return arguments
 	}
 	var value map[string]any

@@ -190,11 +190,16 @@ DeepSeek raw-key runtime follows the same secret-free routing boundary without
 reusing the Claude gateway. `gateway/providerkey` owns provider-specific
 CLI/environment key precedence; `usecase/runtime` sees only a provider name plus
 a bounded list of invocation-local keys and assigns stable hashed routing IDs.
-`gateway/deepseek` binds one transport to each ID, owns the DeepSeek URL/auth
-policy and local Models/Compact routes, and currently reuses `gateway/chatcompat`
-only for the conservative Responses subset. Advanced DeepSeek-specific reasoning,
-strict-tool, web-search, beta-route, and stream-shaping policy stays in the
-gateway backlog rather than leaking into delivery or routing.
+Before proxy construction, `usecase/runtime` resolves the profile-local
+`[deepseek]` config (config.toml before compatibility environment values) and
+writes the dedicated private DeepSeek Codex catalog; the resolved booleans/modes
+are carried as provider metadata rather than rereading files in the HTTP gateway.
+`gateway/deepseek` binds one transport to each key ID, owns URL/auth/local
+Models/Compact routes, and owns the advanced Responses request translator
+(reasoning, primitive controls, strict tools/schema, JSON mode, replay/tool
+history). Shared RTK argument shaping stays in `gateway/chatcompat`.
+DeepSeek response/SSE reasoning/tool shaping and web-search/beta-route policy
+remain isolated gateway work rather than leaking into delivery or routing.
 
 ### Quota gateway and preflight
 
