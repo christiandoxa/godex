@@ -246,7 +246,7 @@ func (fake *fakeLocalLaunchProfiles) AcquireLaunchPool(context.Context, []string
 func TestRunHomeLocalProviderKeepsResolvedHome(t *testing.T) {
 	process := &fakeRunnerProcess{}
 	runner := runtimeusecase.NewRunner(&fakeRunnerAccounts{}, process, nil)
-	home := "/synthetic/resolved-home"
+	home := t.TempDir()
 	if err := RunHome(context.Background(), runner, nil, home, []string{
 		"--url", "http://127.0.0.1:8131", "--model", "qwen3-coder", "exec", "review",
 	}); err != nil {
@@ -270,15 +270,16 @@ func TestRunHomeLocalProviderKeepsResolvedHome(t *testing.T) {
 func TestRunProfilesLocalProviderUsesExplicitStandaloneProfileLease(t *testing.T) {
 	process := &fakeRunnerProcess{}
 	runner := runtimeusecase.NewRunner(&fakeRunnerAccounts{}, process, nil)
+	home := t.TempDir()
 	profiles := &fakeLocalLaunchProfiles{target: profilemodel.LaunchTarget{
-		Name: "local-home", CodexHome: "/synthetic/local-home",
+		Name: "local-home", CodexHome: home,
 	}}
 	if err := RunProfiles(context.Background(), runner, nil, profiles, []string{
 		"--profile", "local-home", "--url", "http://127.0.0.1:8131", "exec",
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if process.home != "/synthetic/local-home" || strings.Join(profiles.acquired, ",") != "local-home" || profiles.released != 1 {
+	if process.home != home || strings.Join(profiles.acquired, ",") != "local-home" || profiles.released != 1 {
 		t.Fatalf("home/lease = %q / %v / %d", process.home, profiles.acquired, profiles.released)
 	}
 }
@@ -286,8 +287,9 @@ func TestRunProfilesLocalProviderUsesExplicitStandaloneProfileLease(t *testing.T
 func TestRunProfilesLocalProviderUsesActiveStandaloneProfile(t *testing.T) {
 	process := &fakeRunnerProcess{}
 	runner := runtimeusecase.NewRunner(&fakeRunnerAccounts{}, process, nil)
+	home := t.TempDir()
 	profiles := &fakeLocalLaunchProfiles{
-		target: profilemodel.LaunchTarget{Name: "active-local", CodexHome: "/synthetic/active-local"},
+		target: profilemodel.LaunchTarget{Name: "active-local", CodexHome: home},
 		active: true,
 	}
 	if err := RunProfiles(context.Background(), runner, nil, profiles, []string{
@@ -295,7 +297,7 @@ func TestRunProfilesLocalProviderUsesActiveStandaloneProfile(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if process.home != "/synthetic/active-local" || strings.Join(profiles.acquired, ",") != "active-local" || profiles.released != 1 {
+	if process.home != home || strings.Join(profiles.acquired, ",") != "active-local" || profiles.released != 1 {
 		t.Fatalf("active home/lease = %q / %v / %d", process.home, profiles.acquired, profiles.released)
 	}
 }
