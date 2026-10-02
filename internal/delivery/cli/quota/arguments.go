@@ -28,6 +28,10 @@ func parseArguments(arguments []string) (showOptions, error) {
 	if err := options.validate(); err != nil {
 		return showOptions{}, err
 	}
+	if !options.All && options.Selector == "" && !options.raw {
+		options.All = true
+		options.detail = true
+	}
 	return options, nil
 }
 

@@ -191,7 +191,7 @@ func compareQuotaReports(left, right quotamodel.Report, sortMode quotaReportSort
 	case quotaSortAccount:
 		return compareQuotaText(quotaReportAccount(left), quotaReportAccount(right))
 	case quotaSortPlan:
-		return compareQuotaText(left.Usage.PlanType, right.Usage.PlanType)
+		return compareQuotaText(quotaReportPlan(left), quotaReportPlan(right))
 	default:
 		return 0
 	}
@@ -200,6 +200,12 @@ func compareQuotaReports(left, right quotamodel.Report, sortMode quotaReportSort
 func quotaReportStatusRank(report quotamodel.Report) int {
 	if report.Err != nil || strings.EqualFold(report.State, "error") {
 		return 2
+	}
+	if report.External != nil {
+		if report.External.Available != nil && *report.External.Available {
+			return 0
+		}
+		return 1
 	}
 	if strings.EqualFold(report.State, "ready") {
 		return 0
@@ -225,10 +231,20 @@ func quotaReportName(report quotamodel.Report) string {
 }
 
 func quotaReportAccount(report quotamodel.Report) string {
+	if report.External != nil && strings.TrimSpace(report.External.Account) != "" {
+		return report.External.Account
+	}
 	if report.Email != "" {
 		return report.Email
 	}
 	return report.AccountName
+}
+
+func quotaReportPlan(report quotamodel.Report) string {
+	if report.External != nil {
+		return report.External.Plan
+	}
+	return report.Usage.PlanType
 }
 
 func compareQuotaText(left, right string) int {

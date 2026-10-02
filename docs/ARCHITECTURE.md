@@ -217,11 +217,24 @@ Quota use cases also expose an eligibility deadline; runtime models keep it
 separate from account enablement. Routing re-admits the account at the deadline
 without a daemon or repeated quota probes. Unknown resets use one minute. The
 quota command keeps refresh policy in CLI delivery: Prodex-compatible watch mode
-refreshes every five seconds unless `--once` or `--raw` is selected. The quota
-use case remains request-scoped and has no background daemon. The profile use case supplies a credential-free quota target catalog so aggregate
-`--auth`/`--provider` filtering can include standalone and non-OpenAI profiles
-without turning them into account identities. Provider-specific quota adapters
-remain part of the 1:1 parity backlog.
+refreshes every five seconds unless `--once` or `--raw` is selected. Delivery
+also owns the 0.435.0 CLI rewrite that turns a quota invocation without
+`--profile`/`--raw` into the detailed aggregate view. The quota use case remains
+request-scoped and has no background daemon. The profile use case supplies a
+credential-free quota target catalog so aggregate `--auth`/`--provider`
+filtering can include standalone and non-OpenAI profiles without turning them
+into account identities.
+
+`gateway/quota` owns virtual providers that do not correspond to managed
+profiles. DeepSeek resolves the plural/single API-key environment policy and
+queries bounded `/user/balance` JSON; local quota probes the command-scoped
+OpenAI-compatible `/models` endpoint; AGY executes the bounded direct
+`agy auth quota --format=json --detail --all-accounts` probe. The virtual gateway
+runs only for explicit DeepSeek/local/AGY filters, never for `all`, matching
+0.435.0. It emits transport-neutral `ExternalInfo`; delivery maps that metadata
+into provider-aware account/plan/status/remaining display and sort keys. Managed
+profile adapters for Gemini/Anthropic/Copilot/Kiro/AGY/custom-provider quota
+remain separate outbound integrations.
 
 The CLI quota delivery package owns watch/once cadence, `--detail`, `--profile`,
 `--auth`, `--provider`, and `--base-url` parsing plus rendering of exact UTC

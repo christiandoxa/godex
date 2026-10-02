@@ -268,3 +268,75 @@ func TestStatusProfileViewDefaultsToActiveAndRawUsesProfileHome(t *testing.T) {
 		t.Fatalf("raw = %q, home = %q, err = %v", body, usage.rawHome, err)
 	}
 }
+
+type fakeVirtualQuota struct {
+	provider string
+	baseURL  string
+	results  []quotamodel.VirtualResult
+}
+
+func (fake *fakeVirtualQuota) Collect(_ context.Context, provider, baseURL string) []quotamodel.VirtualResult {
+	fake.provider, fake.baseURL = provider, baseURL
+	return append([]quotamodel.VirtualResult(nil), fake.results...)
+}
+
+func TestStatusVirtualCollectorRunsByProviderFilterNotAllFlag(t *testing.T) {
+	virtual := &fakeVirtualQuota{}
+	status := NewStatus(fakeAccounts{}, &trackingUsage{})
+	status.SetProfiles(fakeProfileSource{})
+	status.SetVirtual(virtual)
+	if _, err := status.Run(context.Background(), Options{All: true, ProviderFilter: "all"}); err != nil {
+		t.Fatal(err)
+	}
+	if virtual.provider != "all" {
+		t.Fatalf("virtual provider = %q", virtual.provider)
+	}
+	virtual.provider = ""
+	if _, err := status.Run(context.Background(), Options{All: true, ProviderFilter: "agy"}); err != nil {
+		t.Fatal(err)
+	}
+	if virtual.provider != "agy" {
+		t.Fatalf("agy virtual provider = %q", virtual.provider)
+	}
+}
+
+func TestStatusAppendsVirtualProviderQuotaAfterProfileFiltering(t *testing.T) {
+	available := true
+	virtual := &fakeVirtualQuota{results: []quotamodel.VirtualResult{{
+		Name: "deepseek", Provider: "deepseek", Auth: "deepseek-key",
+		External: &quotamodel.ExternalInfo{
+			Provider: "DeepSeek", Plan: "api-key", Status: "Ready", Main: "USD 12.34", Available: &available,
+		},
+	}}}
+	status := NewStatus(fakeAccounts{}, &trackingUsage{})
+	status.SetProfiles(fakeProfileSource{})
+	status.SetVirtual(virtual)
+	reports, err := status.Run(context.Background(), Options{
+		All: true, ProviderFilter: "deepseek", AuthFilter: "chatgpt", BaseURL: "https://quota.example.test/v1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if virtual.provider != "deepseek" || virtual.baseURL != "https://quota.example.test/v1" {
+		t.Fatalf("virtual arguments = %q / %q", virtual.provider, virtual.baseURL)
+	}
+	if len(reports) != 1 || reports[0].ProfileName != "deepseek" || reports[0].State != "ready" || reports[0].External == nil || reports[0].External.Main != "USD 12.34" {
+		t.Fatalf("virtual reports = %#v", reports)
+	}
+}
+
+func TestStatusVirtualProviderErrorBecomesReportError(t *testing.T) {
+	virtual := &fakeVirtualQuota{results: []quotamodel.VirtualResult{{
+		Name: "local", Provider: "local", Auth: "local", Err: errors.New("synthetic virtual quota failure"),
+	}}}
+	status := NewStatus(fakeAccounts{}, &trackingUsage{})
+	status.SetProfiles(fakeProfileSource{})
+	status.SetVirtual(virtual)
+	reports, err := status.Run(context.Background(), Options{All: true, ProviderFilter: "local"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reports) != 1 || reports[0].State != "error" || reports[0].Err == nil {
+		t.Fatalf("virtual error reports = %#v", reports)
+	}
+}

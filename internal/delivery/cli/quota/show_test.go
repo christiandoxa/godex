@@ -45,6 +45,59 @@ func (fake *fakeStatus) Run(_ context.Context, options quotausecase.Options) ([]
 	}}, nil
 }
 
+func TestQuotaDefaultsToDetailedAllProfileViewLikeProdex(t *testing.T) {
+	options, err := parseArguments(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !options.All || !options.detail || options.raw || options.once || !options.watchEnabled() {
+		t.Fatalf("default options = %+v", options)
+	}
+	filtered, err := parseArguments([]string{"--provider", "deepseek", "--once"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !filtered.All || !filtered.detail || filtered.ProviderFilter != "deepseek" || !filtered.once {
+		t.Fatalf("filtered default options = %+v", filtered)
+	}
+	profile, err := parseArguments([]string{"--profile", "work", "--once"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if profile.All || profile.detail || profile.Selector != "work" {
+		t.Fatalf("profile options = %+v", profile)
+	}
+	raw, err := parseArguments([]string{"--raw", "work"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if raw.All || raw.detail || !raw.raw || raw.Selector != "work" {
+		t.Fatalf("raw options = %+v", raw)
+	}
+}
+
+func TestQuotaExternalReportRendersProviderSummary(t *testing.T) {
+	available := true
+	report := quotamodel.Report{
+		ProfileName: "deepseek", Provider: "deepseek", Auth: "deepseek-key",
+		State: "ready", Enabled: true,
+		External: &quotamodel.ExternalInfo{
+			Provider: "DeepSeek", Account: "acct", Plan: "api-key",
+			Status: "Ready", Main: "USD 12.34", Reset: "tomorrow", Available: &available,
+		},
+	}
+	var output strings.Builder
+	if err := writeQuotaReports(&output, []quotamodel.Report{report}, false); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), "deepseek\t\tdeepseek\tdeepseek-key\tready\tapi-key\tUSD 12.34\ttomorrow") {
+		t.Fatalf("external row = %q", output.String())
+	}
+	if quotaReportStatusRank(report) != 0 || quotaReportAccount(report) != "acct" || quotaReportPlan(report) != "api-key" {
+		t.Fatalf("external sort view = rank:%d account:%q plan:%q", quotaReportStatusRank(report), quotaReportAccount(report), quotaReportPlan(report))
+	}
+}
+
 func TestShowRendersOneShotQuotaTable(t *testing.T) {
 	status := &fakeStatus{}
 	var output strings.Builder

@@ -26,7 +26,35 @@ func (status *Status) runProfiles(ctx context.Context, options Options) ([]quota
 			return nil, err
 		}
 	}
+	if status.virtual != nil {
+		reports = append(reports, virtualQuotaReports(status.virtual.Collect(ctx, options.ProviderFilter, options.BaseURL))...)
+	}
 	return reports, nil
+}
+
+func virtualQuotaReports(results []quotamodel.VirtualResult) []quotamodel.Report {
+	reports := make([]quotamodel.Report, 0, len(results))
+	for _, result := range results {
+		report := quotamodel.Report{
+			ProfileName: result.Name,
+			Provider:    result.Provider,
+			Auth:        result.Auth,
+			Enabled:     true,
+			External:    result.External,
+			Err:         result.Err,
+		}
+		switch {
+		case result.Err != nil:
+			report.State = "error"
+		case result.External != nil:
+			report.Email = result.External.Account
+			report.State = strings.ToLower(strings.TrimSpace(result.External.Status))
+		default:
+			report.State = "unsupported"
+		}
+		reports = append(reports, report)
+	}
+	return reports
 }
 
 func (status *Status) populateProfileQuota(ctx context.Context, report *quotamodel.Report, target profilemodel.QuotaTarget, baseURL string) {

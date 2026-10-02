@@ -23,6 +23,7 @@ type Report struct {
 	Active      bool
 	Enabled     bool
 	Usage       Usage
+	External    *ExternalInfo
 	State       string
 	Err         error
 }

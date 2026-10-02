@@ -56,13 +56,19 @@ func TestShowDetailedQuota(t *testing.T) {
 }
 
 func TestDetailPreservesQuotaSelection(t *testing.T) {
-	for _, selector := range []string{"", "work"} {
+	for _, fixture := range []struct {
+		selector string
+		want     quotausecase.Options
+	}{
+		{"", quotausecase.Options{All: true}},
+		{"work", quotausecase.Options{Selector: "work"}},
+	} {
 		status := &fakeStatus{}
-		if err := Show(context.Background(), status, &strings.Builder{}, append([]string{"--detail", "--once"}, strings.Fields(selector)...)); err != nil {
+		if err := Show(context.Background(), status, &strings.Builder{}, append([]string{"--detail", "--once"}, strings.Fields(fixture.selector)...)); err != nil {
 			t.Fatal(err)
 		}
-		if status.options != (quotausecase.Options{Selector: selector}) {
-			t.Fatalf("options = %+v", status.options)
+		if status.options != fixture.want {
+			t.Fatalf("selector %q options = %+v, want %+v", fixture.selector, status.options, fixture.want)
 		}
 	}
 }

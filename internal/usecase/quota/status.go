@@ -37,6 +37,10 @@ type rawOverrideUsageGateway interface {
 	FetchRawAt(context.Context, string, string) ([]byte, error)
 }
 
+type virtualGateway interface {
+	Collect(context.Context, string, string) []quotamodel.VirtualResult
+}
+
 type Options struct {
 	All            bool
 	Selector       string
@@ -49,6 +53,7 @@ type Status struct {
 	accounts accountStore
 	profiles profileSource
 	usage    usageGateway
+	virtual  virtualGateway
 	now      func() time.Time
 }
 
@@ -57,6 +62,8 @@ func NewStatus(accounts accountStore, usage usageGateway) *Status {
 }
 
 func (status *Status) SetProfiles(profiles profileSource) { status.profiles = profiles }
+
+func (status *Status) SetVirtual(virtual virtualGateway) { status.virtual = virtual }
 
 func (status *Status) DoctorReports(ctx context.Context) ([]quotamodel.Report, error) {
 	return status.Run(ctx, Options{All: true})

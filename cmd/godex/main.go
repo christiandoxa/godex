@@ -21,6 +21,7 @@ import (
 	kirogateway "github.com/christiandoxa/godex/internal/gateway/kiro"
 	"github.com/christiandoxa/godex/internal/gateway/openai"
 	providerkeygateway "github.com/christiandoxa/godex/internal/gateway/providerkey"
+	quotagateway "github.com/christiandoxa/godex/internal/gateway/quota"
 	updategateway "github.com/christiandoxa/godex/internal/gateway/update"
 	proxyconfig "github.com/christiandoxa/godex/internal/model/proxy"
 	"github.com/christiandoxa/godex/internal/repository/account"
@@ -71,6 +72,7 @@ func run() int {
 		return 1
 	}
 	quotaStatus := quotausecase.NewStatus(store, quotaClient)
+	quotaStatus.SetVirtual(quotagateway.NewVirtual(nil))
 	bindings := routingrepo.NewStore(settings.Home)
 	copilotSource := copilotgateway.NewSource(nil)
 	claudeSource := claudegateway.NewSource()

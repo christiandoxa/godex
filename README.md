@@ -24,10 +24,13 @@ Fresh requests may rotate between eligible accounts. Existing conversations
 stay with their account, and an established stream is never replayed. Managed
 launches probe quota once before the local proxy starts: accounts that are
 explicitly exhausted are skipped for fresh work, while a failed quota probe is
-kept eligible rather than being treated as exhaustion. `godex quota` follows Prodex's live refresh behavior for OpenAI/Codex 5-hour
-and weekly usage windows: it refreshes every five seconds by default, while
-`--once` renders a single snapshot and `--raw` performs one raw JSON fetch.
-Multi-provider quota remains part of the 1:1 parity backlog. The runtime details are documented in [Runtime rotation and affinity](docs/ROTATION.md).
+kept eligible rather than being treated as exhaustion. `godex quota` follows
+Prodex 0.435.0's default detailed pool view and five-second live refresh. Without
+`--profile` or `--raw`, the command inspects the aggregate pool; `--once`
+renders one snapshot and `--raw` performs one raw OpenAI JSON fetch. Provider
+filters also expose the 0.435.0 virtual DeepSeek, local OpenAI-compatible, and
+Anti-Gravity quota surfaces. The runtime details are documented in [Runtime
+rotation and affinity](docs/ROTATION.md).
 
 ## Requirements
 
@@ -345,7 +348,7 @@ Available profile, account, and runtime commands:
 | godex accounts | List managed ChatGPT account identities. |
 | godex account use SELECTOR | Set the preferred account for account rotation. |
 | godex account remove SELECTOR | Remove a managed account and its isolated home. |
-| godex quota [-p NAME] [--all] [--detail] [--raw] [--once] [--base-url URL] | Watch OpenAI/Codex quota or render a single snapshot. |
+| godex quota [-p NAME] [--all] [--auth AUTH] [--provider PROVIDER] [--detail] [--raw] [--once] [--base-url URL] | Watch the provider quota pool or inspect one profile/raw OpenAI payload. |
 | godex redeem PROFILE [-y|--yes] [--base-url URL] [--no-proxy] | Manually redeem one OpenAI/Codex reset credit. |
 | godex ping openai [-p NAME] [--model MODEL] [--base-url URL] [--no-proxy] [--json] | Run the Prodex-compatible OpenAI application diagnostic. |
 | godex update | Update the running Godex installation from the latest verified GitHub release. |
@@ -354,27 +357,39 @@ Available profile, account, and runtime commands:
 | godex status [--once] [--interval SECONDS] | Show or watch the runtime snapshot. |
 | godex log [stream\|last\|upstream] [--json] | Follow persisted, redacted runtime request events. |
 
-Quota output stays compact by default. Without `--once` or `--raw`, the command
-refreshes every five seconds like Prodex 0.435.0; `--watch` is also accepted as
-the explicit hidden spelling. `-p/--profile NAME` selects one managed OpenAI
-profile, while `--all` shows the managed pool. `--base-url URL` overrides the
-ChatGPT quota endpoint for that command only. `--raw` prints bounded upstream
-usage JSON for one selected or active profile and cannot be combined with
-`--all`, `--detail`, `--watch`, or `--once`. Add `--detail` for exact RFC 3339
-reset timestamps and upstream window lengths. Missing fields, disabled accounts,
-and failed probes display `-`; probe errors never print gateway error contents.
+Quota follows Prodex 0.435.0's aggregate default: unless `--profile` or
+`--raw` is supplied, Godex enables the all-profile detailed view automatically.
+Without `--once`, that view refreshes every five seconds; `--watch` is also
+accepted as the explicit hidden spelling. `-p/--profile NAME` selects one
+profile, while explicit `--all` keeps the compact aggregate unless `--detail`
+is also requested. `--base-url URL` is command-scoped: OpenAI uses it as the
+quota backend override, DeepSeek uses it as the API base, and `local` requires it
+for the OpenAI-compatible server. `--raw` prints bounded upstream OpenAI usage
+JSON for one selected or active profile and cannot be combined with aggregate,
+detail, watch, auth, or provider filters. Missing fields, disabled profiles, and
+failed probes display conservatively; probe error bodies/secrets are never
+rendered.
 `--auth` supports Prodex labels such as `chatgpt`, `no-auth`, `api-key`,
 `invalid-auth`, `unreadable-auth`, `quota-compatible`, and
 `non-quota-compatible`. `--provider` accepts the Prodex 0.435.0 canonical names
 plus aliases such as `chatgpt`/`codex` → `openai`, `google` → `gemini`,
 `claude` → `anthropic`, `github` → `copilot`, `kiro-cli` → `kiro`,
-`openai-compatible` → `local`, and `anti-gravity` → `agy`. In an
+`openai-compatible` → `local`, and `anti-gravity` → `agy`. Virtual provider
+quota matches 0.435.0: `--provider deepseek` reads
+`DEEPSEEK_API_KEYS`/ `DEEPSEEK_API_KEY` and queries `/user/balance`;
+`--provider local --base-url URL` probes the OpenAI-compatible models endpoint
+using `PRODEX_LOCAL_API_KEY` then `OPENAI_API_KEY`; and `--provider agy`
+runs bounded `agy auth quota --format=json --detail --all-accounts`. These
+virtual providers are intentionally absent from the `all` filter unless that
+provider is selected explicitly, matching Prodex. In an
 all-profile terminal watch, the Bubble Tea UI matches the 0.435.0 control state:
 `j/k` or arrows scroll, `s` cycles current/remaining/profile/auth/account/plan
 sorts, `f` cycles provider filters unless an explicit non-`all` provider locked
 the view, and `u` refreshes. Single-profile quota watch remains quit-only.
-Configured non-OpenAI profiles are visible and filterable but remain
-`unsupported` until their provider-specific quota adapters are implemented.
+Configured non-OpenAI profiles remain visible and filterable. The virtual
+DeepSeek/local/AGY adapters above are implemented; profile-backed Gemini,
+Anthropic, Copilot, Kiro, AGY, and custom-provider quota adapters remain separate
+parity work.
 
 `godex redeem PROFILE` performs the same explicit two-step manual flow as Prodex:
 it checks current usage first, asks for confirmation when the nearest 5-hour or

@@ -83,7 +83,8 @@ func writeReport(out io.Writer, report quotamodel.Report, detail bool) error {
 	if name == "" {
 		name = report.AccountName
 	}
-	fields := []string{name, current, valueOrDash(report.Provider), valueOrDash(report.Auth), state, valueOrDash(usage.PlanType), formatWindow(usage.Primary), formatWindow(usage.Secondary)}
+	plan, primary, secondary := quotaReportRowValues(report, usage)
+	fields := []string{name, current, valueOrDash(report.Provider), valueOrDash(report.Auth), state, valueOrDash(plan), primary, secondary}
 	if detail {
 		for _, window := range []*quotamodel.Window{usage.Primary, usage.Secondary} {
 			reset, seconds := formatWindowDetails(window)
@@ -92,6 +93,13 @@ func writeReport(out io.Writer, report quotamodel.Report, detail bool) error {
 	}
 	_, err := fmt.Fprintln(out, strings.Join(fields, "\t"))
 	return err
+}
+
+func quotaReportRowValues(report quotamodel.Report, usage quotamodel.Usage) (plan, primary, secondary string) {
+	if report.External != nil && report.Err == nil {
+		return report.External.Plan, valueOrDash(report.External.Main), valueOrDash(report.External.Reset)
+	}
+	return usage.PlanType, formatWindow(usage.Primary), formatWindow(usage.Secondary)
 }
 
 func formatWindowDetails(window *quotamodel.Window) (reset, seconds string) {

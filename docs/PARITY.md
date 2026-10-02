@@ -261,13 +261,21 @@ and eligibility validation stays in the runtime use case.
 - Quota now matches Prodex's default five-second watch cadence, `--once`, raw,
   detail, profile selection, command-scoped base-URL override, aggregate
   `--auth`/`--provider` filtering, and the 0.435.0 provider-filter aliases.
-  The all-profile Bubble Tea watch also matches the 0.435.0 interactive state:
-  `j/k` or arrows scroll, `s` cycles current/remaining/profile/auth/account/plan
-  sorts, `f` cycles all/openai/gemini/anthropic/copilot/kiro/deepseek/local/agy
-  when not locked by an explicit provider, and `u` refreshes. Single-profile
-  quota watch remains quit-only. The catalog includes standalone profiles and
-  reports non-OpenAI profiles as unsupported until provider-specific quota
-  adapters land. Manual `redeem PROFILE` now matches the usage preflight, one-hour
+  The CLI rewrite also matches 0.435.0: invocations without `--profile`/`--raw`
+  default to the detailed aggregate pool. Virtual provider quota is implemented
+  for DeepSeek (plural/single key precedence + `/user/balance`), local
+  OpenAI-compatible servers (bounded models reachability), and Anti-Gravity
+  (bounded detailed all-account CLI probe); these virtual reports are collected
+  only when their provider filter is selected, not for `all`. External account,
+  plan, status, main/reset summary, readiness, and sort keys are observable in
+  the Godex quota view. The all-profile Bubble Tea watch matches the 0.435.0
+  interactive state: `j/k` or arrows scroll, `s` cycles
+  current/remaining/profile/auth/account/plan sorts, `f` cycles
+  all/openai/gemini/anthropic/copilot/kiro/deepseek/local/agy when not locked by
+  an explicit provider, and `u` refreshes. Single-profile quota watch remains
+  quit-only. Profile-backed Gemini/Anthropic/Copilot/Kiro/AGY/custom-provider
+  quota adapters remain gaps. Manual `redeem PROFILE` now matches the usage
+  preflight, one-hour
   reset confirmation guard, idempotent consume endpoint, base-URL override, and
   no-proxy controls. Runtime `--auto-redeem` policy and provider-specific quota
   adapters remain 1:1 gaps.
