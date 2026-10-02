@@ -32,6 +32,11 @@ func providerEnvPlan(provider string) (envPlan, error) {
 		return envPlan{plural: []string{"ANTHROPIC_API_KEYS"}, single: []string{"ANTHROPIC_API_KEY"}}, nil
 	case "deepseek":
 		return envPlan{plural: []string{"DEEPSEEK_API_KEYS"}, single: []string{"DEEPSEEK_API_KEY"}}, nil
+	case "gemini":
+		return envPlan{
+			plural: []string{"GEMINI_API_KEYS", "GOOGLE_API_KEYS"},
+			single: []string{"GEMINI_API_KEY", "GOOGLE_API_KEY"},
+		}, nil
 	default:
 		return envPlan{}, errors.New("runtime provider API-key shortcut is not implemented")
 	}

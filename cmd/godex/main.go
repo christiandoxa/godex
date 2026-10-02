@@ -17,6 +17,7 @@ import (
 	"github.com/christiandoxa/godex/internal/gateway/codex"
 	copilotgateway "github.com/christiandoxa/godex/internal/gateway/copilot"
 	deepseekgateway "github.com/christiandoxa/godex/internal/gateway/deepseek"
+	geminigateway "github.com/christiandoxa/godex/internal/gateway/gemini"
 	githubgateway "github.com/christiandoxa/godex/internal/gateway/github"
 	kirogateway "github.com/christiandoxa/godex/internal/gateway/kiro"
 	"github.com/christiandoxa/godex/internal/gateway/openai"
@@ -191,6 +192,8 @@ func newRuntimeGateway(
 		return newAnthropicRuntimeGateway(config, claudeSource)
 	case "deepseek":
 		return deepseekgateway.NewRuntimePoolWithOptions(config.Provider.APIURL, config.ProviderCredentials, deepseekgateway.RequestOptions{StrictTools: config.Provider.StrictTools}, nil)
+	case "gemini":
+		return geminigateway.NewRuntimePool(config.Provider.APIURL, config.ProviderCredentials, nil)
 	case "kiro":
 		return newKiroRuntimeGateway(config, kiroSource)
 	default:

@@ -23,6 +23,14 @@ type ErrorClassification struct {
 }
 
 func ClassifyError(status int, body []byte) ErrorClassification {
+	if status == 429 {
+		if class, ok := gemini429Class(body); ok {
+			if class == ErrorQuota {
+				return ErrorClassification{Class: class, Cooldown: 5 * time.Minute}
+			}
+			return ErrorClassification{Class: class, Cooldown: time.Minute}
+		}
+	}
 	best := classifyStatusText(status, body)
 	for _, code := range structuredErrorCodes(body) {
 		candidate := classifyCode(status, code)
@@ -39,6 +47,75 @@ func RetryableAcrossCredentials(class ErrorClass) bool {
 
 func RetryableAcrossModels(class ErrorClass) bool {
 	return class == ErrorQuota || class == ErrorRateLimit || class == ErrorTransient || class == ErrorNotFound
+}
+
+func IsStructuredGemini429(body []byte) bool {
+	_, ok := gemini429Class(body)
+	return ok
+}
+
+func gemini429Class(body []byte) (ErrorClass, bool) {
+	var value any
+	if json.Unmarshal(body, &value) != nil {
+		return ErrorOther, false
+	}
+	return gemini429Value(value)
+}
+
+func gemini429Value(value any) (ErrorClass, bool) {
+	class := ErrorOther
+	switch typed := value.(type) {
+	case map[string]any:
+		for _, key := range []string{"status", "code", "reason"} {
+			if code, ok := typed[key].(string); ok {
+				switch {
+				case gemini429QuotaCode(code):
+					class = ErrorQuota
+				case gemini429RateCode(code) && class != ErrorQuota:
+					class = ErrorRateLimit
+				}
+			}
+		}
+		for _, key := range []string{"quotaId", "quota_limit", "quotaLimit"} {
+			if quota, ok := typed[key].(string); ok && (strings.Contains(quota, "PerDay") || strings.Contains(quota, "Daily")) {
+				class = ErrorQuota
+			}
+		}
+		for _, child := range typed {
+			if childClass, found := gemini429Value(child); found {
+				if childClass == ErrorQuota || class == ErrorOther {
+					class = childClass
+				}
+			}
+		}
+	case []any:
+		for _, child := range typed {
+			if childClass, found := gemini429Value(child); found {
+				if childClass == ErrorQuota || class == ErrorOther {
+					class = childClass
+				}
+			}
+		}
+	}
+	return class, class != ErrorOther
+}
+
+func gemini429QuotaCode(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "quota_exhausted", "quota_exceeded", "resource_exhausted", "insufficient_g1_credits_balance", "insufficient_quota":
+		return true
+	default:
+		return false
+	}
+}
+
+func gemini429RateCode(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "rate_limit_exceeded", "rate_limit_exceeded_error":
+		return true
+	default:
+		return false
+	}
 }
 
 func classifyStatusText(status int, body []byte) ErrorClassification {

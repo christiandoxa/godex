@@ -135,8 +135,18 @@ and eligibility validation stays in the runtime use case.
 - All Godex equivalents of Prodex TUI surfaces must use Bubble Tea. Live status,
   quota watch, log stream/upstream, and redeem confirmation have been migrated;
   non-TTY fallbacks remain line-oriented.
-- Multi-provider runtime/login parity remains incomplete for Gemini and AGY where
-  present in Prodex. DeepSeek now has the 0.435.1 raw-key runtime
+- Gemini now has the 0.435.1 API-key runtime: tagged key/environment precedence,
+  Gemini defaults and model fallback chains, Responses-to-Chat JSON/SSE
+  translation, metadata and thought-signature preservation, function/namespace/
+  MCP/custom/tool-search/web-search conversion, and semantic Compact with the
+  bounded local fallback contract. For Responses, only structured Gemini
+  quota/rate 429s advance the model chain; other 429 responses preserve their
+  original status and body. Chat Completions uses the OpenAI-compatible
+  endpoint; Messages and Embeddings pass through with Gemini API-key headers.
+  The Models route still proxies upstream instead of serving Prodex's local
+  catalog. Gemini OAuth/profile login and provider-specific quota handling remain
+  parity gaps. Antigravity runtime/login parity also remains incomplete.
+- DeepSeek now has the 0.435.1 raw-key runtime
   plus its dedicated Codex model catalog and advanced request-side Responses
   adapter: exact key precedence/provider defaults/stable key rotation, launch-model
   catalog precedence, reasoning effort, primitive sampling/token controls,
@@ -217,8 +227,8 @@ and eligibility validation stays in the runtime use case.
   Prodex-compatible `api_key[_host]` profile naming, private `auth.json`,
   `.prodex-profile.toml` endpoint persistence, repeat-login update/preserve/clear
   semantics, and direct `prodex-openai-compatible` Codex provider injection with
-  user `model_provider` precedence. Antigravity execution and Gemini runtime/login
-  remain action-level parity gaps rather than TUI gaps.
+  user `model_provider` precedence. Antigravity execution and Gemini login remain
+  action-level parity gaps rather than TUI gaps.
 - Explicit self-update, best-effort cached update notices on eligible commands,
   manual reset-credit redemption, and cost-bearing `ping openai` diagnostics are
   implemented.

@@ -196,6 +196,9 @@ func (router *Router) execute(ctx context.Context, request proxymodel.Request, a
 		return nil, errors.New("routing gateway is not configured")
 	}
 	if externalProviderKind(account.Provider.Kind) {
+		if strings.EqualFold(strings.TrimSpace(account.Provider.Kind), "gemini") {
+			return router.executeGeminiModelFallback(ctx, request, account)
+		}
 		return router.gateway.Execute(ctx, request, account)
 	}
 	for reload := 0; reload < 2; reload++ {

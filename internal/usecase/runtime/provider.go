@@ -21,6 +21,10 @@ const (
 	deepSeekContextWindow     = int64(1_048_576)
 	deepSeekAutoCompactLimit  = int64(900_000)
 	deepSeekDefaultAPIURL     = "https://api.deepseek.com"
+	geminiDefaultModel        = "auto"
+	geminiContextWindow       = int64(1_048_576)
+	geminiAutoCompactLimit    = int64(900_000)
+	geminiDefaultAPIURL       = "https://generativelanguage.googleapis.com/v1beta"
 	kiroDefaultModel          = "auto"
 	kiroContextWindow         = int64(1_000_000)
 	kiroAutoCompactLimit      = int64(950_000)
@@ -57,6 +61,19 @@ func DeepSeekProvider(name, apiURL string) proxymodel.Provider {
 		DefaultModel:     deepSeekDefaultModel,
 		ContextWindow:    deepSeekContextWindow,
 		AutoCompactLimit: deepSeekAutoCompactLimit,
+	}
+}
+
+func GeminiProvider(name, apiURL string) proxymodel.Provider {
+	apiURL = strings.TrimSpace(apiURL)
+	if apiURL == "" {
+		apiURL = geminiDefaultAPIURL
+	}
+	return proxymodel.Provider{
+		Kind: "gemini", Name: name, APIURL: apiURL,
+		DefaultModel:     geminiDefaultModel,
+		ContextWindow:    geminiContextWindow,
+		AutoCompactLimit: geminiAutoCompactLimit,
 	}
 }
 

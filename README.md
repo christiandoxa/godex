@@ -242,6 +242,21 @@ DeepSeek-specific response/SSE reasoning/tool shaping and the web-search/beta-ba
 request routes remain the next 0.435.1 parity slice; unsupported web-search
 requests still fail before upstream instead of being silently downgraded.
 
+Gemini API-key launches are also supported with `godex run --provider gemini`.
+Key precedence is `--api-key`, `GEMINI_API_KEYS`, `GOOGLE_API_KEYS`,
+`GEMINI_API_KEY`, then `GOOGLE_API_KEY`; plural values accept comma, semicolon,
+or newline separators. The defaults are model `auto` and
+`https://generativelanguage.googleapis.com/v1beta`; `--base-url` may override
+the endpoint. Responses are translated to Gemini's OpenAI-compatible Chat
+endpoint with model fallback and buffered/SSE response mapping. Compact attempts
+semantic summarization and returns the bounded local fallback when that fails.
+For Responses, only structured Gemini quota/rate 429s advance the model chain;
+other 429 responses retain their original status and body.
+Messages and Embeddings pass through to their requested paths. Raw API keys stay
+in the invocation-local gateway. Gemini's Models route still uses the upstream
+catalog; local catalog emulation, OAuth-backed runtime, and provider-specific
+quota support remain incomplete.
+
 Kiro profiles now have a foreground ACP runtime bridge matching the 0.435.1
 provider surface. Default or active launches form a selected-first managed Kiro
 pool, explicit profile selection remains hard-affinity, and each profile gets its

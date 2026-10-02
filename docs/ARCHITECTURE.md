@@ -229,6 +229,22 @@ history). Shared RTK argument shaping stays in `gateway/chatcompat`.
 DeepSeek response/SSE reasoning/tool shaping and web-search/beta-route policy
 remain isolated gateway work rather than leaking into delivery or routing.
 
+Gemini raw-key runtime follows the same routing boundary. `gateway/gemini` owns
+the API-key pool, Gemini OpenAI-compatible URL/auth behavior, and Responses
+request and buffered/SSE response translation. `usecase/routing` selects the
+bounded Gemini model chain and decides whether an uncommitted error permits the
+next model; `entity/provider` supplies the chain and error classification. Error
+bodies retained for that decision are capped at 8 MiB, and a final non-retryable
+response keeps its status, headers, trailers, and body. Compact HTTP errors use
+the same retry boundary before `gateway/compact` produces its bounded local
+fallback; transport errors and invalid summaries go directly to that fallback.
+`gateway/gemini` reuses `gateway/chatcompat` for shared message/history
+and Chat response conversion, while Gemini-specific reasoning, metadata, tool
+shapes, and thought signatures stay in the Gemini gateway. Native Messages and
+Embeddings requests retain their paths and use `x-goog-api-key`; Responses and
+Chat use the OpenAI-compatible endpoint with Bearer auth. Model catalog
+emulation remains a later Gemini parity stage.
+
 ### Quota gateway and preflight
 
 The OpenAI quota client is a narrow outbound adapter for the ChatGPT usage

@@ -25,11 +25,58 @@ func ModelFallbackChain(providerKind, model string) []string {
 		return copilotFallbackChain(trimmed)
 	case "deepseek":
 		return deepSeekFallbackChain(trimmed)
+	case "gemini":
+		return geminiFallbackChain(trimmed)
 	default:
 		if trimmed == "" {
 			return nil
 		}
 		return []string{trimmed}
+	}
+}
+
+func geminiFallbackChain(model string) []string {
+	switch strings.ToLower(model) {
+	case "", "auto", "default", "auto-gemini-3":
+		return []string{
+			"gemini-3.1-pro-preview", "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash",
+			"gemini-3.5-flash", "gemini-3-flash-preview", "gemini-2.5-pro", "gemini-2.5-flash",
+		}
+	case "flash":
+		return []string{
+			"gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash",
+			"gemini-3.5-flash", "gemini-3-flash-preview", "gemini-2.5-flash",
+		}
+	case "flash-lite":
+		return []string{"gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-2.5-flash-lite"}
+	case "auto-gemini-2.5":
+		return []string{"gemini-2.5-pro", "gemini-2.5-flash"}
+	case "chat-compression-default":
+		return []string{"gemini-3.8-flash", "gemini-3.5-flash", "gemini-3-flash-preview", "gemini-2.5-flash"}
+	case "gemini-3.1-pro-preview-customtools":
+		return []string{"gemini-3.1-pro-preview-customtools", "gemini-3.1-pro-preview", "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-pro"}
+	case "gemini-3.1-pro-preview":
+		return []string{"gemini-3.1-pro-preview", "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-2.5-pro"}
+	case "gemini-3-pro-preview":
+		return []string{"gemini-3.1-pro-preview", "gemini-3.8-flash", "gemini-2.5-pro"}
+	case "gemini-3.8-flash":
+		return []string{"gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash"}
+	case "gemini-3.7-flash":
+		return []string{"gemini-3.7-flash", "gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash"}
+	case "gemini-3.6-flash":
+		return []string{"gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.8-flash", "gemini-3.5-flash", "gemini-2.5-flash"}
+	case "gemini-3.5-flash":
+		return []string{"gemini-3.5-flash", "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-2.5-flash"}
+	case "gemini-3-flash-preview":
+		return []string{"gemini-3-flash-preview", "gemini-3.8-flash", "gemini-3.5-flash", "gemini-2.5-flash"}
+	case "gemini-3-flash":
+		return []string{"gemini-3.8-flash", "gemini-3.5-flash", "gemini-2.5-flash"}
+	case "pro":
+		return []string{"gemini-3.1-pro-preview", "gemini-2.5-pro"}
+	case "gemini-3.1-flash-lite":
+		return []string{"gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-2.5-flash-lite"}
+	default:
+		return []string{model}
 	}
 }
 

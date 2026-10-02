@@ -32,6 +32,36 @@ func TestModelFallbackChainMatchesProdexAnthropicAndCopilot(t *testing.T) {
 	}
 }
 
+func TestGeminiModelFallbackChainsMatchProdex(t *testing.T) {
+	for _, test := range []struct {
+		model string
+		want  []string
+	}{
+		{model: "", want: []string{"gemini-3.1-pro-preview", "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3-flash-preview", "gemini-2.5-pro", "gemini-2.5-flash"}},
+		{model: "auto", want: []string{"gemini-3.1-pro-preview", "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3-flash-preview", "gemini-2.5-pro", "gemini-2.5-flash"}},
+		{model: "auto-gemini-3", want: []string{"gemini-3.1-pro-preview", "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3-flash-preview", "gemini-2.5-pro", "gemini-2.5-flash"}},
+		{model: "auto-gemini-2.5", want: []string{"gemini-2.5-pro", "gemini-2.5-flash"}},
+		{model: "chat-compression-default", want: []string{"gemini-3.8-flash", "gemini-3.5-flash", "gemini-3-flash-preview", "gemini-2.5-flash"}},
+		{model: "flash", want: []string{"gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3-flash-preview", "gemini-2.5-flash"}},
+		{model: "flash-lite", want: []string{"gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-2.5-flash-lite"}},
+		{model: "pro", want: []string{"gemini-3.1-pro-preview", "gemini-2.5-pro"}},
+		{model: "gemini-3.1-pro-preview-customtools", want: []string{"gemini-3.1-pro-preview-customtools", "gemini-3.1-pro-preview", "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-pro"}},
+		{model: "gemini-3.1-pro-preview", want: []string{"gemini-3.1-pro-preview", "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-2.5-pro"}},
+		{model: "gemini-3-pro-preview", want: []string{"gemini-3.1-pro-preview", "gemini-3.8-flash", "gemini-2.5-pro"}},
+		{model: "gemini-3.8-flash", want: []string{"gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash"}},
+		{model: "gemini-3.7-flash", want: []string{"gemini-3.7-flash", "gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash"}},
+		{model: "gemini-3.6-flash", want: []string{"gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.8-flash", "gemini-3.5-flash", "gemini-2.5-flash"}},
+		{model: "gemini-3.5-flash", want: []string{"gemini-3.5-flash", "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-2.5-flash"}},
+		{model: "gemini-3-flash-preview", want: []string{"gemini-3-flash-preview", "gemini-3.8-flash", "gemini-3.5-flash", "gemini-2.5-flash"}},
+		{model: "gemini-3-flash", want: []string{"gemini-3.8-flash", "gemini-3.5-flash", "gemini-2.5-flash"}},
+		{model: "gemini-3.1-flash-lite", want: []string{"gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-2.5-flash-lite"}},
+	} {
+		if got := ModelFallbackChain("gemini", test.model); !reflect.DeepEqual(got, test.want) {
+			t.Fatalf("Gemini fallback chain %q = %#v, want %#v", test.model, got, test.want)
+		}
+	}
+}
+
 func TestModelFallbackChainPreservesProdexComboSemantics(t *testing.T) {
 	cases := []struct {
 		model string

@@ -16,6 +16,7 @@ const (
 	providerShortcutNotImplementedFormat = "runtime provider shortcut %q is not implemented yet"
 	anthropicProviderKind                = "anthropic"
 	deepSeekProviderKind                 = "deepseek"
+	geminiProviderKind                   = "gemini"
 )
 
 func runProfilelessProviderSelection(
@@ -49,7 +50,7 @@ func runProviderSelection(
 	selection runtimemodel.Selection,
 	arguments []string,
 ) error {
-	if selection.Provider != anthropicProviderKind && selection.Provider != deepSeekProviderKind {
+	if selection.Provider != anthropicProviderKind && selection.Provider != deepSeekProviderKind && selection.Provider != geminiProviderKind {
 		return fmt.Errorf(providerShortcutNotImplementedFormat, selection.Provider)
 	}
 	keys, err := runner.ProviderAPIKeys(selection.Provider, selection.APIKey)
@@ -164,6 +165,8 @@ func externalAPIKeyProvider(kind, name, baseURL string) (proxymodel.Provider, er
 		return runtimeusecase.AnthropicProvider(name, baseURL), nil
 	case deepSeekProviderKind:
 		return runtimeusecase.DeepSeekProvider(name, baseURL), nil
+	case geminiProviderKind:
+		return runtimeusecase.GeminiProvider(name, baseURL), nil
 	default:
 		return proxymodel.Provider{}, fmt.Errorf(providerShortcutNotImplementedFormat, kind)
 	}
@@ -175,6 +178,8 @@ func providerCredentialRequired(kind string) error {
 		return errors.New("godex run --provider anthropic requires a Claude profile, --api-key, or ANTHROPIC_API_KEY(S)")
 	case deepSeekProviderKind:
 		return errors.New("godex run --provider deepseek requires --api-key or DEEPSEEK_API_KEY(S)")
+	case geminiProviderKind:
+		return errors.New("godex run --provider gemini requires --api-key, GEMINI_API_KEY(S), or GOOGLE_API_KEY(S)")
 	default:
 		return fmt.Errorf(providerShortcutNotImplementedFormat, kind)
 	}

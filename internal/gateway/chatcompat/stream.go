@@ -11,21 +11,30 @@ import (
 )
 
 const streamEventMaxBytes = 1 << 20
+const streamMetadataMaxBytes = 1 << 20
+
+const streamReasoningBuilderKey = "\x00reasoning_content_builder"
+const streamCompletedKey = "\x00completed"
 
 func ChatSSE(body io.ReadCloser) io.ReadCloser {
+	return ChatSSEWithMetadata(body, "", nil)
+}
+
+func ChatSSEWithMetadata(body io.ReadCloser, providerKey string, responseMetadata map[string]any) io.ReadCloser {
 	reader, writer := io.Pipe()
-	go pumpChatSSE(body, writer)
+	go pumpChatSSE(body, writer, providerKey, responseMetadata)
 	return reader
 }
 
-func pumpChatSSE(body io.ReadCloser, writer *io.PipeWriter) {
+func pumpChatSSE(body io.ReadCloser, writer *io.PipeWriter, providerKey string, responseMetadata map[string]any) {
 	defer body.Close()
 	decoder := sse.NewDecoder(streamEventMaxBytes)
 	buffer := make([]byte, 32<<10)
+	metadata := make(map[string]any)
 	for {
 		read, err := body.Read(buffer)
 		if read > 0 {
-			if writeErr := writeTranslatedEvents(writer, decoder.Feed(buffer[:read])); writeErr != nil {
+			if writeErr := writeTranslatedEvents(writer, decoder.Feed(buffer[:read]), providerKey, responseMetadata, metadata); writeErr != nil {
 				_ = writer.CloseWithError(writeErr)
 				return
 			}
@@ -37,9 +46,9 @@ func pumpChatSSE(body io.ReadCloser, writer *io.PipeWriter) {
 	}
 }
 
-func writeTranslatedEvents(writer *io.PipeWriter, events [][]byte) error {
+func writeTranslatedEvents(writer *io.PipeWriter, events [][]byte, providerKey string, responseMetadata, metadata map[string]any) error {
 	for _, event := range events {
-		translated, supported, err := TranslateChatSSEData(event)
+		translated, supported, err := translateChatSSEData(event, providerKey, responseMetadata, metadata)
 		if err != nil {
 			return err
 		}
@@ -61,8 +70,15 @@ func closeChatSSEWriter(writer *io.PipeWriter, err error) {
 }
 
 func TranslateChatSSEData(data []byte) ([]byte, bool, error) {
+	return translateChatSSEData(data, "", nil, nil)
+}
+
+func translateChatSSEData(data []byte, providerKey string, responseMetadata, metadata map[string]any) ([]byte, bool, error) {
+	if metadata == nil {
+		metadata = make(map[string]any)
+	}
 	if string(data) == "[DONE]" {
-		return responseEvent("response.completed", map[string]any{}), true, nil
+		return completedEvent(providerKey, responseMetadata, metadata)
 	}
 	var root map[string]any
 	if err := json.Unmarshal(data, &root); err != nil {
@@ -73,6 +89,12 @@ func TranslateChatSSEData(data []byte) ([]byte, bool, error) {
 		return nil, false, nil
 	}
 	delta, _ := choice["delta"].(map[string]any)
+	if reasoning, ok := delta["reasoning_content"].(string); ok && reasoning != "" {
+		appendReasoningMetadata(metadata, reasoning)
+	}
+	if finish, ok := choice["finish_reason"].(string); ok && finish != "" {
+		metadata["finish_reason"] = finish
+	}
 	if tool := firstToolDelta(delta); tool != nil {
 		function, _ := tool["function"].(map[string]any)
 		arguments, ok := function["arguments"].(string)
@@ -90,9 +112,63 @@ func TranslateChatSSEData(data []byte) ([]byte, bool, error) {
 		return responseEvent("response.output_text.delta", map[string]any{"type": "response.output_text.delta", "delta": text}), true, nil
 	}
 	if finish, ok := choice["finish_reason"].(string); ok && finish != "" {
-		return responseEvent("response.completed", map[string]any{}), true, nil
+		return completedEvent(providerKey, responseMetadata, metadata)
 	}
 	return nil, false, nil
+}
+
+func completedEvent(providerKey string, responseMetadata, metadata map[string]any) ([]byte, bool, error) {
+	if completed, _ := metadata[streamCompletedKey].(bool); completed {
+		return nil, false, nil
+	}
+	metadata[streamCompletedKey] = true
+	return responseEvent("response.completed", completedPayload(providerKey, responseMetadata, metadata)), true, nil
+}
+
+func completedPayload(providerKey string, responseMetadata, metadata map[string]any) map[string]any {
+	payload := map[string]any{}
+	if providerKey == "" {
+		return payload
+	}
+	result := make(map[string]any, len(responseMetadata)+1)
+	for key, value := range responseMetadata {
+		result[key] = value
+	}
+	merged := make(map[string]any)
+	if provider, ok := responseMetadata[providerKey].(map[string]any); ok {
+		for key, value := range provider {
+			merged[key] = value
+		}
+	}
+	for key, value := range metadata {
+		if key != streamReasoningBuilderKey && key != streamCompletedKey {
+			merged[key] = value
+		}
+	}
+	if reasoning, ok := metadata[streamReasoningBuilderKey].(*strings.Builder); ok && reasoning.Len() > 0 {
+		merged["reasoning_content"] = reasoning.String()
+	}
+	if len(merged) > 0 || len(result) > 0 {
+		result[providerKey] = merged
+		payload["metadata"] = result
+	}
+	return payload
+}
+
+func appendReasoningMetadata(metadata map[string]any, value string) {
+	builder, ok := metadata[streamReasoningBuilderKey].(*strings.Builder)
+	if !ok {
+		builder = &strings.Builder{}
+		metadata[streamReasoningBuilderKey] = builder
+	}
+	remaining := streamMetadataMaxBytes - builder.Len()
+	if remaining <= 0 {
+		return
+	}
+	if len(value) > remaining {
+		value = strings.ToValidUTF8(value[:remaining], "")
+	}
+	_, _ = builder.WriteString(value)
 }
 
 func firstStreamChoice(root map[string]any) map[string]any {
