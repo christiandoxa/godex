@@ -213,6 +213,24 @@ are removed from the Codex child process and raw keys are never persisted in
 profile metadata, routing bindings, or bundles. Without API keys, the same
 `--provider anthropic` shortcut resolves managed Claude OAuth profiles.
 
+DeepSeek now has the same bounded provider-runtime skeleton for its raw API-key
+surface. `godex run --provider deepseek` resolves `--api-key`, then
+`DEEPSEEK_API_KEYS`, then `DEEPSEEK_API_KEY`; plural keys use Prodex's
+comma/semicolon/newline parsing and rotate through stable synthetic routing IDs.
+The 0.434.3 defaults are `deepseek-v4-pro`, `https://api.deepseek.com`,
+1,048,576 advertised context tokens, and a 900,000-token auto-compact threshold.
+Simple Responses requests are translated to `/chat/completions` and follow the
+`pro -> flash` / `flash -> pro` fallback chain before credential rotation.
+Chat Completions and native Messages stay passthrough, with Messages normalized to
+DeepSeek's `/anthropic/v1/messages` endpoint and `x-api-key` auth. Models
+list/single is emulated from the exact four 0.434.3 DeepSeek catalog entries and
+Responses Compact uses the local bounded fallback without an upstream model call.
+
+This is intentionally a basic DeepSeek bridge checkpoint: reasoning metadata,
+strict-tools schema normalization, DeepSeek web-search modes, beta-base routing,
+and DeepSeek-specific response/SSE reasoning/tool shaping remain fail-closed or
+unimplemented until the advanced translator checkpoint lands.
+
 Local OpenAI-compatible Responses endpoints now match Prodex's `--url` surface.
 For example:
 

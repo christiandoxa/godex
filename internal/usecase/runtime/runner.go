@@ -35,7 +35,7 @@ type quotaPreflight interface {
 }
 
 type providerCredentialResolver interface {
-	AnthropicAPIKeys(string) ([]string, error)
+	APIKeys(string, string) ([]string, error)
 }
 
 type Runner struct {
@@ -76,13 +76,10 @@ func (runner *Runner) SetProviderCredentialResolver(resolver providerCredentialR
 }
 
 func (runner *Runner) ProviderAPIKeys(provider, explicit string) ([]string, error) {
-	if provider != "anthropic" {
-		return nil, errors.New("runtime provider API-key shortcut is not implemented")
-	}
 	if runner.credentials == nil {
 		return nil, errors.New("runtime provider credential resolver is not configured")
 	}
-	return runner.credentials.AnthropicAPIKeys(explicit)
+	return runner.credentials.APIKeys(provider, explicit)
 }
 
 func (runner *Runner) CurrentCodexHome() string {

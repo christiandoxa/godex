@@ -185,6 +185,17 @@ It performs no model call. Anthropic Models responses are local and derive from
 the embedded 0.434.3 model IDs/aliases/context/endpoint metadata, while
 usecase/runtime owns the Codex launch catalog and user-override precedence.
 
+
+DeepSeek raw-key runtime follows the same secret-free routing boundary without
+reusing the Claude gateway. `gateway/providerkey` owns provider-specific
+CLI/environment key precedence; `usecase/runtime` sees only a provider name plus
+a bounded list of invocation-local keys and assigns stable hashed routing IDs.
+`gateway/deepseek` binds one transport to each ID, owns the DeepSeek URL/auth
+policy and local Models/Compact routes, and currently reuses `gateway/chatcompat`
+only for the conservative Responses subset. Advanced DeepSeek-specific reasoning,
+strict-tool, web-search, beta-route, and stream-shaping policy stays in the
+gateway backlog rather than leaking into delivery or routing.
+
 ### Quota gateway and preflight
 
 The OpenAI quota client is a narrow outbound adapter for the ChatGPT usage

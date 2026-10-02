@@ -12,7 +12,11 @@ import (
 	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
 )
 
-const anthropicProviderKind = "anthropic"
+const (
+	providerShortcutNotImplementedFormat = "runtime provider shortcut %q is not implemented yet"
+	anthropicProviderKind                = "anthropic"
+	deepSeekProviderKind                 = "deepseek"
+)
 
 func runProfilelessProviderSelection(
 	ctx context.Context,
@@ -20,17 +24,17 @@ func runProfilelessProviderSelection(
 	selection runtimemodel.Selection,
 	arguments []string,
 ) error {
-	if selection.Provider != anthropicProviderKind {
-		return fmt.Errorf("runtime provider shortcut %q is not implemented yet", selection.Provider)
-	}
 	keys, err := runner.ProviderAPIKeys(selection.Provider, selection.APIKey)
 	if err != nil {
 		return err
 	}
 	if len(keys) == 0 {
-		return errors.New("godex run --provider anthropic requires a Claude profile, --api-key, or ANTHROPIC_API_KEY(S)")
+		return providerCredentialRequired(selection.Provider)
 	}
-	provider := runtimeusecase.AnthropicProvider("anthropic-api-key", selection.BaseURL)
+	provider, err := externalAPIKeyProvider(selection.Provider, selection.Provider+"-api-key", selection.BaseURL)
+	if err != nil {
+		return err
+	}
 	applyProviderSelectionModel(&provider, selection.Model)
 	if err := runtimeusecase.ApplyProviderSelectionLimits(&provider, selection.ContextWindow, selection.AutoCompactTokenLimit); err != nil {
 		return err
@@ -45,8 +49,8 @@ func runProviderSelection(
 	selection runtimemodel.Selection,
 	arguments []string,
 ) error {
-	if selection.Provider != anthropicProviderKind {
-		return fmt.Errorf("runtime provider shortcut %q is not implemented yet", selection.Provider)
+	if selection.Provider != anthropicProviderKind && selection.Provider != deepSeekProviderKind {
+		return fmt.Errorf(providerShortcutNotImplementedFormat, selection.Provider)
 	}
 	keys, err := runner.ProviderAPIKeys(selection.Provider, selection.APIKey)
 	if err != nil {
@@ -62,7 +66,10 @@ func runProviderSelection(
 			keys: keys, arguments: arguments,
 		})
 	}
-	return runProviderOAuthSelection(ctx, runner, profiles, selection, target, found, arguments)
+	if selection.Provider == anthropicProviderKind {
+		return runProviderOAuthSelection(ctx, runner, profiles, selection, target, found, arguments)
+	}
+	return providerCredentialRequired(selection.Provider)
 }
 
 type providerAPIKeyRequest struct {
@@ -91,7 +98,10 @@ func runProviderAPIKeySelection(
 			defer func() { runErr = errors.Join(runErr, release()) }()
 		}
 	}
-	provider := runtimeusecase.AnthropicProvider(name, request.selection.BaseURL)
+	provider, err := externalAPIKeyProvider(request.selection.Provider, name, request.selection.BaseURL)
+	if err != nil {
+		return err
+	}
 	applyProviderSelectionModel(&provider, request.selection.Model)
 	if err := runtimeusecase.ApplyProviderSelectionLimits(
 		&provider, request.selection.ContextWindow, request.selection.AutoCompactTokenLimit,
@@ -145,5 +155,27 @@ func applyProviderSelectionModel(provider *proxymodel.Provider, model string) {
 	}
 	if model = strings.TrimSpace(model); model != "" {
 		provider.DefaultModel = model
+	}
+}
+
+func externalAPIKeyProvider(kind, name, baseURL string) (proxymodel.Provider, error) {
+	switch kind {
+	case anthropicProviderKind:
+		return runtimeusecase.AnthropicProvider(name, baseURL), nil
+	case deepSeekProviderKind:
+		return runtimeusecase.DeepSeekProvider(name, baseURL), nil
+	default:
+		return proxymodel.Provider{}, fmt.Errorf(providerShortcutNotImplementedFormat, kind)
+	}
+}
+
+func providerCredentialRequired(kind string) error {
+	switch kind {
+	case anthropicProviderKind:
+		return errors.New("godex run --provider anthropic requires a Claude profile, --api-key, or ANTHROPIC_API_KEY(S)")
+	case deepSeekProviderKind:
+		return errors.New("godex run --provider deepseek requires --api-key or DEEPSEEK_API_KEY(S)")
+	default:
+		return fmt.Errorf(providerShortcutNotImplementedFormat, kind)
 	}
 }

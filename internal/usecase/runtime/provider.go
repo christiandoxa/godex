@@ -17,6 +17,10 @@ const (
 	anthropicContextWindow    = int64(200_000)
 	anthropicAutoCompactLimit = int64(180_000)
 	anthropicDefaultAPIURL    = "https://api.anthropic.com/v1"
+	deepSeekDefaultModel      = "deepseek-v4-pro"
+	deepSeekContextWindow     = int64(1_048_576)
+	deepSeekAutoCompactLimit  = int64(900_000)
+	deepSeekDefaultAPIURL     = "https://api.deepseek.com"
 )
 
 func CopilotProvider(name, host, login, apiURL string) proxymodel.Provider {
@@ -36,6 +40,19 @@ func AnthropicProvider(name, apiURL string) proxymodel.Provider {
 		DefaultModel:     anthropicDefaultModel,
 		ContextWindow:    anthropicContextWindow,
 		AutoCompactLimit: anthropicAutoCompactLimit,
+	}
+}
+
+func DeepSeekProvider(name, apiURL string) proxymodel.Provider {
+	apiURL = strings.TrimSpace(apiURL)
+	if apiURL == "" {
+		apiURL = deepSeekDefaultAPIURL
+	}
+	return proxymodel.Provider{
+		Kind: "deepseek", Name: name, APIURL: apiURL,
+		DefaultModel:     deepSeekDefaultModel,
+		ContextWindow:    deepSeekContextWindow,
+		AutoCompactLimit: deepSeekAutoCompactLimit,
 	}
 }
 

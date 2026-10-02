@@ -1,0 +1,115 @@
+[
+  {
+    "provider": "deepseek",
+    "owned_by": "deepseek",
+    "id": "deepseek-v4-pro",
+    "display_name": "DeepSeek V4 Pro",
+    "description": "DeepSeek Pro alias routed through provider fallback.",
+    "context_window_tokens": 128000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [
+      "pro",
+      "auto"
+    ],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "deepseek",
+    "owned_by": "deepseek",
+    "id": "deepseek-v4-flash",
+    "display_name": "DeepSeek V4 Flash",
+    "description": "DeepSeek Flash alias routed through provider fallback.",
+    "context_window_tokens": 128000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [
+      "flash"
+    ],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "deepseek",
+    "owned_by": "deepseek",
+    "id": "deepseek-chat",
+    "display_name": "DeepSeek Chat",
+    "description": "DeepSeek chat-completions model.",
+    "context_window_tokens": 128000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  },
+  {
+    "provider": "deepseek",
+    "owned_by": "deepseek",
+    "id": "deepseek-reasoner",
+    "display_name": "DeepSeek Reasoner",
+    "description": "DeepSeek reasoning model.",
+    "context_window_tokens": 128000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": true,
+      "reasoning": true
+    },
+    "pricing_known": false
+  }
+]

@@ -2,6 +2,7 @@ package provider
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -39,6 +40,22 @@ func TestModelFallbackChainPreservesProdexComboSemantics(t *testing.T) {
 	for _, fixture := range cases {
 		if got := ModelFallbackChain("openai", fixture.model); !reflect.DeepEqual(got, fixture.want) {
 			t.Fatalf("model=%q got=%#v want=%#v", fixture.model, got, fixture.want)
+		}
+	}
+}
+
+func TestDeepSeekFallbackChainMatchesProdex(t *testing.T) {
+	fixtures := map[string][]string{
+		"":              {"deepseek-v4-pro", "deepseek-v4-flash"},
+		"auto":          {"deepseek-v4-pro", "deepseek-v4-flash"},
+		"pro":           {"deepseek-v4-pro", "deepseek-v4-flash"},
+		"flash":         {"deepseek-v4-flash", "deepseek-v4-pro"},
+		"deepseek-chat": {"deepseek-chat"},
+	}
+	for model, want := range fixtures {
+		got := ModelFallbackChain("deepseek", model)
+		if strings.Join(got, ",") != strings.Join(want, ",") {
+			t.Fatalf("model %q chain = %v, want %v", model, got, want)
 		}
 	}
 }

@@ -42,20 +42,20 @@ func rejectUnsupportedRequest(object map[string]any) error {
 		present bool
 		reason  string
 	}{
-		{hasKey(object, "messages"), "anthropic Responses chat-compat expects Responses input, not raw chat-completions messages"},
-		{hasKey(object, "response_format"), "anthropic Responses chat-compat does not translate response_format controls"},
-		{hasKey(object, "reasoning"), "anthropic Responses chat-compat does not map Responses reasoning controls"},
-		{hasKey(object, "previous_response_id"), "anthropic Responses chat-compat does not map previous_response_id continuation state"},
-		{hasTextFormat(object), "anthropic Responses chat-compat does not translate text.format controls"},
-		{integerGreaterThanOne(object["n"]), "anthropic Responses chat-compat returns only the first choice and does not support n>1"},
-		{hasKey(object, "metadata"), "anthropic Responses chat-compat does not translate request metadata"},
-		{hasKey(object, "safety_identifier"), "anthropic Responses chat-compat does not translate safety_identifier"},
-		{hasKey(object, "web_search_options"), "anthropic Responses chat-compat does not translate web_search_options"},
-		{invalidTools(object["tools"]), "anthropic Responses chat-compat only forwards function tools"},
-		{invalidToolChoice(object["tool_choice"]), "anthropic Responses chat-compat only forwards function tool_choice controls"},
-		{falseBool(object["parallel_tool_calls"]), "anthropic Responses chat-compat does not prove a compatible parallel_tool_calls=false control"},
-		{hasKey(object, "logprobs") || hasKey(object, "top_logprobs"), "anthropic Responses chat-compat does not translate logprobs controls"},
-		{hasKey(object, "stop_sequences"), "anthropic Responses chat-compat does not translate stop_sequences"},
+		{hasKey(object, "messages"), "Responses chat-compat expects Responses input, not raw chat-completions messages"},
+		{hasKey(object, "response_format"), "Responses chat-compat does not translate response_format controls"},
+		{hasKey(object, "reasoning"), "Responses chat-compat does not map Responses reasoning controls"},
+		{hasKey(object, "previous_response_id"), "Responses chat-compat does not map previous_response_id continuation state"},
+		{hasTextFormat(object), "Responses chat-compat does not translate text.format controls"},
+		{integerGreaterThanOne(object["n"]), "Responses chat-compat returns only the first choice and does not support n>1"},
+		{hasKey(object, "metadata"), "Responses chat-compat does not translate request metadata"},
+		{hasKey(object, "safety_identifier"), "Responses chat-compat does not translate safety_identifier"},
+		{hasKey(object, "web_search_options"), "Responses chat-compat does not translate web_search_options"},
+		{invalidTools(object["tools"]), "Responses chat-compat only forwards function tools"},
+		{invalidToolChoice(object["tool_choice"]), "Responses chat-compat only forwards function tool_choice controls"},
+		{falseBool(object["parallel_tool_calls"]), "Responses chat-compat does not prove a compatible parallel_tool_calls=false control"},
+		{hasKey(object, "logprobs") || hasKey(object, "top_logprobs"), "Responses chat-compat does not translate logprobs controls"},
+		{hasKey(object, "stop_sequences"), "Responses chat-compat does not translate stop_sequences"},
 	}
 	for _, check := range checks {
 		if check.present {
@@ -128,7 +128,7 @@ func convertResponseItem(item map[string]any) (any, string, bool, error) {
 	case "function_call_output":
 		return convertFunctionOutput(item), "", true, nil
 	case "input_image", "custom_tool_call":
-		return nil, "", false, errors.New("anthropic Responses chat-compat only translates message/function-call history items")
+		return nil, "", false, errors.New("Responses chat-compat only translates message/function-call history items")
 	case "input_text", "output_text":
 		text, _ := item["text"].(string)
 		return nil, text, false, nil
@@ -177,7 +177,7 @@ func textContent(value any) (string, error) {
 			continue
 		}
 		if kind, _ := part["type"].(string); kind == "input_image" {
-			return "", errors.New("anthropic Responses chat-compat currently translates only text input content")
+			return "", errors.New("Responses chat-compat currently translates only text input content")
 		}
 		if text, ok := part["text"].(string); ok && text != "" {
 			texts = append(texts, text)

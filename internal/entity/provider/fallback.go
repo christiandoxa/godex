@@ -21,6 +21,8 @@ func ModelFallbackChain(providerKind, model string) []string {
 		return anthropicFallbackChain(trimmed)
 	case "copilot":
 		return copilotFallbackChain(trimmed)
+	case "deepseek":
+		return deepSeekFallbackChain(trimmed)
 	default:
 		if trimmed == "" {
 			return nil
@@ -85,6 +87,17 @@ func copilotFallbackChain(model string) []string {
 		return []string{modelClaudeSonnet46, modelGPT53Codex, modelGPT51Codex}
 	case "gemini":
 		return []string{"gemini-3.1-pro-preview", modelGPT53Codex, modelGPT51Codex}
+	default:
+		return []string{model}
+	}
+}
+
+func deepSeekFallbackChain(model string) []string {
+	switch strings.ToLower(model) {
+	case "", "auto", "pro":
+		return []string{"deepseek-v4-pro", "deepseek-v4-flash"}
+	case "flash":
+		return []string{"deepseek-v4-flash", "deepseek-v4-pro"}
 	default:
 		return []string{model}
 	}

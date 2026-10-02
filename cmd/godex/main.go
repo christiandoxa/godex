@@ -16,9 +16,11 @@ import (
 	claudegateway "github.com/christiandoxa/godex/internal/gateway/claude"
 	"github.com/christiandoxa/godex/internal/gateway/codex"
 	copilotgateway "github.com/christiandoxa/godex/internal/gateway/copilot"
+	deepseekgateway "github.com/christiandoxa/godex/internal/gateway/deepseek"
 	githubgateway "github.com/christiandoxa/godex/internal/gateway/github"
 	kirogateway "github.com/christiandoxa/godex/internal/gateway/kiro"
 	"github.com/christiandoxa/godex/internal/gateway/openai"
+	providerkeygateway "github.com/christiandoxa/godex/internal/gateway/providerkey"
 	updategateway "github.com/christiandoxa/godex/internal/gateway/update"
 	proxyconfig "github.com/christiandoxa/godex/internal/model/proxy"
 	"github.com/christiandoxa/godex/internal/repository/account"
@@ -89,7 +91,7 @@ func run() int {
 	runner.SetQuotaPreflight(quotaStatus)
 	runner.SetUpstreamURL(settings.UpstreamURL)
 	runner.SetCurrentCodexHome(settings.CurrentCodexHome)
-	runner.SetProviderCredentialResolver(claudeSource)
+	runner.SetProviderCredentialResolver(providerkeygateway.NewSource())
 	application := cli.New(login, importer, store, runner, doctor, quotaStatus, os.Stdout)
 	profileStore := profilerepo.NewStore(settings.Home)
 	profiles := profileusecase.NewCatalog(profileStore, store, settings.CurrentCodexHome)
@@ -159,6 +161,8 @@ func newRuntimeGateway(
 		return newCopilotRuntimeGateway(config, copilotSource, providerCatalogs)
 	case "anthropic":
 		return newAnthropicRuntimeGateway(config, claudeSource)
+	case "deepseek":
+		return deepseekgateway.NewRuntimePool(config.Provider.APIURL, config.ProviderCredentials, nil)
 	default:
 		return nil, fmt.Errorf("runtime provider %q is not implemented", config.Provider.Kind)
 	}

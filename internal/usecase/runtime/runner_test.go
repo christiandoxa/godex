@@ -613,7 +613,7 @@ type fakeProviderCredentialResolver struct {
 	err  error
 }
 
-func (fake fakeProviderCredentialResolver) AnthropicAPIKeys(string) ([]string, error) {
+func (fake fakeProviderCredentialResolver) APIKeys(string, string) ([]string, error) {
 	return append([]string(nil), fake.keys...), fake.err
 }
 
@@ -624,8 +624,9 @@ func TestProviderAPIKeysUsesInjectedResolverAndRejectsUnsupportedProviders(t *te
 	if err != nil || strings.Join(keys, ",") != "one,two" {
 		t.Fatalf("resolved keys = %#v, err=%v", keys, err)
 	}
-	if _, err := runner.ProviderAPIKeys("gemini", "secret"); err == nil {
-		t.Fatal("unsupported provider API-key shortcut unexpectedly accepted")
+	deepSeek, err := runner.ProviderAPIKeys("deepseek", "ignored-by-fake")
+	if err != nil || strings.Join(deepSeek, ",") != "one,two" {
+		t.Fatalf("DeepSeek resolved keys = %#v, err=%v", deepSeek, err)
 	}
 }
 

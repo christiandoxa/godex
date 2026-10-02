@@ -122,7 +122,14 @@ and eligibility validation stays in the runtime use case.
   quota watch, log stream/upstream, and redeem confirmation have been migrated;
   non-TTY fallbacks remain line-oriented.
 - Multi-provider runtime/login parity remains incomplete for Gemini, Kiro,
-  DeepSeek/AGY where present in Prodex. The Prodex local OpenAI-compatible
+  and AGY where present in Prodex. DeepSeek now has a basic raw-API-key runtime
+  bridge with the exact 0.434.3 key precedence, provider defaults, stable key
+  rotation identities, Responses-to-Chat basic translation, `pro/flash` model
+  fallback, Chat/Messages passthrough, native DeepSeek Messages URL/auth,
+  local Models emulation from the four 0.434.3 catalog entries, and local Compact
+  fallback. Advanced DeepSeek reasoning metadata, strict-tools schema handling,
+  web-search modes, beta-base routing, and DeepSeek-specific JSON/SSE
+  reasoning/tool shaping remain parity gaps. The Prodex local OpenAI-compatible
   `--url` runtime surface is implemented: Godex validates credential-free
   HTTP(S) endpoints, normalizes root URLs to `/v1`, generates the exact
   `prodex-local` Responses provider config/default model/context/compact

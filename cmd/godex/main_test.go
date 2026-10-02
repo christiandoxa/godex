@@ -114,3 +114,23 @@ func TestRuntimeAccountSourceFiltersUnavailableProviderProfiles(t *testing.T) {
 		t.Fatalf("filtered accounts = %#v, err = %v", accounts, err)
 	}
 }
+
+func TestNewRuntimeGatewayBuildsDeepSeekCredentialPool(t *testing.T) {
+	gateway, err := newRuntimeGateway(proxyconfig.Config{
+		Provider: proxyconfig.Provider{Kind: "deepseek", APIURL: "https://api.deepseek.com"},
+		ProviderCredentials: []proxyconfig.ProviderCredential{
+			{ID: "key-a", Secret: "secret-a"},
+			{ID: "key-b", Secret: "secret-b"},
+		},
+	}, nil, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	available, ok := gateway.(runtimeAccountAvailability)
+	if !ok || !available.AvailableAccount("key-a") || !available.AvailableAccount("key-b") || available.AvailableAccount("missing") {
+		t.Fatalf("DeepSeek gateway availability = %#v / %t", gateway, ok)
+	}
+	if closer, ok := gateway.(interface{ Close() }); ok {
+		closer.Close()
+	}
+}
