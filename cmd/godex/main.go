@@ -107,6 +107,7 @@ func run() int {
 	quotaStatus.SetExternalProvider("kiro", kiroSource)
 	quotaStatus.SetExternalProvider("agy", virtualQuota)
 	profiles.SetCopilotSource(copilotSource)
+	quotaStatus.SetExternalProvider("copilot", copilotSource)
 	application.SetProfiles(profiles)
 	activity.SetProfiles(profiles)
 	quotaStatus.SetProfiles(profiles)

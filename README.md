@@ -398,8 +398,12 @@ degrades back to `Ready (OAuth)` without exposing its response body.
 Managed AGY profiles also reuse the same bounded CLI quota adapter but pass the
 profile account as the preferred selection and intentionally omit
 `--all-accounts`; array output selects the matching account and falls back to the
-first row exactly like Prodex. Profile-backed Gemini, Copilot, and custom-provider
-quota adapters remain separate parity work.
+first row exactly like Prodex. Managed Copilot profiles now expose the 0.435.0
+user-quota view through the existing exact-account token resolver: login,
+plan/access, chat/completions remaining versus monthly totals, blocked/readiness,
+monthly reset date, and minimum remaining percentage are derived without storing
+Copilot tokens in Godex. Profile-backed Gemini and custom-provider quota adapters
+remain separate parity work.
 
 `godex redeem PROFILE` performs the same explicit two-step manual flow as Prodex:
 it checks current usage first, asks for confirmation when the nearest 5-hour or

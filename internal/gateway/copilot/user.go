@@ -16,10 +16,13 @@ const userInfoMaxBytes = 1 << 20
 const invalidCopilotHost = "invalid Copilot host"
 
 type userInfo struct {
-	Login         *string        `json:"login"`
-	AccessTypeSKU *string        `json:"access_type_sku"`
-	CopilotPlan   *string        `json:"copilot_plan"`
-	Endpoints     *userEndpoints `json:"endpoints"`
+	Login                *string          `json:"login"`
+	AccessTypeSKU        *string          `json:"access_type_sku"`
+	CopilotPlan          *string          `json:"copilot_plan"`
+	Endpoints            *userEndpoints   `json:"endpoints"`
+	LimitedUserQuotas    map[string]int64 `json:"limited_user_quotas"`
+	MonthlyQuotas        map[string]int64 `json:"monthly_quotas"`
+	LimitedUserResetDate *string          `json:"limited_user_reset_date"`
 }
 
 type userEndpoints struct {

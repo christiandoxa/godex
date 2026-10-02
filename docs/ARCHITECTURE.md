@@ -244,8 +244,12 @@ probes degrade to the OAuth-only view; response bodies and credential values do
 not cross the gateway boundary. The existing `gateway/quota` AGY command/parser
 also implements the managed-profile adapter: profile metadata supplies the
 preferred account, so the command omits `--all-accounts` while the virtual
-provider path retains it. Managed profile adapters for Gemini/Copilot/custom-
-provider quota remain separate outbound integrations.
+provider path retains it. `gateway/copilot` implements the same profile quota
+boundary using the exact host/login account token resolver already used by runtime
+metadata; the token exists only for the bounded user-info request, while quota
+receives login, plan/access, chat/completions counters, reset date, and readiness.
+Managed profile adapters for Gemini/custom-provider quota remain separate outbound
+integrations.
 
 The CLI quota delivery package owns watch/once cadence, `--detail`, `--profile`,
 `--auth`, `--provider`, and `--base-url` parsing plus rendering of exact UTC

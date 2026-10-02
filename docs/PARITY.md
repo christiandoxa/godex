@@ -284,8 +284,12 @@ and eligibility validation stays in the runtime use case.
   implemented. Managed AGY profiles also match the preferred-account external
   quota contract: profile account metadata suppresses `--all-accounts`, matching
   rows are selected from object/array output, and missing preferred rows fall back
-  to the first account. Profile-backed Gemini/Copilot/custom-provider quota
-  adapters remain gaps. Manual `redeem PROFILE` now matches the usage
+  to the first account. Managed Copilot profiles now match the 0.435.0 user-quota
+  policy: exact host/login token resolution, plan/access precedence,
+  chat/completions remaining and monthly totals, blocked/readiness semantics,
+  monthly reset summary, and minimum remaining percentage are implemented without
+  persisting the token. Profile-backed Gemini/custom-provider quota adapters
+  remain gaps. Manual `redeem PROFILE` now matches the usage
   preflight, one-hour
   reset confirmation guard, idempotent consume endpoint, base-URL override, and
   no-proxy controls. Runtime `--auto-redeem` policy and provider-specific quota
