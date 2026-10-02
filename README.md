@@ -365,10 +365,16 @@ reset timestamps and upstream window lengths. Missing fields, disabled accounts,
 and failed probes display `-`; probe errors never print gateway error contents.
 `--auth` supports Prodex labels such as `chatgpt`, `no-auth`, `api-key`,
 `invalid-auth`, `unreadable-auth`, `quota-compatible`, and
-`non-quota-compatible`; `--provider` supports the Prodex provider names and the
-`claude` alias for `anthropic`. Configured non-OpenAI profiles are visible and
-filterable but remain `unsupported` until their provider-specific quota adapters
-are implemented.
+`non-quota-compatible`. `--provider` accepts the Prodex 0.435.0 canonical names
+plus aliases such as `chatgpt`/`codex` → `openai`, `google` → `gemini`,
+`claude` → `anthropic`, `github` → `copilot`, `kiro-cli` → `kiro`,
+`openai-compatible` → `local`, and `anti-gravity` → `agy`. In an
+all-profile terminal watch, the Bubble Tea UI matches the 0.435.0 control state:
+`j/k` or arrows scroll, `s` cycles current/remaining/profile/auth/account/plan
+sorts, `f` cycles provider filters unless an explicit non-`all` provider locked
+the view, and `u` refreshes. Single-profile quota watch remains quit-only.
+Configured non-OpenAI profiles are visible and filterable but remain
+`unsupported` until their provider-specific quota adapters are implemented.
 
 `godex redeem PROFILE` performs the same explicit two-step manual flow as Prodex:
 it checks current usage first, asks for confirmation when the nearest 5-hour or

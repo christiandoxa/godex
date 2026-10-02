@@ -225,7 +225,11 @@ remain part of the 1:1 parity backlog.
 
 The CLI quota delivery package owns watch/once cadence, `--detail`, `--profile`,
 `--auth`, `--provider`, and `--base-url` parsing plus rendering of exact UTC
-reset timestamps and window lengths. Endpoint override reaches the OpenAI gateway through a consumed use-case
+reset timestamps and window lengths. It also owns Bubble Tea watch-only presentation
+state: scroll offset, the 0.435.0 report-sort cycle, and provider-filter cycle/lock.
+Changing an unlocked filter issues a new quota use-case request with the canonical
+provider label; sort and scroll stay purely local and never mutate quota/domain
+state. Endpoint override reaches the OpenAI gateway through a consumed use-case
 capability and does not mutate runtime preflight configuration.
 Manual reset-credit redemption is a separate quota use case: it resolves only a
 quota-compatible OpenAI profile, fetches usage before any side effect, applies

@@ -103,11 +103,11 @@ func consumeQuotaProvider(arguments []string, index int, options *showOptions) (
 	if err != nil {
 		return index, err
 	}
-	value = strings.ToLower(strings.TrimSpace(value))
-	if !validQuotaProviderFilter(value) {
-		return index, fmt.Errorf("unsupported quota provider filter %q", value)
+	canonical, ok := normalizeQuotaProviderFilter(value)
+	if !ok {
+		return index, fmt.Errorf("unsupported quota provider filter %q", strings.ToLower(strings.TrimSpace(value)))
 	}
-	options.ProviderFilter = value
+	options.ProviderFilter = canonical
 	return next, nil
 }
 
@@ -148,11 +148,34 @@ func (options showOptions) watchEnabled() bool {
 }
 
 func validQuotaProviderFilter(value string) bool {
-	switch value {
-	case "all", "openai", "gemini", "anthropic", "claude", "copilot", "kiro", "deepseek", "local", "agy":
-		return true
+	_, ok := normalizeQuotaProviderFilter(value)
+	return ok
+}
+
+func normalizeQuotaProviderFilter(value string) (string, bool) {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	normalized = strings.ReplaceAll(normalized, "_", "-")
+	switch normalized {
+	case "", "all":
+		return "all", true
+	case "openai", "chatgpt", "codex", "openai-codex":
+		return "openai", true
+	case "gemini", "google", "google-gemini":
+		return "gemini", true
+	case "anthropic", "claude", "anthropic-claude":
+		return "anthropic", true
+	case "copilot", "github-copilot", "github":
+		return "copilot", true
+	case "kiro", "kiro-cli":
+		return "kiro", true
+	case "deepseek":
+		return "deepseek", true
+	case "local", "openai-compatible":
+		return "local", true
+	case "agy", "anti-gravity":
+		return "agy", true
 	default:
-		return false
+		return "", false
 	}
 }
 

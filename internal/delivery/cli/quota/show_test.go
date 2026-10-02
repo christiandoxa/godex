@@ -146,7 +146,7 @@ func TestShowRejectsFilterConflictsAndUnknownProvider(t *testing.T) {
 	}
 }
 
-func TestQuotaTUIViewAndKeys(t *testing.T) {
+func TestQuotaProfileTUIViewAndQuitKeys(t *testing.T) {
 	used := int64(20)
 	model := newQuotaTUIModel(context.Background(), &fakeStatus{}, showOptions{detail: true})
 	updated, command := model.Update(quotaSnapshotMsg{reports: []quotamodel.Report{{
@@ -157,7 +157,7 @@ func TestQuotaTUIViewAndKeys(t *testing.T) {
 	if command != nil {
 		t.Fatal("snapshot unexpectedly returned command")
 	}
-	for _, expected := range []string{"Godex Quota", "PROFILE", "work", "q/esc quit", "u/r refresh"} {
+	for _, expected := range []string{"Godex Quota", "PROFILE", "work", "q/esc quit"} {
 		if !strings.Contains(model.View(), expected) {
 			t.Fatalf("view missing %q: %q", expected, model.View())
 		}
@@ -166,8 +166,151 @@ func TestQuotaTUIViewAndKeys(t *testing.T) {
 	if quit == nil {
 		t.Fatal("esc did not quit")
 	}
-	refreshed, refresh := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'u'}})
-	if refresh == nil || !refreshed.(quotaTUIModel).loading {
-		t.Fatal("u did not refresh")
+	if strings.Contains(model.View(), "refresh") {
+		t.Fatalf("profile TUI unexpectedly exposes refresh control: %q", model.View())
+	}
+	unchanged, refresh := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'u'}})
+	if refresh != nil || unchanged.(quotaTUIModel).loading {
+		t.Fatal("profile TUI accepted all-profile refresh key")
+	}
+}
+
+func TestQuotaAllTUISortsAndScrollsLikeProdex(t *testing.T) {
+	status := quotaAllTUITestStatus()
+	model := newQuotaTUIModel(context.Background(), status, showOptions{Options: quotausecase.Options{All: true}})
+	updated, _ := model.Update(quotaSnapshotMsg{reports: status.reports})
+	model = updated.(quotaTUIModel)
+	updated, _ = model.Update(tea.WindowSizeMsg{Width: 100, Height: 9})
+	model = updated.(quotaTUIModel)
+
+	if model.sortMode != quotaSortCurrent || model.providerFilter != quotaProviderAll {
+		t.Fatalf("initial policy = sort:%s provider:%s", model.sortMode.label(), model.providerFilter.label())
+	}
+	if reports := model.sortedReports(); len(reports) != 4 || reports[0].ProfileName != "alpha" {
+		t.Fatalf("current sort = %#v", reports)
+	}
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	model = updated.(quotaTUIModel)
+	if model.scrollOffset != 1 {
+		t.Fatalf("scroll offset after j = %d", model.scrollOffset)
+	}
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyUp})
+	model = updated.(quotaTUIModel)
+	if model.scrollOffset != 0 {
+		t.Fatalf("scroll offset after up = %d", model.scrollOffset)
+	}
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	model = updated.(quotaTUIModel)
+	if model.sortMode != quotaSortRemaining || model.scrollOffset != 0 {
+		t.Fatalf("sort after s = %s offset=%d", model.sortMode.label(), model.scrollOffset)
+	}
+	if reports := model.sortedReports(); len(reports) != 4 || reports[0].ProfileName != "beta" {
+		t.Fatalf("remaining sort = %#v", reports)
+	}
+}
+
+func TestQuotaAllTUIFiltersAndRefreshesLikeProdex(t *testing.T) {
+	status := quotaAllTUITestStatus()
+	model := newQuotaTUIModel(context.Background(), status, showOptions{Options: quotausecase.Options{All: true}})
+	updated, _ := model.Update(quotaSnapshotMsg{reports: status.reports})
+	model = updated.(quotaTUIModel)
+
+	updated, filterCmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	model = updated.(quotaTUIModel)
+	if model.providerFilter != quotaProviderOpenAI || filterCmd == nil || !model.loading {
+		t.Fatalf("filter transition = provider:%s loading:%t cmd:%v", model.providerFilter.label(), model.loading, filterCmd)
+	}
+	message := filterCmd()
+	snapshot, ok := message.(quotaSnapshotMsg)
+	if !ok {
+		t.Fatalf("filter command message = %#v", message)
+	}
+	updated, _ = model.Update(snapshot)
+	model = updated.(quotaTUIModel)
+	if status.options.ProviderFilter != "openai" || len(model.sortedReports()) != 1 || model.sortedReports()[0].ProfileName != "zeta" {
+		t.Fatalf("filtered options/reports = %+v / %#v", status.options, model.sortedReports())
+	}
+
+	updated, refreshCmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'u'}})
+	model = updated.(quotaTUIModel)
+	if refreshCmd == nil || !model.loading {
+		t.Fatal("u did not start all-profile refresh")
+	}
+	for _, expected := range []string{"Sort: current", "Provider: openai", "j/k scroll", "s sort", "f filter", "u refresh"} {
+		if !strings.Contains(model.View(), expected) {
+			t.Fatalf("all-profile view missing %q: %q", expected, model.View())
+		}
+	}
+}
+
+func quotaAllTUITestStatus() *fakeStatus {
+	resetSoon, resetLater := int64(100), int64(200)
+	usedReady, usedBlocked := int64(20), int64(100)
+	return &fakeStatus{reports: []quotamodel.Report{
+		{ProfileName: "zeta", Provider: "openai", Auth: "chatgpt", Active: false, Enabled: true, State: "ready", Email: "z@example.test", Usage: quotamodel.Usage{PlanType: "plus", Primary: &quotamodel.Window{UsedPercent: &usedReady, ResetAt: &resetLater}}},
+		{ProfileName: "alpha", Provider: "anthropic", Auth: "anthropic", Active: true, Enabled: true, State: "unsupported", Email: "a@example.test"},
+		{ProfileName: "beta", Provider: "gemini", Auth: "gemini", Active: false, Enabled: true, State: "ready", Email: "b@example.test", Usage: quotamodel.Usage{PlanType: "pro", Primary: &quotamodel.Window{UsedPercent: &usedReady, ResetAt: &resetSoon}}},
+		{ProfileName: "gamma", Provider: "copilot", Auth: "copilot", Active: false, Enabled: true, State: "exhausted", Usage: quotamodel.Usage{PlanType: "business", Primary: &quotamodel.Window{UsedPercent: &usedBlocked}}},
+	}}
+}
+
+func TestQuotaAllTUILocksExplicitProviderFilter(t *testing.T) {
+	model := newQuotaTUIModel(context.Background(), &fakeStatus{}, showOptions{
+		Options: quotausecase.Options{All: true, ProviderFilter: "anthropic"},
+	})
+	if !model.providerFilterLocked || model.providerFilter != quotaProviderAnthropic {
+		t.Fatalf("locked filter = locked:%t provider:%s", model.providerFilterLocked, model.providerFilter.label())
+	}
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	model = updated.(quotaTUIModel)
+	if command != nil || model.providerFilter != quotaProviderAnthropic {
+		t.Fatalf("locked filter changed = provider:%s cmd:%v", model.providerFilter.label(), command)
+	}
+	if !strings.Contains(model.footer(), "filter locked") {
+		t.Fatalf("locked footer = %q", model.footer())
+	}
+}
+
+func TestQuotaProviderAliasesCanonicalizeLikeProdex(t *testing.T) {
+	fixtures := map[string]string{
+		"chatgpt":           "openai",
+		"codex":             "openai",
+		"google":            "gemini",
+		"google_gemini":     "gemini",
+		"claude":            "anthropic",
+		"github":            "copilot",
+		"github-copilot":    "copilot",
+		"kiro-cli":          "kiro",
+		"openai_compatible": "local",
+		"anti-gravity":      "agy",
+	}
+	for input, want := range fixtures {
+		options, err := parseArguments([]string{"--all", "--provider", input, "--once"})
+		if err != nil {
+			t.Fatalf("provider %q: %v", input, err)
+		}
+		if options.ProviderFilter != want {
+			t.Fatalf("provider %q canonical = %q, want %q", input, options.ProviderFilter, want)
+		}
+	}
+}
+
+func TestQuotaSortPolicyMatchesProdexOrderAndTextRules(t *testing.T) {
+	modes := []quotaReportSort{
+		quotaSortCurrent, quotaSortRemaining, quotaSortProfile,
+		quotaSortAuth, quotaSortAccount, quotaSortPlan,
+	}
+	current := quotaSortCurrent
+	for _, want := range modes {
+		if current != want {
+			t.Fatalf("sort cycle = %s, want %s", current.label(), want.label())
+		}
+		current = current.next()
+	}
+	if current != quotaSortCurrent {
+		t.Fatalf("sort cycle did not wrap: %s", current.label())
+	}
+	if compareQuotaText("  Beta ", "alpha") <= 0 {
+		t.Fatal("case-insensitive trimmed quota text ordering drift")
 	}
 }

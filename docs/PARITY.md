@@ -259,8 +259,13 @@ and eligibility validation stays in the runtime use case.
   enrichment remains part of the wider provider/runtime parity work rather than
   a ping-specific duplicate implementation.
 - Quota now matches Prodex's default five-second watch cadence, `--once`, raw,
-  detail, profile selection, command-scoped base-URL override, and aggregate
-  `--auth`/`--provider` filtering. The catalog includes standalone profiles and
+  detail, profile selection, command-scoped base-URL override, aggregate
+  `--auth`/`--provider` filtering, and the 0.435.0 provider-filter aliases.
+  The all-profile Bubble Tea watch also matches the 0.435.0 interactive state:
+  `j/k` or arrows scroll, `s` cycles current/remaining/profile/auth/account/plan
+  sorts, `f` cycles all/openai/gemini/anthropic/copilot/kiro/deepseek/local/agy
+  when not locked by an explicit provider, and `u` refreshes. Single-profile
+  quota watch remains quit-only. The catalog includes standalone profiles and
   reports non-OpenAI profiles as unsupported until provider-specific quota
   adapters land. Manual `redeem PROFILE` now matches the usage preflight, one-hour
   reset confirmation guard, idempotent consume endpoint, base-URL override, and
