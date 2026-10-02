@@ -257,8 +257,13 @@ reset timestamps and window lengths. It also owns Bubble Tea watch-only presenta
 state: scroll offset, the 0.435.0 report-sort cycle, and provider-filter cycle/lock.
 Changing an unlocked filter issues a new quota use-case request with the canonical
 provider label; sort and scroll stay purely local and never mutate quota/domain
-state. Endpoint override reaches the OpenAI gateway through a consumed use-case
-capability and does not mutate runtime preflight configuration.
+state. The same delivery boundary owns the `Quota Overview` aggregate because it
+is presentation policy over already-normalized reports: OpenAI windows contribute
+summed remaining percentages and earliest resets, while external snapshots may
+contribute provider-neutral main remaining-percent/reset metadata (currently
+Copilot). Provider gateways never import TUI/pool-layout policy. Endpoint override
+reaches the OpenAI gateway through a consumed use-case capability and does not
+mutate runtime preflight configuration.
 Manual reset-credit redemption is a separate quota use case: it resolves only a
 quota-compatible OpenAI profile, fetches usage before any side effect, applies
 the one-hour confirmation policy, and sends the consume request through the same

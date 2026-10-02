@@ -6,15 +6,16 @@ type ExternalDetail struct {
 }
 
 type ExternalInfo struct {
-	Provider  string
-	Account   string
-	Plan      string
-	Status    string
-	Main      string
-	Reset     string
-	ResetAt   *int64
-	Available *bool
-	Details   []ExternalDetail
+	Provider         string
+	Account          string
+	Plan             string
+	Status           string
+	Main             string
+	Reset            string
+	ResetAt          *int64
+	RemainingPercent *int64
+	Available        *bool
+	Details          []ExternalDetail
 }
 
 type VirtualResult struct {

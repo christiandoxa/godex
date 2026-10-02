@@ -34,12 +34,12 @@ func (source *Source) FetchQuota(ctx context.Context, target profilemodel.QuotaT
 }
 
 func copilotQuotaExternal(info userInfo, fallbackLogin string) quotamodel.ExternalInfo {
-	account := normalizedCopilotString(info.Login)
+	account := quotaSnapshotString(info.Login)
 	if account == "" {
 		account = strings.TrimSpace(fallbackLogin)
 	}
-	plan := normalizedCopilotString(info.CopilotPlan)
-	access := normalizedCopilotString(info.AccessTypeSKU)
+	plan := quotaSnapshotString(info.CopilotPlan)
+	access := quotaSnapshotString(info.AccessTypeSKU)
 	if plan == "" {
 		plan = access
 	}
@@ -54,14 +54,17 @@ func copilotQuotaExternal(info userInfo, fallbackLogin string) quotamodel.Extern
 	if access != "" && access != plan {
 		details = append(details, quotamodel.ExternalDetail{Label: "Access", Value: access})
 	}
+	var remainingPercent *int64
 	if percent, ok := copilotRemainingPercent(chatRemaining, chatTotal, completionRemaining, completionTotal); ok {
+		copy := percent
+		remainingPercent = &copy
 		details = append(details, quotamodel.ExternalDetail{Label: "Remaining", Value: fmt.Sprintf("%d%%", percent)})
 	}
 	reset, resetAt := copilotQuotaReset(info.LimitedUserResetDate)
 	return quotamodel.ExternalInfo{
 		Provider: "GitHub Copilot", Account: account, Plan: plan,
 		Status: status, Main: copilotQuotaMain(chatRemaining, chatTotal, completionRemaining, completionTotal),
-		Reset: reset, ResetAt: resetAt, Available: &ready, Details: details,
+		Reset: reset, ResetAt: resetAt, RemainingPercent: remainingPercent, Available: &ready, Details: details,
 	}
 }
 
@@ -80,20 +83,20 @@ func copilotQuotaReset(value *string) (string, *int64) {
 }
 
 func copilotQuotaFeature(info userInfo, key string) (*int64, *int64) {
-	var remaining *int64
-	if value, ok := info.LimitedUserQuotas[key]; ok {
-		copy := value
-		remaining = &copy
-	} else if value, ok := info.MonthlyQuotas[key]; ok {
-		copy := value
-		remaining = &copy
+	remainingValue, hasRemaining := info.LimitedUserQuotas[key]
+	if !hasRemaining {
+		remainingValue, hasRemaining = info.MonthlyQuotas[key]
 	}
-	var total *int64
-	if value, ok := info.MonthlyQuotas[key]; ok {
-		copy := value
-		total = &copy
+	totalValue, hasTotal := info.MonthlyQuotas[key]
+	return optionalQuotaInt64(remainingValue, hasRemaining), optionalQuotaInt64(totalValue, hasTotal)
+}
+
+func optionalQuotaInt64(value int64, present bool) *int64 {
+	if !present {
+		return nil
 	}
-	return remaining, total
+	copy := value
+	return &copy
 }
 
 func copilotQuotaReady(chatRemaining, completionRemaining *int64) bool {
@@ -159,13 +162,6 @@ func roundedPercent(remaining, total int64) int64 {
 }
 
 func quotaSnapshotString(value *string) string {
-	if value == nil {
-		return ""
-	}
-	return strings.TrimSpace(*value)
-}
-
-func normalizedCopilotString(value *string) string {
 	if value == nil {
 		return ""
 	}

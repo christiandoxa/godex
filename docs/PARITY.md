@@ -268,8 +268,12 @@ and eligibility validation stays in the runtime use case.
   (bounded detailed all-account CLI probe); these virtual reports are collected
   only when their provider filter is selected, not for `all`. External account,
   plan, status, main/reset summary, readiness, and sort keys are observable in
-  the Godex quota view. The all-profile Bubble Tea watch matches the 0.435.0
-  interactive state: `j/k` or arrows scroll, `s` cycles
+  the Godex quota view. The all-profile Bubble Tea watch now also matches the
+  0.435.0 `Quota Overview` aggregate: available-profile count, last-update time,
+  ready and total OpenAI 5h/weekly remaining pools with earliest resets, and the
+  generic main remaining pool used by Copilot-style snapshots when OpenAI window
+  data is absent. Its interactive state matches 0.435.0: `j/k` or arrows scroll,
+  `s` cycles
   current/remaining/profile/auth/account/plan sorts, `f` cycles
   all/openai/gemini/anthropic/copilot/kiro/deepseek/local/agy when not locked by
   an explicit provider, and `u` refreshes. Single-profile quota watch remains

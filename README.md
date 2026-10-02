@@ -381,7 +381,13 @@ quota matches 0.435.0: `--provider deepseek` reads
 using `PRODEX_LOCAL_API_KEY` then `OPENAI_API_KEY`; and `--provider agy`
 runs bounded `agy auth quota --format=json --detail --all-accounts`. These
 virtual providers are intentionally absent from the `all` filter unless that
-provider is selected explicitly, matching Prodex. In an
+provider is selected explicitly, matching Prodex. In the all-profile terminal watch, Godex also renders the 0.435.0 `Quota Overview`
+pool summary before the profile rows: availability count and last-update time,
+plus OpenAI ready/total 5h and weekly remaining pools with earliest reset. When
+no OpenAI window data is present, provider snapshots such as Copilot contribute
+the generic main remaining pool from their normalized remaining-percent/reset
+metadata. One-shot TSV output remains unchanged for scripting.
+In an
 all-profile terminal watch, the Bubble Tea UI matches the 0.435.0 control state:
 `j/k` or arrows scroll, `s` cycles current/remaining/profile/auth/account/plan
 sorts, `f` cycles provider filters unless an explicit non-`all` provider locked

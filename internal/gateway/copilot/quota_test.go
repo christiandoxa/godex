@@ -19,7 +19,7 @@ func TestCopilotQuotaExternalMatchesProdexDisplayPolicy(t *testing.T) {
 		LimitedUserResetDate: &reset,
 	}
 	quota := copilotQuotaExternal(info, "config-login")
-	if quota.Provider != "GitHub Copilot" || quota.Account != login || quota.Plan != plan || quota.Status != "Blocked" || quota.Main != "chat 8/10 | comp 0/20" || quota.Reset != "monthly 2026-11-01" || quota.Available == nil || *quota.Available {
+	if quota.Provider != "GitHub Copilot" || quota.Account != login || quota.Plan != plan || quota.Status != "Blocked" || quota.Main != "chat 8/10 | comp 0/20" || quota.Reset != "monthly 2026-11-01" || quota.RemainingPercent == nil || *quota.RemainingPercent != 0 || quota.Available == nil || *quota.Available {
 		t.Fatalf("quota = %#v", quota)
 	}
 	want := map[string]string{"Access": "enterprise", "Remaining": "0%"}

@@ -122,13 +122,13 @@ func quotaQuitKey(value string) bool {
 func (model quotaTUIModel) View() string {
 	var output strings.Builder
 	output.WriteString("Godex Quota\n")
-	if !model.updated.IsZero() {
+	if model.options.All {
+		_, _ = fmt.Fprintf(&output, "Sort: %s • Provider: %s\n", model.sortMode.label(), model.providerFilter.label())
+		model.writePoolSummary(&output)
+	} else if !model.updated.IsZero() {
 		output.WriteString("Updated: ")
 		output.WriteString(model.updated.Format("2006-01-02 15:04:05"))
 		output.WriteByte('\n')
-	}
-	if model.options.All {
-		_, _ = fmt.Fprintf(&output, "Sort: %s • Provider: %s\n", model.sortMode.label(), model.providerFilter.label())
 	}
 	output.WriteByte('\n')
 	model.writeQuotaBody(&output)
@@ -138,6 +138,13 @@ func (model quotaTUIModel) View() string {
 	output.WriteString("\n")
 	output.WriteString(model.footer())
 	return output.String()
+}
+
+func (model quotaTUIModel) writePoolSummary(output *strings.Builder) {
+	output.WriteString("\nQuota Overview\n")
+	for _, field := range quotaPoolSummaryFields(model.reports, model.updated) {
+		_, _ = fmt.Fprintf(output, "%s: %s\n", field.label, field.value)
+	}
 }
 
 func (model quotaTUIModel) writeQuotaBody(output *strings.Builder) {
@@ -178,6 +185,9 @@ func (model quotaTUIModel) sortedReports() []quotamodel.Report {
 
 func (model quotaTUIModel) visibleReportCount() int {
 	reserved := 8
+	if model.options.All {
+		reserved += len(quotaPoolSummaryFields(model.reports, model.updated)) + 2
+	}
 	return max(1, model.height-reserved)
 }
 
