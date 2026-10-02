@@ -8,6 +8,18 @@ import (
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
 
+const (
+	quotaProviderLabelAll       = "all"
+	quotaProviderLabelOpenAI    = "openai"
+	quotaProviderLabelGemini    = "gemini"
+	quotaProviderLabelAnthropic = "anthropic"
+	quotaProviderLabelCopilot   = "copilot"
+	quotaProviderLabelKiro      = "kiro"
+	quotaProviderLabelDeepSeek  = "deepseek"
+	quotaProviderLabelLocal     = "local"
+	quotaProviderLabelAgy       = "agy"
+)
+
 type quotaReportSort uint8
 
 const (
@@ -63,23 +75,23 @@ func (filter quotaProviderFilter) next() quotaProviderFilter {
 func (filter quotaProviderFilter) label() string {
 	switch filter {
 	case quotaProviderOpenAI:
-		return "openai"
+		return quotaProviderLabelOpenAI
 	case quotaProviderGemini:
-		return "gemini"
+		return quotaProviderLabelGemini
 	case quotaProviderAnthropic:
-		return "anthropic"
+		return quotaProviderLabelAnthropic
 	case quotaProviderCopilot:
-		return "copilot"
+		return quotaProviderLabelCopilot
 	case quotaProviderKiro:
-		return "kiro"
+		return quotaProviderLabelKiro
 	case quotaProviderDeepSeek:
-		return "deepseek"
+		return quotaProviderLabelDeepSeek
 	case quotaProviderLocal:
-		return "local"
+		return quotaProviderLabelLocal
 	case quotaProviderAgy:
-		return "agy"
+		return quotaProviderLabelAgy
 	default:
-		return "all"
+		return quotaProviderLabelAll
 	}
 }
 
@@ -89,21 +101,21 @@ func quotaProviderFilterFromString(value string) quotaProviderFilter {
 		return quotaProviderAll
 	}
 	switch canonical {
-	case "openai":
+	case quotaProviderLabelOpenAI:
 		return quotaProviderOpenAI
-	case "gemini":
+	case quotaProviderLabelGemini:
 		return quotaProviderGemini
-	case "anthropic":
+	case quotaProviderLabelAnthropic:
 		return quotaProviderAnthropic
-	case "copilot":
+	case quotaProviderLabelCopilot:
 		return quotaProviderCopilot
-	case "kiro":
+	case quotaProviderLabelKiro:
 		return quotaProviderKiro
-	case "deepseek":
+	case quotaProviderLabelDeepSeek:
 		return quotaProviderDeepSeek
-	case "local":
+	case quotaProviderLabelLocal:
 		return quotaProviderLocal
-	case "agy":
+	case quotaProviderLabelAgy:
 		return quotaProviderAgy
 	default:
 		return quotaProviderAll
@@ -122,19 +134,19 @@ func (filter quotaProviderFilter) matches(report quotamodel.Report) bool {
 	case quotaProviderOpenAI:
 		return strings.EqualFold(auth, "chatgpt")
 	case quotaProviderGemini:
-		return strings.EqualFold(auth, "gemini")
+		return strings.EqualFold(auth, quotaProviderLabelGemini)
 	case quotaProviderAnthropic:
-		return strings.EqualFold(auth, "anthropic")
+		return strings.EqualFold(auth, quotaProviderLabelAnthropic)
 	case quotaProviderCopilot:
-		return strings.EqualFold(auth, "copilot")
+		return strings.EqualFold(auth, quotaProviderLabelCopilot)
 	case quotaProviderKiro:
-		return strings.EqualFold(auth, "kiro")
+		return strings.EqualFold(auth, quotaProviderLabelKiro)
 	case quotaProviderDeepSeek:
 		return strings.EqualFold(auth, "deepseek-key")
 	case quotaProviderLocal:
-		return strings.EqualFold(auth, "local")
+		return strings.EqualFold(auth, quotaProviderLabelLocal)
 	case quotaProviderAgy:
-		return strings.EqualFold(auth, "agy")
+		return strings.EqualFold(auth, quotaProviderLabelAgy)
 	default:
 		return false
 	}
