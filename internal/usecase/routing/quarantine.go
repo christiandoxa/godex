@@ -47,3 +47,31 @@ func (proxy *Router) pruneQuarantineLocked(now time.Time) {
 		}
 	}
 }
+
+func (proxy *Router) clearQuarantine(accountID string) {
+	proxy.mu.Lock()
+	defer proxy.mu.Unlock()
+	delete(proxy.quarantine, accountID)
+	delete(proxy.quotaBlocked, accountID)
+}
+
+func (proxy *Router) markQuotaBlocked(accountID string) {
+	proxy.mu.Lock()
+	defer proxy.mu.Unlock()
+	if proxy.quotaBlocked == nil {
+		proxy.quotaBlocked = make(map[string]bool)
+	}
+	proxy.quotaBlocked[accountID] = true
+}
+
+func (proxy *Router) quotaBlockedAccount(accountID string) bool {
+	proxy.mu.Lock()
+	defer proxy.mu.Unlock()
+	return proxy.quotaBlocked[accountID]
+}
+
+func (proxy *Router) clearQuotaBlocked(accountID string) {
+	proxy.mu.Lock()
+	defer proxy.mu.Unlock()
+	delete(proxy.quotaBlocked, accountID)
+}

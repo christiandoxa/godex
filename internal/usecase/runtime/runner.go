@@ -47,6 +47,7 @@ type Runner struct {
 	upstream    string
 	currentHome string
 	credentials providerCredentialResolver
+	autoRedeem  bool
 }
 
 func NewRunner(accounts launchAccounts, process codexProcess, newProxy ProxyFactory) *Runner {
@@ -73,6 +74,12 @@ func (runner *Runner) SetCurrentCodexHome(home string) {
 
 func (runner *Runner) SetProviderCredentialResolver(resolver providerCredentialResolver) {
 	runner.credentials = resolver
+}
+
+func (runner *Runner) SetAutoRedeem(enabled bool) {
+	if runner != nil {
+		runner.autoRedeem = enabled
+	}
 }
 
 func (runner *Runner) ProviderAPIKeys(provider, explicit string) ([]string, error) {
@@ -137,7 +144,7 @@ func (runner *Runner) launchHome(
 	if err != nil {
 		return err
 	}
-	proxy, err := runner.newProxy(runtimeProxyConfig(ctx, runner.upstream, preferredID, provider, credentials, profiles))
+	proxy, err := runner.newProxy(runtimeProxyConfig(ctx, runner.upstream, preferredID, provider, credentials, profiles, runner.autoRedeem))
 	if err != nil {
 		return err
 	}
@@ -178,6 +185,7 @@ func runtimeProxyConfig(
 	provider proxyconfig.Provider,
 	credentials []proxyconfig.ProviderCredential,
 	profiles []proxyconfig.Account,
+	autoRedeem bool,
 ) proxyconfig.Config {
 	return proxyconfig.Config{
 		Context:             ctx,
@@ -185,6 +193,7 @@ func runtimeProxyConfig(
 		PreferredAccount:    preferredID,
 		Provider:            provider,
 		ProviderCredentials: append([]proxyconfig.ProviderCredential(nil), credentials...),
+		AutoRedeem:          autoRedeem,
 		Accounts: func(ctx context.Context) ([]proxyconfig.Account, error) {
 			if err := ctx.Err(); err != nil {
 				return nil, err

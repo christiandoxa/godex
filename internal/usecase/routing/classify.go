@@ -23,6 +23,7 @@ type responseOutcome struct {
 	kind       responseKind
 	quarantine time.Duration
 	failed     bool
+	quota      bool
 }
 
 type pendingResponse struct {
@@ -49,7 +50,15 @@ func (proxy *Router) classify(response *proxymodel.Response, providerKind string
 	case response.StatusCode == http.StatusUnauthorized:
 		return responseOutcome{kind: responseAuthFailure}, pending, nil
 	case response.StatusCode == http.StatusTooManyRequests:
-		return responseOutcome{kind: responseRetry, quarantine: retryAfter(response.Header, proxy.now())}, pending, nil
+		prefix, complete, err := inspectResponse(response.Body, proxy.maxInspect)
+		pending.prefix = prefix
+		if err != nil {
+			return responseOutcome{}, pending, err
+		}
+		return responseOutcome{
+			kind: responseRetry, quarantine: retryAfter(response.Header, proxy.now()),
+			quota: complete && isQuotaResponse(prefix),
+		}, pending, nil
 	case response.StatusCode == http.StatusInternalServerError ||
 		response.StatusCode == http.StatusBadGateway ||
 		response.StatusCode == http.StatusServiceUnavailable ||
@@ -62,7 +71,7 @@ func (proxy *Router) classify(response *proxymodel.Response, providerKind string
 			return responseOutcome{}, pending, err
 		}
 		if complete && isQuotaResponse(prefix) {
-			return responseOutcome{kind: responseRetry, quarantine: 30 * time.Second}, pending, nil
+			return responseOutcome{kind: responseRetry, quarantine: 30 * time.Second, quota: true}, pending, nil
 		}
 	}
 	return responseOutcome{kind: responsePass}, pending, nil

@@ -120,19 +120,10 @@ func nearestRedeemReset(usage quotamodel.Usage, now time.Time, threshold time.Du
 }
 
 func manualRedeemRequestID(now time.Time, random io.Reader) (string, error) {
-	var id [16]byte
-	if _, err := io.ReadFull(random, id[:]); err != nil {
-		return "", errors.New("generate redeem request id")
+	id, err := redeemUUIDv7(now, random)
+	if err != nil {
+		return "", err
 	}
-	millis := uint64(now.UnixMilli())
-	id[0] = byte(millis >> 40)
-	id[1] = byte(millis >> 32)
-	id[2] = byte(millis >> 24)
-	id[3] = byte(millis >> 16)
-	id[4] = byte(millis >> 8)
-	id[5] = byte(millis)
-	id[6] = (id[6] & 0x0f) | 0x70
-	id[8] = (id[8] & 0x3f) | 0x80
 	return "prodex-manual-redeem-" + formatUUID(id), nil
 }
 

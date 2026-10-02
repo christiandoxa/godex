@@ -91,6 +91,10 @@ func (runner *Runner) commitCandidate(ctx context.Context, candidates []accounte
 	if len(candidates) == 0 {
 		return accountentity.Account{}, snapshot.exhausted, errors.New("no enabled account is available")
 	}
+	if runner.autoRedeem {
+		selected, err := runner.accounts.SelectForLaunch(ctx, candidates[0].ID)
+		return selected, snapshot.exhausted, err
+	}
 	if len(candidates) == 1 {
 		return accountentity.Account{}, snapshot.exhausted, fmt.Errorf("account %q is currently quota exhausted", candidates[0].Name)
 	}

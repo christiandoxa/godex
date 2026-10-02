@@ -74,7 +74,7 @@ func streamOutcome(data []byte, headers http.Header, now time.Time) (responseOut
 		return responseOutcome{}, true
 	case "error", "response.failed":
 		if isQuotaResponse(data) {
-			return responseOutcome{kind: responseRetry, quarantine: retryAfter(headers, now), failed: true}, false
+			return responseOutcome{kind: responseRetry, quarantine: retryAfter(headers, now), failed: true, quota: true}, false
 		}
 		return responseOutcome{kind: responsePass, failed: true}, false
 	default:

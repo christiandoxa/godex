@@ -417,6 +417,21 @@ weekly reset is within one hour, then consumes one reset credit with a stable
 idempotency request ID. `--yes` skips only that confirmation; `--no-proxy`
 disables environment proxy routing for the usage and consume requests.
 
+
+Managed OpenAI/Codex runtime launches also support Prodex 0.435.0's
+`--auto-redeem` policy. Godex first exhausts normal ready/fallback selection;
+quota-blocked profiles may redeem themselves once before rotation, and when the
+whole pool is exhausted Godex redeems only after every relevant OpenAI profile has
+a current quota snapshot and none still has usable weekly quota. Candidate
+selection uses the 0.435.0 plan/reset/order planner, excludes retired Spark models,
+refetches quota before consuming a credit, sends a UUIDv7
+`prodex-auto-redeem-*` idempotency key, refreshes quota after Reset or
+AlreadyRedeemed, and retries only when both 5-hour and weekly windows are usable.
+Hard continuation affinity redeems/retries only its owner profile. Missing quota
+evidence, natural reset within five minutes, zero credits, non-quota/transient
+failures, and non-OpenAI providers never spend a credit. Redemption/retry remains
+pre-commit HTTP/SSE behavior; Godex still does not implement WebSocket/Realtime.
+
 `godex ping openai` is intentionally cost-bearing: it submits the minimal `hello`
 turn through official Codex for each selected OpenAI profile. It uses a private
 diagnostic working directory, a 45-second per-profile timeout, up to four workers,

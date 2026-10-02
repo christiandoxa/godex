@@ -663,3 +663,90 @@ func TestRunProviderAPIKeysAccountPinsManagedHome(t *testing.T) {
 		t.Fatalf("provider raw-key home = %#v", process.homes)
 	}
 }
+
+func TestRunPropagatesAutoRedeemToProxyConfig(t *testing.T) {
+	accounts := &fakeLaunchAccounts{
+		accounts: []accountentity.Account{{ID: "one", Name: "one", Enabled: true}},
+		homes:    map[string]string{"one": "/profiles/one"},
+	}
+	process := &fakeProxyProcess{}
+	var config proxyconfig.Config
+	runner := NewRunner(accounts, process, func(got proxyconfig.Config) (Proxy, error) {
+		config = got
+		return &fakeProxy{}, nil
+	})
+	runner.SetAutoRedeem(true)
+	if err := runner.Run(context.Background(), "one", []string{"exec", "hello"}); err != nil {
+		t.Fatal(err)
+	}
+	if !config.AutoRedeem {
+		t.Fatal("auto-redeem flag was not propagated to proxy config")
+	}
+
+	config = proxyconfig.Config{}
+	runner.SetAutoRedeem(false)
+	if err := runner.Run(context.Background(), "one", []string{"exec", "hello"}); err != nil {
+		t.Fatal(err)
+	}
+	if config.AutoRedeem {
+		t.Fatal("auto-redeem unexpectedly remained enabled")
+	}
+}
+
+func TestRunAutoRedeemLaunchesProxyWhenEveryAccountIsQuotaExhausted(t *testing.T) {
+	accounts := &fakeLaunchAccounts{
+		accounts: []accountentity.Account{
+			{ID: "one", Name: "one", Enabled: true},
+			{ID: "two", Name: "two", Enabled: true},
+		},
+		homes: map[string]string{"one": "/profiles/one", "two": "/profiles/two"},
+	}
+	preflight := &fakeQuotaPreflight{ready: map[string]bool{"one": false, "two": false}, errs: map[string]error{}}
+	process := &fakeProxyProcess{}
+	var config proxyconfig.Config
+	runner := NewRunner(accounts, process, func(got proxyconfig.Config) (Proxy, error) {
+		config = got
+		return &fakeProxy{}, nil
+	})
+	runner.SetQuotaPreflight(preflight)
+	runner.SetAutoRedeem(true)
+	if err := runner.Run(context.Background(), "", nil); err != nil {
+		t.Fatal(err)
+	}
+	if process.home != "/profiles/one" || config.PreferredAccount != "one" || !config.AutoRedeem {
+		t.Fatalf("auto-redeem launch home/config = %q / %#v", process.home, config)
+	}
+	managed, err := config.Accounts(context.Background())
+	if err != nil || len(managed) != 2 || managed[0].EligibleAfter.IsZero() || managed[1].EligibleAfter.IsZero() {
+		t.Fatalf("auto-redeem exhausted pool = %#v, err = %v", managed, err)
+	}
+}
+
+func TestRunAutoRedeemAllowsExplicitExhaustedAccountIntoProxyOnly(t *testing.T) {
+	accounts := &fakeLaunchAccounts{
+		accounts: []accountentity.Account{
+			{ID: "one", Name: "one", Enabled: true},
+			{ID: "two", Name: "two", Enabled: true},
+		},
+		homes: map[string]string{"one": "/profiles/one", "two": "/profiles/two"},
+	}
+	preflight := &fakeQuotaPreflight{ready: map[string]bool{"one": false, "two": true}, errs: map[string]error{}}
+	process := &fakeProxyProcess{}
+	var config proxyconfig.Config
+	runner := NewRunner(accounts, process, func(got proxyconfig.Config) (Proxy, error) {
+		config = got
+		return &fakeProxy{}, nil
+	})
+	runner.SetQuotaPreflight(preflight)
+	runner.SetAutoRedeem(true)
+	if err := runner.Run(context.Background(), "one", nil); err != nil {
+		t.Fatal(err)
+	}
+	managed, err := config.Accounts(context.Background())
+	if err != nil || len(managed) != 1 || managed[0].ID != "one" || managed[0].EligibleAfter.IsZero() {
+		t.Fatalf("explicit auto-redeem pool = %#v, err = %v", managed, err)
+	}
+	if strings.Join(preflight.calls, ",") != "one" {
+		t.Fatalf("explicit auto-redeem preflight calls = %#v", preflight.calls)
+	}
+}

@@ -32,6 +32,7 @@ func Run(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionus
 	if err != nil {
 		return err
 	}
+	runner.SetAutoRedeem(selection.AutoRedeem)
 	if selection.Profile != "" {
 		return errors.New("--profile requires profile-aware runtime dispatch")
 	}
@@ -49,6 +50,7 @@ func RunProfiles(ctx context.Context, runner *runtimeusecase.Runner, sessions *s
 	if err != nil {
 		return err
 	}
+	runner.SetAutoRedeem(selection.AutoRedeem)
 	return runProfileSelection(ctx, runner, sessions, profiles, selection, codexArguments)
 }
 
@@ -57,6 +59,7 @@ func RunHome(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessi
 	if err != nil {
 		return err
 	}
+	runner.SetAutoRedeem(selection.AutoRedeem)
 	if selection.Profile != "" {
 		return errors.New("--profile cannot override an already resolved profile home")
 	}

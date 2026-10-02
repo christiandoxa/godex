@@ -72,6 +72,7 @@ func run() int {
 		return 1
 	}
 	quotaStatus := quotausecase.NewStatus(store, quotaClient)
+	autoRedeemer := quotausecase.NewAutoRedeemer(quotaClient)
 	virtualQuota := quotagateway.NewVirtual(nil)
 	quotaStatus.SetVirtual(virtualQuota)
 	bindings := routingrepo.NewStore(settings.Home)
@@ -83,7 +84,7 @@ func run() int {
 	doctor.SetQuota(quotaStatus)
 	doctor.SetBundleStore(runtimerepo.NewDoctorBundleStore())
 	factory := runtimeusecase.ProxyFactory(func(config proxyconfig.Config) (runtimeusecase.Proxy, error) {
-		router, err := newRuntimeRouter(config, process, copilotSource, claudeSource, providerCatalogs, bindings)
+		router, err := newRuntimeRouter(config, process, copilotSource, claudeSource, providerCatalogs, bindings, autoRedeemer)
 		if err != nil {
 			return nil, err
 		}
@@ -143,6 +144,7 @@ func newRuntimeRouter(
 	claudeSource *claudegateway.Source,
 	providerCatalogs *runtimerepo.ProviderCatalogStore,
 	bindings *routingrepo.Store,
+	autoRedeemer *quotausecase.AutoRedeemer,
 ) (*routingusecase.Router, error) {
 	gateway, err := newRuntimeGateway(config, process, copilotSource, claudeSource, providerCatalogs)
 	if err != nil {
@@ -151,6 +153,7 @@ func newRuntimeRouter(
 	return routingusecase.NewRouter(routingusecase.Config{
 		Gateway: gateway, Accounts: runtimeAccountSource(config.Accounts, gateway),
 		PreferredAccount: config.PreferredAccount, Bindings: bindings,
+		AutoRedeem: config.AutoRedeem, Redeemer: autoRedeemer,
 	})
 }
 

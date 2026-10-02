@@ -14,6 +14,10 @@ import (
 type gateway interface {
 	Execute(context.Context, proxymodel.Request, proxymodel.Account) (*proxymodel.Response, error)
 }
+type AutoRedeemer interface {
+	Try(context.Context, []proxymodel.Account, string, proxymodel.Request) (string, bool, error)
+}
+
 type Config struct {
 	Accounts         func(context.Context) ([]proxymodel.Account, error)
 	PreferredAccount string
@@ -21,6 +25,8 @@ type Config struct {
 	MaxInspectBytes  int64
 	Gateway          gateway
 	Bindings         bindingRepository
+	AutoRedeem       bool
+	Redeemer         AutoRedeemer
 }
 
 type Router struct {
@@ -34,6 +40,9 @@ type Router struct {
 	cursor        int
 	preferredUsed bool
 	quarantine    map[string]time.Time
+	quotaBlocked  map[string]bool
+	autoRedeem    bool
+	redeemer      AutoRedeemer
 	conversations map[string]*conversationLock
 }
 
@@ -47,7 +56,13 @@ func NewRouter(config Config) (*Router, error) {
 	if config.MaxInspectBytes <= 0 {
 		config.MaxInspectBytes = 64 << 10
 	}
-	router := &Router{source: config.Accounts, gateway: config.Gateway, preferred: strings.TrimSpace(config.PreferredAccount), now: config.Now, maxInspect: config.MaxInspectBytes, affinity: newAffinityStore(), quarantine: make(map[string]time.Time)}
+	router := &Router{
+		source: config.Accounts, gateway: config.Gateway,
+		preferred: strings.TrimSpace(config.PreferredAccount),
+		now:       config.Now, maxInspect: config.MaxInspectBytes,
+		affinity: newAffinityStore(), quarantine: make(map[string]time.Time),
+		quotaBlocked: make(map[string]bool), autoRedeem: config.AutoRedeem, redeemer: config.Redeemer,
+	}
 	router.affinity.repository = config.Bindings
 	return router, nil
 }

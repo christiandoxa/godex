@@ -269,6 +269,20 @@ quota-compatible OpenAI profile, fetches usage before any side effect, applies
 the one-hour confirmation policy, and sends the consume request through the same
 Codex-owned auth reader. Delivery owns prompting; the OpenAI gateway owns HTTP
 and no-proxy transport policy.
+
+
+Runtime auto-redeem reuses those same outbound quota/consume gateway operations but
+keeps policy in a separate `usecase/quota.AutoRedeemer`. Runtime delivery only
+propagates the opt-in flag; runtime preflight preserves exhausted accounts in the
+proxy pool only when that flag is enabled. `usecase/routing` decides when the
+redeemer may run: same-profile quota failures are attempted before rotation,
+fresh whole-pool redemption is considered only after normal selection is
+exhausted, hard affinity restricts the candidate to its owner, and request-local
+exclusions prevent repeated redemption attempts. The quota use case owns the
+0.435.0 credit planner, live-before/live-after quota probes, Spark exclusion,
+natural-reset guard, and UUIDv7 idempotency key. The router never consumes a
+credit for auth/transient failures or external providers, and delivery never owns
+credit policy.
 The presentation flag stays local to delivery; account selection and quota
 classification remain in `usecase/quota`, and fetching remains in
 `gateway/openai`. Formatting helpers stay private to the delivery package
@@ -527,7 +541,8 @@ restrict the entire upstream pool. No delivery package accesses an adapter.
 presentation, flushing, trailers, and downstream aborts. It invokes
 `usecase/routing` with `model/proxy` request data. Routing owns deterministic
 selection, hard affinity, quarantine, retry classification, auth reload decisions,
-and the precommit attempt cycle. It calls a consumed transport port;
+the opt-in precommit auto-redeem hook, and the precommit attempt cycle. It calls a
+consumed transport port;
 `gateway/openai` replaces selected-account authentication and forwards upstream
 HTTP bytes. Codex authentication reading is injected at the composition root;
 the OpenAI adapter does not import the Codex adapter. The quota gateway uses the

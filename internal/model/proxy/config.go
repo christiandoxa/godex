@@ -25,5 +25,6 @@ type Config struct {
 	PreferredAccount    string
 	Provider            Provider
 	ProviderCredentials []ProviderCredential
+	AutoRedeem          bool
 	Accounts            func(context.Context) ([]Account, error)
 }
