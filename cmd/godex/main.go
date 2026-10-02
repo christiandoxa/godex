@@ -99,6 +99,7 @@ func run() int {
 	profiles := profileusecase.NewCatalog(profileStore, store, settings.CurrentCodexHome)
 	profiles.SetAuthInspector(process)
 	profiles.SetClaudeSource(claudeSource)
+	quotaStatus.SetExternalProvider("anthropic", claudeSource)
 	kiroSource := kirogateway.NewSource()
 	profiles.SetKiroInspector(kiroSource)
 	profiles.SetKiroSource(kiroSource)

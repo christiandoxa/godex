@@ -235,9 +235,14 @@ runs only for explicit DeepSeek/local/AGY filters, never for `all`, matching
 into provider-aware account/plan/status/remaining display and sort keys. Managed profile quota uses a narrow provider adapter interface over the
 credential-free `QuotaTarget` metadata. `gateway/kiro` implements that interface
 from the same bounded managed auth/catalog snapshots used by Kiro import/runtime;
-the quota use case never parses Kiro secrets or model catalogs itself. Managed
-profile adapters for Gemini/Anthropic/Copilot/AGY/custom-provider quota remain
-separate outbound integrations.
+the quota use case never parses Kiro secrets or model catalogs itself.
+`gateway/claude` implements the same interface for managed Anthropic profiles:
+it reuses the runtime OAuth refresh boundary, exposes only account/auth-method/
+expiry metadata to quota, and optionally probes the bounded Anthropic
+organization rate-limit endpoint when an admin key is configured. Failed admin
+probes degrade to the OAuth-only view; response bodies and credential values do
+not cross the gateway boundary. Managed profile adapters for Gemini/Copilot/AGY/
+custom-provider quota remain separate outbound integrations.
 
 The CLI quota delivery package owns watch/once cadence, `--detail`, `--profile`,
 `--auth`, `--provider`, and `--base-url` parsing plus rendering of exact UTC

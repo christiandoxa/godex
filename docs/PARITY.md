@@ -276,9 +276,13 @@ and eligibility validation stays in the runtime use case.
   quit-only. Imported Kiro profiles now match the 0.435.0 external snapshot
   contract from managed `kiro_auth.json` plus optional model catalog: account
   fallback, auth plan, profile/region details, imported model count, readiness,
-  and missing-catalog fallback are implemented without network work. Profile-backed
-  Gemini/Anthropic/Copilot/AGY/custom-provider quota adapters remain gaps. Manual
-  `redeem PROFILE` now matches the usage
+  and missing-catalog fallback are implemented without network work. Managed
+  Anthropic profiles also match the external quota contract: existing OAuth
+  refresh, account/auth-method/expiry details, optional
+  `ANTHROPIC_ADMIN_KEY`/`ANTHROPIC_ADMIN_API_KEY` organization rate-limit
+  summaries, and safe OAuth-only degradation on admin API failure are
+  implemented. Profile-backed Gemini/Copilot/AGY/custom-provider quota adapters
+  remain gaps. Manual `redeem PROFILE` now matches the usage
   preflight, one-hour
   reset confirmation guard, idempotent consume endpoint, base-URL override, and
   no-proxy controls. Runtime `--auto-redeem` policy and provider-specific quota

@@ -387,11 +387,15 @@ all-profile terminal watch, the Bubble Tea UI matches the 0.435.0 control state:
 sorts, `f` cycles provider filters unless an explicit non-`all` provider locked
 the view, and `u` refreshes. Single-profile quota watch remains quit-only.
 Configured non-OpenAI profiles remain visible and filterable. The virtual
-DeepSeek/local/AGY adapters above are implemented. Imported Kiro profiles also
-expose profile-backed quota/status metadata from the managed `kiro_auth.json` and
-optional `kiro_model_catalog.json`: auth method, profile/region, imported model
-count, and readiness are rendered without a network request. Profile-backed
-Gemini, Anthropic, Copilot, AGY, and custom-provider quota adapters remain
+DeepSeek/local/AGY adapters above are implemented. Imported Kiro profiles also expose profile-backed quota/status metadata from
+the managed `kiro_auth.json` and optional `kiro_model_catalog.json`: auth
+method, profile/region, imported model count, and readiness are rendered without
+a network request. Managed Anthropic profiles now expose the 0.435.0 OAuth quota
+view too: the existing OAuth refresh path is reused, account/auth-method/expiry
+are reported, and `ANTHROPIC_ADMIN_KEY` (or `ANTHROPIC_ADMIN_API_KEY`) enables
+the bounded organization rate-limit summary; an unavailable admin endpoint
+degrades back to `Ready (OAuth)` without exposing its response body.
+Profile-backed Gemini, Copilot, AGY, and custom-provider quota adapters remain
 separate parity work.
 
 `godex redeem PROFILE` performs the same explicit two-step manual flow as Prodex:
