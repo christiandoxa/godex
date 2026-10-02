@@ -72,7 +72,8 @@ func run() int {
 		return 1
 	}
 	quotaStatus := quotausecase.NewStatus(store, quotaClient)
-	quotaStatus.SetVirtual(quotagateway.NewVirtual(nil))
+	virtualQuota := quotagateway.NewVirtual(nil)
+	quotaStatus.SetVirtual(virtualQuota)
 	bindings := routingrepo.NewStore(settings.Home)
 	copilotSource := copilotgateway.NewSource(nil)
 	claudeSource := claudegateway.NewSource()
@@ -104,6 +105,7 @@ func run() int {
 	profiles.SetKiroInspector(kiroSource)
 	profiles.SetKiroSource(kiroSource)
 	quotaStatus.SetExternalProvider("kiro", kiroSource)
+	quotaStatus.SetExternalProvider("agy", virtualQuota)
 	profiles.SetCopilotSource(copilotSource)
 	application.SetProfiles(profiles)
 	activity.SetProfiles(profiles)

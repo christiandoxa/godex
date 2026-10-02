@@ -8,11 +8,12 @@ import (
 	"sort"
 	"strings"
 
+	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
 
 func (virtual *Virtual) collectAgy(ctx context.Context) []quotamodel.VirtualResult {
-	info, err := virtual.fetchAgy(ctx)
+	info, err := virtual.fetchAgy(ctx, "")
 	if err != nil {
 		return []quotamodel.VirtualResult{{Name: virtualProviderAgy, Provider: virtualProviderAgy, Auth: virtualProviderAgy, Err: err}}
 	}
@@ -23,8 +24,19 @@ func (virtual *Virtual) collectAgy(ctx context.Context) []quotamodel.VirtualResu
 	return []quotamodel.VirtualResult{{Name: name, Provider: virtualProviderAgy, Auth: virtualProviderAgy, External: &info}}
 }
 
-func (virtual *Virtual) fetchAgy(ctx context.Context) (quotamodel.ExternalInfo, error) {
-	result, err := virtual.run(ctx, "agy", []string{"auth", "quota", "--format=json", "--detail", "--all-accounts"})
+func (virtual *Virtual) FetchQuota(ctx context.Context, target profilemodel.QuotaTarget) (quotamodel.ExternalInfo, error) {
+	if !strings.EqualFold(strings.TrimSpace(target.Provider), virtualProviderAgy) {
+		return quotamodel.ExternalInfo{}, errors.New("AGY profile quota adapter received a non-AGY target")
+	}
+	return virtual.fetchAgy(ctx, quotaProfileAccount(target))
+}
+
+func (virtual *Virtual) fetchAgy(ctx context.Context, preferredAccount string) (quotamodel.ExternalInfo, error) {
+	arguments := []string{"auth", "quota", "--format=json", "--detail"}
+	if strings.TrimSpace(preferredAccount) == "" {
+		arguments = append(arguments, "--all-accounts")
+	}
+	result, err := virtual.run(ctx, "agy", arguments)
 	if err != nil {
 		return quotamodel.ExternalInfo{}, err
 	}
@@ -40,15 +52,15 @@ func (virtual *Virtual) fetchAgy(ctx context.Context) (quotamodel.ExternalInfo, 
 	if err := decoder.Decode(&value); err != nil {
 		return quotamodel.ExternalInfo{}, errors.New("failed to parse agy quota JSON output")
 	}
-	return parseAgyQuota(value)
+	return parseAgyQuota(value, preferredAccount)
 }
 
-func parseAgyQuota(value any) (quotamodel.ExternalInfo, error) {
+func parseAgyQuota(value any, preferredAccount string) (quotamodel.ExternalInfo, error) {
 	accounts := agyAccounts(value)
-	if len(accounts) == 0 {
-		return quotamodel.ExternalInfo{}, errors.New("no account found in agy output")
+	data, err := agySelectedAccount(accounts, preferredAccount)
+	if err != nil {
+		return quotamodel.ExternalInfo{}, err
 	}
-	data := accounts[0]
 	account := firstAgyString(data, "account", "email")
 	plan := firstAgyString(data, "plan")
 	status := firstAgyString(data, "status")
@@ -60,6 +72,28 @@ func parseAgyQuota(value any) (quotamodel.ExternalInfo, error) {
 		Provider: "Anti-Gravity", Account: account, Plan: plan, Status: status,
 		Main: agyMain(data), Available: &available, Details: agyDetails(data),
 	}, nil
+}
+
+func quotaProfileAccount(target profilemodel.QuotaTarget) string {
+	if target.ProviderConfig.Account == nil {
+		return ""
+	}
+	return strings.TrimSpace(*target.ProviderConfig.Account)
+}
+
+func agySelectedAccount(accounts []map[string]any, preferredAccount string) (map[string]any, error) {
+	preferredAccount = strings.TrimSpace(preferredAccount)
+	if preferredAccount != "" {
+		for _, account := range accounts {
+			if firstAgyString(account, "account", "email") == preferredAccount {
+				return account, nil
+			}
+		}
+	}
+	if len(accounts) == 0 {
+		return nil, errors.New("no account found in agy output")
+	}
+	return accounts[0], nil
 }
 
 func agyAccounts(value any) []map[string]any {

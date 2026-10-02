@@ -281,8 +281,11 @@ and eligibility validation stays in the runtime use case.
   refresh, account/auth-method/expiry details, optional
   `ANTHROPIC_ADMIN_KEY`/`ANTHROPIC_ADMIN_API_KEY` organization rate-limit
   summaries, and safe OAuth-only degradation on admin API failure are
-  implemented. Profile-backed Gemini/Copilot/AGY/custom-provider quota adapters
-  remain gaps. Manual `redeem PROFILE` now matches the usage
+  implemented. Managed AGY profiles also match the preferred-account external
+  quota contract: profile account metadata suppresses `--all-accounts`, matching
+  rows are selected from object/array output, and missing preferred rows fall back
+  to the first account. Profile-backed Gemini/Copilot/custom-provider quota
+  adapters remain gaps. Manual `redeem PROFILE` now matches the usage
   preflight, one-hour
   reset confirmation guard, idempotent consume endpoint, base-URL override, and
   no-proxy controls. Runtime `--auto-redeem` policy and provider-specific quota

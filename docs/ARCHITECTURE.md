@@ -241,8 +241,11 @@ it reuses the runtime OAuth refresh boundary, exposes only account/auth-method/
 expiry metadata to quota, and optionally probes the bounded Anthropic
 organization rate-limit endpoint when an admin key is configured. Failed admin
 probes degrade to the OAuth-only view; response bodies and credential values do
-not cross the gateway boundary. Managed profile adapters for Gemini/Copilot/AGY/
-custom-provider quota remain separate outbound integrations.
+not cross the gateway boundary. The existing `gateway/quota` AGY command/parser
+also implements the managed-profile adapter: profile metadata supplies the
+preferred account, so the command omits `--all-accounts` while the virtual
+provider path retains it. Managed profile adapters for Gemini/Copilot/custom-
+provider quota remain separate outbound integrations.
 
 The CLI quota delivery package owns watch/once cadence, `--detail`, `--profile`,
 `--auth`, `--provider`, and `--base-url` parsing plus rendering of exact UTC

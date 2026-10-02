@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 )
 
 func TestVirtualDeepSeekMatchesEnvAndBalanceContract(t *testing.T) {
@@ -209,5 +211,56 @@ func TestVirtualAgyFailureAndAllFilterRemainBounded(t *testing.T) {
 	results := virtual.Collect(context.Background(), "agy", "")
 	if len(results) != 1 || results[0].Err == nil || strings.Contains(results[0].Err.Error(), "secret-output") || calls != 1 {
 		t.Fatalf("agy failure = %#v, calls=%d", results, calls)
+	}
+}
+
+func TestProfileAgyQuotaUsesPreferredAccountWithoutAllAccounts(t *testing.T) {
+	virtual := NewVirtual(nil)
+	var arguments []string
+	virtual.run = func(_ context.Context, _ string, got []string) (commandResult, error) {
+		arguments = append([]string(nil), got...)
+		return commandResult{stdout: []byte(`[{"account":"first@example.test","plan":"free","credits":1},{"account":"preferred@example.test","plan":"pro","credits":9.5}]`)}, nil
+	}
+	preferred := "preferred@example.test"
+	info, err := virtual.FetchQuota(context.Background(), profilemodel.QuotaTarget{
+		Provider:       "agy",
+		ProviderConfig: profilemodel.ProviderSnapshot{Kind: "agy", Account: &preferred},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(strings.Join(arguments, " "), "--all-accounts") {
+		t.Fatalf("profile AGY command unexpectedly used all-accounts: %#v", arguments)
+	}
+	if strings.Join(arguments, " ") != "auth quota --format=json --detail" {
+		t.Fatalf("profile AGY arguments = %#v", arguments)
+	}
+	if info.Account != preferred || info.Plan != "pro" || info.Main != "9.50 credits available" {
+		t.Fatalf("preferred AGY info = %#v", info)
+	}
+}
+
+func TestProfileAgyQuotaFallsBackToFirstAccountWhenPreferredMissing(t *testing.T) {
+	virtual := NewVirtual(nil)
+	virtual.run = func(context.Context, string, []string) (commandResult, error) {
+		return commandResult{stdout: []byte(`[{"account":"first@example.test","credits":2},{"account":"second@example.test","credits":3}]`)}, nil
+	}
+	missing := "missing@example.test"
+	info, err := virtual.FetchQuota(context.Background(), profilemodel.QuotaTarget{
+		Provider:       "agy",
+		ProviderConfig: profilemodel.ProviderSnapshot{Kind: "agy", Account: &missing},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Account != "first@example.test" || info.Main != "2.00 credits available" {
+		t.Fatalf("fallback AGY info = %#v", info)
+	}
+}
+
+func TestProfileAgyQuotaRejectsWrongProvider(t *testing.T) {
+	virtual := NewVirtual(nil)
+	if _, err := virtual.FetchQuota(context.Background(), profilemodel.QuotaTarget{Provider: "kiro"}); err == nil {
+		t.Fatal("non-AGY target unexpectedly accepted by AGY quota adapter")
 	}
 }

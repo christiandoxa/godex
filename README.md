@@ -395,8 +395,11 @@ view too: the existing OAuth refresh path is reused, account/auth-method/expiry
 are reported, and `ANTHROPIC_ADMIN_KEY` (or `ANTHROPIC_ADMIN_API_KEY`) enables
 the bounded organization rate-limit summary; an unavailable admin endpoint
 degrades back to `Ready (OAuth)` without exposing its response body.
-Profile-backed Gemini, Copilot, AGY, and custom-provider quota adapters remain
-separate parity work.
+Managed AGY profiles also reuse the same bounded CLI quota adapter but pass the
+profile account as the preferred selection and intentionally omit
+`--all-accounts`; array output selects the matching account and falls back to the
+first row exactly like Prodex. Profile-backed Gemini, Copilot, and custom-provider
+quota adapters remain separate parity work.
 
 `godex redeem PROFILE` performs the same explicit two-step manual flow as Prodex:
 it checks current usage first, asks for confirmation when the nearest 5-hour or
