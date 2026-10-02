@@ -46,11 +46,7 @@ func (source *Source) prepareRuntimeCredential(ctx context.Context, home string)
 		return runtimeCredential{}, err
 	}
 	switch {
-	case !found:
-		if err := writeRuntimeDatabase(ctx, dataDir, secret); err != nil {
-			return runtimeCredential{}, err
-		}
-	case newerKiroAuth(secret.AuthJSON, stored):
+	case !found, newerKiroAuth(secret.AuthJSON, stored):
 		if err := writeRuntimeDatabase(ctx, dataDir, secret); err != nil {
 			return runtimeCredential{}, err
 		}

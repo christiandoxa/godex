@@ -171,7 +171,10 @@ func kiroInvalidRequest(status int, message, code string) (*proxymodel.Response,
 	}})
 }
 
-func (transport *RuntimeTransport) Close() {}
+func (transport *RuntimeTransport) Close() {
+	// The Kiro transport owns no persistent handles; each ACP process/database
+	// resource is scoped to an individual request and closed before Execute returns.
+}
 
 func (transport *RuntimeTransport) String() string {
 	return fmt.Sprintf("kiro-runtime(%s)", transport.profileName)

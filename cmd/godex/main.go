@@ -85,7 +85,11 @@ func run() int {
 	doctor.SetQuota(quotaStatus)
 	doctor.SetBundleStore(runtimerepo.NewDoctorBundleStore())
 	factory := runtimeusecase.ProxyFactory(func(config proxyconfig.Config) (runtimeusecase.Proxy, error) {
-		router, err := newRuntimeRouter(config, process, copilotSource, claudeSource, kiroSource, providerCatalogs, bindings, autoRedeemer)
+		router, err := newRuntimeRouter(config, runtimeRouterDependencies{
+			process: process, copilotSource: copilotSource, claudeSource: claudeSource,
+			kiroSource: kiroSource, providerCatalogs: providerCatalogs,
+			bindings: bindings, autoRedeemer: autoRedeemer,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -137,24 +141,35 @@ type runtimeGateway interface {
 	Execute(context.Context, proxyconfig.Request, proxyconfig.Account) (*proxyconfig.Response, error)
 }
 
+type runtimeRouterDependencies struct {
+	process          *codex.CodexProcess
+	copilotSource    *copilotgateway.Source
+	claudeSource     *claudegateway.Source
+	kiroSource       *kirogateway.Source
+	providerCatalogs *runtimerepo.ProviderCatalogStore
+	bindings         *routingrepo.Store
+	autoRedeemer     *quotausecase.AutoRedeemer
+}
+
 func newRuntimeRouter(
 	config proxyconfig.Config,
-	process *codex.CodexProcess,
-	copilotSource *copilotgateway.Source,
-	claudeSource *claudegateway.Source,
-	kiroSource *kirogateway.Source,
-	providerCatalogs *runtimerepo.ProviderCatalogStore,
-	bindings *routingrepo.Store,
-	autoRedeemer *quotausecase.AutoRedeemer,
+	dependencies runtimeRouterDependencies,
 ) (*routingusecase.Router, error) {
-	gateway, err := newRuntimeGateway(config, process, copilotSource, claudeSource, kiroSource, providerCatalogs)
+	gateway, err := newRuntimeGateway(
+		config,
+		dependencies.process,
+		dependencies.copilotSource,
+		dependencies.claudeSource,
+		dependencies.kiroSource,
+		dependencies.providerCatalogs,
+	)
 	if err != nil {
 		return nil, err
 	}
 	return routingusecase.NewRouter(routingusecase.Config{
 		Gateway: gateway, Accounts: runtimeAccountSource(config.Accounts, gateway),
-		PreferredAccount: config.PreferredAccount, Bindings: bindings,
-		AutoRedeem: config.AutoRedeem, Redeemer: autoRedeemer,
+		PreferredAccount: config.PreferredAccount, Bindings: dependencies.bindings,
+		AutoRedeem: config.AutoRedeem, Redeemer: dependencies.autoRedeemer,
 	})
 }
 
