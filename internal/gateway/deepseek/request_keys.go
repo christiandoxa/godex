@@ -17,6 +17,8 @@ const (
 	deepSeekReasoningEffortKey      = "reasoning_effort"
 	deepSeekLogprobsKey             = "logprobs"
 	deepSeekStreamKey               = "stream"
+	deepSeekMetadataKey             = "metadata"
+	deepSeekProviderKey             = "deepseek"
 )
 
 const deepSeekToolCallIDRequired = "DeepSeek input tool items require a call_id"

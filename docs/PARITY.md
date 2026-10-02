@@ -1,17 +1,19 @@
 # OpenAI/Codex core parity audit
 
-Reference: exact Prodex tag `0.434.3`, commit
-`8e0451647f63848a57b8ca3a9adfbca717a6a42f`. The tag's `Cargo.toml` declares
-`0.434.3`, and its audited Codex compatibility target is `rust-v0.159.3` at
-commit `01fc69f4026735edfdf6789820549727a4867b11`. Comparison reads use tagged
-Git objects rather than the mutable Prodex checkout. Historical core-closure
+Reference: exact Prodex tag `0.435.0`, commit
+`caaf2e1998c8cedccb0d1e527d42c39ef3bef83b`. The tag's `Cargo.toml` declares
+`0.435.0`, and its compatibility audit names Codex `rust-v0.160.0` at commit
+`a956835d020762cb2b570053af06f643a11c0ecc`. Comparison reads use tagged Prodex
+Git objects rather than the mutable Prodex checkout. The audited Codex commit is
+not present in this local checkout, so it is treated as release-audit evidence
+rather than a locally re-executed source snapshot. Historical core-closure
 evidence below that names `0.434.2`/`0.159.2` remains evidence for that earlier
 checkpoint, not the current parity target.
 
 
 ## 1:1 parity expansion
 
-The project target is now feature-for-feature parity with Prodex `0.434.3`, not
+The project target is now feature-for-feature parity with Prodex `0.435.0`, not
 only the historical OpenAI/Codex core boundary. The core closure below remains a
 verified baseline while additional surfaces are implemented. Current expansion
 checkpoints add standalone/external profile registration and copy workflows,
@@ -28,7 +30,7 @@ and covered by local verification; a command-name stub does not count as parity.
 Practical parity is reached for the declared OpenAI/Codex account, isolated
 profile, session, and foreground managed HTTP/SSE runtime scope. The preserved core audit read the then-current tagged Prodex source alongside
 Godex production code, callers, tests, and Codex 0.159.2. The active expansion
-baseline is now Prodex 0.434.3 / Codex 0.159.3; the historical audit found and
+baseline is now Prodex 0.435.0 / Codex 0.160.0; the historical audit found and
 closed these gaps:
 
 - Import identity now comes from the same credential snapshot that is staged,
@@ -114,15 +116,21 @@ and eligibility validation stays in the runtime use case.
 
 ## Remaining 1:1 parity gaps
 
-- Prodex `0.434.3` is now the exact parity baseline. Its Codex compatibility
-  target is `rust-v0.159.3`; the accepted minimum remains 0.153.2. The 0.159.3
-  delta adds the account-security setup reminder on Codex-owned authenticated
-  ChatGPT bootstrap traffic, which must stay outside Godex model-account rotation.
+- Prodex `0.435.0` is now the exact parity baseline. Its audited Codex target is
+  `rust-v0.160.0`; the accepted minimum remains 0.153.2. The 0.435.0 audit reports
+  no model-transport change, while adding upstream invariants around explicit
+  provider catalogs, provider/history restoration, projectless defaults, and
+  subagent environment inheritance. Godex must preserve those Codex-owned behaviors.
+- The 0.435.0 provider-error delta is covered locally: `rate_limit_error` maps to
+  rate limiting, `not_found_error` maps to model-not-found, and
+  `overloaded_error` / `server_is_overloaded` map to transient overload with the
+  same cooldown class. The broader 0.435.0 precommit change is policy relocation
+  into Mojo; its observable retry/commit semantics remain the Godex routing target.
 - All Godex equivalents of Prodex TUI surfaces must use Bubble Tea. Live status,
   quota watch, log stream/upstream, and redeem confirmation have been migrated;
   non-TTY fallbacks remain line-oriented.
 - Multi-provider runtime/login parity remains incomplete for Gemini, Kiro,
-  and AGY where present in Prodex. DeepSeek now has the 0.434.3 raw-key runtime
+  and AGY where present in Prodex. DeepSeek now has the 0.435.0 raw-key runtime
   plus its dedicated Codex model catalog and advanced request-side Responses
   adapter: exact key precedence/provider defaults/stable key rotation, launch-model
   catalog precedence, reasoning effort, primitive sampling/token controls,
@@ -142,12 +150,12 @@ and eligibility validation stays in the runtime use case.
   the private .credentials.json token is resolved per profile, expired OAuth is
   refreshed through bounded claude auth status --json, default launches form a
   selected-first credential pool, unusable profiles are filtered, and explicit
-  profile selection remains hard-affinity. Responses use the shared 0.434.3
+  profile selection remains hard-affinity. Responses use the shared 0.435.0
   Responses-to-Chat compatibility contract with exact Anthropic alias/fallback
   ordering before credential rotation; auth failures and bare 429s do not advance
   models. Buffered JSON and live SSE are translated back to Responses, Chat and
   Messages stay passthrough, Models list/single are locally emulated from the
-  verified 0.434.3 IDs/aliases/context/endpoint metadata, and Responses Compact
+  verified 0.435.0 IDs/aliases/context/endpoint metadata, and Responses Compact
   uses the same bounded local-fallback summary and degraded headers as the
   reference without an upstream model call. Raw Anthropic API-key parity is also
   implemented: `--api-key` overrides `ANTHROPIC_API_KEYS`, which overrides
@@ -158,13 +166,13 @@ and eligibility validation stays in the runtime use case.
   Copilot now
   has a foreground Responses bridge with external credential resolution,
   direct/legacy runtime auth, Prodex-compatible request/header policy, private
-  model catalogs built from the exact 0.434.3 static provider data plus account
+  model catalogs built from the exact 0.435.0 static provider data plus account
   `/models` metadata, and managed multi-profile credential rotation. Default or
   active-profile launches prefer the selected profile first, filter unusable
   credential profiles, rotate only before commitment, and retain durable
   continuation affinity through the existing routing layer; explicit profile
   selection remains single-profile hard affinity. Copilot model fallback now also
-  matches the 0.434.3 pre-commit policy for the native Responses path: the exact
+  matches the 0.435.0 pre-commit policy for the native Responses path: the exact
   alias chains are bounded, only quota/rate-limit/transient/not-found classes may
   advance models, bare 429 and auth failures do not, and buffered non-retryable
   error bodies are preserved. The reference resolves Copilot runtime auth at
@@ -192,7 +200,7 @@ and eligibility validation stays in the runtime use case.
   source resolution, bounded regular-file checks, Anthropic identity deduplication,
   Prodex-compatible unique naming, private managed `.credentials.json`, and
   create/update/activate semantics. Anthropic bundle export/import now also
-  matches the 0.434.3 wire contract: empty `auth_json`, provider metadata, and a
+  matches the 0.435.0 wire contract: empty `auth_json`, provider metadata, and a
   validated `.credentials.json` provider secret file survive plain/encrypted
   round trips; update rollback restores prior provider metadata and credentials.
   Kiro bundle export/import also preserves the full provider identity fields,
@@ -230,7 +238,7 @@ and eligibility validation stays in the runtime use case.
   scrollable alternate screen with j/k, arrows, PgUp/PgDn, Home/End, and
   q/Esc/Enter exit controls. JSON, ID-only, resume-command, and non-TTY outputs
   remain unchanged.
-- Doctor expansion now covers the observable 0.434.3 diagnostics that have real
+- Doctor expansion now covers the observable 0.435.0 diagnostics that have real
   Godex data sources: `--install`, `--runtime`, `--quota`, 128 KiB default bounded
   `--tail-bytes`, `--runtime --json`, and `--bundle [PATH] --redacted`. Bundle
   runtime events omit account IDs, quota diagnostics omit identity/email and raw
@@ -289,15 +297,15 @@ Tagged Prodex sources inspected include:
 Local Codex source at `a04940cb` supplied queue grammar and the native debug,
 app-server proxy, and daemon branches that discard CLI overrides or detach.
 
-An ephemeral official npm package `@openai/codex@0.159.3` was exercised with the
-opt-in parser/capability smokes without replacing the developer's global Codex
-installation. It reported `codex-cli 0.159.3`; managed provider strict-config and
-runtime-feature smoke tests passed. Deliberately unknown strict-config fields stop
-exec, nested resume/fork/review, and direct resume/fork/review before model work.
-No live login, quota endpoint, refresh exchange, or model request was performed.
-The managed model configuration leaves `chatgpt_base_url` unset and Codex-owned,
-so the 0.159.3 account-security setup request remains outside Godex model-account
-rotation as required by the Prodex 0.434.3 compatibility audit.
+Historical local parser validation used an ephemeral official npm package
+`@openai/codex@0.159.3` without replacing the developer's global Codex installation.
+It reported `codex-cli 0.159.3`; managed provider strict-config and runtime-feature
+smoke tests passed, and unknown strict-config fields stopped exec/resume/fork/review
+before model work. That remains useful regression evidence, but it is not presented
+as a 0.160.0 execution result. The current Prodex 0.435.0 audit identifies Codex
+0.160.0 as the compatibility target and reports no required model-transport change.
+No live login, quota endpoint, refresh exchange, or model request is used for this
+baseline migration.
 
 ## Verification and limits
 

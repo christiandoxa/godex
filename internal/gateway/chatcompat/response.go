@@ -4,36 +4,91 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 )
 
+const (
+	chatMessageKey   = "message"
+	chatContentKey   = "content"
+	chatCallIDKey    = "call_id"
+	chatArgumentsKey = "arguments"
+)
+
+type ResponseOptions struct {
+	ProviderKey        string
+	AdapterLabel       string
+	DefaultModel       string
+	FallbackResponseID func() string
+	FallbackCallID     func(int) string
+}
+
 func ChatResponse(body []byte, now time.Time) ([]byte, error) {
+	return ChatResponseWithOptions(body, now, ResponseOptions{
+		AdapterLabel:       "chat-compatible",
+		DefaultModel:       "unknown",
+		FallbackResponseID: func() string { return "resp_prodex" },
+		FallbackCallID:     func(index int) string { return fmt.Sprintf("call_%d", index) },
+	})
+}
+
+func ChatResponseWithOptions(body []byte, now time.Time, options ResponseOptions) ([]byte, error) {
+	root, err := decodeChatResponse(body)
+	if err != nil {
+		return nil, err
+	}
+	options = normalizeResponseOptions(options)
+	choice := firstChoice(root)
+	message, _ := choice[chatMessageKey].(map[string]any)
+	output, toolErr := responseOutput(message, options)
+	result := map[string]any{
+		"id":         stringOr(root["id"], options.FallbackResponseID()),
+		"object":     "response",
+		"created_at": uintValueOr(root["created"], uint64(now.Unix())),
+		"model":      stringOr(root["model"], options.DefaultModel),
+		"output":     output,
+	}
+	if toolErr != nil {
+		result["status"] = "failed"
+		result["error"] = map[string]any{
+			"code":         "invalid_tool_call_arguments",
+			chatMessageKey: toolErr.Error(),
+		}
+	}
+	if usage := chatUsage(root["usage"], options.ProviderKey); usage != nil {
+		result["usage"] = usage
+	}
+	if metadata := chatResponseMetadata(root, choice, message); len(metadata) > 0 && options.ProviderKey != "" {
+		result["metadata"] = map[string]any{options.ProviderKey: metadata}
+	}
+	return json.Marshal(result)
+}
+
+func decodeChatResponse(body []byte) (map[string]any, error) {
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.UseNumber()
 	var root map[string]any
 	if err := decoder.Decode(&root); err != nil {
 		return nil, errors.New("failed to parse chat completions response JSON")
 	}
-	result := map[string]any{
-		"id":         stringOr(root["id"], "resp_prodex"),
-		"object":     "response",
-		"created_at": uintValueOr(root["created"], uint64(now.Unix())),
-		"model":      stringOr(root["model"], "unknown"),
-		"output":     []any{},
+	return root, nil
+}
+
+func normalizeResponseOptions(options ResponseOptions) ResponseOptions {
+	if strings.TrimSpace(options.AdapterLabel) == "" {
+		options.AdapterLabel = "chat-compatible"
 	}
-	output := make([]any, 0)
-	if choice := firstChoice(root); choice != nil {
-		if message, ok := choice["message"].(map[string]any); ok {
-			output = append(output, responseTextItems(message)...)
-			output = append(output, responseToolItems(message)...)
-		}
+	if strings.TrimSpace(options.DefaultModel) == "" {
+		options.DefaultModel = "unknown"
 	}
-	result["output"] = output
-	if usage := chatUsage(root["usage"]); usage != nil {
-		result["usage"] = usage
+	if options.FallbackResponseID == nil {
+		options.FallbackResponseID = func() string { return "resp_prodex" }
 	}
-	return json.Marshal(result)
+	if options.FallbackCallID == nil {
+		options.FallbackCallID = func(index int) string { return fmt.Sprintf("call_%d", index) }
+	}
+	return options
 }
 
 func firstChoice(root map[string]any) map[string]any {
@@ -45,8 +100,27 @@ func firstChoice(root map[string]any) map[string]any {
 	return choice
 }
 
+func responseOutput(message map[string]any, options ResponseOptions) ([]any, error) {
+	output := make([]any, 0)
+	output = append(output, responseTextItems(message)...)
+	calls, ok := message["tool_calls"].([]any)
+	if !ok {
+		return output, nil
+	}
+	for index, raw := range calls {
+		item, err := responseToolItem(raw, index, options)
+		if err != nil {
+			return output, err
+		}
+		if item != nil {
+			output = append(output, item)
+		}
+	}
+	return output, nil
+}
+
 func responseTextItems(message map[string]any) []any {
-	texts := chatContentTexts(message["content"])
+	texts := chatContentTexts(message[chatContentKey])
 	if len(texts) == 0 {
 		return nil
 	}
@@ -54,7 +128,7 @@ func responseTextItems(message map[string]any) []any {
 	for _, text := range texts {
 		parts = append(parts, map[string]any{"type": "output_text", "text": text})
 	}
-	return []any{map[string]any{"type": "message", "role": "assistant", "content": parts}}
+	return []any{map[string]any{"type": chatMessageKey, "role": "assistant", chatContentKey: parts}}
 }
 
 func chatContentTexts(value any) []string {
@@ -87,57 +161,8 @@ func chatContentPartText(part map[string]any) string {
 	if text, ok := part["text"].(string); ok && text != "" {
 		return text
 	}
-	text, _ := part["content"].(string)
+	text, _ := part[chatContentKey].(string)
 	return text
-}
-
-func responseToolItems(message map[string]any) []any {
-	calls, ok := message["tool_calls"].([]any)
-	if !ok {
-		return nil
-	}
-	result := make([]any, 0, len(calls))
-	for _, raw := range calls {
-		call, ok := raw.(map[string]any)
-		if !ok {
-			continue
-		}
-		function, ok := call["function"].(map[string]any)
-		if !ok {
-			continue
-		}
-		name, _ := function["name"].(string)
-		arguments, _ := function["arguments"].(string)
-		arguments = WrapRTKArguments(name, arguments)
-		namespace, short := splitToolName(name)
-		item := map[string]any{
-			"type": "function_call", "call_id": stringOr(call["id"], ""),
-			"name": short, "arguments": arguments,
-		}
-		if namespace != "" {
-			item["namespace"] = namespace
-		}
-		result = append(result, item)
-	}
-	return result
-}
-
-func splitToolName(name string) (string, string) {
-	index := strings.LastIndex(name, ".")
-	if index <= 0 || index == len(name)-1 {
-		return "", name
-	}
-	return name[:index], name[index+1:]
-}
-
-func chatUsage(value any) map[string]any {
-	usage, ok := value.(map[string]any)
-	if !ok {
-		return nil
-	}
-	input := uintValueOr(usage["prompt_tokens"], 0)
-	output := uintValueOr(usage["completion_tokens"], 0)
-	return map[string]any{"input_tokens": input, "output_tokens": output, "total_tokens": input + output}
 }
 
 func stringOr(value any, fallback string) string {
@@ -147,6 +172,7 @@ func stringOr(value any, fallback string) string {
 	}
 	return text
 }
+
 func uintValueOr(value any, fallback uint64) uint64 {
 	switch current := value.(type) {
 	case json.Number:

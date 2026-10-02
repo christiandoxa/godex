@@ -31,7 +31,7 @@ Multi-provider quota remains part of the 1:1 parity backlog. The runtime details
 
 ## Requirements
 
-- The official Codex CLI 0.153.2 or newer available as `codex` (audited compatibility target: Codex 0.159.3).
+- The official Codex CLI 0.153.2 or newer available as `codex` (audited compatibility target: Codex 0.160.0).
 - Linux, macOS, or Windows on amd64 or arm64 for release binaries.
 - Go 1.27.1 or newer only when building from source.
 
@@ -103,7 +103,7 @@ godex account use work
 godex run --account work -- --model MODEL
 ~~~
 
-Export or import OpenAI/Anthropic/Kiro/Copilot profile bundles compatible with Prodex `0.434.3`:
+Export or import OpenAI/Anthropic/Kiro/Copilot profile bundles compatible with Prodex `0.435.0`:
 
 ~~~bash
 PRODEX_PROFILE_EXPORT_PASSWORD=... godex profile export --password-protect profiles.json
@@ -161,7 +161,7 @@ prefers direct OAuth `/models` auth with the legacy token exchange as fallback,
 forwards `/responses` and `/responses/compact` with Prodex-compatible headers,
 canonicalizes Copilot model aliases, strips non-compaction encrypted content,
 and detects agent/vision inputs for Copilot request headers. The launch also
-writes private bounded Copilot model catalogs: the exact Prodex `0.434.3`
+writes private bounded Copilot model catalogs: the exact Prodex `0.435.0`
 provider/static catalog is merged with account `/models` metadata, per-model
 prompt/context limits drive Codex context and auto-compaction budgets, and an
 explicit user `model_catalog_json` override always wins.
@@ -174,10 +174,10 @@ conversation affinity. Explicit `--profile` launches remain single-profile hard
 affinity. Copilot model selection now also follows Prodex's bounded pre-commit
 fallback chains: quota/rate-limit/transient/not-found failures may advance to the
 next model, while auth failures, bare 429 responses, and any committed response do
-not replay. Launch-time auth resolution already matches Prodex 0.434.3; the
+not replay. Launch-time auth resolution already matches Prodex 0.435.0; the
 reference does not perform a separate per-request Copilot credential refresh on
 this native Responses path. The Copilot endpoint contract now also matches the
-0.434.3 registry: `/responses`, `/responses/compact`, `/chat/completions`, and
+0.435.0 registry: `/responses`, `/responses/compact`, `/chat/completions`, and
 `/messages` use the provider transport, while GET `/models` and `/models/{id}` are
 emulated locally from the merged static/account catalog. Trace context is preserved
 for passthrough routes and unsupported Copilot endpoints remain fail-closed.
@@ -191,14 +191,14 @@ unusable credentials are excluded, explicit --profile stays hard-affinity, and
 the generic router retains durable conversation ownership and pre-commit
 credential rotation.
 
-For /responses, Godex translates the 0.434.3 lossless Responses subset to
+For /responses, Godex translates the 0.435.0 lossless Responses subset to
 OpenAI Chat Completions, applies Anthropic's model fallback order before rotating
 credentials, and translates JSON/SSE output back to Responses. Bare 429 and auth
 failures do not advance models. /chat/completions and /messages remain native
 passthrough surfaces with Anthropic OAuth headers, GET /models and /models/{id}
-are emulated from the verified 0.434.3 Anthropic catalog metadata, and
+are emulated from the verified 0.435.0 Anthropic catalog metadata, and
 /responses/compact uses Prodex's bounded local-fallback summary contract without
-an upstream model call. Launch catalogs use the 0.434.3 model IDs, aliases, 200k
+an upstream model call. Launch catalogs use the 0.435.0 model IDs, aliases, 200k
 context window, and 180k default auto-compact limit.
 
 The same bridge now supports Prodex-compatible raw Anthropic API-key launches:
@@ -208,19 +208,19 @@ semicolon, or newline separators and rotate selected-first across fresh requests
 `--base-url` accepts only absolute credential-free HTTP(S) URLs and may override
 the Anthropic endpoint. API-key Responses exhaust the model fallback chain before
 credential rotation; native `/messages` uses `x-api-key` while chat-compatible
-routes use bearer auth, matching 0.434.3. Provider secret environment variables
+routes use bearer auth, matching 0.435.0. Provider secret environment variables
 are removed from the Codex child process and raw keys are never persisted in
 profile metadata, routing bindings, or bundles. Without API keys, the same
 `--provider anthropic` shortcut resolves managed Claude OAuth profiles.
 
-DeepSeek now has the bounded 0.434.3 raw-key runtime plus the advanced
+DeepSeek now has the bounded 0.435.0 raw-key runtime plus the advanced
 request-side Responses adapter. `godex run --provider deepseek` resolves
 `--api-key`, then `DEEPSEEK_API_KEYS`, then `DEEPSEEK_API_KEY`; plural keys
 use Prodex's comma/semicolon/newline parsing and rotate through stable synthetic
 routing IDs. The launch path writes the dedicated
 `prodex-deepseek-model-catalog.json` used by Prodex (launch model first, then
 `auto/pro/flash` and the current DeepSeek model IDs), while later user
-`model_catalog_json` overrides still win. The 0.434.3 defaults remain
+`model_catalog_json` overrides still win. The 0.435.0 defaults remain
 `deepseek-v4-pro`, `https://api.deepseek.com`, 1,048,576 advertised context
 tokens, and a 900,000-token automatic-compaction threshold.
 
@@ -236,7 +236,7 @@ Completions and native Messages stay passthrough, Models list/single remains loc
 and Responses Compact remains the bounded local fallback with no model call.
 
 DeepSeek-specific response/SSE reasoning/tool shaping and the web-search/beta-base
-request routes remain the next 0.434.3 parity slice; unsupported web-search
+request routes remain the next 0.435.0 parity slice; unsupported web-search
 requests still fail before upstream instead of being silently downgraded.
 
 Local OpenAI-compatible Responses endpoints now match Prodex's `--url` surface.
@@ -277,10 +277,13 @@ Supported wrapper flags are `--web-search`, `--rollout-budget-tokens`,
 `--respect-system-proxy`, and `--no-respect-system-proxy`. Put them before the
 first Codex argument, or use `--` to end Godex option parsing.
 
-With Codex 0.159.3, `--current-time-reminder-interval N` is measured in seconds
-and emits `reminder_interval_seconds`. Prodex 0.434.3 still exposes its older request-count
-config field is not accepted by that Codex version. Numeric config values must
-fit signed TOML integers; token weights must be finite and nonnegative.
+For the audited Codex 0.160.0 target, Godex keeps the wrapper flag
+`--current-time-reminder-interval N` but emits the Codex-native
+`reminder_interval_seconds` override. Prodex 0.435.0 still renders its legacy
+`reminder_interval_model_requests` wrapper field, so Godex deliberately performs
+this compatibility conversion at delivery rather than forwarding the legacy key.
+Numeric config values must fit signed TOML integers; token <redacted> must be finite
+and nonnegative.
 
 Find sessions across managed profiles, or only sessions for this directory:
 
@@ -352,7 +355,7 @@ Available profile, account, and runtime commands:
 | godex log [stream\|last\|upstream] [--json] | Follow persisted, redacted runtime request events. |
 
 Quota output stays compact by default. Without `--once` or `--raw`, the command
-refreshes every five seconds like Prodex 0.434.3; `--watch` is also accepted as
+refreshes every five seconds like Prodex 0.435.0; `--watch` is also accepted as
 the explicit hidden spelling. `-p/--profile NAME` selects one managed OpenAI
 profile, while `--all` shows the managed pool. `--base-url URL` overrides the
 ChatGPT quota endpoint for that command only. `--raw` prints bounded upstream
@@ -435,7 +438,7 @@ control, backups, bug reports, or fixtures.
 - [Architecture](docs/ARCHITECTURE.md) — package ownership and runtime design.
 - [Runtime rotation and affinity](docs/ROTATION.md) — selection, retries,
   commitment, streaming, and forwarding rules.
-- [Parity audit](docs/PARITY.md) — Prodex 0.434.3 implemented equivalents,
+- [Parity audit](docs/PARITY.md) — Prodex 0.435.0 implemented equivalents,
   remaining 1:1 gaps, and validation limits.
 - [AGENTS.md](AGENTS.md) — engineering invariants for contributors.
 

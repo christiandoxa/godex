@@ -72,10 +72,12 @@ func classifyCode(status int, code string) ErrorClassification {
 		return ErrorClassification{Class: ErrorAuth}
 	case "insufficient_quota", "credit_balance_exhausted", "organization_spend_limit_exceeded", "project_spend_limit_exceeded", "quota_exhausted", "quota_exceeded", "resource_exhausted", "usage_limit_reached":
 		return ErrorClassification{Class: ErrorQuota, Cooldown: 5 * time.Minute}
-	case "rate_limit_exceeded", "rate_limit_exceeded_error", "slow_down":
+	case "rate_limit_error", "rate_limit_exceeded", "rate_limit_exceeded_error", "slow_down":
 		return ErrorClassification{Class: ErrorRateLimit, Cooldown: time.Minute}
-	case "model_not_supported":
+	case "not_found_error", "model_not_supported":
 		return ErrorClassification{Class: ErrorNotFound}
+	case "overloaded_error", "server_is_overloaded":
+		return ErrorClassification{Class: ErrorTransient, Cooldown: 10 * time.Second}
 	default:
 		return classifyStatusText(status, []byte(code))
 	}

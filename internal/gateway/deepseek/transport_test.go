@@ -284,3 +284,80 @@ func TestDeepSeekBare429DoesNotAdvanceModel(t *testing.T) {
 		t.Fatalf("calls/status = %d / %d", calls, response.StatusCode)
 	}
 }
+
+func TestDeepSeekBufferedResponseMergesRequestAndProviderMetadata(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{
+			"id":"chatcmpl_1",
+			"model":"deepseek-v4-pro",
+			"choices":[{"message":{"content":"done","reasoning_content":"thought"},"finish_reason":"stop"}],
+			"usage":{"prompt_tokens":11,"completion_tokens":7,"prompt_cache_hit_tokens":5,"prompt_cache_miss_tokens":6}
+		}`))
+	}))
+	defer server.Close()
+	transport, err := NewRuntimeTransport(server.URL, "fixture-key", server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer transport.Close()
+	response, err := transport.Execute(context.Background(), proxymodel.Request{
+		Method: http.MethodPost,
+		Path:   mountPath + "/responses",
+		Body: []byte(`{
+			"input":"hello",
+			"metadata":{"tag":"one","deepseek":{"existing":"keep"}},
+			"client_metadata":{"client":true},
+			"prompt_cache_key":"cache-key",
+			"response_format":{"type":"json_schema"}
+		}`),
+	}, proxymodel.Account{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	body, _ := io.ReadAll(response.Body)
+	var value map[string]any
+	if err := json.Unmarshal(body, &value); err != nil {
+		t.Fatal(err)
+	}
+	metadata := value["metadata"].(map[string]any)
+	if metadata["tag"] != "one" || metadata["client_metadata"].(map[string]any)["client"] != true || metadata["prompt_cache_key"] != "cache-key" {
+		t.Fatalf("response metadata = %#v", metadata)
+	}
+	deepseek := metadata["deepseek"].(map[string]any)
+	if deepseek["existing"] != "keep" || deepseek["reasoning_content"] != "thought" || deepseek["finish_reason"] != "stop" {
+		t.Fatalf("provider metadata = %#v", deepseek)
+	}
+	if deepseek["degraded_response_format"].(map[string]any)["from"] != "json_schema" {
+		t.Fatalf("degraded response metadata = %#v", deepseek)
+	}
+	usage := value["usage"].(map[string]any)
+	if usage["input_tokens_details"].(map[string]any)["cached_tokens"] != float64(5) {
+		t.Fatalf("usage = %#v", usage)
+	}
+}
+
+func TestDeepSeekMetadataMergeMatchesProdexShallowObjectPolicy(t *testing.T) {
+	response := map[string]any{"metadata": map[string]any{
+		"scalar": false,
+		"object": map[string]any{"old": float64(1), "nested": map[string]any{"a": float64(1)}},
+	}}
+	mergeResponseMetadata(response, map[string]any{
+		"scalar":  map[string]any{"new": float64(2)},
+		"object":  map[string]any{"new": float64(2), "nested": map[string]any{"b": float64(2)}},
+		"missing": map[string]any{},
+	})
+	metadata := response["metadata"].(map[string]any)
+	if metadata["scalar"] != false {
+		t.Fatalf("scalar metadata was overwritten: %#v", metadata)
+	}
+	object := metadata["object"].(map[string]any)
+	if object["old"] != float64(1) || object["new"] != float64(2) {
+		t.Fatalf("object metadata = %#v", object)
+	}
+	nested := object["nested"].(map[string]any)
+	if len(nested) != 1 || nested["b"] != float64(2) {
+		t.Fatalf("nested metadata = %#v", nested)
+	}
+}

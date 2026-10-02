@@ -73,8 +73,9 @@ configuration is validated without accepting execution or model work. No shared
 helper or new application boundary is needed for this protocol-specific parsing.
 
 Runtime CLI delivery translates supported wrapper features into native config.
-Codex 0.159.3's reminder interval uses seconds, unlike Prodex 0.434.3's older
-request-count field. Delivery validates finite nonnegative weights and signed
+Godex targets the Codex 0.160.0 reminder contract in seconds, while Prodex 0.435.0
+still renders its legacy request-count wrapper field. Delivery owns that compatibility
+conversion and validates finite nonnegative weights plus signed
 TOML integer bounds before launch; percentage defaults remain correct for large
 valid token limits. These flag conversions remain private to CLI runtime.
 
@@ -131,14 +132,14 @@ it returns only tokenless provider metadata to `usecase/profile`.
 The same gateway owns the Copilot Responses transport and launch-time runtime-auth
 resolution; bearer credentials never leave that gateway. `repository/runtime`
 owns private bounded runtime/final model-catalog files, while `usecase/runtime`
-owns launch-model/config precedence and converts the exact 0.434.3 Copilot catalog
+owns launch-model/config precedence and converts the exact 0.435.0 Copilot catalog
 snapshots plus account `/models` metadata into Codex `model_catalog_json`. This
 keeps provider HTTP/auth mechanics out of delivery and keeps filesystem policy
 out of the gateway.
 
 
 Copilot model fallback stays inside `gateway/copilot`, before a response returns
-to generic routing. The gateway derives the exact 0.434.3 fallback chain from the
+to generic routing. The gateway derives the exact 0.435.0 fallback chain from the
 request model and buffers only intermediate non-success responses under the same
 8 MiB runtime bound used for Copilot auth responses. Structured provider error
 codes decide whether another model is legal; auth failures and bare 429s do not
@@ -148,7 +149,7 @@ successful/SSE responses remain live and unbuffered. Account rotation and durabl
 conversation affinity continue to belong exclusively to `usecase/routing`.
 
 
-Copilot route planning is explicit in `gateway/copilot`: the 0.434.3 supported
+Copilot route planning is explicit in `gateway/copilot`: the 0.435.0 supported
 surface is Responses, Responses Compact, Chat Completions, Messages, and Models.
 The four model-traffic routes share the same auth/header/model-fallback transport;
 GET Models list/single is answered locally from the already bounded merged runtime
@@ -182,7 +183,7 @@ gateway/compact owns the bounded deterministic local compaction fallback used by
 translated providers: at most 24 recent snippets, 768 bytes per snippet, and
 24 KiB total summary, with the reference x-prodex-compact-* degradation metadata.
 It performs no model call. Anthropic Models responses are local and derive from
-the embedded 0.434.3 model IDs/aliases/context/endpoint metadata, while
+the embedded 0.435.0 model IDs/aliases/context/endpoint metadata, while
 usecase/runtime owns the Codex launch catalog and user-override precedence.
 
 
@@ -432,7 +433,7 @@ rollout/session ownership.
 ## 1:1 expansion boundary
 
 The verified OpenAI/Codex core remains the stability baseline while Godex expands
-toward feature-for-feature Prodex 0.434.3 parity. Remaining multi-provider
+toward feature-for-feature Prodex 0.435.0 parity. Remaining multi-provider
 bridges, Super, gateway, richer diagnostics, provider runtime bridges, and any
 still-missing provider-specific import/bundle surfaces remain implementation backlog
 rather than permanent exclusions.

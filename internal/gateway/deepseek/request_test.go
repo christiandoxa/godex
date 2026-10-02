@@ -165,3 +165,45 @@ func decodeDeepSeekRequest(t *testing.T, content []byte) map[string]any {
 	}
 	return value
 }
+
+func TestDeepSeekTranslatedRequestPreservesResponseMetadata(t *testing.T) {
+	translated, err := TranslateResponsesRequest([]byte(`{
+		"input":"hello",
+		"response_format":{"type":"json_schema"},
+		"metadata":{"tag":"one","deepseek":{}},
+		"client_metadata":{"client":true},
+		"prompt_cache_key":" cache-key ",
+		"prompt_cache_retention":"24h"
+	}`), RequestOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	metadata := translated.ResponseMetadata
+	if metadata["tag"] != "one" || metadata["prompt_cache_key"] != " cache-key " || metadata["prompt_cache_retention"] != "24h" {
+		t.Fatalf("metadata = %#v", metadata)
+	}
+	if metadata["client_metadata"].(map[string]any)["client"] != true {
+		t.Fatalf("client metadata = %#v", metadata)
+	}
+	deepseek := metadata["deepseek"].(map[string]any)
+	degraded := deepseek["degraded_response_format"].(map[string]any)
+	if degraded["from"] != "json_schema" || !strings.Contains(degraded["reason"].(string), "JSON Schema") {
+		t.Fatalf("degraded metadata = %#v", degraded)
+	}
+}
+
+func TestDeepSeekTranslatedRequestMetadataErrorPrecedence(t *testing.T) {
+	fixtures := []struct {
+		body, want string
+	}{
+		{`{"input":"x","metadata":{"deepseek":"bad"},"client_metadata":[],"prompt_cache_key":42}`, "metadata.deepseek must be an object"},
+		{`{"input":"x","metadata":{},"client_metadata":[],"prompt_cache_key":42}`, "client_metadata must be an object"},
+		{`{"input":"x","metadata":{},"client_metadata":{},"prompt_cache_key":42}`, "prompt_cache_key must be a string"},
+		{`{"input":"x","metadata":{},"client_metadata":{},"prompt_cache_key":"ok","prompt_cache_retention":42}`, "prompt_cache_retention must be a string"},
+	}
+	for _, fixture := range fixtures {
+		if _, err := TranslateResponsesRequest([]byte(fixture.body), RequestOptions{}); err == nil || !strings.Contains(err.Error(), fixture.want) {
+			t.Fatalf("body %s error = %v, want %q", fixture.body, err, fixture.want)
+		}
+	}
+}

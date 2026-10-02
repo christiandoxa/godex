@@ -15,6 +15,7 @@ import (
 	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 	compactgateway "github.com/christiandoxa/godex/internal/gateway/compact"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
+	"github.com/google/uuid"
 )
 
 const (
@@ -58,7 +59,7 @@ func (transport *RuntimeTransport) Execute(ctx context.Context, input proxymodel
 	case routeModelsList, routeModelsSingle:
 		return modelsResponse(input.Method, current)
 	case routeCompact:
-		return compactgateway.LocalFallback(input.Body, "deepseek", "local-policy")
+		return compactgateway.LocalFallback(input.Body, deepSeekProviderKey, "local-policy")
 	case routeResponses:
 		return transport.executeResponses(ctx, input, current)
 	default:
@@ -68,21 +69,21 @@ func (transport *RuntimeTransport) Execute(ctx context.Context, input proxymodel
 
 func (transport *RuntimeTransport) executeResponses(ctx context.Context, input proxymodel.Request, current route) (*proxymodel.Response, error) {
 	model := requestModel(input.Body)
-	models := providerentity.ModelFallbackChain("deepseek", model)
+	models := providerentity.ModelFallbackChain(deepSeekProviderKey, model)
 	if len(models) == 0 {
 		models = []string{"deepseek-v4-pro", "deepseek-v4-flash"}
 	}
 	for index, candidate := range models {
-		body, err := ResponsesRequest(input.Body, RequestOptions{Model: candidate, StrictTools: transport.options.StrictTools})
+		translatedRequest, err := TranslateResponsesRequest(input.Body, RequestOptions{Model: candidate, StrictTools: transport.options.StrictTools})
 		if err != nil {
 			return nil, &proxymodel.Error{StatusCode: http.StatusBadRequest, Message: err.Error()}
 		}
-		response, err := transport.send(ctx, input, current, body)
+		response, err := transport.send(ctx, input, current, translatedRequest.Body)
 		if err != nil {
 			return nil, err
 		}
 		if response.StatusCode >= 200 && response.StatusCode < 300 {
-			return translateResponse(response)
+			return translateResponseWithMetadata(response, translatedRequest.ResponseMetadata)
 		}
 		buffered, err := bufferError(response)
 		if err != nil {
@@ -165,7 +166,7 @@ func applyHeaders(destination, source http.Header, apiKey string, nativeMessages
 	}
 }
 
-func translateResponse(response *http.Response) (*proxymodel.Response, error) {
+func translateResponseWithMetadata(response *http.Response, requestMetadata map[string]any) (*proxymodel.Response, error) {
 	contentType := strings.ToLower(response.Header.Get(contentTypeHeader))
 	if strings.Contains(contentType, "text/event-stream") {
 		header := translatedHeaders(response.Header, "text/event-stream")
@@ -179,16 +180,11 @@ func translateResponse(response *http.Response) (*proxymodel.Response, error) {
 	if len(body) > bodyMaxBytes {
 		return nil, errors.New("DeepSeek translated response exceeded the safe read limit")
 	}
-	translated, err := chatcompat.ChatResponse(body, time.Now())
+	translated, err := chatcompat.ChatResponseWithOptions(body, time.Now(), deepSeekResponseOptions())
 	if err != nil {
 		return nil, err
 	}
-	return &proxymodel.Response{
-		StatusCode: response.StatusCode,
-		Header:     translatedHeaders(response.Header, "application/json"),
-		Body:       io.NopCloser(bytes.NewReader(translated)),
-		Trailer:    response.Trailer.Clone(),
-	}, nil
+	return translatedDeepSeekResponse(response, translated, requestMetadata)
 }
 
 func translatedHeaders(source http.Header, contentType string) http.Header {
@@ -272,3 +268,42 @@ func cloneClient(client *http.Client) *http.Client {
 }
 
 func (transport *RuntimeTransport) Close() { transport.client.CloseIdleConnections() }
+
+func deepSeekResponseOptions() chatcompat.ResponseOptions {
+	return chatcompat.ResponseOptions{
+		ProviderKey:  deepSeekProviderKey,
+		AdapterLabel: "DeepSeek",
+		DefaultModel: "deepseek-v4-pro",
+		FallbackResponseID: func() string {
+			return "resp_deepseek_" + uuid.NewString()
+		},
+		FallbackCallID: func(int) string {
+			return "call_deepseek_" + uuid.NewString()
+		},
+	}
+}
+
+func translatedDeepSeekResponse(
+	response *http.Response,
+	translated []byte,
+	requestMetadata map[string]any,
+) (*proxymodel.Response, error) {
+	if len(requestMetadata) > 0 {
+		var value map[string]any
+		if err := json.Unmarshal(translated, &value); err != nil {
+			return nil, errors.New("failed to parse translated DeepSeek Responses JSON")
+		}
+		mergeResponseMetadata(value, requestMetadata)
+		content, err := json.Marshal(value)
+		if err != nil {
+			return nil, errors.New("failed to serialize translated DeepSeek Responses JSON")
+		}
+		translated = content
+	}
+	return &proxymodel.Response{
+		StatusCode: response.StatusCode,
+		Header:     translatedHeaders(response.Header, "application/json"),
+		Body:       io.NopCloser(bytes.NewReader(translated)),
+		Trailer:    response.Trailer.Clone(),
+	}, nil
+}

@@ -9,6 +9,7 @@ func TestRequireSupportedVersion(t *testing.T) {
 	}{
 		{output: "codex-cli 0.153.2"},
 		{output: "codex-cli 0.159.2"},
+		{output: "codex-cli 0.160.0"},
 		{output: "codex 1.0.0"},
 		{output: "codex-cli 0.153.1", wantErr: true},
 		{output: "codex-cli 0.152.99", wantErr: true},
@@ -30,5 +31,15 @@ func TestParseCodexVersionIgnoresSurroundingText(t *testing.T) {
 	}
 	if version.String() != "0.159.2" {
 		t.Fatalf("version = %s", version.String())
+	}
+}
+
+func TestAuditedVersionIsParseable(t *testing.T) {
+	version, err := parseCodexVersion(AuditedVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if version.String() != "0.160.0" {
+		t.Fatalf("audited version = %s", version.String())
 	}
 }

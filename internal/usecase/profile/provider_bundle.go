@@ -52,7 +52,7 @@ func sourceProviderKind(source profilemodel.ExportedProfile) profileentity.Provi
 }
 
 func providerSupportsCodexRuntime(kind profileentity.ProviderKind) bool {
-	// Prodex 0.434.3 treats OpenAI as the native-Codex route. Anthropic is a
+	// Prodex 0.435.0 treats OpenAI as the native-Codex route. Anthropic is a
 	// Responses adapter, so bundle identity de-duplication is intentionally not
 	// applied across names for Anthropic profiles.
 	return kind == profileentity.ProviderOpenAI

@@ -24,19 +24,35 @@ type translatedRequestParts struct {
 }
 
 func ResponsesRequest(body []byte, options RequestOptions) ([]byte, error) {
-	object, err := parseResponsesObject(body)
+	translated, err := TranslateResponsesRequest(body, options)
 	if err != nil {
 		return nil, err
+	}
+	return translated.Body, nil
+}
+
+func TranslateResponsesRequest(body []byte, options RequestOptions) (TranslatedRequest, error) {
+	object, err := parseResponsesObject(body)
+	if err != nil {
+		return TranslatedRequest{}, err
 	}
 	parts, err := translateRequestParts(object, options.StrictTools)
 	if err != nil {
-		return nil, err
+		return TranslatedRequest{}, err
+	}
+	metadata, err := deepSeekResponseMetadata(object, parts.thinking)
+	if err != nil {
+		return TranslatedRequest{}, err
 	}
 	result, err := buildTranslatedRequest(object, options.Model, parts)
 	if err != nil {
-		return nil, err
+		return TranslatedRequest{}, err
 	}
-	return json.Marshal(result)
+	content, err := json.Marshal(result)
+	if err != nil {
+		return TranslatedRequest{}, err
+	}
+	return TranslatedRequest{Body: content, ResponseMetadata: metadata}, nil
 }
 
 func parseResponsesObject(body []byte) (map[string]any, error) {
