@@ -10,6 +10,7 @@ type Selection struct {
 	Model                 string
 	ContextWindow         *uint64
 	AutoCompactTokenLimit *uint64
+	AutoRedeem            bool
 }
 
 func (selection Selection) Empty() bool {
@@ -21,5 +22,6 @@ func (selection Selection) Empty() bool {
 		selection.URL == "" &&
 		selection.Model == "" &&
 		selection.ContextWindow == nil &&
-		selection.AutoCompactTokenLimit == nil
+		selection.AutoCompactTokenLimit == nil &&
+		!selection.AutoRedeem
 }

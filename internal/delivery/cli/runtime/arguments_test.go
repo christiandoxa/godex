@@ -210,3 +210,26 @@ func TestParseRunArgumentsValidatesProviderBaseURLLikeProdex(t *testing.T) {
 		}
 	}
 }
+
+func TestParseRunArgumentsSupportsAutoRedeem(t *testing.T) {
+	selection, arguments, err := parseRunArguments([]string{"--auto-redeem", "exec", "hello"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !selection.AutoRedeem || len(arguments) != 2 || arguments[0] != "exec" || arguments[1] != "hello" {
+		t.Fatalf("selection/arguments = %#v / %#v", selection, arguments)
+	}
+	if selection.Empty() {
+		t.Fatal("auto-redeem selection unexpectedly reported empty")
+	}
+}
+
+func TestParseRunArgumentsKeepsAutoRedeemLiteralAfterSeparator(t *testing.T) {
+	selection, arguments, err := parseRunArguments([]string{"--", "--auto-redeem"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if selection.AutoRedeem || len(arguments) != 1 || arguments[0] != "--auto-redeem" {
+		t.Fatalf("selection/arguments = %#v / %#v", selection, arguments)
+	}
+}

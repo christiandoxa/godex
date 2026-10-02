@@ -43,6 +43,10 @@ func consumeWrapperArgument(
 	selection *runtimemodel.Selection,
 	features *runtimeFeatures,
 ) (int, bool, error) {
+	if arguments[index] == "--auto-redeem" {
+		selection.AutoRedeem = true
+		return index + 1, true, nil
+	}
 	if next, handled, err := consumeSelectorArgument(arguments, index, selection); handled {
 		return next, true, err
 	}

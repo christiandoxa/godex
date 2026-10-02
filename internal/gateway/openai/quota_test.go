@@ -136,3 +136,35 @@ func TestQuotaClientFetchAtUsesOverrideBaseURL(t *testing.T) {
 		t.Fatal("non-http quota override unexpectedly accepted")
 	}
 }
+
+func TestDecodeQuotaUsageAcceptsResetCreditAliases(t *testing.T) {
+	fixtures := []struct {
+		name string
+		body string
+		want int64
+	}{
+		{"snake", "{\"rate_limit_reset_credits\":{\"available_count\":2}}", 2},
+		{"camel", "{\"rateLimitResetCredits\":{\"availableCount\":3}}", 3},
+	}
+	for _, fixture := range fixtures {
+		t.Run(fixture.name, func(t *testing.T) {
+			usage, err := decodeQuotaUsage([]byte(fixture.body))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if usage.ResetCredits == nil || usage.ResetCredits.AvailableCount != fixture.want {
+				t.Fatalf("reset credits = %#v, want %d", usage.ResetCredits, fixture.want)
+			}
+		})
+	}
+}
+
+func TestDecodeQuotaUsageLeavesMissingResetCreditsUnknown(t *testing.T) {
+	usage, err := decodeQuotaUsage([]byte("{\"plan_type\":\"plus\"}"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if usage.ResetCredits != nil {
+		t.Fatalf("missing reset credits became %#v", usage.ResetCredits)
+	}
+}

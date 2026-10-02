@@ -6,12 +6,17 @@ type Window struct {
 	LimitWindowSeconds *int64
 }
 
+type ResetCredits struct {
+	AvailableCount int64
+}
+
 type Usage struct {
 	PlanType     string
 	Allowed      *bool
 	LimitReached *bool
 	Primary      *Window
 	Secondary    *Window
+	ResetCredits *ResetCredits
 }
 
 type Report struct {

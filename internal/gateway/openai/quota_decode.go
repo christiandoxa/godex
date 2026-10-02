@@ -18,6 +18,13 @@ type rawQuotaUsage struct {
 	OrdinaryUsageAllowed      *bool                      `json:"ordinaryUsageAllowed"`
 	OrdinaryUsageAllowedSnake *bool                      `json:"ordinary_usage_allowed"`
 	RateLimitReachedType      json.RawMessage            `json:"rate_limit_reached_type"`
+	ResetCredits              *rawResetCredits           `json:"rate_limit_reset_credits"`
+	ResetCreditsCamel         *rawResetCredits           `json:"rateLimitResetCredits"`
+}
+
+type rawResetCredits struct {
+	AvailableCount      *int64 `json:"availableCount"`
+	AvailableCountSnake *int64 `json:"available_count"`
 }
 
 type rawQuotaPair struct {
@@ -65,6 +72,11 @@ func decodeQuotaUsage(body []byte) (quotamodel.Usage, error) {
 	usage := quotamodel.Usage{
 		PlanType: plan, Allowed: pair.Allowed, LimitReached: pair.LimitReached,
 		Primary: pair.Primary, Secondary: pair.Secondary,
+	}
+	if credits := firstResetCredits(raw.ResetCredits, raw.ResetCreditsCamel); credits != nil {
+		if available := firstInt64(credits.AvailableCount, credits.AvailableCountSnake); available != nil {
+			usage.ResetCredits = &quotamodel.ResetCredits{AvailableCount: *available}
+		}
 	}
 	if allowed := firstBool(raw.OrdinaryUsageAllowed, raw.OrdinaryUsageAllowedSnake); allowed != nil && !*allowed {
 		usage.Allowed = allowed
@@ -116,6 +128,15 @@ func decodeQuotaWindow(content json.RawMessage) (*quotamodel.Window, error) {
 		ResetAt:            firstInt64(raw.ResetAt, raw.ResetAtCamel, raw.ResetsAt),
 		LimitWindowSeconds: seconds,
 	}, nil
+}
+
+func firstResetCredits(values ...*rawResetCredits) *rawResetCredits {
+	for _, value := range values {
+		if value != nil {
+			return value
+		}
+	}
+	return nil
 }
 
 func firstRaw(values ...json.RawMessage) json.RawMessage {
