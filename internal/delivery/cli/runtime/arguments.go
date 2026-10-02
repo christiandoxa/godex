@@ -4,9 +4,16 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 
 	runtimemodel "github.com/christiandoxa/godex/internal/model/runtime"
+)
+
+const (
+	providerModelOptionName   = "model"
+	providerContextOptionName = "context-window"
+	providerCompactOptionName = "auto-compact-token-limit"
 )
 
 const optionRequiresValueFormat = "%s requires a value"
@@ -104,25 +111,66 @@ func applyProviderSelection(selection *runtimemodel.Selection, name, value strin
 			return err
 		}
 		selection.BaseURL = value
+	case "url":
+		if err := validateCredentialFreeHTTPURL(value, "--url"); err != nil {
+			return err
+		}
+		selection.URL = value
+	case providerModelOptionName:
+		selection.Model = value
+	case providerContextOptionName:
+		parsed, err := parseProviderUint(value, "--context-window")
+		if err != nil {
+			return err
+		}
+		selection.ContextWindow = &parsed
+	case providerCompactOptionName:
+		parsed, err := parseProviderUint(value, "--auto-compact-token-limit")
+		if err != nil {
+			return err
+		}
+		selection.AutoCompactTokenLimit = &parsed
 	}
 	return nil
 }
 
-func finishRunArguments(selection runtimemodel.Selection, features runtimeFeatures, remaining []string) (runtimemodel.Selection, []string, error) {
-	if selection.Provider != "" && selection.Account != "" {
-		return runtimemodel.Selection{}, nil, errors.New("--provider cannot be combined with --account")
-	}
-	if selection.Provider == "" && selection.APIKey != "" {
-		return runtimemodel.Selection{}, nil, errors.New("--api-key requires --provider")
-	}
-	if selection.Provider == "" && selection.BaseURL != "" {
-		return runtimemodel.Selection{}, nil, errors.New("--base-url requires --provider")
+func finishRunArguments(
+	selection runtimemodel.Selection,
+	features runtimeFeatures,
+	remaining []string,
+) (runtimemodel.Selection, []string, error) {
+	if err := validateRunSelection(selection); err != nil {
+		return runtimemodel.Selection{}, nil, err
 	}
 	featureArguments, err := features.arguments()
 	if err != nil {
 		return runtimemodel.Selection{}, nil, err
 	}
-	return selection, append(featureArguments, remaining...), nil
+	codexArguments := append(featureArguments, remaining...)
+	if selection.Model != "" && selection.Provider == "" && selection.URL == "" {
+		codexArguments = append([]string{"--model", selection.Model}, codexArguments...)
+	}
+	return selection, codexArguments, nil
+}
+
+func validateRunSelection(selection runtimemodel.Selection) error {
+	switch {
+	case selection.Provider != "" && selection.Account != "":
+		return errors.New("--provider cannot be combined with --account")
+	case selection.Provider != "" && selection.URL != "":
+		return errors.New("--provider conflicts with --url")
+	case selection.BaseURL != "" && selection.URL != "":
+		return errors.New("--base-url conflicts with --url")
+	case selection.Provider == "" && selection.APIKey != "":
+		return errors.New("--api-key requires --provider")
+	case selection.Provider == "" && selection.BaseURL != "":
+		return errors.New("--base-url requires --provider")
+	case (selection.ContextWindow != nil || selection.AutoCompactTokenLimit != nil) &&
+		selection.Provider == "" && selection.URL == "":
+		return errors.New("context-window options require --provider or --url")
+	default:
+		return nil
+	}
 }
 
 func providerValue(arguments []string, index int) (string, string, int, bool, error) {
@@ -132,6 +180,13 @@ func providerValue(arguments []string, index int) (string, string, int, bool, er
 	for _, option := range []struct{ flag, name string }{
 		{"--provider", "provider"},
 		{"--base-url", "base-url"},
+		{"--url", "url"},
+		{"--model", providerModelOptionName},
+		{"--local-model", providerModelOptionName},
+		{"--context-window", providerContextOptionName},
+		{"--local-context-window", providerContextOptionName},
+		{"--auto-compact-token-limit", providerCompactOptionName},
+		{"--local-auto-compact-token-limit", providerCompactOptionName},
 	} {
 		value, consumed, ok, err := namedOptionValue(arguments, index, option.flag)
 		if ok {
@@ -201,8 +256,12 @@ func namedOptionValue(arguments []string, index int, name string) (string, int, 
 }
 
 func validateProviderBaseURL(value string) error {
+	return validateCredentialFreeHTTPURL(value, "--base-url")
+}
+
+func validateCredentialFreeHTTPURL(value, option string) error {
 	invalid := func() error {
-		return errors.New("invalid --base-url: expected an absolute http(s) URL with host and no credentials, query, or fragment")
+		return fmt.Errorf("invalid %s: expected an absolute http(s) URL with host and no credentials, query, or fragment", option)
 	}
 	if strings.HasPrefix(value, "http:///") || strings.HasPrefix(value, "https:///") {
 		return invalid()
@@ -214,6 +273,14 @@ func validateProviderBaseURL(value string) error {
 		return invalid()
 	}
 	return nil
+}
+
+func parseProviderUint(value, option string) (uint64, error) {
+	parsed, err := strconv.ParseUint(value, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("%s expects an unsigned integer", option)
+	}
+	return parsed, nil
 }
 
 func selectorValue(arguments []string, index int) (string, string, int, bool, error) {

@@ -405,12 +405,20 @@ beside the command they serve.
 
 No access token, ID token, refresh token, or API token belongs in this file.
 
+Local-provider launches deliberately bypass the HTTP routing gateway. The CLI
+parses `--url` plus model/context/compact overrides, `usecase/runtime` renders
+the bounded `prodex-local` Codex `-c` entries, and the Codex process runs in the
+selected/active home directly against that endpoint. This keeps local endpoint
+traffic out of quota preflight, managed-account rotation, durable upstream
+affinity, and provider credential state while preserving the same Codex home for
+rollout/session ownership.
+
 ## 1:1 expansion boundary
 
 The verified OpenAI/Codex core remains the stability baseline while Godex expands
-toward feature-for-feature Prodex 0.434.3 parity. Multi-provider bridges, Super,
-gateway, richer diagnostics, remaining provider runtime bridges, and any still-
-missing provider-specific import/bundle surfaces remain implementation backlog
+toward feature-for-feature Prodex 0.434.3 parity. Remaining multi-provider
+bridges, Super, gateway, richer diagnostics, provider runtime bridges, and any
+still-missing provider-specific import/bundle surfaces remain implementation backlog
 rather than permanent exclusions.
 Manual redeem, `ping openai`, explicit self-update, and the best-effort cached
 update notice are now implemented reference surfaces. OpenAI/Anthropic/Kiro/Copilot bundle

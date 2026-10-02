@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
+	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	runtimemodel "github.com/christiandoxa/godex/internal/model/runtime"
 	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
 )
@@ -29,6 +31,10 @@ func runProfilelessProviderSelection(
 		return errors.New("godex run --provider anthropic requires a Claude profile, --api-key, or ANTHROPIC_API_KEY(S)")
 	}
 	provider := runtimeusecase.AnthropicProvider("anthropic-api-key", selection.BaseURL)
+	applyProviderSelectionModel(&provider, selection.Model)
+	if err := runtimeusecase.ApplyProviderSelectionLimits(&provider, selection.ContextWindow, selection.AutoCompactTokenLimit); err != nil {
+		return err
+	}
 	return runner.RunProviderAPIKeys(ctx, "", provider, keys, arguments)
 }
 
@@ -86,6 +92,12 @@ func runProviderAPIKeySelection(
 		}
 	}
 	provider := runtimeusecase.AnthropicProvider(name, request.selection.BaseURL)
+	applyProviderSelectionModel(&provider, request.selection.Model)
+	if err := runtimeusecase.ApplyProviderSelectionLimits(
+		&provider, request.selection.ContextWindow, request.selection.AutoCompactTokenLimit,
+	); err != nil {
+		return err
+	}
 	if request.found && request.target.AccountID != "" {
 		return runner.RunProviderAPIKeysAccount(
 			ctx, request.target.AccountID, provider, request.keys, request.arguments,
@@ -113,6 +125,10 @@ func runProviderOAuthSelection(
 	if selection.BaseURL != "" {
 		provider.APIURL = selection.BaseURL
 	}
+	applyProviderSelectionModel(&provider, selection.Model)
+	if err := runtimeusecase.ApplyProviderSelectionLimits(&provider, selection.ContextWindow, selection.AutoCompactTokenLimit); err != nil {
+		return err
+	}
 	pool, err := profiles.ProviderLaunchPool(ctx, target.Name, anthropicProviderKind, selection.Profile == "")
 	if err != nil {
 		return err
@@ -121,4 +137,13 @@ func runProviderOAuthSelection(
 		profiles: profiles, selected: target, provider: provider, pool: pool,
 		arguments: arguments, apiURLOverride: selection.BaseURL,
 	})
+}
+
+func applyProviderSelectionModel(provider *proxymodel.Provider, model string) {
+	if provider == nil {
+		return
+	}
+	if model = strings.TrimSpace(model); model != "" {
+		provider.DefaultModel = model
+	}
 }

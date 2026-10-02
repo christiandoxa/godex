@@ -213,6 +213,27 @@ are removed from the Codex child process and raw keys are never persisted in
 profile metadata, routing bindings, or bundles. Without API keys, the same
 `--provider anthropic` shortcut resolves managed Claude OAuth profiles.
 
+Local OpenAI-compatible Responses endpoints now match Prodex's `--url` surface.
+For example:
+
+~~~bash
+godex run --url http://127.0.0.1:8131 --model qwen3-coder exec "review this repository"
+godex run --url http://127.0.0.1:8131 \
+  --context-window 32768 --auto-compact-token-limit 30000
+~~~
+
+A root URL is normalized to `/v1`; an explicit path is preserved with only its
+trailing slash removed. Godex generates the same `prodex-local` Codex provider
+configuration: Responses wire API, OpenAI-auth requirement, WebSockets disabled,
+reasoning summaries disabled, web search disabled, apps/JS REPL/image generation
+disabled. The default model is `unsloth/qwen3.5-35b-a3b`, with a 16,384-token
+context window and 14,000-token auto-compact threshold. `--local-model`,
+`--local-context-window`, and `--local-auto-compact-token-limit` remain aliases
+for the standard model/context flags. Local launches use the selected or active
+Codex home for session state but run Codex directly against the local endpoint;
+they do not enter Godex's quota gate, upstream account rotation, or provider
+credential proxy.
+
 Prodex-compatible Codex runtime feature flags are translated to Codex `-c`
 overrides before the remaining Codex arguments. Explicit later Codex `-c`
 arguments still win:

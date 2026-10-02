@@ -122,7 +122,12 @@ and eligibility validation stays in the runtime use case.
   quota watch, log stream/upstream, and redeem confirmation have been migrated;
   non-TTY fallbacks remain line-oriented.
 - Multi-provider runtime/login parity remains incomplete for Gemini, Kiro,
-  DeepSeek/local/AGY where present in Prodex. Anthropic now has both managed
+  DeepSeek/AGY where present in Prodex. The Prodex local OpenAI-compatible
+  `--url` runtime surface is implemented: Godex validates credential-free
+  HTTP(S) endpoints, normalizes root URLs to `/v1`, generates the exact
+  `prodex-local` Responses provider config/default model/context/compact
+  settings, preserves later Codex argument precedence, and launches directly
+  without quota/account/provider rotation. Anthropic now has both managed
   Claude OAuth and raw API-key runtime paths. The OAuth path has a foreground
   runtime bridge:
   the private .credentials.json token is resolved per profile, expired OAuth is

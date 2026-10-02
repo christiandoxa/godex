@@ -33,10 +33,12 @@ func (fakeRunnerAccounts) List(context.Context) ([]accountentity.Account, error)
 func (fakeRunnerAccounts) CodexHome(string) string { return "/synthetic/codex" }
 
 type fakeRunnerProcess struct {
+	home      string
 	arguments []string
 }
 
-func (process *fakeRunnerProcess) Run(_ context.Context, _ string, arguments []string) error {
+func (process *fakeRunnerProcess) Run(_ context.Context, home string, arguments []string) error {
+	process.home = home
 	process.arguments = append([]string(nil), arguments...)
 	return nil
 }
@@ -200,5 +202,100 @@ func TestLaunchRuntimeProviderSupportsCopilotAndAnthropic(t *testing.T) {
 	}
 	if _, err := launchRuntimeProvider(profilemodel.LaunchTarget{Provider: "kiro"}); err == nil || !strings.Contains(err.Error(), "not implemented") {
 		t.Fatalf("unsupported provider error = %v", err)
+	}
+}
+
+type fakeLocalLaunchProfiles struct {
+	target   profilemodel.LaunchTarget
+	active   bool
+	acquired []string
+	released int
+}
+
+func (fake *fakeLocalLaunchProfiles) ResolveLaunch(_ context.Context, name string) (profilemodel.LaunchTarget, error) {
+	if fake.target.Name != name {
+		return profilemodel.LaunchTarget{}, errors.New("missing profile")
+	}
+	return fake.target, nil
+}
+
+func (fake *fakeLocalLaunchProfiles) ActiveLaunch(context.Context) (profilemodel.LaunchTarget, bool, error) {
+	return fake.target, fake.active, nil
+}
+
+func (fake *fakeLocalLaunchProfiles) AcquireLaunch(_ context.Context, name string) (func() error, error) {
+	fake.acquired = append(fake.acquired, name)
+	return func() error {
+		fake.released++
+		return nil
+	}, nil
+}
+
+func (fake *fakeLocalLaunchProfiles) ProviderLaunchPool(context.Context, string, string, bool) ([]profilemodel.LaunchTarget, error) {
+	return nil, errors.New("provider pool must not run for --url")
+}
+
+func (fake *fakeLocalLaunchProfiles) ResolveProviderLaunch(context.Context, string, string) (profilemodel.LaunchTarget, bool, error) {
+	return profilemodel.LaunchTarget{}, false, errors.New("provider resolution must not run for --url")
+}
+
+func (fake *fakeLocalLaunchProfiles) AcquireLaunchPool(context.Context, []string) (func() error, error) {
+	return nil, errors.New("provider pool lease must not run for --url")
+}
+
+func TestRunHomeLocalProviderKeepsResolvedHome(t *testing.T) {
+	process := &fakeRunnerProcess{}
+	runner := runtimeusecase.NewRunner(&fakeRunnerAccounts{}, process, nil)
+	home := "/synthetic/resolved-home"
+	if err := RunHome(context.Background(), runner, nil, home, []string{
+		"--url", "http://127.0.0.1:8131", "--model", "qwen3-coder", "exec", "review",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if process.home != home {
+		t.Fatalf("local provider home = %q, want %q", process.home, home)
+	}
+	joined := strings.Join(process.arguments, "\n")
+	for _, expected := range []string{
+		"model_provider=\"prodex-local\"",
+		"model=\"qwen3-coder\"",
+		"model_providers.prodex-local.base_url=\"http://127.0.0.1:8131/v1\"",
+	} {
+		if !strings.Contains(joined, expected) {
+			t.Fatalf("local provider args missing %q: %#v", expected, process.arguments)
+		}
+	}
+}
+
+func TestRunProfilesLocalProviderUsesExplicitStandaloneProfileLease(t *testing.T) {
+	process := &fakeRunnerProcess{}
+	runner := runtimeusecase.NewRunner(&fakeRunnerAccounts{}, process, nil)
+	profiles := &fakeLocalLaunchProfiles{target: profilemodel.LaunchTarget{
+		Name: "local-home", CodexHome: "/synthetic/local-home",
+	}}
+	if err := RunProfiles(context.Background(), runner, nil, profiles, []string{
+		"--profile", "local-home", "--url", "http://127.0.0.1:8131", "exec",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if process.home != "/synthetic/local-home" || strings.Join(profiles.acquired, ",") != "local-home" || profiles.released != 1 {
+		t.Fatalf("home/lease = %q / %v / %d", process.home, profiles.acquired, profiles.released)
+	}
+}
+
+func TestRunProfilesLocalProviderUsesActiveStandaloneProfile(t *testing.T) {
+	process := &fakeRunnerProcess{}
+	runner := runtimeusecase.NewRunner(&fakeRunnerAccounts{}, process, nil)
+	profiles := &fakeLocalLaunchProfiles{
+		target: profilemodel.LaunchTarget{Name: "active-local", CodexHome: "/synthetic/active-local"},
+		active: true,
+	}
+	if err := RunProfiles(context.Background(), runner, nil, profiles, []string{
+		"--url=http://127.0.0.1:8131", "exec",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if process.home != "/synthetic/active-local" || strings.Join(profiles.acquired, ",") != "active-local" || profiles.released != 1 {
+		t.Fatalf("active home/lease = %q / %v / %d", process.home, profiles.acquired, profiles.released)
 	}
 }

@@ -35,6 +35,9 @@ func Run(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionus
 	if selection.Profile != "" {
 		return errors.New("--profile requires profile-aware runtime dispatch")
 	}
+	if selection.URL != "" {
+		return runner.RunLocalProvider(ctx, selection.Account, localProviderConfig(selection), codexArguments)
+	}
 	if selection.Provider != "" {
 		return runProfilelessProviderSelection(ctx, runner, selection, codexArguments)
 	}
@@ -57,6 +60,12 @@ func RunHome(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessi
 	if selection.Profile != "" {
 		return errors.New("--profile cannot override an already resolved profile home")
 	}
+	if selection.URL != "" {
+		if selection.Account != "" {
+			return runner.RunLocalProvider(ctx, selection.Account, localProviderConfig(selection), codexArguments)
+		}
+		return runner.RunLocalProviderHome(ctx, home, localProviderConfig(selection), codexArguments)
+	}
 	if selection.Account != "" {
 		return runParsed(ctx, runner, sessions, selection.Account, codexArguments)
 	}
@@ -64,6 +73,9 @@ func RunHome(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessi
 }
 
 func runProfileSelection(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionusecase.Catalog, profiles launchProfiles, selection runtimemodel.Selection, codexArguments []string) error {
+	if selection.URL != "" {
+		return runLocalProviderSelection(ctx, runner, profiles, selection, codexArguments)
+	}
 	if selection.Provider != "" {
 		return runProviderSelection(ctx, runner, profiles, selection, codexArguments)
 	}
