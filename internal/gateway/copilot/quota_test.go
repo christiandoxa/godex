@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 )
@@ -95,5 +96,25 @@ func TestCopilotProfileQuotaRequiresHostAndLogin(t *testing.T) {
 		if _, err := source.FetchQuota(context.Background(), target); err == nil {
 			t.Fatalf("incomplete target %#v unexpectedly accepted", target)
 		}
+	}
+}
+
+func TestCopilotQuotaResetMatchesProdexSummaryAndLocalEpoch(t *testing.T) {
+	reset := " 2026-11-01 "
+	summary, epoch := copilotQuotaReset(&reset)
+	if summary != "monthly 2026-11-01" || epoch == nil {
+		t.Fatalf("reset = %q / %#v", summary, epoch)
+	}
+	want := time.Date(2026, 11, 1, 0, 0, 0, 0, time.Local).Unix()
+	if *epoch != want {
+		t.Fatalf("reset epoch = %d, want %d", *epoch, want)
+	}
+	empty := "   "
+	summary, epoch = copilotQuotaReset(&empty)
+	if summary != "monthly " || epoch != nil {
+		t.Fatalf("empty reset = %q / %#v", summary, epoch)
+	}
+	if summary, epoch := copilotQuotaReset(nil); summary != "" || epoch != nil {
+		t.Fatalf("nil reset = %q / %#v", summary, epoch)
 	}
 }

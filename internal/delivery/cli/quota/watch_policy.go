@@ -215,6 +215,9 @@ func quotaReportStatusRank(report quotamodel.Report) int {
 
 func quotaReportResetEpoch(report quotamodel.Report) int64 {
 	result := int64(math.MaxInt64)
+	if report.External != nil && report.External.ResetAt != nil {
+		result = *report.External.ResetAt
+	}
 	for _, window := range []*quotamodel.Window{report.Usage.Primary, report.Usage.Secondary} {
 		if window != nil && window.ResetAt != nil && *window.ResetAt < result {
 			result = *window.ResetAt

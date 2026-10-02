@@ -367,3 +367,17 @@ func TestQuotaSortPolicyMatchesProdexOrderAndTextRules(t *testing.T) {
 		t.Fatal("case-insensitive trimmed quota text ordering drift")
 	}
 }
+
+func TestQuotaRemainingSortUsesExternalResetEpoch(t *testing.T) {
+	early := int64(100)
+	late := int64(200)
+	available := true
+	reports := []quotamodel.Report{
+		{ProfileName: "late", Provider: "copilot", State: "ready", External: &quotamodel.ExternalInfo{Available: &available, ResetAt: &late}},
+		{ProfileName: "early", Provider: "copilot", State: "ready", External: &quotamodel.ExternalInfo{Available: &available, ResetAt: &early}},
+	}
+	sorted := quotaSortedReports(reports, quotaProviderAll, quotaSortRemaining)
+	if len(sorted) != 2 || sorted[0].ProfileName != "early" || sorted[1].ProfileName != "late" {
+		t.Fatalf("sorted = %#v", sorted)
+	}
+}

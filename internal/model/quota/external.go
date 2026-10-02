@@ -12,6 +12,7 @@ type ExternalInfo struct {
 	Status    string
 	Main      string
 	Reset     string
+	ResetAt   *int64
 	Available *bool
 	Details   []ExternalDetail
 }

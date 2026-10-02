@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
@@ -56,15 +57,26 @@ func copilotQuotaExternal(info userInfo, fallbackLogin string) quotamodel.Extern
 	if percent, ok := copilotRemainingPercent(chatRemaining, chatTotal, completionRemaining, completionTotal); ok {
 		details = append(details, quotamodel.ExternalDetail{Label: "Remaining", Value: fmt.Sprintf("%d%%", percent)})
 	}
-	reset := ""
-	if info.LimitedUserResetDate != nil && strings.TrimSpace(*info.LimitedUserResetDate) != "" {
-		reset = "monthly " + strings.TrimSpace(*info.LimitedUserResetDate)
-	}
+	reset, resetAt := copilotQuotaReset(info.LimitedUserResetDate)
 	return quotamodel.ExternalInfo{
 		Provider: "GitHub Copilot", Account: account, Plan: plan,
 		Status: status, Main: copilotQuotaMain(chatRemaining, chatTotal, completionRemaining, completionTotal),
-		Reset: reset, Available: &ready, Details: details,
+		Reset: reset, ResetAt: resetAt, Available: &ready, Details: details,
 	}
+}
+
+func copilotQuotaReset(value *string) (string, *int64) {
+	if value == nil {
+		return "", nil
+	}
+	trimmed := strings.TrimSpace(*value)
+	reset := "monthly " + trimmed
+	parsed, err := time.ParseInLocation("2006-01-02", trimmed, time.Local)
+	if err != nil {
+		return reset, nil
+	}
+	epoch := parsed.Unix()
+	return reset, &epoch
 }
 
 func copilotQuotaFeature(info userInfo, key string) (*int64, *int64) {
