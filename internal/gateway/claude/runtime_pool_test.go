@@ -97,7 +97,7 @@ func TestAnthropicAPIKeyPoolExhaustsModelsBeforeCredentialRotation(t *testing.T)
 			_, _ = writer.Write([]byte(`{"error":{"code":"quota_exhausted"}}`))
 			return
 		}
-		_, _ = writer.Write([]byte(`{"id":"chat_ok","model":"claude-sonnet-4-6","choices":[{"message":{"role":"assistant","content":"ok"}}]}`))
+		_, _ = writer.Write([]byte(`{"id":"chat_ok","model":"claude-sonnet-5-5","choices":[{"message":{"role":"assistant","content":"ok"}}]}`))
 	}))
 	defer server.Close()
 
@@ -132,9 +132,9 @@ func TestAnthropicAPIKeyPoolExhaustsModelsBeforeCredentialRotation(t *testing.T)
 	mu.Lock()
 	defer mu.Unlock()
 	want := []string{
-		"Bearer key-one:claude-sonnet-4-6",
-		"Bearer key-one:claude-opus-4-8",
-		"Bearer key-two:claude-sonnet-4-6",
+		"Bearer key-one:claude-sonnet-5-5",
+		"Bearer key-one:claude-opus-5-5",
+		"Bearer key-two:claude-sonnet-5-5",
 	}
 	if strings.Join(attempts, "|") != strings.Join(want, "|") {
 		t.Fatalf("attempts = %#v, want %#v", attempts, want)

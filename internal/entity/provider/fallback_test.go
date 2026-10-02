@@ -11,13 +11,19 @@ func TestModelFallbackChainMatchesProdexAnthropicAndCopilot(t *testing.T) {
 		provider, model string
 		want            []string
 	}{
-		{"anthropic", "", []string{"claude-sonnet-4-6", "claude-opus-4-8", "claude-haiku-4-5"}},
-		{"anthropic", "DEFAULT", []string{"claude-sonnet-4-6", "claude-opus-4-8", "claude-haiku-4-5"}},
-		{"anthropic", "best", []string{"claude-opus-4-8", "claude-sonnet-4-6"}},
-		{"anthropic", "pro", []string{"claude-sonnet-4-6", "claude-opus-4-8"}},
-		{"anthropic", "flash", []string{"claude-haiku-4-5", "claude-sonnet-4-6"}},
-		{"copilot", "pro", []string{"gpt-5.3-codex", "gpt-5.1-codex", "gpt-4o"}},
-		{"copilot", "sonnet", []string{"claude-sonnet-4-6", "gpt-5.3-codex", "gpt-5.1-codex"}},
+		{"anthropic", "", []string{"claude-sonnet-5-5", "claude-opus-5-5", "claude-haiku-4-5"}},
+		{"anthropic", "DEFAULT", []string{"claude-sonnet-5-5", "claude-opus-5-5", "claude-haiku-4-5"}},
+		{"anthropic", "best", []string{"claude-opus-5-5", "claude-sonnet-5-5"}},
+		{"anthropic", "pro", []string{"claude-sonnet-5-5", "claude-opus-5-5"}},
+		{"anthropic", "flash", []string{"claude-haiku-4-5", "claude-sonnet-5-5"}},
+		{"copilot", "", []string{"gpt-6-astra", "gpt-6.1-sol", "gpt-5.3-codex"}},
+		{"copilot", "pro", []string{"gpt-6-astra", "gpt-6.1-sol", "gpt-5.3-codex"}},
+		{"copilot", "astra", []string{"gpt-6-astra", "gpt-6.1-sol", "gpt-6-luna"}},
+		{"copilot", "sol", []string{"gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna"}},
+		{"copilot", "luna", []string{"gpt-6-luna", "gpt-6.1-sol"}},
+		{"copilot", "gpt-5.3-codex", []string{"gpt-5.3-codex", "gpt-6.1-sol", "gpt-6-luna"}},
+		{"copilot", "sonnet", []string{"claude-sonnet-5-5", "gpt-6.1-sol", "gpt-5.3-codex"}},
+		{"copilot", "gemini", []string{"gemini-3.8-flash", "gpt-6.1-sol", "gpt-5.3-codex"}},
 	}
 	for _, fixture := range cases {
 		if got := ModelFallbackChain(fixture.provider, fixture.model); !reflect.DeepEqual(got, fixture.want) {

@@ -94,10 +94,6 @@ func buildCopilotExternalCatalog(
 		return nil, err
 	}
 	dynamicModels := parseDynamicCopilotModels(dynamic)
-	seeds, err := proxymodel.CopilotExternalCatalogSeeds()
-	if err != nil {
-		return nil, err
-	}
 	providerEntries, err := proxymodel.CopilotProviderCatalog()
 	if err != nil {
 		return nil, err
@@ -111,14 +107,14 @@ func buildCopilotExternalCatalog(
 	if err != nil {
 		return nil, err
 	}
-	candidates := copilotCatalogCandidates(launchModel, dynamicModels, seeds)
+	candidates := copilotCatalogCandidates(launchModel, dynamicModels, providerEntries)
 	models := make([]map[string]any, 0, len(candidates))
 	for _, candidate := range candidates {
 		if len(models) >= proxymodel.ProviderCatalogMaxItems {
 			return nil, fmt.Errorf("provider model catalog exceeds the hard limit of %d entries", proxymodel.ProviderCatalogMaxItems)
 		}
 		dynamicModel := exactDynamicModel(dynamicModels, candidate.slug)
-		displayName, description := copilotCatalogMetadata(candidate.slug, dynamicModel, seeds)
+		displayName, description := copilotCatalogMetadata(candidate.slug, dynamicModel, providerEntries)
 		modelContext := candidate.contextWindow
 		if modelContext == 0 {
 			modelContext = contextWindow
@@ -141,20 +137,21 @@ func buildCopilotExternalCatalog(
 func copilotCatalogCandidates(
 	launchModel string,
 	dynamic []dynamicCopilotModel,
-	seeds []proxymodel.CopilotExternalCatalogSeed,
+	entries []proxymodel.ProviderCatalogEntry,
 ) []catalogCandidate {
-	result := make([]catalogCandidate, 0, 1+len(dynamic)+len(seeds))
+	result := make([]catalogCandidate, 0, 1+len(dynamic)+len(entries))
 	seen := make(map[string]bool, cap(result))
 	appendCandidate := func(slug string, contextWindow uint64) {
 		slug = strings.TrimSpace(slug)
-		if slug == "" || seen[strings.ToLower(slug)] {
+		key := strings.ToLower(slug)
+		if slug == "" || seen[key] {
 			return
 		}
-		seen[strings.ToLower(slug)] = true
+		seen[key] = true
 		result = append(result, catalogCandidate{slug: slug, contextWindow: contextWindow})
 	}
 	launchDynamic := exactDynamicModel(dynamic, launchModel)
-	launchContext := copilotModelPromptLimit(launchModel)
+	launchContext := copilotModelPromptLimit(launchModel, entries)
 	if launchDynamic != nil && launchDynamic.contextWindow > 0 {
 		launchContext = launchDynamic.contextWindow
 	}
@@ -162,12 +159,12 @@ func copilotCatalogCandidates(
 	for _, model := range dynamic {
 		contextWindow := model.contextWindow
 		if contextWindow == 0 {
-			contextWindow = copilotModelPromptLimit(model.slug)
+			contextWindow = copilotModelPromptLimit(model.slug, entries)
 		}
 		appendCandidate(model.slug, contextWindow)
 	}
-	for _, seed := range seeds {
-		appendCandidate(seed.Slug, copilotModelPromptLimit(seed.Slug))
+	for _, entry := range entries {
+		appendCandidate(entry.ID, copilotModelPromptLimit(entry.ID, entries))
 	}
 	return result
 }
@@ -212,14 +209,13 @@ func exactDynamicModel(models []dynamicCopilotModel, slug string) *dynamicCopilo
 func copilotCatalogMetadata(
 	slug string,
 	dynamic *dynamicCopilotModel,
-	seeds []proxymodel.CopilotExternalCatalogSeed,
+	entries []proxymodel.ProviderCatalogEntry,
 ) (string, string) {
-	fallbackName, fallbackDescription := slug, "External provider model routed through the Prodex Responses adapter."
-	for _, seed := range seeds {
-		if strings.EqualFold(seed.Slug, slug) {
-			fallbackName, fallbackDescription = seed.DisplayName, seed.Description
-			break
-		}
+	fallbackName := strings.TrimSpace(slug)
+	fallbackDescription := "External provider model routed through the Prodex Responses adapter."
+	if entry := proxymodel.ResolveProviderCatalogEntry(entries, slug); entry != nil {
+		fallbackName = entry.DisplayName
+		fallbackDescription = entry.Description
 	}
 	if dynamic == nil {
 		return fallbackName, fallbackDescription
@@ -304,17 +300,7 @@ func copilotProviderCatalogEntry(
 	entries []proxymodel.ProviderCatalogEntry,
 	slug string,
 ) *proxymodel.ProviderCatalogEntry {
-	for index := range entries {
-		if strings.EqualFold(entries[index].ID, slug) {
-			return &entries[index]
-		}
-		for _, alias := range entries[index].Aliases {
-			if strings.EqualFold(alias, slug) {
-				return &entries[index]
-			}
-		}
-	}
-	return nil
+	return proxymodel.ResolveProviderCatalogEntry(entries, slug)
 }
 
 func reasoningEffortDescription(effort string) string {
@@ -340,9 +326,9 @@ func reasoningEffortDescription(effort string) string {
 	}
 }
 
-func copilotModelPromptLimit(model string) uint64 {
+func copilotModelPromptLimit(model string, entries []proxymodel.ProviderCatalogEntry) uint64 {
 	switch strings.ToLower(strings.TrimSpace(model)) {
-	case "auto", "codex", "gpt-5.3-codex", "gpt-5.1-codex", "gpt-5.1-codex-max", "gpt-5.1-codex-mini":
+	case "auto", "codex", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.3-codex", "gpt-5.1-codex", "gpt-5.1-codex-max", "gpt-5.1-codex-mini":
 		return 272_000
 	case "gpt-5.5", "gpt-5.4":
 		return 922_000
@@ -350,9 +336,11 @@ func copilotModelPromptLimit(model string) uint64 {
 		return 936_000
 	case "gpt-5-mini", "gpt-5.4-mini", "gpt-5.4-nano", "raptor-mini":
 		return 128_000
-	default:
-		return 0
 	}
+	if entry := proxymodel.ResolveProviderCatalogEntry(entries, model); entry != nil && entry.ContextWindowTokens != nil {
+		return *entry.ContextWindowTokens
+	}
+	return 0
 }
 
 func catalogMapString(value map[string]any, keys ...string) string {

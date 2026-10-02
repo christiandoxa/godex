@@ -7,7 +7,7 @@ import (
 	"unicode"
 )
 
-const defaultRuntimeModel = "gpt-5.3-codex"
+const defaultRuntimeModel = "gpt-6-astra"
 const copilotImageURLField = "image_url"
 
 func canonicalizeCopilotRequest(body []byte) []byte {
@@ -35,12 +35,16 @@ func canonicalizeCopilotRequest(body []byte) []byte {
 func canonicalCopilotModel(model string) string {
 	trimmed := strings.TrimSpace(model)
 	switch strings.ToLower(trimmed) {
-	case "", "auto", "default", "codex":
+	case "", "auto", "default", "codex", "astra":
 		return defaultRuntimeModel
-	case "sonnet":
-		return "claude-sonnet-4-6"
+	case "sol":
+		return "gpt-6.1-sol"
+	case "luna":
+		return "gpt-6-luna"
+	case "sonnet", "claude":
+		return "claude-sonnet-5-5"
 	case "gemini":
-		return "gemini-3.1-pro-preview"
+		return "gemini-3.8-flash"
 	default:
 		return trimmed
 	}

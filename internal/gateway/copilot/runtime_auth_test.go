@@ -33,10 +33,10 @@ func TestRuntimeAuthPrefersDirectOAuthModels(t *testing.T) {
 		t.Fatalf("auth/legacy = %#v / %d", auth, legacyCalls)
 	}
 	ids := auth.modelIDs()
-	if len(ids) != 27 || ids[0] != "gpt-5.6-luna" || ids[25] != "gpt-4o" || ids[26] != "account/custom-model" {
+	if len(ids) != 31 || ids[0] != "gpt-6-astra" || ids[30] != "account/custom-model" {
 		t.Fatalf("model ids = %#v", ids)
 	}
-	custom := auth.ModelCatalog()[26]
+	custom := auth.ModelCatalog()[30]
 	if custom["display_name"] != "Account Custom" || custom["context_window"] != uint64(345678) || custom["max_prompt_tokens"] != uint64(345678) {
 		t.Fatalf("custom catalog entry = %#v", custom)
 	}
@@ -66,7 +66,7 @@ func TestRuntimeAuthFallsBackToLegacyExchange(t *testing.T) {
 		t.Fatalf("auth = %#v, err = %v", auth, err)
 	}
 	ids := auth.modelIDs()
-	if len(ids) != 27 || ids[26] != "legacy/custom-model" {
+	if len(ids) != 31 || ids[30] != "legacy/custom-model" {
 		t.Fatalf("legacy model ids = %#v", ids)
 	}
 }

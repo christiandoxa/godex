@@ -118,6 +118,90 @@
   {
     "provider": "anthropic",
     "owned_by": "anthropic",
+    "id": "claude-opus-5-5",
+    "display_name": "Claude Opus 5.5",
+    "description": "Anthropic Claude Opus 5.5 flagship model.",
+    "context_window_tokens": 1000000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": false,
+      "reasoning": true
+    },
+    "pricing_known": false,
+    "max_output_tokens": 128000
+  },
+  {
+    "provider": "anthropic",
+    "owned_by": "anthropic",
+    "id": "claude-sonnet-5-5",
+    "display_name": "Claude Sonnet 5.5",
+    "description": "Anthropic Claude Sonnet 5.5 balanced model.",
+    "context_window_tokens": 1000000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": false,
+      "reasoning": true
+    },
+    "pricing_known": false,
+    "max_output_tokens": 128000
+  },
+  {
+    "provider": "anthropic",
+    "owned_by": "anthropic",
+    "id": "claude-fable-5-1",
+    "display_name": "Claude Fable 5.1",
+    "description": "Anthropic Claude Fable 5.1 model.",
+    "context_window_tokens": 1000000,
+    "input_cost_per_million_microusd": null,
+    "output_cost_per_million_microusd": null,
+    "supported_endpoints": [
+      "responses",
+      "responses/compact",
+      "chat-completions",
+      "messages",
+      "models"
+    ],
+    "aliases": [],
+    "feature_flags": {
+      "tools": true,
+      "json_schema": false,
+      "vision": false,
+      "audio": false,
+      "web_search": false,
+      "reasoning": true
+    },
+    "pricing_known": false,
+    "max_output_tokens": 128000
+  },
+  {
+    "provider": "anthropic",
+    "owned_by": "anthropic",
     "id": "claude-opus-4-8",
     "display_name": "Claude Opus 4.8",
     "description": "Anthropic model exposed through Prodex.",

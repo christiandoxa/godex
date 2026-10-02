@@ -10,12 +10,12 @@ import (
 )
 
 const (
-	copilotDefaultModel       = "gpt-5.3-codex"
-	copilotContextWindow      = int64(272_000)
-	copilotAutoCompactLimit   = int64(258_400)
-	anthropicDefaultModel     = "claude-sonnet-4-6"
-	anthropicContextWindow    = int64(200_000)
-	anthropicAutoCompactLimit = int64(180_000)
+	copilotDefaultModel       = "gpt-6-astra"
+	copilotContextWindow      = int64(1_050_000)
+	copilotAutoCompactLimit   = int64(997_500)
+	anthropicDefaultModel     = "claude-sonnet-5-5"
+	anthropicContextWindow    = int64(1_000_000)
+	anthropicAutoCompactLimit = int64(950_000)
 	anthropicDefaultAPIURL    = "https://api.anthropic.com/v1"
 	deepSeekDefaultModel      = "deepseek-v4-pro"
 	deepSeekContextWindow     = int64(1_048_576)

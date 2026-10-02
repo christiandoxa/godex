@@ -14,11 +14,11 @@ import (
 
 func TestAnthropicModelFallbackChainsMatchProdex(t *testing.T) {
 	fixtures := map[string][]string{
-		"":        {"claude-sonnet-4-6", "claude-opus-4-8", "claude-haiku-4-5"},
-		"DEFAULT": {"claude-sonnet-4-6", "claude-opus-4-8", "claude-haiku-4-5"},
-		"best":    {"claude-opus-4-8", "claude-sonnet-4-6"},
-		"pro":     {"claude-sonnet-4-6", "claude-opus-4-8"},
-		"flash":   {"claude-haiku-4-5", "claude-sonnet-4-6"},
+		"":        {"claude-sonnet-5-5", "claude-opus-5-5", "claude-haiku-4-5"},
+		"DEFAULT": {"claude-sonnet-5-5", "claude-opus-5-5", "claude-haiku-4-5"},
+		"best":    {"claude-opus-5-5", "claude-sonnet-5-5"},
+		"pro":     {"claude-sonnet-5-5", "claude-opus-5-5"},
+		"flash":   {"claude-haiku-4-5", "claude-sonnet-5-5"},
 	}
 	for model, want := range fixtures {
 		body, _ := json.Marshal(map[string]any{"model": model, "input": "hello"})
@@ -61,7 +61,7 @@ func TestAnthropicResponsesFallsBackAcrossModelsBeforeCredentialRotation(t *test
 		t.Fatal(err)
 	}
 	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK || strings.Join(models, ",") != "claude-sonnet-4-6,claude-opus-4-8" {
+	if response.StatusCode != http.StatusOK || strings.Join(models, ",") != "claude-sonnet-5-5,claude-opus-5-5" {
 		t.Fatalf("status/models = %d / %v", response.StatusCode, models)
 	}
 }

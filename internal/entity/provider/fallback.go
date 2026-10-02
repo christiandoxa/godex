@@ -3,12 +3,14 @@ package provider
 import "strings"
 
 const (
-	modelClaudeSonnet46 = "claude-sonnet-4-6"
-	modelClaudeOpus48   = "claude-opus-4-8"
+	modelClaudeSonnet55 = "claude-sonnet-5-5"
+	modelClaudeOpus55   = "claude-opus-5-5"
 	modelClaudeHaiku45  = "claude-haiku-4-5"
+	modelGPT6Astra      = "gpt-6-astra"
+	modelGPT61Sol       = "gpt-6.1-sol"
+	modelGPT6Luna       = "gpt-6-luna"
+	modelGPT6Sol        = "gpt-6-sol"
 	modelGPT53Codex     = "gpt-5.3-codex"
-	modelGPT51Codex     = "gpt-5.1-codex"
-	modelGPT4o          = "gpt-4o"
 )
 
 func ModelFallbackChain(providerKind, model string) []string {
@@ -61,13 +63,13 @@ func parseComboFallback(model string) ([]string, bool) {
 func anthropicFallbackChain(model string) []string {
 	switch strings.ToLower(model) {
 	case "", "auto", "default":
-		return []string{modelClaudeSonnet46, modelClaudeOpus48, modelClaudeHaiku45}
+		return []string{modelClaudeSonnet55, modelClaudeOpus55, modelClaudeHaiku45}
 	case "opus", "best":
-		return []string{modelClaudeOpus48, modelClaudeSonnet46}
+		return []string{modelClaudeOpus55, modelClaudeSonnet55}
 	case "sonnet", "pro":
-		return []string{modelClaudeSonnet46, modelClaudeOpus48}
+		return []string{modelClaudeSonnet55, modelClaudeOpus55}
 	case "haiku", "flash":
-		return []string{modelClaudeHaiku45, modelClaudeSonnet46}
+		return []string{modelClaudeHaiku45, modelClaudeSonnet55}
 	default:
 		return []string{model}
 	}
@@ -76,17 +78,23 @@ func anthropicFallbackChain(model string) []string {
 func copilotFallbackChain(model string) []string {
 	switch strings.ToLower(model) {
 	case "", "auto", "default", "codex", "pro":
-		return []string{modelGPT53Codex, modelGPT51Codex, modelGPT4o}
+		return []string{modelGPT6Astra, modelGPT61Sol, modelGPT53Codex}
+	case "astra":
+		return []string{modelGPT6Astra, modelGPT61Sol, modelGPT6Luna}
+	case "sol":
+		return []string{modelGPT61Sol, modelGPT6Sol, modelGPT6Luna}
+	case "luna":
+		return []string{modelGPT6Luna, modelGPT61Sol}
 	case "gpt-5.5":
-		return []string{"gpt-5.5", modelGPT53Codex, modelGPT51Codex, modelGPT4o}
+		return []string{"gpt-5.5", modelGPT61Sol, modelGPT53Codex}
 	case "gpt-5.4":
-		return []string{"gpt-5.4", modelGPT53Codex, modelGPT51Codex, modelGPT4o}
+		return []string{"gpt-5.4", modelGPT61Sol, modelGPT53Codex}
 	case modelGPT53Codex:
-		return []string{modelGPT53Codex, modelGPT51Codex, modelGPT4o}
+		return []string{modelGPT53Codex, modelGPT61Sol, modelGPT6Luna}
 	case "claude", "sonnet":
-		return []string{modelClaudeSonnet46, modelGPT53Codex, modelGPT51Codex}
+		return []string{modelClaudeSonnet55, modelGPT61Sol, modelGPT53Codex}
 	case "gemini":
-		return []string{"gemini-3.1-pro-preview", modelGPT53Codex, modelGPT51Codex}
+		return []string{"gemini-3.8-flash", modelGPT61Sol, modelGPT53Codex}
 	default:
 		return []string{model}
 	}

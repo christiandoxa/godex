@@ -7,9 +7,9 @@ import (
 
 func TestCopilotCanonicalModelAliases(t *testing.T) {
 	for input, want := range map[string]string{
-		"": "gpt-5.3-codex", "auto": "gpt-5.3-codex", "DEFAULT": "gpt-5.3-codex",
-		"codex": "gpt-5.3-codex", "gpt-5.5": "gpt-5.5", "sonnet": "claude-sonnet-4-6",
-		"gemini": "gemini-3.1-pro-preview",
+		"": "gpt-6-astra", "auto": "gpt-6-astra", "DEFAULT": "gpt-6-astra",
+		"codex": "gpt-6-astra", "astra": "gpt-6-astra", "sol": "gpt-6.1-sol", "luna": "gpt-6-luna", "gpt-5.5": "gpt-5.5", "sonnet": "claude-sonnet-5-5",
+		"gemini": "gemini-3.8-flash",
 	} {
 		if got := canonicalCopilotModel(input); got != want {
 			t.Fatalf("canonical model %q = %q, want %q", input, got, want)
@@ -89,14 +89,18 @@ func TestCopilotVisionDetectionMatchesReference(t *testing.T) {
 
 func TestCopilotModelFallbackChainsMatchProdex(t *testing.T) {
 	for model, want := range map[string][]string{
-		"":             {"gpt-5.3-codex", "gpt-5.1-codex", "gpt-4o"},
-		"AUTO":         {"gpt-5.3-codex", "gpt-5.1-codex", "gpt-4o"},
-		"codex":        {"gpt-5.3-codex", "gpt-5.1-codex", "gpt-4o"},
-		"gpt-5.5":      {"gpt-5.5", "gpt-5.3-codex", "gpt-5.1-codex", "gpt-4o"},
-		"gpt-5.4":      {"gpt-5.4", "gpt-5.3-codex", "gpt-5.1-codex", "gpt-4o"},
-		"sonnet":       {"claude-sonnet-4-6", "gpt-5.3-codex", "gpt-5.1-codex"},
-		"gemini":       {"gemini-3.1-pro-preview", "gpt-5.3-codex", "gpt-5.1-codex"},
-		"custom-model": {"custom-model"},
+		"":              {"gpt-6-astra", "gpt-6.1-sol", "gpt-5.3-codex"},
+		"AUTO":          {"gpt-6-astra", "gpt-6.1-sol", "gpt-5.3-codex"},
+		"codex":         {"gpt-6-astra", "gpt-6.1-sol", "gpt-5.3-codex"},
+		"astra":         {"gpt-6-astra", "gpt-6.1-sol", "gpt-6-luna"},
+		"sol":           {"gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna"},
+		"luna":          {"gpt-6-luna", "gpt-6.1-sol"},
+		"gpt-5.5":       {"gpt-5.5", "gpt-6.1-sol", "gpt-5.3-codex"},
+		"gpt-5.4":       {"gpt-5.4", "gpt-6.1-sol", "gpt-5.3-codex"},
+		"gpt-5.3-codex": {"gpt-5.3-codex", "gpt-6.1-sol", "gpt-6-luna"},
+		"sonnet":        {"claude-sonnet-5-5", "gpt-6.1-sol", "gpt-5.3-codex"},
+		"gemini":        {"gemini-3.8-flash", "gpt-6.1-sol", "gpt-5.3-codex"},
+		"custom-model":  {"custom-model"},
 	} {
 		body, _ := json.Marshal(map[string]any{"model": model})
 		got := copilotModelFallbackChain(body)

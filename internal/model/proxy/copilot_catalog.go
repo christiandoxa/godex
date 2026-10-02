@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"errors"
+	"strings"
 )
 
 const (
@@ -19,11 +20,8 @@ const (
 	copilotDescriptionKey = "description"
 )
 
-//go:embed copilot_provider_catalog_0_434_3.json
+//go:embed copilot_provider_catalog_0_435_1.json
 var copilotProviderCatalogSource []byte
-
-//go:embed copilot_external_catalog_0_434_3.json
-var copilotExternalCatalogSource []byte
 
 type ProviderCatalogEntry struct {
 	Provider                     string            `json:"provider"`
@@ -46,12 +44,6 @@ type ProviderCatalogEntry struct {
 	PricingKnown                 bool              `json:"pricing_known"`
 }
 
-type CopilotExternalCatalogSeed struct {
-	Slug        string `json:"slug"`
-	DisplayName string `json:"display_name"`
-	Description string `json:"description"`
-}
-
 func CopilotProviderCatalog() ([]ProviderCatalogEntry, error) {
 	var entries []ProviderCatalogEntry
 	if err := json.Unmarshal(copilotProviderCatalogSource, &entries); err != nil {
@@ -61,6 +53,21 @@ func CopilotProviderCatalog() ([]ProviderCatalogEntry, error) {
 		return nil, errors.New("embedded Copilot provider catalog has invalid size")
 	}
 	return entries, nil
+}
+
+func ResolveProviderCatalogEntry(entries []ProviderCatalogEntry, model string) *ProviderCatalogEntry {
+	model = strings.TrimSpace(model)
+	for index := range entries {
+		if strings.EqualFold(entries[index].ID, model) {
+			return &entries[index]
+		}
+		for _, alias := range entries[index].Aliases {
+			if strings.EqualFold(alias, model) {
+				return &entries[index]
+			}
+		}
+	}
+	return nil
 }
 
 func CopilotProviderCatalogJSON() ([]map[string]any, error) {
@@ -97,17 +104,6 @@ func providerCatalogJSON(entries []ProviderCatalogEntry) []map[string]any {
 		})
 	}
 	return result
-}
-
-func CopilotExternalCatalogSeeds() ([]CopilotExternalCatalogSeed, error) {
-	var seeds []CopilotExternalCatalogSeed
-	if err := json.Unmarshal(copilotExternalCatalogSource, &seeds); err != nil {
-		return nil, errors.New("parse embedded Copilot external catalog")
-	}
-	if len(seeds) == 0 || len(seeds) > ProviderCatalogMaxItems {
-		return nil, errors.New("embedded Copilot external catalog has invalid size")
-	}
-	return seeds, nil
 }
 
 func nilOrStrings(values []string) any {

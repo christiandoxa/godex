@@ -151,3 +151,38 @@ func reasoningEfforts(model map[string]any) []string {
 	}
 	return result
 }
+
+func TestCopilotStaticCatalogMatchesProdex04351Hotfix(t *testing.T) {
+	home := t.TempDir()
+	store := runtimerepo.NewProviderCatalogStore()
+	provider := CopilotProvider("copilot", "github.com", "octocat", "https://api.githubcopilot.com")
+	if _, err := prepareProviderRuntimeArguments(store, home, provider, []string{"exec", "hello"}); err != nil {
+		t.Fatal(err)
+	}
+	models := readExternalCatalogModels(t, home)
+	for _, id := range []string{"gpt-6-astra", "gpt-6.1-sol", "gpt-6-luna", "gpt-6-sol", "claude-sonnet-5-5", "gemini-3.8-flash"} {
+		_ = findCatalogModel(t, models, id)
+	}
+	for _, retired := range []string{"gpt-5.1-codex", "gemini-3.1-pro-preview"} {
+		if catalogContainsModel(models, retired) {
+			t.Fatalf("retired static Copilot model %q remained in catalog", retired)
+		}
+	}
+	astra := findCatalogModel(t, models, "gpt-6-astra")
+	if astra["context_window"] != float64(1_050_000) || astra["auto_compact_token_limit"] != float64(997_500) {
+		t.Fatalf("Astra catalog = %#v", astra)
+	}
+	legacy := findCatalogModel(t, models, "gpt-5.3-codex")
+	if legacy["context_window"] != float64(272_000) || legacy["auto_compact_token_limit"] != float64(258_400) {
+		t.Fatalf("legacy prompt-limit override drifted: %#v", legacy)
+	}
+}
+
+func catalogContainsModel(models []map[string]any, slug string) bool {
+	for _, model := range models {
+		if value, _ := model["slug"].(string); value == slug {
+			return true
+		}
+	}
+	return false
+}

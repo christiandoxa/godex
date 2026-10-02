@@ -480,9 +480,9 @@ func TestRunProviderProfilePropagatesCopilotConfigAndDefaults(t *testing.T) {
 	joined := strings.Join(process.arguments, " ")
 	for _, want := range []string{
 		"-c model_catalog_json=",
-		`-c model="gpt-5.3-codex"`,
-		"-c model_context_window=272000",
-		"-c model_auto_compact_token_limit=258400",
+		`-c model="gpt-6-astra"`,
+		"-c model_context_window=1050000",
+		"-c model_auto_compact_token_limit=997500",
 		"--model custom-model exec hello",
 	} {
 		if !strings.Contains(joined, want) {

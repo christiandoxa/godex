@@ -21,9 +21,9 @@ func TestAnthropicCatalogUsesProdexDefaultsAndStaticSeeds(t *testing.T) {
 	}
 	joined := strings.Join(prepared, " ")
 	for _, expected := range []string{
-		`model="claude-sonnet-4-6"`,
-		"model_context_window=200000",
-		"model_auto_compact_token_limit=180000",
+		`model="claude-sonnet-5-5"`,
+		"model_context_window=1000000",
+		"model_auto_compact_token_limit=950000",
 		"model_catalog_json=",
 	} {
 		if !strings.Contains(joined, expected) {
@@ -31,10 +31,10 @@ func TestAnthropicCatalogUsesProdexDefaultsAndStaticSeeds(t *testing.T) {
 		}
 	}
 	models := readAnthropicCatalogModels(t, home)
-	if len(models) != 9 || models[0]["slug"] != "claude-sonnet-4-6" || models[0]["context_window"] != float64(200000) || models[0]["auto_compact_token_limit"] != float64(180000) {
+	if len(models) != 12 || models[0]["slug"] != "claude-sonnet-5-5" || models[0]["context_window"] != float64(1000000) || models[0]["auto_compact_token_limit"] != float64(950000) {
 		t.Fatalf("Anthropic catalog = %#v", models)
 	}
-	if findAnthropicModel(t, models, "auto")["display_name"] != "Claude Auto" || findAnthropicModel(t, models, "claude-opus-4-8")["display_name"] != "Claude Opus 4.8" {
+	if findAnthropicModel(t, models, "auto")["display_name"] != "Anthropic Auto" || findAnthropicModel(t, models, "claude-opus-5-5")["display_name"] != "Claude Opus 5.5" {
 		t.Fatalf("Anthropic seed metadata = %#v", models)
 	}
 }
@@ -56,7 +56,7 @@ func TestAnthropicCatalogPutsLaunchModelFirstAndRespectsOverrides(t *testing.T) 
 	if models[0]["slug"] != "custom-model" || models[0]["context_window"] != float64(300000) || models[0]["auto_compact_token_limit"] != float64(250000) {
 		t.Fatalf("launch model = %#v", models[0])
 	}
-	if len(models) != 10 {
+	if len(models) != 13 {
 		t.Fatalf("catalog len = %d", len(models))
 	}
 }

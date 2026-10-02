@@ -16,8 +16,11 @@ func buildAnthropicExternalCatalog(
 	if err != nil {
 		return nil, err
 	}
-	seeds := proxymodel.AnthropicExternalCatalogSeeds()
-	return anthropicCatalogModels(launchModel, contextWindow, autoCompact, seeds)
+	entries, err := proxymodel.AnthropicProviderCatalog()
+	if err != nil {
+		return nil, err
+	}
+	return anthropicCatalogModels(launchModel, contextWindow, autoCompact, entries)
 }
 
 func anthropicLaunchLimits(provider proxymodel.Provider, arguments []string) (uint64, uint64, error) {
@@ -38,16 +41,29 @@ func anthropicLaunchLimits(provider proxymodel.Provider, arguments []string) (ui
 func anthropicCatalogModels(
 	launchModel string,
 	contextWindow, autoCompact uint64,
-	seeds []proxymodel.AnthropicExternalCatalogSeed,
+	entries []proxymodel.ProviderCatalogEntry,
 ) ([]map[string]any, error) {
-	models := make([]map[string]any, 0, len(seeds)+1)
-	seen := make(map[string]bool, len(seeds)+1)
-	displayName, description := anthropicSeedMetadata(launchModel, seeds)
-	if err := appendAnthropicCatalogModel(&models, seen, launchModel, displayName, description, contextWindow, autoCompact); err != nil {
+	models := make([]map[string]any, 0, len(entries)+1)
+	seen := make(map[string]bool, len(entries)+1)
+	if err := appendAnthropicCatalogModel(
+		&models, seen, launchModel,
+		anthropicCatalogContext(launchModel, contextWindow, entries),
+		autoCompact, entries,
+	); err != nil {
 		return nil, err
 	}
-	for _, seed := range seeds {
-		if err := appendAnthropicCatalogModel(&models, seen, seed.Slug, seed.DisplayName, seed.Description, contextWindow, autoCompact); err != nil {
+	for _, entry := range entries {
+		modelContext := contextWindow
+		if entry.ContextWindowTokens != nil {
+			modelContext = *entry.ContextWindowTokens
+		}
+		modelCompact := autoCompact
+		if entry.ContextWindowTokens != nil {
+			modelCompact = modelContext * 95 / 100
+		}
+		if err := appendAnthropicCatalogModel(
+			&models, seen, entry.ID, modelContext, modelCompact, entries,
+		); err != nil {
 			return nil, err
 		}
 	}
@@ -57,8 +73,9 @@ func anthropicCatalogModels(
 func appendAnthropicCatalogModel(
 	models *[]map[string]any,
 	seen map[string]bool,
-	slug, displayName, description string,
+	slug string,
 	contextWindow, autoCompact uint64,
+	entries []proxymodel.ProviderCatalogEntry,
 ) error {
 	slug = strings.TrimSpace(slug)
 	key := strings.ToLower(slug)
@@ -69,27 +86,34 @@ func appendAnthropicCatalogModel(
 		return fmt.Errorf("provider model catalog exceeds the hard limit of %d entries", proxymodel.ProviderCatalogMaxItems)
 	}
 	seen[key] = true
-	if displayName == "" {
-		displayName = slug
-	}
-	if description == "" {
-		description = "External provider model routed through the Prodex Responses adapter."
+	displayName, description := anthropicCatalogMetadata(slug, entries)
+	if contextWindow > 0 && autoCompact >= contextWindow {
+		autoCompact = contextWindow - 1
 	}
 	*models = append(*models, externalCodexCatalogModel(
 		slug, displayName, description, len(*models)+1,
-		contextWindow, autoCompact, nil,
+		contextWindow, autoCompact, entries,
 	))
 	return nil
 }
 
-func anthropicSeedMetadata(
-	slug string,
-	seeds []proxymodel.AnthropicExternalCatalogSeed,
-) (string, string) {
-	for _, seed := range seeds {
-		if strings.EqualFold(seed.Slug, strings.TrimSpace(slug)) {
-			return seed.DisplayName, seed.Description
-		}
+func anthropicCatalogContext(
+	model string,
+	fallback uint64,
+	entries []proxymodel.ProviderCatalogEntry,
+) uint64 {
+	if entry := proxymodel.ResolveProviderCatalogEntry(entries, model); entry != nil && entry.ContextWindowTokens != nil {
+		return *entry.ContextWindowTokens
 	}
-	return strings.TrimSpace(slug), ""
+	return fallback
+}
+
+func anthropicCatalogMetadata(
+	slug string,
+	entries []proxymodel.ProviderCatalogEntry,
+) (string, string) {
+	if entry := proxymodel.ResolveProviderCatalogEntry(entries, slug); entry != nil {
+		return entry.DisplayName, entry.Description
+	}
+	return strings.TrimSpace(slug), "External provider model routed through the Prodex Responses adapter."
 }

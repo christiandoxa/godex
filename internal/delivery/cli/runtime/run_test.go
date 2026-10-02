@@ -189,7 +189,7 @@ func TestLaunchRuntimeProviderSupportsCopilotAndAnthropic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if provider.Kind != "copilot" || provider.Name != "copilot-work" || provider.Host != host || provider.Login != login || provider.APIURL != apiURL || provider.DefaultModel != "gpt-5.3-codex" || provider.ContextWindow != 272000 || provider.AutoCompactLimit != 258400 {
+	if provider.Kind != "copilot" || provider.Name != "copilot-work" || provider.Host != host || provider.Login != login || provider.APIURL != apiURL || provider.DefaultModel != "gpt-6-astra" || provider.ContextWindow != 1050000 || provider.AutoCompactLimit != 997500 {
 		t.Fatalf("Copilot provider = %#v", provider)
 	}
 	openAI, err := launchRuntimeProvider(profilemodel.LaunchTarget{Provider: "openai"})
@@ -197,7 +197,7 @@ func TestLaunchRuntimeProviderSupportsCopilotAndAnthropic(t *testing.T) {
 		t.Fatalf("OpenAI provider = %#v, err = %v", openAI, err)
 	}
 	anthropic, err := launchRuntimeProvider(profilemodel.LaunchTarget{Name: "claude-work", Provider: "anthropic"})
-	if err != nil || anthropic.Kind != "anthropic" || anthropic.Name != "claude-work" || anthropic.APIURL != "https://api.anthropic.com/v1" || anthropic.DefaultModel != "claude-sonnet-4-6" || anthropic.ContextWindow != 200000 || anthropic.AutoCompactLimit != 180000 {
+	if err != nil || anthropic.Kind != "anthropic" || anthropic.Name != "claude-work" || anthropic.APIURL != "https://api.anthropic.com/v1" || anthropic.DefaultModel != "claude-sonnet-5-5" || anthropic.ContextWindow != 1000000 || anthropic.AutoCompactLimit != 950000 {
 		t.Fatalf("Anthropic provider = %#v, err = %v", anthropic, err)
 	}
 	if _, err := launchRuntimeProvider(profilemodel.LaunchTarget{Provider: "kiro"}); err == nil || !strings.Contains(err.Error(), "not implemented") {

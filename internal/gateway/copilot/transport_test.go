@@ -286,7 +286,7 @@ func TestRuntimeTransportFallsBackToNextModelBeforeCommit(t *testing.T) {
 		}
 		model, _ := body["model"].(string)
 		models = append(models, model)
-		if model == "gpt-5.3-codex" {
+		if model == "gpt-6-astra" {
 			writer.WriteHeader(http.StatusNotFound)
 			_, _ = writer.Write([]byte(`{"error":{"code":"model_not_supported"}}`))
 			return
@@ -306,7 +306,7 @@ func TestRuntimeTransportFallsBackToNextModelBeforeCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK || len(models) != 2 || models[0] != "gpt-5.3-codex" || models[1] != "gpt-5.1-codex" {
+	if response.StatusCode != http.StatusOK || len(models) != 2 || models[0] != "gpt-6-astra" || models[1] != "gpt-6.1-sol" {
 		t.Fatalf("response/models = %d / %#v", response.StatusCode, models)
 	}
 }

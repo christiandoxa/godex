@@ -57,7 +57,7 @@ func captureAnthropicTranslatedRequest(t *testing.T, request *http.Request) map[
 
 func assertAnthropicTranslatedRequest(t *testing.T, received map[string]any) {
 	t.Helper()
-	if received["model"] != "claude-sonnet-4-6" || received["stream"] != false {
+	if received["model"] != "claude-sonnet-5-5" || received["stream"] != false {
 		t.Fatalf("upstream request = %#v", received)
 	}
 	messages := received["messages"].([]any)
