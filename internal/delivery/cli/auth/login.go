@@ -12,19 +12,36 @@ import (
 	authusecase "github.com/christiandoxa/godex/internal/usecase/auth"
 )
 
-func Login(ctx context.Context, login *authusecase.Login, out io.Writer, arguments []string) error {
+type LoginOptions struct {
+	Name       string
+	DeviceAuth bool
+}
+
+func ParseLoginOptions(arguments []string) (LoginOptions, error) {
 	flags := flag.NewFlagSet("login", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	name := flags.String("name", "", "friendly account name")
 	deviceAuth := flags.Bool("device-auth", false, "use Codex device authentication")
 	if err := flags.Parse(arguments); err != nil {
-		return fmt.Errorf("parse login arguments: %w", err)
+		return LoginOptions{}, fmt.Errorf("parse login arguments: %w", err)
 	}
 	if flags.NArg() != 0 {
-		return errors.New("login does not accept positional arguments")
+		return LoginOptions{}, errors.New("login does not accept positional arguments")
 	}
+	return LoginOptions{Name: *name, DeviceAuth: *deviceAuth}, nil
+}
 
-	account, err := login.Run(ctx, accountmodel.LoginInput{Name: *name, DeviceAuth: *deviceAuth})
+func ShouldPromptLoginMenu(arguments []string) bool {
+	options, err := ParseLoginOptions(arguments)
+	return err == nil && !options.DeviceAuth
+}
+
+func Login(ctx context.Context, login *authusecase.Login, out io.Writer, arguments []string) error {
+	options, err := ParseLoginOptions(arguments)
+	if err != nil {
+		return err
+	}
+	account, err := login.Run(ctx, accountmodel.LoginInput{Name: options.Name, DeviceAuth: options.DeviceAuth})
 	if err != nil {
 		return err
 	}

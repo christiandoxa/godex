@@ -476,6 +476,11 @@ stderr with `godex update`; a failed check never blocks the requested command.
 Read-only/minimal surfaces (`info`, `log`, `ping`, `update`, help/version, raw
 quota, and JSON/bundle doctor modes) suppress the notice.
 
+Interactive `godex login` opens the provider chooser only when the inferred
+method is still the default ChatGPT login and both stdin/stderr are terminals.
+`--device-auth`, invalid/unknown arguments, and all non-TTY invocations keep the
+direct deterministic login path.
+
 Selectors match an exact account ID, friendly name, or email. Ambiguous
 selectors fail. Unknown top-level commands are treated as Codex subcommands and
 run through the same managed account runtime. Repeating login for an existing ChatGPT account updates its
@@ -485,11 +490,18 @@ and Codex configuration survive repeat login and import-current.
 
 Interactive terminal surfaces that correspond to Prodex TUIs use
 [Bubble Tea](https://github.com/charmbracelet/bubbletea). Current Bubble Tea
-surfaces include live `status`, live `quota`, interactive `log stream/upstream`,
-human session lists, doctor panels, manual redeem confirmation, and profile
-export/import protection/password prompts. Non-TTY and machine-readable modes
-keep plain output for scripts and pipes. The remaining login/provider menu TUI
-must use the same framework when multi-provider login parity lands.
+surfaces include the login/provider chooser, live `status`, live `quota`,
+interactive `log stream/upstream`, human session lists, doctor panels, manual
+redeem confirmation, and profile export/import protection/password prompts.
+When `godex login` is invoked with the default ChatGPT method and stdin/stderr
+are terminals, the 0.435.1 nine-entry provider menu is shown with j/k, arrows,
+PgUp/PgDn, Home/End, digit shortcuts, Enter, and q/Esc cancellation. Non-TTY and
+machine-readable modes keep plain output for scripts and pipes.
+
+The menu dispatches existing ChatGPT/device login plus Claude and Copilot import
+flows. Runtime-only Gemini/Anthropic/DeepSeek API-key entries stay guidance-only.
+Persisted OpenAI/API-compatible API-key login and Antigravity login execution are
+still separate parity work; the menu never reports those actions as completed.
 
 ## Configuration
 

@@ -204,14 +204,16 @@ and eligibility validation stays in the runtime use case.
   restored into managed snapshots only under the reference freshness rule.
 - Super mode and its hidden expose/broker/MCP bridge/sub-agent execution stack,
   including optional Presidio integration.
-- The standalone gateway surface, remaining live TUI parity, process/resource
-  metrics, audit-log backend, and richer runtime-policy diagnostics. Doctor now
-  supports install checks, bounded runtime tails, quota summaries, runtime JSON,
-  and redacted private bundles; import-journal repair, full session-index repair,
-  and policy suggestions remain. Existing status/quota/log, doctor panels, and
-  redeem-confirmation, human session-list, and profile bundle password TUIs use
-  Bubble Tea; the login/provider menu remains to be implemented with Bubble Tea
-  once multi-provider login bridges land.
+- The standalone gateway surface, remaining process/resource metrics,
+  audit-log backend, and richer runtime-policy diagnostics. Doctor now supports
+  install checks, bounded runtime tails, quota summaries, runtime JSON, and
+  redacted private bundles; import-journal repair, full session-index repair, and
+  policy suggestions remain. Existing status/quota/log, doctor panels,
+  redeem-confirmation, human session-list, profile bundle password, and
+  login/provider-menu TUIs use Bubble Tea. The login menu now mirrors the 0.435.1
+  nine-entry ordering/navigation and preserves the reference TTY-only trigger;
+  persisted OpenAI/API-compatible API-key login, Antigravity execution, and
+  Gemini runtime/login are still action-level parity gaps rather than TUI gaps.
 - Explicit self-update, best-effort cached update notices on eligible commands,
   manual reset-credit redemption, and cost-bearing `ping openai` diagnostics are
   implemented.

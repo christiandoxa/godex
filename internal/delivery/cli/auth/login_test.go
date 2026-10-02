@@ -73,3 +73,26 @@ func TestLoginRejectsUnexpectedArgumentsAndOutputErrors(t *testing.T) {
 type failingWriter struct{}
 
 func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("synthetic output failure") }
+
+func TestLoginMenuPromptEligibilityPreservesExplicitAndInvalidCLI(t *testing.T) {
+	for _, arguments := range [][]string{nil, {"--name", "work"}, {"--name=work"}} {
+		if !ShouldPromptLoginMenu(arguments) {
+			t.Fatalf("arguments %#v should allow interactive menu", arguments)
+		}
+	}
+	for _, arguments := range [][]string{{"--device-auth"}, {"positional"}, {"--unknown"}, {"--name"}} {
+		if ShouldPromptLoginMenu(arguments) {
+			t.Fatalf("arguments %#v unexpectedly allow interactive menu", arguments)
+		}
+	}
+}
+
+func TestParseLoginOptionsIsSharedByMenuAndDirectLogin(t *testing.T) {
+	options, err := ParseLoginOptions([]string{"--name", "work", "--device-auth"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if options.Name != "work" || !options.DeviceAuth {
+		t.Fatalf("options = %#v", options)
+	}
+}

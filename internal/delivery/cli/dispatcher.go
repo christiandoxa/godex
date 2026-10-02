@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	accountcli "github.com/christiandoxa/godex/internal/delivery/cli/account"
@@ -67,10 +68,7 @@ func (app *App) Run(ctx context.Context, arguments []string) error {
 
 	switch arguments[0] {
 	case "login":
-		if len(arguments) > 1 && arguments[1] == "status" {
-			return authcli.Native(ctx, app.nativeAuth, false, arguments[2:])
-		}
-		return authcli.Login(ctx, app.login, app.out, arguments[1:])
+		return app.runLogin(ctx, arguments[1:])
 	case "logout":
 		return authcli.Native(ctx, app.nativeAuth, true, arguments[1:])
 	case "accounts":
@@ -127,6 +125,52 @@ func (app *App) Run(ctx context.Context, arguments []string) error {
 	default:
 		return app.runRuntime(ctx, arguments)
 	}
+}
+
+func (app *App) runLogin(ctx context.Context, arguments []string) error {
+	if len(arguments) > 0 && arguments[0] == "status" {
+		return authcli.Native(ctx, app.nativeAuth, false, arguments[1:])
+	}
+	if !authcli.ShouldPromptLoginMenu(arguments) || !authcli.LoginMenuInteractive(os.Stdin, app.errOut) {
+		return authcli.Login(ctx, app.login, app.out, arguments)
+	}
+	action, err := authcli.RunLoginMenu(ctx, os.Stdin, app.errOut)
+	if err != nil {
+		return err
+	}
+	return app.runLoginMenuAction(ctx, action, arguments)
+}
+
+func (app *App) runLoginMenuAction(ctx context.Context, action authcli.LoginMenuAction, arguments []string) error {
+	options, err := authcli.ParseLoginOptions(arguments)
+	if err != nil {
+		return err
+	}
+	switch action {
+	case authcli.LoginChatGPT:
+		return authcli.Login(ctx, app.login, app.out, arguments)
+	case authcli.LoginDeviceCode:
+		deviceArguments := append([]string(nil), arguments...)
+		deviceArguments = append(deviceArguments, "--device-auth")
+		return authcli.Login(ctx, app.login, app.out, deviceArguments)
+	case authcli.LoginClaude:
+		return app.runBuiltinLoginImport(ctx, "claude", options.Name)
+	case authcli.LoginCopilotImport:
+		return app.runBuiltinLoginImport(ctx, "copilot", options.Name)
+	default:
+		return fmt.Errorf("selected login method is guidance-only in this Godex build")
+	}
+}
+
+func (app *App) runBuiltinLoginImport(ctx context.Context, source, name string) error {
+	if app.profiles == nil {
+		return fmt.Errorf("profile support is not configured")
+	}
+	arguments := []string{"import", source, "--activate"}
+	if strings.TrimSpace(name) != "" {
+		arguments = append(arguments, "--name", name)
+	}
+	return profilecli.Run(ctx, app.profiles, app.out, arguments)
 }
 
 func (app *App) showUpdateNotice(ctx context.Context, arguments []string) {
@@ -238,10 +282,17 @@ Run options (before the Codex command/flags):
   --no-respect-system-proxy         Disable Codex system-proxy support
 
 Login options:
-  --name NAME      Friendly account name
+  --name NAME      Friendly account/profile name
   --device-auth    Use Codex device authentication
+  Interactive default login opens the Bubble Tea provider chooser.
 `)
 	return err
+}
+
+func (app *App) SetErrorOutput(stderr io.Writer) {
+	if stderr != nil {
+		app.errOut = stderr
+	}
 }
 
 func (app *App) SetSessions(catalog *sessionusecase.Catalog) { app.sessions = catalog }

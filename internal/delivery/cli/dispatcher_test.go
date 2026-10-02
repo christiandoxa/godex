@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	authcli "github.com/christiandoxa/godex/internal/delivery/cli/auth"
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 	accountrepo "github.com/christiandoxa/godex/internal/repository/account"
@@ -128,7 +129,7 @@ func TestDispatcherRoutesCommandDomains(t *testing.T) {
 	commands := [][]string{
 		{"accounts"}, {"current"}, {"account", "list"}, {"profile", "current"}, {"account", "use", "work"}, {"account", "remove", "work"}, {"profile", "import-current", "imported"},
 		{"use", "work"}, {"remove", "work"}, {"run", "--account", "work", "--", "--model", "synthetic"},
-		{"login", "--name", "work"}, {}, {"doctor"},
+		{"login", menuLoginNameOption, "work"}, {}, {"doctor"},
 	}
 	for _, command := range commands {
 		if err := app.Run(context.Background(), command); err != nil {
@@ -191,5 +192,89 @@ func TestUpdateNoticeEligibilityMatchesReadOnlyAndMinimalSurfaces(t *testing.T) 
 		if shouldShowUpdateNotice(arguments) {
 			t.Fatalf("arguments %#v unexpectedly show update notice", arguments)
 		}
+	}
+}
+
+const (
+	menuLoginNameOption = "--name"
+	menuClaudeProfile   = "claude-menu"
+	menuCopilotProfile  = "copilot-menu"
+)
+
+type dispatcherClaudeSource struct {
+	credential profilemodel.BuiltinCredential
+}
+
+func (source dispatcherClaudeSource) Load(context.Context) (profilemodel.BuiltinCredential, error) {
+	return source.credential, nil
+}
+
+func (source dispatcherClaudeSource) InspectCredential(context.Context, string) (profilemodel.BuiltinCredential, error) {
+	return source.credential, nil
+}
+
+type dispatcherCopilotSource struct {
+	credential profilemodel.BuiltinCredential
+}
+
+func (source dispatcherCopilotSource) Load(context.Context) (profilemodel.BuiltinCredential, error) {
+	return source.credential, nil
+}
+
+func TestDispatcherLoginMenuActionsUseExistingAuthAndProfileFlows(t *testing.T) {
+	root := t.TempDir()
+	accounts := accountrepo.NewFileStore(root)
+	profiles := profilerepo.NewStore(root)
+	catalog := profileusecase.NewCatalog(profiles, accounts, t.TempDir())
+	claudeAccount, claudeMethod := "person@example.test", "claude-ai-oauth:pro"
+	catalog.SetClaudeSource(dispatcherClaudeSource{credential: profilemodel.BuiltinCredential{
+		Provider:    profilemodel.ProviderSnapshot{Kind: "anthropic", Account: &claudeAccount, AuthMethod: &claudeMethod},
+		Email:       claudeAccount,
+		SecretFiles: []profilemodel.ExportedSecretFile{{Path: ".credentials.json", Text: `{"accessToken":"fixture"}`}},
+	}})
+	copilotHost, copilotLogin := "https://github.example.test", "octocat"
+	catalog.SetCopilotSource(dispatcherCopilotSource{credential: profilemodel.BuiltinCredential{
+		Provider: profilemodel.ProviderSnapshot{Kind: "copilot", Host: &copilotHost, Login: &copilotLogin},
+		Email:    copilotLogin,
+	}})
+	login := authusecase.NewLogin(dispatcherLoginAccounts{}, dispatcherLoginCodex{})
+	var output bytes.Buffer
+	app := New(login, nil, accounts, nil, nil, nil, &output)
+	app.SetProfiles(catalog)
+
+	if err := app.runLoginMenuAction(context.Background(), authcli.LoginChatGPT, []string{menuLoginNameOption, "chatgpt-menu"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.runLoginMenuAction(context.Background(), authcli.LoginDeviceCode, []string{menuLoginNameOption, "device-menu"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.runLoginMenuAction(context.Background(), authcli.LoginClaude, []string{menuLoginNameOption, menuClaudeProfile}); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.runLoginMenuAction(context.Background(), authcli.LoginCopilotImport, []string{menuLoginNameOption, menuCopilotProfile}); err != nil {
+		t.Fatal(err)
+	}
+	listed, err := catalog.List(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := map[string]bool{}
+	for _, report := range listed {
+		found[report.Profile.Name] = true
+	}
+	for _, name := range []string{menuClaudeProfile, menuCopilotProfile} {
+		if !found[name] {
+			t.Fatalf("login menu profile %q missing from %#v", name, found)
+		}
+	}
+	if !strings.Contains(output.String(), "Logged in as chatgpt-menu") || !strings.Contains(output.String(), "Logged in as device-menu") || !strings.Contains(output.String(), `profile "`+menuClaudeProfile+`"`) || !strings.Contains(output.String(), `profile "`+menuCopilotProfile+`"`) {
+		t.Fatalf("login menu output = %q", output.String())
+	}
+}
+
+func TestDispatcherLoginMenuUnsupportedMethodFailsExplicitly(t *testing.T) {
+	app := New(nil, nil, nil, nil, nil, nil, &bytes.Buffer{})
+	if err := app.runLoginMenuAction(context.Background(), authcli.LoginOpenAIAPIKey, nil); err == nil || !strings.Contains(err.Error(), "guidance-only") {
+		t.Fatalf("unsupported login action error = %v", err)
 	}
 }
