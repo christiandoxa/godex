@@ -6,13 +6,14 @@ type QuotaAuthSummary struct {
 }
 
 type QuotaTarget struct {
-	Name       string
-	CodexHome  string
-	Email      string
-	Provider   string
-	Auth       string
-	AccountID  string
-	Active     bool
-	Enabled    bool
-	Compatible bool
+	Name           string
+	CodexHome      string
+	Email          string
+	Provider       string
+	ProviderConfig ProviderSnapshot
+	Auth           string
+	AccountID      string
+	Active         bool
+	Enabled        bool
+	Compatible     bool
 }

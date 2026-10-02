@@ -3,6 +3,7 @@ package quota
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
@@ -37,6 +38,10 @@ type rawOverrideUsageGateway interface {
 	FetchRawAt(context.Context, string, string) ([]byte, error)
 }
 
+type externalProfileGateway interface {
+	FetchQuota(context.Context, profilemodel.QuotaTarget) (quotamodel.ExternalInfo, error)
+}
+
 type virtualGateway interface {
 	Collect(context.Context, string, string) []quotamodel.VirtualResult
 }
@@ -54,16 +59,31 @@ type Status struct {
 	profiles profileSource
 	usage    usageGateway
 	virtual  virtualGateway
+	external map[string]externalProfileGateway
 	now      func() time.Time
 }
 
 func NewStatus(accounts accountStore, usage usageGateway) *Status {
-	return &Status{accounts: accounts, usage: usage, now: time.Now}
+	return &Status{
+		accounts: accounts, usage: usage,
+		external: make(map[string]externalProfileGateway), now: time.Now,
+	}
 }
 
 func (status *Status) SetProfiles(profiles profileSource) { status.profiles = profiles }
 
 func (status *Status) SetVirtual(virtual virtualGateway) { status.virtual = virtual }
+
+func (status *Status) SetExternalProvider(provider string, gateway externalProfileGateway) {
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	if provider == "" || gateway == nil {
+		return
+	}
+	if status.external == nil {
+		status.external = make(map[string]externalProfileGateway)
+	}
+	status.external[provider] = gateway
+}
 
 func (status *Status) DoctorReports(ctx context.Context) ([]quotamodel.Report, error) {
 	return status.Run(ctx, Options{All: true})

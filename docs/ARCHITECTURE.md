@@ -232,9 +232,12 @@ OpenAI-compatible `/models` endpoint; AGY executes the bounded direct
 `agy auth quota --format=json --detail --all-accounts` probe. The virtual gateway
 runs only for explicit DeepSeek/local/AGY filters, never for `all`, matching
 0.435.0. It emits transport-neutral `ExternalInfo`; delivery maps that metadata
-into provider-aware account/plan/status/remaining display and sort keys. Managed
-profile adapters for Gemini/Anthropic/Copilot/Kiro/AGY/custom-provider quota
-remain separate outbound integrations.
+into provider-aware account/plan/status/remaining display and sort keys. Managed profile quota uses a narrow provider adapter interface over the
+credential-free `QuotaTarget` metadata. `gateway/kiro` implements that interface
+from the same bounded managed auth/catalog snapshots used by Kiro import/runtime;
+the quota use case never parses Kiro secrets or model catalogs itself. Managed
+profile adapters for Gemini/Anthropic/Copilot/AGY/custom-provider quota remain
+separate outbound integrations.
 
 The CLI quota delivery package owns watch/once cadence, `--detail`, `--profile`,
 `--auth`, `--provider`, and `--base-url` parsing plus rendering of exact UTC

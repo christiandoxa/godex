@@ -340,3 +340,59 @@ func TestStatusVirtualProviderErrorBecomesReportError(t *testing.T) {
 		t.Fatalf("virtual error reports = %#v", reports)
 	}
 }
+
+type fakeExternalProfileQuota struct {
+	target profilemodel.QuotaTarget
+	info   quotamodel.ExternalInfo
+	err    error
+	calls  int
+}
+
+func (fake *fakeExternalProfileQuota) FetchQuota(_ context.Context, target profilemodel.QuotaTarget) (quotamodel.ExternalInfo, error) {
+	fake.calls++
+	fake.target = target
+	return fake.info, fake.err
+}
+
+func TestStatusUsesProfileBackedExternalQuotaAdapter(t *testing.T) {
+	available := true
+	external := &fakeExternalProfileQuota{info: quotamodel.ExternalInfo{
+		Provider: "Kiro CLI", Account: "person@example.test", Plan: "builder-id",
+		Status: "Ready (imported)", Main: "2 imported models", Available: &available,
+	}}
+	status := NewStatus(fakeAccounts{}, &trackingUsage{})
+	status.SetProfiles(fakeProfileSource{targets: []profilemodel.QuotaTarget{{
+		Name: "kiro-main", CodexHome: "/profiles/kiro-main", Provider: "kiro", Auth: "kiro",
+		Enabled: true, Active: true,
+		ProviderConfig: profilemodel.ProviderSnapshot{Kind: "kiro", ProfileName: stringPtr("main")},
+	}}})
+	status.SetExternalProvider("kiro", external)
+	reports, err := status.Run(context.Background(), Options{All: true, ProviderFilter: "kiro"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if external.calls != 1 || external.target.CodexHome != "/profiles/kiro-main" || external.target.ProviderConfig.ProfileName == nil || *external.target.ProviderConfig.ProfileName != "main" {
+		t.Fatalf("external call/target = %d / %#v", external.calls, external.target)
+	}
+	if len(reports) != 1 || reports[0].State != "ready (imported)" || reports[0].External == nil || reports[0].External.Main != "2 imported models" || reports[0].Err != nil {
+		t.Fatalf("external reports = %#v", reports)
+	}
+}
+
+func TestStatusExternalQuotaAdapterFailureBecomesReportError(t *testing.T) {
+	external := &fakeExternalProfileQuota{err: errors.New("synthetic Kiro quota failure")}
+	status := NewStatus(fakeAccounts{}, &trackingUsage{})
+	status.SetProfiles(fakeProfileSource{targets: []profilemodel.QuotaTarget{{
+		Name: "kiro-main", CodexHome: "/profiles/kiro-main", Provider: "kiro", Auth: "kiro", Enabled: true,
+	}}})
+	status.SetExternalProvider("kiro", external)
+	reports, err := status.Run(context.Background(), Options{All: true, ProviderFilter: "kiro"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reports) != 1 || reports[0].State != "error" || reports[0].Err == nil || reports[0].External != nil {
+		t.Fatalf("external failure report = %#v", reports)
+	}
+}
+
+func stringPtr(value string) *string { return &value }

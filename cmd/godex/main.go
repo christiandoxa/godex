@@ -102,6 +102,7 @@ func run() int {
 	kiroSource := kirogateway.NewSource()
 	profiles.SetKiroInspector(kiroSource)
 	profiles.SetKiroSource(kiroSource)
+	quotaStatus.SetExternalProvider("kiro", kiroSource)
 	profiles.SetCopilotSource(copilotSource)
 	application.SetProfiles(profiles)
 	activity.SetProfiles(profiles)

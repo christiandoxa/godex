@@ -273,8 +273,12 @@ and eligibility validation stays in the runtime use case.
   current/remaining/profile/auth/account/plan sorts, `f` cycles
   all/openai/gemini/anthropic/copilot/kiro/deepseek/local/agy when not locked by
   an explicit provider, and `u` refreshes. Single-profile quota watch remains
-  quit-only. Profile-backed Gemini/Anthropic/Copilot/Kiro/AGY/custom-provider
-  quota adapters remain gaps. Manual `redeem PROFILE` now matches the usage
+  quit-only. Imported Kiro profiles now match the 0.435.0 external snapshot
+  contract from managed `kiro_auth.json` plus optional model catalog: account
+  fallback, auth plan, profile/region details, imported model count, readiness,
+  and missing-catalog fallback are implemented without network work. Profile-backed
+  Gemini/Anthropic/Copilot/AGY/custom-provider quota adapters remain gaps. Manual
+  `redeem PROFILE` now matches the usage
   preflight, one-hour
   reset confirmation guard, idempotent consume endpoint, base-URL override, and
   no-proxy controls. Runtime `--auto-redeem` policy and provider-specific quota

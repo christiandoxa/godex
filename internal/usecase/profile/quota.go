@@ -22,7 +22,8 @@ func (catalog *Catalog) QuotaTargets(ctx context.Context) ([]profilemodel.QuotaT
 		targets = append(targets, profilemodel.QuotaTarget{
 			Name: report.Profile.Name, CodexHome: report.Profile.CodexHome,
 			Email: report.Profile.Email, Provider: string(report.Profile.Provider.Kind),
-			Auth: auth.Label, AccountID: report.AccountID,
+			ProviderConfig: providerSnapshotFromEntity(report.Profile.Provider),
+			Auth:           auth.Label, AccountID: report.AccountID,
 			Active: report.Active, Enabled: report.Enabled, Compatible: auth.Compatible,
 		})
 	}

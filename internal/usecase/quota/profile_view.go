@@ -61,14 +61,36 @@ func (status *Status) populateProfileQuota(ctx context.Context, report *quotamod
 	switch {
 	case !target.Enabled:
 		report.State = "disabled"
-	case target.Provider != "openai":
-		report.State = "unsupported"
-	case !target.Compatible:
-		report.State = target.Auth
+	case target.Provider == "openai":
+		status.populateOpenAIProfileQuota(ctx, report, target, baseURL)
+	case status.externalProvider(target.Provider) != nil:
+		info, err := status.externalProvider(target.Provider).FetchQuota(ctx, target)
+		report.Err = err
+		if err != nil {
+			report.State = "error"
+			return
+		}
+		report.External = &info
+		report.State = strings.ToLower(strings.TrimSpace(info.Status))
 	default:
-		report.Usage, report.Err = status.fetchHomeUsage(ctx, target.CodexHome, baseURL)
-		report.State = quotaState(*report, status.now())
+		report.State = "unsupported"
 	}
+}
+
+func (status *Status) populateOpenAIProfileQuota(ctx context.Context, report *quotamodel.Report, target profilemodel.QuotaTarget, baseURL string) {
+	if !target.Compatible {
+		report.State = target.Auth
+		return
+	}
+	report.Usage, report.Err = status.fetchHomeUsage(ctx, target.CodexHome, baseURL)
+	report.State = quotaState(*report, status.now())
+}
+
+func (status *Status) externalProvider(provider string) externalProfileGateway {
+	if status == nil || status.external == nil {
+		return nil
+	}
+	return status.external[strings.ToLower(strings.TrimSpace(provider))]
 }
 
 func (status *Status) selectedProfiles(ctx context.Context, options Options) ([]profilemodel.QuotaTarget, error) {
