@@ -59,16 +59,35 @@ func CopilotProviderCatalog() ([]ProviderCatalogEntry, error) {
 func ResolveProviderCatalogEntry(entries []ProviderCatalogEntry, model string) *ProviderCatalogEntry {
 	model = strings.TrimSpace(model)
 	for index := range entries {
-		if strings.EqualFold(entries[index].ID, model) {
+		if providerCatalogASCIIEqualFold(entries[index].ID, model) {
 			return &entries[index]
 		}
 		for _, alias := range entries[index].Aliases {
-			if strings.EqualFold(alias, model) {
+			if providerCatalogASCIIEqualFold(alias, model) {
 				return &entries[index]
 			}
 		}
 	}
 	return nil
+}
+
+func providerCatalogASCIIEqualFold(left, right string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := 0; index < len(left); index++ {
+		leftByte, rightByte := left[index], right[index]
+		if leftByte >= 'A' && leftByte <= 'Z' {
+			leftByte += 'a' - 'A'
+		}
+		if rightByte >= 'A' && rightByte <= 'Z' {
+			rightByte += 'a' - 'A'
+		}
+		if leftByte != rightByte {
+			return false
+		}
+	}
+	return true
 }
 
 func CopilotProviderCatalogJSON() ([]map[string]any, error) {

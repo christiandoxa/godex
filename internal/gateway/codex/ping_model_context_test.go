@@ -261,3 +261,29 @@ func TestPingModelContextEnforcesProdexConfigBound(t *testing.T) {
 		t.Fatalf("oversized config error = %v", err)
 	}
 }
+
+func TestPingModelContextSkipsMalformedConfigForExplicitNonLargeModel(t *testing.T) {
+	home := t.TempDir()
+	if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte("model = ["), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	base := pingArguments(pingmodel.Options{Model: "gpt-4o"})
+	got, err := pingModelContextArguments(home, base)
+	if err != nil {
+		t.Fatalf("non-large explicit model read unrelated malformed config: %v", err)
+	}
+	if !reflect.DeepEqual(got, base) {
+		t.Fatalf("non-large explicit model args = %#v, want %#v", got, base)
+	}
+}
+
+func TestPingModelCacheIdentityUsesASCIIOnlyCaseFold(t *testing.T) {
+	home := t.TempDir()
+	content := `{"models":[{"slug":"sol","context_window":777000}]}`
+	if err := os.WriteFile(filepath.Join(home, "models_cache.json"), []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := pingOpenAIModelContextFromCache(home, "ſol"); got != nil {
+		t.Fatalf("Unicode fold matched ASCII-only catalog identity: %d", *got)
+	}
+}

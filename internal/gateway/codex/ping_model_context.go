@@ -22,16 +22,24 @@ type pingModelConfig struct {
 }
 
 func pingModelContextArguments(codexHome string, args []string) ([]string, error) {
-	config, err := readPingModelConfig(filepath.Join(codexHome, "config.toml"))
-	if err != nil {
-		return nil, err
-	}
 	model := pingCLIModel(args)
+	var config pingModelConfig
+	var err error
 	if model == "" {
+		config, err = readPingModelConfig(filepath.Join(codexHome, "config.toml"))
+		if err != nil {
+			return nil, err
+		}
 		model = config.stringValue("model")
 	}
 	if model == "" || !pingOpenAILargeContextModel(model) {
 		return append([]string(nil), args...), nil
+	}
+	if config.values == nil {
+		config, err = readPingModelConfig(filepath.Join(codexHome, "config.toml"))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	explicitContext := config.uintValue("model_context_window")
@@ -205,7 +213,7 @@ func pingOpenAIModelContextFromCache(codexHome, model string) *uint64 {
 			identity, _ = entry["id"].(string)
 		}
 		identity = strings.TrimSpace(identity)
-		if identity == "" || !strings.EqualFold(identity, query) {
+		if identity == "" || !pingASCIIEqualFold(identity, query) {
 			continue
 		}
 		context := pingJSONUint(entry["context_window"])
@@ -227,6 +235,25 @@ func pingOpenAIModelContextFromCache(codexHome, model string) *uint64 {
 		return maxContext
 	}
 	return nil
+}
+
+func pingASCIIEqualFold(left, right string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := 0; index < len(left); index++ {
+		leftByte, rightByte := left[index], right[index]
+		if leftByte >= 'A' && leftByte <= 'Z' {
+			leftByte += 'a' - 'A'
+		}
+		if rightByte >= 'A' && rightByte <= 'Z' {
+			rightByte += 'a' - 'A'
+		}
+		if leftByte != rightByte {
+			return false
+		}
+	}
+	return true
 }
 
 func pingJSONUint(value any) *uint64 {

@@ -25,3 +25,16 @@ func TestOpenAIProviderCatalogMatchesProdex04351(t *testing.T) {
 		}
 	}
 }
+
+func TestProviderCatalogResolverUsesProdexASCIIOnlyCaseFold(t *testing.T) {
+	entries, err := OpenAIProviderCatalog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if entry := ResolveProviderCatalogEntry(entries, "ſol"); entry != nil {
+		t.Fatalf("Unicode fold unexpectedly resolved ASCII alias: %#v", entry)
+	}
+	if entry := ResolveProviderCatalogEntry(entries, " SOL "); entry == nil || entry.ID != "gpt-6.1-sol" {
+		t.Fatalf("ASCII casefold/trim regression: %#v", entry)
+	}
+}
