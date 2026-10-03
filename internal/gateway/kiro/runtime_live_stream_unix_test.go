@@ -219,20 +219,42 @@ func readUntilKiroStream(
 	}
 }
 
+func TestReadPIDFileWaitsForShellWriteContent(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "delayed.pid")
+	if err := os.WriteFile(path, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		time.Sleep(25 * time.Millisecond)
+		_ = os.WriteFile(path, []byte("4242\n"), 0o600)
+	}()
+	if got := readPIDFile(t, path); got != 4242 {
+		t.Fatalf("PID = %d, want 4242", got)
+	}
+}
+
 func readPIDFile(t *testing.T, path string) int {
 	t.Helper()
 	deadline := time.Now().Add(time.Second)
+	var lastErr error
 	for {
 		content, err := os.ReadFile(path)
 		if err == nil {
-			value, err := strconv.Atoi(strings.TrimSpace(string(content)))
-			if err != nil {
-				t.Fatal(err)
+			text := strings.TrimSpace(string(content))
+			if text != "" {
+				value, parseErr := strconv.Atoi(text)
+				if parseErr == nil {
+					return value
+				}
+				lastErr = parseErr
+			} else {
+				lastErr = errors.New("PID file is empty")
 			}
-			return value
+		} else {
+			lastErr = err
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("PID file %s unavailable: %v", path, err)
+			t.Fatalf("PID file %s unavailable or incomplete: %v", path, lastErr)
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
