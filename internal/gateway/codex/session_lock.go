@@ -19,16 +19,37 @@ const (
 // SessionLocker coordinates Codex child processes with shared-session maintenance.
 type SessionLocker struct{}
 
-func (SessionLocker) LockCodexSessionsForChild(ctx context.Context, codexHome string) (func() error, error) {
+func (SessionLocker) TryLockCodexSessionsForMaintenance(codexHome string) (func() error, bool, error) {
+	lockPath, err := prepareCodexSessionLockPath(codexHome)
+	if err != nil {
+		return nil, false, err
+	}
+	release, err := lockfile.TryAcquire(lockPath)
+	if errors.Is(err, lockfile.ErrBusy) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, fmt.Errorf("lock Codex sessions for maintenance: %w", err)
+	}
+	return release, true, nil
+}
+
+func prepareCodexSessionLockPath(codexHome string) (string, error) {
 	if err := validateCodexHomePath(codexHome); err != nil {
-		return nil, err
+		return "", err
 	}
 	sessionsDir := filepath.Join(codexHome, "sessions")
 	if err := os.MkdirAll(sessionsDir, 0o700); err != nil {
-		return nil, fmt.Errorf("create Codex sessions directory: %w", err)
+		return "", fmt.Errorf("create Codex sessions directory: %w", err)
 	}
+	return filepath.Join(sessionsDir, codexSessionMaintenanceLockFile), nil
+}
 
-	lockPath := filepath.Join(sessionsDir, codexSessionMaintenanceLockFile)
+func (SessionLocker) LockCodexSessionsForChild(ctx context.Context, codexHome string) (func() error, error) {
+	lockPath, err := prepareCodexSessionLockPath(codexHome)
+	if err != nil {
+		return nil, err
+	}
 	deadline := time.Now().Add(codexSessionChildLockTimeout)
 	for {
 		if err := ctx.Err(); err != nil {

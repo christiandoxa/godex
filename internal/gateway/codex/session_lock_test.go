@@ -34,6 +34,14 @@ func TestCodexSessionLockHelperProcess(t *testing.T) {
 		defer release()
 		_, _ = io.WriteString(os.Stdout, "locked\n")
 		_, _ = io.Copy(io.Discard, os.Stdin)
+	case "hold-shared":
+		release, err := lockfile.TryRead(os.Getenv(sessionLockHelperPath))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer release()
+		_, _ = io.WriteString(os.Stdout, "locked\n")
+		_, _ = io.Copy(io.Discard, os.Stdin)
 	case "try-exclusive":
 		release, err := lockfile.TryAcquire(os.Getenv(sessionLockHelperPath))
 		if errors.Is(err, lockfile.ErrBusy) {
@@ -79,6 +87,51 @@ func TestCodexSessionLockerUsesProdexPathAndWaitsForCrossProcessLock(t *testing.
 	}
 	if _, err := os.Stat(lockPath); err != nil {
 		t.Fatalf("Prodex lock path %q was not created: %v", lockPath, err)
+	}
+}
+
+func TestSessionLockerMaintenanceSkipsWhileChildLockIsHeld(t *testing.T) {
+	home := filepath.Join(t.TempDir(), "shared-codex")
+	sessions := filepath.Join(home, "sessions")
+	lockPath := filepath.Join(sessions, ".prodex-maintenance.lock")
+	if err := os.MkdirAll(sessions, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	command, input := startSessionLockHelper(t, "hold-shared", lockPath)
+	defer stopSessionLockHelper(command, input)
+
+	release, acquired, err := (SessionLocker{}).TryLockCodexSessionsForMaintenance(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if acquired || release != nil {
+		t.Fatalf("maintenance lock = acquired:%t release:%v, want skipped", acquired, release != nil)
+	}
+}
+
+func TestSessionLockerMaintenanceExcludesChildAndReleases(t *testing.T) {
+	home := filepath.Join(t.TempDir(), "shared-codex")
+	release, acquired, err := (SessionLocker{}).TryLockCodexSessionsForMaintenance(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !acquired || release == nil {
+		t.Fatalf("maintenance lock = acquired:%t release:%v", acquired, release != nil)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	if _, err := (SessionLocker{}).LockCodexSessionsForChild(ctx, home); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("child entered during maintenance: %v", err)
+	}
+	if err := release(); err != nil {
+		t.Fatal(err)
+	}
+	childRelease, err := (SessionLocker{}).LockCodexSessionsForChild(context.Background(), home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := childRelease(); err != nil {
+		t.Fatal(err)
 	}
 }
 
