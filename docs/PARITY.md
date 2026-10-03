@@ -306,9 +306,12 @@ and eligibility validation stays in the runtime use case.
   `--repair-import-auth-journals` recovers profile-store auth replacements, counts
   remaining orphan journals without mutating them, and exposes the tagged human,
   runtime-JSON, and bundle status fields. Account-store imports remain outside this
-  journal path. Bundle runtime events omit account IDs, quota diagnostics omit
-  identity/email and raw gateway errors, and file output is private/atomic. Full
-  session-index repair and runtime-policy suggestions remain unsupported.
+  journal path. External provider quota diagnostics now use the tagged `Quota`,
+  `Main`, and optional `Reset` human fields plus the nested `{profile, provider,
+  quota}` JSON shape; OpenAI window rendering remains separate parity work. Bundle
+  runtime events omit account IDs, quota diagnostics omit identity/email and raw
+  gateway errors, and file output is private/atomic. Full session-index repair and
+  runtime-policy suggestions remain unsupported.
 - `update` now matches the standalone Prodex self-update contract: five-minute
   latest-release cache, short GitHub redirect probe, semver/no-downgrade decision,
   exclusive install lock with actual-binary re-probe, embedded installer execution,

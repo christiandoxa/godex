@@ -240,11 +240,17 @@ func (doctor *Doctor) quotaDiagnostics(ctx context.Context) ([]runtimemodel.Doct
 		if report.Err != nil {
 			state = "error"
 		}
-		result = append(result, runtimemodel.DoctorQuota{
+		quota := runtimemodel.DoctorQuota{
 			Profile: name, Provider: provider, Auth: report.Auth, State: state,
 			Plan: report.Usage.PlanType, FiveHour: doctorWindow(report.Usage.Primary),
 			Weekly: doctorWindow(report.Usage.Secondary), Active: report.Active, Enabled: report.Enabled,
-		})
+		}
+		if report.External != nil {
+			quota.External = &runtimemodel.DoctorExternalQuota{
+				Status: report.External.Status, Main: report.External.Main, Reset: report.External.Reset,
+			}
+		}
+		result = append(result, quota)
 	}
 	return result, nil
 }

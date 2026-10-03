@@ -272,19 +272,6 @@ func doctorRuntimePanel(runtime runtimemodel.DoctorRuntime) doctorPanel {
 	}}
 }
 
-func doctorQuotaPanel(quota runtimemodel.DoctorQuota) doctorPanel {
-	return doctorPanel{title: "Profile " + quota.Profile, fields: [][2]string{
-		{"Current", yesNo(quota.Active)},
-		{"Enabled", yesNo(quota.Enabled)},
-		{"Provider", valueOrDash(quota.Provider)},
-		{"Auth", valueOrDash(quota.Auth)},
-		{"Quota", valueOrDash(quota.State)},
-		{"Plan", valueOrDash(quota.Plan)},
-		{"5h", valueOrDash(quota.FiveHour)},
-		{"Weekly", valueOrDash(quota.Weekly)},
-	}}
-}
-
 func yesNo(value bool) string {
 	if value {
 		return "Yes"
