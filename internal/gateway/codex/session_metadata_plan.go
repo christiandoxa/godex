@@ -14,6 +14,10 @@ func planSessionMetadataRepair(path, contents string) (string, bool, error) {
 	if !ok {
 		return contents, false, nil
 	}
+	return planSessionMetadataRepairWithSelector(path, selector, contents)
+}
+
+func planSessionMetadataRepairWithSelector(path, selector, contents string) (string, bool, error) {
 	lines := splitSessionRepairLines(contents)
 	firstContent := -1
 	for index, line := range lines {
