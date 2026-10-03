@@ -18,3 +18,11 @@ func removeHopHeaders(headers http.Header) {
 		}
 	}
 }
+
+func prepareWebSocketRequestHeaders(headers http.Header, websocketKey string) {
+	removeHopHeaders(headers)
+	headers.Set("Sec-WebSocket-Key", websocketKey)
+	headers.Set("Sec-WebSocket-Version", "13")
+	headers.Set("Connection", "Upgrade")
+	headers.Set("Upgrade", "websocket")
+}

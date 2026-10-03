@@ -3,10 +3,16 @@ package openai
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/sha1"
+	"encoding/base64"
 	"errors"
+	"io"
 	"net/http"
 	"net/url"
+	"strings"
 
+	"github.com/christiandoxa/godex/internal/helper/httpheader"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
@@ -21,6 +27,7 @@ type Transport struct {
 	client   *http.Client
 	upstream *url.URL
 	auth     authReader
+	cookies  *webSocketCookieJar
 }
 
 func NewTransport(upstream string, client *http.Client, auth authReader) (*Transport, error) {
@@ -34,9 +41,17 @@ func NewTransport(upstream string, client *http.Client, auth authReader) (*Trans
 	if auth == nil {
 		return nil, errors.New("selected account authentication reader is required")
 	}
-	return &Transport{client: cloneHTTPClient(client), upstream: parsed, auth: auth}, nil
+	return &Transport{client: cloneHTTPClient(client), upstream: parsed, auth: auth, cookies: newWebSocketCookieJar()}, nil
 }
 func (transport *Transport) Execute(ctx context.Context, input proxymodel.Request, account proxymodel.Account) (*proxymodel.Response, error) {
+	return transport.execute(ctx, input, account, false)
+}
+
+func (transport *Transport) ExecuteWebSocket(ctx context.Context, input proxymodel.Request, account proxymodel.Account) (*proxymodel.Response, error) {
+	return transport.execute(ctx, input, account, true)
+}
+
+func (transport *Transport) execute(ctx context.Context, input proxymodel.Request, account proxymodel.Account, websocket bool) (*proxymodel.Response, error) {
 	auth, err := transport.auth.ReadAuth(ctx, account.Home)
 	if err != nil {
 		return nil, err
@@ -50,18 +65,76 @@ func (transport *Transport) Execute(ctx context.Context, input proxymodel.Reques
 		return nil, err
 	}
 	request.Header = input.Header.Clone()
-	removeHopHeaders(request.Header)
+	if request.Header == nil {
+		request.Header = make(http.Header)
+	}
+	websocketKey := ""
+	if websocket {
+		websocketKey, err = newWebSocketKey()
+		if err != nil {
+			return nil, err
+		}
+		prepareWebSocketRequestHeaders(request.Header, websocketKey)
+		if cookie := transport.cookies.header(websocketCookieProfile(account), request.URL, request.Header); cookie != "" {
+			request.Header.Set("Cookie", cookie)
+		} else {
+			request.Header.Del("Cookie")
+		}
+	} else {
+		removeHopHeaders(request.Header)
+	}
 	request.Header.Set("Authorization", "Bearer "+auth.AccessToken)
 	if auth.AccountID != "" {
 		request.Header.Set("ChatGPT-Account-Id", auth.AccountID)
 	}
-	response, err := transport.client.Do(request)
+	client := transport.client
+	if websocket && client.Jar != nil {
+		copy := *client
+		copy.Jar = nil
+		client = &copy
+	}
+	response, err := client.Do(request)
 	if err != nil {
 		return nil, err
 	}
+	if websocket {
+		transport.cookies.capture(websocketCookieProfile(account), request.URL, response.Header)
+	}
+	if websocket && response.StatusCode == http.StatusSwitchingProtocols {
+		if !strings.EqualFold(strings.TrimSpace(response.Header.Get("Upgrade")), "websocket") ||
+			!httpheader.ConnectionTokens(response.Header)[http.CanonicalHeaderKey("Upgrade")] ||
+			!validWebSocketAccept(websocketKey, response.Header.Get("Sec-WebSocket-Accept")) {
+			_ = response.Body.Close()
+			return nil, errors.New("upstream websocket handshake response is invalid")
+		}
+		if _, ok := response.Body.(io.ReadWriteCloser); !ok {
+			_ = response.Body.Close()
+			return nil, errors.New("upstream websocket connection is not duplex")
+		}
+	}
 	return &proxymodel.Response{StatusCode: response.StatusCode, Header: response.Header, Body: response.Body, Trailer: response.Trailer}, nil
 }
-func (transport *Transport) Close() { transport.client.CloseIdleConnections() }
+
+func newWebSocketKey() (string, error) {
+	var nonce [16]byte
+	if _, err := rand.Read(nonce[:]); err != nil {
+		return "", errors.New("generate upstream websocket key")
+	}
+	return base64.StdEncoding.EncodeToString(nonce[:]), nil
+}
+
+func validWebSocketAccept(key, accept string) bool {
+	decoded, err := base64.StdEncoding.DecodeString(strings.TrimSpace(key))
+	if err != nil || len(decoded) != 16 {
+		return false
+	}
+	digest := sha1.Sum([]byte(strings.TrimSpace(key) + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"))
+	return strings.TrimSpace(accept) == base64.StdEncoding.EncodeToString(digest[:])
+}
+func (transport *Transport) Close() {
+	transport.client.CloseIdleConnections()
+	transport.cookies.clear()
+}
 
 func cloneHTTPClient(client *http.Client) *http.Client {
 	if client == nil {
