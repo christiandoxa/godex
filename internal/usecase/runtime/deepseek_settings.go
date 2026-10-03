@@ -3,10 +3,13 @@ package runtime
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
@@ -31,13 +34,15 @@ func applyDeepSeekRuntimeSettings(home string, provider *proxymodel.Provider) er
 	provider.StrictTools = settings.strictTools
 	provider.WebSearchMode = settings.webSearchMode
 	provider.BetaBaseURL = settings.betaBaseURL
+	provider.SSELookaheadTimeout = settings.sseLookaheadTimeout
 	return nil
 }
 
 type deepSeekSettings struct {
-	strictTools   bool
-	webSearchMode string
-	betaBaseURL   string
+	strictTools         bool
+	webSearchMode       string
+	betaBaseURL         string
+	sseLookaheadTimeout time.Duration
 }
 
 func deepSeekRuntimeSettings(home string, lookup func(string) (string, bool)) (deepSeekSettings, error) {
@@ -54,7 +59,33 @@ func deepSeekRuntimeSettings(home string, lookup func(string) (string, bool)) (d
 	if err != nil {
 		return deepSeekSettings{}, err
 	}
-	return deepSeekSettings{strictTools: strict, webSearchMode: mode, betaBaseURL: beta}, nil
+	lookahead, err := deepSeekSSELookaheadTimeout(lookup)
+	if err != nil {
+		return deepSeekSettings{}, err
+	}
+	return deepSeekSettings{
+		strictTools: strict, webSearchMode: mode, betaBaseURL: beta,
+		sseLookaheadTimeout: lookahead,
+	}, nil
+}
+
+func deepSeekSSELookaheadTimeout(lookup func(string) (string, bool)) (time.Duration, error) {
+	const key = "PRODEX_RUNTIME_PROXY_SSE_LOOKAHEAD_TIMEOUT_MS"
+	value, found := lookup(key)
+	if !found {
+		return time.Second, nil
+	}
+	milliseconds, err := strconv.ParseUint(value, 10, 63)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be an unsigned integer", key)
+	}
+	if milliseconds == 0 {
+		return 0, fmt.Errorf("%s must be greater than zero", key)
+	}
+	if milliseconds > uint64((1<<63-1)/int64(time.Millisecond)) {
+		return 0, fmt.Errorf("%s exceeds the supported duration", key)
+	}
+	return time.Duration(milliseconds) * time.Millisecond, nil
 }
 
 func readDeepSeekConfig(home string) map[string]any {
@@ -62,11 +93,12 @@ func readDeepSeekConfig(home string) map[string]any {
 		return nil
 	}
 	path := filepath.Join(filepath.Clean(home), "config.toml")
-	info, err := os.Lstat(path)
-	if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || info.Size() > deepSeekConfigMaxBytes {
+	file, err := os.Open(path)
+	if err != nil {
 		return nil
 	}
-	content, err := os.ReadFile(path)
+	defer file.Close()
+	content, err := io.ReadAll(io.LimitReader(file, deepSeekConfigMaxBytes+1))
 	if err != nil || len(content) > deepSeekConfigMaxBytes {
 		return nil
 	}

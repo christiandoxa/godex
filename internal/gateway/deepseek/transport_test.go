@@ -3,6 +3,7 @@ package deepseek
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -106,6 +107,87 @@ func TestDeepSeekResponsesTranslateFallbackAndHeaders(t *testing.T) {
 	}
 }
 
+func TestDeepSeekStrictResponsesUseConfiguredBetaBase(t *testing.T) {
+	type captured struct {
+		path, query, searchContext string
+	}
+	requests := make(chan captured, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		body, _ := io.ReadAll(request.Body)
+		var value map[string]any
+		_ = json.Unmarshal(body, &value)
+		search, _ := value["web_search_options"].(map[string]any)
+		contextSize, _ := search["search_context_size"].(string)
+		requests <- captured{path: request.URL.Path, query: request.URL.RawQuery, searchContext: contextSize}
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"choices":[{"message":{"content":"ok"}}]}`))
+	}))
+	defer server.Close()
+
+	transport, err := NewRuntimeTransportWithOptions(server.URL+"/v1", "fixture-key", RequestOptions{
+		StrictTools: true, WebSearchMode: "openai_chat", BetaBaseURL: server.URL + "/tenant/beta/",
+	}, server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer transport.Close()
+	response, err := transport.Execute(context.Background(), proxymodel.Request{
+		Method: http.MethodPost, Path: mountPath + "/responses", RawQuery: "trace=one",
+		Body: []byte(`{"input":"search","web_search_options":{"search_context_size":"high"}}`),
+	}, proxymodel.Account{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if got := <-requests; got.path != "/tenant/beta/chat/completions" || got.query != "trace=one" || got.searchContext != "high" {
+		t.Fatalf("DeepSeek beta request = %#v", got)
+	}
+}
+
+func TestDeepSeekBetaBaseURLDefaultsAndRejectsMalformedValues(t *testing.T) {
+	transport, err := NewRuntimeTransportWithOptions("https://api.deepseek.com", "fixture-key", RequestOptions{StrictTools: true}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := transport.betaUpstream.String(); got != defaultBetaBaseURL {
+		t.Fatalf("default beta base URL = %q", got)
+	}
+	if got := transport.target(route{kind: routeResponses}, "trace=one"); got != defaultBetaBaseURL+"/chat/completions?trace=one" {
+		t.Fatalf("default beta target = %q", got)
+	}
+	transport.Close()
+
+	for _, baseURL := range []string{
+		"file:///tmp/deepseek", "https://user:pass@example.test/beta", "https://example.test/beta?key=value",
+		"https://example.test/beta#fragment", "https://bad host/beta", "https://example.test/beta path",
+	} {
+		if _, err := NewRuntimeTransportWithOptions("https://api.deepseek.com", "fixture-key", RequestOptions{BetaBaseURL: baseURL}, nil); err == nil {
+			t.Fatalf("malformed beta base URL %q accepted", baseURL)
+		}
+	}
+}
+
+func TestDeepSeekOffModeRejectsSearchBeforeUpstream(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { calls++ }))
+	defer server.Close()
+	transport, err := NewRuntimeTransportWithOptions(server.URL, "fixture-key", RequestOptions{WebSearchMode: "off"}, server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer transport.Close()
+	_, err = transport.Execute(context.Background(), proxymodel.Request{
+		Method: http.MethodPost, Path: mountPath + "/responses", Body: []byte(`{"input":"search","web_search_options":{}}`),
+	}, proxymodel.Account{})
+	var proxyError *proxymodel.Error
+	if !errors.As(err, &proxyError) || proxyError.StatusCode != http.StatusBadRequest || !strings.Contains(err.Error(), "web search mode is off") {
+		t.Fatalf("off-mode response error = %v", err)
+	}
+	if calls != 0 {
+		t.Fatalf("off-mode search reached upstream %d time(s)", calls)
+	}
+}
+
 func TestDeepSeekAdvancedResponsesTranslateBeforeUpstream(t *testing.T) {
 	var bodies []map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -157,7 +239,7 @@ func TestDeepSeekAdvancedResponsesTranslateBeforeUpstream(t *testing.T) {
 
 }
 
-func TestDeepSeekUnsupportedWebSearchFailsBeforeUpstream(t *testing.T) {
+func TestDeepSeekMalformedWebSearchFailsBeforeUpstream(t *testing.T) {
 	calls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { calls++ }))
 	defer server.Close()
@@ -168,13 +250,13 @@ func TestDeepSeekUnsupportedWebSearchFailsBeforeUpstream(t *testing.T) {
 	defer transport.Close()
 	_, err = transport.Execute(context.Background(), proxymodel.Request{
 		Method: http.MethodPost, Path: mountPath + "/responses",
-		Body: []byte(`{"input":"hello","web_search_options":{}}`),
+		Body: []byte(`{"input":"hello","web_search_options":{"search_context_size":"huge"}}`),
 	}, proxymodel.Account{})
-	if err == nil || !strings.Contains(err.Error(), "web_search_options") {
-		t.Fatalf("web-search request error = %v", err)
+	if err == nil || !strings.Contains(err.Error(), "search_context_size") {
+		t.Fatalf("malformed web-search request error = %v", err)
 	}
 	if calls != 0 {
-		t.Fatalf("unsupported web-search request reached upstream %d time(s)", calls)
+		t.Fatalf("malformed web-search request reached upstream %d time(s)", calls)
 	}
 }
 
@@ -193,7 +275,9 @@ func TestDeepSeekChatAndMessagesRemainPassthrough(t *testing.T) {
 		_, _ = writer.Write([]byte(`{"ok":true}`))
 	}))
 	defer server.Close()
-	transport, err := NewRuntimeTransport(server.URL+"/v1", "fixture-key", server.Client())
+	transport, err := NewRuntimeTransportWithOptions(server.URL+"/v1", "fixture-key", RequestOptions{
+		StrictTools: true, BetaBaseURL: server.URL + "/beta",
+	}, server.Client())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -335,6 +419,82 @@ func TestDeepSeekBufferedResponseMergesRequestAndProviderMetadata(t *testing.T) 
 	usage := value["usage"].(map[string]any)
 	if usage["input_tokens_details"].(map[string]any)["cached_tokens"] != float64(5) {
 		t.Fatalf("usage = %#v", usage)
+	}
+}
+
+func TestDeepSeekResponsesTranslateStreamWithProviderShaping(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(writer,
+			"data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"id\":\"call_shell\",\"function\":{\"name\":\"functions.exec_command\",\"arguments\":\"{\\\"cmd\\\":\\\"ls\\\"}\"}}]}}]}\n\n"+
+				"data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"thinking\"}}]}\n\n"+
+				"data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n"+
+				"data: [DONE]\n\n",
+		)
+	}))
+	defer server.Close()
+	transport, err := NewRuntimeTransport(server.URL, "fixture-key", server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer transport.Close()
+
+	response, err := transport.Execute(context.Background(), proxymodel.Request{
+		Method: http.MethodPost,
+		Path:   mountPath + "/responses",
+		Body:   []byte(`{"input":"hello","stream":true,"stream_options":{"include_usage":true}}`),
+	}, proxymodel.Account{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "event: response.function_call_arguments.delta\ndata: {\"call_id\":\"call_shell\",\"delta\":\"{\\\"cmd\\\":\\\"ls\\\"}\",\"type\":\"response.function_call_arguments.delta\"}\n\n" +
+		"event: response.output_text.delta\ndata: {\"delta\":\"\",\"type\":\"response.output_text.delta\"}\n\n" +
+		"event: response.output_text.delta\ndata: {\"delta\":\"\",\"type\":\"response.output_text.delta\"}\n\n" +
+		"event: response.completed\ndata: {}\n\n"
+	if response.StatusCode != http.StatusOK || string(body) != want {
+		t.Fatalf("translated DeepSeek stream = status:%d body:%s", response.StatusCode, body)
+	}
+}
+
+func TestDeepSeekBufferedResponseUsesTaggedSparseDefaults(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"choices":[{"message":{"tool_calls":[{"function":{"name":"lookup","arguments":"{}"}}]}}]}`))
+	}))
+	defer server.Close()
+	transport, err := NewRuntimeTransport(server.URL, "fixture-key", server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer transport.Close()
+	response, err := transport.Execute(context.Background(), proxymodel.Request{
+		Method: http.MethodPost,
+		Path:   mountPath + "/responses",
+		Body:   []byte(`{"input":"hello"}`),
+	}, proxymodel.Account{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var value map[string]any
+	if err := json.Unmarshal(body, &value); err != nil {
+		t.Fatal(err)
+	}
+	if value["id"] != "chatcmpl_prodex" || value["model"] != "deepseek-chat" {
+		t.Fatalf("sparse DeepSeek response defaults = %#v", value)
+	}
+	tool := value["output"].([]any)[0].(map[string]any)
+	if tool["call_id"] != "call_0" {
+		t.Fatalf("sparse DeepSeek tool-call ID = %#v", tool)
 	}
 }
 

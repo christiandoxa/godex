@@ -178,6 +178,7 @@ func (runner *Runner) prepareProviderLaunch(
 		result[index].Provider.StrictTools = provider.StrictTools
 		result[index].Provider.WebSearchMode = provider.WebSearchMode
 		result[index].Provider.BetaBaseURL = provider.BetaBaseURL
+		result[index].Provider.SSELookaheadTimeout = provider.SSELookaheadTimeout
 	}
 	return provider, result, nil
 }

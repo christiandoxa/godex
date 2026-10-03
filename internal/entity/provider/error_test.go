@@ -27,6 +27,7 @@ func TestClassifyErrorMatchesProdexCorePolicy(t *testing.T) {
 		{"not found code", 500, `{"error":{"type":"not_found_error"}}`, ErrorNotFound, 0},
 		{"overloaded code", 400, `{"error":{"type":"overloaded_error"}}`, ErrorTransient, 10 * time.Second},
 		{"server overloaded code", 400, `{"error":{"code":"server_is_overloaded"}}`, ErrorTransient, 10 * time.Second},
+		{"runtime proxy usage limit is not a provider quota code", 400, `{"error":{"code":"usage_limit_reached"}}`, ErrorOther, 0},
 		{"transient", 503, `{}`, ErrorTransient, 10 * time.Second},
 	}
 	for _, fixture := range cases {
@@ -45,6 +46,30 @@ func TestRetryEligibilityMatchesProdexTransitionPolicy(t *testing.T) {
 	}
 	if !RetryableAcrossCredentials(ErrorAuth) || RetryableAcrossCredentials(ErrorNotFound) || RetryableAcrossCredentials(ErrorOther) {
 		t.Fatal("credential retry policy drift")
+	}
+}
+
+func TestClassifyFirstEventErrorUsesTaggedCodePrecedence(t *testing.T) {
+	for _, fixture := range []struct {
+		name  string
+		body  string
+		class ErrorClass
+		found bool
+	}{
+		{"error type precedes code", `{"type":"error","error":{"type":"overloaded_error","code":"authentication_error"}}`, ErrorTransient, true},
+		{"unknown error type blocks lower precedence code", `{"type":"error","error":{"type":"unknown","code":"overloaded_error"}}`, ErrorOther, true},
+		{"error code used when type is absent", `{"type":"error","error":{"code":"rate_limit_error"}}`, ErrorRateLimit, true},
+		{"top level code used last", `{"type":"error","code":"quota_exhausted"}`, ErrorQuota, true},
+		{"runtime proxy usage limit is not a provider quota code", `{"type":"error","error":{"type":"usage_limit_reached"}}`, ErrorOther, true},
+		{"non-error event ignored", `{"type":"message_start","code":"overloaded_error"}`, ErrorOther, false},
+		{"untyped error object retained as terminal", `{"error":{"message":"overloaded"}}`, ErrorOther, true},
+	} {
+		t.Run(fixture.name, func(t *testing.T) {
+			_, classification, found := ClassifyFirstEventError([]byte(fixture.body))
+			if found != fixture.found || classification.Class != fixture.class {
+				t.Fatalf("event classification = %#v, found=%t", classification, found)
+			}
+		})
 	}
 }
 

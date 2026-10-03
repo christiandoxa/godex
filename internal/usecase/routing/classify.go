@@ -20,16 +20,18 @@ const (
 )
 
 type responseOutcome struct {
-	kind       responseKind
-	quarantine time.Duration
-	failed     bool
-	quota      bool
+	kind            responseKind
+	quarantine      time.Duration
+	failed          bool
+	quota           bool
+	firstEventRetry bool
 }
 
 type pendingResponse struct {
-	response  *proxymodel.Response
-	prefix    []byte
-	accountID string
+	response        *proxymodel.Response
+	prefix          []byte
+	accountID       string
+	firstEventRetry bool
 }
 
 func (pending *pendingResponse) close() {
@@ -40,11 +42,8 @@ func (pending *pendingResponse) close() {
 
 func (proxy *Router) classify(response *proxymodel.Response, providerKind string) (responseOutcome, *pendingResponse, error) {
 	pending := &pendingResponse{response: response}
-	if response.StatusCode == http.StatusOK && strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream") && response.Header.Get("Content-Encoding") == "" {
-		return proxy.inspectStream(response, pending)
-	}
-	if externalProviderKind(providerKind) && response.StatusCode >= http.StatusBadRequest {
-		return proxy.classifyExternalProvider(response, pending)
+	if outcome, specialPending, err, handled := proxy.classifySpecialResponse(response, pending, providerKind); handled {
+		return outcome, specialPending, err
 	}
 	switch {
 	case response.StatusCode == http.StatusUnauthorized:
@@ -75,6 +74,48 @@ func (proxy *Router) classify(response *proxymodel.Response, providerKind string
 		}
 	}
 	return responseOutcome{kind: responsePass}, pending, nil
+}
+
+func (proxy *Router) classifySpecialResponse(
+	response *proxymodel.Response,
+	pending *pendingResponse,
+	providerKind string,
+) (responseOutcome, *pendingResponse, error, bool) {
+	switch {
+	case response.PrecommitFailure != nil:
+		outcome, pending, err := proxy.classifyPrecommitFailure(response, pending)
+		return outcome, pending, err, true
+	case response.FirstEventCommitted:
+		return responseOutcome{}, pending, nil, true
+	case response.StatusCode == http.StatusOK &&
+		strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream") &&
+		response.Header.Get("Content-Encoding") == "":
+		outcome, pending, err := proxy.inspectStream(response, pending)
+		return outcome, pending, err, true
+	case externalProviderKind(providerKind) && response.StatusCode >= http.StatusBadRequest:
+		outcome, pending, err := proxy.classifyExternalProvider(response, pending)
+		return outcome, pending, err, true
+	default:
+		return responseOutcome{}, pending, nil, false
+	}
+}
+
+func (proxy *Router) classifyPrecommitFailure(response *proxymodel.Response, pending *pendingResponse) (responseOutcome, *pendingResponse, error) {
+	failure := response.PrecommitFailure
+	classification := providerentity.ClassifyProviderCode(failure.Code)
+	if failure.Transport {
+		classification = providerentity.ClassifyError(http.StatusBadGateway, nil)
+	}
+	if response.FirstEventRetryUsed || response.FirstEventCommitted || !providerentity.RetryableAcrossCredentials(classification.Class) {
+		return responseOutcome{kind: responsePass, failed: true}, pending, nil
+	}
+	if classification.Class == providerentity.ErrorAuth {
+		return responseOutcome{kind: responseAuthFailure, failed: true, firstEventRetry: true}, pending, nil
+	}
+	return responseOutcome{
+		kind: responseRetry, quarantine: classification.Cooldown, failed: true,
+		quota: classification.Class == providerentity.ErrorQuota, firstEventRetry: true,
+	}, pending, nil
 }
 
 func retryAfter(headers http.Header, now time.Time) time.Duration {

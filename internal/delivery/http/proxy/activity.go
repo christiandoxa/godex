@@ -15,6 +15,7 @@ type activityRecorder interface {
 
 type requestActivity struct {
 	id        string
+	sequence  uint64
 	method    string
 	path      string
 	accountID string
@@ -26,11 +27,13 @@ type requestActivity struct {
 
 func (proxy *Proxy) startActivity(request *http.Request) *requestActivity {
 	started := time.Now()
+	sequence := proxy.sequence.Add(1)
 	activity := &requestActivity{
-		id:      fmt.Sprintf("%d-%d", started.UnixNano(), proxy.sequence.Add(1)),
-		method:  request.Method,
-		path:    request.URL.Path,
-		started: started,
+		id:       fmt.Sprintf("%d-%d", started.UnixNano(), sequence),
+		sequence: sequence,
+		method:   request.Method,
+		path:     request.URL.Path,
+		started:  started,
 	}
 	proxy.recordActivity(context.WithoutCancel(request.Context()), runtimemodel.Event{
 		Kind: "request_started", RequestID: activity.id, Method: activity.method, Path: activity.path,

@@ -3,33 +3,33 @@ package deepseek
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	providerentity "github.com/christiandoxa/godex/internal/entity/provider"
-	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 	compactgateway "github.com/christiandoxa/godex/internal/gateway/compact"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
-	"github.com/google/uuid"
 )
 
 const (
-	contentTypeHeader = "Content-Type"
-	defaultAPIURL     = "https://api.deepseek.com"
-	anthropicVersion  = "2023-06-01"
-	bodyMaxBytes      = 8 << 20
+	contentTypeHeader      = "Content-Type"
+	defaultAPIURL          = "https://api.deepseek.com"
+	defaultBetaBaseURL     = "https://api.deepseek.com/beta"
+	anthropicVersion       = "2023-06-01"
+	bodyMaxBytes           = 8 << 20
+	streamEventMaxBytes    = 1 << 20
+	nativeMessagesMaxBytes = 4 << 20
 )
 
 type RuntimeTransport struct {
-	client   *http.Client
-	upstream *url.URL
-	apiKey   string
-	options  RequestOptions
+	client       *http.Client
+	upstream     *url.URL
+	betaUpstream *url.URL
+	apiKey       string
+	options      RequestOptions
 }
 
 func NewRuntimeTransport(apiURL, apiKey string, client *http.Client) (*RuntimeTransport, error) {
@@ -44,10 +44,22 @@ func NewRuntimeTransportWithOptions(apiURL, apiKey string, options RequestOption
 	if err != nil {
 		return nil, err
 	}
+	if options.BetaBaseURL == "" {
+		options.BetaBaseURL = defaultBetaBaseURL
+	}
+	if options.SSELookaheadTimeout <= 0 {
+		options.SSELookaheadTimeout = defaultSSELookaheadTimeout
+	}
+	betaUpstream, err := validateRuntimeURL(options.BetaBaseURL)
+	if err != nil {
+		return nil, err
+	}
 	if strings.TrimSpace(apiKey) == "" {
 		return nil, errors.New("DeepSeek API credential is unavailable")
 	}
-	return &RuntimeTransport{client: cloneClient(client), upstream: parsed, apiKey: apiKey}, nil
+	return &RuntimeTransport{
+		client: cloneClient(client), upstream: parsed, betaUpstream: betaUpstream, apiKey: apiKey, options: options,
+	}, nil
 }
 
 func (transport *RuntimeTransport) Execute(ctx context.Context, input proxymodel.Request, _ proxymodel.Account) (*proxymodel.Response, error) {
@@ -67,35 +79,191 @@ func (transport *RuntimeTransport) Execute(ctx context.Context, input proxymodel
 	}
 }
 
+type deepSeekResponseAttempt struct {
+	body           []byte
+	route          route
+	nativeMessages bool
+	metadata       map[string]any
+}
+
+type deepSeekPrecommitState struct {
+	failure   *proxymodel.PrecommitFailure
+	retry     bool
+	retryUsed bool
+	committed bool
+}
+
 func (transport *RuntimeTransport) executeResponses(ctx context.Context, input proxymodel.Request, current route) (*proxymodel.Response, error) {
-	model := requestModel(input.Body)
-	models := providerentity.ModelFallbackChain(deepSeekProviderKey, model)
+	models := providerentity.ModelFallbackChain(deepSeekProviderKey, requestModel(input.Body))
 	if len(models) == 0 {
 		models = []string{"deepseek-v4-pro", "deepseek-v4-flash"}
 	}
+	firstEventRetryUsed := input.FirstEventRetryUsed
 	for index, candidate := range models {
-		translatedRequest, err := TranslateResponsesRequest(input.Body, RequestOptions{Model: candidate, StrictTools: transport.options.StrictTools})
-		if err != nil {
-			return nil, &proxymodel.Error{StatusCode: http.StatusBadRequest, Message: err.Error()}
-		}
-		response, err := transport.send(ctx, input, current, translatedRequest.Body)
+		attempt, err := transport.prepareResponseAttempt(input, current, candidate)
 		if err != nil {
 			return nil, err
 		}
-		if response.StatusCode >= 200 && response.StatusCode < 300 {
-			return translateResponseWithMetadata(response, translatedRequest.ResponseMetadata)
-		}
-		buffered, err := bufferError(response)
+		response, err := transport.send(ctx, input, attempt.route, attempt.body)
 		if err != nil {
 			return nil, err
 		}
-		classification := providerentity.ClassifyError(buffered.StatusCode, buffered.body)
-		if index+1 < len(models) && providerentity.RetryableAcrossModels(classification.Class) {
+		final, retry, retryUsed, err := transport.finishResponseAttempt(
+			ctx, input, response, attempt, firstEventRetryUsed, index+1 < len(models),
+		)
+		firstEventRetryUsed = retryUsed
+		if err != nil {
+			return nil, err
+		}
+		if retry {
 			continue
 		}
-		return buffered.proxyResponse(), nil
+		return final, nil
 	}
 	return nil, errors.New("DeepSeek runtime model fallback produced no attempts")
+}
+
+func (transport *RuntimeTransport) prepareResponseAttempt(input proxymodel.Request, current route, candidate string) (deepSeekResponseAttempt, error) {
+	translated, err := TranslateResponsesRequest(input.Body, RequestOptions{
+		Model: candidate, StrictTools: transport.options.StrictTools, WebSearchMode: transport.options.WebSearchMode,
+	})
+	if err != nil {
+		return deepSeekResponseAttempt{}, &proxymodel.Error{StatusCode: http.StatusBadRequest, Message: err.Error()}
+	}
+	attempt := deepSeekResponseAttempt{
+		body: translated.Body, route: current, metadata: translated.ResponseMetadata,
+		nativeMessages: nativeMessagesMode(transport.options.WebSearchMode) && nativeMessagesContext(translated.Body),
+	}
+	if !attempt.nativeMessages {
+		return attempt, nil
+	}
+	attempt.body, err = deepSeekAnthropicRequest(translated.Body)
+	if err == nil {
+		attempt.route = route{kind: routeMessages}
+		return attempt, nil
+	}
+	if !nativeMessagesFallbackAllowed(transport.options.WebSearchMode) || !deepSeekNativeFallbackSafe(err) {
+		return deepSeekResponseAttempt{}, &proxymodel.Error{StatusCode: http.StatusBadRequest, Message: err.Error()}
+	}
+	attempt.body, err = deepSeekChatFallbackBody(translated.Body)
+	if err != nil {
+		return deepSeekResponseAttempt{}, err
+	}
+	attempt.nativeMessages = false
+	return attempt, nil
+}
+
+func (transport *RuntimeTransport) finishResponseAttempt(
+	ctx context.Context,
+	input proxymodel.Request,
+	response *http.Response,
+	attempt deepSeekResponseAttempt,
+	firstEventRetryUsed bool,
+	hasNextModel bool,
+) (*proxymodel.Response, bool, bool, error) {
+	if response.StatusCode >= 200 && response.StatusCode < 300 {
+		if attempt.nativeMessages {
+			return transport.finishNativeResponse(ctx, input, response, attempt.metadata, firstEventRetryUsed, hasNextModel)
+		}
+		translated, err := translateResponseWithMetadata(response, attempt.metadata)
+		return translated, false, firstEventRetryUsed, err
+	}
+	buffered, err := bufferError(response)
+	if err != nil {
+		return nil, false, firstEventRetryUsed, err
+	}
+	classification := providerentity.ClassifyError(buffered.StatusCode, buffered.body)
+	if hasNextModel && providerentity.RetryableAcrossModels(classification.Class) {
+		return nil, true, firstEventRetryUsed, nil
+	}
+	return buffered.proxyResponse(), false, firstEventRetryUsed, nil
+}
+
+func (transport *RuntimeTransport) finishNativeResponse(
+	ctx context.Context,
+	input proxymodel.Request,
+	response *http.Response,
+	metadata map[string]any,
+	firstEventRetryUsed bool,
+	hasNextModel bool,
+) (*proxymodel.Response, bool, bool, error) {
+	precommit, err := transport.inspectNativePrecommit(ctx, response, firstEventRetryUsed, hasNextModel)
+	if err != nil {
+		return nil, false, precommit.retryUsed, err
+	}
+	if precommit.retry {
+		return nil, true, precommit.retryUsed, nil
+	}
+	translated, err := translateAnthropicResponseWithRequestID(response, metadata, input.RequestID)
+	if err != nil {
+		return nil, false, precommit.retryUsed, err
+	}
+	translated.FirstEventRetryUsed = precommit.retryUsed
+	translated.FirstEventCommitted = precommit.committed
+	translated.PrecommitFailure = precommit.failure
+	return translated, false, precommit.retryUsed, nil
+}
+
+func (transport *RuntimeTransport) inspectNativePrecommit(
+	ctx context.Context,
+	response *http.Response,
+	firstEventRetryUsed bool,
+	hasNextModel bool,
+) (deepSeekPrecommitState, error) {
+	state := deepSeekPrecommitState{retryUsed: firstEventRetryUsed}
+	if !strings.Contains(strings.ToLower(response.Header.Get(contentTypeHeader)), "text/event-stream") {
+		return state, nil
+	}
+	state.committed = true
+	upstreamBody := response.Body
+	replayed, firstEvent, err := peekAnthropicFirstEvent(ctx, upstreamBody, transport.options.SSELookaheadTimeout)
+	response.Body = replayed
+	if ctx.Err() != nil {
+		_ = upstreamBody.Close()
+		return state, ctx.Err()
+	}
+	if err != nil && !errors.Is(err, io.EOF) {
+		if !state.retryUsed && hasNextModel {
+			_ = response.Body.Close()
+			state.retry = true
+			state.retryUsed = true
+			return state, nil
+		}
+		state.failure = &proxymodel.PrecommitFailure{Transport: true}
+	} else {
+		state = classifyNativeFirstEvent(state, firstEvent, hasNextModel, response)
+		if state.retry {
+			return state, nil
+		}
+	}
+	if state.failure != nil {
+		classification := providerentity.ClassifyProviderCode(state.failure.Code)
+		if state.failure.Transport {
+			classification = providerentity.ClassifyError(http.StatusBadGateway, nil)
+		}
+		state.committed = state.retryUsed || !providerentity.RetryableAcrossCredentials(classification.Class)
+	}
+	return state, nil
+}
+
+func classifyNativeFirstEvent(
+	state deepSeekPrecommitState,
+	firstEvent []byte,
+	hasNextModel bool,
+	response *http.Response,
+) deepSeekPrecommitState {
+	code, classification, isError := providerentity.ClassifyFirstEventError(firstEvent)
+	if !isError {
+		return state
+	}
+	if !state.retryUsed && hasNextModel && providerentity.RetryableAcrossModels(classification.Class) {
+		_ = response.Body.Close()
+		state.retry = true
+		state.retryUsed = true
+		return state
+	}
+	state.failure = &proxymodel.PrecommitFailure{Code: code}
+	return state
 }
 
 func (transport *RuntimeTransport) executePassthrough(ctx context.Context, input proxymodel.Request, current route) (*proxymodel.Response, error) {
@@ -117,6 +285,9 @@ func (transport *RuntimeTransport) send(ctx context.Context, input proxymodel.Re
 
 func (transport *RuntimeTransport) target(current route, rawQuery string) string {
 	target := *transport.upstream
+	if current.kind == routeResponses && transport.options.StrictTools {
+		target = *transport.betaUpstream
+	}
 	base := strings.TrimRight(target.Path, "/")
 	switch current.kind {
 	case routeResponses, routeChat:
@@ -164,146 +335,4 @@ func applyHeaders(destination, source http.Header, apiKey string, nativeMessages
 			destination.Set(name, value)
 		}
 	}
-}
-
-func translateResponseWithMetadata(response *http.Response, requestMetadata map[string]any) (*proxymodel.Response, error) {
-	contentType := strings.ToLower(response.Header.Get(contentTypeHeader))
-	if strings.Contains(contentType, "text/event-stream") {
-		header := translatedHeaders(response.Header, "text/event-stream")
-		return &proxymodel.Response{StatusCode: response.StatusCode, Header: header, Body: chatcompat.ChatSSE(response.Body), Trailer: response.Trailer}, nil
-	}
-	defer response.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(response.Body, bodyMaxBytes+1))
-	if err != nil {
-		return nil, errors.New("failed to read DeepSeek translated response")
-	}
-	if len(body) > bodyMaxBytes {
-		return nil, errors.New("DeepSeek translated response exceeded the safe read limit")
-	}
-	translated, err := chatcompat.ChatResponseWithOptions(body, time.Now(), deepSeekResponseOptions())
-	if err != nil {
-		return nil, err
-	}
-	return translatedDeepSeekResponse(response, translated, requestMetadata)
-}
-
-func translatedHeaders(source http.Header, contentType string) http.Header {
-	header := source.Clone()
-	header.Del("Content-Length")
-	header.Del("Content-Encoding")
-	header.Set(contentTypeHeader, contentType)
-	return header
-}
-
-func proxyResponse(response *http.Response) *proxymodel.Response {
-	return &proxymodel.Response{StatusCode: response.StatusCode, Header: response.Header, Body: response.Body, Trailer: response.Trailer}
-}
-
-type bufferedResponse struct {
-	StatusCode int
-	Header     http.Header
-	Trailer    http.Header
-	body       []byte
-}
-
-func bufferError(response *http.Response) (bufferedResponse, error) {
-	defer response.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(response.Body, bodyMaxBytes+1))
-	if err != nil {
-		return bufferedResponse{}, errors.New("failed to read DeepSeek error response before fallback")
-	}
-	if len(body) > bodyMaxBytes {
-		return bufferedResponse{}, errors.New("DeepSeek error response exceeded the safe read limit")
-	}
-	return bufferedResponse{StatusCode: response.StatusCode, Header: response.Header.Clone(), Trailer: response.Trailer.Clone(), body: body}, nil
-}
-
-func (response bufferedResponse) proxyResponse() *proxymodel.Response {
-	return &proxymodel.Response{StatusCode: response.StatusCode, Header: response.Header, Body: io.NopCloser(bytes.NewReader(response.body)), Trailer: response.Trailer}
-}
-
-func requestModel(body []byte) string {
-	var object map[string]any
-	if json.Unmarshal(body, &object) != nil {
-		return ""
-	}
-	model, _ := object["model"].(string)
-	return strings.TrimSpace(model)
-}
-
-func validateRuntimeURL(value string) (*url.URL, error) {
-	parsed, err := url.Parse(strings.TrimSpace(value))
-	if err != nil || parsed.Scheme == "" || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
-		return nil, errors.New("DeepSeek runtime API URL must be an http(s) URL without credentials, query, or fragment")
-	}
-	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return nil, errors.New("DeepSeek runtime API URL must use http or https")
-	}
-	return parsed, nil
-}
-
-func cloneClient(client *http.Client) *http.Client {
-	if client == nil {
-		client = &http.Client{}
-	}
-	copy := *client
-	if copy.Transport == nil {
-		if transport, ok := http.DefaultTransport.(*http.Transport); ok {
-			copy.Transport = transport.Clone()
-		}
-	}
-	if transport, ok := copy.Transport.(*http.Transport); ok {
-		transport = transport.Clone()
-		transport.DisableCompression = true
-		if transport.ResponseHeaderTimeout == 0 {
-			transport.ResponseHeaderTimeout = 30 * time.Second
-		}
-		if transport.IdleConnTimeout == 0 {
-			transport.IdleConnTimeout = 90 * time.Second
-		}
-		copy.Transport = transport
-	}
-	copy.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	return &copy
-}
-
-func (transport *RuntimeTransport) Close() { transport.client.CloseIdleConnections() }
-
-func deepSeekResponseOptions() chatcompat.ResponseOptions {
-	return chatcompat.ResponseOptions{
-		ProviderKey:  deepSeekProviderKey,
-		AdapterLabel: "DeepSeek",
-		DefaultModel: "deepseek-v4-pro",
-		FallbackResponseID: func() string {
-			return "resp_deepseek_" + uuid.NewString()
-		},
-		FallbackCallID: func(int) string {
-			return "call_deepseek_" + uuid.NewString()
-		},
-	}
-}
-
-func translatedDeepSeekResponse(
-	response *http.Response,
-	translated []byte,
-	requestMetadata map[string]any,
-) (*proxymodel.Response, error) {
-	if len(requestMetadata) > 0 {
-		var value map[string]any
-		if err := json.Unmarshal(translated, &value); err != nil {
-			return nil, errors.New("failed to parse translated DeepSeek Responses JSON")
-		}
-		mergeResponseMetadata(value, requestMetadata)
-		content, err := json.Marshal(value)
-		if err != nil {
-			return nil, errors.New("failed to serialize translated DeepSeek Responses JSON")
-		}
-		translated = content
-	}
-	return &proxymodel.Response{
-		StatusCode: response.StatusCode,
-		Header:     translatedHeaders(response.Header, "application/json"),
-		Body:       io.NopCloser(bytes.NewReader(translated)),
-		Trailer:    response.Trailer.Clone(),
-	}, nil
 }

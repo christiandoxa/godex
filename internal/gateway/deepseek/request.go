@@ -6,21 +6,26 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 )
 
 const requestMaxBytes = 16 << 20
 
 type RequestOptions struct {
-	Model       string
-	StrictTools bool
+	Model               string
+	StrictTools         bool
+	WebSearchMode       string
+	BetaBaseURL         string
+	SSELookaheadTimeout time.Duration
 }
 
 type translatedRequestParts struct {
-	thinking        bool
-	reasoningFields map[string]any
-	messages        []any
-	tools           []any
-	toolNames       map[string]bool
+	thinking         bool
+	reasoningFields  map[string]any
+	messages         []any
+	tools            []any
+	toolNames        map[string]bool
+	webSearchOptions map[string]any
 }
 
 func ResponsesRequest(body []byte, options RequestOptions) ([]byte, error) {
@@ -36,7 +41,7 @@ func TranslateResponsesRequest(body []byte, options RequestOptions) (TranslatedR
 	if err != nil {
 		return TranslatedRequest{}, err
 	}
-	parts, err := translateRequestParts(object, options.StrictTools)
+	parts, err := translateRequestParts(object, options)
 	if err != nil {
 		return TranslatedRequest{}, err
 	}
@@ -75,7 +80,7 @@ func parseResponsesObject(body []byte) (map[string]any, error) {
 	return object, nil
 }
 
-func translateRequestParts(object map[string]any, strictTools bool) (translatedRequestParts, error) {
+func translateRequestParts(object map[string]any, options RequestOptions) (translatedRequestParts, error) {
 	thinking, reasoningFields, err := deepSeekReasoning(object)
 	if err != nil {
 		return translatedRequestParts{}, err
@@ -84,13 +89,18 @@ func translateRequestParts(object map[string]any, strictTools bool) (translatedR
 	if err != nil {
 		return translatedRequestParts{}, err
 	}
-	tools, toolNames, err := deepSeekTools(object, strictTools)
+	tools, toolNames, err := deepSeekTools(object, options.StrictTools)
+	if err != nil {
+		return translatedRequestParts{}, err
+	}
+	webSearchOptions, err := deepSeekWebSearchOptions(object, options.WebSearchMode)
 	if err != nil {
 		return translatedRequestParts{}, err
 	}
 	return translatedRequestParts{
 		thinking: thinking, reasoningFields: reasoningFields,
 		messages: messages, tools: tools, toolNames: toolNames,
+		webSearchOptions: webSearchOptions,
 	}, nil
 }
 
@@ -108,6 +118,9 @@ func buildTranslatedRequest(object map[string]any, model string, parts translate
 	}
 	if len(parts.tools) > 0 {
 		result["tools"] = parts.tools
+	}
+	if parts.webSearchOptions != nil {
+		result["web_search_options"] = parts.webSearchOptions
 	}
 	toolChoice, err := deepSeekToolChoice(object, parts.toolNames, parts.thinking)
 	if err != nil {
@@ -245,10 +258,13 @@ func rejectBetaAndContinuationFields(object map[string]any) error {
 		}
 	}
 	if value, ok := object["web_search_options"]; ok {
-		if value == nil {
+		options, valid := value.(map[string]any)
+		if !valid {
 			return errors.New("DeepSeek web_search_options must be an object")
 		}
-		return errors.New("DeepSeek web_search_options require the DeepSeek web-search translator")
+		if err := validateDeepSeekWebSearchOptions(options); err != nil {
+			return err
+		}
 	}
 	if previous, ok := object["previous_response_id"].(string); ok && strings.TrimSpace(previous) != "" {
 		return errors.New("DeepSeek previous_response_id continuation replay is not implemented yet")

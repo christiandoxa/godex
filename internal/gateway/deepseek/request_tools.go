@@ -25,6 +25,9 @@ func deepSeekTools(object map[string]any, strictTools bool) ([]any, map[string]b
 		if !ok {
 			return nil, nil, errors.New("DeepSeek tools entries must be objects")
 		}
+		if deepSeekWebSearchTool(item) {
+			continue
+		}
 		converted, err := deepSeekFunctionTool(item, strictTools)
 		if err != nil {
 			return nil, nil, err

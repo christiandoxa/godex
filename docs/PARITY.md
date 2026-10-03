@@ -170,8 +170,14 @@ and eligibility validation stays in the runtime use case.
   arguments, strict-schema normalization with config.toml-over-env precedence,
   named tool choice, `pro/flash` model fallback, Chat/Messages passthrough,
   native DeepSeek Messages URL/auth, local Models emulation, and local Compact
-  fallback are implemented. DeepSeek-specific response/SSE reasoning/tool shaping,
-  web-search modes, and beta-base routing remain parity gaps. The Prodex local OpenAI-compatible
+  fallback are implemented. Buffered Responses and live SSE match the tagged sparse
+  defaults, reasoning/tool shaping, raw function-argument deltas, empty-delta
+  events, and completion semantics. Search-option mapping, off-mode rejection,
+  config-over-environment `auto`/`openai_chat`/`anthropic` selection, strict-tools
+  beta-base routing, and native DeepSeek Anthropic Messages request/response/SSE
+  translation are implemented. Native streams inspect the first event before
+  commitment, preserving the tagged bounded model-fallback and credential-rotation
+  rules without replay after commitment. The Prodex local OpenAI-compatible
   `--url` runtime surface is implemented: Godex validates credential-free
   HTTP(S) endpoints, normalizes root URLs to `/v1`, generates the exact
   `prodex-local` Responses provider config/default model/context/compact
@@ -385,6 +391,11 @@ Tagged Prodex sources inspected include:
   `buffered_response.rs`, and
   `crates/prodex-runtime-proxy/src/response_forwarding.rs` for precommit SSE
   inspection, body failures, and incremental SSE ownership tracking.
+- `crates/prodex-provider-core/src/translators/anthropic/messages.rs`,
+  `crates/prodex-provider-core/src/translators/anthropic/messages/stream.rs`, and
+  `crates/prodex-app/src/runtime_launch/proxy_startup/local_rewrite_deepseek_send.rs`
+  for DeepSeek native Anthropic Messages request, response, SSE, and precommit
+  fallback behavior.
 
 Local Codex source at `a04940cb` supplied queue grammar and the native debug,
 app-server proxy, and daemon branches that discard CLI overrides or detach.

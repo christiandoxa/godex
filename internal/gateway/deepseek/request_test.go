@@ -146,9 +146,96 @@ func TestDeepSeekResponsesRequestRejectsUnsupportedControls(t *testing.T) {
 		{`{"input":"x","top_logprobs":2}`, "requires logprobs=true"},
 		{`{"input":"x","stop_sequences":["1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17"]}`, "at most 16"},
 		{`{"input":"x","reasoning":{"summary":"auto"}}`, "reasoning.summary"},
-		{`{"input":"x","web_search_options":{}}`, "web_search_options"},
 		{`{"input":"x","previous_response_id":"resp_1"}`, "previous_response_id"},
 		{`{"input":[{"type":"message","content":[{"type":"input_image","image_url":"x"}]}]}`, "text-only"},
+	}
+	for _, fixture := range fixtures {
+		if _, err := ResponsesRequest([]byte(fixture.body), RequestOptions{}); err == nil || !strings.Contains(err.Error(), fixture.want) {
+			t.Fatalf("body %s error = %v, want contains %q", fixture.body, err, fixture.want)
+		}
+	}
+}
+
+func TestDeepSeekResponsesRequestMapsWebSearch(t *testing.T) {
+	empty, err := ResponsesRequest([]byte(`{"input":"x","web_search_options":{}}`), RequestOptions{})
+	if err != nil || decodeDeepSeekRequest(t, empty)["web_search_options"] == nil {
+		t.Fatalf("empty web-search options = %s, error = %v", empty, err)
+	}
+
+	translated, err := ResponsesRequest([]byte(`{"input":"x","web_search_options":{
+		"search_context_size":"medium",
+		"allowed_domains":["docs.example"],
+		"blocked_domains":["ads.example"],
+		"max_uses":2,
+		"user_location":{"country":"US"},
+		"provider_extension":true
+	}}`), RequestOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	options := decodeDeepSeekRequest(t, translated)["web_search_options"].(map[string]any)
+	if options["search_context_size"] != "medium" || options["allowed_domains"].([]any)[0] != "docs.example" ||
+		options["blocked_domains"].([]any)[0] != "ads.example" || options["max_uses"] != float64(2) ||
+		options["user_location"].(map[string]any)["country"] != "US" || options["provider_extension"] != true {
+		t.Fatalf("forwarded web-search options = %#v", options)
+	}
+
+	for _, kind := range []string{"web_search", "web_search_preview", "web_search_preview_2025_03_11"} {
+		t.Run(kind, func(t *testing.T) {
+			body := `{"input":"x","tools":[{"type":"` + kind + `","context_size":"high","location":{"country":"JP"}},` +
+				`{"type":"function","name":"lookup"}]}`
+			translated, err := ResponsesRequest([]byte(body), RequestOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := decodeDeepSeekRequest(t, translated)
+			options := got["web_search_options"].(map[string]any)
+			tools := got["tools"].([]any)
+			if options["search_context_size"] != "high" || options["user_location"].(map[string]any)["country"] != "JP" ||
+				len(tools) != 1 || tools[0].(map[string]any)["function"].(map[string]any)["name"] != "lookup" {
+				t.Fatalf("translated web search = %#v", got)
+			}
+		})
+	}
+
+	translated, err = ResponsesRequest([]byte(`{"input":"x","web_search_options":{"search_context_size":"low"},`+
+		`"tools":[{"type":"web_search","search_context_size":"high"}]}`), RequestOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	options = decodeDeepSeekRequest(t, translated)["web_search_options"].(map[string]any)
+	if options["search_context_size"] != "low" {
+		t.Fatalf("explicit web-search options did not take precedence: %#v", options)
+	}
+}
+
+func TestDeepSeekResponsesRequestRejectsWebSearchWhenModeOff(t *testing.T) {
+	for _, body := range []string{
+		`{"input":"search","web_search_options":{}}`,
+		`{"input":"search","tools":[{"type":"web_search_preview"}]}`,
+	} {
+		_, err := ResponsesRequest([]byte(body), RequestOptions{WebSearchMode: "off"})
+		if err == nil || !strings.Contains(err.Error(), "web search mode is off") {
+			t.Fatalf("body %s error = %v", body, err)
+		}
+	}
+}
+
+func TestDeepSeekResponsesRequestRejectsMalformedWebSearch(t *testing.T) {
+	fixtures := []struct {
+		body, want string
+	}{
+		{`{"input":"x","web_search_options":null}`, "web_search_options must be an object"},
+		{`{"input":"x","web_search_options":[]}`, "web_search_options must be an object"},
+		{`{"input":"x","web_search_options":{"search_context_size":"huge"}}`, "search_context_size must be low, medium, or high"},
+		{`{"input":"x","web_search_options":{"allowed_domains":"docs.example"}}`, "allowed_domains must be an array of strings"},
+		{`{"input":"x","web_search_options":{"allowed_domains":[1]}}`, "allowed_domains entries must be non-empty strings"},
+		{`{"input":"x","web_search_options":{"blocked_domains":["  "]}}`, "blocked_domains entries must be non-empty strings"},
+		{`{"input":"x","web_search_options":{"max_uses":0}}`, "max_uses must be a positive integer"},
+		{`{"input":"x","web_search_options":{"max_uses":1.5}}`, "max_uses must be a positive integer"},
+		{`{"input":"x","web_search_options":{"user_location":[]}}`, "user_location must be an object"},
+		{`{"input":"x","tools":[{"type":"web_search_preview","search_context_size":false}]}`, "web_search context_size must be low, medium, or high"},
+		{`{"input":"x","tools":[{"type":"web_search","allowed_domains":[""]}]}`, "allowed_domains entries must be non-empty strings"},
 	}
 	for _, fixture := range fixtures {
 		if _, err := ResponsesRequest([]byte(fixture.body), RequestOptions{}); err == nil || !strings.Contains(err.Error(), fixture.want) {

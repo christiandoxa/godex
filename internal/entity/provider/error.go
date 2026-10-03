@@ -41,6 +41,40 @@ func ClassifyError(status int, body []byte) ErrorClassification {
 	return best
 }
 
+func ClassifyProviderCode(code string) ErrorClassification {
+	classification, ok := classifyProviderCode(code)
+	if !ok {
+		return ErrorClassification{Class: ErrorOther}
+	}
+	return classification
+}
+
+func ClassifyFirstEventError(body []byte) (string, ErrorClassification, bool) {
+	var event map[string]any
+	if json.Unmarshal(body, &event) != nil || event == nil {
+		return "", ErrorClassification{Class: ErrorOther}, false
+	}
+	errorValue, hasError := event["error"]
+	if event["type"] != "error" && !hasError {
+		return "", ErrorClassification{Class: ErrorOther}, false
+	}
+	var code string
+	var found bool
+	if providerError, ok := errorValue.(map[string]any); ok {
+		code, found = providerError["type"].(string)
+		if !found {
+			code, found = providerError["code"].(string)
+		}
+	}
+	if !found {
+		code, found = event["code"].(string)
+	}
+	if !found {
+		return "", ErrorClassification{Class: ErrorOther}, true
+	}
+	return code, ClassifyProviderCode(code), true
+}
+
 func RetryableAcrossCredentials(class ErrorClass) bool {
 	return class == ErrorAuth || class == ErrorQuota || class == ErrorRateLimit || class == ErrorTransient
 }
@@ -144,19 +178,27 @@ func classifyCode(status int, code string) ErrorClassification {
 	if status != 429 && (status == 401 || status == 403) {
 		return ErrorClassification{Class: ErrorAuth}
 	}
+	if classification, ok := classifyProviderCode(code); ok {
+		return classification
+	}
+	return classifyStatusText(status, []byte(code))
+}
+
+func classifyProviderCode(code string) (ErrorClassification, bool) {
+	code = strings.ToLower(strings.TrimSpace(code))
 	switch code {
 	case "unauthenticated", "invalid_api_key", "authentication_error":
-		return ErrorClassification{Class: ErrorAuth}
-	case "insufficient_quota", "credit_balance_exhausted", "organization_spend_limit_exceeded", "project_spend_limit_exceeded", "quota_exhausted", "quota_exceeded", "resource_exhausted", "usage_limit_reached":
-		return ErrorClassification{Class: ErrorQuota, Cooldown: 5 * time.Minute}
+		return ErrorClassification{Class: ErrorAuth}, true
+	case "insufficient_quota", "credit_balance_exhausted", "organization_spend_limit_exceeded", "project_spend_limit_exceeded", "quota_exhausted", "quota_exceeded", "resource_exhausted":
+		return ErrorClassification{Class: ErrorQuota, Cooldown: 5 * time.Minute}, true
 	case "rate_limit_error", "rate_limit_exceeded", "rate_limit_exceeded_error", "slow_down":
-		return ErrorClassification{Class: ErrorRateLimit, Cooldown: time.Minute}
+		return ErrorClassification{Class: ErrorRateLimit, Cooldown: time.Minute}, true
 	case "not_found_error", "model_not_supported":
-		return ErrorClassification{Class: ErrorNotFound}
+		return ErrorClassification{Class: ErrorNotFound}, true
 	case "overloaded_error", "server_is_overloaded":
-		return ErrorClassification{Class: ErrorTransient, Cooldown: 10 * time.Second}
+		return ErrorClassification{Class: ErrorTransient, Cooldown: 10 * time.Second}, true
 	default:
-		return classifyStatusText(status, []byte(code))
+		return ErrorClassification{Class: ErrorOther}, false
 	}
 }
 

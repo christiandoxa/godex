@@ -238,9 +238,19 @@ normalization used by chat-compatible responses. `pro -> flash` /
 Completions and native Messages stay passthrough, Models list/single remains local,
 and Responses Compact remains the bounded local fallback with no model call.
 
-DeepSeek-specific response/SSE reasoning/tool shaping and the web-search/beta-base
-request routes remain the next 0.435.1 parity slice; unsupported web-search
-requests still fail before upstream instead of being silently downgraded.
+Buffered DeepSeek responses and live SSE now use the tagged response contract,
+including sparse response defaults, reasoning/tool output, raw function-argument
+deltas, empty-delta events, and terminal completion shaping. `deepseek.web_search_mode`
+is resolved from `config.toml` before `PRODEX_DEEPSEEK_WEB_SEARCH_MODE` and
+supports `auto`, `off`, `openai_chat`, and `anthropic`; strict-tools requests
+use the tagged beta-base routing policy. Web-search Responses in native mode use
+DeepSeek's `/anthropic/v1/messages` endpoint with `x-api-key` and
+`anthropic-version`, translating system/tool history, namespaced tools, native
+web search, buffered responses, and Anthropic SSE back to Responses. In `auto`,
+only tagged safe translation loss falls back to Chat; explicit `anthropic` mode
+fails closed. Native stream first-event inspection is bounded by
+`PRODEX_RUNTIME_PROXY_SSE_LOOKAHEAD_TIMEOUT_MS` (default 1000 ms) before model
+or credential retry is allowed.
 
 Gemini API-key launches are also supported with `godex run --provider gemini`.
 Key precedence is `--api-key`, `GEMINI_API_KEYS`, `GOOGLE_API_KEYS`,

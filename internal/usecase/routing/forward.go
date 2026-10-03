@@ -207,13 +207,16 @@ func (router *Router) tryFreshCandidates(
 	last **pendingResponse,
 	excluded map[string]bool,
 ) (proxymodel.Forwarded, bool, error) {
-	for _, account := range candidates {
+	for index, account := range candidates {
 		result, found, pending, err := router.tryFreshCandidate(ctx, request, candidates, account)
 		if err != nil || found {
 			return result, found, err
 		}
 		excluded[account.ID] = true
 		if pending != nil {
+			if pending.firstEventRetry && index+1 < len(candidates) {
+				request.FirstEventRetryUsed = true
+			}
 			replacePending(last, pending)
 		}
 	}
@@ -235,6 +238,9 @@ func (router *Router) tryFreshCandidate(
 	}
 	if pending == nil || !router.autoRedeem || !router.quotaBlockedAccount(account.ID) {
 		return proxymodel.Forwarded{}, false, pending, nil
+	}
+	if pending.firstEventRetry {
+		request.FirstEventRetryUsed = true
 	}
 	return router.tryFreshQuotaRedeem(ctx, request, accounts, account, pending)
 }
@@ -321,6 +327,7 @@ func (router *Router) freshAttempt(ctx context.Context, request proxymodel.Reque
 		return result, nil, nil
 	}
 	router.applyRetryOutcome(account.ID, outcome)
+	pending.firstEventRetry = outcome.firstEventRetry
 	pending.accountID = account.ID
 	return nil, pending, nil
 }

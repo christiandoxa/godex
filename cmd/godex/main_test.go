@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -269,5 +272,43 @@ func TestNewRuntimeGatewayBuildsDeepSeekCredentialPool(t *testing.T) {
 	}
 	if closer, ok := gateway.(interface{ Close() }); ok {
 		closer.Close()
+	}
+}
+
+func TestNewRuntimeGatewayPassesDeepSeekRuntimeSettings(t *testing.T) {
+	var path, searchMode string
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		path = request.URL.Path
+		body, _ := io.ReadAll(request.Body)
+		var value map[string]any
+		_ = json.Unmarshal(body, &value)
+		search, _ := value["web_search_options"].(map[string]any)
+		searchMode, _ = search["search_context_size"].(string)
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"choices":[{"message":{"content":"ok"}}]}`))
+	}))
+	defer server.Close()
+
+	gateway, err := newRuntimeGateway(proxyconfig.Config{
+		Provider: proxyconfig.Provider{
+			Kind: "deepseek", APIURL: server.URL + "/v1", StrictTools: true,
+			WebSearchMode: "openai_chat", BetaBaseURL: server.URL + "/tenant/beta",
+		},
+		ProviderCredentials: []proxyconfig.ProviderCredential{{ID: "key", Secret: "fixture-key"}},
+	}, nil, nil, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer gateway.(interface{ Close() }).Close()
+	response, err := gateway.Execute(context.Background(), proxyconfig.Request{
+		Method: http.MethodPost, Path: "/backend-api/prodex/responses",
+		Body: []byte(`{"input":"search","web_search_options":{"search_context_size":"medium"}}`),
+	}, proxyconfig.Account{ID: "key"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if path != "/tenant/beta/chat/completions" || searchMode != "medium" {
+		t.Fatalf("DeepSeek composed gateway request = %q / %q", path, searchMode)
 	}
 }

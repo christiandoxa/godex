@@ -228,9 +228,14 @@ are carried as provider metadata rather than rereading files in the HTTP gateway
 `gateway/deepseek` binds one transport to each key ID, owns URL/auth/local
 Models/Compact routes, and owns the advanced Responses request translator
 (reasoning, primitive controls, strict tools/schema, JSON mode, replay/tool
-history). Shared RTK argument shaping stays in `gateway/chatcompat`.
-DeepSeek response/SSE reasoning/tool shaping and web-search/beta-route policy
-remain isolated gateway work rather than leaking into delivery or routing.
+history). Shared RTK argument shaping stays in `gateway/chatcompat`. The gateway
+also owns tagged buffered/SSE response translation and native Anthropic Messages
+translation for DeepSeek web search. Native mode switches URL/auth atomically to
+`/anthropic/v1/messages` plus `x-api-key`, performs bounded first-event
+lookahead, and exposes only transport-neutral precommit failure metadata.
+`usecase/routing` owns the resulting credential retry/quarantine decision and
+never replays after stream commitment. The HTTP boundary supplies a monotonic
+request sequence used only for stable provider-stream item identity.
 
 Gemini raw-key runtime follows the same routing boundary. `gateway/gemini` owns
 the API-key pool, Gemini OpenAI-compatible URL/auth behavior, and Responses

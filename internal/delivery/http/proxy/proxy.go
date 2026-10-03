@@ -115,7 +115,7 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 		}
 		return
 	}
-	exchange, err := proxy.router.Forward(request.Context(), proxymodel.Request{Method: request.Method, Path: request.URL.Path, RawPath: request.URL.EscapedPath(), RawQuery: request.URL.RawQuery, Header: request.Header.Clone(), Body: body})
+	exchange, err := proxy.router.Forward(request.Context(), proxymodel.Request{RequestID: activity.sequence, Method: request.Method, Path: request.URL.Path, RawPath: request.URL.EscapedPath(), RawQuery: request.URL.RawQuery, Header: request.Header.Clone(), Body: body})
 	if err != nil {
 		if request.Context().Err() != nil {
 			activity.fail(0, "request canceled")

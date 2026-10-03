@@ -6,15 +6,24 @@ import (
 )
 
 type Request struct {
+	RequestID                       uint64
 	Method, Path, RawPath, RawQuery string
 	Header                          http.Header
 	Body                            []byte
+	FirstEventRetryUsed             bool
 }
 type Response struct {
-	StatusCode int
-	Header     http.Header
-	Body       io.ReadCloser
-	Trailer    http.Header
+	StatusCode          int
+	Header              http.Header
+	Body                io.ReadCloser
+	Trailer             http.Header
+	FirstEventRetryUsed bool
+	FirstEventCommitted bool
+	PrecommitFailure    *PrecommitFailure
+}
+type PrecommitFailure struct {
+	Code      string
+	Transport bool
 }
 type Forwarded struct {
 	Response  *Response

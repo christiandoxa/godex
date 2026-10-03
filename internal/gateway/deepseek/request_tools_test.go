@@ -63,7 +63,8 @@ func TestDeepSeekToolValidationMatchesReferencePolicy(t *testing.T) {
 	fixtures := []struct {
 		body, want string
 	}{
-		{`{"input":"x","tools":[{"type":"web_search_preview"}]}`, "tool type `web_search_preview` is not supported"},
+		{`{"input":"x","tools":[{"type":"file_search"}]}`, "tool type `file_search` is not supported"},
+		{`{"input":"x","tools":[{"type":"web_search_previewX"}]}`, "tool type `web_search_previewX` is not supported"},
 		{`{"input":"x","tools":[{"type":"function","name":"bad.name"}]}`, "function tool names"},
 		{`{"input":"x","tools":[{"type":"function","name":"lookup"}],"tool_choice":{"type":"function","name":"missing"}}`, "does not match any translated function tool"},
 		{`{"input":"x","tools":[{"type":"function","name":"lookup"}],"tool_choice":"weird"}`, "tool_choice string `weird`"},

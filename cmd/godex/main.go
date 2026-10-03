@@ -205,7 +205,10 @@ func newRuntimeGateway(
 	case "anthropic":
 		return newAnthropicRuntimeGateway(config, claudeSource)
 	case "deepseek":
-		return deepseekgateway.NewRuntimePoolWithOptions(config.Provider.APIURL, config.ProviderCredentials, deepseekgateway.RequestOptions{StrictTools: config.Provider.StrictTools}, nil)
+		return deepseekgateway.NewRuntimePoolWithOptions(config.Provider.APIURL, config.ProviderCredentials, deepseekgateway.RequestOptions{
+			StrictTools: config.Provider.StrictTools, WebSearchMode: config.Provider.WebSearchMode,
+			BetaBaseURL: config.Provider.BetaBaseURL, SSELookaheadTimeout: config.Provider.SSELookaheadTimeout,
+		}, nil)
 	case "gemini":
 		return geminigateway.NewRuntimePool(config.Provider.APIURL, config.ProviderCredentials, nil)
 	case "kiro":
