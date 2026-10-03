@@ -81,6 +81,11 @@ func (process *CodexProcess) runThroughProxy(
 	if err != nil {
 		return err
 	}
+	release, err := (SessionLocker{}).LockCodexSessionsForChild(ctx, codexHome)
+	if err != nil {
+		return err
+	}
+	defer release()
 	command := exec.CommandContext(ctx, binary, arguments...)
 	command.Env = proxyChildEnvironment(codexHome, provider)
 	command.Stdin = process.terminal.Stdin

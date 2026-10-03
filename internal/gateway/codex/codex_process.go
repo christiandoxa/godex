@@ -37,6 +37,11 @@ func (process *CodexProcess) Login(
 	if err := prepareCodexHome(codexHome); err != nil {
 		return entity.Identity{}, err
 	}
+	release, err := (SessionLocker{}).LockCodexSessionsForChild(ctx, codexHome)
+	if err != nil {
+		return entity.Identity{}, err
+	}
+	defer release()
 
 	arguments := []string{"login"}
 	if deviceAuth {
@@ -76,6 +81,11 @@ func (process *CodexProcess) run(ctx context.Context, codexHome string, argument
 	if err := secureCodexHome(codexHome); err != nil {
 		return err
 	}
+	release, err := (SessionLocker{}).LockCodexSessionsForChild(ctx, codexHome)
+	if err != nil {
+		return err
+	}
+	defer release()
 	command := exec.CommandContext(ctx, binary, arguments...)
 	command.Env = environmentWith("CODEX_HOME", codexHome)
 	command.Stdin = process.terminal.Stdin
