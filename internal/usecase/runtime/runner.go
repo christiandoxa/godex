@@ -39,15 +39,18 @@ type providerCredentialResolver interface {
 }
 
 type Runner struct {
-	accounts    launchAccounts
-	process     codexProcess
-	newProxy    ProxyFactory
-	quota       quotaPreflight
-	catalog     providerCatalogStore
-	upstream    string
-	currentHome string
-	credentials providerCredentialResolver
-	autoRedeem  bool
+	accounts        launchAccounts
+	process         codexProcess
+	newProxy        ProxyFactory
+	quota           quotaPreflight
+	catalog         providerCatalogStore
+	upstream        string
+	currentHome     string
+	credentials     providerCredentialResolver
+	antigravity     antigravityProcess
+	antigravityHome string
+	sessionLocker   codexSessionLocker
+	autoRedeem      bool
 }
 
 func NewRunner(accounts launchAccounts, process codexProcess, newProxy ProxyFactory) *Runner {

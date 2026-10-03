@@ -1,13 +1,39 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"reflect"
 	"testing"
+	"time"
 
+	"github.com/christiandoxa/godex/internal/config"
 	proxyconfig "github.com/christiandoxa/godex/internal/model/proxy"
+	updaterepo "github.com/christiandoxa/godex/internal/repository/update"
 )
+
+const antigravityLoginCaptureEnv = "GODEX_ANTIGRAVITY_LOGIN_CAPTURE"
+
+func TestMain(m *testing.M) {
+	if capturePath := os.Getenv(antigravityLoginCaptureEnv); capturePath != "" {
+		captured, err := json.Marshal(struct {
+			Arguments []string `json:"arguments"`
+			CodexHome string   `json:"codex_home"`
+		}{Arguments: os.Args[1:], CodexHome: os.Getenv(config.CodexHomeEnv)})
+		if err != nil {
+			os.Exit(2)
+		}
+		if err := os.WriteFile(capturePath, captured, 0o600); err != nil {
+			os.Exit(2)
+		}
+		os.Exit(23)
+	}
+	os.Exit(m.Run())
+}
 
 func TestExitCodePreservesChildStatus(t *testing.T) {
 	command := exec.Command(os.Args[0], "-test.run=^TestExitCodeChild$")
@@ -15,6 +41,58 @@ func TestExitCodePreservesChildStatus(t *testing.T) {
 	err := command.Run()
 	if got := exitCode(context.Background(), err); got != 23 {
 		t.Fatalf("exit code = %d, want 23", got)
+	}
+}
+
+func TestAntigravityExitCodeReportsChildFailureAndPreservesStatus(t *testing.T) {
+	command := exec.Command(os.Args[0], "-test.run=^TestExitCodeChild$")
+	command.Env = append(os.Environ(), "GODEX_EXIT_CODE_HELPER=1")
+	err := command.Run()
+	var stderr bytes.Buffer
+	if got := antigravityExitCode(context.Background(), err, &stderr); got != 23 {
+		t.Fatalf("Antigravity exit code = %d, want 23", got)
+	}
+	if got, want := stderr.String(), "Error: Antigravity CLI exited unsuccessfully\n"; got != want {
+		t.Fatalf("Antigravity child diagnostic = %q, want %q", got, want)
+	}
+}
+
+func TestRunAntigravityLoginUsesNormalStartupAndSharedHome(t *testing.T) {
+	godexHome := t.TempDir()
+	sharedHome := filepath.Join(t.TempDir(), "shared-codex")
+	capturePath := filepath.Join(t.TempDir(), "agy-login.json")
+	t.Setenv(config.HomeEnv, godexHome)
+	t.Setenv(config.CodexHomeEnv, t.TempDir())
+	t.Setenv(config.UpstreamEnv, "")
+	t.Setenv(config.ProdexHomeEnv, t.TempDir())
+	t.Setenv(config.ProdexSharedCodexHomeEnv, sharedHome)
+	t.Setenv(config.AgyBinEnv, os.Args[0])
+	t.Setenv(antigravityLoginCaptureEnv, capturePath)
+	if err := updaterepo.NewStore(godexHome).SaveLatest("1.0.0", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	original := os.Args
+	os.Args = []string{"godex", "login", "--with-antigravity"}
+	t.Cleanup(func() { os.Args = original })
+	if got := run(); got != 23 {
+		t.Fatalf("Antigravity login exit code = %d, want 23", got)
+	}
+	content, err := os.ReadFile(capturePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var captured struct {
+		Arguments []string `json:"arguments"`
+		CodexHome string   `json:"codex_home"`
+	}
+	if err := json.Unmarshal(content, &captured); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := captured.Arguments, []string{"auth", "login"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("Antigravity login arguments = %#v, want %#v", got, want)
+	}
+	if captured.CodexHome != sharedHome {
+		t.Fatalf("Antigravity login CODEX_HOME = %q, want %q", captured.CodexHome, sharedHome)
 	}
 }
 
@@ -44,6 +122,65 @@ func TestRunMapsUnknownCommandToFailure(t *testing.T) {
 	t.Cleanup(func() { os.Args = original })
 	if got := run(); got != 1 {
 		t.Fatalf("run exit code = %d", got)
+	}
+}
+
+func TestRunNativeAntigravityUsesMinimalStartup(t *testing.T) {
+	t.Setenv(config.HomeEnv, t.TempDir())
+	t.Setenv(config.CodexHomeEnv, string(os.PathSeparator))
+	t.Setenv(config.UpstreamEnv, "not-a-valid-upstream")
+	t.Setenv(config.ProdexHomeEnv, t.TempDir())
+	sharedHome := filepath.Join(t.TempDir(), "shared-codex")
+	t.Setenv(config.ProdexSharedCodexHomeEnv, sharedHome)
+	t.Setenv(config.AgyBinEnv, "/missing/agy")
+	original := os.Args
+	os.Args = []string{
+		"godex", "s", "gemini", "--no-presidio", "--no-sub-agent", "--cli", "agy",
+		"--model", "gpt-6-luna", "--dry-run", "-c", "model_provider=\"openai\"", "exec",
+	}
+	t.Cleanup(func() { os.Args = original })
+	if got := run(); got != 0 {
+		t.Fatalf("minimal Antigravity dry-run exit code = %d", got)
+	}
+	info, err := os.Stat(sharedHome)
+	if err != nil || !info.IsDir() {
+		t.Fatalf("dry-run shared CODEX_HOME info = %#v, err=%v", info, err)
+	}
+}
+
+func TestNativeAntigravityArgumentsIgnoresExplicitGodexCommands(t *testing.T) {
+	for _, command := range []string{"doctor", "login", "quota", "profile", "help"} {
+		if _, ok := nativeAntigravityArguments([]string{
+			command, "--provider", "gemini", "--cli", "agy",
+		}); ok {
+			t.Fatalf("Antigravity intercepted explicit %s command", command)
+		}
+	}
+}
+
+func TestNativeAntigravityArgumentsAcceptsProdexSuperSyntax(t *testing.T) {
+	for _, input := range [][]string{
+		{"s", "gemini", "--cli", "agy"},
+		{"super", "gemini", "--cli", "agy"},
+		{"s", "--provider", "gemini", "--cli", "agy"},
+		{"s", "--no-presidio", "--no-sub-agent", "gemini", "--cli", "agy"},
+	} {
+		arguments, ok := nativeAntigravityArguments(input)
+		if !ok {
+			t.Fatalf("native Antigravity did not recognize Prodex syntax %#v", input)
+		}
+		want := []string{"--provider", "gemini", "--cli", "agy"}
+		if input[1] == "--provider" {
+			want = input[1:]
+		} else if input[1] == "--no-presidio" {
+			want = []string{"--no-presidio", "--no-sub-agent", "--provider", "gemini", "--cli", "agy"}
+		}
+		if got, want := arguments, want; !reflect.DeepEqual(got, want) {
+			t.Fatalf("normalized Prodex syntax = %#v, want %#v", got, want)
+		}
+	}
+	if _, ok := nativeAntigravityArguments([]string{"s", "gemini"}); ok {
+		t.Fatal("Super syntax without native Antigravity was intercepted")
 	}
 }
 

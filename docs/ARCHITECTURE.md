@@ -578,6 +578,11 @@ and preserves the remaining arguments. Native local commands use runtime's local
 launch path without proxy or quota orchestration. Explicit runtime selectors
 restrict the entire upstream pool. No delivery package accesses an adapter.
 
+Native Antigravity launch policy stays in `usecase/runtime`; its CLI process
+adapter lives in `gateway/antigravity`. The same adapter serves global
+`agy auth login` through `usecase/auth`. This path owns no Godex profile, quota,
+or Gemini API-key proxy state.
+
 ## HTTP model request boundary
 
 `delivery/http/proxy` owns the loopback listener, bounded input capture, HTTP

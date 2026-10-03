@@ -4,6 +4,8 @@ type Selection struct {
 	Account               string
 	Profile               string
 	Provider              string
+	CLI                   string
+	DryRun                bool
 	APIKey                string
 	BaseURL               string
 	URL                   string
@@ -17,6 +19,8 @@ func (selection Selection) Empty() bool {
 	return selection.Account == "" &&
 		selection.Profile == "" &&
 		selection.Provider == "" &&
+		selection.CLI == "" &&
+		!selection.DryRun &&
 		selection.APIKey == "" &&
 		selection.BaseURL == "" &&
 		selection.URL == "" &&

@@ -13,6 +13,7 @@ import (
 	"github.com/christiandoxa/godex/internal/config"
 	"github.com/christiandoxa/godex/internal/delivery/cli"
 	proxyhttp "github.com/christiandoxa/godex/internal/delivery/http/proxy"
+	antigravitygateway "github.com/christiandoxa/godex/internal/gateway/antigravity"
 	claudegateway "github.com/christiandoxa/godex/internal/gateway/claude"
 	"github.com/christiandoxa/godex/internal/gateway/codex"
 	copilotgateway "github.com/christiandoxa/godex/internal/gateway/copilot"
@@ -51,6 +52,9 @@ func main() {
 func run() int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	if arguments, ok := nativeAntigravityArguments(os.Args[1:]); ok {
+		return runNativeAntigravity(ctx, arguments)
+	}
 
 	settings, err := config.Load()
 	if err != nil {
@@ -63,6 +67,9 @@ func run() int {
 		Stdin:  os.Stdin,
 		Stdout: os.Stdout,
 		Stderr: os.Stderr,
+	})
+	antigravityProcess := antigravitygateway.NewProcess(settings.AgyBin, antigravitygateway.Terminal{
+		Stdin: os.Stdin, Stdout: os.Stdout, Stderr: os.Stderr,
 	})
 	login := authusecase.NewLogin(store, process)
 	importer := authusecase.NewImportCurrent(store, process, settings.CurrentCodexHome)
@@ -102,6 +109,8 @@ func run() int {
 	runner.SetUpstreamURL(settings.UpstreamURL)
 	runner.SetCurrentCodexHome(settings.CurrentCodexHome)
 	runner.SetProviderCredentialResolver(providerkeygateway.NewSource())
+	runner.SetAntigravityProcess(antigravityProcess)
+	runner.SetAntigravitySessionLocker(codex.SessionLocker{})
 	application := cli.New(login, importer, store, runner, doctor, quotaStatus, os.Stdout)
 	application.SetErrorOutput(os.Stderr)
 	profileStore := profilerepo.NewStore(settings.Home)
@@ -126,7 +135,10 @@ func run() int {
 		os.Stderr,
 	)
 
-	application.SetNativeAuth(authusecase.NewNative(store, process))
+	nativeAuth := authusecase.NewNative(store, process, antigravityProcess)
+	nativeAuth.SetAntigravityCodexHome(settings.SharedCodexHome)
+	nativeAuth.SetAntigravitySessionLocker(codex.SessionLocker{})
+	application.SetNativeAuth(nativeAuth)
 	application.SetActivity(activity)
 	sessions := sessionusecase.NewCatalog(store, sessionrepo.NewReader(), runner)
 	sessions.SetOwnerLookup(func(ctx context.Context, id string) (string, error) {
@@ -333,6 +345,11 @@ func exitCode(ctx context.Context, err error) int {
 	if errors.As(err, &childError) {
 		if code := childError.ExitCode(); code >= 0 {
 			return code
+		}
+		if childError.ProcessState != nil {
+			if status, ok := childError.ProcessState.Sys().(syscall.WaitStatus); ok && status.Signaled() {
+				return 128 + int(status.Signal())
+			}
 		}
 	}
 	if errors.Is(ctx.Err(), context.Canceled) || errors.Is(err, context.Canceled) {

@@ -33,6 +33,9 @@ func TestLoginMenuEntriesMatchProdex4351Order(t *testing.T) {
 			t.Fatalf("entry %d = %#v", index, entry)
 		}
 	}
+	if entries[5].guidance {
+		t.Fatal("Antigravity login unexpectedly remains guidance-only")
+	}
 }
 
 func TestLoginMenuLayoutAndWindowMatchReferenceFixtures(t *testing.T) {
@@ -131,5 +134,15 @@ func TestLoginMenuAPIKeyEntryIsSelectableNotGuidance(t *testing.T) {
 	final := updated.(loginMenuModel)
 	if command == nil || final.chosen == nil || *final.chosen != LoginOpenAIAPIKey || final.guidance {
 		t.Fatalf("API-key selection = %#v command=%v", final, command)
+	}
+}
+
+func TestLoginMenuAntigravityEntrySelectsLoginAction(t *testing.T) {
+	model := newLoginMenuModel(loginMenuEntries(), 24)
+	model.selected = 5
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	final := updated.(loginMenuModel)
+	if command == nil || final.chosen == nil || *final.chosen != LoginAntigravity || final.guidance {
+		t.Fatalf("Antigravity selection = %#v command=%v", final, command)
 	}
 }

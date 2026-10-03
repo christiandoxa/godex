@@ -1,13 +1,18 @@
 package runtime
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
+	"os"
+	"reflect"
 	"strings"
 	"testing"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
 	sessionentity "github.com/christiandoxa/godex/internal/entity/session"
+	"github.com/christiandoxa/godex/internal/gateway/codex"
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
 	sessionusecase "github.com/christiandoxa/godex/internal/usecase/session"
@@ -37,6 +42,24 @@ type fakeRunnerProcess struct {
 	arguments []string
 }
 
+type fakeAntigravityRunnerProcess struct {
+	arguments    []string
+	codexHome    string
+	preparedHome string
+	err          error
+}
+
+func (process *fakeAntigravityRunnerProcess) PrepareCodexHome(codexHome string) error {
+	process.preparedHome = codexHome
+	return nil
+}
+
+func (process *fakeAntigravityRunnerProcess) RunRuntimeWithCodexHome(_ context.Context, codexHome string, arguments []string) error {
+	process.codexHome = codexHome
+	process.arguments = append([]string(nil), arguments...)
+	return process.err
+}
+
 func (process *fakeRunnerProcess) Run(_ context.Context, home string, arguments []string) error {
 	process.home = home
 	process.arguments = append([]string(nil), arguments...)
@@ -47,7 +70,7 @@ func TestRunAndLaunchDelegateToRunner(t *testing.T) {
 	accounts := &fakeRunnerAccounts{}
 	process := &fakeRunnerProcess{}
 	runner := runtimeusecase.NewRunner(accounts, process, nil)
-	if err := Run(context.Background(), runner, nil, []string{"--account", "work", "--", "--model", "synthetic"}); err != nil {
+	if err := Run(context.Background(), runner, nil, []string{"--account", "work", "--", "--model", "synthetic"}, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	if accounts.selected != "work" || strings.Join(process.arguments, " ") != "--model synthetic" {
@@ -58,6 +81,81 @@ func TestRunAndLaunchDelegateToRunner(t *testing.T) {
 	}
 	if accounts.selected != "" {
 		t.Fatalf("launch selector = %q", accounts.selected)
+	}
+}
+
+func TestRunProfilesLaunchesAntigravityWithoutProfilesOrGeminiKey(t *testing.T) {
+	process := &fakeAntigravityRunnerProcess{}
+	runner := runtimeusecase.NewRunner(nil, nil, nil)
+	runner.SetAntigravityProcess(process)
+	home := t.TempDir()
+	runner.SetAntigravityCodexHome(home)
+	runner.SetAntigravitySessionLocker(codex.SessionLocker{})
+	err := RunProfiles(context.Background(), runner, nil, nil, []string{
+		"--provider", "gemini", "--cli", "agy", "--model", "gemini-3.1-pro", "--", "exec", "review",
+	}, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"--model", "gemini-3.1-pro", "--dangerously-skip-permissions", "exec", "review"}
+	if !reflect.DeepEqual(process.arguments, want) {
+		t.Fatalf("Antigravity args = %#v, want %#v", process.arguments, want)
+	}
+	if process.codexHome != home {
+		t.Fatalf("Antigravity CODEX_HOME = %q", process.codexHome)
+	}
+}
+
+func TestRunNativeAntigravityDryRunPrintsDiagnosticsWithoutLaunching(t *testing.T) {
+	var output bytes.Buffer
+	process := &fakeAntigravityRunnerProcess{}
+	runner := runtimeusecase.NewRunner(nil, nil, nil)
+	runner.SetAntigravityProcess(process)
+	runner.SetAntigravityCodexHome("/synthetic/shared-codex")
+	err := Run(context.Background(), runner, nil, []string{
+		"--provider", "gemini", "--cli", "agy", "--dry-run",
+	}, &output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "Prodex dry run: launch diagnostics\nFlow: native-cli\nProvider: antigravity\nProfile: (native CLI owned)\nRuntime proxy: disabled\n"
+	if output.String() != want {
+		t.Fatalf("dry-run output = %q, want %q", output.String(), want)
+	}
+	if process.preparedHome != "/synthetic/shared-codex" || len(process.arguments) != 0 {
+		t.Fatalf("dry-run prepared %q and launched arguments %#v", process.preparedHome, process.arguments)
+	}
+}
+
+func TestAntigravityDryRunPanelRequiresTTYAndUnsetCodexCI(t *testing.T) {
+	t.Setenv("CODEX_CI", "")
+	if antigravityDryRunPanelAllowed(true) {
+		t.Fatal("dry-run panel enabled while CODEX_CI was set to an empty value")
+	}
+	if antigravityDryRunPanelAllowed(false) {
+		t.Fatal("dry-run panel enabled without a TTY")
+	}
+	if err := os.Unsetenv("CODEX_CI"); err != nil {
+		t.Fatal(err)
+	}
+	if !antigravityDryRunPanelAllowed(true) {
+		t.Fatal("dry-run panel was disabled for a TTY with CODEX_CI unset")
+	}
+}
+
+func TestAntigravityDryRunPanelUsesBubbleTea(t *testing.T) {
+	var output bytes.Buffer
+	t.Setenv("PRODEX_TERM_COLUMNS", "60")
+	if err := printAntigravityDryRunPanel(&output); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), "┌"+strings.Repeat("─", 58)+"┐") ||
+		!strings.Contains(output.String(), "Prodex Dry Run") ||
+		!strings.Contains(output.String(), "Flow:"+strings.Repeat(" ", 10)+"native-cli") ||
+		!strings.Contains(output.String(), "Provider:"+strings.Repeat(" ", 6)+"antigravity") ||
+		!strings.Contains(output.String(), "Profile:"+strings.Repeat(" ", 7)+"(native CLI owned)") ||
+		!strings.Contains(output.String(), "Runtime proxy: disabled") {
+		t.Fatalf("dry-run Bubble Tea panel differs from tagged layout: %q", output.String())
 	}
 }
 
@@ -114,7 +212,7 @@ func TestNativeLocalDispatchRecognizesRootAndWrapperOptions(t *testing.T) {
 		accounts := &fakeRunnerAccounts{selected: "unchanged"}
 		process := &fakeRunnerProcess{}
 		runner := runtimeusecase.NewRunner(accounts, process, nil)
-		if err := Run(t.Context(), runner, nil, args); err != nil {
+		if err := Run(t.Context(), runner, nil, args, io.Discard); err != nil {
 			t.Fatalf("%v: %v", args, err)
 		}
 		if accounts.selected != "unchanged" || len(process.arguments) == 0 {
@@ -132,7 +230,7 @@ func TestNativeCommandsCannotDiscardManagedRouting(t *testing.T) {
 		{"app-server", "--listen", "stdio", "proxy"},
 		{"app-server", "--ws-auth", "capability-token", "--ws-token-file", "/synthetic/token", "proxy"},
 	} {
-		if err := Run(t.Context(), nil, nil, args); err == nil || !strings.Contains(err.Error(), "bypasses Godex routing") {
+		if err := Run(t.Context(), nil, nil, args, io.Discard); err == nil || !strings.Contains(err.Error(), "bypasses Godex routing") {
 			t.Fatalf("unsafe native command accepted: %v, %v", args, err)
 		}
 	}
@@ -146,7 +244,7 @@ func TestNativeCommandsCannotDiscardManagedRouting(t *testing.T) {
 
 func TestPassthroughCannotMutateManagedCredentials(t *testing.T) {
 	for _, args := range [][]string{{"--", "logout"}, {"--current-time-reminder", "logout"}, {"--", "--model", "synthetic", "login"}, {"--", "login", "--device-auth"}} {
-		if err := Run(t.Context(), nil, nil, args); err == nil || !strings.Contains(err.Error(), "use godex") {
+		if err := Run(t.Context(), nil, nil, args, io.Discard); err == nil || !strings.Contains(err.Error(), "use godex") {
 			t.Fatalf("unsafe auth passthrough %v: %v", args, err)
 		}
 	}
@@ -170,7 +268,7 @@ func TestNativeSessionDeliveryPreservesOptionsAndResolvesPrefix(t *testing.T) {
 		process := &fakeRunnerProcess{}
 		runner := runtimeusecase.NewRunner(accounts, process, nil)
 		catalog := sessionusecase.NewCatalog(accounts, nativeSessionReader{}, runner)
-		if err := Run(t.Context(), runner, catalog, args); err != nil {
+		if err := Run(t.Context(), runner, catalog, args, io.Discard); err != nil {
 			t.Fatalf("%v: %v", args, err)
 		}
 		if accounts.selected != "unchanged" || !strings.Contains(strings.Join(process.arguments, " "), "00000000-0000-4000-8000-000000000001") {
@@ -254,7 +352,7 @@ func TestRunHomeLocalProviderKeepsResolvedHome(t *testing.T) {
 	home := t.TempDir()
 	if err := RunHome(context.Background(), runner, nil, home, []string{
 		"--url", "http://127.0.0.1:8131", "--model", "qwen3-coder", "exec", "review",
-	}); err != nil {
+	}, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	if process.home != home {
@@ -281,7 +379,7 @@ func TestRunProfilesLocalProviderUsesExplicitStandaloneProfileLease(t *testing.T
 	}}
 	if err := RunProfiles(context.Background(), runner, nil, profiles, []string{
 		"--profile", "local-home", "--url", "http://127.0.0.1:8131", "exec",
-	}); err != nil {
+	}, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	if process.home != home || strings.Join(profiles.acquired, ",") != "local-home" || profiles.released != 1 {
@@ -299,7 +397,7 @@ func TestRunProfilesLocalProviderUsesActiveStandaloneProfile(t *testing.T) {
 	}
 	if err := RunProfiles(context.Background(), runner, nil, profiles, []string{
 		"--url=http://127.0.0.1:8131", "exec",
-	}); err != nil {
+	}, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	if process.home != home || strings.Join(profiles.acquired, ",") != "active-local" || profiles.released != 1 {

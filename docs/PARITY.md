@@ -145,7 +145,14 @@ and eligibility validation stays in the runtime use case.
   endpoint; Messages and Embeddings pass through with Gemini API-key headers.
   The Models route still proxies upstream instead of serving Prodex's local
   catalog. Gemini OAuth/profile login and provider-specific quota handling remain
-  parity gaps. Antigravity runtime/login parity also remains incomplete.
+  parity gaps. Native Antigravity launch and global login now use
+  `PRODEX_AGY_BIN` (default `agy`) with the shared Codex home and tagged child
+  arguments/environment. Native launch skips profile startup and update lookup,
+  prepares the shared home during dry-run without spawning `agy`, rejects resume
+  and unsupported provider options, and preserves child exit status. Child
+  launches hold the shared Codex session lock through process exit. Godex accepts
+  the tagged `s`/`super` Gemini syntax plus its existing `run` spelling. The
+  dry-run TTY panel uses Bubble Tea with the tagged panel fields.
 - DeepSeek now has the 0.435.1 raw-key runtime
   plus its dedicated Codex model catalog and advanced request-side Responses
   adapter: exact key precedence/provider defaults/stable key rotation, launch-model
@@ -227,8 +234,8 @@ and eligibility validation stays in the runtime use case.
   Prodex-compatible `api_key[_host]` profile naming, private `auth.json`,
   `.prodex-profile.toml` endpoint persistence, repeat-login update/preserve/clear
   semantics, and direct `prodex-openai-compatible` Codex provider injection with
-  user `model_provider` precedence. Antigravity execution and Gemini login remain
-  action-level parity gaps rather than TUI gaps.
+  user `model_provider` precedence. Antigravity runtime and login now execute
+  through the native CLI; Gemini API-key entries remain guidance-only.
 - Explicit self-update, best-effort cached update notices on eligible commands,
   manual reset-credit redemption, and cost-bearing `ping openai` diagnostics are
   implemented.

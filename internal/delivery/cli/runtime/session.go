@@ -103,6 +103,11 @@ func nativeCommandIndex(arguments []string) int {
 	return index
 }
 
+func codexResumeRequested(arguments []string) bool {
+	command := nativeCommandIndex(arguments)
+	return command >= 0 && arguments[command] == "resume"
+}
+
 func nextCommandWord(arguments []string, start int) int {
 	for i := start; i < len(arguments); i++ {
 		if arguments[i] == "--" {

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
+	"github.com/christiandoxa/godex/internal/gateway/codex"
 	authusecase "github.com/christiandoxa/godex/internal/usecase/auth"
 )
 
@@ -41,18 +42,30 @@ func (fakeLoginCodex) Login(_ context.Context, _ string, deviceAuth bool) (accou
 	return accountentity.Identity{ChatGPTAccountID: "browser-account"}, nil
 }
 
+type fakeAntigravityProcess struct {
+	home      string
+	arguments []string
+	err       error
+}
+
+func (process *fakeAntigravityProcess) RunWithCodexHome(_ context.Context, home string, arguments []string) error {
+	process.home = home
+	process.arguments = append([]string(nil), arguments...)
+	return process.err
+}
+
 func TestLoginParsesFlagsAndRendersIdentity(t *testing.T) {
 	accounts := &fakeLoginAccounts{}
 	login := authusecase.NewLogin(accounts, fakeLoginCodex{})
 	var output strings.Builder
-	if err := Login(context.Background(), login, &output, []string{"--device-auth", "--name", "device"}); err != nil {
+	if err := Login(context.Background(), login, nil, &output, []string{"--device-auth", "--name", "device"}); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(output.String(), "Logged in as device (device@example.com).") {
 		t.Fatalf("login output = %q", output.String())
 	}
 	output.Reset()
-	if err := Login(context.Background(), login, &output, []string{"--name", "browser"}); err != nil {
+	if err := Login(context.Background(), login, nil, &output, []string{"--name", "browser"}); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.HasPrefix(output.String(), "Logged in as browser (") || !strings.HasSuffix(output.String(), ").\n") {
@@ -62,10 +75,10 @@ func TestLoginParsesFlagsAndRendersIdentity(t *testing.T) {
 
 func TestLoginRejectsUnexpectedArgumentsAndOutputErrors(t *testing.T) {
 	login := authusecase.NewLogin(&fakeLoginAccounts{}, fakeLoginCodex{})
-	if err := Login(context.Background(), login, io.Discard, []string{"positional"}); err == nil {
+	if err := Login(context.Background(), login, nil, io.Discard, []string{"positional"}); err == nil {
 		t.Fatal("positional argument unexpectedly accepted")
 	}
-	if err := Login(context.Background(), login, failingWriter{}, nil); err == nil {
+	if err := Login(context.Background(), login, nil, failingWriter{}, nil); err == nil {
 		t.Fatal("output failure unexpectedly ignored")
 	}
 }
@@ -119,7 +132,49 @@ func TestLoginPromptEligibilityMatchesAPIKeyReference(t *testing.T) {
 		t.Fatal("base URL alone should still allow provider chooser")
 	}
 	login := authusecase.NewLogin(&fakeLoginAccounts{}, fakeLoginCodex{})
-	if err := Login(context.Background(), login, io.Discard, []string{"--base-url", "https://example.test/v1"}); err == nil || !strings.Contains(err.Error(), "only supported for API key") {
+	if err := Login(context.Background(), login, nil, io.Discard, []string{"--base-url", "https://example.test/v1"}); err == nil || !strings.Contains(err.Error(), "only supported for API key") {
 		t.Fatalf("base URL without API-key login error = %v", err)
+	}
+}
+
+func TestAntigravityLoginDispatchAndOptionValidation(t *testing.T) {
+	options, err := ParseLoginOptions([]string{"--with-antigravity"})
+	if err != nil || !options.WithAntigravity || ShouldPromptLoginMenu([]string{"--with-antigravity"}) {
+		t.Fatalf("Antigravity options = %#v, err=%v", options, err)
+	}
+	for _, arguments := range [][]string{
+		{"--with-antigravity", "--name", "work"},
+		{"--with-antigravity", "--base-url", "https://example.test"},
+	} {
+		if _, err := ParseLoginOptions(arguments); err == nil {
+			t.Fatalf("Antigravity login accepted unsupported options %#v", arguments)
+		}
+	}
+	devicePrecedence, err := ParseLoginOptions([]string{"--with-antigravity", "--device-auth"})
+	if err != nil || !devicePrecedence.WithAntigravity {
+		t.Fatalf("Antigravity/device precedence = %#v, err=%v", devicePrecedence, err)
+	}
+	apiPrecedence, err := ParseLoginOptions([]string{
+		"--with-antigravity", "--with-api-key", "--name", "api-profile", "--base-url", "https://example.test/v1",
+	})
+	if err != nil || !apiPrecedence.WithAPIKey || apiPrecedence.WithAntigravity {
+		t.Fatalf("API-key/Antigravity precedence = %#v, err=%v", apiPrecedence, err)
+	}
+	for _, alias := range []string{"--antigravity", "--with-agy", "--agy"} {
+		options, err := ParseLoginOptions([]string{alias})
+		if err != nil || !options.WithAntigravity {
+			t.Fatalf("Antigravity alias %q = %#v, err=%v", alias, options, err)
+		}
+	}
+	process := &fakeAntigravityProcess{}
+	native := authusecase.NewNative(nil, nil, process)
+	home := t.TempDir()
+	native.SetAntigravityCodexHome(home)
+	native.SetAntigravitySessionLocker(codex.SessionLocker{})
+	if err := Login(context.Background(), nil, native, io.Discard, []string{"--with-antigravity"}); err != nil {
+		t.Fatal(err)
+	}
+	if process.home != home || strings.Join(process.arguments, " ") != "auth login" {
+		t.Fatalf("Antigravity login home/args = %q / %#v", process.home, process.arguments)
 	}
 }

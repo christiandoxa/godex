@@ -27,6 +27,20 @@ import (
 
 const importCurrentCommand = "import-current"
 
+// IsExplicitGodexCommand reports whether the first argument selects a Godex command.
+func IsExplicitGodexCommand(command string) bool {
+	switch command {
+	case "login", "logout", "accounts", "current", importCurrentCommand,
+		"account", "profile", "use", "remove", "run", "quota", "redeem",
+		"ping", "update", "session", "info", "status", "log", "doctor",
+		"version", "--version", "-version", "help", "--help", "-h":
+		return true
+	default:
+		return false
+	}
+}
+
+
 type App struct {
 	login      *authusecase.Login
 	importer   *authusecase.ImportCurrent
@@ -139,8 +153,11 @@ func (app *App) runLogin(ctx context.Context, arguments []string) error {
 	if options.WithAPIKey {
 		return app.runAPIKeyLogin(ctx, options)
 	}
+	if options.WithAntigravity {
+		return authcli.Login(ctx, app.login, app.nativeAuth, app.out, arguments)
+	}
 	if !authcli.ShouldPromptLoginMenu(arguments) || !authcli.LoginMenuInteractive(app.in, app.errOut) {
-		return authcli.Login(ctx, app.login, app.out, arguments)
+		return authcli.Login(ctx, app.login, app.nativeAuth, app.out, arguments)
 	}
 	action, err := authcli.RunLoginMenu(ctx, app.in, app.errOut)
 	if err != nil {
@@ -156,13 +173,17 @@ func (app *App) runLoginMenuAction(ctx context.Context, action authcli.LoginMenu
 	}
 	switch action {
 	case authcli.LoginChatGPT:
-		return authcli.Login(ctx, app.login, app.out, arguments)
+		return authcli.Login(ctx, app.login, app.nativeAuth, app.out, arguments)
 	case authcli.LoginDeviceCode:
 		deviceArguments := append([]string(nil), arguments...)
 		deviceArguments = append(deviceArguments, "--device-auth")
-		return authcli.Login(ctx, app.login, app.out, deviceArguments)
+		return authcli.Login(ctx, app.login, app.nativeAuth, app.out, deviceArguments)
 	case authcli.LoginOpenAIAPIKey:
 		return app.runAPIKeyLogin(ctx, options)
+	case authcli.LoginAntigravity:
+		antigravityArguments := append([]string(nil), arguments...)
+		antigravityArguments = append(antigravityArguments, "--with-antigravity")
+		return authcli.Login(ctx, app.login, app.nativeAuth, app.out, antigravityArguments)
 	case authcli.LoginClaude:
 		return app.runBuiltinLoginImport(ctx, "claude", options.Name)
 	case authcli.LoginCopilotImport:
@@ -217,6 +238,13 @@ func (app *App) showUpdateNotice(ctx context.Context, arguments []string) {
 }
 
 func shouldShowUpdateNotice(arguments []string) bool {
+	runtimeArguments := arguments
+	if len(runtimeArguments) > 0 && runtimeArguments[0] == "run" {
+		runtimeArguments = runtimeArguments[1:]
+	}
+	if runtimecli.UsesNativeAntigravity(runtimeArguments) {
+		return false
+	}
 	if len(arguments) == 0 {
 		return true
 	}
@@ -241,9 +269,9 @@ func shouldShowUpdateNotice(arguments []string) bool {
 
 func (app *App) runRuntime(ctx context.Context, arguments []string) error {
 	if app.profiles != nil {
-		return runtimecli.RunProfiles(ctx, app.runtime, app.sessions, app.profiles, arguments)
+		return runtimecli.RunProfiles(ctx, app.runtime, app.sessions, app.profiles, arguments, app.out)
 	}
-	return runtimecli.Run(ctx, app.runtime, app.sessions, arguments)
+	return runtimecli.Run(ctx, app.runtime, app.sessions, arguments, app.out)
 }
 
 func (app *App) runAccountGroup(ctx context.Context, arguments []string) error {
@@ -297,7 +325,7 @@ Usage:
   godex ping openai [-p NAME] [--model MODEL] [--base-url URL] [--no-proxy] [--json]
                                Run a cost-bearing OpenAI application diagnostic
   godex update                  Update from the latest verified GitHub release
-  godex run [--account SEL] -- [codex args...]
+  godex run [options] [CLI args...]
   godex session list/current [--json|--id-only|--resume-command]
                                Find sessions across managed profiles
   godex session resume ID       Resume in the owning profile
@@ -316,11 +344,14 @@ Run options (before the Codex command/flags):
   --current-time-reminder           Enable Codex current-time reminders
   --respect-system-proxy            Enable Codex system-proxy support
   --no-respect-system-proxy         Disable Codex system-proxy support
+  --provider gemini --cli agy       Launch native Antigravity CLI
+  --dry-run                         Print native Antigravity launch diagnostics only
 
 Login options:
   --name NAME                  Friendly account/profile name
   --device-auth                Use Codex device authentication
   --with-api-key               Use OpenAI/OpenAI-compatible API-key login
+  --with-antigravity           Run global Antigravity CLI sign-in
   --base-url URL               Store an OpenAI-compatible base URL for API-key login
   --openai-base-url URL        Alias for --base-url
   Interactive default login opens the Bubble Tea provider chooser.

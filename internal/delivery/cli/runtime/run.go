@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
@@ -28,10 +29,16 @@ type launchProfiles interface {
 	OpenAICompatibleBaseURL(context.Context, string) (string, bool, error)
 }
 
-func Run(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionusecase.Catalog, arguments []string) error {
+func Run(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionusecase.Catalog, arguments []string, out io.Writer) error {
 	selection, codexArguments, err := parseRunArguments(arguments)
 	if err != nil {
 		return err
+	}
+	if selection.CLI == "agy" {
+		if selection.DryRun {
+			return runAntigravityDryRun(runner, out)
+		}
+		return runner.RunAntigravity(ctx, selection.Model, codexArguments)
 	}
 	runner.SetAutoRedeem(selection.AutoRedeem)
 	if selection.Profile != "" {
@@ -46,19 +53,31 @@ func Run(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionus
 	return runParsed(ctx, runner, sessions, selection.Account, codexArguments)
 }
 
-func RunProfiles(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionusecase.Catalog, profiles launchProfiles, arguments []string) error {
+func RunProfiles(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionusecase.Catalog, profiles launchProfiles, arguments []string, out io.Writer) error {
 	selection, codexArguments, err := parseRunArguments(arguments)
 	if err != nil {
 		return err
+	}
+	if selection.CLI == "agy" {
+		if selection.DryRun {
+			return runAntigravityDryRun(runner, out)
+		}
+		return runner.RunAntigravity(ctx, selection.Model, codexArguments)
 	}
 	runner.SetAutoRedeem(selection.AutoRedeem)
 	return runProfileSelection(ctx, runner, sessions, profiles, selection, codexArguments)
 }
 
-func RunHome(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionusecase.Catalog, home string, arguments []string) error {
+func RunHome(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionusecase.Catalog, home string, arguments []string, out io.Writer) error {
 	selection, codexArguments, err := parseRunArguments(arguments)
 	if err != nil {
 		return err
+	}
+	if selection.CLI == "agy" {
+		if selection.DryRun {
+			return runAntigravityDryRun(runner, out)
+		}
+		return runner.RunAntigravity(ctx, selection.Model, codexArguments)
 	}
 	runner.SetAutoRedeem(selection.AutoRedeem)
 	if selection.Profile != "" {

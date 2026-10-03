@@ -257,6 +257,15 @@ in the invocation-local gateway. Gemini's Models route still uses the upstream
 catalog; local catalog emulation, OAuth-backed runtime, and provider-specific
 quota support remain incomplete.
 
+Launch the native Antigravity CLI with `godex s gemini --cli agy` (or
+`godex super gemini --cli agy`; `godex run --provider gemini --cli agy` remains
+available). Godex adds `--dangerously-skip-permissions`, passes remaining arguments
+to `agy`, and does not use Godex account/profile selection or the Gemini API-key
+proxy. Run `godex login --with-antigravity` to delegate global sign-in to
+`agy auth login`; this does not create a Godex profile. Set `PRODEX_AGY_BIN` to
+override the `agy` executable. Pass `--model MODEL` to set a default model;
+explicit `agy` model arguments take precedence.
+
 Kiro profiles now have a foreground ACP runtime bridge matching the 0.435.1
 provider surface. Default or active launches form a selected-first managed Kiro
 pool, explicit profile selection remains hard-affinity, and each profile gets its
@@ -535,7 +544,7 @@ managed profile name; `godex login --with-api-key` uses the same flow directly.
 the default OpenAI endpoint. The key is stored only in the managed profile's
 private `auth.json`; an optional custom endpoint is stored separately in
 `.prodex-profile.toml`. Runtime-only Gemini/Anthropic/DeepSeek API-key entries
-remain guidance-only, and Antigravity login execution remains separate parity work.
+remain guidance-only. Antigravity authentication stays global to the native CLI.
 
 ## Configuration
 
@@ -543,6 +552,7 @@ remain guidance-only, and Antigravity login execution remains separate parity wo
 | --- | --- | --- |
 | GODEX_HOME | ~/.godex | State, profiles, locks, and staging files. |
 | GODEX_CODEX_BIN | codex | Codex executable to invoke. |
+| PRODEX_AGY_BIN | agy | Antigravity CLI executable to invoke. |
 | PRODEX_KIRO_BIN | auto-detect `kiro-cli-chat` / `kiro-cli` | Kiro CLI executable used for built-in import metadata. |
 | COPILOT_HOME | ~/.copilot | Copilot CLI config root used by `profile import copilot`. |
 | COPILOT_CACHE_HOME | platform cache | Optional Copilot package-cache override for keytar/SDK credential fallback. |

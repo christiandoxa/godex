@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -19,6 +20,10 @@ const (
 const optionRequiresValueFormat = "%s requires a value"
 
 func parseRunArguments(arguments []string) (runtimemodel.Selection, []string, error) {
+	arguments = NormalizeNativeAntigravityArguments(arguments)
+	if UsesNativeAntigravity(arguments) {
+		return parseNativeAntigravityArguments(arguments)
+	}
 	selection := runtimemodel.Selection{}
 	features := runtimeFeatures{}
 	for index := 0; index < len(arguments); {
@@ -43,6 +48,10 @@ func consumeWrapperArgument(
 	selection *runtimemodel.Selection,
 	features *runtimeFeatures,
 ) (int, bool, error) {
+	if arguments[index] == "--dry-run" {
+		selection.DryRun = true
+		return index + 1, true, nil
+	}
 	if arguments[index] == "--auto-redeem" {
 		selection.AutoRedeem = true
 		return index + 1, true, nil
@@ -108,6 +117,12 @@ func applyProviderSelection(selection *runtimemodel.Selection, name, value strin
 			return err
 		}
 		selection.Provider = provider
+	case "cli":
+		cli, err := normalizeRuntimeCLI(value)
+		if err != nil {
+			return err
+		}
+		selection.CLI = cli
 	case "api-key":
 		selection.APIKey = value
 	case "base-url":
@@ -150,7 +165,23 @@ func finishRunArguments(
 	if err != nil {
 		return runtimemodel.Selection{}, nil, err
 	}
-	codexArguments := append(featureArguments, remaining...)
+	if selection.CLI == "agy" && len(features.nativeOptions) > 0 {
+		if slices.Contains(features.nativeOptions, "--presidio") {
+			return runtimemodel.Selection{}, nil, errors.New("--presidio is unsupported for native Antigravity")
+		}
+		return runtimemodel.Selection{}, nil, errors.New("selected options are unsupported for native Antigravity")
+	}
+	if selection.DryRun && selection.CLI != "agy" {
+		return runtimemodel.Selection{}, nil, errors.New("--dry-run requires --cli agy")
+	}
+	if selection.CLI == "agy" && len(featureArguments) > 0 {
+		return runtimemodel.Selection{}, nil, errors.New("selected options are unsupported for native Antigravity")
+	}
+	codexArguments := append(features.nativeOptions, featureArguments...)
+	codexArguments = append(codexArguments, remaining...)
+	if selection.CLI == "agy" && codexResumeRequested(codexArguments) {
+		return runtimemodel.Selection{}, nil, errors.New("resume is unsupported for native Antigravity")
+	}
 	if selection.Model != "" && selection.Provider == "" && selection.URL == "" {
 		codexArguments = append([]string{"--model", selection.Model}, codexArguments...)
 	}
@@ -158,6 +189,21 @@ func finishRunArguments(
 }
 
 func validateRunSelection(selection runtimemodel.Selection) error {
+	if selection.CLI != "" {
+		if selection.CLI != "agy" {
+			return fmt.Errorf("invalid --cli: supported values are agy, got %q", selection.CLI)
+		}
+		if selection.Provider != "gemini" {
+			return errors.New("--cli agy requires --provider gemini; use godex run --provider gemini --cli agy")
+		}
+		if selection.Account != "" || selection.Profile != "" {
+			return errors.New("--cli agy cannot use Godex accounts or profiles")
+		}
+		if selection.APIKey != "" || selection.BaseURL != "" || selection.URL != "" ||
+			selection.ContextWindow != nil || selection.AutoCompactTokenLimit != nil || selection.AutoRedeem {
+			return errors.New("selected options are unsupported for native Antigravity")
+		}
+	}
 	switch {
 	case selection.Provider != "" && selection.Account != "":
 		return errors.New("--provider cannot be combined with --account")
@@ -183,6 +229,7 @@ func providerValue(arguments []string, index int) (string, string, int, bool, er
 	}
 	for _, option := range []struct{ flag, name string }{
 		{"--provider", "provider"},
+		{"--cli", "cli"},
 		{"--base-url", "base-url"},
 		{"--url", "url"},
 		{"--model", providerModelOptionName},

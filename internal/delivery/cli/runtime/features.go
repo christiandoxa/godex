@@ -19,6 +19,7 @@ const (
 
 type runtimeFeatures struct {
 	webSearch          string
+	nativeOptions      []string
 	rolloutLimit       *uint64
 	rolloutReminders   []uint64
 	samplingWeight     *float64
@@ -30,6 +31,27 @@ type runtimeFeatures struct {
 }
 
 func (features *runtimeFeatures) consume(arguments []string, index int) (next int, handled bool, err error) {
+	switch arguments[index] {
+	case "--no-presidio", "--no-sub-agent", "--no-auto-rotate", "--full-access":
+		return index + 1, true, nil
+	case "--presidio", "--sub-agent", "--auto-rotate", "--skip-quota-check", "--no-proxy":
+		features.nativeOptions = append(features.nativeOptions, arguments[index])
+		return index + 1, true, nil
+	}
+	for _, name := range []string{
+		"--tool", "--require-tool", "--sub-agent-provider", "--sub-agent-model",
+		"--sub-agent-model-reasoning-effort", "--sub-agent-url", "--sub-agent-max-concurrency",
+	} {
+		_, consumed, ok, err := namedOptionValue(arguments, index, name)
+		if !ok {
+			continue
+		}
+		if err != nil {
+			return index, true, err
+		}
+		features.nativeOptions = append(features.nativeOptions, arguments[index:index+consumed]...)
+		return index + consumed, true, nil
+	}
 	switch featureName(arguments[index]) {
 	case "--web-search":
 		return features.consumeWebSearch(arguments, index)

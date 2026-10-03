@@ -6,16 +6,21 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	authcli "github.com/christiandoxa/godex/internal/delivery/cli/auth"
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
 	profileentity "github.com/christiandoxa/godex/internal/entity/profile"
+	"github.com/christiandoxa/godex/internal/gateway/codex"
+	updategateway "github.com/christiandoxa/godex/internal/gateway/update"
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 	accountrepo "github.com/christiandoxa/godex/internal/repository/account"
 	profilerepo "github.com/christiandoxa/godex/internal/repository/profile"
+	updaterepo "github.com/christiandoxa/godex/internal/repository/update"
 	authusecase "github.com/christiandoxa/godex/internal/usecase/auth"
 	profileusecase "github.com/christiandoxa/godex/internal/usecase/profile"
 	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
+	updateusecase "github.com/christiandoxa/godex/internal/usecase/update"
 )
 
 type failingWriter struct{ err error }
@@ -170,6 +175,7 @@ func TestUpdateNoticeEligibilityMatchesReadOnlyAndMinimalSurfaces(t *testing.T) 
 	for _, arguments := range [][]string{
 		nil,
 		{"run"},
+		{"login", "--with-antigravity"},
 		{"quota", "--once"},
 		{"redeem", "work"},
 		{"status", "--once"},
@@ -187,6 +193,10 @@ func TestUpdateNoticeEligibilityMatchesReadOnlyAndMinimalSurfaces(t *testing.T) 
 		{"quota", "--raw", "work"},
 		{"doctor", "--json"},
 		{"doctor", "--bundle", "out.json"},
+		{"run", "--provider", "gemini", "--cli", "agy", "exec"},
+		{"run", "session-id", "--provider", "gemini", "--cli", "agy"},
+		{"run", "--provider", "gemini", "--cli", "agy", "--dry-run"},
+		{"run", "--provider", "gemini", "--cli", "agy", "resume", "thread"},
 		{"help"},
 		{"--version"},
 	} {
@@ -194,6 +204,41 @@ func TestUpdateNoticeEligibilityMatchesReadOnlyAndMinimalSurfaces(t *testing.T) 
 			t.Fatalf("arguments %#v unexpectedly show update notice", arguments)
 		}
 	}
+}
+
+func TestNativeAntigravityDryRunSkipsUpdateNoticeLookup(t *testing.T) {
+	store := updaterepo.NewStore(t.TempDir())
+	if err := store.SaveLatest("9.9.9", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	updater := updateusecase.NewUpdater(dispatcherReleaseSource{}, store, updategateway.NewInstaller(), "1.0.0")
+	var output, notices bytes.Buffer
+	agy := &dispatcherAntigravityProcess{}
+	runner := runtimeusecase.NewRunner(nil, nil, nil)
+	runner.SetAntigravityProcess(agy)
+	runner.SetAntigravityCodexHome(t.TempDir())
+	app := New(nil, nil, nil, runner, nil, nil, &output)
+	app.SetUpdate(updater, &notices)
+	if err := app.Run(context.Background(), []string{
+		"run", "session-id", "--provider", "gemini", "--cli", "agy", "--dry-run",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if notices.Len() != 0 {
+		t.Fatalf("native Antigravity emitted update notice: %q", notices.String())
+	}
+	if !strings.Contains(output.String(), "Provider: antigravity") {
+		t.Fatalf("native Antigravity dry-run output = %q", output.String())
+	}
+	if agy.preparedHome == "" || len(agy.arguments) != 0 {
+		t.Fatalf("dry-run prepared %q and launched arguments %#v", agy.preparedHome, agy.arguments)
+	}
+}
+
+type dispatcherReleaseSource struct{}
+
+func (dispatcherReleaseSource) LatestVersion(context.Context) (string, error) {
+	return "9.9.9", nil
 }
 
 const (
@@ -219,6 +264,42 @@ type dispatcherCopilotSource struct {
 	credential profilemodel.BuiltinCredential
 }
 
+type dispatcherAntigravityProcess struct {
+	home         string
+	preparedHome string
+	arguments    []string
+	err          error
+}
+
+func TestHelpDocumentsNativeAntigravityRuntimeAndLogin(t *testing.T) {
+	var output bytes.Buffer
+	if err := printHelp(&output); err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{"--provider gemini --cli agy", "--with-antigravity"} {
+		if !strings.Contains(output.String(), expected) {
+			t.Fatalf("help missing %q", expected)
+		}
+	}
+}
+
+func (process *dispatcherAntigravityProcess) RunWithCodexHome(_ context.Context, home string, arguments []string) error {
+	process.home = home
+	process.arguments = append([]string(nil), arguments...)
+	return process.err
+}
+
+func (process *dispatcherAntigravityProcess) RunRuntimeWithCodexHome(_ context.Context, home string, arguments []string) error {
+	process.home = home
+	process.arguments = append([]string(nil), arguments...)
+	return process.err
+}
+
+func (process *dispatcherAntigravityProcess) PrepareCodexHome(home string) error {
+	process.preparedHome = home
+	return nil
+}
+
 func (source dispatcherCopilotSource) Load(context.Context) (profilemodel.BuiltinCredential, error) {
 	return source.credential, nil
 }
@@ -240,9 +321,14 @@ func TestDispatcherLoginMenuActionsUseExistingAuthAndProfileFlows(t *testing.T) 
 		Email:    copilotLogin,
 	}})
 	login := authusecase.NewLogin(dispatcherLoginAccounts{}, dispatcherLoginCodex{})
+	agy := &dispatcherAntigravityProcess{}
 	var output bytes.Buffer
 	app := New(login, nil, accounts, nil, nil, nil, &output)
 	app.SetProfiles(catalog)
+	nativeAuth := authusecase.NewNative(nil, nil, agy)
+	nativeAuth.SetAntigravityCodexHome(t.TempDir())
+	nativeAuth.SetAntigravitySessionLocker(codex.SessionLocker{})
+	app.SetNativeAuth(nativeAuth)
 	app.SetInput(strings.NewReader("fixture-menu-api-key\n"))
 
 	if err := app.runLoginMenuAction(context.Background(), authcli.LoginChatGPT, []string{menuLoginNameOption, "chatgpt-menu"}); err != nil {
@@ -258,6 +344,12 @@ func TestDispatcherLoginMenuActionsUseExistingAuthAndProfileFlows(t *testing.T) 
 		t.Fatal(err)
 	}
 	if err := app.runLoginMenuAction(context.Background(), authcli.LoginCopilotImport, []string{menuLoginNameOption, menuCopilotProfile}); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.runLoginMenuAction(context.Background(), authcli.LoginAntigravity, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.runLogin(context.Background(), []string{"--with-antigravity"}); err != nil {
 		t.Fatal(err)
 	}
 	listed, err := catalog.List(context.Background())
@@ -278,6 +370,9 @@ func TestDispatcherLoginMenuActionsUseExistingAuthAndProfileFlows(t *testing.T) 
 	}
 	if strings.Contains(output.String(), "fixture-menu-api-key") {
 		t.Fatalf("API key leaked into dispatcher output: %q", output.String())
+	}
+	if got := strings.Join(agy.arguments, " "); got != "auth login" {
+		t.Fatalf("Antigravity login arguments = %#v", agy.arguments)
 	}
 	apiBaseURL, foundBaseURL, err := profiles.ReadOpenAICompatibleBaseURL(profiles.ManagedHome(menuAPIKeyProfile))
 	if err != nil || !foundBaseURL || apiBaseURL != "http://127.0.0.1:11434/v1" {

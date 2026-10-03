@@ -19,13 +19,50 @@ type nativeProcess interface {
 	Run(context.Context, string, []string) error
 }
 
-type Native struct {
-	accounts nativeAccounts
-	process  nativeProcess
+type antigravityProcess interface {
+	RunWithCodexHome(context.Context, string, []string) error
 }
 
-func NewNative(accounts nativeAccounts, process nativeProcess) *Native {
-	return &Native{accounts, process}
+type codexSessionLocker interface {
+	LockCodexSessionsForChild(context.Context, string) (func() error, error)
+}
+
+type Native struct {
+	accounts        nativeAccounts
+	process         nativeProcess
+	antigravity     antigravityProcess
+	antigravityHome string
+	sessionLocker   codexSessionLocker
+}
+
+func NewNative(accounts nativeAccounts, process nativeProcess, antigravity antigravityProcess) *Native {
+	return &Native{accounts: accounts, process: process, antigravity: antigravity}
+}
+
+func (native *Native) SetAntigravityCodexHome(home string) {
+	native.antigravityHome = home
+}
+
+func (native *Native) SetAntigravitySessionLocker(locker codexSessionLocker) {
+	native.sessionLocker = locker
+}
+
+func (native *Native) RunAntigravityLogin(ctx context.Context) (runErr error) {
+	if native == nil || native.antigravity == nil {
+		return errors.New("antigravity CLI is not configured")
+	}
+	if native.antigravityHome == "" {
+		return errors.New("antigravity CODEX_HOME is not configured")
+	}
+	if native.sessionLocker == nil {
+		return errors.New("antigravity session lock is not configured")
+	}
+	release, err := native.sessionLocker.LockCodexSessionsForChild(ctx, native.antigravityHome)
+	if err != nil {
+		return err
+	}
+	defer func() { runErr = errors.Join(runErr, release()) }()
+	return native.antigravity.RunWithCodexHome(ctx, native.antigravityHome, []string{"auth", "login"})
 }
 
 func (native *Native) Run(ctx context.Context, input authmodel.Command) (err error) {

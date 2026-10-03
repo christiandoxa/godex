@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -113,6 +114,69 @@ func TestParseRunArgumentsProviderAliases(t *testing.T) {
 		if err != nil || selection.Provider != want {
 			t.Fatalf("provider %q = %#v, err=%v", input, selection, err)
 		}
+	}
+}
+
+func TestParseRunArgumentsSupportsNativeAntigravityAndRejectsUnsupportedOptions(t *testing.T) {
+	selection, arguments, err := parseRunArguments([]string{
+		"--provider", "gemini", "--cli", "agy", "--model", "gemini-3.1-pro", "--", "exec", "review",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if selection.Provider != "gemini" || selection.CLI != "agy" || selection.Model != "gemini-3.1-pro" ||
+		!reflect.DeepEqual(arguments, []string{"exec", "review"}) {
+		t.Fatalf("native Antigravity selection = %#v, args = %#v", selection, arguments)
+	}
+	for _, args := range [][]string{
+		{"--cli", "unknown"},
+		{"--provider", "gemini", "--cli", "AGY"},
+		{"--provider", "gemini", "--cli", " agy "},
+		{"--cli", "agy"},
+		{"--provider", "anthropic", "--cli", "agy"},
+		{"--provider", "gemini", "--cli", "agy", "--account", "work"},
+		{"--provider", "gemini", "--cli", "agy", "--profile", "work"},
+		{"--provider", "gemini", "--cli", "agy", "--api-key", "synthetic"},
+		{"--provider", "gemini", "--cli", "agy", "--base-url", "https://example.test"},
+		{"--provider", "gemini", "--cli", "agy", "--auto-redeem"},
+		{"--provider", "gemini", "--cli", "agy", "--web-search", "live"},
+	} {
+		if _, _, err := parseRunArguments(args); err == nil {
+			t.Fatalf("native Antigravity accepted unsupported arguments %#v", args)
+		}
+	}
+	for _, args := range [][]string{
+		{"--provider", "gemini", "--cli", "agy", "resume", "thread"},
+		{"--provider", "gemini", "--cli", "agy", "exec", "resume", "thread"},
+	} {
+		if _, _, err := parseRunArguments(args); err == nil || !strings.Contains(err.Error(), "resume is unsupported") {
+			t.Fatalf("native Antigravity accepted resume arguments %#v: %v", args, err)
+		}
+	}
+	if _, _, err := parseRunArguments([]string{
+		"--provider", "gemini", "--cli", "agy", "--", "--model", "resume", "exec", "review",
+	}); err != nil {
+		t.Fatalf("native Antigravity mistook a model value for resume: %v", err)
+	}
+	selection, arguments, err = parseRunArguments([]string{
+		"--provider", "gemini", "--cli", "agy", "--dry-run", "--", "exec", "review",
+	})
+	if err != nil || !selection.DryRun || !reflect.DeepEqual(arguments, []string{"exec", "review"}) {
+		t.Fatalf("native Antigravity dry-run = %#v / %#v, err=%v", selection, arguments, err)
+	}
+	if _, _, err := parseRunArguments([]string{"--provider", "gemini", "--dry-run"}); err == nil {
+		t.Fatal("dry-run without native Antigravity unexpectedly accepted")
+	}
+	selection, arguments, err = parseRunArguments([]string{
+		"--provider", "gemini", "--cli", "agy", "--", "--dry-run",
+	})
+	if err != nil || selection.DryRun || !reflect.DeepEqual(arguments, []string{"--dry-run"}) {
+		t.Fatalf("Codex passthrough dry-run = %#v / %#v, err=%v", selection, arguments, err)
+	}
+	secret := "antigravity-api-key-sentinel"
+	_, _, err = parseRunArguments([]string{"--provider", "gemini", "--cli", "agy", "--api-key", secret})
+	if err == nil || strings.Contains(err.Error(), secret) {
+		t.Fatalf("native Antigravity API-key error = %v", err)
 	}
 }
 
