@@ -40,7 +40,7 @@ func (catalog *Catalog) applyImportAction(ctx context.Context, action importActi
 	switch sourceProviderKind(action.source) {
 	case profileentity.ProviderOpenAI:
 		return catalog.applyOpenAIImportAction(ctx, action)
-	case profileentity.ProviderAnthropic, profileentity.ProviderKiro, profileentity.ProviderCopilot:
+	case profileentity.ProviderAnthropic, profileentity.ProviderGemini, profileentity.ProviderKiro, profileentity.ProviderCopilot:
 		return catalog.applyProviderImportAction(ctx, action)
 	default:
 		return importMutation{}, fmt.Errorf("profile provider %q import is not implemented yet", sourceProviderKind(action.source))

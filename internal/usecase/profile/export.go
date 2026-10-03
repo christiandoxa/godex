@@ -64,6 +64,8 @@ func (catalog *Catalog) exportProfile(ctx context.Context, report Report) (profi
 	switch report.Profile.Provider.Kind {
 	case profileentity.ProviderOpenAI:
 		return catalog.exportOpenAIProfile(ctx, report)
+	case profileentity.ProviderGemini:
+		return catalog.exportGeminiProfile(report)
 	case profileentity.ProviderAnthropic:
 		return catalog.exportAnthropicProfile(ctx, report)
 	case profileentity.ProviderKiro:
@@ -73,6 +75,27 @@ func (catalog *Catalog) exportProfile(ctx context.Context, report Report) (profi
 	default:
 		return profilemodel.ExportedProfile{}, fmt.Errorf("profile provider %q export is not implemented yet", report.Profile.Provider.Kind)
 	}
+}
+
+func (catalog *Catalog) exportGeminiProfile(report Report) (profilemodel.ExportedProfile, error) {
+	secret, err := catalog.profiles.ReadProviderSecret(report.Profile.CodexHome, geminiOAuthFile)
+	if err != nil {
+		return profilemodel.ExportedProfile{}, fmt.Errorf("export profile %q: %w", report.Profile.Name, err)
+	}
+	email := report.Profile.Email
+	exported := profilemodel.ExportedProfile{
+		Name: report.Profile.Name, Email: optionalString(strings.TrimSpace(report.Profile.Email)),
+		SourceManaged: report.Profile.Managed,
+		Provider: profilemodel.ProviderSnapshot{
+			Kind: string(profileentity.ProviderGemini), Email: &email,
+			ProjectID: optionalString(report.Profile.Provider.ProjectID),
+		},
+		SecretFiles: []profilemodel.ExportedSecretFile{{Path: geminiOAuthFile, Text: secret}},
+	}
+	if _, err := inspectGeminiSecret(exported); err != nil {
+		return profilemodel.ExportedProfile{}, fmt.Errorf("export profile %q: Gemini OAuth credentials are invalid", report.Profile.Name)
+	}
+	return exported, nil
 }
 
 func (catalog *Catalog) exportOpenAIProfile(ctx context.Context, report Report) (profilemodel.ExportedProfile, error) {

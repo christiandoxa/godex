@@ -175,8 +175,11 @@ func importedProfileEmail(source profilemodel.ExportedProfile, identity accounte
 	if email := strings.TrimSpace(identity.Email); email != "" {
 		return email
 	}
-	if source.Email != nil {
+	if source.Email != nil && strings.TrimSpace(*source.Email) != "" {
 		return strings.TrimSpace(*source.Email)
+	}
+	if sourceProviderKind(source) == profileentity.ProviderGemini && source.Provider.Email != nil {
+		return strings.TrimSpace(*source.Provider.Email)
 	}
 	return ""
 }
@@ -199,6 +202,9 @@ func (catalog *Catalog) validateImportedProfile(ctx context.Context, source prof
 		return err
 	case profileentity.ProviderKiro:
 		_, err := catalog.inspectKiroSecrets(ctx, source)
+		return err
+	case profileentity.ProviderGemini:
+		_, err := inspectGeminiSecret(source)
 		return err
 	case profileentity.ProviderCopilot:
 		if len(source.SecretFiles) != 0 {

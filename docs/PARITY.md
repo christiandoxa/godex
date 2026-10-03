@@ -150,8 +150,11 @@ and eligibility validation stays in the runtime use case.
   disabled-auth guidance without credential reads or network access. OpenAI
   profiles with a non-OpenAI Codex `model_provider` expose the tagged configured
   provider/auth metadata and skip OpenAI quota probing. Gemini OAuth bundle
-  migration remains a separate parity gap. Native Antigravity launch and global
-  login now use
+  migration is implemented independently of the disabled runtime: plain/encrypted
+  bundles preserve empty `auth_json`, tagged provider email/project metadata, and
+  one validated `gemini_oauth.json`; same-name updates replace metadata and the
+  private secret without creating `auth.json`. Native Antigravity launch and
+  global login now use
   `PRODEX_AGY_BIN` (default `agy`) with the shared Codex home and tagged child
   arguments/environment. Native launch skips profile startup and update lookup,
   prepares the shared home during dry-run without spawning `agy`, rejects resume

@@ -259,7 +259,11 @@ non-GET Models requests pass upstream. OAuth runtime remains disabled. Legacy
 Gemini OAuth profile quota returns the tagged migration guidance without reading
 credentials or making a network request. OpenAI profiles whose Codex
 `config.toml` selects a non-OpenAI `model_provider` report that configured
-provider instead of probing OpenAI quota.
+provider instead of probing OpenAI quota. Legacy Gemini OAuth profiles can also
+be migrated through profile bundles: plain/encrypted exports carry an empty
+`auth_json`, tagged Gemini provider metadata, and one validated private
+`gemini_oauth.json`. This preserves migration compatibility without re-enabling
+Gemini OAuth runtime/login.
 
 Launch the native Antigravity CLI with `godex s gemini --cli agy` (or
 `godex super gemini --cli agy`; `godex run --provider gemini --cli agy` remains

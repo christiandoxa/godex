@@ -126,7 +126,10 @@ deduplication, Prodex-compatible profile naming, activation, and create-vs-updat
 policy. `repository/profile` owns private provider-secret persistence and rollback
 of failed metadata updates. Bundle export/import consumes that same boundary:
 Anthropic exports carry `.credentials.json` as a validated provider secret with
-empty `auth_json`. Kiro exports follow the same adapter boundary with required
+empty `auth_json`. Gemini migration bundles similarly carry one schema-validated
+`gemini_oauth.json`, empty `auth_json`, and the tagged provider email/project
+metadata; persistence still uses the generic private provider-secret boundary,
+not the disabled Gemini runtime. Kiro exports follow the same adapter boundary with required
 `kiro_auth.json` plus optional `kiro_model_catalog.json`; `gateway/kiro` validates
 the nested auth JSON and accepted model-catalog shapes without owning profile
 persistence. The same gateway owns built-in Kiro source discovery: it opens the

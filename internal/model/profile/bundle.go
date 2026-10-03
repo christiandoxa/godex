@@ -1,5 +1,7 @@
 package profile
 
+import "encoding/json"
+
 type ExportRequest struct {
 	Profiles   []string
 	OutputPath string
@@ -59,6 +61,17 @@ type ProviderSnapshot struct {
 	ProfileName   *string `json:"profile_name,omitempty"`
 	StartURL      *string `json:"start_url,omitempty"`
 	Region        *string `json:"region,omitempty"`
+}
+
+func (provider ProviderSnapshot) MarshalJSON() ([]byte, error) {
+	type snapshot ProviderSnapshot
+	if provider.Kind != "gemini" || provider.ProjectID != nil {
+		return json.Marshal(snapshot(provider))
+	}
+	return json.Marshal(struct {
+		snapshot
+		ProjectID *string `json:"project_id"`
+	}{snapshot: snapshot(provider)})
 }
 
 type ExportedSecretFile struct {

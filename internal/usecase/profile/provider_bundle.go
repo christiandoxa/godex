@@ -1,10 +1,15 @@
 package profile
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	profileentity "github.com/christiandoxa/godex/internal/entity/profile"
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
@@ -13,6 +18,7 @@ import (
 const (
 	kiroCredentialFile   = "kiro_auth.json"
 	kiroModelCatalogFile = "kiro_model_catalog.json"
+	geminiOAuthFile      = "gemini_oauth.json"
 )
 
 func providerSnapshotFromEntity(provider profileentity.Provider) profilemodel.ProviderSnapshot {
@@ -97,6 +103,107 @@ func (catalog *Catalog) inspectKiroSecrets(ctx context.Context, source profilemo
 		}
 	}
 	return credential, nil
+}
+
+func inspectGeminiSecret(source profilemodel.ExportedProfile) (profilemodel.ExportedSecretFile, error) {
+	if source.Provider.Kind != string(profileentity.ProviderGemini) || source.Provider.Email == nil {
+		return profilemodel.ExportedSecretFile{}, fmt.Errorf("profile %q has invalid Gemini provider metadata", source.Name)
+	}
+	file, err := requiredSecretFile(source.SecretFiles, geminiOAuthFile)
+	if err != nil {
+		return profilemodel.ExportedSecretFile{}, fmt.Errorf("profile %q: %w", source.Name, err)
+	}
+	if !validGeminiOAuthJSON(file.Text) {
+		return profilemodel.ExportedSecretFile{}, fmt.Errorf("profile %q has invalid Gemini OAuth credentials", source.Name)
+	}
+	return file, nil
+}
+
+func validGeminiOAuthJSON(text string) bool {
+	decoder := json.NewDecoder(strings.NewReader(text))
+	token, err := decoder.Token()
+	if err != nil || token != json.Delim('{') {
+		return false
+	}
+	seen := make(map[string]bool, 7)
+	for decoder.More() {
+		token, err := decoder.Token()
+		if err != nil {
+			return false
+		}
+		name, ok := token.(string)
+		if !ok {
+			return false
+		}
+		var value json.RawMessage
+		if err := decoder.Decode(&value); err != nil {
+			clearBundleBytes(value)
+			return false
+		}
+		value = bytes.TrimSpace(value)
+		valid := true
+		switch name {
+		case "auth_mode", "access_token", "email":
+			valid = !seen[name] && isJSONString(value)
+			seen[name] = true
+		case "refresh_token", "token_type", "scope", "project_id":
+			valid = !seen[name] && (bytes.Equal(value, []byte("null")) || isJSONString(value))
+			seen[name] = true
+		case "expiry_date":
+			var expiry *int64
+			valid = !seen[name] && json.Unmarshal(value, &expiry) == nil
+			seen[name] = true
+		}
+		clearBundleBytes(value)
+		if !valid {
+			return false
+		}
+	}
+	token, err = decoder.Token()
+	if err != nil || token != json.Delim('}') || !seen["auth_mode"] || !seen["access_token"] || !seen["email"] {
+		return false
+	}
+	var trailing json.RawMessage
+	return decoder.Decode(&trailing) == io.EOF
+}
+
+func isJSONString(value []byte) bool {
+	if len(value) < 2 || value[0] != '"' || value[len(value)-1] != '"' || !utf8.Valid(value) {
+		return false
+	}
+	for index := 1; index < len(value)-1; index++ {
+		if value[index] != '\\' {
+			continue
+		}
+		if value[index+1] != 'u' {
+			index++
+			continue
+		}
+		if index+6 > len(value)-1 {
+			return false
+		}
+		code, err := strconv.ParseUint(string(value[index+2:index+6]), 16, 16)
+		if err != nil {
+			return false
+		}
+		surrogate := uint16(code)
+		switch {
+		case surrogate >= 0xdc00 && surrogate <= 0xdfff:
+			return false
+		case surrogate >= 0xd800 && surrogate <= 0xdbff:
+			if index+12 >= len(value) || value[index+6] != '\\' || value[index+7] != 'u' {
+				return false
+			}
+			low, err := strconv.ParseUint(string(value[index+8:index+12]), 16, 16)
+			if err != nil || low < 0xdc00 || low > 0xdfff {
+				return false
+			}
+			index += 11
+		default:
+			index += 5
+		}
+	}
+	return true
 }
 
 func kiroSecretFiles(files []profilemodel.ExportedSecretFile) (profilemodel.ExportedSecretFile, *profilemodel.ExportedSecretFile, error) {
