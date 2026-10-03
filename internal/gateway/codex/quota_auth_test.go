@@ -53,3 +53,54 @@ func writeQuotaAuthCase(path, content string, directory bool) error {
 	}
 	return os.WriteFile(path, []byte(content), 0o600)
 }
+
+func TestInspectQuotaAuthPrefersNonOpenAIModelProviderOverAuthJSON(t *testing.T) {
+	home := t.TempDir()
+	if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte("model_provider = 'amazon-bedrock'\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, "auth.json"), []byte(`{"auth_mode":"chatgpt","tokens":{"access_token":"<redacted>"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := NewCodexProcess("", Terminal{}).InspectQuotaAuth(context.Background(), home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Label != "model-provider:amazon-bedrock" || got.Compatible {
+		t.Fatalf("summary = %+v", got)
+	}
+}
+
+func TestInspectQuotaAuthReportsConfigErrorBeforeAuthJSON(t *testing.T) {
+	home := t.TempDir()
+	if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte("model_provider = ["), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, "auth.json"), []byte(`{"auth_mode":"chatgpt","tokens":{"access_token":"<redacted>"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := NewCodexProcess("", Terminal{}).InspectQuotaAuth(context.Background(), home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Label != "config-error" || got.Compatible {
+		t.Fatalf("summary = %+v", got)
+	}
+}
+
+func TestInspectQuotaAuthKeepsOpenAIProviderAuthSummary(t *testing.T) {
+	home := t.TempDir()
+	if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte("model_provider = 'OPENAI'\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, "auth.json"), []byte(`{"auth_mode":"chatgpt","tokens":{"access_token":"<redacted>"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := NewCodexProcess("", Terminal{}).InspectQuotaAuth(context.Background(), home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Label != "chatgpt" || !got.Compatible {
+		t.Fatalf("summary = %+v", got)
+	}
+}

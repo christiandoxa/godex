@@ -19,6 +19,16 @@ func (process *CodexProcess) InspectQuotaAuth(ctx context.Context, codexHome str
 	if err := ctx.Err(); err != nil {
 		return profilemodel.QuotaAuthSummary{}, err
 	}
+	modelProvider, err := process.InspectModelProvider(ctx, codexHome)
+	if err != nil {
+		if ctx.Err() != nil {
+			return profilemodel.QuotaAuthSummary{}, ctx.Err()
+		}
+		return quotaAuthSummary("config-error", false), nil
+	}
+	if modelProvider != nil {
+		return quotaAuthSummary("model-provider:"+modelProvider.ProviderID, false), nil
+	}
 	path := filepath.Join(codexHome, "auth.json")
 	info, err := os.Lstat(path)
 	if errors.Is(err, os.ErrNotExist) {

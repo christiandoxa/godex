@@ -49,3 +49,29 @@ func TestCatalogQuotaTargetsIncludeAccountsAndStandaloneProfiles(t *testing.T) {
 		t.Fatalf("standalone target = %+v", byName["standalone"])
 	}
 }
+
+type modelProviderQuotaCatalogInspector struct{}
+
+func (modelProviderQuotaCatalogInspector) InspectAuthJSON(context.Context, []byte) (accountentity.Identity, error) {
+	return accountentity.Identity{}, nil
+}
+
+func (modelProviderQuotaCatalogInspector) InspectQuotaAuth(context.Context, string) (profilemodel.QuotaAuthSummary, error) {
+	return profilemodel.QuotaAuthSummary{Label: "model-provider:amazon-bedrock", Compatible: false}, nil
+}
+
+func TestCatalogQuotaTargetsPreserveModelProviderAuthSummary(t *testing.T) {
+	repo := profilerepo.NewStore(t.TempDir())
+	catalog := NewCatalog(repo, &fakeAccounts{}, t.TempDir())
+	catalog.SetAuthInspector(modelProviderQuotaCatalogInspector{})
+	if _, err := catalog.Add(context.Background(), profilemodel.AddRequest{Name: "bedrock", Activate: true}); err != nil {
+		t.Fatal(err)
+	}
+	targets, err := catalog.QuotaTargets(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(targets) != 1 || targets[0].Auth != "model-provider:amazon-bedrock" || targets[0].Compatible {
+		t.Fatalf("quota targets = %#v", targets)
+	}
+}
