@@ -40,7 +40,6 @@ func IsExplicitGodexCommand(command string) bool {
 	}
 }
 
-
 type App struct {
 	login      *authusecase.Login
 	importer   *authusecase.ImportCurrent
