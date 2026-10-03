@@ -3,6 +3,7 @@ package codex
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -62,6 +63,42 @@ func TestReadSessionAttachmentFileRejectsInvalidUTF8AndSymlink(t *testing.T) {
 		if _, _, err := readSessionAttachmentFile(link); err == nil || !strings.Contains(strings.ToLower(err.Error()), "symlink") {
 			t.Fatalf("symlink read error = %v", err)
 		}
+	}
+}
+
+func TestReadSessionAttachmentFileSkipsOversizedBeforeOpen(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows does not enforce POSIX permission bits")
+	}
+	path := filepath.Join(t.TempDir(), "oversized-unreadable.jsonl")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Truncate(sessionAttachmentRewriteMaxBytes + 1); err != nil {
+		file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(path, 0o600) })
+	got, ok, err := readSessionAttachmentFile(path)
+	if err != nil || ok || got != "" {
+		t.Fatalf("oversized unreadable file = found:%t content:%q err:%v", ok, got, err)
+	}
+}
+
+func TestReadSessionAttachmentFileRejectsInvalidZstd(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "broken.jsonl.zst")
+	if err := os.WriteFile(path, []byte("not-zstd"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := readSessionAttachmentFile(path); err == nil {
+		t.Fatal("invalid zstd session was accepted")
 	}
 }
 

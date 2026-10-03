@@ -13,14 +13,18 @@ import (
 const sessionAttachmentRewriteMaxBytes int64 = 64 * 1024 * 1024
 
 func readSessionAttachmentFile(path string) (string, bool, error) {
-	file, info, err := openSessionRegularFileNoFollow(path)
+	info, err := inspectSessionRegularFile(path)
+	if err != nil {
+		return "", false, err
+	}
+	if info.Size() > sessionAttachmentRewriteMaxBytes {
+		return "", false, nil
+	}
+	file, err := openSessionRegularFileFromMetadata(path, info)
 	if err != nil {
 		return "", false, err
 	}
 	defer file.Close()
-	if info.Size() > sessionAttachmentRewriteMaxBytes {
-		return "", false, nil
-	}
 
 	var reader io.Reader = file
 	var decoder *zstd.Decoder
