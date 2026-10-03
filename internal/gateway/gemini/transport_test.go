@@ -96,6 +96,10 @@ func TestGeminiModelsAreServedLocallyWithCanonicalMetadata(t *testing.T) {
 	if body.Data[0]["id"] != "auto" || body.Data[0]["display_name"] != "Gemini Auto" {
 		t.Fatalf("Gemini model metadata = %#v", body.Data[0])
 	}
+	aliases, ok := body.Data[1]["aliases"].([]any)
+	if !ok || len(aliases) != 0 {
+		t.Fatalf("Gemini empty aliases wire shape = %#v, want []", body.Data[1]["aliases"])
+	}
 
 	for path, wantID := range map[string]string{
 		mountPath + "/models/gemini-3.5-flash": "gemini-3.5-flash",
@@ -138,9 +142,14 @@ func TestGeminiModelsAreServedLocallyWithCanonicalMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	var paddedModel map[string]any
+	if err := json.NewDecoder(padded.Body).Decode(&paddedModel); err != nil {
+		padded.Body.Close()
+		t.Fatal(err)
+	}
 	padded.Body.Close()
-	if padded.StatusCode != http.StatusNotFound {
-		t.Fatalf("whitespace-padded Gemini model status = %d, want %d", padded.StatusCode, http.StatusNotFound)
+	if padded.StatusCode != http.StatusOK || paddedModel["id"] != "gemini-3.5-flash" {
+		t.Fatalf("whitespace-padded Gemini model = status:%d model:%#v", padded.StatusCode, paddedModel)
 	}
 	unicodeFold, err := transport.Execute(context.Background(), proxymodel.Request{
 		Method: http.MethodGet, Path: mountPath + "/models/gemini-3.5-flaſh",

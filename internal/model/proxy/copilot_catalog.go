@@ -99,7 +99,7 @@ func providerCatalogJSON(entries []ProviderCatalogEntry) []map[string]any {
 			"input_cost_per_million_microusd":  entry.InputCostPerMillionMicrousd,
 			"output_cost_per_million_microusd": entry.OutputCostPerMillionMicrousd,
 			"endpoints":                        append([]string(nil), entry.SupportedEndpoints...),
-			"aliases":                          append([]string(nil), entry.Aliases...),
+			"aliases":                          append([]string{}, entry.Aliases...),
 			"feature_flags":                    cloneAnyMap(entry.FeatureFlags),
 			"pricing_known":                    entry.PricingKnown,
 		})

@@ -3,6 +3,7 @@ package gemini
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
@@ -18,7 +19,7 @@ func modelsResponse(current route) (*proxymodel.Response, error) {
 	if current.kind != routeModel {
 		return nil, errors.New("Gemini model catalog route is invalid")
 	}
-	modelID := current.modelID
+	modelID := strings.TrimSpace(current.modelID)
 	for _, model := range models {
 		id, _ := model["id"].(string)
 		if equalModelID(id, modelID) {
