@@ -55,10 +55,11 @@ func Doctor(ctx context.Context, doctor doctorRunner, out io.Writer, arguments [
 		return err
 	}
 	report, err := doctor.Diagnose(ctx, runtimemodel.DoctorOptions{
-		Runtime:   options.runtime || options.bundle != "",
-		Quota:     options.quota,
-		Install:   options.install,
-		TailBytes: options.tailBytes,
+		Runtime:                  options.runtime || options.bundle != "",
+		Quota:                    options.quota,
+		Install:                  options.install,
+		RepairImportAuthJournals: options.repairImport,
+		TailBytes:                options.tailBytes,
 	})
 	if err != nil {
 		return err
@@ -164,8 +165,6 @@ func validateDoctorOptions(options doctorOptions) error {
 
 func rejectUnsupportedDoctorActions(options doctorOptions) error {
 	switch {
-	case options.repairImport:
-		return errors.New("doctor --repair-import-auth-journals is not available until import lifecycle journal parity is implemented")
 	case options.repairIndex:
 		return errors.New("doctor --repair-session-index is not available until full Codex thread-index repair parity is implemented")
 	case options.suggest:
@@ -212,7 +211,7 @@ func parseDoctorTailBytes(value string) (int, error) {
 }
 
 func doctorPanels(report runtimemodel.DoctorDiagnostics, options doctorOptions) []doctorPanel {
-	if options.install && !options.runtime && !options.quota {
+	if options.install && !options.runtime && !options.quota && !options.repairImport {
 		return []doctorPanel{{title: "Install Checks", fields: doctorCheckFields(report.Install)}}
 	}
 	panels := []doctorPanel{{title: "Doctor", fields: [][2]string{
@@ -220,6 +219,11 @@ func doctorPanels(report runtimemodel.DoctorDiagnostics, options doctorOptions) 
 		{"Codex", report.CodexVersion},
 		{"Accounts", fmt.Sprintf("%d (%d enabled)", report.AccountCount, report.EnabledCount)},
 	}}}
+	if report.ImportAuthJournals != nil {
+		panels[0].fields = append(panels[0].fields, [2]string{
+			"Import auth journals", formatDoctorImportAuthJournals(*report.ImportAuthJournals),
+		})
+	}
 	if options.install {
 		panels = append(panels, doctorPanel{title: "Install Checks", fields: doctorCheckFields(report.Install)})
 	}
@@ -230,6 +234,22 @@ func doctorPanels(report runtimemodel.DoctorDiagnostics, options doctorOptions) 
 		panels = append(panels, doctorQuotaPanel(quota))
 	}
 	return panels
+}
+
+func formatDoctorImportAuthJournals(status runtimemodel.DoctorImportAuthJournals) string {
+	if status.RepairPerformed {
+		if status.OrphanCount == 0 {
+			return fmt.Sprintf("Repaired %d orphan journal(s).", status.Repaired)
+		}
+		return fmt.Sprintf("Repaired %d; %d orphan journal(s) remain.", status.Repaired, status.OrphanCount)
+	}
+	if status.OrphanCount > 0 {
+		return fmt.Sprintf(
+			"Warning: profile-import-auth-journal contains %d orphan journal(s); run `godex doctor --repair-import-auth-journals`.",
+			status.OrphanCount,
+		)
+	}
+	return "None"
 }
 
 func doctorCheckFields(checks []runtimemodel.DoctorCheck) [][2]string {
@@ -310,6 +330,9 @@ type doctorBundleDocument struct {
 	Paths struct {
 		GodexRoot string `json:"godex_root"`
 	} `json:"paths"`
+	Config struct {
+		ImportAuthJournals *runtimemodel.DoctorImportAuthJournals `json:"import_auth_journals,omitempty"`
+	} `json:"config"`
 	State struct {
 		AccountCount  int    `json:"account_count"`
 		EnabledCount  int    `json:"enabled_count"`
@@ -349,6 +372,7 @@ func doctorBundle(report runtimemodel.DoctorDiagnostics) doctorBundleDocument {
 	document.Paths.GodexRoot = report.GodexHome
 	document.State.AccountCount = report.AccountCount
 	document.State.EnabledCount = report.EnabledCount
+	document.Config.ImportAuthJournals = report.ImportAuthJournals
 	document.Runtime = report.Runtime
 	document.Quota = report.Quota
 	document.Install = report.Install
@@ -359,6 +383,6 @@ func doctorBundle(report runtimemodel.DoctorDiagnostics) doctorBundleDocument {
 	return document
 }
 
-const doctorUsage = "usage: godex doctor [--quota] [--runtime] [--install] [--tail-bytes BYTES] [--json] [--bundle [PATH] --redacted]"
+const doctorUsage = "usage: godex doctor [--quota] [--runtime] [--install] [--repair-import-auth-journals] [--tail-bytes BYTES] [--json] [--bundle [PATH] --redacted]"
 
 var _ doctorRunner = (*runtimeusecase.Doctor)(nil)

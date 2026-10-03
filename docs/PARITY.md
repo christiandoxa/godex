@@ -239,9 +239,11 @@ and eligibility validation stays in the runtime use case.
 - The standalone gateway surface, remaining process/resource metrics,
   audit-log backend, and richer runtime-policy diagnostics. Doctor now supports
   install checks, bounded runtime tails, quota summaries, runtime JSON, and
-  redacted private bundles; import-journal repair, full session-index repair, and
-  policy suggestions remain. Existing status/quota/log, doctor panels,
-  redeem-confirmation, human session-list, profile bundle password, and
+  redacted private bundles; `--repair-import-auth-journals` now recovers
+  profile-store auth-replacement journals and reports the tagged orphan/repaired
+  status shape. Full session-index repair and policy suggestions remain. Existing
+  status/quota/log, doctor panels, redeem-confirmation, human session-list, profile
+  bundle password, and
   login/provider-menu TUIs use Bubble Tea. The login menu now mirrors the 0.435.1
   nine-entry ordering/navigation and preserves the reference TTY-only trigger.
   Persisted OpenAI/API-compatible API-key login is implemented end-to-end:
@@ -300,10 +302,13 @@ and eligibility validation stays in the runtime use case.
   remain unchanged.
 - Doctor expansion now covers the observable 0.435.1 diagnostics that have real
   Godex data sources: `--install`, `--runtime`, `--quota`, 128 KiB default bounded
-  `--tail-bytes`, `--runtime --json`, and `--bundle [PATH] --redacted`. Bundle
-  runtime events omit account IDs, quota diagnostics omit identity/email and raw
-  gateway errors, and file output is private/atomic. Unsupported repair/policy
-  actions fail explicitly until their owning subsystems land.
+  `--tail-bytes`, `--runtime --json`, and `--bundle [PATH] --redacted`.
+  `--repair-import-auth-journals` recovers profile-store auth replacements, counts
+  remaining orphan journals without mutating them, and exposes the tagged human,
+  runtime-JSON, and bundle status fields. Account-store imports remain outside this
+  journal path. Bundle runtime events omit account IDs, quota diagnostics omit
+  identity/email and raw gateway errors, and file output is private/atomic. Full
+  session-index repair and runtime-policy suggestions remain unsupported.
 - `update` now matches the standalone Prodex self-update contract: five-minute
   latest-release cache, short GitHub redirect probe, semver/no-downgrade decision,
   exclusive install lock with actual-binary re-probe, embedded installer execution,

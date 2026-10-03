@@ -116,6 +116,7 @@ func run() int {
 	application := cli.New(login, importer, store, runner, doctor, quotaStatus, os.Stdout)
 	application.SetErrorOutput(os.Stderr)
 	profileStore := profilerepo.NewStore(settings.Home)
+	doctor.SetImportJournalRepairer(profileStore)
 	profiles := profileusecase.NewCatalog(profileStore, store, settings.CurrentCodexHome)
 	profiles.SetAuthInspector(process)
 	profiles.SetClaudeSource(claudeSource)

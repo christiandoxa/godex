@@ -41,12 +41,18 @@ type doctorBundleStore interface {
 	Write(string, []byte) (string, error)
 }
 
+type doctorImportJournalRepairer interface {
+	CountImportAuthJournals(context.Context) (int, error)
+	RepairImportAuthJournals(context.Context) (int, error)
+}
+
 type Doctor struct {
 	accounts doctorAccounts
 	codex    versionedCodex
 	activity doctorActivity
 	quota    doctorQuota
 	bundles  doctorBundleStore
+	imports  doctorImportJournalRepairer
 	now      func() time.Time
 }
 
@@ -59,6 +65,10 @@ func (doctor *Doctor) SetActivity(activity doctorActivity) { doctor.activity = a
 func (doctor *Doctor) SetQuota(quota doctorQuota) { doctor.quota = quota }
 
 func (doctor *Doctor) SetBundleStore(store doctorBundleStore) { doctor.bundles = store }
+
+func (doctor *Doctor) SetImportJournalRepairer(repairer doctorImportJournalRepairer) {
+	doctor.imports = repairer
+}
 
 func (doctor *Doctor) SaveBundle(path string, content []byte) (string, error) {
 	if doctor == nil || doctor.bundles == nil {
@@ -100,6 +110,31 @@ func (doctor *Doctor) Run(ctx context.Context) (accountmodel.DoctorReport, error
 }
 
 func (doctor *Doctor) Diagnose(ctx context.Context, options runtimemodel.DoctorOptions) (runtimemodel.DoctorDiagnostics, error) {
+	var importStatus *runtimemodel.DoctorImportAuthJournals
+	if doctor.imports != nil {
+		repaired := 0
+		if options.RepairImportAuthJournals {
+			var err error
+			repaired, err = doctor.imports.RepairImportAuthJournals(ctx)
+			if err != nil {
+				return runtimemodel.DoctorDiagnostics{}, err
+			}
+		}
+		orphanCount, err := doctor.imports.CountImportAuthJournals(ctx)
+		if err != nil {
+			return runtimemodel.DoctorDiagnostics{}, err
+		}
+		status := "ok"
+		if orphanCount > 0 {
+			status = "warning"
+		}
+		importStatus = &runtimemodel.DoctorImportAuthJournals{
+			OrphanCount: orphanCount, RepairPerformed: options.RepairImportAuthJournals,
+			Repaired: repaired, Status: status,
+		}
+	} else if options.RepairImportAuthJournals {
+		return runtimemodel.DoctorDiagnostics{}, fmt.Errorf("profile import journal repair is not configured")
+	}
 	baseline, err := doctor.Run(ctx)
 	if err != nil {
 		return runtimemodel.DoctorDiagnostics{}, err
@@ -108,6 +143,7 @@ func (doctor *Doctor) Diagnose(ctx context.Context, options runtimemodel.DoctorO
 		GeneratedAt: doctor.now().UTC().Format(time.RFC3339),
 		GodexHome:   baseline.GodexHome, CodexVersion: baseline.CodexVersion,
 		AccountCount: baseline.AccountCount, EnabledCount: baseline.EnabledCount,
+		ImportAuthJournals: importStatus,
 	}
 	if options.Install {
 		report.Install = doctorInstallChecks(baseline)

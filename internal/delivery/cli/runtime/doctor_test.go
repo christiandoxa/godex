@@ -87,7 +87,6 @@ func TestDoctorValidatesReferenceFlagRelationships(t *testing.T) {
 
 func TestDoctorRejectsUnimplementedRepairAndPolicyActions(t *testing.T) {
 	for _, arguments := range [][]string{
-		{"--repair-import-auth-journals"},
 		{"--repair-session-index"},
 		{"--runtime", "--suggest-policy"},
 	} {

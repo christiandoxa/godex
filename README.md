@@ -414,11 +414,13 @@ bounded runtime summary/tail, and `--quota` for per-profile quota readiness.
 `doctor --bundle [PATH] --redacted` emits a redacted diagnostic bundle; omitting
 PATH or using `-` writes it to stdout, while file bundles are written privately
 and atomically. `--tail-bytes` defaults to 128 KiB and is capped at 8 MiB.
-Automatic import-lifecycle recovery runs before profile operations. An explicit
-doctor repair surface for those lifecycle journals, full session-index repair,
-and runtime-policy suggestion flags remain separate parity work rather than
-no-op switches. Interactive human doctor panels use Bubble Tea; non-TTY output
-remains line-oriented.
+Automatic import-lifecycle recovery runs before profile operations.
+`doctor --repair-import-auth-journals` recovers an interrupted profile-store auth
+replacement and reports repaired/remaining orphan-journal status in human, runtime
+JSON, and redacted bundle diagnostics. Account-store import updates remain outside
+this journal path. Full session-index repair and runtime-policy suggestions remain
+unsupported. Interactive human doctor panels use Bubble Tea; non-TTY output remains
+line-oriented.
 
 Available profile, account, and runtime commands:
 
@@ -440,7 +442,7 @@ Available profile, account, and runtime commands:
 | godex ping openai [-p NAME] [--model MODEL] [--base-url URL] [--no-proxy] [--json] | Run the Prodex-compatible OpenAI application diagnostic. |
 | godex update | Update the running Godex installation from the latest verified GitHub release. |
 | godex info [--json] [--tokens] | Show profile/runtime/Codex information. |
-| godex doctor [--install] [--runtime] [--quota] [--json] [--bundle [PATH] --redacted] | Inspect install/runtime/quota health or emit a redacted bundle. |
+| godex doctor [--install] [--runtime] [--quota] [--repair-import-auth-journals] [--json] [--bundle [PATH] --redacted] | Inspect health, repair a profile-store auth journal, or emit a redacted bundle. |
 | godex status [--once] [--interval SECONDS] | Show or watch the runtime snapshot. |
 | godex log [stream\|last\|upstream] [--json] | Follow persisted, redacted runtime request events. |
 

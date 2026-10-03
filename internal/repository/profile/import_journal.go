@@ -13,6 +13,7 @@ import (
 
 	profileentity "github.com/christiandoxa/godex/internal/entity/profile"
 	"github.com/christiandoxa/godex/internal/helper/fileutil"
+	"github.com/christiandoxa/godex/internal/helper/lockfile"
 )
 
 const (
@@ -28,6 +29,26 @@ type profileImportAuthJournal struct {
 	CodexHome  string `json:"codex_home"`
 	BackupName string `json:"backup_name"`
 	Phase      string `json:"phase"`
+}
+
+func (store *Store) CountImportAuthJournals(ctx context.Context) (int, error) {
+	if err := store.Prepare(); err != nil {
+		return 0, err
+	}
+	release, err := lockfile.Acquire(ctx, store.lockPath())
+	if err != nil {
+		return 0, err
+	}
+	defer release()
+	_, err = os.Lstat(store.importAuthJournalPath())
+	switch {
+	case err == nil:
+		return 1, nil
+	case errors.Is(err, os.ErrNotExist):
+		return 0, nil
+	default:
+		return 0, fmt.Errorf("inspect profile import auth journal: %w", err)
+	}
 }
 
 func (store *Store) RepairImportAuthJournals(ctx context.Context) (int, error) {
