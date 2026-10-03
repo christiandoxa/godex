@@ -120,8 +120,7 @@ func (store *Store) ReplaceAuth(ctx context.Context, name string, authJSON []byt
 		if index < 0 {
 			return fmt.Errorf(profileDoesNotExistFormat, name)
 		}
-		_, err = fileutil.AtomicWrite(filepath.Join(state.Profiles[index].CodexHome, profileAuthFileName), authJSON)
-		return err
+		return store.replaceImportedAuthLocked(state.Profiles[index], authJSON)
 	})
 }
 

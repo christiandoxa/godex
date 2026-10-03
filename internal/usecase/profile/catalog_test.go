@@ -28,6 +28,11 @@ func (fake *fakeAccounts) Current(context.Context) (accountentity.Account, error
 	}
 	return accountentity.Account{}, errors.New("no active account")
 }
+func (fake *fakeAccounts) ActiveID(context.Context) (string, error) { return fake.current, nil }
+func (fake *fakeAccounts) ClearActive(context.Context) error {
+	fake.current = ""
+	return nil
+}
 func (fake *fakeAccounts) SetActive(_ context.Context, selector string) (accountentity.Account, error) {
 	for _, value := range fake.values {
 		if value.Name == selector {
@@ -54,6 +59,15 @@ func (fake *fakeAccounts) ReplaceImportedAuth(_ context.Context, selector string
 		}
 	}
 	return errors.New("not found")
+}
+func (fake *fakeAccounts) PrepareImportedAuthRollback(context.Context, string, string) error {
+	return nil
+}
+func (fake *fakeAccounts) RestoreImportedAuthRollback(context.Context, string, string) error {
+	return nil
+}
+func (fake *fakeAccounts) CleanupImportedAuthRollback(context.Context, string, string) error {
+	return nil
 }
 
 func (fake *fakeAccounts) CodexHome(id string) string {

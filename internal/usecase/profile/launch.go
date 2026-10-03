@@ -11,18 +11,18 @@ import (
 )
 
 func (catalog *Catalog) ActiveStandalone(ctx context.Context) (profileentity.Profile, bool, error) {
-	hasActive, err := catalog.profiles.HasActive(ctx)
-	if err != nil {
-		return profileentity.Profile{}, false, err
-	}
-	if !hasActive {
-		return profileentity.Profile{}, false, nil
-	}
-	current, err := catalog.profiles.Current(ctx)
-	if err != nil {
-		return profileentity.Profile{}, false, err
-	}
-	return current, true, nil
+	var current profileentity.Profile
+	active := false
+	err := catalog.withBundleImportLock(ctx, func() error {
+		hasActive, err := catalog.profiles.HasActive(ctx)
+		if err != nil || !hasActive {
+			return err
+		}
+		current, err = catalog.profiles.Current(ctx)
+		active = err == nil
+		return err
+	})
+	return current, active, err
 }
 
 func (catalog *Catalog) ResolveLaunch(ctx context.Context, name string) (profilemodel.LaunchTarget, error) {

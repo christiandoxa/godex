@@ -297,6 +297,9 @@ func TestGeminiBundleImportRejectsInvalidSecretsWithoutCreatingProfiles(t *testi
 			if err != nil || len(profiles) != 0 {
 				t.Fatalf("profiles after rejected import = %d, err=%v", len(profiles), err)
 			}
+			if journals, err := repo.BundleImportJournals(); err != nil || len(journals) != 0 {
+				t.Fatalf("import journals after rejected import = %d, err=%v", len(journals), err)
+			}
 		})
 	}
 }

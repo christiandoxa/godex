@@ -156,10 +156,17 @@ func (store *Store) snapshot(ctx context.Context) (stateFile, error) {
 		return stateFile{}, err
 	}
 	defer release()
+	if _, err := store.recoverImportAuthJournalLocked(); err != nil {
+		return stateFile{}, err
+	}
 	return store.readState()
 }
 
 func (store *Store) withLock(ctx context.Context, operation func() error) error {
+	return store.withLockRecovering(ctx, func(int) error { return operation() })
+}
+
+func (store *Store) withLockRecovering(ctx context.Context, operation func(int) error) error {
 	if err := store.Prepare(); err != nil {
 		return err
 	}
@@ -168,7 +175,11 @@ func (store *Store) withLock(ctx context.Context, operation func() error) error 
 		return err
 	}
 	defer release()
-	return operation()
+	recovered, err := store.recoverImportAuthJournalLocked()
+	if err != nil {
+		return err
+	}
+	return operation(recovered)
 }
 
 func (store *Store) profilesRoot() string { return filepath.Join(store.root, "profiles") }

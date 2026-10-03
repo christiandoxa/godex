@@ -70,7 +70,7 @@ is not required for isolated-profile correctness.
 | Capability | Godex implementation and observable coverage |
 | --- | --- |
 | Isolated ChatGPT accounts | Official Codex interactive/device login, per-account homes, identity deduplication, deterministic and unambiguous selectors. Account/auth tests cover registration and selection. |
-| Safe profile lifecycle | Repeat login/import replaces credentials while retaining native state. Metadata-only journals recover interrupted operations; owned OS locks and shared profile leases exclude concurrent credential mutation/removal. Account repository tests cover recovery, leases, and unsafe paths. |
+| Safe profile lifecycle | Repeat login/import replaces credentials while retaining native state. Metadata-only single-auth and multi-profile lifecycle journals recover interrupted operations, infer a fully persisted commit before cleanup, or roll partial actions back in reverse while restoring profile/account selection. Owned OS locks and shared profile leases exclude concurrent credential mutation/removal. |
 | Account retention and native auth | Enable/disable retains the home. Managed status/logout bypass quota/rotation; logout uses an exclusive lease. Unsafe mutating auth passthrough is rejected with managed-command guidance. |
 | Session discovery and launch | Bounded metadata catalog, list/current filters, text/JSON/ID/resume-command output, unique prefixes, and bare UUID resume. Native resume/fork, including nested exec forms and root options, resolve the rollout home; local deletion/archive stays local. Delivery/session/runtime tests cover argument preservation and selector conflicts. |
 | Quota and fresh selection | One-shot compact/detailed usage windows, single-profile raw JSON, reset timestamps, fail-open probe uncertainty, deterministic bounded selection, and temporary exhaustion deadlines. Explicit selectors remain fixed. Quota/runtime tests cover exhaustion, uncertainty, and reset eligibility. |
@@ -272,9 +272,11 @@ and eligibility validation stays in the runtime use case.
   email. Built-in Copilot import is implemented with commented-config parsing,
   config/keytar/libsecret/SDK credential fallback, bounded user-info enrichment,
   trimmed host+config-login identity matching, Prodex-compatible naming, and
-  tokenless profile persistence. Process-crash lifecycle-journal recovery for
-  multi-profile imports also remains
-  to match Prodex exactly. OpenAI plain/encrypted bundle wire formats, Bubble Tea
+  tokenless profile persistence. Multi-profile bundle imports now use a private,
+  credential-free lifecycle journal with crash recovery across create/update
+  actions, account-backed auth replacements, active-selection restoration, orphan
+  staging cleanup, and committed-state inference when the final phase marker was
+  not persisted. OpenAI plain/encrypted bundle wire formats, Bubble Tea
   protection/password prompts, and identity-safe runtime rollback are implemented.
 - HTTP/SSE model transport is explicit; Godex does not implement Prodex's
   WebSocket/Realtime forwarding. Unexpected upgrades fail before upstream work.

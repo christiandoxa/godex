@@ -72,6 +72,10 @@ func assertProfileBundleWorkflow(t *testing.T, password string) {
 	if err != nil || string(auth) != "auth-work" {
 		t.Fatalf("imported auth = %q, err = %v", auth, err)
 	}
+	files, err := os.ReadDir(current.Profile.CodexHome)
+	if err != nil || len(files) != 1 || files[0].Name() != "auth.json" {
+		t.Fatalf("committed import lifecycle marker remains: files=%v err=%v", files, err)
+	}
 }
 
 func privateTempDir(t *testing.T) string {
@@ -112,6 +116,13 @@ func TestProfileBundleImportUpdatesOnlyVerifiedIdentity(t *testing.T) {
 	if err != nil || string(auth) != "auth-new" {
 		t.Fatalf("updated auth = %q, err = %v", auth, err)
 	}
+	if journals, err := repo.BundleImportJournals(); err != nil || len(journals) != 0 {
+		t.Fatalf("committed import journals = %+v, err=%v", journals, err)
+	}
+	files, err := os.ReadDir(added.Profile.CodexHome)
+	if err != nil || len(files) != 1 || files[0].Name() != "auth.json" {
+		t.Fatalf("committed import backups remain: files=%v err=%v", files, err)
+	}
 
 	writeBundleFixture(t, repo, path, "work", "auth-other")
 	if _, err := catalog.Import(context.Background(), profilemodel.ImportRequest{Path: path}); err == nil {
@@ -120,6 +131,21 @@ func TestProfileBundleImportUpdatesOnlyVerifiedIdentity(t *testing.T) {
 	auth, err = repo.ReadAuthJSON(added.Profile.CodexHome)
 	if err != nil || string(auth) != "auth-new" {
 		t.Fatalf("mismatch changed auth = %q, err = %v", auth, err)
+	}
+}
+
+func TestProfileBundleImportRejectsDuplicateResolvedTargets(t *testing.T) {
+	catalog := NewCatalog(profilerepo.NewStore(t.TempDir()), &fakeAccounts{}, t.TempDir())
+	catalog.SetAuthInspector(bundleInspector{identities: map[string]accountentity.Identity{
+		"auth-one": {Email: bundleTestEmail, ChatGPTAccountID: "workspace-1"},
+		"auth-two": {Email: bundleTestEmail, ChatGPTAccountID: "workspace-1"},
+	}})
+	_, err := catalog.planImport(context.Background(), profilemodel.BundlePayload{Profiles: []profilemodel.ExportedProfile{
+		{Name: "first", Provider: profilemodel.ProviderSnapshot{Kind: "openai"}, AuthJSON: "auth-one"},
+		{Name: "second", Provider: profilemodel.ProviderSnapshot{Kind: "openai"}, AuthJSON: "auth-two"},
+	}})
+	if err == nil || err.Error() != `profile export entries resolve to duplicate target "first"` {
+		t.Fatalf("duplicate target error = %v", err)
 	}
 }
 
@@ -250,7 +276,7 @@ func TestAnthropicBundleUpdateRollsBackWhenLaterProfileFails(t *testing.T) {
 		newSecret:        {Provider: profilemodel.ProviderSnapshot{Kind: "anthropic", Account: &account, AuthMethod: &method}, Email: account},
 		newProfileSecret: {Provider: profilemodel.ProviderSnapshot{Kind: "anthropic", Account: &newAccount, AuthMethod: &method}, Email: newAccount},
 	}}
-	repo := profilerepo.NewStore(t.TempDir())
+	repo := &failingBundleImportRepository{Store: profilerepo.NewStore(t.TempDir()), failName: "new-profile"}
 	catalog := NewCatalog(repo, &fakeAccounts{}, t.TempDir())
 	catalog.SetClaudeSource(inspector)
 	original := profileentity.Profile{
@@ -260,14 +286,6 @@ func TestAnthropicBundleUpdateRollsBackWhenLaterProfileFails(t *testing.T) {
 	if err := repo.ImportProvider(context.Background(), original, map[string]string{claudeCredentialFile: oldSecret}, true); err != nil {
 		t.Fatal(err)
 	}
-	orphan := repo.ManagedHome("new-profile")
-	if err := os.MkdirAll(orphan, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(orphan, "occupied"), []byte("fixture"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
 	bundleDir := privateTempDir(t)
 	path := filepath.Join(bundleDir, "rollback.json")
 	payload := profilemodel.BundlePayload{
@@ -327,4 +345,21 @@ func TestAnthropicBundleRejectsMissingUnexpectedOrInvalidSecret(t *testing.T) {
 			t.Fatalf("secret files %#v unexpectedly accepted", files)
 		}
 	}
+}
+
+type failingBundleImportRepository struct {
+	*profilerepo.Store
+	failName string
+}
+
+func (repo *failingBundleImportRepository) ImportBundleProfile(
+	ctx context.Context,
+	value profileentity.Profile,
+	files map[string][]byte,
+	id string,
+) error {
+	if value.Name == repo.failName {
+		return errors.New("injected provider import failure")
+	}
+	return repo.Store.ImportBundleProfile(ctx, value, files, id)
 }

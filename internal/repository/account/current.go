@@ -25,3 +25,23 @@ func (store *FileStore) Current(ctx context.Context) (entity.Account, error) {
 	}
 	return entity.Account{}, errors.New("active account metadata is inconsistent")
 }
+
+func (store *FileStore) ActiveID(ctx context.Context) (string, error) {
+	state, err := store.readSnapshot(ctx)
+	if err != nil {
+		return "", err
+	}
+	return state.ActiveAccountID, nil
+}
+
+func (store *FileStore) ClearActive(ctx context.Context) error {
+	return store.withLock(ctx, func() error {
+		state, err := store.readState()
+		if err != nil {
+			return err
+		}
+		state.ActiveAccountID = ""
+		_, err = store.writeState(state)
+		return err
+	})
+}

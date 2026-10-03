@@ -143,6 +143,7 @@ whether each optional secret existed before replacement. Copilot bundle handling
 uses the same provider-metadata path with no provider secret files: host/login/API
 and plan metadata are persisted in Godex, while the actual Copilot token remains
 owned by the external Copilot config/keychain boundary. `gateway/copilot` owns
+
 built-in Copilot discovery and is the only layer allowed to touch `config.json`,
 keytar/libsecret/SDK credential fallbacks, or the authenticated user-info request;
 it returns only tokenless provider metadata to `usecase/profile`.
@@ -153,6 +154,18 @@ owns launch-model/config precedence and converts the exact 0.435.1 Copilot catal
 snapshots plus account `/models` metadata into Codex `model_catalog_json`. This
 keeps provider HTTP/auth mechanics out of delivery and keeps filesystem policy
 out of the gateway.
+
+Multi-profile bundle mutation coordination remains in `usecase/profile`, while
+`repository/profile` and `repository/account` own durable journal/backup bytes.
+The lifecycle journal contains only target metadata, before/after provider
+snapshots, active-selection identifiers, and SHA-256 credential digests; secret
+contents stay in private rollback files under the owning managed home. Before
+profile reads or mutations, the use case serializes recovery under the lifecycle
+lock. An `applying` journal is finalized only when every persisted profile/account
+action, expected credential digest, owned promoted home, and active selection
+matches the recorded after-state; otherwise actions roll back in reverse order.
+This mirrors Prodex's crash window around final state persistence without making
+delivery or doctor presentation responsible for transaction semantics.
 
 
 Copilot model fallback stays inside `gateway/copilot`, before a response returns

@@ -122,6 +122,14 @@ protected export/import passwords are entered through a masked Bubble Tea prompt
 when the matching `PRODEX_PROFILE_*_PASSWORD` environment variable is unset.
 Non-TTY workflows remain fail-closed and require explicit flags/environment.
 
+Bundle imports use a private metadata-only lifecycle journal plus per-target
+rollback backups. Profile operations recover interrupted imports before reading
+or mutating profile state: a fully persisted after-state is finalized and cleaned
+up, while a partial transaction rolls back actions in reverse order and restores
+the previous standalone/account selections. Credential contents never enter the
+lifecycle journal. If neither the existing state nor the source bundle selects an
+active profile, importing a new profile keeps the active selection empty.
+
 `godex profile import claude` imports an existing Claude Code OAuth credential
 from `CLAUDE_CONFIG_DIR` or `~/.claude/.credentials.json`. The source is read as
 a bounded regular file, symlinked roots/files are rejected, and the managed copy
@@ -406,9 +414,11 @@ bounded runtime summary/tail, and `--quota` for per-profile quota readiness.
 `doctor --bundle [PATH] --redacted` emits a redacted diagnostic bundle; omitting
 PATH or using `-` writes it to stdout, while file bundles are written privately
 and atomically. `--tail-bytes` defaults to 128 KiB and is capped at 8 MiB.
-Repair-import-journal, full session-index repair, and runtime-policy suggestion
-flags remain explicit parity gaps rather than no-op switches. Interactive human
-doctor panels use Bubble Tea; non-TTY output remains line-oriented.
+Automatic import-lifecycle recovery runs before profile operations. An explicit
+doctor repair surface for those lifecycle journals, full session-index repair,
+and runtime-policy suggestion flags remain separate parity work rather than
+no-op switches. Interactive human doctor panels use Bubble Tea; non-TTY output
+remains line-oriented.
 
 Available profile, account, and runtime commands:
 

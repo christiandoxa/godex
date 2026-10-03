@@ -5,9 +5,43 @@ import (
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 )
+
+func TestImportedAuthRollbackRestoresPrivateProfileBackup(t *testing.T) {
+	store := newTestStore(t)
+	account := commitTestAccount(t, store, "import-target", "import@example.test", "chatgpt-import-target")
+	home := store.CodexHome(account.ID)
+	authPath := filepath.Join(home, authFileName)
+	if err := os.WriteFile(authPath, []byte(`{"access_token":"previous"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	const journalID = "0123456789abcdef0123456789abcdef"
+	if err := store.PrepareImportedAuthRollback(t.Context(), account.ID, journalID); err != nil {
+		t.Fatal(err)
+	}
+	backupPath := filepath.Join(home, importedAuthRollbackDir+journalID, authFileName)
+	if info, err := os.Stat(backupPath); err != nil || (info.Mode().Perm()&0o077 != 0 && runtime.GOOS != "windows") {
+		t.Fatalf("auth backup is missing or not private: info=%v err=%v", info, err)
+	}
+	if err := store.ReplaceImportedAuth(t.Context(), account.ID, []byte(`{"access_token":"next"}`)); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RestoreImportedAuthRollback(t.Context(), account.ID, journalID); err != nil {
+		t.Fatal(err)
+	}
+	if content, err := os.ReadFile(authPath); err != nil || string(content) != `{"access_token":"previous"}` {
+		t.Fatalf("restored auth = %q, err=%v", content, err)
+	}
+	if err := store.CleanupImportedAuthRollback(t.Context(), account.ID, journalID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(filepath.Dir(backupPath)); !os.IsNotExist(err) {
+		t.Fatalf("account rollback backup remains: %v", err)
+	}
+}
 
 func TestCrashRecoveryRestoresRemovalBeforeStateCommit(t *testing.T) {
 	store := newTestStore(t)

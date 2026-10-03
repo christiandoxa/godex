@@ -40,11 +40,15 @@ func (catalog *Catalog) Import(ctx context.Context, request profilemodel.ImportR
 	if err != nil {
 		return profilemodel.ImportResult{}, err
 	}
-	plan, err := catalog.planImport(ctx, payload)
-	if err != nil {
-		return profilemodel.ImportResult{}, err
-	}
-	result, err := catalog.applyImport(ctx, plan)
+	var result profilemodel.ImportResult
+	err = catalog.withBundleImportLock(ctx, func() error {
+		plan, err := catalog.planImport(ctx, payload)
+		if err != nil {
+			return err
+		}
+		result, err = catalog.applyImport(ctx, plan)
+		return err
+	})
 	if err != nil {
 		return profilemodel.ImportResult{}, err
 	}
@@ -54,17 +58,22 @@ func (catalog *Catalog) Import(ctx context.Context, request profilemodel.ImportR
 }
 
 func (catalog *Catalog) planImport(ctx context.Context, payload profilemodel.BundlePayload) (importPlan, error) {
-	listed, err := catalog.List(ctx)
+	listed, err := catalog.list(ctx)
 	if err != nil {
 		return importPlan{}, err
 	}
 	existingByName, identityTargets, keepActive := catalog.indexImportTargets(ctx, listed)
 	plan := importPlan{resolvedNames: make(map[string]string, len(payload.Profiles)), keepActive: keepActive}
+	resolvedTargets := make(map[string]bool, len(payload.Profiles))
 	for _, source := range payload.Profiles {
 		action, err := catalog.planImportedProfile(ctx, source, existingByName, identityTargets)
 		if err != nil {
 			return importPlan{}, err
 		}
+		if resolvedTargets[action.target.Profile.Name] {
+			return importPlan{}, fmt.Errorf("profile export entries resolve to duplicate target %q", action.target.Profile.Name)
+		}
+		resolvedTargets[action.target.Profile.Name] = true
 		plan.actions = append(plan.actions, action)
 		plan.resolvedNames[source.Name] = action.target.Profile.Name
 		if action.identityKey != "" {

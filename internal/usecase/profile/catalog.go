@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"sort"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
 	profileentity "github.com/christiandoxa/godex/internal/entity/profile"
@@ -27,6 +26,7 @@ type repository interface {
 	Acquire(context.Context, string) (func() error, error)
 	ReadAuthJSON(string) ([]byte, error)
 	ImportOpenAI(context.Context, profileentity.Profile, []byte, bool) error
+	ImportBundleProfile(context.Context, profileentity.Profile, map[string][]byte, string) error
 	ReplaceAuth(context.Context, string, []byte) error
 	LoginOpenAIAPIKey(context.Context, profileentity.Profile, []byte, *string, bool, bool) (profileentity.Profile, bool, error)
 	ReadOpenAICompatibleBaseURL(string) (string, bool, error)
@@ -39,14 +39,30 @@ type repository interface {
 	ReadProviderSecret(string, string) (string, error)
 	ReadOptionalProviderSecret(string, string) (string, bool, error)
 	RestoreProvider(context.Context, string, string, profileentity.Provider, map[string]*string) error
+	AcquireBundleImportLock(context.Context) (func() error, error)
+	WriteBundleImportJournal(profilemodel.ImportLifecycleJournal) error
+	BundleImportJournals() ([]profilemodel.ImportLifecycleJournal, error)
+	RemoveBundleImportJournal(string) error
+	PrepareBundleImportRollback(context.Context, string, string, []string) error
+	RestoreBundleImportRollback(context.Context, string, string, profilemodel.ImportLifecycleProfile) error
+	CleanupBundleImportRollback(context.Context, string, string) error
+	RemoveBundleImportedProfile(context.Context, profilemodel.ImportLifecycleAction, string) error
+	CleanupBundleImportOwnerMarker(context.Context, string, string) error
+	CheckBundleImportHomeAvailable(context.Context, string) error
+	CleanupOrphanedImportStagingHomes(context.Context) error
 }
 
 type accountStore interface {
 	List(context.Context) ([]accountentity.Account, error)
 	Current(context.Context) (accountentity.Account, error)
+	ActiveID(context.Context) (string, error)
 	SetActive(context.Context, string) (accountentity.Account, error)
+	ClearActive(context.Context) error
 	RemoveProfile(context.Context, string, bool) (accountentity.Account, error)
 	ReplaceImportedAuth(context.Context, string, []byte) error
+	PrepareImportedAuthRollback(context.Context, string, string) error
+	RestoreImportedAuthRollback(context.Context, string, string) error
+	CleanupImportedAuthRollback(context.Context, string, string) error
 	CodexHome(string) string
 }
 
@@ -114,54 +130,6 @@ func (catalog *Catalog) SetAuthInspector(inspector authInspector) {
 	}
 }
 
-func (catalog *Catalog) List(ctx context.Context) ([]Report, error) {
-	stored, err := catalog.profiles.List(ctx)
-	if err != nil {
-		return nil, err
-	}
-	accounts, err := catalog.accounts.List(ctx)
-	if err != nil {
-		return nil, err
-	}
-	activeName := catalog.activeName(ctx)
-	byName := make(map[string]Report, len(stored)+len(accounts))
-	for _, current := range accounts {
-		profile := accountProfile(current, catalog.accounts.CodexHome(current.ID))
-		byName[profile.Name] = Report{Profile: profile, Active: profile.Name == activeName, Enabled: current.Enabled, AccountID: current.ID}
-	}
-	for _, current := range stored {
-		if _, exists := byName[current.Name]; exists {
-			return nil, fmt.Errorf("profile %q conflicts with a managed account", current.Name)
-		}
-		byName[current.Name] = Report{Profile: current, Active: current.Name == activeName, Enabled: true}
-	}
-	result := make([]Report, 0, len(byName))
-	for _, current := range byName {
-		result = append(result, current)
-	}
-	sort.Slice(result, func(i, j int) bool { return result[i].Profile.Name < result[j].Profile.Name })
-	return result, nil
-}
-
-func (catalog *Catalog) Current(ctx context.Context) (Report, error) {
-	hasActive, err := catalog.profiles.HasActive(ctx)
-	if err != nil {
-		return Report{}, err
-	}
-	if hasActive {
-		current, err := catalog.profiles.Current(ctx)
-		if err != nil {
-			return Report{}, err
-		}
-		return Report{Profile: current, Active: true, Enabled: true}, nil
-	}
-	account, err := catalog.accounts.Current(ctx)
-	if err != nil {
-		return Report{}, errors.New("no active profile")
-	}
-	return Report{Profile: accountProfile(account, catalog.accounts.CodexHome(account.ID)), Active: true, Enabled: account.Enabled, AccountID: account.ID}, nil
-}
-
 func (catalog *Catalog) Add(ctx context.Context, request profilemodel.AddRequest) (Report, error) {
 	if err := profileentity.ValidateName(request.Name); err != nil {
 		return Report{}, err
@@ -189,36 +157,6 @@ func (catalog *Catalog) Add(ctx context.Context, request profilemodel.AddRequest
 		return Report{}, err
 	}
 	return Report{Profile: value, Active: activate, Enabled: true}, nil
-}
-
-func (catalog *Catalog) Use(ctx context.Context, name string) (Report, error) {
-	if current, err := catalog.profiles.Resolve(ctx, name); err == nil {
-		selected, setErr := catalog.profiles.SetActive(ctx, current.Name)
-		return Report{Profile: selected, Active: setErr == nil, Enabled: true}, setErr
-	}
-	accounts, err := catalog.accounts.List(ctx)
-	if err != nil {
-		return Report{}, err
-	}
-	for _, account := range accounts {
-		if account.Name != name {
-			continue
-		}
-		previous, previousErr := catalog.profiles.Current(ctx)
-		if err := catalog.profiles.ClearActive(ctx); err != nil {
-			return Report{}, err
-		}
-		selected, err := catalog.accounts.SetActive(ctx, account.Name)
-		if err != nil {
-			if previousErr == nil {
-				_, _ = catalog.profiles.SetActive(ctx, previous.Name)
-			}
-			return Report{}, err
-		}
-		profile := accountProfile(selected, catalog.accounts.CodexHome(selected.ID))
-		return Report{Profile: profile, Active: true, Enabled: selected.Enabled, AccountID: selected.ID}, nil
-	}
-	return Report{}, fmt.Errorf(profileNotFoundFormat, name)
 }
 
 func (catalog *Catalog) Remove(ctx context.Context, request profilemodel.RemoveRequest) ([]Report, error) {
@@ -337,25 +275,6 @@ func (catalog *Catalog) ensureNameAvailable(ctx context.Context, name string) er
 		}
 	}
 	return nil
-}
-
-func (catalog *Catalog) activeName(ctx context.Context) string {
-	if hasActive, err := catalog.profiles.HasActive(ctx); err == nil && hasActive {
-		if current, currentErr := catalog.profiles.Current(ctx); currentErr == nil {
-			return current.Name
-		}
-	}
-	if account, err := catalog.accounts.Current(ctx); err == nil {
-		return account.Name
-	}
-	return ""
-}
-
-func accountProfile(account accountentity.Account, home string) profileentity.Profile {
-	return profileentity.Profile{
-		Name: account.Name, CodexHome: home, Managed: true, Email: account.Email,
-		Provider: profileentity.Provider{Kind: profileentity.ProviderOpenAI},
-	}
 }
 
 func removalTargets(listed []Report, request profilemodel.RemoveRequest) ([]Report, error) {
