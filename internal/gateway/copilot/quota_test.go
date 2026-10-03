@@ -1,9 +1,12 @@
 package copilot
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -87,6 +90,39 @@ func TestCopilotProfileQuotaResolvesExactAccountAndNeverReturnsCredential(t *tes
 	}
 }
 
+func TestCopilotProfileQuotaRawUsesProdexFourMiBBound(t *testing.T) {
+	const credential = "fixture-token"
+	padding := strings.Repeat("x", (1<<20)+1024)
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		_, _ = writer.Write([]byte(`{"login":"raw-login","padding":"` + padding + `"}`))
+	}))
+	defer server.Close()
+
+	configDir := t.TempDir()
+	writeCopilotConfig(t, configDir, map[string]any{
+		configLastUserField:    map[string]any{"host": server.URL, configLoginField: "config-login"},
+		configLoggedUsersField: []any{map[string]any{"host": server.URL, configLoginField: "config-login"}},
+		configTokensField:      map[string]any{server.URL + ":config-login": credential},
+	})
+	source := NewSource(server.Client())
+	source.getenv = func(key string) string {
+		if key == testCopilotHomeEnv {
+			return configDir
+		}
+		return ""
+	}
+	host, login := server.URL, "config-login"
+	body, err := source.FetchQuotaRaw(context.Background(), profilemodel.QuotaTarget{
+		Provider: "copilot", ProviderConfig: profilemodel.ProviderSnapshot{Kind: "copilot", Host: &host, Login: &login},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(body) <= 1<<20 || !bytes.Contains(body, []byte(`"login":"raw-login"`)) {
+		t.Fatalf("raw Copilot body size/content = %d", len(body))
+	}
+}
+
 func TestCopilotProfileQuotaRequiresHostAndLogin(t *testing.T) {
 	source := NewSource(nil)
 	for _, target := range []profilemodel.QuotaTarget{
@@ -116,5 +152,115 @@ func TestCopilotQuotaResetMatchesProdexSummaryAndLocalEpoch(t *testing.T) {
 	}
 	if summary, epoch := copilotQuotaReset(nil); summary != "" || epoch != nil {
 		t.Fatalf("nil reset = %q / %#v", summary, epoch)
+	}
+}
+
+func TestCopilotProfileQuotaRawPreservesUserInfoJSONValue(t *testing.T) {
+	const credential = "fixture-token"
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Header.Get("Authorization") != "Bearer "+credential {
+			t.Errorf("authorization = %q", request.Header.Get("Authorization"))
+		}
+		_, _ = writer.Write([]byte(`{"login":"raw-login","copilot_plan":"pro","unknown":{"big":9007199254740993}}`))
+	}))
+	defer server.Close()
+
+	configDir := t.TempDir()
+	writeCopilotConfig(t, configDir, map[string]any{
+		configLastUserField:    map[string]any{"host": server.URL, configLoginField: "config-login"},
+		configLoggedUsersField: []any{map[string]any{"host": server.URL, configLoginField: "config-login"}},
+		configTokensField:      map[string]any{server.URL + ":config-login": credential},
+	})
+	source := NewSource(server.Client())
+	source.getenv = func(key string) string {
+		if key == testCopilotHomeEnv {
+			return configDir
+		}
+		return ""
+	}
+	host, login := server.URL, "config-login"
+	body, err := source.FetchQuotaRaw(context.Background(), profilemodel.QuotaTarget{
+		Provider: "copilot", ProviderConfig: profilemodel.ProviderSnapshot{Kind: "copilot", Host: &host, Login: &login},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var value map[string]any
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.UseNumber()
+	if err := decoder.Decode(&value); err != nil {
+		t.Fatal(err)
+	}
+	if value["login"] != "raw-login" || value["unknown"].(map[string]any)["big"].(json.Number).String() != "9007199254740993" {
+		t.Fatalf("raw Copilot user info = %#v", value)
+	}
+	if strings.Contains(string(body), credential) {
+		t.Fatal("raw Copilot quota leaked credential")
+	}
+}
+
+func TestCopilotProfileQuotaRawDoesNotHTMLEscapeJSONValues(t *testing.T) {
+	const credential = "fixture-token"
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		_, _ = writer.Write([]byte(`{"login":"<raw>&user"}`))
+	}))
+	defer server.Close()
+	configDir := t.TempDir()
+	writeCopilotConfig(t, configDir, map[string]any{
+		configLastUserField:    map[string]any{"host": server.URL, configLoginField: "config-login"},
+		configLoggedUsersField: []any{map[string]any{"host": server.URL, configLoginField: "config-login"}},
+		configTokensField:      map[string]any{server.URL + ":config-login": credential},
+	})
+	source := NewSource(server.Client())
+	source.getenv = func(key string) string {
+		if key == testCopilotHomeEnv {
+			return configDir
+		}
+		return ""
+	}
+	host, login := server.URL, "config-login"
+	body, err := source.FetchQuotaRaw(context.Background(), profilemodel.QuotaTarget{
+		Provider: "copilot", ProviderConfig: profilemodel.ProviderSnapshot{Kind: "copilot", Host: &host, Login: &login},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(body) != `{"login":"<raw>&user"}` {
+		t.Fatalf("raw Copilot HTML escaping = %s", body)
+	}
+}
+
+func TestCopilotProfileQuotaRawMatchesProdexUserAgentAndHTTPErrorDetail(t *testing.T) {
+	const credential = "fixture-token"
+	var userAgent string
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		userAgent = request.Header.Get("User-Agent")
+		writer.WriteHeader(http.StatusForbidden)
+		_, _ = writer.Write([]byte(`{"message":"denied","code":403}`))
+	}))
+	defer server.Close()
+	configDir := t.TempDir()
+	writeCopilotConfig(t, configDir, map[string]any{
+		configLastUserField:    map[string]any{"host": server.URL, configLoginField: "config-login"},
+		configLoggedUsersField: []any{map[string]any{"host": server.URL, configLoginField: "config-login"}},
+		configTokensField:      map[string]any{server.URL + ":config-login": credential},
+	})
+	source := NewSource(server.Client())
+	source.getenv = func(key string) string {
+		if key == testCopilotHomeEnv {
+			return configDir
+		}
+		return ""
+	}
+	host, login := server.URL, "config-login"
+	_, err := source.FetchQuotaRaw(context.Background(), profilemodel.QuotaTarget{
+		Provider: "copilot", ProviderConfig: profilemodel.ProviderSnapshot{Kind: "copilot", Host: &host, Login: &login},
+	})
+	if userAgent != "prodex/0.435.1" {
+		t.Fatalf("User-Agent = %q", userAgent)
+	}
+	if err == nil || !strings.Contains(err.Error(), "Copilot account query failed (HTTP 403) at "+server.URL+"/copilot_internal/user") ||
+		!strings.Contains(err.Error(), "\n  \"code\": 403") || !strings.Contains(err.Error(), "\n  \"message\": \"denied\"") {
+		t.Fatalf("Copilot raw HTTP error = %v", err)
 	}
 }

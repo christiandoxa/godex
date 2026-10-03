@@ -501,8 +501,12 @@ first row exactly like Prodex. Managed Copilot profiles now expose the 0.435.1
 user-quota view through the existing exact-account token resolver: login,
 plan/access, chat/completions remaining versus monthly totals, blocked/readiness,
 monthly reset date, and minimum remaining percentage are derived without storing
-Copilot tokens in Godex. Profile-backed Gemini and custom-provider quota adapters
-remain separate parity work.
+Copilot tokens in Godex. `quota --raw PROFILE` now follows the 0.435.1
+provider-specific path: Copilot returns the bounded user-info JSON, Anthropic/Kiro/AGY
+return external quota JSON, and legacy Gemini OAuth returns the disabled/migration
+guidance before network access. OpenAI profiles configured with a non-OpenAI
+`model_provider` use the `model-provider:<id>` auth label, are non-quota-compatible,
+and expose the configured-provider snapshot/raw JSON instead of probing OpenAI.
 
 `godex redeem PROFILE` performs the same explicit two-step manual flow as Prodex:
 it checks current usage first, asks for confirmation when the nearest 5-hour or

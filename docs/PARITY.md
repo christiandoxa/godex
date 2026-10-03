@@ -371,8 +371,13 @@ and eligibility validation stays in the runtime use case.
   policy: exact host/login token resolution, plan/access precedence,
   chat/completions remaining and monthly totals, blocked/readiness semantics,
   monthly reset summary, and minimum remaining percentage are implemented without
-  persisting the token. Profile-backed Gemini/custom-provider quota adapters
-  remain gaps. Manual `redeem PROFILE` now matches the usage
+  persisting the token. Profile-backed raw quota now follows the tagged provider
+  dispatch: Copilot returns the bounded original user-info JSON, Anthropic/Kiro/AGY
+  serialize their external snapshot, and legacy Gemini OAuth fails before network
+  access with the 0.435.1 migration guidance. OpenAI profiles whose `config.toml`
+  selects a non-OpenAI `model_provider` report `model-provider:<id>` as auth, are
+  non-quota-compatible, and expose the tagged configured-provider snapshot/raw JSON.
+  Manual `redeem PROFILE` now matches the usage
   preflight, one-hour
   reset confirmation guard, idempotent consume endpoint, base-URL override, and
   no-proxy controls. Runtime `--auto-redeem` now matches the managed OpenAI
@@ -384,7 +389,6 @@ and eligibility validation stays in the runtime use case.
   hard-affinity owner preservation are implemented. Failed/missing quota probes,
   non-quota failures, and non-OpenAI providers never spend a credit. WebSocket
   auto-redeem remains absent with the wider WebSocket/Realtime transport.
-  Profile-specific Gemini/custom-provider quota adapters remain 1:1 gaps.
 - Godex reloads Codex-owned auth on an authentication retry; it does not implement
   OAuth/token refresh, aggressive history rewrites, or silent model relaunch.
 - Native tools, models, approval/sandbox behavior, foreground command servers,

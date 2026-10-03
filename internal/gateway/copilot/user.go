@@ -1,6 +1,7 @@
 package copilot
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -12,7 +13,7 @@ import (
 	"time"
 )
 
-const userInfoMaxBytes = 1 << 20
+const userInfoMaxBytes = 4 << 20
 const invalidCopilotHost = "invalid Copilot host"
 
 type userInfo struct {
@@ -44,38 +45,95 @@ func defaultHTTPClient() *http.Client {
 }
 
 func (source *Source) fetchUserInfo(ctx context.Context, host, token string) (userInfo, error) {
-	origin, err := copilotUserAPIOrigin(host)
+	body, err := source.fetchUserInfoBody(ctx, host, token)
 	if err != nil {
 		return userInfo{}, err
-	}
-	target := strings.TrimRight(origin, "/") + "/copilot_internal/user"
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
-	if err != nil {
-		return userInfo{}, fmt.Errorf("create Copilot account request: %w", err)
-	}
-	request.Header.Set("Authorization", "Bearer "+token)
-	request.Header.Set("Accept", "application/json")
-	request.Header.Set("User-Agent", "godex")
-	response, err := source.client.Do(request)
-	if err != nil {
-		if ctx.Err() != nil {
-			return userInfo{}, ctx.Err()
-		}
-		return userInfo{}, errors.New("failed to query Copilot account")
-	}
-	defer response.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(response.Body, userInfoMaxBytes+1))
-	if err != nil || len(body) > userInfoMaxBytes {
-		return userInfo{}, errors.New("failed to read Copilot account response")
-	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return userInfo{}, fmt.Errorf("Copilot account query failed (HTTP %d)", response.StatusCode)
 	}
 	var info userInfo
 	if err := json.Unmarshal(body, &info); err != nil {
 		return userInfo{}, errors.New("failed to parse Copilot account response")
 	}
 	return info, nil
+}
+
+func (source *Source) fetchUserInfoJSON(ctx context.Context, host, token string) ([]byte, error) {
+	body, err := source.fetchUserInfoBody(ctx, host, token)
+	if err != nil {
+		return nil, err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.UseNumber()
+	var value any
+	if err := decoder.Decode(&value); err != nil {
+		return nil, errors.New("failed to parse Copilot account response")
+	}
+	if decoder.Decode(new(any)) != io.EOF {
+		return nil, errors.New("failed to parse Copilot account response")
+	}
+	var output bytes.Buffer
+	encoder := json.NewEncoder(&output)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(value); err != nil {
+		return nil, errors.New("failed to serialize Copilot account response")
+	}
+	return bytes.TrimSuffix(output.Bytes(), []byte{'\n'}), nil
+}
+
+func (source *Source) fetchUserInfoBody(ctx context.Context, host, token string) ([]byte, error) {
+	origin, err := copilotUserAPIOrigin(host)
+	if err != nil {
+		return nil, err
+	}
+	target := strings.TrimRight(origin, "/") + "/copilot_internal/user"
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create Copilot account request: %w", err)
+	}
+	request.Header.Set("Authorization", "Bearer "+token)
+	request.Header.Set("Accept", "application/json")
+	request.Header.Set("User-Agent", "prodex/0.435.1")
+	response, err := source.client.Do(request)
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return nil, fmt.Errorf("failed to query %s: %w", target, err)
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(response.Body, userInfoMaxBytes+1))
+	if err != nil {
+		return nil, fmt.Errorf("failed to read %s: %w", target, err)
+	}
+	if len(body) > userInfoMaxBytes {
+		return nil, fmt.Errorf("failed to read %s: response body exceeds safe size limit (%d bytes)", target, userInfoMaxBytes)
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		bodyText := formatCopilotResponseBody(body)
+		if bodyText == "" {
+			return nil, fmt.Errorf("Copilot account query failed (HTTP %d) at %s", response.StatusCode, target)
+		}
+		return nil, fmt.Errorf("Copilot account query failed (HTTP %d) at %s: %s", response.StatusCode, target, bodyText)
+	}
+	return body, nil
+}
+
+func formatCopilotResponseBody(body []byte) string {
+	if len(body) == 0 {
+		return ""
+	}
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.UseNumber()
+	var value any
+	if err := decoder.Decode(&value); err == nil && decoder.Decode(new(any)) == io.EOF {
+		var output bytes.Buffer
+		encoder := json.NewEncoder(&output)
+		encoder.SetEscapeHTML(false)
+		encoder.SetIndent("", "  ")
+		if err := encoder.Encode(value); err == nil {
+			return strings.TrimSpace(output.String())
+		}
+	}
+	return strings.TrimSpace(strings.ToValidUTF8(string(body), "�"))
 }
 
 func copilotUserAPIOrigin(host string) (string, error) {

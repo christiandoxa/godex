@@ -33,6 +33,28 @@ func (source *Source) FetchQuota(ctx context.Context, target profilemodel.QuotaT
 	return copilotQuotaExternal(info, login), nil
 }
 
+func (source *Source) FetchQuotaRaw(ctx context.Context, target profilemodel.QuotaTarget) ([]byte, error) {
+	host := quotaSnapshotString(target.ProviderConfig.Host)
+	login := quotaSnapshotString(target.ProviderConfig.Login)
+	if host == "" || login == "" {
+		return nil, errors.New("Copilot quota requires profile host/login metadata")
+	}
+	config, err := source.readConfig()
+	if err != nil {
+		return nil, err
+	}
+	token, err := source.resolveToken(ctx, config, configUser{Host: host, Login: login})
+	if err != nil {
+		return nil, err
+	}
+	body, err := source.fetchUserInfoJSON(ctx, host, token)
+	token = "<redacted>"
+	if err != nil {
+		return nil, err
+	}
+	return body, nil
+}
+
 func copilotQuotaExternal(info userInfo, fallbackLogin string) quotamodel.ExternalInfo {
 	account := quotaSnapshotString(info.Login)
 	if account == "" {

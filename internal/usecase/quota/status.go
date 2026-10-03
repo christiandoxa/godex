@@ -42,6 +42,10 @@ type externalProfileGateway interface {
 	FetchQuota(context.Context, profilemodel.QuotaTarget) (quotamodel.ExternalInfo, error)
 }
 
+type rawExternalProfileGateway interface {
+	FetchQuotaRaw(context.Context, profilemodel.QuotaTarget) ([]byte, error)
+}
+
 type modelProviderInspector interface {
 	InspectModelProvider(context.Context, string) (*profilemodel.ModelProviderSetting, error)
 }
@@ -111,7 +115,21 @@ func (status *Status) Raw(ctx context.Context, selector, baseURL string) ([]byte
 		if inspected.modelProvider != nil {
 			return codexModelProviderQuotaJSON(*inspected.modelProvider)
 		}
-		if target.Provider != "openai" || !target.Compatible {
+		if target.Provider != "openai" {
+			gateway := status.externalProvider(target.Provider)
+			if gateway == nil {
+				return nil, errors.New("raw quota is not supported for this profile provider")
+			}
+			if raw, ok := gateway.(rawExternalProfileGateway); ok {
+				return raw.FetchQuotaRaw(ctx, target)
+			}
+			info, err := gateway.FetchQuota(ctx, target)
+			if err != nil {
+				return nil, err
+			}
+			return marshalExternalQuotaJSON(info)
+		}
+		if !target.Compatible {
 			return nil, errors.New("raw quota requires a quota-compatible OpenAI profile")
 		}
 		return status.fetchRaw(ctx, target.CodexHome, baseURL)

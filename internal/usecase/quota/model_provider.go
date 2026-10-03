@@ -2,7 +2,6 @@ package quota
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -53,16 +52,7 @@ func codexModelProviderQuota(setting profilemodel.ModelProviderSetting) *quotamo
 }
 
 func codexModelProviderQuotaJSON(setting profilemodel.ModelProviderSetting) ([]byte, error) {
-	info := codexModelProviderQuota(setting)
-	details := make([]map[string]string, 0, len(info.Details))
-	for _, detail := range info.Details {
-		details = append(details, map[string]string{"label": detail.Label, "value": detail.Value})
-	}
-	return json.Marshal(map[string]any{
-		"provider": info.Provider, "account": info.Account, "plan": info.Plan,
-		"status": info.Status, "main": info.Main, "reset": nil,
-		"available": nil, "details": details,
-	})
+	return marshalExternalQuotaJSON(*codexModelProviderQuota(setting))
 }
 
 func profileProviderFilterMatches(filter string, inspected inspectedProfileQuotaTarget) bool {
