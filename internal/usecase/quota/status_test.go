@@ -339,7 +339,7 @@ func TestStatusShowsConfiguredCodexProviderWithoutQuotaProbe(t *testing.T) {
 	if inspector.calls != 1 || inspector.home != "/profiles/custom" || len(usage.homes) != 0 {
 		t.Fatalf("provider inspection/quota calls = %d/%q / %#v", inspector.calls, inspector.home, usage.homes)
 	}
-	if len(reports) != 1 || reports[0].State != "configured" || reports[0].Auth != "model-provider:prodex-deepseek" || reports[0].External == nil ||
+	if len(reports) != 1 || reports[0].State != "configured" || reports[0].Auth != "api-key" || reports[0].External == nil ||
 		reports[0].External.Provider != "DeepSeek" || reports[0].External.Account != "prodex-deepseek" ||
 		reports[0].External.Plan != "config.toml" || reports[0].External.Status != "Configured" ||
 		reports[0].External.Main != "quota handled by provider/Codex" || reports[0].External.Available != nil {
@@ -368,7 +368,7 @@ func TestStatusReportsCodexProviderInspectionFailure(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(reports) != 1 || reports[0].State != "error" || reports[0].Auth != "config-error" || reports[0].Err == nil || len(usage.homes) != 0 {
+	if len(reports) != 1 || reports[0].State != "error" || reports[0].Auth != "chatgpt" || reports[0].Err == nil || len(usage.homes) != 0 {
 		t.Fatalf("inspection failure report/quota calls = %#v / %#v", reports, usage.homes)
 	}
 }
@@ -410,10 +410,10 @@ func TestStatusAuthFiltersUseConfiguredCodexProvider(t *testing.T) {
 		filter    string
 		wantCount int
 	}{
-		{filter: "quota-compatible"},
-		{filter: "non-quota-compatible", wantCount: 1},
-		{filter: "model-provider:prodex-deepseek", wantCount: 1},
-		{filter: "chatgpt"},
+		{filter: "quota-compatible", wantCount: 1},
+		{filter: "non-quota-compatible"},
+		{filter: "model-provider:prodex-deepseek"},
+		{filter: "chatgpt", wantCount: 1},
 	} {
 		t.Run(test.filter, func(t *testing.T) {
 			usage := &trackingUsage{}

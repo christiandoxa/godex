@@ -22,14 +22,8 @@ func (status *Status) inspectProfileQuotaTarget(ctx context.Context, target prof
 		return inspected
 	}
 	inspected.modelProvider, inspected.modelProviderErr = status.modelProvider.InspectModelProvider(ctx, target.CodexHome)
-	switch {
-	case inspected.modelProviderErr != nil:
+	if inspected.modelProviderErr != nil {
 		inspected.modelProvider = nil
-		inspected.target.Auth = "config-error"
-		inspected.target.Compatible = false
-	case inspected.modelProvider != nil:
-		inspected.target.Auth = "model-provider:" + inspected.modelProvider.ProviderID
-		inspected.target.Compatible = false
 	}
 	return inspected
 }
