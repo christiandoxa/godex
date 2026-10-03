@@ -5,6 +5,11 @@ type QuotaAuthSummary struct {
 	Compatible bool
 }
 
+type ModelProviderSetting struct {
+	ProviderID string
+	Source     string
+}
+
 type QuotaTarget struct {
 	Name           string
 	CodexHome      string

@@ -34,3 +34,23 @@ func TestCanonicalProviderCatalogsMatchProdex04351(t *testing.T) {
 		t.Fatalf("retired Copilot static model remained: %#v", entry)
 	}
 }
+
+func TestGeminiProviderCatalogMatchesProdex04351(t *testing.T) {
+	gemini, err := GeminiProviderCatalog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(gemini) != 22 {
+		t.Fatalf("Gemini catalog count = %d", len(gemini))
+	}
+	if entry := ResolveProviderCatalogEntry(gemini, " DEFAULT "); entry == nil || entry.ID != "auto" || entry.ContextWindowTokens == nil || *entry.ContextWindowTokens != 1_048_576 {
+		t.Fatalf("Gemini alias lookup = %#v", entry)
+	}
+	models, err := GeminiModelsAPI()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(models) != len(gemini) || models[0]["id"] != "auto" || models[len(models)-1]["id"] != "gemma-4-26b-a4b-it" {
+		t.Fatalf("Gemini API models = %#v", models)
+	}
+}

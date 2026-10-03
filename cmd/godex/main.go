@@ -80,6 +80,8 @@ func run() int {
 		return 1
 	}
 	quotaStatus := quotausecase.NewStatus(store, quotaClient)
+	quotaStatus.SetModelProviderInspector(process)
+	quotaStatus.SetExternalProvider("gemini", geminigateway.ProfileQuota{})
 	autoRedeemer := quotausecase.NewAutoRedeemer(quotaClient)
 	virtualQuota := quotagateway.NewVirtual(nil)
 	quotaStatus.SetVirtual(virtualQuota)

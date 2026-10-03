@@ -15,12 +15,13 @@ func (status *Status) runProfiles(ctx context.Context, options Options) ([]quota
 		return nil, err
 	}
 	reports := make([]quotamodel.Report, 0, len(targets))
-	for _, target := range targets {
+	for _, inspected := range targets {
+		target := inspected.target
 		report := quotamodel.Report{
 			ProfileName: target.Name, Provider: target.Provider, Auth: target.Auth,
 			Email: target.Email, Active: target.Active, Enabled: target.Enabled,
 		}
-		status.populateProfileQuota(ctx, &report, target, options.BaseURL)
+		status.populateProfileQuota(ctx, &report, inspected, options.BaseURL)
 		reports = append(reports, report)
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -57,12 +58,13 @@ func virtualQuotaReports(results []quotamodel.VirtualResult) []quotamodel.Report
 	return reports
 }
 
-func (status *Status) populateProfileQuota(ctx context.Context, report *quotamodel.Report, target profilemodel.QuotaTarget, baseURL string) {
+func (status *Status) populateProfileQuota(ctx context.Context, report *quotamodel.Report, inspected inspectedProfileQuotaTarget, baseURL string) {
+	target := inspected.target
 	switch {
 	case !target.Enabled:
 		report.State = "disabled"
 	case target.Provider == "openai":
-		status.populateOpenAIProfileQuota(ctx, report, target, baseURL)
+		status.populateOpenAIProfileQuota(ctx, report, inspected, baseURL)
 	case status.externalProvider(target.Provider) != nil:
 		info, err := status.externalProvider(target.Provider).FetchQuota(ctx, target)
 		report.Err = err
@@ -77,7 +79,18 @@ func (status *Status) populateProfileQuota(ctx context.Context, report *quotamod
 	}
 }
 
-func (status *Status) populateOpenAIProfileQuota(ctx context.Context, report *quotamodel.Report, target profilemodel.QuotaTarget, baseURL string) {
+func (status *Status) populateOpenAIProfileQuota(ctx context.Context, report *quotamodel.Report, inspected inspectedProfileQuotaTarget, baseURL string) {
+	target := inspected.target
+	if inspected.modelProviderErr != nil {
+		report.Err = inspected.modelProviderErr
+		report.State = "error"
+		return
+	}
+	if inspected.modelProvider != nil {
+		report.External = codexModelProviderQuota(*inspected.modelProvider)
+		report.State = "configured"
+		return
+	}
 	if !target.Compatible {
 		report.State = target.Auth
 		return
@@ -93,35 +106,38 @@ func (status *Status) externalProvider(provider string) externalProfileGateway {
 	return status.external[strings.ToLower(strings.TrimSpace(provider))]
 }
 
-func (status *Status) selectedProfiles(ctx context.Context, options Options) ([]profilemodel.QuotaTarget, error) {
+func (status *Status) selectedProfiles(ctx context.Context, options Options) ([]inspectedProfileQuotaTarget, error) {
 	targets, err := status.profiles.QuotaTargets(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if options.All {
-		return filterQuotaTargets(targets, options), nil
-	}
-	if options.Selector != "" {
+	if !options.All {
 		for _, target := range targets {
-			if target.Name == options.Selector {
-				return []profilemodel.QuotaTarget{target}, nil
+			if (options.Selector != "" && target.Name == options.Selector) || (options.Selector == "" && target.Active) {
+				return []inspectedProfileQuotaTarget{status.inspectProfileQuotaTarget(ctx, target)}, nil
 			}
 		}
-		return nil, errors.New("quota profile does not exist")
+		if options.Selector != "" {
+			return nil, errors.New("quota profile does not exist")
+		}
+		return nil, errors.New("no active profile")
 	}
+
+	inspected := make([]inspectedProfileQuotaTarget, 0, len(targets))
 	for _, target := range targets {
-		if target.Active {
-			return []profilemodel.QuotaTarget{target}, nil
+		inspected = append(inspected, status.inspectProfileQuotaTarget(ctx, target))
+		if err := ctx.Err(); err != nil {
+			return nil, err
 		}
 	}
-	return nil, errors.New("no active profile")
+	return filterQuotaTargets(inspected, options), nil
 }
 
-func filterQuotaTargets(targets []profilemodel.QuotaTarget, options Options) []profilemodel.QuotaTarget {
-	filtered := make([]profilemodel.QuotaTarget, 0, len(targets))
-	for _, target := range targets {
-		if providerFilterMatches(options.ProviderFilter, target.Provider) && authFilterMatches(options.AuthFilter, target) {
-			filtered = append(filtered, target)
+func filterQuotaTargets(targets []inspectedProfileQuotaTarget, options Options) []inspectedProfileQuotaTarget {
+	filtered := make([]inspectedProfileQuotaTarget, 0, len(targets))
+	for _, inspected := range targets {
+		if profileProviderFilterMatches(options.ProviderFilter, inspected) && authFilterMatches(options.AuthFilter, inspected.target) {
+			filtered = append(filtered, inspected)
 		}
 	}
 	return filtered

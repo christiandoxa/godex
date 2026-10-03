@@ -63,6 +63,128 @@ func TestGeminiRouteRejectsModelPathSegments(t *testing.T) {
 	}
 }
 
+func TestGeminiModelsAreServedLocallyWithCanonicalMetadata(t *testing.T) {
+	upstreamCalls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		upstreamCalls++
+		http.Error(writer, "unexpected upstream request", http.StatusBadGateway)
+	}))
+	defer server.Close()
+	transport, err := NewRuntimeTransport(server.URL, "fixture-key", server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer transport.Close()
+
+	list, err := transport.Execute(context.Background(), proxymodel.Request{
+		Method: http.MethodGet, Path: mountPath + "/v1/models",
+	}, proxymodel.Account{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer list.Body.Close()
+	var body struct {
+		Object string           `json:"object"`
+		Data   []map[string]any `json:"data"`
+	}
+	if err := json.NewDecoder(list.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if list.StatusCode != http.StatusOK || body.Object != "list" || len(body.Data) != 22 || list.Header.Get("Content-Type") != "application/json; charset=utf-8" {
+		t.Fatalf("Gemini model list = status:%d header:%q body:%#v", list.StatusCode, list.Header.Get("Content-Type"), body)
+	}
+	if body.Data[0]["id"] != "auto" || body.Data[0]["display_name"] != "Gemini Auto" {
+		t.Fatalf("Gemini model metadata = %#v", body.Data[0])
+	}
+
+	for path, wantID := range map[string]string{
+		mountPath + "/models/gemini-3.5-flash": "gemini-3.5-flash",
+		mountPath + "/models/default":          "auto",
+		mountPath + "/models/GEMINI-3.5-FLASH": "gemini-3.5-flash",
+	} {
+		response, err := transport.Execute(context.Background(), proxymodel.Request{Method: http.MethodGet, Path: path}, proxymodel.Account{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var model map[string]any
+		if err := json.NewDecoder(response.Body).Decode(&model); err != nil {
+			response.Body.Close()
+			t.Fatal(err)
+		}
+		response.Body.Close()
+		if response.StatusCode != http.StatusOK || model["id"] != wantID {
+			t.Errorf("GET %s = status:%d model:%#v; want %q", path, response.StatusCode, model, wantID)
+		}
+	}
+
+	missing, err := transport.Execute(context.Background(), proxymodel.Request{
+		Method: http.MethodGet, Path: mountPath + "/models/not-a-gemini-model",
+	}, proxymodel.Account{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer missing.Body.Close()
+	var notFound map[string]any
+	if err := json.NewDecoder(missing.Body).Decode(&notFound); err != nil {
+		t.Fatal(err)
+	}
+	errorBody, ok := notFound["error"].(map[string]any)
+	if missing.StatusCode != http.StatusNotFound || !ok || errorBody["code"] != "model_not_found" {
+		t.Fatalf("missing Gemini model = status:%d body:%#v", missing.StatusCode, notFound)
+	}
+	padded, err := transport.Execute(context.Background(), proxymodel.Request{
+		Method: http.MethodGet, Path: mountPath + "/models/ gemini-3.5-flash ",
+	}, proxymodel.Account{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	padded.Body.Close()
+	if padded.StatusCode != http.StatusNotFound {
+		t.Fatalf("whitespace-padded Gemini model status = %d, want %d", padded.StatusCode, http.StatusNotFound)
+	}
+	unicodeFold, err := transport.Execute(context.Background(), proxymodel.Request{
+		Method: http.MethodGet, Path: mountPath + "/models/gemini-3.5-flaſh",
+	}, proxymodel.Account{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unicodeFold.Body.Close()
+	if unicodeFold.StatusCode != http.StatusNotFound {
+		t.Fatalf("non-ASCII model case fold status = %d, want %d", unicodeFold.StatusCode, http.StatusNotFound)
+	}
+	if upstreamCalls != 0 {
+		t.Fatalf("local Gemini model requests reached upstream %d times", upstreamCalls)
+	}
+}
+
+func TestGeminiNonGetModelsRequestPassesThrough(t *testing.T) {
+	captured := false
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		captured = true
+		if request.Method != http.MethodPost || request.URL.Path != "/v1beta/openai/models" {
+			t.Errorf("upstream model request = %s %s", request.Method, request.URL.Path)
+		}
+		_, _ = io.WriteString(writer, "upstream")
+	}))
+	defer server.Close()
+	transport, err := NewRuntimeTransport(server.URL+"/v1beta", "fixture-key", server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer transport.Close()
+	response, err := transport.Execute(context.Background(), proxymodel.Request{
+		Method: http.MethodPost, Path: mountPath + "/models", Body: []byte(`{"probe":true}`),
+	}, proxymodel.Account{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(response.Body)
+	if err != nil || string(body) != "upstream" || !captured {
+		t.Fatalf("non-GET model response = %q, captured=%t, err=%v", body, captured, err)
+	}
+}
+
 func TestGeminiResponsesUsesRequestedModelAndBearerAuth(t *testing.T) {
 	type captured struct {
 		path  string

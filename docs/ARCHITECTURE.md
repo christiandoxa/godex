@@ -242,8 +242,10 @@ fallback; transport errors and invalid summaries go directly to that fallback.
 and Chat response conversion, while Gemini-specific reasoning, metadata, tool
 shapes, and thought signatures stay in the Gemini gateway. Native Messages and
 Embeddings requests retain their paths and use `x-goog-api-key`; Responses and
-Chat use the OpenAI-compatible endpoint with Bearer auth. Model catalog
-emulation remains a later Gemini parity stage.
+Chat use the OpenAI-compatible endpoint with Bearer <redacted> The canonical
+Gemini model catalog lives in `model/proxy`; `gateway/gemini` serves tagged GET
+Models list/single requests locally and leaves non-GET requests on the upstream
+route.
 
 ### Quota gateway and preflight
 
@@ -267,6 +269,13 @@ request-scoped and has no background daemon. The profile use case supplies a
 credential-free quota target catalog so aggregate `--auth`/`--provider`
 filtering can include standalone and non-OpenAI profiles without turning them
 into account identities.
+
+For profile-backed quota, `usecase/quota` consumes a narrow Codex
+model-provider inspector. `gateway/codex` reads bounded profile-local
+`config.toml` data and reports a configured non-OpenAI provider before any
+OpenAI usage request is attempted. `gateway/gemini` implements the tagged
+disabled-OAuth quota surface for legacy Gemini profiles; it returns migration
+guidance without credential or network access.
 
 `gateway/quota` owns virtual providers that do not correspond to managed
 profiles. DeepSeek resolves the plural/single API-key environment policy and

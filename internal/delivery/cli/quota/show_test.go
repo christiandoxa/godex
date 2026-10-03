@@ -296,6 +296,30 @@ func TestQuotaAllTUIFiltersAndRefreshesLikeProdex(t *testing.T) {
 	}
 }
 
+func TestQuotaAllTUIExplicitFiltersKeepCustomCodexProviders(t *testing.T) {
+	for _, test := range []struct {
+		filter string
+		name   string
+		info   quotamodel.ExternalInfo
+	}{
+		{filter: "deepseek", name: "DeepSeek", info: quotamodel.ExternalInfo{Provider: "DeepSeek", Account: "prodex-deepseek"}},
+		{filter: "local", name: "Local", info: quotamodel.ExternalInfo{Provider: "Local OpenAI-compatible", Account: "prodex-local"}},
+	} {
+		t.Run(test.filter, func(t *testing.T) {
+			report := quotamodel.Report{ProfileName: test.name, Provider: "openai", External: &test.info, State: "configured"}
+			status := &fakeStatus{reports: []quotamodel.Report{report}}
+			model := newQuotaTUIModel(context.Background(), status, showOptions{
+				Options: quotausecase.Options{All: true, ProviderFilter: test.filter},
+			})
+			updated, _ := model.Update(quotaSnapshotMsg{reports: status.reports})
+			model = updated.(quotaTUIModel)
+			if reports := model.sortedReports(); len(reports) != 1 || reports[0].ProfileName != test.name {
+				t.Fatalf("provider %q filtered reports = %#v", test.filter, reports)
+			}
+		})
+	}
+}
+
 func quotaAllTUITestStatus() *fakeStatus {
 	resetSoon, resetLater := int64(100), int64(200)
 	usedReady, usedBlocked := int64(20), int64(100)

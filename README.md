@@ -253,9 +253,13 @@ semantic summarization and returns the bounded local fallback when that fails.
 For Responses, only structured Gemini quota/rate 429s advance the model chain;
 other 429 responses retain their original status and body.
 Messages and Embeddings pass through to their requested paths. Raw API keys stay
-in the invocation-local gateway. Gemini's Models route still uses the upstream
-catalog; local catalog emulation, OAuth-backed runtime, and provider-specific
-quota support remain incomplete.
+in the invocation-local gateway. GET Models list/single requests use the exact
+Prodex 0.435.1 Gemini catalog locally; unknown models return the tagged 404 and
+non-GET Models requests pass upstream. OAuth runtime remains disabled. Legacy
+Gemini OAuth profile quota returns the tagged migration guidance without reading
+credentials or making a network request. OpenAI profiles whose Codex
+`config.toml` selects a non-OpenAI `model_provider` report that configured
+provider instead of probing OpenAI quota.
 
 Launch the native Antigravity CLI with `godex s gemini --cli agy` (or
 `godex super gemini --cli agy`; `godex run --provider gemini --cli agy` remains

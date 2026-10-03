@@ -42,6 +42,10 @@ type externalProfileGateway interface {
 	FetchQuota(context.Context, profilemodel.QuotaTarget) (quotamodel.ExternalInfo, error)
 }
 
+type modelProviderInspector interface {
+	InspectModelProvider(context.Context, string) (*profilemodel.ModelProviderSetting, error)
+}
+
 type virtualGateway interface {
 	Collect(context.Context, string, string) []quotamodel.VirtualResult
 }
@@ -55,12 +59,13 @@ type Options struct {
 }
 
 type Status struct {
-	accounts accountStore
-	profiles profileSource
-	usage    usageGateway
-	virtual  virtualGateway
-	external map[string]externalProfileGateway
-	now      func() time.Time
+	accounts      accountStore
+	profiles      profileSource
+	usage         usageGateway
+	virtual       virtualGateway
+	external      map[string]externalProfileGateway
+	modelProvider modelProviderInspector
+	now           func() time.Time
 }
 
 func NewStatus(accounts accountStore, usage usageGateway) *Status {
@@ -85,6 +90,10 @@ func (status *Status) SetExternalProvider(provider string, gateway externalProfi
 	status.external[provider] = gateway
 }
 
+func (status *Status) SetModelProviderInspector(inspector modelProviderInspector) {
+	status.modelProvider = inspector
+}
+
 func (status *Status) DoctorReports(ctx context.Context) ([]quotamodel.Report, error) {
 	return status.Run(ctx, Options{All: true})
 }
@@ -94,6 +103,13 @@ func (status *Status) Raw(ctx context.Context, selector, baseURL string) ([]byte
 		target, err := status.selectedProfile(ctx, selector)
 		if err != nil {
 			return nil, err
+		}
+		inspected := status.inspectProfileQuotaTarget(ctx, target)
+		if inspected.modelProviderErr != nil {
+			return nil, inspected.modelProviderErr
+		}
+		if inspected.modelProvider != nil {
+			return codexModelProviderQuotaJSON(*inspected.modelProvider)
 		}
 		if target.Provider != "openai" || !target.Compatible {
 			return nil, errors.New("raw quota requires a quota-compatible OpenAI profile")

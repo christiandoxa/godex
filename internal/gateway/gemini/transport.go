@@ -44,6 +44,9 @@ func (transport *RuntimeTransport) Execute(ctx context.Context, input proxymodel
 	if err != nil {
 		return nil, err
 	}
+	if (current.kind == routeModels || current.kind == routeModel) && strings.EqualFold(input.Method, http.MethodGet) {
+		return modelsResponse(current)
+	}
 	switch current.kind {
 	case routeCompact:
 		return transport.executeCompact(ctx, input)

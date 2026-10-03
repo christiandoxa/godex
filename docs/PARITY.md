@@ -143,9 +143,15 @@ and eligibility validation stays in the runtime use case.
   quota/rate 429s advance the model chain; other 429 responses preserve their
   original status and body. Chat Completions uses the OpenAI-compatible
   endpoint; Messages and Embeddings pass through with Gemini API-key headers.
-  The Models route still proxies upstream instead of serving Prodex's local
-  catalog. Gemini OAuth/profile login and provider-specific quota handling remain
-  parity gaps. Native Antigravity launch and global login now use
+  GET Models list/single requests serve the exact Prodex 0.435.1 Gemini catalog
+  locally, including tagged alias/case matching and model-not-found 404 behavior;
+  non-GET Models requests still pass upstream. Gemini OAuth runtime/login remains
+  disabled as in the tag. Legacy Gemini OAuth profile quota returns the exact
+  disabled-auth guidance without credential reads or network access. OpenAI
+  profiles with a non-OpenAI Codex `model_provider` expose the tagged configured
+  provider/auth metadata and skip OpenAI quota probing. Gemini OAuth bundle
+  migration remains a separate parity gap. Native Antigravity launch and global
+  login now use
   `PRODEX_AGY_BIN` (default `agy`) with the shared Codex home and tagged child
   arguments/environment. Native launch skips profile startup and update lookup,
   prepares the shared home during dry-run without spawning `agy`, rejects resume

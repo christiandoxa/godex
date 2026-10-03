@@ -129,6 +129,18 @@ func (filter quotaProviderFilter) matches(report quotamodel.Report) bool {
 	if strings.EqualFold(strings.TrimSpace(report.Provider), filter.label()) {
 		return true
 	}
+	if info := report.External; info != nil {
+		switch filter {
+		case quotaProviderDeepSeek:
+			if strings.EqualFold(info.Provider, "DeepSeek") || strings.EqualFold(info.Account, "prodex-deepseek") {
+				return true
+			}
+		case quotaProviderLocal:
+			if strings.EqualFold(info.Provider, "Local OpenAI-compatible") || strings.EqualFold(info.Account, "prodex-local") {
+				return true
+			}
+		}
+	}
 	auth := report.Auth
 	switch filter {
 	case quotaProviderOpenAI:
