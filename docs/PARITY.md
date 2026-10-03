@@ -308,8 +308,10 @@ and eligibility validation stays in the runtime use case.
   runtime-JSON, and bundle status fields. Account-store imports remain outside this
   journal path. External provider quota diagnostics now use the tagged `Quota`,
   `Main`, and optional `Reset` human fields plus the nested `{profile, provider,
-  quota}` JSON shape; OpenAI window rendering remains separate parity work. Bundle
-  runtime events omit account IDs, quota diagnostics omit identity/email and raw
+  quota}` JSON shape. OpenAI diagnostics now derive ready/blocked state from tagged
+  admission + 5h/weekly window semantics, preserve missing-vs-empty rate-limit
+  shape, and emit the same nested success/error JSON without leaking raw errors.
+  Bundle runtime events omit account IDs, quota diagnostics omit identity/email and raw
   gateway errors, and file output is private/atomic. Full session-index repair and
   runtime-policy suggestions remain unsupported.
 - `update` now matches the standalone Prodex self-update contract: five-minute

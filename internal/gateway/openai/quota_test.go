@@ -168,3 +168,20 @@ func TestDecodeQuotaUsageLeavesMissingResetCreditsUnknown(t *testing.T) {
 		t.Fatalf("missing reset credits became %#v", usage.ResetCredits)
 	}
 }
+
+func TestDecodeQuotaUsagePreservesRateLimitPresence(t *testing.T) {
+	missing, err := decodeQuotaUsage([]byte(`{}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if missing.RateLimitPresent {
+		t.Fatalf("missing rate_limit marked present: %+v", missing)
+	}
+	empty, err := decodeQuotaUsage([]byte(`{"rate_limit":{}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !empty.RateLimitPresent {
+		t.Fatalf("empty rate_limit object lost presence: %+v", empty)
+	}
+}

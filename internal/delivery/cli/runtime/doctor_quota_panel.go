@@ -9,6 +9,17 @@ func doctorQuotaPanel(quota runtimemodel.DoctorQuota) doctorPanel {
 		{"Provider", valueOrDash(quota.Provider)},
 		{"Auth", valueOrDash(quota.Auth)},
 	}
+	if quota.Error != "" {
+		fields = append(fields, [2]string{"Quota", quota.Error})
+		return doctorPanel{title: "Profile " + quota.Profile, fields: fields}
+	}
+	if quota.OpenAI != nil {
+		fields = append(fields,
+			[2]string{"Quota", quota.OpenAI.HumanStatus},
+			[2]string{"Main", quota.OpenAI.Main},
+		)
+		return doctorPanel{title: "Profile " + quota.Profile, fields: fields}
+	}
 	if quota.External != nil {
 		fields = append(fields,
 			[2]string{"Quota", quota.External.Status},

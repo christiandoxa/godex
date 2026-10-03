@@ -70,7 +70,8 @@ func decodeQuotaUsage(body []byte) (quotamodel.Usage, error) {
 		plan = raw.PlanTypeCamel
 	}
 	usage := quotamodel.Usage{
-		PlanType: plan, Allowed: pair.Allowed, LimitReached: pair.LimitReached,
+		PlanType: plan, RateLimitPresent: len(pairRaw) > 0,
+		Allowed: pair.Allowed, LimitReached: pair.LimitReached,
 		Primary: pair.Primary, Secondary: pair.Secondary,
 	}
 	if credits := firstResetCredits(raw.ResetCredits, raw.ResetCreditsCamel); credits != nil {

@@ -46,6 +46,8 @@ type DoctorQuota struct {
 	Auth     string               `json:"auth"`
 	State    string               `json:"state"`
 	External *DoctorExternalQuota `json:"-"`
+	OpenAI   *DoctorOpenAIQuota   `json:"-"`
+	Error    string               `json:"-"`
 	Plan     string               `json:"plan,omitempty"`
 	FiveHour string               `json:"five_hour,omitempty"`
 	Weekly   string               `json:"weekly,omitempty"`
@@ -59,7 +61,33 @@ type DoctorExternalQuota struct {
 	Reset  string
 }
 
+type DoctorOpenAIQuota struct {
+	Status      string
+	HumanStatus string
+	Main        string
+}
+
 func (quota DoctorQuota) MarshalJSON() ([]byte, error) {
+	if quota.Error != "" {
+		return json.Marshal(struct {
+			Profile  string         `json:"profile"`
+			Provider string         `json:"provider"`
+			Quota    map[string]any `json:"quota"`
+		}{
+			Profile: quota.Profile, Provider: quota.Provider,
+			Quota: map[string]any{"error": quota.Error},
+		})
+	}
+	if quota.OpenAI != nil {
+		return json.Marshal(struct {
+			Profile  string         `json:"profile"`
+			Provider string         `json:"provider"`
+			Quota    map[string]any `json:"quota"`
+		}{
+			Profile: quota.Profile, Provider: quota.Provider,
+			Quota: map[string]any{"status": quota.OpenAI.Status, "main": quota.OpenAI.Main},
+		})
+	}
 	if quota.External == nil {
 		type doctorQuotaAlias DoctorQuota
 		return json.Marshal(doctorQuotaAlias(quota))
