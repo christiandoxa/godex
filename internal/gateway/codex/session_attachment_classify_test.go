@@ -79,3 +79,25 @@ func TestSessionAttachmentSuffixDoesNotNormalizeParentComponents(t *testing.T) {
 		t.Fatalf("parent-containing suffix accepted as %q", got)
 	}
 }
+
+func TestSessionWindowsPathHelpersMatchProdexEscaping(t *testing.T) {
+	raw := `C:\\Users\\runner\\attachments\\id-a\\image-1.png`
+	if got := sessionPathEscapeWidth(raw); got != 2 {
+		t.Fatalf("escape width = %d, want 2", got)
+	}
+	decoded := decodeSessionPathEscaped(raw, 2)
+	want := `C:\Users\runner\attachments\id-a\image-1.png`
+	if decoded != want {
+		t.Fatalf("decoded path = %q, want %q", decoded, want)
+	}
+	got := sessionPathComponentsMode(decoded, true)
+	wantParts := []string{"C:", "Users", "runner", "attachments", "id-a", "image-1.png"}
+	if !reflect.DeepEqual(got, wantParts) {
+		t.Fatalf("Windows components = %#v, want %#v", got, wantParts)
+	}
+
+	mixed := `C:\\Users\\\\runner`
+	if got := decodeSessionPathEscaped(mixed, sessionPathEscapeWidth(mixed)); got != `C:\Users\\runner` {
+		t.Fatalf("mixed escape decode = %q", got)
+	}
+}
