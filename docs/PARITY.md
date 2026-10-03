@@ -332,9 +332,11 @@ and eligibility validation stays in the runtime use case.
   profile/model/base-URL/no-proxy/JSON options, 45-second timeout, four-worker
   cap, completion-order human rows, stable nullable JSON fields, failure taxonomy,
   private diagnostic CWD, provider-secret environment stripping, and bounded
-  redacted failure detail. It is never invoked implicitly. Large-model context
-  enrichment remains part of the wider provider/runtime parity work rather than
-  a ping-specific duplicate implementation.
+  redacted failure detail. Large-context OpenAI models now use the tagged launch
+  precedence before spawn: explicit root config, configured/effective
+  `models_cache.json`, then the exact 0.435.1 OpenAI catalog, with max-context
+  preference for the tagged model families and the 90% auto-compact default only
+  when not explicitly configured. It is never invoked implicitly.
 - Quota now matches Prodex's default five-second watch cadence, `--once`, raw,
   detail, profile selection, command-scoped base-URL override, aggregate
   `--auth`/`--provider` filtering, and the 0.435.1 provider-filter aliases.

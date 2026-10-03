@@ -528,9 +528,13 @@ pre-commit HTTP/SSE behavior; Godex still does not implement WebSocket/Realtime.
 `godex ping openai` is intentionally cost-bearing: it submits the minimal `hello`
 turn through official Codex for each selected OpenAI profile. It uses a private
 diagnostic working directory, a 45-second per-profile timeout, up to four workers,
-and strips provider API-key environment variables before launch. Human output
-streams profile results as workers finish; `--json` emits one stable aggregate
-object. Failure details are bounded and secret-redacted. No ping runs implicitly.
+and strips provider API-key environment variables before launch. Large-context
+models use the same tagged context-window enrichment as Prodex: root config takes
+precedence, then `models_cache.json`, then the exact 0.435.1 OpenAI catalog; tagged
+max-context families prefer cached maximums and missing auto-compact limits default
+to 90% of the selected context. Human output streams profile results as workers
+finish; `--json` emits one stable aggregate object. Failure details are bounded and
+secret-redacted. No ping runs implicitly.
 
 `godex update` resolves the latest stable GitHub release with a five-minute private
 cache, takes an exclusive install lock, re-checks the actual running binary under
