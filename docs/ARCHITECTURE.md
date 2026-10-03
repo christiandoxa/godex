@@ -88,8 +88,13 @@ diagnostics. CLI delivery owns flag relationships plus human/JSON/bundle
 formatting; terminal human panels use Bubble Tea. User-selected bundle files are
 persisted through `repository/runtime.DoctorBundleStore`, which enforces a 4 MiB
 ceiling, rejects non-regular targets, and writes atomically with owner-only mode.
-Repair-journal, full Codex thread-index repair, and policy-suggestion flags fail
-closed until their owning subsystems exist; they are never silently accepted.
+Doctor repair actions use narrow ports rather than embedding filesystem policy in
+delivery. Profile import-journal recovery stays repository-owned. Full Codex
+thread-index repair resolves the active/default home in the profile use case, runs
+shared-session maintenance in `gateway/codex` using the Godex root for its versioned
+cache, then launches Codex app-server reconciliation with the exact active/shared
+home environment. Delivery owns the stderr completion notice and option ordering.
+Policy-suggestion flags still fail closed until their runtime-doctor planner exists.
 
 ### Terminal UI ownership
 

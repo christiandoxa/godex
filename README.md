@@ -418,9 +418,13 @@ Automatic import-lifecycle recovery runs before profile operations.
 `doctor --repair-import-auth-journals` recovers an interrupted profile-store auth
 replacement and reports repaired/remaining orphan-journal status in human, runtime
 JSON, and redacted bundle diagnostics. Account-store import updates remain outside
-this journal path. Full session-index repair and runtime-policy suggestions remain
-unsupported. Interactive human doctor panels use Bubble Tea; non-TTY output remains
-line-oriented.
+this journal path. `doctor --repair-session-index` runs full shared-session
+maintenance before Codex app-server reconciliation: attachment paths are stabilized,
+session metadata ordering and mtimes are repaired, goal-database attachment paths and
+the versioned maintenance cache are updated, then active and archived thread listings
+reconcile Codex's index. Successful repair is reported on stderr; runtime-policy
+suggestions remain unsupported. Interactive human doctor panels use Bubble Tea;
+non-TTY output remains line-oriented.
 
 Available profile, account, and runtime commands:
 

@@ -116,3 +116,29 @@ func codexSessionsShareDirectory(codexHome, sharedCodexHome string) bool {
 	}
 	return activePath == sharedPath
 }
+
+// RepairSessionIndex runs full managed-session maintenance before asking Codex
+// app-server to reconcile the active thread index.
+func (process *CodexProcess) RepairSessionIndex(ctx context.Context, codexHome, sharedCodexHome, cacheRoot string) error {
+	started := time.Now()
+	defer process.emitRuntimeTiming("startup.thread_index_reconcile_ms", started)
+	if err := MaintainManagedSessions(sharedCodexHome, cacheRoot); err != nil {
+		return fmt.Errorf("full session index repair failed: %w", err)
+	}
+	if err := process.ReconcileThreadIndex(ctx, codexHome, sharedCodexHome); err != nil {
+		return fmt.Errorf("full session index repair failed: %w", err)
+	}
+	return nil
+}
+
+func (process *CodexProcess) emitRuntimeTiming(stage string, started time.Time) {
+	if _, enabled := os.LookupEnv("PRODEX_RUNTIME_TIMINGS"); !enabled || process == nil || process.terminal.Stderr == nil {
+		return
+	}
+	_, _ = fmt.Fprintf(
+		process.terminal.Stderr,
+		"prodex_runtime_timing stage=%s duration_ms=%g\n",
+		stage,
+		float64(time.Since(started))/float64(time.Millisecond),
+	)
+}

@@ -130,7 +130,7 @@ func (app *App) Run(ctx context.Context, arguments []string) error {
 	case "log":
 		return runtimecli.Log(ctx, app.activity, app.out, arguments[1:])
 	case "doctor":
-		return runtimecli.Doctor(ctx, app.doctor, app.out, arguments[1:])
+		return runtimecli.DoctorWithErrorOutput(ctx, app.doctor, app.out, app.errOut, arguments[1:])
 	case "version", "--version", "-version":
 		_, err := fmt.Fprintln(app.out, version.String())
 		return err
@@ -331,8 +331,8 @@ Usage:
   godex info [--json] [--tokens]
   godex status [--once] [--interval N]
   godex log [stream|last|upstream] [--json]
-  godex doctor [--quota] [--runtime] [--install] [--tail-bytes BYTES]
-               [--json] [--bundle [PATH] --redacted]
+  godex doctor [--quota] [--runtime] [--install] [--repair-import-auth-journals] [--repair-session-index]
+               [--tail-bytes BYTES] [--json] [--bundle [PATH] --redacted]
   godex --version
   godex <codex-subcommand> ...  Run an unknown Codex command through Godex
 

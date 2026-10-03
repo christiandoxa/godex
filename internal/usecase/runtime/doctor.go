@@ -28,6 +28,14 @@ type versionedCodex interface {
 	CheckProxySupport(context.Context) error
 }
 
+type doctorSessionIndexRepairer interface {
+	RepairSessionIndex(context.Context, string, string, string) error
+}
+
+type activeCodexHomeResolver interface {
+	CurrentCodexHome(context.Context) (string, error)
+}
+
 type doctorActivity interface {
 	Overview(context.Context) (runtimemodel.Overview, error)
 	Events(context.Context, int) ([]runtimemodel.Event, error)
@@ -47,13 +55,16 @@ type doctorImportJournalRepairer interface {
 }
 
 type Doctor struct {
-	accounts doctorAccounts
-	codex    versionedCodex
-	activity doctorActivity
-	quota    doctorQuota
-	bundles  doctorBundleStore
-	imports  doctorImportJournalRepairer
-	now      func() time.Time
+	accounts        doctorAccounts
+	codex           versionedCodex
+	repairer        doctorSessionIndexRepairer
+	activeHome      activeCodexHomeResolver
+	sharedCodexHome string
+	activity        doctorActivity
+	quota           doctorQuota
+	bundles         doctorBundleStore
+	imports         doctorImportJournalRepairer
+	now             func() time.Time
 }
 
 func NewDoctor(accounts doctorAccounts, codex versionedCodex) *Doctor {
@@ -61,6 +72,31 @@ func NewDoctor(accounts doctorAccounts, codex versionedCodex) *Doctor {
 }
 
 func (doctor *Doctor) SetActivity(activity doctorActivity) { doctor.activity = activity }
+
+func (doctor *Doctor) SetSessionIndexRepairer(repairer doctorSessionIndexRepairer) {
+	doctor.repairer = repairer
+}
+
+func (doctor *Doctor) SetActiveCodexHomeResolver(resolver activeCodexHomeResolver) {
+	doctor.activeHome = resolver
+}
+
+func (doctor *Doctor) SetSharedCodexHome(home string) { doctor.sharedCodexHome = home }
+
+// RepairSessionIndex asks Codex to reconcile sessions for the active home.
+func (doctor *Doctor) RepairSessionIndex(ctx context.Context) error {
+	if doctor.repairer == nil {
+		return fmt.Errorf("session index repair is not configured")
+	}
+	if doctor.activeHome == nil {
+		return fmt.Errorf("active Codex home resolution is not configured")
+	}
+	codexHome, err := doctor.activeHome.CurrentCodexHome(ctx)
+	if err != nil {
+		return err
+	}
+	return doctor.repairer.RepairSessionIndex(ctx, codexHome, doctor.sharedCodexHome, doctor.accounts.Root())
+}
 
 func (doctor *Doctor) SetQuota(quota doctorQuota) { doctor.quota = quota }
 

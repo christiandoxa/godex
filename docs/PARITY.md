@@ -241,7 +241,10 @@ and eligibility validation stays in the runtime use case.
   install checks, bounded runtime tails, quota summaries, runtime JSON, and
   redacted private bundles; `--repair-import-auth-journals` now recovers
   profile-store auth-replacement journals and reports the tagged orphan/repaired
-  status shape. Full session-index repair and policy suggestions remain. Existing
+  status shape. `--repair-session-index` now resolves the active/default Codex
+  home, runs full shared-session maintenance, then reconciles active and archived
+  threads through Codex app-server before reporting completion. Policy suggestions
+  remain. Existing
   status/quota/log, doctor panels, redeem-confirmation, human session-list, profile
   bundle password, and
   login/provider-menu TUIs use Bubble Tea. The login menu now mirrors the 0.435.1
@@ -312,8 +315,12 @@ and eligibility validation stays in the runtime use case.
   admission + 5h/weekly window semantics, preserve missing-vs-empty rate-limit
   shape, and emit the same nested success/error JSON without leaking raw errors.
   Bundle runtime events omit account IDs, quota diagnostics omit identity/email and raw
-  gateway errors, and file output is private/atomic. Full session-index repair and
-  runtime-policy suggestions remain unsupported.
+  gateway errors, and file output is private/atomic. Full session-index repair now
+  matches the tagged maintenance-before-reconciliation ordering, including stable
+  attachment paths, metadata-prefix repair, modified-time restoration, goal-DB path
+  persistence, versioned maintenance cache, app-server active/archived pagination,
+  and the optional runtime timing marker. Runtime-policy suggestions remain
+  unsupported.
 - `update` now matches the standalone Prodex self-update contract: five-minute
   latest-release cache, short GitHub redirect probe, semver/no-downgrade decision,
   exclusive install lock with actual-binary re-probe, embedded installer execution,

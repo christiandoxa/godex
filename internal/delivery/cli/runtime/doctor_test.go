@@ -85,15 +85,10 @@ func TestDoctorValidatesReferenceFlagRelationships(t *testing.T) {
 	}
 }
 
-func TestDoctorRejectsUnimplementedRepairAndPolicyActions(t *testing.T) {
-	for _, arguments := range [][]string{
-		{"--repair-session-index"},
-		{"--runtime", "--suggest-policy"},
-	} {
-		err := Doctor(context.Background(), &fakeDoctorRunner{}, &strings.Builder{}, arguments)
-		if err == nil || !strings.Contains(err.Error(), "not available") {
-			t.Fatalf("arguments %v error=%v", arguments, err)
-		}
+func TestDoctorRejectsUnimplementedPolicySuggestion(t *testing.T) {
+	err := Doctor(context.Background(), &fakeDoctorRunner{}, &strings.Builder{}, []string{"--runtime", "--suggest-policy"})
+	if err == nil || !strings.Contains(err.Error(), "not available") {
+		t.Fatalf("error=%v", err)
 	}
 }
 

@@ -38,14 +38,26 @@ type doctorRunner interface {
 	SaveBundle(string, []byte) (string, error)
 }
 
+type doctorSessionIndexRepairer interface {
+	RepairSessionIndex(context.Context) error
+}
+
 type doctorPanel struct {
 	title  string
 	fields [][2]string
 }
 
 func Doctor(ctx context.Context, doctor doctorRunner, out io.Writer, arguments []string) error {
+	return DoctorWithErrorOutput(ctx, doctor, out, io.Discard, arguments)
+}
+
+// DoctorWithErrorOutput writes the repair completion notice to errOut.
+func DoctorWithErrorOutput(ctx context.Context, doctor doctorRunner, out, errOut io.Writer, arguments []string) error {
 	if doctor == nil {
 		return errors.New("doctor support is not configured")
+	}
+	if errOut == nil {
+		errOut = io.Discard
 	}
 	options, err := parseDoctorArguments(arguments)
 	if err != nil {
@@ -53,6 +65,18 @@ func Doctor(ctx context.Context, doctor doctorRunner, out io.Writer, arguments [
 	}
 	if err := rejectUnsupportedDoctorActions(options); err != nil {
 		return err
+	}
+	if options.repairIndex {
+		repairer, ok := doctor.(doctorSessionIndexRepairer)
+		if !ok {
+			return errors.New("doctor session index repair is not configured")
+		}
+		if err := repairer.RepairSessionIndex(ctx); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(errOut, "godex doctor: session index repair completed."); err != nil {
+			return err
+		}
 	}
 	report, err := doctor.Diagnose(ctx, runtimemodel.DoctorOptions{
 		Runtime:                  options.runtime || options.bundle != "",
@@ -164,14 +188,10 @@ func validateDoctorOptions(options doctorOptions) error {
 }
 
 func rejectUnsupportedDoctorActions(options doctorOptions) error {
-	switch {
-	case options.repairIndex:
-		return errors.New("doctor --repair-session-index is not available until full Codex thread-index repair parity is implemented")
-	case options.suggest:
+	if options.suggest {
 		return errors.New("doctor --suggest-policy is not available until runtime policy parity is implemented")
-	default:
-		return nil
 	}
+	return nil
 }
 
 func doctorOptionValue(arguments []string, index int, argument, name string) (string, int, error) {
@@ -211,7 +231,7 @@ func parseDoctorTailBytes(value string) (int, error) {
 }
 
 func doctorPanels(report runtimemodel.DoctorDiagnostics, options doctorOptions) []doctorPanel {
-	if options.install && !options.runtime && !options.quota && !options.repairImport {
+	if options.install && !options.runtime && !options.quota && !options.repairImport && !options.repairIndex {
 		return []doctorPanel{{title: "Install Checks", fields: doctorCheckFields(report.Install)}}
 	}
 	panels := []doctorPanel{{title: "Doctor", fields: [][2]string{
@@ -370,6 +390,6 @@ func doctorBundle(report runtimemodel.DoctorDiagnostics) doctorBundleDocument {
 	return document
 }
 
-const doctorUsage = "usage: godex doctor [--quota] [--runtime] [--install] [--repair-import-auth-journals] [--tail-bytes BYTES] [--json] [--bundle [PATH] --redacted]"
+const doctorUsage = "usage: godex doctor [--quota] [--runtime] [--install] [--repair-import-auth-journals] [--repair-session-index] [--tail-bytes BYTES] [--json] [--bundle [PATH] --redacted]"
 
 var _ doctorRunner = (*runtimeusecase.Doctor)(nil)
