@@ -12,6 +12,7 @@ type WebSocketPolicy struct {
 	RequestSession          bool
 	RequestTurnState        bool
 	TurnStateOverride       bool
+	RealtimeDuplex          bool
 }
 
 type Request struct {
@@ -25,18 +26,19 @@ type Request struct {
 	FirstEventRetryUsed             bool
 }
 type Response struct {
-	StatusCode             int
-	Header                 http.Header
-	Body                   io.ReadCloser
-	Trailer                http.Header
-	WebSocketResponseID    string
-	WebSocketTurnState     string
-	WebSocketFrames        bool
-	WebSocketReusedSession bool
-	WebSocketReuseIdle     time.Duration
-	FirstEventRetryUsed    bool
-	FirstEventCommitted    bool
-	PrecommitFailure       *PrecommitFailure
+	StatusCode              int
+	Header                  http.Header
+	Body                    io.ReadCloser
+	Trailer                 http.Header
+	WebSocketResponseID     string
+	WebSocketTurnState      string
+	WebSocketFrames         bool
+	WebSocketReusedSession  bool
+	WebSocketReuseIdle      time.Duration
+	WebSocketRealtimeDuplex bool
+	FirstEventRetryUsed     bool
+	FirstEventCommitted     bool
+	PrecommitFailure        *PrecommitFailure
 }
 type PrecommitFailure struct {
 	Code                      string

@@ -189,8 +189,16 @@ and eligibility validation stays in the runtime use case.
   owner matches receive the 400 `previous_response_not_found` full-context replay
   signal, and a subsequent full-context message remains on that session owner.
   Non-eligible invalid-ID errors pass through unchanged. Realtime/live WebSocket
-  surfaces and quota-triggered full-context/fallback remain active parity work, so
-  full WebSocket parity is still open.
+  surfaces now use the same precommit selection path for their first text frame:
+  the local 101 handshake completes before any upstream profile is selected, the
+  first text establishes and commits the selected upstream WebSocket without
+  waiting for provider output, and the committed session then pumps text and
+  binary messages bidirectionally. Local client pings receive local pongs,
+  upstream pings receive upstream pongs, and close frames propagate across the
+  committed duplex session. This is covered by gateway and public E2E regressions
+  including multiple client frames while upstream is silent. Quota-triggered
+  full-context/fallback remains active parity work, so full WebSocket parity is
+  still open.
 - Full native-home import remains unsupported. Godex imports auth only, leaves
   source settings, rollouts, and databases intact, and keeps managed homes isolated.
 - The `0.435.1` hotfix adds no user-facing command surface; its material Godex

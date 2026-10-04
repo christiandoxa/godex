@@ -48,6 +48,15 @@ func (transport *Transport) ExecuteWebSocketMessage(
 			return nil, errors.New("upstream websocket connection is not duplex")
 		}
 	}
+	if input.WebSocketPolicy.RealtimeDuplex {
+		if err := writeWebSocketTextFrame(connection, input.Body); err != nil {
+			_ = connection.Close()
+			return nil, fmt.Errorf("send upstream realtime websocket message: %w", err)
+		}
+		return websocketRealtimeCommittedResponse(
+			connection, state.turnState, input.FirstEventRetryUsed, reusedSession, reuseIdle,
+		), nil
+	}
 	watchdog := newWebSocketReadWatchdog(connection, websocketPrecommitProgressTimeout)
 	connection = watchdog
 	if err := writeWebSocketTextFrame(connection, input.Body); err != nil {
@@ -58,6 +67,27 @@ func (transport *Transport) ExecuteWebSocketMessage(
 	return transport.readWebSocketMessage(
 		ctx, input, account, connection, state, reusedSession, reuseIdle, plan,
 	)
+}
+
+func websocketRealtimeCommittedResponse(
+	connection io.ReadWriteCloser,
+	turnState string,
+	retryUsed bool,
+	reusedSession bool,
+	reuseIdle time.Duration,
+) *proxymodel.Response {
+	return &proxymodel.Response{
+		StatusCode:              http.StatusSwitchingProtocols,
+		Header:                  make(http.Header),
+		Body:                    connection,
+		WebSocketTurnState:      turnState,
+		WebSocketFrames:         true,
+		WebSocketReusedSession:  reusedSession,
+		WebSocketReuseIdle:      reuseIdle,
+		WebSocketRealtimeDuplex: true,
+		FirstEventRetryUsed:     retryUsed,
+		FirstEventCommitted:     true,
+	}
 }
 
 func writeWebSocketTextFrame(connection io.Writer, payload []byte) error {

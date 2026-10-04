@@ -192,21 +192,21 @@ func TestPublicResponsesWebSocketRejectsBinaryAndContinues(t *testing.T) {
 	}
 }
 
-func TestPublicResponsesWebSocketKeepsOtherUpgradeSurfacesFailClosed(t *testing.T) {
+func TestPublicResponsesWebSocketKeepsUnsupportedUpgradeSurfacesFailClosed(t *testing.T) {
 	gateway := &responsesPublicGateway{closed: make(chan uint64, 1)}
 	proxy := newResponsesPublicProxy(t, gateway)
 	server := httptest.NewServer(proxy.server.Handler)
 	defer server.Close()
 
-	connection, reader := dialResponsesPublicWebSocket(t, server.URL, "/v1/realtime")
+	connection, reader := dialResponsesPublicWebSocket(t, server.URL, "/backend-api/codex/responses/compact")
 	defer connection.Close()
 	response, err := http.ReadResponse(reader, &http.Request{Method: http.MethodGet})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer response.Body.Close()
-	if response.StatusCode != http.StatusUpgradeRequired {
-		t.Fatalf("realtime websocket status = %d, want 426", response.StatusCode)
+	if response.StatusCode != http.StatusNotFound {
+		t.Fatalf("unsupported websocket status = %d, want 404", response.StatusCode)
 	}
 	gateway.mu.Lock()
 	calls := len(gateway.bodies)

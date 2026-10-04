@@ -79,6 +79,9 @@ func (proxy *Proxy) forwardResponsesWebSocket(
 			Body:               payload,
 			WebSocketMessage:   true,
 			WebSocketSessionID: sessionID,
+			WebSocketPolicy: proxymodel.WebSocketPolicy{
+				RealtimeDuplex: websocketRealtimeDuplexPath(request.URL.Path),
+			},
 		})
 		if err != nil {
 			if sessionContext.Err() != nil {
@@ -103,6 +106,25 @@ func (proxy *Proxy) forwardResponsesWebSocket(
 			activity.accountID = "<redacted>"
 		}
 		tunnel.setUpstream(result.Response.Body)
+		if result.Response.WebSocketRealtimeDuplex {
+			duplex, ok := result.Response.Body.(io.ReadWriteCloser)
+			if !ok {
+				_ = forwarded.Close()
+				return errors.New("realtime websocket response is not duplex")
+			}
+			err = runRealtimeWebSocketDuplex(
+				buffered.Reader, tunnel.toClient, duplex, tunnel.close,
+			)
+			closeErr := forwarded.Close()
+			tunnel.clearUpstream()
+			if err == nil {
+				lifecycle.complete()
+			}
+			if err != nil {
+				return err
+			}
+			return closeErr
+		}
 		if result.Response.WebSocketFrames {
 			err = copyWebSocketFrames(result.Response.Body, tunnel.toClient)
 		} else {

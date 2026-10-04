@@ -65,11 +65,24 @@ func supportedWebSocketPath(path string) bool {
 }
 
 func websocketUsesMessageRouting(path string) bool {
-	effective := path
+	effective := websocketEffectivePath(path)
+	return effective == "/responses" ||
+		strings.HasSuffix(effective, "/codex/responses") ||
+		websocketRealtimeDuplexPath(path)
+}
+
+func websocketRealtimeDuplexPath(path string) bool {
+	effective := websocketEffectivePath(path)
+	return strings.HasSuffix(effective, "/realtime") ||
+		strings.HasSuffix(effective, "/live") ||
+		websocketEffectiveLiveCall(effective)
+}
+
+func websocketEffectivePath(path string) string {
 	if suffixStart := websocketMountSuffixStart(path); suffixStart >= 0 {
-		effective = path[suffixStart:]
+		return path[suffixStart:]
 	}
-	return effective == "/responses" || strings.HasSuffix(effective, "/codex/responses")
+	return path
 }
 
 func websocketMountSuffixStart(path string) int {
