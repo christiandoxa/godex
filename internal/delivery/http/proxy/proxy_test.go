@@ -30,7 +30,9 @@ func TestProxyRoundRobinAndPreCommitRotation(t *testing.T) {
 		mu.Unlock()
 		if token == "Bearer token-a" && len(seen) == 3 {
 			writer.Header().Set("Retry-After", "60")
+			writer.Header().Set("Content-Type", "application/json")
 			writer.WriteHeader(http.StatusTooManyRequests)
+			_, _ = io.WriteString(writer, `{"error":{"code":"rate_limit_exceeded"}}`)
 			return
 		}
 		writer.Header().Set("Content-Type", "application/json")
@@ -323,7 +325,9 @@ func TestProxyRetryAfterQuarantinesAccount(t *testing.T) {
 		seen = append(seen, token)
 		if token == "Bearer token-a" {
 			writer.Header().Set("Retry-After", "60")
+			writer.Header().Set("Content-Type", "application/json")
 			writer.WriteHeader(http.StatusTooManyRequests)
+			_, _ = io.WriteString(writer, `{"error":{"code":"rate_limit_exceeded"}}`)
 			return
 		}
 		writer.WriteHeader(http.StatusOK)
@@ -343,22 +347,23 @@ func TestProxyRetryAfterQuarantinesAccount(t *testing.T) {
 	}
 }
 
-func TestProxyBoundsRetryAttempts(t *testing.T) {
+func TestProxyStopsOnPermanentBadRequest(t *testing.T) {
 	accounts := testRuntimeAccounts(t, "A", "token-a", "B", "token-b")
 	var calls int
 	upstream := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		calls++
-		writer.WriteHeader(http.StatusBadGateway)
+		writer.WriteHeader(http.StatusBadRequest)
+		_, _ = io.WriteString(writer, `{"error":{"code":"invalid_request"}}`)
 	}))
 	defer upstream.Close()
 	proxy := newTestProxy(t, upstream.URL, accounts)
 	response := doProxyJSON(t, proxy.URL+"/backend-api/prodex/responses", `{}`, nil)
-	if response.StatusCode != http.StatusBadGateway {
+	if response.StatusCode != http.StatusBadRequest {
 		t.Fatalf("status = %d", response.StatusCode)
 	}
 	_ = response.Body.Close()
-	if calls != len(accounts) {
-		t.Fatalf("upstream attempts = %d, want %d", calls, len(accounts))
+	if calls != 1 {
+		t.Fatalf("upstream attempts = %d, want one for a permanent request error", calls)
 	}
 }
 

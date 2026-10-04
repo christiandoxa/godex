@@ -3,6 +3,8 @@ package proxy
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
+	"testing"
 	"time"
 
 	"github.com/christiandoxa/godex/internal/gateway/codex"
@@ -20,6 +22,7 @@ type ProxyConfig struct {
 	Accounts                                  func(context.Context) ([]RuntimeAccount, error)
 	Client                                    *http.Client
 	Now                                       func() time.Time
+	Wait                                      func(context.Context, time.Duration) error
 	MaxRequestBytes, MaxInspectBytes          int64
 	Activity                                  activityRecorder
 	Bindings                                  *routingrepo.Store
@@ -30,7 +33,10 @@ func newProxyForTest(config ProxyConfig) (*Proxy, error) {
 	if err != nil {
 		return nil, err
 	}
-	routingConfig := routingusecase.Config{Gateway: transport, Accounts: config.Accounts, PreferredAccount: config.PreferredAccount, Now: config.Now, MaxInspectBytes: config.MaxInspectBytes}
+	routingConfig := routingusecase.Config{
+		Gateway: transport, Accounts: config.Accounts, PreferredAccount: config.PreferredAccount,
+		Now: config.Now, Wait: config.Wait, MaxInspectBytes: config.MaxInspectBytes,
+	}
 	if config.Bindings != nil {
 		routingConfig.Bindings = config.Bindings
 	}
@@ -39,4 +45,15 @@ func newProxyForTest(config ProxyConfig) (*Proxy, error) {
 		return nil, err
 	}
 	return NewProxy(Config{Router: router, Activity: config.Activity, ListenAddr: config.ListenAddr, MaxRequestBytes: config.MaxRequestBytes, MaxInspectBytes: config.MaxInspectBytes})
+}
+
+func newParityProxyWithConfig(t *testing.T, config ProxyConfig) *httptest.Server {
+	t.Helper()
+	proxy, err := newProxyForTest(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(proxy)
+	t.Cleanup(server.Close)
+	return server
 }

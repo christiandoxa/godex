@@ -1,8 +1,8 @@
-# OpenAI/Codex core parity audit
+# Prodex 0.435.2 parity audit
 
-Reference: exact Prodex tag `0.435.1`, commit
-`99c68d86b7493ef324ff9cf7a1d4c8ef65d509b2`. The tag's `Cargo.toml` declares
-`0.435.1`, and its compatibility audit names Codex `rust-v0.160.0` at commit
+Reference: exact Prodex tag `0.435.3`, commit
+`31a1dbaedb300201a9e050ed3060fc5381dea62b`. The tag's `Cargo.toml` declares
+`0.435.3`, and its compatibility audit names Codex `rust-v0.160.0` at commit
 `a956835d020762cb2b570053af06f643a11c0ecc`. Comparison reads use tagged Prodex
 Git objects rather than the mutable Prodex checkout. The audited Codex commit is
 not present in this local checkout, so it is treated as release-audit evidence
@@ -13,7 +13,7 @@ checkpoint, not the current parity target.
 
 ## 1:1 parity expansion
 
-The project target is now feature-for-feature parity with Prodex `0.435.1`, not
+The project target is now feature-for-feature parity with Prodex `0.435.3`, not
 only the historical OpenAI/Codex core boundary. The core closure below remains a
 verified baseline while additional surfaces are implemented. Current expansion
 checkpoints add standalone/external profile registration and copy workflows,
@@ -24,14 +24,17 @@ Argon2id/AES-256-GCM-SIV, and legacy encrypted v1 PBKDF2-SHA256 envelopes.
 
 A feature is counted as closed only when its observable behavior is implemented
 and covered by local verification; a command-name stub does not count as parity.
+Full parity remains open while any gap below remains.
 
-## Final closure decision
+## Historical core closure decision
 
-Practical parity is reached for the declared OpenAI/Codex account, isolated
-profile, session, and foreground managed HTTP/SSE runtime scope. The preserved core audit read the then-current tagged Prodex source alongside
-Godex production code, callers, tests, and Codex 0.159.2. The active expansion
-baseline is now Prodex 0.435.1 / Codex 0.160.0; the historical audit found and
-closed these gaps:
+The earlier core checkpoint closed practical parity for the declared
+OpenAI/Codex account, isolated profile, session, and foreground managed HTTP/SSE
+scope against its then-current baseline. It does not close feature-for-feature
+parity with Prodex 0.435.3. The preserved audit read tagged Prodex source
+alongside Godex production code, callers, tests, and Codex 0.159.2. The active
+expansion baseline is Prodex 0.435.3 / Codex 0.160.0; the earlier audit found
+and closed these gaps:
 
 - Import identity now comes from the same credential snapshot that is staged,
   so concurrent native credential replacement cannot associate another account's
@@ -59,11 +62,6 @@ closed these gaps:
   and rejects unsupported Codex runtimes without submitting model work.
 - Single-profile `quota --raw` now emits the bounded upstream usage JSON, matching
   Prodex's non-watch raw inspection path without adding live polling or provider filters.
-
-Full native-home import remains a deliberate difference. Auth-only first import
-leaves the source settings, rollouts, and databases intact; existing managed
-state survives repeat import/login. Copying live Codex databases or sharing homes
-is not required for isolated-profile correctness.
 
 ## Implemented practical parity
 
@@ -116,11 +114,22 @@ and eligibility validation stays in the runtime use case.
 
 ## Remaining 1:1 parity gaps
 
-- Prodex `0.435.1` is now the exact parity baseline. Its audited Codex target is
-  `rust-v0.160.0`; the accepted minimum remains 0.153.2. The 0.435.1 audit reports
-  no model-transport change, while adding upstream invariants around explicit
-  provider catalogs, provider/history restoration, projectless defaults, and
-  subagent environment inheritance. Godex must preserve those Codex-owned behaviors.
+- Prodex `0.435.3` is the exact parity baseline. Its audited Codex target remains
+  `rust-v0.160.0`; the accepted minimum remains 0.153.2. The inherited 0.435.2
+  auto-rotation reliability behavior is now covered on Godex HTTP production
+  paths: 1% quota remains usable, authoritative all-zero pools do not dispatch,
+  structured rate limits, overloads, and precommit transport failures recover
+  across repeated sweeps, recovery sweeps are not a terminal attempt cap,
+  cancellation remains terminal, and committed streams are never replayed.
+  Individual recovery waits remain bounded while the overall retry epoch may
+  continue as long as a retryable profile remains. Prodex 0.435.3 additionally
+  removes user-visible local-capacity deadlines in favor of wait-and-resume
+  backpressure with eligibility re-evaluation. That local admission/profile
+  capacity behavior and the full per-message WebSocket recovery path remain
+  active Godex parity work; WebSocket must not be considered closed until those
+  semantics are production-proven.
+- Full native-home import remains unsupported. Godex imports auth only, leaves
+  source settings, rollouts, and databases intact, and keeps managed homes isolated.
 - The `0.435.1` hotfix adds no user-facing command surface; its material Godex
   delta is provider-model policy. Anthropic/Copilot embedded catalogs now come
   directly from the tagged canonical provider catalog, Anthropic defaults are

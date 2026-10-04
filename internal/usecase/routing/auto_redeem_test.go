@@ -159,6 +159,7 @@ func TestAutoRedeemHardAffinityRetriesSameOwnerOnce(t *testing.T) {
 
 func TestAutoRedeemDoesNotTreatTransientQuarantineAsCreditCandidate(t *testing.T) {
 	now := time.Unix(100, 0)
+	var waits []time.Duration
 	accounts := []proxymodel.Account{
 		{ID: "transient", Home: "/transient", Enabled: true},
 		{ID: "quota", Home: "/quota", Enabled: true, EligibleAfter: now.Add(time.Hour)},
@@ -167,6 +168,11 @@ func TestAutoRedeemDoesNotTreatTransientQuarantineAsCreditCandidate(t *testing.T
 	router, err := NewRouter(Config{
 		Gateway: &sequenceRoutingGateway{}, Accounts: func(context.Context) ([]proxymodel.Account, error) { return accounts, nil },
 		Now: func() time.Time { return now }, AutoRedeem: true, Redeemer: redeemer,
+		Wait: func(ctx context.Context, delay time.Duration) error {
+			waits = append(waits, delay)
+			now = now.Add(delay)
+			return ctx.Err()
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -180,10 +186,13 @@ func TestAutoRedeemDoesNotTreatTransientQuarantineAsCreditCandidate(t *testing.T
 	if len(redeemer.poolIDs) != 1 || strings.Join(redeemer.poolIDs[0], ",") != "quota" {
 		t.Fatalf("auto-redeem pool = %#v", redeemer.poolIDs)
 	}
+	if len(waits) != 1 || waits[0] != 30*time.Second {
+		t.Fatalf("transient recovery waits = %v", waits)
+	}
 }
 
 func TestQuotaOutcomeMarksAndSuccessfulRetryClearsQuotaMarker(t *testing.T) {
-	router := &Router{now: time.Now, quarantine: make(map[string]time.Time), quotaBlocked: make(map[string]bool)}
+	router := &Router{now: time.Now, quarantine: make(map[string]quarantineState), quotaBlocked: make(map[string]bool)}
 	router.applyRetryOutcome("a", responseOutcome{kind: responseRetry, quarantine: time.Second, quota: true})
 	if !router.quotaBlockedAccount("a") {
 		t.Fatal("quota marker was not set")

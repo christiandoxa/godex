@@ -22,6 +22,7 @@ type Config struct {
 	Accounts         func(context.Context) ([]proxymodel.Account, error)
 	PreferredAccount string
 	Now              func() time.Time
+	Wait             func(context.Context, time.Duration) error
 	MaxInspectBytes  int64
 	Gateway          gateway
 	Bindings         bindingRepository
@@ -34,12 +35,13 @@ type Router struct {
 	gateway       gateway
 	preferred     string
 	now           func() time.Time
+	wait          func(context.Context, time.Duration) error
 	maxInspect    int64
 	affinity      *affinityStore
 	mu            sync.Mutex
 	cursor        int
 	preferredUsed bool
-	quarantine    map[string]time.Time
+	quarantine    map[string]quarantineState
 	quotaBlocked  map[string]bool
 	autoRedeem    bool
 	redeemer      AutoRedeemer
@@ -53,14 +55,17 @@ func NewRouter(config Config) (*Router, error) {
 	if config.Now == nil {
 		config.Now = time.Now
 	}
+	if config.Wait == nil {
+		config.Wait = waitContext
+	}
 	if config.MaxInspectBytes <= 0 {
 		config.MaxInspectBytes = 64 << 10
 	}
 	router := &Router{
 		source: config.Accounts, gateway: config.Gateway,
 		preferred: strings.TrimSpace(config.PreferredAccount),
-		now:       config.Now, maxInspect: config.MaxInspectBytes,
-		affinity: newAffinityStore(), quarantine: make(map[string]time.Time),
+		now:       config.Now, wait: config.Wait, maxInspect: config.MaxInspectBytes,
+		affinity: newAffinityStore(), quarantine: make(map[string]quarantineState),
 		quotaBlocked: make(map[string]bool), autoRedeem: config.AutoRedeem, redeemer: config.Redeemer,
 	}
 	router.affinity.repository = config.Bindings

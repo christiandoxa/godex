@@ -24,6 +24,7 @@ type responseOutcome struct {
 	quarantine      time.Duration
 	failed          bool
 	quota           bool
+	transient       bool
 	firstEventRetry bool
 }
 
@@ -32,6 +33,9 @@ type pendingResponse struct {
 	prefix          []byte
 	accountID       string
 	firstEventRetry bool
+	authFailure     bool
+	quota           bool
+	transient       bool
 }
 
 func (pending *pendingResponse) close() {
@@ -54,15 +58,30 @@ func (proxy *Router) classify(response *proxymodel.Response, providerKind string
 		if err != nil {
 			return responseOutcome{}, pending, err
 		}
+		classificationBody := prefix
+		if !complete {
+			classificationBody = nil
+		}
+		classification := providerentity.ClassifyError(response.StatusCode, classificationBody)
+		if classification.Class != providerentity.ErrorQuota &&
+			classification.Class != providerentity.ErrorRateLimit &&
+			classification.Class != providerentity.ErrorTransient {
+			return responseOutcome{kind: responsePass}, pending, nil
+		}
+		cooldown := maxDuration(retryAfter(response.Header, proxy.now()), classification.Cooldown)
+		if classification.Class == providerentity.ErrorRateLimit {
+			cooldown = rateLimitCooldown(response.Header, classificationBody)
+		}
 		return responseOutcome{
-			kind: responseRetry, quarantine: retryAfter(response.Header, proxy.now()),
-			quota: complete && isQuotaResponse(prefix),
+			kind: responseRetry, quarantine: cooldown,
+			quota:     classification.Class == providerentity.ErrorQuota,
+			transient: classification.Class == providerentity.ErrorRateLimit || classification.Class == providerentity.ErrorTransient,
 		}, pending, nil
 	case response.StatusCode == http.StatusInternalServerError ||
 		response.StatusCode == http.StatusBadGateway ||
 		response.StatusCode == http.StatusServiceUnavailable ||
 		response.StatusCode == http.StatusGatewayTimeout:
-		return responseOutcome{kind: responseRetry}, pending, nil
+		return responseOutcome{kind: responseRetry, transient: true}, pending, nil
 	case response.StatusCode == http.StatusBadRequest || response.StatusCode == http.StatusForbidden:
 		prefix, complete, err := inspectResponse(response.Body, proxy.maxInspect)
 		pending.prefix = prefix
@@ -90,7 +109,10 @@ func (proxy *Router) classifySpecialResponse(
 	case response.StatusCode == http.StatusOK &&
 		strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream") &&
 		response.Header.Get("Content-Encoding") == "":
-		outcome, pending, err := proxy.inspectStream(response, pending)
+		outcome, pending, err := proxy.inspectStream(response, pending, providerKind)
+		if err != nil {
+			pending.transient = true
+		}
 		return outcome, pending, err, true
 	case externalProviderKind(providerKind) && response.StatusCode >= http.StatusBadRequest:
 		outcome, pending, err := proxy.classifyExternalProvider(response, pending)
@@ -114,7 +136,9 @@ func (proxy *Router) classifyPrecommitFailure(response *proxymodel.Response, pen
 	}
 	return responseOutcome{
 		kind: responseRetry, quarantine: classification.Cooldown, failed: true,
-		quota: classification.Class == providerentity.ErrorQuota, firstEventRetry: true,
+		quota:           classification.Class == providerentity.ErrorQuota,
+		transient:       classification.Class == providerentity.ErrorRateLimit || classification.Class == providerentity.ErrorTransient,
+		firstEventRetry: true,
 	}, pending, nil
 }
 
@@ -140,6 +164,13 @@ func clampDuration(duration time.Duration) time.Duration {
 		return 24 * time.Hour
 	}
 	return duration
+}
+
+func maxDuration(left, right time.Duration) time.Duration {
+	if right > left {
+		return right
+	}
+	return left
 }
 
 func inspectResponse(body io.Reader, limit int64) ([]byte, bool, error) {
@@ -225,8 +256,14 @@ func (proxy *Router) classifyExternalProvider(
 	switch classification.Class {
 	case providerentity.ErrorAuth:
 		return responseOutcome{kind: responseAuthFailure}, pending, nil
-	case providerentity.ErrorQuota, providerentity.ErrorRateLimit, providerentity.ErrorTransient:
-		return responseOutcome{kind: responseRetry, quarantine: classification.Cooldown}, pending, nil
+	case providerentity.ErrorQuota:
+		return responseOutcome{kind: responseRetry, quarantine: classification.Cooldown, quota: true}, pending, nil
+	case providerentity.ErrorRateLimit:
+		return responseOutcome{
+			kind: responseRetry, quarantine: maxDuration(retryAfter(response.Header, proxy.now()), classification.Cooldown), transient: true,
+		}, pending, nil
+	case providerentity.ErrorTransient:
+		return responseOutcome{kind: responseRetry, quarantine: classification.Cooldown, transient: true}, pending, nil
 	default:
 		return responseOutcome{kind: responsePass}, pending, nil
 	}

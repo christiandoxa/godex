@@ -1,0 +1,203 @@
+package routing
+
+import (
+	"context"
+	"time"
+
+	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
+)
+
+func (router *Router) tryFreshCandidates(
+	ctx context.Context,
+	request proxymodel.Request,
+	candidates []proxymodel.Account,
+	last **pendingResponse,
+	excluded, retryable map[string]bool,
+	firstEventRetryUsed *bool,
+) (proxymodel.Forwarded, bool, bool, error) {
+	sawTransient := false
+	for _, account := range candidates {
+		request.FirstEventRetryUsed = *firstEventRetryUsed
+		result, found, pending, err := router.tryFreshCandidate(ctx, request, candidates, account)
+		if err != nil || found {
+			return result, found, sawTransient, err
+		}
+		excluded[account.ID] = true
+		if pending != nil {
+			if pending.firstEventRetry {
+				*firstEventRetryUsed = true
+			}
+			if pending.authFailure || pending.quota {
+				retryable[account.ID] = false
+			}
+			sawTransient = sawTransient || pending.transient
+			replacePending(last, pending)
+		}
+	}
+	return proxymodel.Forwarded{}, false, sawTransient, nil
+}
+
+func (router *Router) tryFreshCandidate(
+	ctx context.Context,
+	request proxymodel.Request,
+	accounts []proxymodel.Account,
+	account proxymodel.Account,
+) (proxymodel.Forwarded, bool, *pendingResponse, error) {
+	result, pending, err := router.freshAttempt(ctx, request, account)
+	if err != nil {
+		return proxymodel.Forwarded{}, false, nil, err
+	}
+	if result != nil {
+		return *result, true, nil, nil
+	}
+	if pending == nil || !router.autoRedeem || !router.quotaBlockedAccount(account.ID) {
+		return proxymodel.Forwarded{}, false, pending, nil
+	}
+	if pending.firstEventRetry {
+		request.FirstEventRetryUsed = true
+	}
+	return router.tryFreshQuotaRedeem(ctx, request, accounts, account, pending)
+}
+
+func (router *Router) tryFreshQuotaRedeem(
+	ctx context.Context,
+	request proxymodel.Request,
+	accounts []proxymodel.Account,
+	account proxymodel.Account,
+	pending *pendingResponse,
+) (proxymodel.Forwarded, bool, *pendingResponse, error) {
+	redeemed, ok, err := router.tryAutoRedeem(ctx, accounts, account.ID, request)
+	if err != nil {
+		pending.close()
+		return proxymodel.Forwarded{}, false, nil, err
+	}
+	if !ok {
+		return proxymodel.Forwarded{}, false, pending, nil
+	}
+	pending.close()
+	result, retryPending, err := router.freshAttempt(ctx, request, redeemed)
+	if err != nil {
+		if ctx.Err() != nil {
+			return proxymodel.Forwarded{}, false, nil, ctx.Err()
+		}
+		return proxymodel.Forwarded{}, false, nil, nil
+	}
+	if result != nil {
+		return *result, true, nil, nil
+	}
+	return proxymodel.Forwarded{}, false, retryPending, nil
+}
+
+func freshAutoRedeemPool(
+	accounts []proxymodel.Account,
+	excluded map[string]bool,
+) []proxymodel.Account {
+	if len(excluded) == 0 {
+		return accounts
+	}
+	result := make([]proxymodel.Account, 0, len(accounts))
+	for _, account := range accounts {
+		if !excluded[account.ID] {
+			result = append(result, account)
+		}
+	}
+	return result
+}
+
+func (router *Router) tryFreshAutoRedeem(
+	ctx context.Context,
+	request proxymodel.Request,
+	accounts []proxymodel.Account,
+) (proxymodel.Forwarded, bool, error) {
+	redeemed, ok, err := router.tryAutoRedeem(ctx, accounts, "", request)
+	if err != nil || !ok {
+		return proxymodel.Forwarded{}, false, err
+	}
+	result, redeemErr := router.redeemedAttempt(ctx, request, redeemed)
+	if redeemErr != nil {
+		return proxymodel.Forwarded{}, false, redeemErr
+	}
+	return result, true, nil
+}
+
+func (router *Router) freshAttempt(
+	ctx context.Context,
+	request proxymodel.Request,
+	account proxymodel.Account,
+) (*proxymodel.Forwarded, *pendingResponse, error) {
+	response, err := router.execute(ctx, request, account)
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, nil, ctx.Err()
+		}
+		return nil, &pendingResponse{accountID: account.ID, transient: true}, nil
+	}
+	outcome, pending, err := router.classify(response, account.Provider.Kind)
+	if err != nil {
+		if ctx.Err() != nil {
+			if pending != nil {
+				pending.close()
+			}
+			return nil, nil, ctx.Err()
+		}
+		if pending != nil && pending.transient {
+			pending.close()
+			return nil, &pendingResponse{accountID: account.ID, transient: true}, nil
+		}
+		if pending != nil {
+			pending.close()
+		}
+		return nil, nil, &proxymodel.Error{StatusCode: 502, Message: "upstream response failed before commitment"}
+	}
+	if outcome.kind == responsePass {
+		router.clearQuotaBlocked(account.ID)
+		result := &proxymodel.Forwarded{Response: response, Prefix: pending.prefix, AccountID: account.ID, Failed: outcome.failed}
+		return result, nil, nil
+	}
+	router.applyRetryOutcome(account.ID, outcome)
+	pending.firstEventRetry = outcome.firstEventRetry
+	pending.accountID = account.ID
+	pending.authFailure = outcome.kind == responseAuthFailure
+	pending.quota = outcome.quota
+	pending.transient = outcome.transient
+	return nil, pending, nil
+}
+
+func (router *Router) applyRetryOutcome(accountID string, outcome responseOutcome) {
+	if outcome.quota {
+		router.markQuotaBlocked(accountID)
+	} else {
+		router.clearQuotaBlocked(accountID)
+	}
+	if outcome.kind == responseAuthFailure {
+		router.quarantineAuthFailure(accountID, 60*time.Second)
+		return
+	}
+	if outcome.quarantine > 0 {
+		router.quarantineAccount(accountID, outcome.quarantine)
+	}
+}
+
+func replacePending(last **pendingResponse, pending *pendingResponse) {
+	closePending(last)
+	*last = pending
+}
+
+func closePending(last **pendingResponse) {
+	if *last != nil {
+		(*last).close()
+		*last = nil
+	}
+}
+
+func finishFresh(last **pendingResponse) (proxymodel.Forwarded, error) {
+	if *last == nil {
+		return proxymodel.Forwarded{}, &proxymodel.Error{StatusCode: 502, Message: "all eligible accounts failed before upstream response commitment"}
+	}
+	pending := *last
+	*last = nil
+	if pending.response == nil {
+		return proxymodel.Forwarded{}, &proxymodel.Error{StatusCode: 502, Message: "all eligible accounts failed before upstream response commitment"}
+	}
+	return proxymodel.Forwarded{Response: pending.response, Prefix: pending.prefix, AccountID: pending.accountID, Failed: true}, nil
+}

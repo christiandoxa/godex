@@ -36,9 +36,14 @@ func sortRuntimeAccounts(accounts []proxymodel.Account) []proxymodel.Account {
 func (proxy *Router) candidates(accounts []proxymodel.Account, now time.Time) []proxymodel.Account {
 	available := make([]proxymodel.Account, 0, len(accounts))
 	for _, account := range accounts {
-		if account.ID != "" && account.Home != "" && account.Enabled && !account.EligibleAfter.After(now) && !proxy.isQuarantined(account.ID, now) {
-			available = append(available, account)
+		if account.ID == "" || account.Home == "" || !account.Enabled || account.EligibleAfter.After(now) {
+			continue
 		}
+		if proxy.authFailureQuarantined(account.ID, now) ||
+			(proxy.quotaBlockedAccount(account.ID) && proxy.isQuarantined(account.ID, now)) {
+			continue
+		}
+		available = append(available, account)
 	}
 	if len(available) == 0 {
 		return nil

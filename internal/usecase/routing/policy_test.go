@@ -12,7 +12,7 @@ import (
 )
 
 func TestProxyQuarantineIsBounded(t *testing.T) {
-	proxy := &Router{now: func() time.Time { return time.Unix(10, 0) }, quarantine: make(map[string]time.Time)}
+	proxy := &Router{now: func() time.Time { return time.Unix(10, 0) }, quarantine: make(map[string]quarantineState)}
 	for index := 0; index <= maxQuarantinedAccounts; index++ {
 		proxy.quarantineAccount(fmt.Sprintf("account-%d", index), time.Minute)
 	}
@@ -25,7 +25,7 @@ func TestProxyQuarantineIsBounded(t *testing.T) {
 }
 
 func TestProxyQuarantineKeepsLongerExistingLease(t *testing.T) {
-	proxy := &Router{now: func() time.Time { return time.Unix(10, 0) }, quarantine: make(map[string]time.Time)}
+	proxy := &Router{now: func() time.Time { return time.Unix(10, 0) }, quarantine: make(map[string]quarantineState)}
 	proxy.quarantineAccount("synthetic", time.Hour)
 	proxy.quarantineAccount("synthetic", time.Second)
 	if !proxy.isQuarantined("synthetic", time.Unix(10, 0).Add(time.Minute)) {
@@ -62,7 +62,8 @@ func TestClassifyPreCommitFailures(t *testing.T) {
 		quarantine bool
 	}{
 		{name: "server error", status: http.StatusBadGateway, kind: responseRetry},
-		{name: "rate limit", status: http.StatusTooManyRequests, kind: responseRetry, quarantine: true},
+		{name: "rate limit", status: http.StatusTooManyRequests, body: `{"error":{"code":"rate_limit_exceeded"}}`, kind: responseRetry, quarantine: true},
+		{name: "generic rate limit", status: http.StatusTooManyRequests, kind: responsePass},
 		{name: "unauthorized", status: http.StatusUnauthorized, kind: responseAuthFailure},
 		{name: "client error", status: http.StatusBadRequest, body: `{"error":{"code":"invalid_request"}}`, kind: responsePass},
 		{name: "quota body", status: http.StatusForbidden, body: `{"error":{"code":"insufficient_quota"}}`, kind: responseRetry, quarantine: true},
@@ -94,7 +95,7 @@ func TestClassifyPreCommitFailures(t *testing.T) {
 
 func TestLaunchQuotaExclusionRecoversAtItsDeadline(t *testing.T) {
 	now := time.Unix(100, 0)
-	router := &Router{now: func() time.Time { return now }, quarantine: make(map[string]time.Time)}
+	router := &Router{now: func() time.Time { return now }, quarantine: make(map[string]quarantineState)}
 	accounts := []proxymodel.Account{{ID: "exhausted", Home: "home", Enabled: true, EligibleAfter: now.Add(time.Minute)}}
 	if got := router.candidates(accounts, now); len(got) != 0 {
 		t.Fatal("exhausted account admitted early")

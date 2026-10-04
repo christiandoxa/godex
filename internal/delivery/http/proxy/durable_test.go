@@ -49,7 +49,9 @@ func durableRotationHandler(t *testing.T, calls *int) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		*calls = *calls + 1
 		if *calls == 1 {
+			writer.Header().Set("Content-Type", "application/json")
 			writer.WriteHeader(http.StatusTooManyRequests)
+			_, _ = io.WriteString(writer, `{"error":{"code":"insufficient_quota"}}`)
 			return
 		}
 		if request.Header.Get("ChatGPT-Account-Id") != "workspace-B" {

@@ -108,6 +108,20 @@ func TestStatusReadyUsesQuotaPolicy(t *testing.T) {
 	}
 }
 
+func TestAvailabilityTreatsOnePercentRemainingAsUsable(t *testing.T) {
+	used := int64(99)
+	reset := time.Unix(1000, 0).Unix()
+	account := accountentity.Account{ID: "one", Enabled: true}
+	status := NewStatus(fakeAccounts{}, fakeUsage{byHome: map[string]quotamodel.Usage{
+		"/managed/one": {Primary: &quotamodel.Window{UsedPercent: &used, ResetAt: &reset}},
+	}})
+	status.now = func() time.Time { return time.Unix(10, 0) }
+	availability, err := status.Availability(context.Background(), account)
+	if err != nil || !availability.Ready {
+		t.Fatalf("one-percent quota availability = %+v, err = %v", availability, err)
+	}
+}
+
 func TestAvailabilityUsesObservedResetAndFiniteUnknownRetry(t *testing.T) {
 	now := time.Unix(100, 0)
 	reset := now.Add(15 * time.Second).Unix()
