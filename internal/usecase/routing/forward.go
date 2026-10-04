@@ -29,6 +29,9 @@ func (router *Router) forwardBound(
 			Message:    "conversation owner could not be reached; continuity was preserved",
 		}
 	}
+	if request.WebSocketMessage {
+		return router.handleBoundWebSocketResponse(ctx, request, accounts, account, response)
+	}
 	if !router.autoRedeem {
 		return router.legacyBoundResponse(account, response), nil
 	}
