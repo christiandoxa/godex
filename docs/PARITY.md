@@ -135,9 +135,13 @@ and eligibility validation stays in the runtime use case.
   and Compact/Standard weight 1; permits live through response-body/duplex close,
   hard affinity bypasses the cap while remaining counted, capacity release wakes
   waiting work, and each wait epoch reloads profile eligibility so an unavailable
-  saturated profile can yield to another profile. Lane/queue admission and the
-  full per-message WebSocket recovery path remain active parity work; WebSocket
-  must not be considered closed until those semantics are production-proven.
+  saturated profile can yield to another profile. Global and per-route lane
+  admission are acquired atomically, so a waiter on a saturated Responses lane
+  does not consume a free global slot; lane defaults follow the tagged
+  parallelism/global policy and saturated lanes wait for release or cancellation
+  instead of returning local overload. Long-lived queue admission and the full
+  per-message WebSocket recovery path remain active parity work; WebSocket must
+  not be considered closed until those semantics are production-proven.
 - Full native-home import remains unsupported. Godex imports auth only, leaves
   source settings, rollouts, and databases intact, and keeps managed homes isolated.
 - The `0.435.1` hotfix adds no user-facing command surface; its material Godex
