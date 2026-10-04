@@ -11,15 +11,16 @@ import (
 )
 
 type websocketEvent struct {
-	text          bool
-	kind          string
-	payload       []byte
-	frames        []byte
-	responseID    string
-	turnState     string
-	retryCode     string
-	terminal      bool
-	terminalReset bool
+	text                      bool
+	kind                      string
+	payload                   []byte
+	frames                    []byte
+	responseID                string
+	turnState                 string
+	retryCode                 string
+	invalidPreviousResponseID bool
+	terminal                  bool
+	terminalReset             bool
 }
 
 func readWebSocketEvent(connection io.ReadWriteCloser) (websocketEvent, error) {
@@ -72,7 +73,11 @@ func readWebSocketEvent(connection io.ReadWriteCloser) (websocketEvent, error) {
 				return websocketEvent{}, errors.New("upstream websocket text message is not valid UTF-8")
 			}
 			event.kind, event.responseID, event.turnState = websocketEventMetadata(event.payload)
+			event.invalidPreviousResponseID = websocketInvalidPreviousResponseID(event.payload)
 			event.retryCode = websocketRetryFailureCode(event.payload)
+			if event.invalidPreviousResponseID {
+				event.retryCode = "previous_response_not_found"
+			}
 			event.terminal = websocketPayloadTerminal(event.kind, event.payload)
 			event.terminalReset = event.terminal && websocketTerminalShouldReset(event.kind)
 		}

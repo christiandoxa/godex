@@ -205,7 +205,9 @@ func websocketPrecommitFailure(
 		WebSocketReusedSession: reusedSession,
 		WebSocketReuseIdle:     reuseIdle,
 		FirstEventRetryUsed:    retryUsed,
-		PrecommitFailure:       &proxymodel.PrecommitFailure{Code: event.retryCode},
+		PrecommitFailure: &proxymodel.PrecommitFailure{
+			Code: event.retryCode, InvalidPreviousResponseID: event.invalidPreviousResponseID,
+		},
 	}
 }
 

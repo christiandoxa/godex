@@ -39,8 +39,9 @@ type Response struct {
 	PrecommitFailure       *PrecommitFailure
 }
 type PrecommitFailure struct {
-	Code      string
-	Transport bool
+	Code                      string
+	Transport                 bool
+	InvalidPreviousResponseID bool
 }
 type Forwarded struct {
 	Response  *Response

@@ -182,9 +182,15 @@ and eligibility validation stays in the runtime use case.
   fresh message may redeem the same profile once before retrying that profile,
   while message-level quota failures and requests carrying previous/session/turn
   context do not trigger auto-redeem and instead continue through quota fallback/
-  affinity policy. Realtime/live WebSocket surfaces and unbound/full-context
-  previous-response or quota fallback remain active parity work, so full WebSocket
-  parity is still open.
+  affinity policy. The tagged invalid-previous-response compatibility gate is now
+  closed too: exact `invalid_request_error` + "Invalid `previous_response_id`."
+  events are distinguished from ordinary missing-chain failures, the dead response
+  binding is removed without releasing session ownership, eligible previous+session
+  owner matches receive the 400 `previous_response_not_found` full-context replay
+  signal, and a subsequent full-context message remains on that session owner.
+  Non-eligible invalid-ID errors pass through unchanged. Realtime/live WebSocket
+  surfaces and quota-triggered full-context/fallback remain active parity work, so
+  full WebSocket parity is still open.
 - Full native-home import remains unsupported. Godex imports auth only, leaves
   source settings, rollouts, and databases intact, and keeps managed homes isolated.
 - The `0.435.1` hotfix adds no user-facing command surface; its material Godex

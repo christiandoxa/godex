@@ -77,6 +77,11 @@ func (router *Router) executeRouted(
 		if !websocketPreviousResponseNotFound(response, metadata.previousResponseID) {
 			return response, nil
 		}
+		if response.PrecommitFailure.InvalidPreviousResponseID {
+			return router.handleInvalidWebSocketPreviousResponse(
+				ctx, response, metadata, account, trustedPreviousAffinity,
+			)
+		}
 
 		turnState := strings.TrimSpace(response.WebSocketTurnState)
 		plan := planWebSocketPreviousResponse(websocketPreviousResponsePlanInput{
