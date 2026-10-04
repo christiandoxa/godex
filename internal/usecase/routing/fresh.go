@@ -50,6 +50,11 @@ func (router *Router) forwardFresh(
 				return proxymodel.Forwarded{}, err
 			}
 			recoverySweeps++
+			refreshedAccounts, refreshedCandidates, err := router.reloadFreshCandidatesAfterRecoveryWait(ctx, candidates, retryable)
+			if err != nil {
+				return proxymodel.Forwarded{}, err
+			}
+			accounts, candidates = refreshedAccounts, refreshedCandidates
 			continue
 		}
 		result, found, transient, saturated, err := router.tryFreshCandidates(
@@ -89,6 +94,11 @@ func (router *Router) forwardFresh(
 			return proxymodel.Forwarded{}, err
 		}
 		recoverySweeps++
+		refreshedAccounts, refreshedCandidates, err := router.reloadFreshCandidatesAfterRecoveryWait(ctx, candidates, retryable)
+		if err != nil {
+			return proxymodel.Forwarded{}, err
+		}
+		accounts, candidates = refreshedAccounts, refreshedCandidates
 	}
 	remaining := freshAutoRedeemPool(accounts, excluded)
 	if !autoRedeemAttempted {

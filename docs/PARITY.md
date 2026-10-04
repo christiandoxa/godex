@@ -1,8 +1,8 @@
-# Prodex 0.435.2 parity audit
+# Prodex 0.435.4 parity audit
 
-Reference: exact Prodex tag `0.435.3`, commit
-`31a1dbaedb300201a9e050ed3060fc5381dea62b`. The tag's `Cargo.toml` declares
-`0.435.3`, and its compatibility audit names Codex `rust-v0.160.0` at commit
+Reference: exact Prodex tag `0.435.4`, commit
+`8583f6026f157bcf349d6efd9940a7e19b3b7d0f`. The tag's `Cargo.toml` declares
+`0.435.4`, and its compatibility audit names Codex `rust-v0.160.0` at commit
 `a956835d020762cb2b570053af06f643a11c0ecc`. Comparison reads use tagged Prodex
 Git objects rather than the mutable Prodex checkout. The audited Codex commit is
 not present in this local checkout, so it is treated as release-audit evidence
@@ -13,7 +13,7 @@ checkpoint, not the current parity target.
 
 ## 1:1 parity expansion
 
-The project target is now feature-for-feature parity with Prodex `0.435.3`, not
+The project target is now feature-for-feature parity with Prodex `0.435.4`, not
 only the historical OpenAI/Codex core boundary. The core closure below remains a
 verified baseline while additional surfaces are implemented. Current expansion
 checkpoints add standalone/external profile registration and copy workflows,
@@ -31,9 +31,9 @@ Full parity remains open while any gap below remains.
 The earlier core checkpoint closed practical parity for the declared
 OpenAI/Codex account, isolated profile, session, and foreground managed HTTP/SSE
 scope against its then-current baseline. It does not close feature-for-feature
-parity with Prodex 0.435.3. The preserved audit read tagged Prodex source
+parity with Prodex 0.435.4. The preserved audit read tagged Prodex source
 alongside Godex production code, callers, tests, and Codex 0.159.2. The active
-expansion baseline is Prodex 0.435.3 / Codex 0.160.0; the earlier audit found
+expansion baseline is Prodex 0.435.4 / Codex 0.160.0; the earlier audit found
 and closed these gaps:
 
 - Import identity now comes from the same credential snapshot that is staged,
@@ -114,7 +114,7 @@ and eligibility validation stays in the runtime use case.
 
 ## Remaining 1:1 parity gaps
 
-- Prodex `0.435.3` is the exact parity baseline. Its audited Codex target remains
+- Prodex `0.435.4` is the exact parity baseline. Its audited Codex target remains
   `rust-v0.160.0`; the accepted minimum remains 0.153.2. The inherited 0.435.2
   auto-rotation reliability behavior is now covered on Godex HTTP production
   paths: 1% quota remains usable, authoritative all-zero pools do not dispatch,
@@ -152,6 +152,13 @@ and eligibility validation stays in the runtime use case.
   8-second precommit and 300-second committed idle timing, non-leaking precommit
   failures, retry-vs-terminal event separation, response-header turn state,
   connection-limit reuse recovery, and reset-on-failed/incomplete terminal events.
+  Prodex 0.435.4 additionally makes profile viability authoritative across
+  precommit-budget boundaries. Godex fresh recovery now reloads the account source
+  and rebuilds its candidate/retryable set after each recovery wait, so a newly
+  selectable profile can replace a stale candidate even when no transient-failure
+  flag was recorded. The no-transient wait path has an explicit regression.
+  Request-local Compact quota exclusions and the equivalent fresh WebSocket
+  retryable-profile recovery rule remain active 0.435.4 parity work.
   Public upgrade wiring, routing/rotation ownership, stale-continuation policy,
   and WebSocket auto-redeem remain active parity work; WebSocket must not be
   considered closed until those end-to-end production semantics are proven.
