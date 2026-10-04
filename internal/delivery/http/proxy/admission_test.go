@@ -72,6 +72,26 @@ func newAdmissionParityProxy(t *testing.T, gateway *admissionGateway, limit int)
 	return server
 }
 
+func TestActiveRequestLimitMatchesProdexParallelismPolicy(t *testing.T) {
+	for _, test := range []struct {
+		parallelism int
+		want        int
+	}{
+		{parallelism: 0, want: 64},
+		{parallelism: 1, want: 64},
+		{parallelism: 4, want: 64},
+		{parallelism: 9, want: 64},
+		{parallelism: 10, want: 70},
+		{parallelism: 11, want: 77},
+		{parallelism: 12, want: 84},
+		{parallelism: 64, want: 84},
+	} {
+		if got := activeRequestLimitForParallelism(test.parallelism); got != test.want {
+			t.Fatalf("parallelism %d active limit = %d, want %d", test.parallelism, got, test.want)
+		}
+	}
+}
+
 func TestActiveRequestBackpressureSerializesThirtyTwoCallersWithoutRejection(t *testing.T) {
 	const callers = 32
 	gateway := &admissionGateway{

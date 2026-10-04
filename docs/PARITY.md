@@ -125,9 +125,11 @@ and eligibility validation stays in the runtime use case.
   continue as long as a retryable profile remains. Prodex 0.435.3 additionally
   removes user-visible local-capacity deadlines in favor of wait-and-resume
   backpressure with eligibility re-evaluation. Godex now applies that contract to
-  global active-request admission: the default 64-request ceiling queues excess
-  callers instead of rejecting them, cancellation stops queued work without
-  upstream dispatch, and a production-path 32-caller/limit-1 regression verifies
+  global active-request admission: the host-derived Prodex default computes
+  worker/long-lived capacity from available parallelism and yields a 64-84 request
+  ceiling; excess callers queue instead of being rejected, cancellation stops
+  queued work without upstream dispatch, and a production-path 32-caller/limit-1
+  regression verifies
   serialization with zero local saturation failures. Per-profile hard admission
   now follows the tagged default hard limit of 8 with Responses/WebSocket weight 2
   and Compact/Standard weight 1; permits live through response-body/duplex close,
