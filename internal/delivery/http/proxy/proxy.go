@@ -19,6 +19,7 @@ type Config struct {
 	Router                           *routingusecase.Router
 	Activity                         activityRecorder
 	ListenAddr                       string
+	ActiveRequestLimit               int
 	MaxRequestBytes, MaxInspectBytes int64
 }
 type Proxy struct {
@@ -52,7 +53,10 @@ func NewProxy(config Config) (*Proxy, error) {
 		config.MaxInspectBytes = 64 << 10
 	}
 	proxy := &Proxy{router: config.Router, activity: config.Activity, listenAddr: config.ListenAddr, maxRequest: config.MaxRequestBytes, maxInspect: config.MaxInspectBytes}
-	proxy.server = &http.Server{Handler: proxy, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 90 * time.Second}
+	proxy.server = &http.Server{
+		Handler:           newActiveRequestHandler(proxy, config.ActiveRequestLimit),
+		ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 90 * time.Second,
+	}
 	return proxy, nil
 }
 func (proxy *Proxy) Start() error {

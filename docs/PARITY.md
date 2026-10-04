@@ -124,10 +124,14 @@ and eligibility validation stays in the runtime use case.
   Individual recovery waits remain bounded while the overall retry epoch may
   continue as long as a retryable profile remains. Prodex 0.435.3 additionally
   removes user-visible local-capacity deadlines in favor of wait-and-resume
-  backpressure with eligibility re-evaluation. That local admission/profile
-  capacity behavior and the full per-message WebSocket recovery path remain
-  active Godex parity work; WebSocket must not be considered closed until those
-  semantics are production-proven.
+  backpressure with eligibility re-evaluation. Godex now applies that contract to
+  global active-request admission: the default 64-request ceiling queues excess
+  callers instead of rejecting them, cancellation stops queued work without
+  upstream dispatch, and a production-path 32-caller/limit-1 regression verifies
+  serialization with zero local saturation failures. Per-profile hard-limit
+  re-evaluation, lane/queue admission, and the full per-message WebSocket recovery
+  path remain active parity work; WebSocket must not be considered closed until
+  those semantics are production-proven.
 - Full native-home import remains unsupported. Godex imports auth only, leaves
   source settings, rollouts, and databases intact, and keeps managed homes isolated.
 - The `0.435.1` hotfix adds no user-facing command surface; its material Godex
