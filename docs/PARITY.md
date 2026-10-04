@@ -139,9 +139,12 @@ and eligibility validation stays in the runtime use case.
   admission are acquired atomically, so a waiter on a saturated Responses lane
   does not consume a free global slot; lane defaults follow the tagged
   parallelism/global policy and saturated lanes wait for release or cancellation
-  instead of returning local overload. Long-lived queue admission and the full
-  per-message WebSocket recovery path remain active parity work; WebSocket must
-  not be considered closed until those semantics are production-proven.
+  instead of returning local overload. Prodex's separate bounded long-lived worker
+  queue has no Godex resource-equivalent: Godex's net/http request goroutine waits
+  directly at the global+lane admission boundary, so there is no independent
+  queue-full deadline that can surface to the caller. The full per-message
+  WebSocket recovery path remains active parity work; WebSocket must not be
+  considered closed until those semantics are production-proven.
 - Full native-home import remains unsupported. Godex imports auth only, leaves
   source settings, rollouts, and databases intact, and keeps managed homes isolated.
 - The `0.435.1` hotfix adds no user-facing command surface; its material Godex
