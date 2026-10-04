@@ -19,33 +19,39 @@ type AutoRedeemer interface {
 }
 
 type Config struct {
-	Accounts         func(context.Context) ([]proxymodel.Account, error)
-	PreferredAccount string
-	Now              func() time.Time
-	Wait             func(context.Context, time.Duration) error
-	MaxInspectBytes  int64
-	Gateway          gateway
-	Bindings         bindingRepository
-	AutoRedeem       bool
-	Redeemer         AutoRedeemer
+	Accounts                 func(context.Context) ([]proxymodel.Account, error)
+	PreferredAccount         string
+	Now                      func() time.Time
+	Wait                     func(context.Context, time.Duration) error
+	ProfileInflightWait      profileInflightWaitFunc
+	ProfileInflightHardLimit int
+	MaxInspectBytes          int64
+	Gateway                  gateway
+	Bindings                 bindingRepository
+	AutoRedeem               bool
+	Redeemer                 AutoRedeemer
 }
 
 type Router struct {
-	source        func(context.Context) ([]proxymodel.Account, error)
-	gateway       gateway
-	preferred     string
-	now           func() time.Time
-	wait          func(context.Context, time.Duration) error
-	maxInspect    int64
-	affinity      *affinityStore
-	mu            sync.Mutex
-	cursor        int
-	preferredUsed bool
-	quarantine    map[string]quarantineState
-	quotaBlocked  map[string]bool
-	autoRedeem    bool
-	redeemer      AutoRedeemer
-	conversations map[string]*conversationLock
+	source                   func(context.Context) ([]proxymodel.Account, error)
+	gateway                  gateway
+	preferred                string
+	now                      func() time.Time
+	wait                     func(context.Context, time.Duration) error
+	maxInspect               int64
+	affinity                 *affinityStore
+	mu                       sync.Mutex
+	cursor                   int
+	preferredUsed            bool
+	inflight                 map[string]int
+	inflightChanged          chan struct{}
+	profileInflightHardLimit int
+	profileInflightWait      profileInflightWaitFunc
+	quarantine               map[string]quarantineState
+	quotaBlocked             map[string]bool
+	autoRedeem               bool
+	redeemer                 AutoRedeemer
+	conversations            map[string]*conversationLock
 }
 
 func NewRouter(config Config) (*Router, error) {
@@ -61,11 +67,19 @@ func NewRouter(config Config) (*Router, error) {
 	if config.MaxInspectBytes <= 0 {
 		config.MaxInspectBytes = 64 << 10
 	}
+	if config.ProfileInflightHardLimit <= 0 {
+		config.ProfileInflightHardLimit = defaultProfileInflightHardLimit
+	}
+	if config.ProfileInflightWait == nil {
+		config.ProfileInflightWait = waitProfileInflightSignalOrEpoch
+	}
 	router := &Router{
 		source: config.Accounts, gateway: config.Gateway,
 		preferred: strings.TrimSpace(config.PreferredAccount),
 		now:       config.Now, wait: config.Wait, maxInspect: config.MaxInspectBytes,
 		affinity: newAffinityStore(), quarantine: make(map[string]quarantineState),
+		inflight: make(map[string]int), inflightChanged: make(chan struct{}),
+		profileInflightHardLimit: config.ProfileInflightHardLimit, profileInflightWait: config.ProfileInflightWait,
 		quotaBlocked: make(map[string]bool), autoRedeem: config.AutoRedeem, redeemer: config.Redeemer,
 	}
 	router.affinity.repository = config.Bindings

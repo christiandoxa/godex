@@ -62,7 +62,7 @@ func (router *Router) redeemedAttempt(
 	request proxymodel.Request,
 	account proxymodel.Account,
 ) (proxymodel.Forwarded, error) {
-	response, err := router.execute(ctx, request, account)
+	response, err := router.executeWithProfileInflightWait(ctx, request, account, false)
 	if err != nil {
 		if ctx.Err() != nil {
 			return proxymodel.Forwarded{}, ctx.Err()

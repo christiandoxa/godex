@@ -14,13 +14,18 @@ func (router *Router) tryFreshCandidates(
 	last **pendingResponse,
 	excluded, retryable map[string]bool,
 	firstEventRetryUsed *bool,
-) (proxymodel.Forwarded, bool, bool, error) {
+) (proxymodel.Forwarded, bool, bool, bool, error) {
 	sawTransient := false
+	sawSaturated := false
 	for _, account := range candidates {
 		request.FirstEventRetryUsed = *firstEventRetryUsed
-		result, found, pending, err := router.tryFreshCandidate(ctx, request, candidates, account)
+		result, found, pending, saturated, err := router.tryFreshCandidate(ctx, request, candidates, account)
 		if err != nil || found {
-			return result, found, sawTransient, err
+			return result, found, sawTransient, sawSaturated, err
+		}
+		if saturated {
+			sawSaturated = true
+			continue
 		}
 		excluded[account.ID] = true
 		if pending != nil {
@@ -34,7 +39,7 @@ func (router *Router) tryFreshCandidates(
 			replacePending(last, pending)
 		}
 	}
-	return proxymodel.Forwarded{}, false, sawTransient, nil
+	return proxymodel.Forwarded{}, false, sawTransient, sawSaturated, nil
 }
 
 func (router *Router) tryFreshCandidate(
@@ -42,21 +47,25 @@ func (router *Router) tryFreshCandidate(
 	request proxymodel.Request,
 	accounts []proxymodel.Account,
 	account proxymodel.Account,
-) (proxymodel.Forwarded, bool, *pendingResponse, error) {
-	result, pending, err := router.freshAttempt(ctx, request, account)
+) (proxymodel.Forwarded, bool, *pendingResponse, bool, error) {
+	result, pending, saturated, err := router.freshAttempt(ctx, request, account)
 	if err != nil {
-		return proxymodel.Forwarded{}, false, nil, err
+		return proxymodel.Forwarded{}, false, nil, false, err
+	}
+	if saturated {
+		return proxymodel.Forwarded{}, false, nil, true, nil
 	}
 	if result != nil {
-		return *result, true, nil, nil
+		return *result, true, nil, false, nil
 	}
 	if pending == nil || !router.autoRedeem || !router.quotaBlockedAccount(account.ID) {
-		return proxymodel.Forwarded{}, false, pending, nil
+		return proxymodel.Forwarded{}, false, pending, false, nil
 	}
 	if pending.firstEventRetry {
 		request.FirstEventRetryUsed = true
 	}
-	return router.tryFreshQuotaRedeem(ctx, request, accounts, account, pending)
+	redeemResult, found, nextPending, err := router.tryFreshQuotaRedeem(ctx, request, accounts, account, pending)
+	return redeemResult, found, nextPending, false, err
 }
 
 func (router *Router) tryFreshQuotaRedeem(
@@ -75,17 +84,25 @@ func (router *Router) tryFreshQuotaRedeem(
 		return proxymodel.Forwarded{}, false, pending, nil
 	}
 	pending.close()
-	result, retryPending, err := router.freshAttempt(ctx, request, redeemed)
-	if err != nil {
-		if ctx.Err() != nil {
-			return proxymodel.Forwarded{}, false, nil, ctx.Err()
+	for {
+		result, retryPending, saturated, err := router.freshAttempt(ctx, request, redeemed)
+		if err != nil {
+			if ctx.Err() != nil {
+				return proxymodel.Forwarded{}, false, nil, ctx.Err()
+			}
+			return proxymodel.Forwarded{}, false, nil, nil
 		}
-		return proxymodel.Forwarded{}, false, nil, nil
+		if saturated {
+			if err := router.waitForProfileInflight(ctx); err != nil {
+				return proxymodel.Forwarded{}, false, nil, err
+			}
+			continue
+		}
+		if result != nil {
+			return *result, true, nil, nil
+		}
+		return proxymodel.Forwarded{}, false, retryPending, nil
 	}
-	if result != nil {
-		return *result, true, nil, nil
-	}
-	return proxymodel.Forwarded{}, false, retryPending, nil
 }
 
 func freshAutoRedeemPool(
@@ -124,13 +141,16 @@ func (router *Router) freshAttempt(
 	ctx context.Context,
 	request proxymodel.Request,
 	account proxymodel.Account,
-) (*proxymodel.Forwarded, *pendingResponse, error) {
-	response, err := router.execute(ctx, request, account)
+) (*proxymodel.Forwarded, *pendingResponse, bool, error) {
+	response, acquired, err := router.tryExecuteWithProfileInflight(ctx, request, account, false)
+	if !acquired {
+		return nil, nil, true, nil
+	}
 	if err != nil {
 		if ctx.Err() != nil {
-			return nil, nil, ctx.Err()
+			return nil, nil, false, ctx.Err()
 		}
-		return nil, &pendingResponse{accountID: account.ID, transient: true}, nil
+		return nil, &pendingResponse{accountID: account.ID, transient: true}, false, nil
 	}
 	outcome, pending, err := router.classify(response, account.Provider.Kind)
 	if err != nil {
@@ -138,21 +158,21 @@ func (router *Router) freshAttempt(
 			if pending != nil {
 				pending.close()
 			}
-			return nil, nil, ctx.Err()
+			return nil, nil, false, ctx.Err()
 		}
 		if pending != nil && pending.transient {
 			pending.close()
-			return nil, &pendingResponse{accountID: account.ID, transient: true}, nil
+			return nil, &pendingResponse{accountID: account.ID, transient: true}, false, nil
 		}
 		if pending != nil {
 			pending.close()
 		}
-		return nil, nil, &proxymodel.Error{StatusCode: 502, Message: "upstream response failed before commitment"}
+		return nil, nil, false, &proxymodel.Error{StatusCode: 502, Message: "upstream response failed before commitment"}
 	}
 	if outcome.kind == responsePass {
 		router.clearQuotaBlocked(account.ID)
 		result := &proxymodel.Forwarded{Response: response, Prefix: pending.prefix, AccountID: account.ID, Failed: outcome.failed}
-		return result, nil, nil
+		return result, nil, false, nil
 	}
 	router.applyRetryOutcome(account.ID, outcome)
 	pending.firstEventRetry = outcome.firstEventRetry
@@ -160,7 +180,7 @@ func (router *Router) freshAttempt(
 	pending.authFailure = outcome.kind == responseAuthFailure
 	pending.quota = outcome.quota
 	pending.transient = outcome.transient
-	return nil, pending, nil
+	return nil, pending, false, nil
 }
 
 func (router *Router) applyRetryOutcome(accountID string, outcome responseOutcome) {

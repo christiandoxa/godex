@@ -128,10 +128,14 @@ and eligibility validation stays in the runtime use case.
   global active-request admission: the default 64-request ceiling queues excess
   callers instead of rejecting them, cancellation stops queued work without
   upstream dispatch, and a production-path 32-caller/limit-1 regression verifies
-  serialization with zero local saturation failures. Per-profile hard-limit
-  re-evaluation, lane/queue admission, and the full per-message WebSocket recovery
-  path remain active parity work; WebSocket must not be considered closed until
-  those semantics are production-proven.
+  serialization with zero local saturation failures. Per-profile hard admission
+  now follows the tagged default hard limit of 8 with Responses/WebSocket weight 2
+  and Compact/Standard weight 1; permits live through response-body/duplex close,
+  hard affinity bypasses the cap while remaining counted, capacity release wakes
+  waiting work, and each wait epoch reloads profile eligibility so an unavailable
+  saturated profile can yield to another profile. Lane/queue admission and the
+  full per-message WebSocket recovery path remain active parity work; WebSocket
+  must not be considered closed until those semantics are production-proven.
 - Full native-home import remains unsupported. Godex imports auth only, leaves
   source settings, rollouts, and databases intact, and keeps managed homes isolated.
 - The `0.435.1` hotfix adds no user-facing command surface; its material Godex

@@ -52,11 +52,31 @@ func (router *Router) forwardFresh(
 			recoverySweeps++
 			continue
 		}
-		result, found, transient, err := router.tryFreshCandidates(
+		result, found, transient, saturated, err := router.tryFreshCandidates(
 			ctx, request, current, &last, excluded, retryable, &firstEventRetryUsed,
 		)
 		if err != nil || found {
 			return result, err
+		}
+		if saturated {
+			if err := router.waitForProfileInflight(ctx); err != nil {
+				return proxymodel.Forwarded{}, err
+			}
+			refreshed, loadErr := router.loadAccounts(ctx)
+			if loadErr != nil {
+				return proxymodel.Forwarded{}, loadErr
+			}
+			accounts = refreshed
+			candidates = router.candidates(accounts, router.now())
+			for _, account := range candidates {
+				if _, exists := retryable[account.ID]; !exists {
+					retryable[account.ID] = true
+				}
+			}
+			if len(candidates) == 0 && last == nil {
+				return router.forwardFreshWithoutCandidates(ctx, request, accounts)
+			}
+			continue
 		}
 		if !transient || !hasRetryableFreshAccount(retryable) {
 			break

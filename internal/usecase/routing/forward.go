@@ -22,7 +22,7 @@ func (router *Router) forwardBound(
 	if err != nil {
 		return proxymodel.Forwarded{}, err
 	}
-	response, err := router.execute(ctx, request, account)
+	response, err := router.executeWithProfileInflightWait(ctx, request, account, true)
 	if err != nil {
 		return proxymodel.Forwarded{}, &proxymodel.Error{
 			StatusCode: http.StatusBadGateway,
