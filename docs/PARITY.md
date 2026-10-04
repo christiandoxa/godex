@@ -160,9 +160,11 @@ and eligibility validation stays in the runtime use case.
   Compact now also respects request-local exclusions when deciding whether quota
   fallback is exhausted: a profile already failed/excluded in the same request is
   not counted again merely because it remains globally eligible. This is scoped
-  to Compact and leaves ordinary Responses recovery unchanged. The equivalent
-  fresh WebSocket retryable-profile recovery rule remains active 0.435.4 parity
-  work.
+  to Compact and leaves ordinary Responses recovery unchanged. Fresh WebSocket
+  messages inherit the same 0.435.4 viability rule through the generic fresh
+  recovery path: a retryable profile may wait/reselect without a transient flag,
+  while a known previous-response owner remains hard-affinity/fail-closed during
+  backoff. Dedicated regressions lock both behaviors.
   Public upgrade wiring, routing/rotation ownership, stale-continuation policy,
   and WebSocket auto-redeem remain active parity work; WebSocket must not be
   considered closed until those end-to-end production semantics are proven.
