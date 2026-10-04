@@ -62,7 +62,8 @@ func (router *Router) tryFreshCandidate(
 	if result != nil {
 		return *result, true, nil, false, nil
 	}
-	if pending == nil || !router.autoRedeem || !router.quotaBlockedAccount(account.ID) {
+	if pending == nil || !router.autoRedeem || !router.quotaBlockedAccount(account.ID) ||
+		!freshAutoRedeemAllowedForResponse(request, pending) {
 		return proxymodel.Forwarded{}, false, pending, false, nil
 	}
 	if pending.firstEventRetry {

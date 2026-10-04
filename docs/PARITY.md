@@ -177,9 +177,14 @@ and eligibility validation stays in the runtime use case.
   retry reason fail closed immediately, turn-state overrides are not truncated by
   a Godex-only 4 KiB cap, and terminal stale failures are translated to the tagged
   409 `stale_continuation` WebSocket shape without leaking the raw upstream code;
-  the local socket remains usable for the next message. Realtime/live WebSocket
-  surfaces, unbound/full-context previous-response fallback, and WebSocket
-  auto-redeem remain active parity work, so full WebSocket parity is still open.
+  the local socket remains usable for the next message. Fresh upstream WebSocket
+  connect quota failures now also match the tagged auto-redeem policy: a context-free
+  fresh message may redeem the same profile once before retrying that profile,
+  while message-level quota failures and requests carrying previous/session/turn
+  context do not trigger auto-redeem and instead continue through quota fallback/
+  affinity policy. Realtime/live WebSocket surfaces and unbound/full-context
+  previous-response or quota fallback remain active parity work, so full WebSocket
+  parity is still open.
 - Full native-home import remains unsupported. Godex imports auth only, leaves
   source settings, rollouts, and databases intact, and keeps managed homes isolated.
 - The `0.435.1` hotfix adds no user-facing command surface; its material Godex
