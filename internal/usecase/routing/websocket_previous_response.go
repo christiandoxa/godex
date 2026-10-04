@@ -9,28 +9,44 @@ var websocketPreviousResponseRetryDelays = [...]time.Duration{
 }
 
 type websocketPreviousResponsePlan struct {
-	retryDelay        time.Duration
-	retryOwner        bool
-	staleContinuation bool
+	retryDelay                    time.Duration
+	retryOwner                    bool
+	staleContinuation             bool
+	requestRequiresLockedAffinity bool
+	freshBlockedWithoutAffinity   bool
 }
 
 type websocketPreviousResponsePlanInput struct {
-	previousPresent bool
-	hasTurnState    bool
-	lockedAffinity  bool
-	retryIndex      int
+	previousPresent                 bool
+	hasTurnStateRetry               bool
+	requestRequiresPreviousAffinity bool
+	trustedPreviousAffinity         bool
+	requestTurnStatePresent         bool
+	retryIndex                      int
 }
 
 func planWebSocketPreviousResponse(input websocketPreviousResponsePlanInput) websocketPreviousResponsePlan {
-	if !input.previousPresent {
-		return websocketPreviousResponsePlan{}
-	}
-	retryReason := input.hasTurnState || input.lockedAffinity
+	websocketRequiresAffinity := input.trustedPreviousAffinity &&
+		input.previousPresent &&
+		!input.requestTurnStatePresent
+	requestRequiresLockedAffinity := input.requestRequiresPreviousAffinity || websocketRequiresAffinity
+	lockedAffinityRetry := input.requestRequiresPreviousAffinity && !input.hasTurnStateRetry
+
+	retryReason := input.hasTurnStateRetry || lockedAffinityRetry
 	if retryReason && input.retryIndex >= 0 && input.retryIndex < len(websocketPreviousResponseRetryDelays) {
 		return websocketPreviousResponsePlan{
-			retryDelay: websocketPreviousResponseRetryDelays[input.retryIndex],
-			retryOwner: true,
+			retryDelay:                    websocketPreviousResponseRetryDelays[input.retryIndex],
+			retryOwner:                    true,
+			requestRequiresLockedAffinity: requestRequiresLockedAffinity,
 		}
 	}
-	return websocketPreviousResponsePlan{staleContinuation: true}
+
+	freshFailClosed := input.previousPresent || requestRequiresLockedAffinity
+	return websocketPreviousResponsePlan{
+		staleContinuation:             input.previousPresent,
+		requestRequiresLockedAffinity: requestRequiresLockedAffinity,
+		freshBlockedWithoutAffinity: freshFailClosed &&
+			!input.hasTurnStateRetry &&
+			!requestRequiresLockedAffinity,
+	}
 }
