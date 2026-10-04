@@ -202,12 +202,16 @@ and eligibility validation stays in the runtime use case.
   for previous+session continuations, releases only the failed owner's
   previous/turn/session affinity, and lets the next full-context replay select the
   ready profile without leaking the upstream quota event. Session-only affinity is
-  soft and rotates the same request when a fallback is ready; with no ready
-  fallback, the original quota failure and ownership remain. Message-level quota
-  never spends an auto-redeem credit. Public E2E regressions cover A -> signal ->
-  reconnect/full-context -> B. With Responses, Realtime/live, stale/invalid
-  continuation handling, commitment, backpressure, and quota recovery all closed,
-  the Prodex 0.435.4 WebSocket surface is now considered parity-complete.
+  soft and rotates the same request when a fallback is ready. The tagged
+  `Ready` / `LastChance` / `Unavailable` quota-fallback policy is also enforced:
+  a context-free session may use one otherwise-healthy profile through transient
+  quarantine/backoff without waiting, context-constrained continuations never
+  use that last chance, and the profile hard in-flight cap remains authoritative.
+  With no legal fallback, the original quota failure and ownership remain.
+  Message-level quota never spends an auto-redeem credit. Public E2E regressions
+  cover A -> signal -> reconnect/full-context -> B. With Responses, Realtime/live,
+  stale/invalid continuation handling, commitment, backpressure, and quota recovery
+  all closed, the Prodex 0.435.4 WebSocket surface is now considered parity-complete.
 - Full native-home import remains unsupported. Godex imports auth only, leaves
   source settings, rollouts, and databases intact, and keeps managed homes isolated.
 - The `0.435.1` hotfix adds no user-facing command surface; its material Godex

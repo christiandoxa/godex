@@ -3,10 +3,12 @@ package routing
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	routingrepo "github.com/christiandoxa/godex/internal/repository/routing"
@@ -154,6 +156,172 @@ func TestProdex04354WebSocketSessionOnlyQuotaRotatesSameRequest(t *testing.T) {
 	if next.Result.AccountID != websocketQuotaOwnerB ||
 		strings.Join(gateway.accounts, ",") != websocketQuotaOwnerA+","+websocketQuotaOwnerA+","+websocketQuotaOwnerB {
 		t.Fatalf("session quota fallback = account=%q attempts=%v", next.Result.AccountID, gateway.accounts)
+	}
+}
+
+func TestProdex04354WebSocketSessionQuotaUsesOneLastChanceProfileWithoutWaiting(t *testing.T) {
+	gateway := &websocketDispatchGateway{responses: []*proxymodel.Response{
+		websocketCommittedTestResponse("resp-first"),
+		websocketQuotaFailureResponse(),
+		websocketCommittedTestResponse("resp-last-chance"),
+	}}
+	var waits []time.Duration
+	router, err := NewRouter(Config{
+		Gateway: gateway, PreferredAccount: websocketQuotaOwnerA,
+		Wait: func(context.Context, time.Duration) error {
+			waits = append(waits, time.Second)
+			return errors.New("last-chance fallback must not wait for transient quarantine")
+		},
+		Accounts: func(context.Context) ([]proxymodel.Account, error) {
+			return websocketQuotaAccounts(), nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := router.Forward(t.Context(), websocketDispatchRequest(
+		"{\"type\":\"response.create\",\"session_id\":\"session-last-chance\"}", 105,
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := first.Close(); err != nil {
+		t.Fatal(err)
+	}
+	router.quarantineAccount(websocketQuotaOwnerB, time.Minute)
+
+	next, err := router.Forward(t.Context(), websocketDispatchRequest(
+		"{\"type\":\"response.create\",\"session_id\":\"session-last-chance\",\"input\":[{\"type\":\"message\",\"role\":\"user\",\"content\":\"next\"}]}", 105,
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer next.Close()
+	if next.Result.AccountID != websocketQuotaOwnerB ||
+		next.Result.Response.WebSocketResponseID != "resp-last-chance" ||
+		len(waits) != 0 ||
+		strings.Join(gateway.accounts, ",") != websocketQuotaOwnerA+","+websocketQuotaOwnerA+","+websocketQuotaOwnerB {
+		t.Fatalf("last-chance fallback = account=%q response=%q waits=%v attempts=%v",
+			next.Result.AccountID, next.Result.Response.WebSocketResponseID, waits, gateway.accounts)
+	}
+}
+
+func TestProdex04354WebSocketContextConstraintRejectsLastChanceFallback(t *testing.T) {
+	gateway := &websocketDispatchGateway{responses: []*proxymodel.Response{
+		websocketCommittedTestResponse("resp-main"),
+		websocketQuotaFailureResponse(),
+	}}
+	router, err := NewRouter(Config{
+		Gateway: gateway, PreferredAccount: websocketQuotaOwnerA,
+		Accounts: func(context.Context) ([]proxymodel.Account, error) {
+			return websocketQuotaAccounts(), nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := router.Forward(t.Context(), websocketDispatchRequest(
+		"{\"type\":\"response.create\",\"session_id\":\"session-context\"}", 106,
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := first.Close(); err != nil {
+		t.Fatal(err)
+	}
+	router.quarantineAccount(websocketQuotaOwnerB, time.Minute)
+
+	quota, err := router.Forward(t.Context(), websocketDispatchRequest(
+		"{\"type\":\"response.create\",\"session_id\":\"session-context\",\"previous_response_id\":\"resp-main\",\"input\":[{\"type\":\"custom_tool_call_output\",\"call_id\":\"call-1\",\"output\":\"done\"}]}", 106,
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer quota.Close()
+	if quota.Result.AccountID != websocketQuotaOwnerA ||
+		quota.Result.Response.PrecommitFailure == nil ||
+		quota.Result.Response.PrecommitFailure.Code != "insufficient_quota" ||
+		strings.Join(gateway.accounts, ",") != websocketQuotaOwnerA+","+websocketQuotaOwnerA {
+		t.Fatalf("context-constrained quota used last chance: account=%q response=%#v attempts=%v",
+			quota.Result.AccountID, quota.Result.Response, gateway.accounts)
+	}
+	owner, err := router.affinity.owner(
+		t.Context(), affinityKeys{session: "session-context"}, router.now(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if owner != websocketQuotaOwnerA {
+		t.Fatalf("context-constrained quota released session owner: %q", owner)
+	}
+}
+
+func TestProdex04354WebSocketQuotaFallbackPolicyRejectsLastChanceWhenContextConstrained(t *testing.T) {
+	router, err := NewRouter(Config{
+		Gateway: &websocketDispatchGateway{},
+		Accounts: func(context.Context) ([]proxymodel.Account, error) {
+			return websocketQuotaAccounts(), nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	router.quarantineAccount(websocketQuotaOwnerB, time.Minute)
+	decision := router.websocketQuotaFallbackDecision(
+		websocketDispatchRequest(
+			"{\"type\":\"response.create\",\"previous_response_id\":\"resp-main\"}", 109,
+		),
+		websocketQuotaAccounts(),
+		proxymodel.Account{ID: websocketQuotaOwnerA, Home: "/a", Enabled: true},
+		websocketRequestMetadata{previousResponseID: "resp-main"},
+	)
+	if decision.kind != websocketQuotaFallbackUnavailable || decision.account.ID != "" {
+		t.Fatalf("context-constrained fallback = %#v, want unavailable", decision)
+	}
+}
+
+func TestProdex04354WebSocketLastChanceRespectsHardInflightCap(t *testing.T) {
+	gateway := &websocketDispatchGateway{responses: []*proxymodel.Response{
+		websocketCommittedTestResponse("resp-first"),
+		websocketQuotaFailureResponse(),
+	}}
+	router, err := NewRouter(Config{
+		Gateway: gateway, PreferredAccount: websocketQuotaOwnerA,
+		ProfileInflightHardLimit: 8,
+		Accounts: func(context.Context) ([]proxymodel.Account, error) {
+			return websocketQuotaAccounts(), nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := router.Forward(t.Context(), websocketDispatchRequest(
+		"{\"type\":\"response.create\",\"session_id\":\"session-hard-cap\"}", 107,
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := first.Close(); err != nil {
+		t.Fatal(err)
+	}
+	router.quarantineAccount(websocketQuotaOwnerB, time.Minute)
+	router.mu.Lock()
+	router.inflight[websocketQuotaOwnerB] = 8
+	router.mu.Unlock()
+
+	quota, err := router.Forward(t.Context(), websocketDispatchRequest(
+		"{\"type\":\"response.create\",\"session_id\":\"session-hard-cap\"}", 107,
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer quota.Close()
+	if quota.Result.AccountID != websocketQuotaOwnerA ||
+		quota.Result.Response.PrecommitFailure == nil ||
+		quota.Result.Response.PrecommitFailure.Code != "insufficient_quota" ||
+		strings.Join(gateway.accounts, ",") != websocketQuotaOwnerA+","+websocketQuotaOwnerA {
+		t.Fatalf("hard-capped last chance was used: account=%q response=%#v attempts=%v",
+			quota.Result.AccountID, quota.Result.Response, gateway.accounts)
 	}
 }
 
