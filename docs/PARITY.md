@@ -170,9 +170,16 @@ and eligibility validation stays in the runtime use case.
   rejects binary messages without ending the session, routes each text message
   through the existing owner-aware router under one stable local WebSocket
   session id, releases the upstream message session on local close, and closes
-  active public tunnels during proxy shutdown. Realtime/live WebSocket surfaces
-  remain deliberately fail-closed; stale-continuation and WebSocket auto-redeem
-  semantics remain active parity work, so full WebSocket parity is still open.
+  active public tunnels during proxy shutdown. Known-owner
+  `previous_response_not_found` is now handled on the production message path:
+  semantic locked-affinity or upstream turn-state recovery retries the same owner
+  on the tagged 75/200/500 ms schedule, trusted-owner continuations without a
+  retry reason fail closed immediately, turn-state overrides are not truncated by
+  a Godex-only 4 KiB cap, and terminal stale failures are translated to the tagged
+  409 `stale_continuation` WebSocket shape without leaking the raw upstream code;
+  the local socket remains usable for the next message. Realtime/live WebSocket
+  surfaces, unbound/full-context previous-response fallback, and WebSocket
+  auto-redeem remain active parity work, so full WebSocket parity is still open.
 - Full native-home import remains unsupported. Godex imports auth only, leaves
   source settings, rollouts, and databases intact, and keeps managed homes isolated.
 - The `0.435.1` hotfix adds no user-facing command surface; its material Godex
