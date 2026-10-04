@@ -97,7 +97,7 @@ func (router *Router) tryExecuteWithProfileInflight(
 	if !acquired {
 		return nil, false, nil
 	}
-	response, err := router.execute(ctx, request, account)
+	response, err := router.executeRouted(ctx, request, account, hardAffinity)
 	if err != nil {
 		release()
 		return nil, true, err

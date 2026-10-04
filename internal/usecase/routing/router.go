@@ -99,7 +99,7 @@ func (exchange *Exchange) Close() error {
 }
 
 func (router *Router) Forward(ctx context.Context, request proxymodel.Request) (*Exchange, error) {
-	keys := requestAffinity(request, request.Body)
+	keys := requestRoutingAffinity(request)
 	release, err := router.acquireConversation(ctx, keys)
 	if err != nil {
 		return nil, err
@@ -184,6 +184,21 @@ func (router *Router) routeRequest(ctx context.Context, request proxymodel.Reque
 
 func (router *Router) bindSuccessfulResponse(ctx context.Context, result *proxymodel.Forwarded, keys affinityKeys) error {
 	if result.Failed || result.Response.StatusCode >= 400 {
+		return nil
+	}
+	if result.Response.WebSocketFrames {
+		if !result.Response.FirstEventCommitted {
+			return nil
+		}
+		if err := router.affinity.remember(ctx, result.AccountID, keys, router.now()); err != nil {
+			result.Response.Body.Close()
+			return err
+		}
+		responseKeys := websocketCommittedAffinity(result.Response)
+		if err := router.affinity.remember(ctx, result.AccountID, responseKeys, router.now()); err != nil {
+			result.Response.Body.Close()
+			return err
+		}
 		return nil
 	}
 	stream := strings.Contains(strings.ToLower(result.Response.Header.Get("Content-Type")), "text/event-stream")
