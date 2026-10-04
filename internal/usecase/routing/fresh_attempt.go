@@ -37,6 +37,10 @@ func (router *Router) tryFreshCandidates(
 			}
 			sawTransient = sawTransient || pending.transient
 			replacePending(last, pending)
+			if pending.quota && compactQuotaFallbackExhaustedForRequest(request, candidates, account.ID, excluded) {
+				result, finishErr := finishFresh(last)
+				return result, true, sawTransient, sawSaturated, finishErr
+			}
 		}
 	}
 	return proxymodel.Forwarded{}, false, sawTransient, sawSaturated, nil

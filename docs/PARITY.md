@@ -157,8 +157,12 @@ and eligibility validation stays in the runtime use case.
   and rebuilds its candidate/retryable set after each recovery wait, so a newly
   selectable profile can replace a stale candidate even when no transient-failure
   flag was recorded. The no-transient wait path has an explicit regression.
-  Request-local Compact quota exclusions and the equivalent fresh WebSocket
-  retryable-profile recovery rule remain active 0.435.4 parity work.
+  Compact now also respects request-local exclusions when deciding whether quota
+  fallback is exhausted: a profile already failed/excluded in the same request is
+  not counted again merely because it remains globally eligible. This is scoped
+  to Compact and leaves ordinary Responses recovery unchanged. The equivalent
+  fresh WebSocket retryable-profile recovery rule remains active 0.435.4 parity
+  work.
   Public upgrade wiring, routing/rotation ownership, stale-continuation policy,
   and WebSocket auto-redeem remain active parity work; WebSocket must not be
   considered closed until those end-to-end production semantics are proven.
