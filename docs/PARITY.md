@@ -165,9 +165,14 @@ and eligibility validation stays in the runtime use case.
   recovery path: a retryable profile may wait/reselect without a transient flag,
   while a known previous-response owner remains hard-affinity/fail-closed during
   backoff. Dedicated regressions lock both behaviors.
-  Public upgrade wiring, routing/rotation ownership, stale-continuation policy,
-  and WebSocket auto-redeem remain active parity work; WebSocket must not be
-  considered closed until those end-to-end production semantics are proven.
+  The public Responses WebSocket entrypoint is now enabled for the tagged
+  Responses paths: Godex performs the local 101 handshake from the client key,
+  rejects binary messages without ending the session, routes each text message
+  through the existing owner-aware router under one stable local WebSocket
+  session id, releases the upstream message session on local close, and closes
+  active public tunnels during proxy shutdown. Realtime/live WebSocket surfaces
+  remain deliberately fail-closed; stale-continuation and WebSocket auto-redeem
+  semantics remain active parity work, so full WebSocket parity is still open.
 - Full native-home import remains unsupported. Godex imports auth only, leaves
   source settings, rollouts, and databases intact, and keeps managed homes isolated.
 - The `0.435.1` hotfix adds no user-facing command surface; its material Godex

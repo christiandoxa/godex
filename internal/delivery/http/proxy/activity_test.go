@@ -73,7 +73,7 @@ func TestProxyRecordsPrecommitFailure(t *testing.T) {
 	}
 	server := httptest.NewServer(proxy)
 	defer server.Close()
-	request, err := http.NewRequest(http.MethodGet, server.URL+"/responses", nil)
+	request, err := http.NewRequest(http.MethodGet, server.URL+"/backend-api/codex/responses", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func TestProxyRecordsPrecommitFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = response.Body.Close()
-	if len(recorder.events) != 2 || recorder.events[1].Kind != "request_failed" || recorder.events[1].StatusCode != http.StatusUpgradeRequired {
+	if len(recorder.events) != 2 || recorder.events[1].Kind != "request_failed" || recorder.events[1].StatusCode != http.StatusBadRequest {
 		t.Fatalf("failure events = %#v", recorder.events)
 	}
 }

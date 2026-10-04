@@ -23,16 +23,18 @@ type Config struct {
 	MaxRequestBytes, MaxInspectBytes int64
 }
 type Proxy struct {
-	router                 *routingusecase.Router
-	server                 *http.Server
-	listenAddr             string
-	maxRequest, maxInspect int64
-	mu                     sync.Mutex
-	sequence               atomic.Uint64
-	activity               activityRecorder
-	listener               net.Listener
-	done                   chan struct{}
-	endpoint               string
+	router                    *routingusecase.Router
+	server                    *http.Server
+	listenAddr                string
+	maxRequest, maxInspect    int64
+	mu                        sync.Mutex
+	sequence                  atomic.Uint64
+	activity                  activityRecorder
+	listener                  net.Listener
+	done                      chan struct{}
+	endpoint                  string
+	responsesWebSocketTunnels map[*responsesWebSocketTunnel]struct{}
+	closing                   bool
 }
 
 func NewProxy(config Config) (*Proxy, error) {
@@ -52,7 +54,11 @@ func NewProxy(config Config) (*Proxy, error) {
 	if config.MaxInspectBytes <= 0 {
 		config.MaxInspectBytes = 64 << 10
 	}
-	proxy := &Proxy{router: config.Router, activity: config.Activity, listenAddr: config.ListenAddr, maxRequest: config.MaxRequestBytes, maxInspect: config.MaxInspectBytes}
+	proxy := &Proxy{
+		router: config.Router, activity: config.Activity, listenAddr: config.ListenAddr,
+		maxRequest: config.MaxRequestBytes, maxInspect: config.MaxInspectBytes,
+		responsesWebSocketTunnels: make(map[*responsesWebSocketTunnel]struct{}),
+	}
 	proxy.server = &http.Server{
 		Handler:           newActiveRequestHandler(proxy, config.ActiveRequestLimit),
 		ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 90 * time.Second,
@@ -62,6 +68,9 @@ func NewProxy(config Config) (*Proxy, error) {
 func (proxy *Proxy) Start() error {
 	proxy.mu.Lock()
 	defer proxy.mu.Unlock()
+	if proxy.closing {
+		return errors.New("proxy is closed")
+	}
 	if proxy.listener != nil {
 		return errors.New("proxy is already running")
 	}
@@ -83,8 +92,16 @@ func (proxy *Proxy) Endpoint() string {
 func (proxy *Proxy) Close(ctx context.Context) error {
 	defer proxy.router.Close()
 	proxy.mu.Lock()
+	proxy.closing = true
 	done := proxy.done
+	tunnels := make([]*responsesWebSocketTunnel, 0, len(proxy.responsesWebSocketTunnels))
+	for tunnel := range proxy.responsesWebSocketTunnels {
+		tunnels = append(tunnels, tunnel)
+	}
 	proxy.mu.Unlock()
+	for _, tunnel := range tunnels {
+		tunnel.close()
+	}
 	if done == nil {
 		return nil
 	}
@@ -104,6 +121,32 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 	activity := proxy.startActivity(request)
 	activityContext := context.WithoutCancel(request.Context())
 	defer proxy.finishActivity(activityContext, activity)
+	if isWebSocketUpgradeRequest(request) {
+		if status, message := websocketRequestError(request); status != 0 {
+			activity.fail(status, message)
+			http.Error(writer, message, status)
+			return
+		}
+		if !websocketUsesMessageRouting(request.URL.Path) {
+			activity.fail(http.StatusUpgradeRequired, "websocket route is not enabled yet")
+			http.Error(writer, "Godex WebSocket support is currently limited to Responses", http.StatusUpgradeRequired)
+			return
+		}
+		lifecycle := &requestLifecycle{}
+		err := proxy.forwardResponsesWebSocket(
+			writer, request, activity, lifecycle, websocketRequestKey(request),
+		)
+		if err != nil {
+			if lifecycle.canAttempt() {
+				activity.fail(http.StatusBadGateway, "websocket handshake failed before commitment")
+				http.Error(writer, "websocket handshake failed", http.StatusBadGateway)
+			} else {
+				lifecycle.failAfterCommit()
+			}
+		}
+		activity.finishLifecycle(lifecycle)
+		return
+	}
 	if request.Header.Get("Upgrade") != "" {
 		activity.fail(http.StatusUpgradeRequired, "websocket upgrade is not supported")
 		http.Error(writer, "Godex requires Codex HTTP/SSE model transport", http.StatusUpgradeRequired)

@@ -64,6 +64,14 @@ func supportedWebSocketPath(path string) bool {
 	return websocketEffectiveLiveCall(effective)
 }
 
+func websocketUsesMessageRouting(path string) bool {
+	effective := path
+	if suffixStart := websocketMountSuffixStart(path); suffixStart >= 0 {
+		effective = path[suffixStart:]
+	}
+	return effective == "/responses" || strings.HasSuffix(effective, "/codex/responses")
+}
+
 func websocketMountSuffixStart(path string) int {
 	const legacy = "/backend-api/prodex/v"
 	const mount = "/backend-api/prodex"

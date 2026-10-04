@@ -710,7 +710,7 @@ func TestProxyRejectsWebsocketUpgradeBeforeUpstream(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { t.Error("unexpected upstream upgrade") }))
 	defer upstream.Close()
 	proxy := newTestProxy(t, upstream.URL, accounts)
-	request, err := http.NewRequest(http.MethodGet, proxy.URL+"/responses", nil)
+	request, err := http.NewRequest(http.MethodGet, proxy.URL+"/backend-api/codex/responses", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -721,8 +721,8 @@ func TestProxyRejectsWebsocketUpgradeBeforeUpstream(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer response.Body.Close()
-	if response.StatusCode != http.StatusUpgradeRequired {
-		t.Fatalf("upgrade status = %d", response.StatusCode)
+	if response.StatusCode != http.StatusBadRequest {
+		t.Fatalf("upgrade status = %d, want %d", response.StatusCode, http.StatusBadRequest)
 	}
 }
 
