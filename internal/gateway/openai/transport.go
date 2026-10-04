@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 
 	"github.com/christiandoxa/godex/internal/helper/httpheader"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
@@ -24,10 +25,13 @@ type authReader interface {
 	ReadAuth(context.Context, string) (proxymodel.Auth, error)
 }
 type Transport struct {
-	client   *http.Client
-	upstream *url.URL
-	auth     authReader
-	cookies  *webSocketCookieJar
+	client                   *http.Client
+	upstream                 *url.URL
+	auth                     authReader
+	cookies                  *webSocketCookieJar
+	websocketMessageMu       sync.Mutex
+	websocketMessageSessions map[uint64]websocketMessageSession
+	websocketMessageClosed   bool
 }
 
 func NewTransport(upstream string, client *http.Client, auth authReader) (*Transport, error) {
@@ -41,7 +45,10 @@ func NewTransport(upstream string, client *http.Client, auth authReader) (*Trans
 	if auth == nil {
 		return nil, errors.New("selected account authentication reader is required")
 	}
-	return &Transport{client: cloneHTTPClient(client), upstream: parsed, auth: auth, cookies: newWebSocketCookieJar()}, nil
+	return &Transport{
+		client: cloneHTTPClient(client), upstream: parsed, auth: auth, cookies: newWebSocketCookieJar(),
+		websocketMessageSessions: make(map[uint64]websocketMessageSession),
+	}, nil
 }
 func (transport *Transport) Execute(ctx context.Context, input proxymodel.Request, account proxymodel.Account) (*proxymodel.Response, error) {
 	return transport.execute(ctx, input, account, false)
@@ -132,6 +139,7 @@ func validWebSocketAccept(key, accept string) bool {
 	return strings.TrimSpace(accept) == base64.StdEncoding.EncodeToString(digest[:])
 }
 func (transport *Transport) Close() {
+	transport.closeWebSocketMessageSessions()
 	transport.client.CloseIdleConnections()
 	transport.cookies.clear()
 }

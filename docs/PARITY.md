@@ -146,9 +146,15 @@ and eligibility validation stays in the runtime use case.
   frame/message protocol layer now mirrors Prodex's tungstenite 0.30.0 server
   defaults and validation for 16 MiB frames, 64 MiB messages, masking/reserved
   bits/opcodes, fragmented UTF-8 text, control frames, and close payload/code
-  handling. Upgrade wiring, per-message routing, precommit promotion/fail-closed
-  policy, and recovery remain active parity work; WebSocket must not be considered
-  closed until those production semantics are proven.
+  handling. The internal OpenAI upstream per-message transport now also matches
+  the tagged Responses-WebSocket mechanics for session reuse/turn-state override,
+  8 KiB fresh precommit promotion, 512 KiB hard-affinity fail-closed buffering,
+  8-second precommit and 300-second committed idle timing, non-leaking precommit
+  failures, retry-vs-terminal event separation, response-header turn state,
+  connection-limit reuse recovery, and reset-on-failed/incomplete terminal events.
+  Public upgrade wiring, routing/rotation ownership, stale-continuation policy,
+  and WebSocket auto-redeem remain active parity work; WebSocket must not be
+  considered closed until those end-to-end production semantics are proven.
 - Full native-home import remains unsupported. Godex imports auth only, leaves
   source settings, rollouts, and databases intact, and keeps managed homes isolated.
 - The `0.435.1` hotfix adds no user-facing command surface; its material Godex
@@ -313,8 +319,11 @@ and eligibility validation stays in the runtime use case.
   staging cleanup, and committed-state inference when the final phase marker was
   not persisted. OpenAI plain/encrypted bundle wire formats, Bubble Tea
   protection/password prompts, and identity-safe runtime rollback are implemented.
-- HTTP/SSE model transport is explicit; Godex does not implement Prodex's
-  WebSocket/Realtime forwarding. Unexpected upgrades fail before upstream work.
+- HTTP/SSE model transport is explicit. Godex now contains source-audited local
+  WebSocket protocol and OpenAI upstream per-message transport prerequisites, but
+  the public upgrade path is not yet wired to the complete Prodex routing/recovery
+  policy. Until that end-to-end path closes, unsupported upgrades continue to fail
+  before upstream work rather than exposing a half-complete forwarding surface.
 - Import-current is auth-only, not full native-home migration. Existing native
   configuration, rollouts,
   history, and databases remain owned by Codex; homes are not symlink-shared.
