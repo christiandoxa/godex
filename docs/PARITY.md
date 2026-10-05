@@ -79,6 +79,18 @@ and closed these gaps:
 
 ## Gaps closed by these checkpoints
 
+- `2176248` closes full native-home `profile import-current` parity against
+  Prodex `0.435.5`: a new identity copies the current Codex home into its
+  isolated managed home while omitting only the installer-owned root `packages`
+  directory; a duplicate identity refreshes authentication without replacing
+  existing managed native state, and the resulting profile is activated in the
+  same repository transaction. Source files and permissions are never mutated.
+  Trusted readable source homes are accepted, group/other-writable parents and
+  non-private `auth.json` are rejected by default, and `--insecure` bypasses
+  those trust-permission checks without permitting symlink traversal. Copy
+  regressions cover metadata preservation, disappearing files, in-root regular
+  symlinks, escaping/broken links, special entries, destination cleanup, strict
+  name collisions, duplicate auth-only refresh, and the real CLI production path.
 - Strict capability checking previously used a command that rejected
   `--strict-config`. It now uses `exec-server --listen stdio`, closed stdin,
   a temporary home and working directory, and a ten-second deadline. Relative
@@ -222,8 +234,6 @@ and eligibility validation stays in the runtime use case.
   and the new pre-send blocked-owner path. With Responses, Realtime/live, stale/invalid
   continuation handling, commitment, backpressure, and quota recovery all closed, the
   Prodex 0.435.5 WebSocket surface is now considered parity-complete.
-- Full native-home import remains unsupported. Godex imports auth only, leaves
-  source settings, rollouts, and databases intact, and keeps managed homes isolated.
 - The `0.435.1` hotfix adds no user-facing command surface; its material Godex
   delta is provider-model policy. Anthropic/Copilot embedded catalogs now come
   directly from the tagged canonical provider catalog, Anthropic defaults are
@@ -391,9 +401,6 @@ and eligibility validation stays in the runtime use case.
   the public upgrade path is not yet wired to the complete Prodex routing/recovery
   policy. Until that end-to-end path closes, unsupported upgrades continue to fail
   before upstream work rather than exposing a half-complete forwarding surface.
-- Import-current is auth-only, not full native-home migration. Existing native
-  configuration, rollouts,
-  history, and databases remain owned by Codex; homes are not symlink-shared.
 - Remove keeps its existing destructive contract. Disable and logout provide
   retained deactivation; no second archive tree or changed removal default.
 - Native names/pickers/last remain profile-local rather than a shared-session UI.
