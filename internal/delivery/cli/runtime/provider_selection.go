@@ -16,6 +16,7 @@ const (
 	providerShortcutNotImplementedFormat = "runtime provider shortcut %q is not implemented yet"
 	anthropicProviderKind                = "anthropic"
 	deepSeekProviderKind                 = "deepseek"
+	copilotProviderKind                  = "copilot"
 	geminiProviderKind                   = "gemini"
 )
 
@@ -50,7 +51,8 @@ func runProviderSelection(
 	selection runtimemodel.Selection,
 	arguments []string,
 ) error {
-	if selection.Provider != anthropicProviderKind && selection.Provider != deepSeekProviderKind && selection.Provider != geminiProviderKind {
+	if selection.Provider != anthropicProviderKind && selection.Provider != copilotProviderKind &&
+		selection.Provider != deepSeekProviderKind && selection.Provider != geminiProviderKind {
 		return fmt.Errorf(providerShortcutNotImplementedFormat, selection.Provider)
 	}
 	keys, err := runner.ProviderAPIKeys(selection.Provider, selection.APIKey)
@@ -88,7 +90,7 @@ func runProviderAPIKeySelection(
 	request providerAPIKeyRequest,
 ) (runErr error) {
 	home := ""
-	name := "anthropic-api-key"
+	name := request.selection.Provider + "-api-key"
 	if request.found {
 		home, name = request.target.CodexHome, request.target.Name
 		if request.target.Name != "" && request.target.AccountID == "" {
@@ -165,6 +167,8 @@ func externalAPIKeyProvider(kind, name, baseURL string) (proxymodel.Provider, er
 		return runtimeusecase.AnthropicProvider(name, baseURL), nil
 	case deepSeekProviderKind:
 		return runtimeusecase.DeepSeekProvider(name, baseURL), nil
+	case copilotProviderKind:
+		return runtimeusecase.CopilotProvider(name, "", "", baseURL), nil
 	case geminiProviderKind:
 		return runtimeusecase.GeminiProvider(name, baseURL), nil
 	default:
@@ -178,6 +182,8 @@ func providerCredentialRequired(kind string) error {
 		return errors.New("godex run --provider anthropic requires a Claude profile, --api-key, or ANTHROPIC_API_KEY(S)")
 	case deepSeekProviderKind:
 		return errors.New("godex run --provider deepseek requires --api-key or DEEPSEEK_API_KEY(S)")
+	case copilotProviderKind:
+		return errors.New("godex run --provider copilot requires an imported Copilot profile, --api-key, or GITHUB_COPILOT_API_KEY(S)")
 	case geminiProviderKind:
 		return errors.New("godex run --provider gemini requires --api-key, GEMINI_API_KEY(S), or GOOGLE_API_KEY(S)")
 	default:

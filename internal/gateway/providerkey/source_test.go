@@ -10,6 +10,7 @@ func TestProviderKeysMatchProdexPrecedence(t *testing.T) {
 	for provider, names := range map[string][2]string{
 		"anthropic": {"ANTHROPIC_API_KEYS", "ANTHROPIC_API_KEY"},
 		"deepseek":  {"DEEPSEEK_API_KEYS", "DEEPSEEK_API_KEY"},
+		"copilot":   {"GITHUB_COPILOT_API_KEYS", "GITHUB_COPILOT_API_KEY"},
 	} {
 		t.Run(provider, func(t *testing.T) {
 			env := map[string]string{names[0]: "one, two", names[1]: "single"}

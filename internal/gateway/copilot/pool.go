@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"sort"
+	"strings"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
@@ -12,6 +14,38 @@ import (
 type RuntimePool struct {
 	transports map[string]*RuntimeTransport
 	catalog    []map[string]any
+}
+
+func NewRuntimeAPIKeyPool(apiURL string, credentials []proxymodel.ProviderCredential, client *http.Client) (*RuntimePool, error) {
+	if strings.TrimSpace(apiURL) == "" {
+		apiURL = "https://api.githubcopilot.com"
+	}
+	pool := &RuntimePool{transports: make(map[string]*RuntimeTransport, len(credentials))}
+	for _, credential := range credentials {
+		if credential.ID == "" || credential.Secret == "" {
+			pool.Close()
+			return nil, errors.New("Copilot runtime API-key credential is incomplete")
+		}
+		transport, err := NewRuntimeTransport(apiURL, RuntimeAuth{apiKey: credential.Secret}, client)
+		if err != nil {
+			pool.Close()
+			return nil, err
+		}
+		if previous := pool.transports[credential.ID]; previous != nil {
+			previous.Close()
+		}
+		pool.transports[credential.ID] = transport
+		merged, err := mergeRuntimeCatalog(pool.catalog, transport.ModelCatalog())
+		if err != nil {
+			pool.Close()
+			return nil, err
+		}
+		pool.catalog = merged
+	}
+	if len(pool.transports) == 0 {
+		return nil, errors.New("Copilot runtime API-key pool is empty")
+	}
+	return pool, nil
 }
 
 func (source *Source) NewRuntimePool(ctx context.Context, accounts []proxymodel.Account) (*RuntimePool, error) {

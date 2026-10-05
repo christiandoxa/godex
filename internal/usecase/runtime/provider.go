@@ -32,8 +32,13 @@ const (
 )
 
 func CopilotProvider(name, host, login, apiURL string) proxymodel.Provider {
+	host = strings.TrimSpace(host)
+	apiURL = strings.TrimSpace(apiURL)
+	if host == "" && apiURL == "" {
+		apiURL = "https://api.githubcopilot.com"
+	}
 	return proxymodel.Provider{
-		Kind: "copilot", Name: name, Host: strings.TrimSpace(host), Login: strings.TrimSpace(login), APIURL: strings.TrimSpace(apiURL),
+		Kind: "copilot", Name: name, Host: host, Login: strings.TrimSpace(login), APIURL: apiURL,
 		DefaultModel: copilotDefaultModel, ContextWindow: copilotContextWindow, AutoCompactLimit: copilotAutoCompactLimit,
 	}
 }

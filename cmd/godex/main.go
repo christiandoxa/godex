@@ -271,6 +271,9 @@ func newCopilotRuntimeGateway(
 	source *copilotgateway.Source,
 	catalogs *runtimerepo.ProviderCatalogStore,
 ) (runtimeGateway, error) {
+	if len(config.ProviderCredentials) > 0 {
+		return copilotgateway.NewRuntimeAPIKeyPool(config.Provider.APIURL, config.ProviderCredentials, nil)
+	}
 	if source == nil {
 		return nil, errors.New("Copilot runtime source is not configured")
 	}

@@ -11,6 +11,13 @@ import (
 	runtimerepo "github.com/christiandoxa/godex/internal/repository/runtime"
 )
 
+func TestProdex04355CopilotProfilelessAPIKeyProviderUsesPublicDefaultURL(t *testing.T) {
+	provider := CopilotProvider("copilot-api-key", "", "", "")
+	if provider.APIURL != "https://api.githubcopilot.com" || provider.DefaultModel != "gpt-6-astra" {
+		t.Fatalf("Copilot API-key provider = %#v", provider)
+	}
+}
+
 func TestCopilotCatalogUsesPromptLimitWithoutRuntimeSnapshot(t *testing.T) {
 	home := t.TempDir()
 	store := runtimerepo.NewProviderCatalogStore()
