@@ -28,11 +28,40 @@ func (fake *fakeDoctorAccounts) List(context.Context) ([]accountentity.Account, 
 	return fake.accounts, nil
 }
 
-type fakeVersionedCodex struct{ supportErr error }
+type fakeCodexRepair struct {
+	home       string
+	sharedHome string
+	cacheRoot  string
+	err        error
+}
+
+type fakeVersionedCodex struct {
+	supportErr error
+	repair     *fakeCodexRepair
+}
 
 func (fakeVersionedCodex) Version(context.Context) (string, error) { return "codex synthetic", nil }
 
 func (fake fakeVersionedCodex) CheckProxySupport(context.Context) error { return fake.supportErr }
+
+func (fake fakeVersionedCodex) RepairSessionIndex(_ context.Context, home, sharedHome, cacheRoot string) error {
+	if fake.repair == nil {
+		return nil
+	}
+	fake.repair.home = home
+	fake.repair.sharedHome = sharedHome
+	fake.repair.cacheRoot = cacheRoot
+	return fake.repair.err
+}
+
+type fakeDoctorHomeResolver struct {
+	home string
+	err  error
+}
+
+func (fake fakeDoctorHomeResolver) CurrentCodexHome(context.Context) (string, error) {
+	return fake.home, fake.err
+}
 
 func TestDoctorReportsAccountHealth(t *testing.T) {
 	accounts := &fakeDoctorAccounts{accounts: []accountentity.Account{
@@ -77,6 +106,63 @@ func (fake fakeDoctorQuota) DoctorReports(context.Context) ([]quotamodel.Report,
 	return append([]quotamodel.Report(nil), fake.reports...), nil
 }
 
+type fakeDoctorImportJournalRepairer struct {
+	recovered int
+	orphans   int
+	err       error
+}
+
+func (fake fakeDoctorImportJournalRepairer) CountImportAuthJournals(context.Context) (int, error) {
+	return fake.orphans, fake.err
+}
+
+func (fake fakeDoctorImportJournalRepairer) RepairImportAuthJournals(context.Context) (int, error) {
+	return fake.recovered, fake.err
+}
+
+func TestDoctorDiagnoseRepairsImportAuthJournals(t *testing.T) {
+	doctor := NewDoctor(&fakeDoctorAccounts{}, fakeVersionedCodex{})
+	doctor.SetImportJournalRepairer(fakeDoctorImportJournalRepairer{recovered: 2})
+	report, err := doctor.Diagnose(t.Context(), runtimemodel.DoctorOptions{RepairImportAuthJournals: true})
+	if err != nil || report.ImportAuthJournals == nil || report.ImportAuthJournals.Repaired != 2 || !report.ImportAuthJournals.RepairPerformed || report.ImportAuthJournals.OrphanCount != 0 {
+		t.Fatalf("diagnostics = %#v, err = %v", report, err)
+	}
+}
+
+func TestDoctorDiagnoseRepairsCurrentCodexSessionIndex(t *testing.T) {
+	repair := &fakeCodexRepair{}
+	codex := fakeVersionedCodex{repair: repair}
+	doctor := NewDoctor(&fakeDoctorAccounts{}, codex)
+	doctor.SetSessionIndexRepairer(codex)
+	doctor.SetActiveCodexHomeResolver(fakeDoctorHomeResolver{home: "/active/codex"})
+	doctor.SetSharedCodexHome("/shared/codex")
+	if err := doctor.RepairSessionIndex(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if repair.home != "/active/codex" || repair.sharedHome != "/shared/codex" || repair.cacheRoot != "/godex" {
+		t.Fatalf("repair paths = %q, %q, %q", repair.home, repair.sharedHome, repair.cacheRoot)
+	}
+}
+
+func TestDoctorSessionIndexRepairRequiresActiveHomeResolver(t *testing.T) {
+	codex := fakeVersionedCodex{}
+	doctor := NewDoctor(&fakeDoctorAccounts{}, codex)
+	doctor.SetSessionIndexRepairer(codex)
+	err := doctor.RepairSessionIndex(t.Context())
+	if err == nil || !strings.Contains(err.Error(), "home resolution") {
+		t.Fatalf("repair error = %v", err)
+	}
+}
+
+func TestDoctorRepairRequiresImportJournalRepository(t *testing.T) {
+	_, err := NewDoctor(&fakeDoctorAccounts{}, fakeVersionedCodex{}).Diagnose(
+		t.Context(), runtimemodel.DoctorOptions{RepairImportAuthJournals: true},
+	)
+	if err == nil || !strings.Contains(err.Error(), "not configured") {
+		t.Fatalf("repair error = %v", err)
+	}
+}
+
 func TestDoctorDiagnoseAddsBoundedRuntimeQuotaAndInstallData(t *testing.T) {
 	used := int64(20)
 	doctor := NewDoctor(&fakeDoctorAccounts{accounts: []accountentity.Account{{Enabled: true}}}, fakeVersionedCodex{})
@@ -90,7 +176,8 @@ func TestDoctorDiagnoseAddsBoundedRuntimeQuotaAndInstallData(t *testing.T) {
 	})
 	doctor.SetQuota(fakeDoctorQuota{reports: []quotamodel.Report{{
 		ProfileName: "work", Provider: "openai", Auth: "chatgpt", State: "ready", Active: true, Enabled: true,
-		Usage: quotamodel.Usage{PlanType: "plus", Primary: &quotamodel.Window{UsedPercent: &used}},
+		External: &quotamodel.ExternalInfo{Status: "Configured", Main: "quota handled by provider/Codex", Reset: "monthly"},
+		Usage:    quotamodel.Usage{PlanType: "plus", Primary: &quotamodel.Window{UsedPercent: &used}},
 	}}})
 	report, err := doctor.Diagnose(context.Background(), runtimemodel.DoctorOptions{Runtime: true, Quota: true, Install: true, TailBytes: 4096})
 	if err != nil {
@@ -99,7 +186,8 @@ func TestDoctorDiagnoseAddsBoundedRuntimeQuotaAndInstallData(t *testing.T) {
 	if report.Runtime == nil || len(report.Runtime.Events) != 2 || len(report.Install) != 3 || len(report.Quota) != 1 {
 		t.Fatalf("diagnostics = %+v", report)
 	}
-	if report.Runtime.Events[0].AccountID != "" || report.Quota[0].FiveHour != "80%" || report.Quota[0].Plan != "plus" {
+	if report.Runtime.Events[0].AccountID != "" || report.Quota[0].FiveHour != "80%" || report.Quota[0].Plan != "plus" ||
+		report.Quota[0].External == nil || report.Quota[0].External.Status != "Configured" || report.Quota[0].External.Main != "quota handled by provider/Codex" || report.Quota[0].External.Reset != "monthly" {
 		t.Fatalf("redaction/quota = %+v / %+v", report.Runtime.Events, report.Quota)
 	}
 }

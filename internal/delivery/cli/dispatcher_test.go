@@ -108,6 +108,8 @@ func (dispatcherProcess) Version(context.Context) (string, error) { return "code
 
 func (dispatcherProcess) CheckProxySupport(context.Context) error { return nil }
 
+func (dispatcherProcess) RepairSessionIndex(context.Context, string, string) error { return nil }
+
 type dispatcherLoginAccounts struct{}
 
 func (dispatcherLoginAccounts) CreateStagedHome() (string, error) { return "/synthetic/staged", nil }

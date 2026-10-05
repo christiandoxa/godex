@@ -24,6 +24,9 @@ func (codex *importJournalDoctorCodex) Version(context.Context) (string, error) 
 	return "codex 0.160.0", nil
 }
 func (*importJournalDoctorCodex) CheckProxySupport(context.Context) error { return nil }
+func (*importJournalDoctorCodex) RepairSessionIndex(context.Context, string, string) error {
+	return nil
+}
 
 type importJournalRepairer struct {
 	count     int

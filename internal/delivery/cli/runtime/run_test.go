@@ -173,6 +173,10 @@ func (fakeVersionedCodex) Version(context.Context) (string, error) { return "cod
 
 func (fakeVersionedCodex) CheckProxySupport(context.Context) error { return nil }
 
+func (fakeVersionedCodex) RepairSessionIndex(context.Context, string, string, string) error {
+	return nil
+}
+
 func TestDoctorRendersReport(t *testing.T) {
 	doctor := runtimeusecase.NewDoctor(fakeDoctorAccounts{}, fakeVersionedCodex{})
 	var output strings.Builder

@@ -11,7 +11,7 @@ import (
 const (
 	threadIndexPageLimit     = 100
 	threadIndexClientName    = "prodex-thread-index-reconciliation"
-	threadIndexClientVersion = "0.435.1"
+	threadIndexClientVersion = "0.435.5"
 )
 
 func reconcileCodexThreadIndexProtocol(stdout io.Reader, stdin io.Writer) error {

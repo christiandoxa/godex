@@ -101,20 +101,38 @@ func codexThreadIndexEnvironment(codexHome, sharedCodexHome string) []string {
 }
 
 func codexSessionsShareDirectory(codexHome, sharedCodexHome string) bool {
-	if !filepath.IsAbs(sharedCodexHome) {
-		return false
-	}
-	activePath := filepath.Join(codexHome, "sessions")
-	sharedPath := filepath.Join(sharedCodexHome, "sessions")
-	activeResolved, activeErr := filepath.EvalSymlinks(activePath)
-	if activeErr == nil {
-		activePath = activeResolved
-	}
-	sharedResolved, sharedErr := filepath.EvalSymlinks(sharedPath)
-	if sharedErr == nil {
-		sharedPath = sharedResolved
-	}
+	activePath := normalizeCodexPathForCompare(filepath.Join(codexHome, "sessions"))
+	sharedPath := normalizeCodexPathForCompare(filepath.Join(sharedCodexHome, "sessions"))
 	return activePath == sharedPath
+}
+
+func normalizeCodexPathForCompare(path string) string {
+	absolute, err := filepath.Abs(path)
+	if err == nil {
+		path = absolute
+	}
+	lexical := filepath.Clean(path)
+	if resolved, err := filepath.EvalSymlinks(lexical); err == nil {
+		return filepath.Clean(resolved)
+	}
+
+	cursor := lexical
+	missing := make([]string, 0, 4)
+	for {
+		parent := filepath.Dir(cursor)
+		if parent == cursor {
+			break
+		}
+		missing = append(missing, filepath.Base(cursor))
+		if resolved, err := filepath.EvalSymlinks(parent); err == nil {
+			for index := len(missing) - 1; index >= 0; index-- {
+				resolved = filepath.Join(resolved, missing[index])
+			}
+			return filepath.Clean(resolved)
+		}
+		cursor = parent
+	}
+	return lexical
 }
 
 // RepairSessionIndex runs full managed-session maintenance before asking Codex

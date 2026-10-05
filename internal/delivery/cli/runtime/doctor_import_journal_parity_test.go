@@ -21,6 +21,8 @@ func (runner *importJournalDoctorRunner) Diagnose(_ context.Context, options run
 	return runner.report, nil
 }
 
+func (*importJournalDoctorRunner) RepairSessionIndex(context.Context) error { return nil }
+
 func (runner *importJournalDoctorRunner) SaveBundle(_ string, content []byte) (string, error) {
 	runner.saved = append([]byte(nil), content...)
 	return "/tmp/doctor.json", nil

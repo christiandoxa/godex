@@ -32,7 +32,7 @@ func TestThreadIndexProtocolParityScansActiveAndArchivedPages(t *testing.T) {
 		requests = append(requests, request)
 	}
 	client := requests[0]["params"].(map[string]any)["clientInfo"].(map[string]any)
-	if client["name"] != "prodex-thread-index-reconciliation" || client["version"] != "0.435.1" {
+	if client["name"] != "prodex-thread-index-reconciliation" || client["version"] != "0.435.5" {
 		t.Fatalf("clientInfo = %#v", client)
 	}
 	active := requests[2]["params"].(map[string]any)
