@@ -114,8 +114,10 @@ and eligibility validation stays in the runtime use case.
 
 ## Remaining 1:1 parity gaps
 
-- Prodex `0.435.4` is the exact parity baseline. Its audited Codex target remains
-  `rust-v0.160.0`; the accepted minimum remains 0.153.2. The inherited 0.435.2
+- Prodex `0.435.5` is the exact parity baseline. Its audited Codex target remains
+  `rust-v0.160.0`; the accepted minimum remains 0.153.2. Prodex `0.435.5` adds no
+  new user-facing surface; its WebSocket hard-affinity quota-replay delta is closed
+  below. The inherited 0.435.2
   auto-rotation reliability behavior is now covered on Godex HTTP production
   paths: 1% quota remains usable, authoritative all-zero pools do not dispatch,
   structured rate limits, overloads, and precommit transport failures recover
