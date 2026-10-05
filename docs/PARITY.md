@@ -70,7 +70,7 @@ and closed these gaps:
 | Isolated ChatGPT accounts | Official Codex interactive/device login, per-account homes, identity deduplication, deterministic and unambiguous selectors. Account/auth tests cover registration and selection. |
 | Safe profile lifecycle | Repeat login/import replaces credentials while retaining native state. Metadata-only single-auth and multi-profile lifecycle journals recover interrupted operations, infer a fully persisted commit before cleanup, or roll partial actions back in reverse while restoring profile/account selection. Owned OS locks and shared profile leases exclude concurrent credential mutation/removal. |
 | Account retention and native auth | Enable/disable retains the home. Managed status/logout bypass quota/rotation; logout uses an exclusive lease. Unsafe mutating auth passthrough is rejected with managed-command guidance. |
-| Session discovery and launch | Bounded metadata catalog, list/current filters, text/JSON/ID/resume-command output, unique prefixes, and bare UUID resume. Native resume/fork, including nested exec forms and root options, resolve the rollout home; local deletion/archive stays local. Delivery/session/runtime tests cover argument preservation and selector conflicts. |
+| Session discovery and launch | Bounded metadata catalog, list/current filters, text/JSON/ID/resume-command output, unique prefixes, and bare UUID resume. Native name/`--last` lookup follows Codex 0.160.0 source/preview semantics across managed profiles. Bare native resume/fork keeps Codex's own picker UI while managed rollout/archive/attachment/index state is projected onto one shared session root; credentials and configuration remain profile-local. Delivery/session/runtime plus exact Codex app-server tests cover the global view and argument preservation. |
 | Quota and fresh selection | One-shot compact/detailed usage windows, single-profile raw JSON, reset timestamps, fail-open probe uncertainty, deterministic bounded selection, and temporary exhaustion deadlines. Explicit selectors remain fixed. Quota/runtime tests cover exhaustion, uncertainty, and reset eligibility. |
 | Managed Codex configuration | HTTP/SSE Responses provider keeps native account/bootstrap HTTPS. Managed config enters the innermost exec scope; user overrides retain precedence. Routing/auth-store overrides, quoted/equals forms, whole provider tables, OSS/local providers, and remote app-server routing cannot bypass it. The Codex delimiter preserves literal arguments. |
 | Durable conversation ownership | Hashed, bounded, versioned bindings survive restart/cache expiry. Requested owners beyond cache capacity resolve correctly. Independent routers serialize first-owner selection under an OS guard. Native picker/name/last resumes keep the rollout home and the enabled owner pool; explicit account scope remains fixed. |
@@ -79,6 +79,7 @@ and closed these gaps:
 
 ## Gaps closed by these checkpoints
 
+- `09d5cec` and `9fa089b` close the remaining native session-name/`--last`/picker gap against Codex `rust-v0.160.0`. Name lookup is case-sensitive, active-session only, uses the native `cli`/`vscode` source set, and falls back from thread name to the first user-message preview. The native picker itself is not reimplemented: before launch Godex merges managed rollout/archive/attachment/index state into the configured shared Codex root and links each managed home to it while keeping `auth.json` and `config.toml` profile-local. `CODEX_SQLITE_HOME` points at the shared root only after session sharing is established. An opt-in integration regression runs the exact local Codex 0.160.0 app-server and proves `thread/list` launched from one profile sees picker-visible rollouts imported from two managed profiles.
 - `2176248` closes full native-home `profile import-current` parity against
   Prodex `0.435.5`: a new identity copies the current Codex home into its
   isolated managed home while omitting only the installer-owned root `packages`
@@ -403,8 +404,6 @@ and eligibility validation stays in the runtime use case.
   before upstream work rather than exposing a half-complete forwarding surface.
 - Remove keeps its existing destructive contract. Disable and logout provide
   retained deactivation; no second archive tree or changed removal default.
-- Native names/pickers/last remain profile-local rather than a shared-session UI.
-  Explicit UUIDs/prefixes provide the cross-profile workflow.
 - Profile bundle protection/password interaction now matches the Prodex terminal
   split with Bubble Tea: export protection defaults to protected on Enter, masked
   password + confirmation are required when no export-password env value exists,
