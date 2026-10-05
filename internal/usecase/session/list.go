@@ -77,7 +77,7 @@ func sessionReport(account accountentity.Account, stored sessionentity.Session) 
 	return sessionmodel.Report{
 		ID: stored.ID, ThreadName: stored.ThreadName,
 		UpdatedAt: stored.UpdatedAt, UpdatedUnix: stored.UpdatedUnix, CWD: stored.CWD,
-		ModelProvider: stored.ModelProvider, Path: stored.Path, ParentThreadID: stored.ParentThreadID,
+		ModelProvider: stored.ModelProvider, Source: stored.Source, Path: stored.Path, ParentThreadID: stored.ParentThreadID,
 		Profile: account.Name, AccountID: account.ID,
 	}
 }

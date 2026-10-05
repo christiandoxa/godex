@@ -7,6 +7,7 @@ type Session struct {
 	UpdatedAt      string
 	CWD            string
 	ModelProvider  string
+	Source         string
 	Path           string
 	ParentThreadID string
 	UpdatedUnix    int64

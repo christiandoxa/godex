@@ -9,6 +9,7 @@ type Report struct {
 	UpstreamAccountID string `json:"-"`
 	AccountID         string `json:"-"`
 	ModelProvider     string `json:"model_provider,omitempty"`
+	Source            string `json:"-"`
 	Path              string `json:"path"`
 	ParentThreadID    string `json:"parent_thread_id,omitempty"`
 	UpdatedUnix       int64  `json:"-"`

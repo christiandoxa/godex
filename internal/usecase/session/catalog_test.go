@@ -147,3 +147,75 @@ func TestQueueKeepsOwningProfileAndArgumentForm(t *testing.T) {
 		}
 	}
 }
+
+func TestResumeResolvesExactThreadNameAcrossProfiles(t *testing.T) {
+	catalog, launcher := testCatalog()
+	input := sessionmodel.Launch{
+		SessionSelector: "Repair",
+		IDIndex:         1,
+		Arguments:       []string{"resume", "Repair", "continue"},
+	}
+	if err := catalog.ResumeArguments(t.Context(), input); err != nil {
+		t.Fatal(err)
+	}
+	if launcher.account != "two" || !reflect.DeepEqual(launcher.args, []string{"resume", "b111", "continue"}) {
+		t.Fatalf("name launch = %#v", launcher)
+	}
+
+	catalog.reader = readerFake{map[string][]sessionentity.Session{
+		"one": {{ID: "a111", ThreadName: "Duplicate", UpdatedUnix: 1, Path: "a"}},
+		"two": {{ID: "b111", ThreadName: "Duplicate", UpdatedUnix: 2, Path: "b"}},
+	}}
+	if _, err := catalog.Resolve(t.Context(), "Duplicate"); err == nil {
+		t.Fatal("ambiguous thread name accepted")
+	}
+}
+
+func TestResumeLastUsesNewestActiveTopLevelSessionInCurrentDirectory(t *testing.T) {
+	project := t.TempDir()
+	other := t.TempDir()
+	t.Chdir(project)
+	launcher := &launcherFake{}
+	catalog := NewCatalog(accountsFake{}, readerFake{map[string][]sessionentity.Session{
+		"one": {
+			{ID: "a111", CWD: project, UpdatedUnix: 10, Path: "/profiles/one/sessions/a111.jsonl"},
+		},
+		"two": {
+			{ID: "b555", CWD: project, Source: "exec", UpdatedUnix: 70, Path: "/profiles/two/sessions/b555.jsonl"},
+			{ID: "b999", CWD: other, Source: "cli", UpdatedUnix: 50, Path: "/profiles/two/sessions/b999.jsonl"},
+			{ID: "b888", CWD: project, UpdatedUnix: 60, Path: "/profiles/two/archived_sessions/b888.jsonl"},
+			{ID: "b777", CWD: project, UpdatedUnix: 55, ParentThreadID: "parent", Path: "/profiles/two/sessions/b777.jsonl"},
+			{ID: "b666", CWD: project, UpdatedUnix: 40, Path: "/profiles/two/sessions/b666.jsonl"},
+		},
+	}}, launcher)
+
+	input := sessionmodel.Launch{
+		SessionSelector: "--last",
+		IDIndex:         1,
+		Arguments:       []string{"resume", "--last", "continue"},
+	}
+	if err := catalog.ResumeArguments(t.Context(), input); err != nil {
+		t.Fatal(err)
+	}
+	if launcher.account != "two" || !reflect.DeepEqual(launcher.args, []string{"resume", "b666", "continue"}) {
+		t.Fatalf("default last launch = %#v", launcher)
+	}
+
+	launcher.account, launcher.args = "", nil
+	input.Arguments = []string{"resume", "--last", "--all", "continue"}
+	if err := catalog.ResumeArguments(t.Context(), input); err != nil {
+		t.Fatal(err)
+	}
+	if launcher.account != "two" || !reflect.DeepEqual(launcher.args, []string{"resume", "b999", "--all", "continue"}) {
+		t.Fatalf("all last launch = %#v", launcher)
+	}
+
+	launcher.account, launcher.args = "", nil
+	input.Arguments = []string{"resume", "--last", "--all", "--include-non-interactive", "continue"}
+	if err := catalog.ResumeArguments(t.Context(), input); err != nil {
+		t.Fatal(err)
+	}
+	if launcher.account != "two" || !reflect.DeepEqual(launcher.args, []string{"resume", "b555", "--all", "--include-non-interactive", "continue"}) {
+		t.Fatalf("non-interactive last launch = %#v", launcher)
+	}
+}

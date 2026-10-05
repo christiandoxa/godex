@@ -404,3 +404,63 @@ func TestRunProfilesLocalProviderUsesActiveStandaloneProfile(t *testing.T) {
 		t.Fatalf("active home/lease = %q / %v / %d", process.home, profiles.acquired, profiles.released)
 	}
 }
+
+type sharedNativeSessionAccounts struct{}
+
+func (sharedNativeSessionAccounts) List(context.Context) ([]accountentity.Account, error) {
+	return []accountentity.Account{
+		{ID: "one", Name: "personal", Enabled: true},
+		{ID: "two", Name: "work", Enabled: true},
+	}, nil
+}
+
+func (sharedNativeSessionAccounts) CodexHome(id string) string {
+	if id == "two" {
+		return "/profiles/two"
+	}
+	return "/profiles/one"
+}
+
+func (sharedNativeSessionAccounts) LaunchCandidates(context.Context, string) ([]accountentity.Account, error) {
+	return nil, errors.New("fresh launch selection must not run for resolved shared sessions")
+}
+
+func (sharedNativeSessionAccounts) SelectForLaunch(context.Context, string) (accountentity.Account, error) {
+	return accountentity.Account{}, errors.New("fresh launch selection must not run for resolved shared sessions")
+}
+
+type sharedNativeSessionReader struct{ project string }
+
+func (reader sharedNativeSessionReader) List(_ context.Context, home string) ([]sessionentity.Session, error) {
+	if home == "/profiles/two" {
+		return []sessionentity.Session{{
+			ID: "00000000-0000-4000-8000-000000000222", ThreadName: "Repair", CWD: reader.project,
+			Source: "cli", UpdatedUnix: 20, Path: "/profiles/two/sessions/repair.jsonl",
+		}}, nil
+	}
+	return []sessionentity.Session{{
+		ID: "00000000-0000-4000-8000-000000000111", ThreadName: "Older", CWD: reader.project,
+		Source: "cli", UpdatedUnix: 10, Path: "/profiles/one/sessions/older.jsonl",
+	}}, nil
+}
+
+func TestNativeSessionDeliveryRoutesNameAndLastAcrossProfileHomes(t *testing.T) {
+	project := t.TempDir()
+	t.Chdir(project)
+	for _, args := range [][]string{
+		{"--", "resume", "Repair", "continue"},
+		{"--", "resume", "--last", "continue"},
+		{"--", "fork", "--last", "continue"},
+	} {
+		accounts := sharedNativeSessionAccounts{}
+		process := &fakeRunnerProcess{}
+		runner := runtimeusecase.NewRunner(accounts, process, nil)
+		catalog := sessionusecase.NewCatalog(accounts, sharedNativeSessionReader{project: project}, runner)
+		if err := Run(t.Context(), runner, catalog, args, io.Discard); err != nil {
+			t.Fatalf("%v: %v", args, err)
+		}
+		if process.home != "/profiles/two" || !strings.Contains(strings.Join(process.arguments, " "), "00000000-0000-4000-8000-000000000222") {
+			t.Fatalf("shared session route for %v = home %q args %#v", args, process.home, process.arguments)
+		}
+	}
+}

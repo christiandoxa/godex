@@ -26,7 +26,11 @@ func TestNativeSessionArgumentForms(t *testing.T) {
 		{[]string{"--", "resume", id}, -1},
 		{[]string{"exec", "--", "resume", id}, -1},
 		{[]string{"exec", "prompt", "resume", id}, -1},
-		{[]string{"resume", "--last", "prompt"}, -1}, {[]string{"resume", "thread name"}, -1}, {[]string{"exec", id}, -1},
+		{[]string{"resume", "--last", "prompt"}, 1}, {[]string{"resume", "thread name"}, 1},
+		{[]string{"exec", "resume", "thread name", "prompt"}, 2}, {[]string{"fork", "--last", "prompt"}, 1},
+		{[]string{"resume", "--remote", "ws://127.0.0.1:9000", "thread name"}, 3},
+		{[]string{"fork", "--remote-auth-token-env", "CODEX_REMOTE_TOKEN", "--last"}, 3},
+		{[]string{"fork", "thread name"}, -1}, {[]string{"exec", id}, -1},
 	} {
 		index, args := sessionArgument(test.args)
 		if index != test.index {

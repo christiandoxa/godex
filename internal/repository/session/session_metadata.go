@@ -42,6 +42,9 @@ func applySessionMetadata(report *sessionentity.Session, line []byte) {
 	); provider != "" {
 		report.ModelProvider = provider
 	}
+	if source := firstString(payload["source"], value["source"]); source != "" {
+		report.Source = source
+	}
 	if parent := sessionParentThreadID(value, payload); parent != "" {
 		report.ParentThreadID = parent
 	}

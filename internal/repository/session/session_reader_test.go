@@ -98,3 +98,23 @@ func TestCollectorRejectsFilesWhenBudgetIsAlreadyUsed(t *testing.T) {
 		t.Fatal("archived file beyond total budget was ignored")
 	}
 }
+
+func TestReaderExtractsCodexSessionSource(t *testing.T) {
+	home := t.TempDir()
+	directory := filepath.Join(home, "sessions")
+	if err := os.MkdirAll(directory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(directory, "rollout-source.jsonl")
+	content := `{"type":"session_meta","payload":{"id":"` + threadID + `","cwd":"/synthetic","source":"exec"}}` + "\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	reports, err := NewReader().List(t.Context(), home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reports) != 1 || reports[0].Source != "exec" {
+		t.Fatalf("session source = %#v", reports)
+	}
+}

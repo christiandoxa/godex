@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	sessionmodel "github.com/christiandoxa/godex/internal/model/session"
@@ -19,6 +20,7 @@ func (service *Catalog) Resolve(ctx context.Context, selector string) (sessionmo
 	}
 	exact := make([]sessionmodel.Report, 0, 1)
 	prefix := make([]sessionmodel.Report, 0, 1)
+	names := make([]sessionmodel.Report, 0, 1)
 	for _, report := range reports {
 		if strings.EqualFold(report.ID, selector) {
 			exact = append(exact, report)
@@ -26,6 +28,9 @@ func (service *Catalog) Resolve(ctx context.Context, selector string) (sessionmo
 		}
 		if strings.HasPrefix(strings.ToLower(report.ID), strings.ToLower(selector)) {
 			prefix = append(prefix, report)
+		}
+		if report.ThreadName == selector {
+			names = append(names, report)
 		}
 	}
 	if len(exact) == 1 {
@@ -40,6 +45,12 @@ func (service *Catalog) Resolve(ctx context.Context, selector string) (sessionmo
 	if len(prefix) > 1 {
 		return sessionmodel.Report{}, fmt.Errorf("session id prefix %q is ambiguous", selector)
 	}
+	if len(names) == 1 {
+		return service.withOwner(ctx, names[0])
+	}
+	if len(names) > 1 {
+		return sessionmodel.Report{}, fmt.Errorf("session name %q is ambiguous", selector)
+	}
 	return sessionmodel.Report{}, fmt.Errorf("session %q was not found", selector)
 }
 
@@ -51,7 +62,13 @@ func (catalog *Catalog) ResumeArguments(ctx context.Context, input sessionmodel.
 	if catalog.launcher == nil {
 		return fmt.Errorf("session resume launcher is not configured")
 	}
-	report, err := catalog.Resolve(ctx, input.SessionSelector)
+	var report sessionmodel.Report
+	var err error
+	if input.SessionSelector == "--last" {
+		report, err = catalog.resolveLast(ctx, input.Arguments)
+	} else {
+		report, err = catalog.Resolve(ctx, input.SessionSelector)
+	}
 	if err != nil {
 		return err
 	}
@@ -66,6 +83,55 @@ func (catalog *Catalog) ResumeArguments(ctx context.Context, input sessionmodel.
 		return catalog.launcher.RunLocal(ctx, report.AccountID, args)
 	}
 	return catalog.launcher.RunSession(ctx, report.AccountID, report.UpstreamAccountID, args)
+}
+
+func (catalog *Catalog) resolveLast(ctx context.Context, args []string) (sessionmodel.Report, error) {
+	query := sessionmodel.Query{}
+	if !sessionArgumentPresent(args, "--all") {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return sessionmodel.Report{}, err
+		}
+		query.CurrentDir = cwd
+	}
+	reports, err := catalog.List(ctx, query)
+	if err != nil {
+		return sessionmodel.Report{}, err
+	}
+	includeNonInteractive := sessionArgumentPresent(args, "--include-non-interactive")
+	for _, report := range reports {
+		if report.ParentThreadID != "" || sessionReportArchived(report.Path) {
+			continue
+		}
+		if !includeNonInteractive && sessionReportNonInteractive(report) {
+			continue
+		}
+		return catalog.withOwner(ctx, report)
+	}
+	return sessionmodel.Report{}, fmt.Errorf("no resumable session was found")
+}
+
+func sessionArgumentPresent(args []string, name string) bool {
+	for _, arg := range args {
+		if arg == name {
+			return true
+		}
+	}
+	return false
+}
+
+func sessionReportNonInteractive(report sessionmodel.Report) bool {
+	source := strings.ToLower(strings.TrimSpace(report.Source))
+	return source != "" && source != "cli"
+}
+
+func sessionReportArchived(path string) bool {
+	for _, component := range strings.FieldsFunc(path, func(r rune) bool { return r == '/' || r == '\\' }) {
+		if component == "archived_sessions" {
+			return true
+		}
+	}
+	return false
 }
 
 func (catalog *Catalog) validateAccountOwner(ctx context.Context, selector string, report sessionmodel.Report) error {

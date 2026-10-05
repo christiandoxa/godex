@@ -19,11 +19,63 @@ func sessionArgument(arguments []string) (int, []string) {
 	switch args[command] {
 	case "queue":
 		return queueArgument(args, command+1), args
-	case "resume", "fork", "delete", "archive", "unarchive":
+	case "resume":
+		return findResumeSessionSelector(args, command+1), args
+	case "fork":
+		return findForkSessionSelector(args, command+1), args
+	case "delete", "archive", "unarchive":
 		return findExplicitSessionSelector(args, command+1), args
 	default:
 		return -1, args
 	}
+}
+
+func findResumeSessionSelector(args []string, start int) int {
+	for i := start; i < len(args); {
+		if args[i] == "--" {
+			if i+1 < len(args) && strings.TrimSpace(args[i+1]) != "" {
+				return i + 1
+			}
+			return -1
+		}
+		if args[i] == "--last" {
+			return i
+		}
+		if nativeOptionTakesValue(args[i]) {
+			i += 2
+			continue
+		}
+		if strings.HasPrefix(args[i], "-") {
+			i++
+			continue
+		}
+		return i
+	}
+	return -1
+}
+
+func findForkSessionSelector(args []string, start int) int {
+	for i := start; i < len(args); {
+		if args[i] == "--" {
+			return selectorAfterDelimiter(args, i+1)
+		}
+		if args[i] == "--last" {
+			return i
+		}
+		if nativeOptionTakesValue(args[i]) {
+			i += 2
+			continue
+		}
+		if strings.HasPrefix(args[i], "-") {
+			i++
+			continue
+		}
+		if explicitSessionSelector(args[i]) {
+			return i
+		}
+		return -1
+	}
+	return -1
 }
 
 func findExplicitSessionSelector(args []string, start int) int {
@@ -130,7 +182,7 @@ func nativeOptionTakesValue(argument string) bool {
 	switch argument {
 	case "-c", "--config", "-m", "--model", "-C", "--cd", "-i", "--image", "-p", "--profile", "-s", "--sandbox", "-a", "--ask-for-approval", "--enable", "--disable", "--add-dir", "--color", "-o", "--output-last-message", "--output-schema", "--thread-source", "--local-provider", "--listen", "--code-mode-host":
 		return true
-	case "--ws-auth", "--ws-token-file", "--ws-token-sha256", "--ws-shared-secret-file", "--ws-issuer", "--ws-audience", "--ws-max-clock-skew-seconds":
+	case "--remote", "--remote-auth-token-env", "--ws-auth", "--ws-token-file", "--ws-token-sha256", "--ws-shared-secret-file", "--ws-issuer", "--ws-audience", "--ws-max-clock-skew-seconds":
 		return true
 	}
 	return false
