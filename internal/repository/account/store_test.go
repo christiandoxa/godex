@@ -402,7 +402,7 @@ func TestCommitImportCurrentRejectsRequestedNameWithoutSuffixing(t *testing.T) {
 	candidate := newTestAccount(t, "default", "two@example.com", "account-2", time.Unix(2, 0))
 	staged := stagedHome(t, store)
 
-	if _, err := store.CommitImportCurrent(context.Background(), candidate, staged); err == nil ||
+	if _, err := store.CommitImportCurrent(context.Background(), candidate, staged, nil); err == nil ||
 		!strings.Contains(err.Error(), `profile "default" already exists`) {
 		t.Fatalf("import-current name collision = %v", err)
 	}
@@ -438,9 +438,16 @@ func TestCommitImportCurrentDeduplicatesAuthAndActivatesInSameCommit(t *testing.
 	}
 	candidate := newTestAccount(t, "duplicate", "one@example.com", "account-1", time.Unix(3, 0))
 
-	committed, err := store.CommitImportCurrent(context.Background(), candidate, staged)
+	completeCalled := false
+	committed, err := store.CommitImportCurrent(context.Background(), candidate, staged, func() error {
+		completeCalled = true
+		return fmt.Errorf("duplicate identity must not complete full home")
+	})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if completeCalled {
+		t.Fatal("duplicate identity completed full native home")
 	}
 	if committed.ID != primary.ID || committed.Name != "primary" || !committed.Enabled {
 		t.Fatalf("committed duplicate = %#v", committed)
@@ -783,5 +790,57 @@ func TestRemoveProfileCanRetainManagedHome(t *testing.T) {
 	accounts, err := store.List(context.Background())
 	if err != nil || len(accounts) != 0 {
 		t.Fatalf("accounts = %+v, err = %v", accounts, err)
+	}
+}
+
+func TestCommitImportCurrentCompletesNewHomeWhileStateIsSerialized(t *testing.T) {
+	store := newTestStore(t)
+	existing := commitTestAccount(t, store, "existing", "existing@example.com", "existing-account")
+	candidate := newTestAccount(t, "imported", "imported@example.com", "imported-account", time.Unix(9, 0))
+	staged := stagedHome(t, store)
+	if err := os.WriteFile(filepath.Join(staged, "auth.json"), []byte(`{"synthetic":"fresh"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	callbackStarted := make(chan struct{})
+	releaseCallback := make(chan struct{})
+	removeDone := make(chan error, 1)
+	commitDone := make(chan error, 1)
+	go func() {
+		_, err := store.CommitImportCurrent(context.Background(), candidate, staged, func() error {
+			close(callbackStarted)
+			<-releaseCallback
+			return os.WriteFile(filepath.Join(staged, "history.jsonl"), []byte("copied history"), 0o600)
+		})
+		commitDone <- err
+	}()
+	<-callbackStarted
+	go func() {
+		_, err := store.Remove(context.Background(), existing.ID)
+		removeDone <- err
+	}()
+
+	select {
+	case err := <-removeDone:
+		t.Fatalf("profile mutation escaped import-current state lock: %v", err)
+	case <-time.After(75 * time.Millisecond):
+	}
+	close(releaseCallback)
+	if err := <-commitDone; err != nil {
+		t.Fatal(err)
+	}
+	if err := <-removeDone; err != nil {
+		t.Fatal(err)
+	}
+	accounts, err := store.List(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(accounts) != 1 || accounts[0].Name != "imported" {
+		t.Fatalf("serialized import accounts = %#v", accounts)
+	}
+	history, err := os.ReadFile(filepath.Join(store.CodexHome(accounts[0].ID), "history.jsonl"))
+	if err != nil || string(history) != "copied history" {
+		t.Fatalf("committed native history = %q err=%v", history, err)
 	}
 }

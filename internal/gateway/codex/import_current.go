@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"github.com/christiandoxa/godex/internal/helper/fileutil"
 	authmodel "github.com/christiandoxa/godex/internal/model/auth"
@@ -141,14 +140,14 @@ func validateImportSource(path string, insecure bool) error {
 		if err != nil {
 			return fmt.Errorf("inspect current Codex home path %s: %w", current, err)
 		}
-		if info.Mode()&os.ModeSymlink != 0 {
-			return fmt.Errorf("current Codex home path contains symbolic link %s", current)
+		if info.Mode()&os.ModeSymlink != 0 || !importCurrentEntryIsSafe(info) {
+			return fmt.Errorf("current Codex home path contains symbolic link or reparse point %s", current)
 		}
 		if current == clean && !info.IsDir() {
 			return errors.New("current Codex home must be a real directory")
 		}
-		if !insecure && runtime.GOOS != "windows" && info.IsDir() && info.Mode().Perm()&0o022 != 0 && info.Mode()&os.ModeSticky == 0 {
-			return fmt.Errorf("CODEX_HOME path %s is writable by group or others; pass --insecure to bypass this check", current)
+		if !insecure && info.IsDir() && !importCurrentDirectoryTrusted(current, info) {
+			return fmt.Errorf("CODEX_HOME path %s is not trusted by the current user; pass --insecure to bypass this check", current)
 		}
 		parent := filepath.Dir(current)
 		if parent == current {
@@ -163,14 +162,14 @@ func readImportCurrentAuthFile(path string, insecure bool) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read Codex auth profile: %w", err)
 	}
-	if !info.Mode().IsRegular() {
-		return nil, errors.New("codex auth profile is not a regular file")
+	if !info.Mode().IsRegular() || !importCurrentEntryIsSafe(info) {
+		return nil, errors.New("codex auth profile is not a non-reparse regular file")
 	}
 	if info.Size() > maxAuthFileSize {
 		return nil, errors.New("codex auth profile is too large")
 	}
-	if !insecure && runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0 {
-		return nil, errors.New("codex auth profile is accessible by group or others; pass --insecure to bypass this check")
+	if !insecure && !importCurrentPrivateFileTrusted(path, info) {
+		return nil, errors.New("codex auth profile is not private to the current user; pass --insecure to bypass this check")
 	}
 
 	file, err := os.Open(path)

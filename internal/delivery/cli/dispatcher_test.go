@@ -116,7 +116,12 @@ func (dispatcherLoginAccounts) CommitLogin(_ context.Context, candidate accounte
 	return candidate, nil
 }
 
-func (dispatcherLoginAccounts) CommitImportCurrent(_ context.Context, candidate accountentity.Account, _ string) (accountentity.Account, error) {
+func (dispatcherLoginAccounts) CommitImportCurrent(_ context.Context, candidate accountentity.Account, _ string, complete func() error) (accountentity.Account, error) {
+	if complete != nil {
+		if err := complete(); err != nil {
+			return accountentity.Account{}, err
+		}
+	}
 	return candidate, nil
 }
 

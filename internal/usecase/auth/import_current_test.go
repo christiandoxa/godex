@@ -236,3 +236,68 @@ func TestImportCurrentRemovesStagedHomeOnFailure(t *testing.T) {
 		t.Fatalf("staged homes = %v, err = %v", entries, err)
 	}
 }
+
+type staleDuplicateImportAccounts struct {
+	root      string
+	existing  accountentity.Account
+	committed accountentity.Account
+}
+
+func (fake *staleDuplicateImportAccounts) CreateStagedHome() (string, error) {
+	path := filepath.Join(fake.root, "staged")
+	return path, os.MkdirAll(path, 0o700)
+}
+
+func (fake *staleDuplicateImportAccounts) RemoveStagedHome(path string) error {
+	return os.RemoveAll(path)
+}
+
+func (fake *staleDuplicateImportAccounts) List(context.Context) ([]accountentity.Account, error) {
+	// The usecase observes a duplicate identity here. Prodex holds its lifecycle
+	// lock from this decision through commit, so that duplicate cannot disappear.
+	return []accountentity.Account{fake.existing}, nil
+}
+
+func (fake *staleDuplicateImportAccounts) CommitImportCurrent(
+	_ context.Context,
+	candidate accountentity.Account,
+	staged string,
+	complete func() error,
+) (accountentity.Account, error) {
+	// Simulate the duplicate having been concurrently removed before commit.
+	// A serialized commit must make the new-profile decision here and request
+	// the full native home before persisting it.
+	if complete != nil {
+		if err := complete(); err != nil {
+			return accountentity.Account{}, err
+		}
+	}
+	if _, err := os.Stat(filepath.Join(staged, "history.jsonl")); err != nil {
+		return accountentity.Account{}, errors.New("new import reached commit without full native home")
+	}
+	fake.committed = candidate
+	return candidate, nil
+}
+
+func TestImportCurrentDuplicateDecisionCannotGoStaleBeforeCommit(t *testing.T) {
+	existing, err := accountentity.NewAccount(
+		accountentity.Identity{Email: "same@example.com", ChatGPTAccountID: "same-account"},
+		"primary",
+		time.Unix(1, 0),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	accounts := &staleDuplicateImportAccounts{root: t.TempDir(), existing: existing}
+	codex := &fakeCurrentCodex{identity: authmodel.ImportCurrentIdentity{
+		Email: "same@example.com", ChatGPTAccountID: "same-account",
+	}}
+	importer := NewImportCurrent(accounts, codex, "/synthetic/current-codex")
+
+	if _, err := importer.Run(context.Background(), authmodel.ImportCurrentRequest{Name: "new-profile"}); err != nil {
+		t.Fatalf("import must not commit a partial new profile after duplicate state changes: %v", err)
+	}
+	if codex.completeCalls != 1 {
+		t.Fatalf("full-home copy calls = %d, want 1 when commit creates a new profile", codex.completeCalls)
+	}
+}

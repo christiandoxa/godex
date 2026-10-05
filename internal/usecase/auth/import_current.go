@@ -16,7 +16,7 @@ const defaultImportCurrentName = "default"
 type importCurrentAccounts interface {
 	CreateStagedHome() (string, error)
 	RemoveStagedHome(string) error
-	CommitImportCurrent(context.Context, accountentity.Account, string) (accountentity.Account, error)
+	CommitImportCurrent(context.Context, accountentity.Account, string, func() error) (accountentity.Account, error)
 	List(context.Context) ([]accountentity.Account, error)
 }
 
@@ -75,24 +75,13 @@ func (importer *ImportCurrent) Run(
 	identity := accountentity.Identity{
 		Email: result.Email, ChatGPTAccountID: result.ChatGPTAccountID,
 	}
-	duplicateIdentity := false
-	for _, account := range existing {
-		if account.SameIdentity(identity) {
-			duplicateIdentity = true
-			break
-		}
-	}
-	if !duplicateIdentity {
-		if err := importer.codex.CompleteImportCurrentHome(ctx, importer.sourceHome, stagedHome); err != nil {
-			return authmodel.ImportCurrentResponse{}, err
-		}
-	}
-
 	candidate, err := accountentity.NewAccount(identity, request.Name, importer.now())
 	if err != nil {
 		return authmodel.ImportCurrentResponse{}, err
 	}
-	account, err := importer.accounts.CommitImportCurrent(ctx, candidate, stagedHome)
+	account, err := importer.accounts.CommitImportCurrent(ctx, candidate, stagedHome, func() error {
+		return importer.codex.CompleteImportCurrentHome(ctx, importer.sourceHome, stagedHome)
+	})
 	if err != nil {
 		return authmodel.ImportCurrentResponse{}, err
 	}

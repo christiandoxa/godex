@@ -49,6 +49,7 @@ func (store *FileStore) CommitImportCurrent(
 	ctx context.Context,
 	candidate entity.Account,
 	stagedCodexHome string,
+	completeHome func() error,
 ) (entity.Account, error) {
 	if err := entity.ValidateAccount(candidate); err != nil {
 		return entity.Account{}, err
@@ -68,6 +69,15 @@ func (store *FileStore) CommitImportCurrent(
 		}
 		if nameInUse(state.Accounts, candidate.Name, -1) {
 			return fmt.Errorf("profile %q already exists", candidate.Name)
+		}
+		_, existingIndex, err := mergeLoginCandidate(state.Accounts, candidate, false)
+		if err != nil {
+			return err
+		}
+		if existingIndex < 0 && completeHome != nil {
+			if err := completeHome(); err != nil {
+				return err
+			}
 		}
 		account, err := store.commitLoginStateLocked(state, candidate, stagedCodexHome, false, true)
 		if err != nil {
