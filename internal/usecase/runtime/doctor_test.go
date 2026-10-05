@@ -192,6 +192,25 @@ func TestDoctorDiagnoseAddsBoundedRuntimeQuotaAndInstallData(t *testing.T) {
 	}
 }
 
+func TestProdex04355DoctorDiagnoseBuildsPolicySuggestionsFromRuntimeMarkers(t *testing.T) {
+	doctor := NewDoctor(&fakeDoctorAccounts{}, fakeVersionedCodex{})
+	doctor.SetActivity(fakeDoctorActivity{
+		overview: runtimemodel.Overview{},
+		events: []runtimemodel.Event{
+			{Kind: "runtime_proxy_lane_limit_reached", Fields: map[string]string{"lane": "compact", "active": "6", "limit": "6"}},
+			{Kind: "runtime_proxy_lane_limit_reached", Fields: map[string]string{"lane": "compact", "active": "7", "limit": "6"}},
+		},
+	})
+	report, err := doctor.Diagnose(t.Context(), runtimemodel.DoctorOptions{Runtime: true, SuggestPolicy: true, TailBytes: 4096})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Runtime == nil || report.Runtime.PolicySuggestionCount == nil || *report.Runtime.PolicySuggestionCount != 1 ||
+		report.Runtime.PolicySuggestions == nil || len(*report.Runtime.PolicySuggestions) != 1 || (*report.Runtime.PolicySuggestions)[0].ID != "lane_pressure" {
+		t.Fatalf("runtime policy report = %#v", report.Runtime)
+	}
+}
+
 func TestDoctorTailEventsHonorsByteBudget(t *testing.T) {
 	events := []runtimemodel.Event{
 		{Kind: "request_started", RequestID: strings.Repeat("a", 64)},

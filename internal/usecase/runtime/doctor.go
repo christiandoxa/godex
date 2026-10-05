@@ -189,6 +189,12 @@ func (doctor *Doctor) Diagnose(ctx context.Context, options runtimemodel.DoctorO
 		if err != nil {
 			return runtimemodel.DoctorDiagnostics{}, err
 		}
+		if options.SuggestPolicy {
+			suggestions := doctorPolicySuggestions(runtimeReport.Events)
+			count := len(suggestions)
+			runtimeReport.PolicySuggestionCount = &count
+			runtimeReport.PolicySuggestions = &suggestions
+		}
 		report.Runtime = &runtimeReport
 	}
 	if options.Quota {

@@ -3,10 +3,12 @@ package routing
 import (
 	"context"
 	"net/http"
+	"strconv"
 
 	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
+	runtimemodel "github.com/christiandoxa/godex/internal/model/runtime"
 )
 
 type routeHealthKey struct {
@@ -15,16 +17,29 @@ type routeHealthKey struct {
 }
 
 func (router *Router) recordRouteFailure(ctx context.Context, accountID string, selection quotamodel.Selection) {
-	router.recordRouteFailurePenalty(ctx, accountID, selection, 1)
+	router.recordRouteFailurePenaltyReason(ctx, accountID, selection, 1, "route_failure")
 }
 
 func (router *Router) recordRouteFailurePenalty(ctx context.Context, accountID string, selection quotamodel.Selection, penalty uint8) {
+	reason := routeHealthRoute(selection.RouteKind) + "_overload"
+	router.recordRouteFailurePenaltyReason(ctx, accountID, selection, penalty, reason)
+}
+
+func (router *Router) recordRouteFailurePenaltyReason(ctx context.Context, accountID string, selection quotamodel.Selection, penalty uint8, reason string) {
 	if penalty == 0 {
 		return
 	}
 	for range penalty {
 		router.adjustRouteHealth(ctx, accountID, selection, 1)
 	}
+	route := routeHealthRoute(selection.RouteKind)
+	router.mu.Lock()
+	score := router.routeHealth[routeHealthKey{accountID: accountID, route: route}].Effective(router.now())
+	router.mu.Unlock()
+	router.recordRuntimeMarker(ctx, runtimemodel.Event{Kind: "profile_health", Fields: map[string]string{
+		"profile": accountID, "route": route, "score": strconv.Itoa(int(score)),
+		"delta": strconv.Itoa(int(penalty)), "reason": reason,
+	}})
 	router.openRouteCircuit(ctx, accountID, selection)
 }
 

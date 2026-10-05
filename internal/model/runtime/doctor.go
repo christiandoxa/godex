@@ -7,6 +7,7 @@ type DoctorOptions struct {
 	Quota                    bool
 	Install                  bool
 	RepairImportAuthJournals bool
+	SuggestPolicy            bool
 	TailBytes                int
 }
 
@@ -35,9 +36,29 @@ type DoctorCheck struct {
 }
 
 type DoctorRuntime struct {
-	Overview  Overview `json:"overview"`
-	Events    []Event  `json:"events"`
-	TailBytes int      `json:"tail_bytes"`
+	Overview              Overview                  `json:"overview"`
+	Events                []Event                   `json:"events"`
+	TailBytes             int                       `json:"tail_bytes"`
+	PolicySuggestionCount *int                      `json:"policy_suggestion_count,omitempty"`
+	PolicySuggestions     *[]DoctorPolicySuggestion `json:"policy_suggestions,omitempty"`
+}
+
+type DoctorPolicySettingSuggestion struct {
+	Section        string `json:"section"`
+	Key            string `json:"key"`
+	CurrentValue   uint64 `json:"current_value"`
+	SuggestedValue uint64 `json:"suggested_value"`
+	Rationale      string `json:"rationale"`
+}
+
+type DoctorPolicySuggestion struct {
+	ID       string                          `json:"id"`
+	Title    string                          `json:"title"`
+	Severity string                          `json:"severity"`
+	Reason   string                          `json:"reason"`
+	Markers  []string                        `json:"markers"`
+	Settings []DoctorPolicySettingSuggestion `json:"settings"`
+	Snippet  string                          `json:"snippet"`
 }
 
 type DoctorQuota struct {

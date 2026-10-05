@@ -62,7 +62,7 @@ func NewProxy(config Config) (*Proxy, error) {
 		responsesWebSocketTunnels: make(map[*responsesWebSocketTunnel]struct{}),
 	}
 	proxy.server = &http.Server{
-		Handler:           newActiveRequestHandler(proxy, config.ActiveRequestLimit),
+		Handler:           newActiveRequestHandlerWithRecorder(proxy, config.ActiveRequestLimit, config.Activity),
 		ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 90 * time.Second,
 	}
 	return proxy, nil

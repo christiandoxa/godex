@@ -14,11 +14,16 @@ import (
 	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
+	runtimemodel "github.com/christiandoxa/godex/internal/model/runtime"
 )
 
 type gateway interface {
 	Execute(context.Context, proxymodel.Request, proxymodel.Account) (*proxymodel.Response, error)
 }
+type ActivityRecorder interface {
+	Record(context.Context, runtimemodel.Event) error
+}
+
 type AutoRedeemer interface {
 	Try(context.Context, []proxymodel.Account, string, proxymodel.Request) (string, bool, error)
 }
@@ -49,6 +54,7 @@ type routingStateRepository interface {
 type Config struct {
 	Accounts                 func(context.Context) ([]proxymodel.Account, error)
 	PreferredAccount         string
+	Activity                 ActivityRecorder
 	QuotaPreflight           quotaPreflight
 	RoutingState             routingStateRepository
 	Now                      func() time.Time
@@ -67,6 +73,7 @@ type Router struct {
 	gateway                   gateway
 	quota                     quotaPreflight
 	state                     routingStateRepository
+	activity                  ActivityRecorder
 	preferred                 string
 	now                       func() time.Time
 	wait                      func(context.Context, time.Duration) error
@@ -119,6 +126,7 @@ func NewRouter(config Config) (*Router, error) {
 		source: config.Accounts, gateway: config.Gateway,
 		quota:     config.QuotaPreflight,
 		state:     config.RoutingState,
+		activity:  config.Activity,
 		preferred: strings.TrimSpace(config.PreferredAccount),
 		now:       config.Now, wait: config.Wait, maxInspect: config.MaxInspectBytes,
 		affinity: newAffinityStore(), quarantine: make(map[string]quarantineState),
@@ -402,4 +410,16 @@ func (router *Router) Close() {
 	if closer, ok := router.gateway.(interface{ Close() }); ok {
 		closer.Close()
 	}
+}
+
+func (router *Router) recordRuntimeMarker(ctx context.Context, event runtimemodel.Event) {
+	if router == nil || router.activity == nil {
+		return
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	} else {
+		ctx = context.WithoutCancel(ctx)
+	}
+	_ = router.activity.Record(ctx, event)
 }

@@ -274,10 +274,60 @@ func (home integrationCodexHome) CurrentCodexHome(context.Context) (string, erro
 	return string(home), nil
 }
 
-func TestDoctorStillRejectsUnimplementedPolicySuggestion(t *testing.T) {
-	err := Doctor(context.Background(), &fakeDoctorRunner{}, &strings.Builder{}, []string{"--runtime", "--suggest-policy"})
-	if err == nil || !strings.Contains(err.Error(), "not available") {
-		t.Fatalf("error = %v", err)
+func TestProdex04355DoctorRendersPolicySuggestions(t *testing.T) {
+	count := 1
+	suggestions := []runtimemodel.DoctorPolicySuggestion{{
+		ID: "lane_pressure", Title: "Lane pressure", Severity: "medium",
+		Reason:   "2 lane-limit marker(s) on lane=compact; apply only if host/network headroom exists",
+		Markers:  []string{"runtime_proxy_lane_limit_reached"},
+		Settings: []runtimemodel.DoctorPolicySettingSuggestion{{Section: "runtime_proxy", Key: "compact_active_limit", CurrentValue: 1, SuggestedValue: 12}},
+		Snippet:  "[runtime_proxy]\ncompact_active_limit = 12",
+	}}
+	report := doctorFixture()
+	report.Runtime.PolicySuggestionCount = &count
+	report.Runtime.PolicySuggestions = &suggestions
+	runner := &fakeDoctorRunner{report: report}
+	var output strings.Builder
+	if err := Doctor(context.Background(), runner, &output, []string{"--runtime", "--suggest-policy"}); err != nil {
+		t.Fatal(err)
+	}
+	if !runner.options.SuggestPolicy || !strings.Contains(output.String(), "Runtime Policy Suggestions") ||
+		!strings.Contains(output.String(), "- Lane pressure: 2 lane-limit marker(s)") ||
+		!strings.Contains(output.String(), "  [runtime_proxy]") || !strings.Contains(output.String(), "  compact_active_limit = 12") {
+		t.Fatalf("policy output = %q options=%+v", output.String(), runner.options)
+	}
+
+	output.Reset()
+	runner = &fakeDoctorRunner{report: report}
+	if err := Doctor(context.Background(), runner, &output, []string{"--runtime", "--suggest-policy", "--json"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), `"policy_suggestion_count": 1`) || !strings.Contains(output.String(), `"id": "lane_pressure"`) {
+		t.Fatalf("policy json = %q", output.String())
+	}
+
+	output.Reset()
+	runner = &fakeDoctorRunner{report: report}
+	if err := Doctor(context.Background(), runner, &output, []string{"--runtime", "--suggest-policy", "--bundle", "-", "--redacted"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), `"policy_suggestion_count": 1`) || !strings.Contains(output.String(), `"policy_suggestions": [`) || !strings.Contains(output.String(), `"lane_pressure"`) {
+		t.Fatalf("policy bundle = %q", output.String())
+	}
+}
+
+func TestProdex04355DoctorRendersEmptyPolicySuggestionResult(t *testing.T) {
+	count := 0
+	suggestions := []runtimemodel.DoctorPolicySuggestion{}
+	report := doctorFixture()
+	report.Runtime.PolicySuggestionCount = &count
+	report.Runtime.PolicySuggestions = &suggestions
+	var output strings.Builder
+	if err := Doctor(context.Background(), &fakeDoctorRunner{report: report}, &output, []string{"--runtime", "--suggest-policy"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), noDoctorPolicySuggestion) {
+		t.Fatalf("empty suggestion output = %q", output.String())
 	}
 }
 

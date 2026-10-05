@@ -4,8 +4,11 @@ import (
 	"context"
 	"net/http"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
+
+	runtimemodel "github.com/christiandoxa/godex/internal/model/runtime"
 )
 
 type admissionLane uint8
@@ -34,16 +37,26 @@ type activeRequestHandler struct {
 	laneActive [admissionLaneCount]int
 	changed    chan struct{}
 	limits     admissionLimits
+	activity   activityRecorder
 }
 
 func newActiveRequestHandler(next http.Handler, globalOverride int) http.Handler {
 	return newActiveRequestHandlerWithLimits(
-		next,
-		admissionLimitsForParallelism(runtime.NumCPU(), globalOverride),
+		next, admissionLimitsForParallelism(runtime.NumCPU(), globalOverride),
+	)
+}
+
+func newActiveRequestHandlerWithRecorder(next http.Handler, globalOverride int, activity activityRecorder) http.Handler {
+	return newActiveRequestHandlerWithLimitsAndRecorder(
+		next, admissionLimitsForParallelism(runtime.NumCPU(), globalOverride), activity,
 	)
 }
 
 func newActiveRequestHandlerWithLimits(next http.Handler, limits admissionLimits) http.Handler {
+	return newActiveRequestHandlerWithLimitsAndRecorder(next, limits, nil)
+}
+
+func newActiveRequestHandlerWithLimitsAndRecorder(next http.Handler, limits admissionLimits, activity activityRecorder) http.Handler {
 	if limits.global <= 0 {
 		limits = admissionLimitsForParallelism(runtime.NumCPU(), 0)
 	}
@@ -54,7 +67,7 @@ func newActiveRequestHandlerWithLimits(next http.Handler, limits admissionLimits
 	}
 	return &activeRequestHandler{
 		next: next, wait: waitAdmissionSignal,
-		changed: make(chan struct{}), limits: limits,
+		changed: make(chan struct{}), limits: limits, activity: activity,
 	}
 }
 
@@ -134,7 +147,7 @@ func admissionLaneForRequest(request *http.Request) admissionLane {
 
 func (handler *activeRequestHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	lane := admissionLaneForRequest(request)
-	if !handler.acquire(request.Context(), lane) {
+	if !handler.acquireRequest(request, lane) {
 		return
 	}
 	defer handler.release(lane)
@@ -142,21 +155,68 @@ func (handler *activeRequestHandler) ServeHTTP(writer http.ResponseWriter, reque
 }
 
 func (handler *activeRequestHandler) acquire(ctx context.Context, lane admissionLane) bool {
+	return handler.acquireWithMetadata(ctx, lane, "", "")
+}
+
+func (handler *activeRequestHandler) acquireRequest(request *http.Request, lane admissionLane) bool {
+	transport := "http"
+	if isWebSocketUpgradeRequest(request) {
+		transport = "websocket"
+	}
+	return handler.acquireWithMetadata(request.Context(), lane, request.URL.Path, transport)
+}
+
+func (handler *activeRequestHandler) acquireWithMetadata(ctx context.Context, lane admissionLane, path, transport string) bool {
 	for {
 		handler.mu.Lock()
-		if handler.active < handler.limits.global &&
-			handler.laneActive[lane] < handler.limits.lane[lane] {
+		if handler.active < handler.limits.global && handler.laneActive[lane] < handler.limits.lane[lane] {
 			handler.active++
 			handler.laneActive[lane]++
 			handler.mu.Unlock()
 			return true
 		}
+		active, globalLimit := handler.active, handler.limits.global
+		laneActive, laneLimit := handler.laneActive[lane], handler.limits.lane[lane]
 		changed := handler.changed
 		handler.mu.Unlock()
+		handler.recordAdmissionPressure(ctx, lane, path, transport, active, globalLimit, laneActive, laneLimit)
 
 		if !handler.wait(ctx, changed) {
 			return false
 		}
+	}
+}
+
+func (handler *activeRequestHandler) recordAdmissionPressure(
+	ctx context.Context, lane admissionLane, path, transport string, active, globalLimit, laneActive, laneLimit int,
+) {
+	if handler.activity == nil {
+		return
+	}
+	kind := "runtime_proxy_lane_limit_reached"
+	fields := map[string]string{
+		"transport": transport, "path": path, "lane": admissionLaneLabel(lane),
+		"active": strconv.Itoa(laneActive), "limit": strconv.Itoa(laneLimit),
+	}
+	if active >= globalLimit {
+		kind = "runtime_proxy_active_limit_reached"
+		fields["active"], fields["limit"] = strconv.Itoa(active), strconv.Itoa(globalLimit)
+	}
+	_ = handler.activity.Record(context.WithoutCancel(ctx), runtimemodel.Event{Kind: kind, Path: path, Fields: fields})
+}
+
+func admissionLaneLabel(lane admissionLane) string {
+	switch lane {
+	case admissionLaneResponses:
+		return "responses"
+	case admissionLaneCompact:
+		return "compact"
+	case admissionLaneWebSocket:
+		return "websocket"
+	case admissionLaneStandard:
+		return "standard"
+	default:
+		return "unknown"
 	}
 }
 

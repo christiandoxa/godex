@@ -63,9 +63,6 @@ func DoctorWithErrorOutput(ctx context.Context, doctor doctorRunner, out, errOut
 	if err != nil {
 		return err
 	}
-	if err := rejectUnsupportedDoctorActions(options); err != nil {
-		return err
-	}
 	if options.repairIndex {
 		repairer, ok := doctor.(doctorSessionIndexRepairer)
 		if !ok {
@@ -83,6 +80,7 @@ func DoctorWithErrorOutput(ctx context.Context, doctor doctorRunner, out, errOut
 		Quota:                    options.quota,
 		Install:                  options.install,
 		RepairImportAuthJournals: options.repairImport,
+		SuggestPolicy:            options.suggest,
 		TailBytes:                options.tailBytes,
 	})
 	if err != nil {
@@ -96,9 +94,18 @@ func DoctorWithErrorOutput(ctx context.Context, doctor doctorRunner, out, errOut
 	}
 	panels := doctorPanels(report, options)
 	if writerIsTerminal(out) {
+		if options.suggest {
+			panels = append(panels, doctorPolicySuggestionPanel(report.Runtime))
+		}
 		return runDoctorTUI(out, panels)
 	}
-	return writeDoctorPanels(out, panels)
+	if err := writeDoctorPanels(out, panels); err != nil {
+		return err
+	}
+	if options.suggest {
+		return writeDoctorPolicySuggestions(out, report.Runtime)
+	}
+	return nil
 }
 
 func parseDoctorArguments(arguments []string) (doctorOptions, error) {
@@ -183,13 +190,6 @@ func validateDoctorOptions(options doctorOptions) error {
 	}
 	if options.suggest && !options.runtime {
 		return errors.New("doctor --suggest-policy requires --runtime")
-	}
-	return nil
-}
-
-func rejectUnsupportedDoctorActions(options doctorOptions) error {
-	if options.suggest {
-		return errors.New("doctor --suggest-policy is not available until runtime policy parity is implemented")
 	}
 	return nil
 }
@@ -390,6 +390,6 @@ func doctorBundle(report runtimemodel.DoctorDiagnostics) doctorBundleDocument {
 	return document
 }
 
-const doctorUsage = "usage: godex doctor [--quota] [--runtime] [--install] [--repair-import-auth-journals] [--repair-session-index] [--tail-bytes BYTES] [--json] [--bundle [PATH] --redacted]"
+const doctorUsage = "usage: godex doctor [--quota] [--runtime] [--install] [--suggest-policy] [--repair-import-auth-journals] [--repair-session-index] [--tail-bytes BYTES] [--json] [--bundle [PATH] --redacted]"
 
 var _ doctorRunner = (*runtimeusecase.Doctor)(nil)

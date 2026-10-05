@@ -3,11 +3,13 @@ package routing
 import (
 	"context"
 	"io"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
+	runtimemodel "github.com/christiandoxa/godex/internal/model/runtime"
 )
 
 const (
@@ -56,8 +58,23 @@ func (router *Router) tryAcquireProfileInflight(
 	weight := requestProfileInflightWeight(request)
 	router.mu.Lock()
 	current := router.inflight[accountID]
-	if !hardAffinity && current+weight > effectiveProfileInflightHardLimit(router.profileInflightHardLimit, weight) {
+	hardLimit := effectiveProfileInflightHardLimit(router.profileInflightHardLimit, weight)
+	if !hardAffinity && current+weight > hardLimit {
 		router.mu.Unlock()
+		transport := "http"
+		if strings.EqualFold(strings.TrimSpace(request.Header.Get("Upgrade")), "websocket") || request.WebSocketMessage {
+			transport = "websocket"
+		}
+		fields := map[string]string{
+			"profile": accountID, "hard_limit": strconv.Itoa(hardLimit),
+			"route": routeHealthRoute(request.QuotaSelection.RouteKind), "transport": transport,
+			"active": strconv.Itoa(current), "weight": strconv.Itoa(weight),
+		}
+		event := runtimemodel.Event{Kind: "profile_inflight_saturated", Fields: fields}
+		if request.RequestID != 0 {
+			event.RequestID = strconv.FormatUint(request.RequestID, 10)
+		}
+		router.recordRuntimeMarker(context.Background(), event)
 		return nil, false
 	}
 	router.inflight[accountID] = current + weight
