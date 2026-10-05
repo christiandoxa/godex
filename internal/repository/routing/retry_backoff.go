@@ -17,13 +17,16 @@ import (
 )
 
 const (
-	maxRetryBackoffs     = 4096
-	maxRetryBackoffBytes = 1 << 20
+	maxRetryBackoffs            = 4096
+	maxRetryBackoffUpdates      = 4096
+	maxRetryBackoffBytes        = 1 << 20
+	retryBackoffUpdateRetention = 14 * 24 * time.Hour
 )
 
 type retryBackoffSnapshot struct {
-	Version  int                          `json:"version"`
-	Backoffs []routingentity.RetryBackoff `json:"backoffs"`
+	Version   int                          `json:"version"`
+	Backoffs  []routingentity.RetryBackoff `json:"backoffs"`
+	UpdatedAt map[string]int64             `json:"updated_at,omitempty"`
 }
 
 func (store *Store) LoadRetryBackoffs(ctx context.Context, now time.Time) ([]routingentity.RetryBackoff, error) {
@@ -77,6 +80,10 @@ func (store *Store) SetRetryBackoff(ctx context.Context, backoff routingentity.R
 	if err != nil {
 		return fmt.Errorf("read routing retry backoff store: %w", err)
 	}
+	mutation := now.UnixMilli()
+	if snapshot.UpdatedAt != nil && snapshot.UpdatedAt[backoff.AccountID] > mutation {
+		return nil
+	}
 	replaced := false
 	for index, current := range snapshot.Backoffs {
 		if current.AccountID == backoff.AccountID {
@@ -88,11 +95,16 @@ func (store *Store) SetRetryBackoff(ctx context.Context, backoff routingentity.R
 	if !replaced {
 		snapshot.Backoffs = append(snapshot.Backoffs, backoff)
 	}
+	if snapshot.UpdatedAt == nil {
+		snapshot.UpdatedAt = make(map[string]int64)
+	}
+	snapshot.UpdatedAt[backoff.AccountID] = mutation
 	snapshot.Backoffs = retainRetryBackoffs(snapshot.Backoffs, now)
-	return store.writeRetryBackoffs(snapshot.Backoffs)
+	snapshot.UpdatedAt = retainRetryBackoffUpdates(snapshot.UpdatedAt, now)
+	return store.writeRetryBackoffs(snapshot.Backoffs, snapshot.UpdatedAt)
 }
 
-func (store *Store) ClearRetryBackoff(ctx context.Context, accountID string) error {
+func (store *Store) ClearRetryBackoff(ctx context.Context, accountID string, now time.Time) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -112,20 +124,26 @@ func (store *Store) ClearRetryBackoff(ctx context.Context, accountID string) err
 	if err != nil {
 		return fmt.Errorf("read routing retry backoff store: %w", err)
 	}
+	mutation := now.UnixMilli()
+	if snapshot.UpdatedAt != nil && snapshot.UpdatedAt[accountID] > mutation {
+		return nil
+	}
 	remaining := snapshot.Backoffs[:0]
 	for _, backoff := range snapshot.Backoffs {
 		if backoff.AccountID != accountID {
 			remaining = append(remaining, backoff)
 		}
 	}
-	if len(remaining) == len(snapshot.Backoffs) {
-		return nil
+	if snapshot.UpdatedAt == nil {
+		snapshot.UpdatedAt = make(map[string]int64)
 	}
-	return store.writeRetryBackoffs(remaining)
+	snapshot.UpdatedAt[accountID] = mutation
+	snapshot.UpdatedAt = retainRetryBackoffUpdates(snapshot.UpdatedAt, now)
+	return store.writeRetryBackoffs(remaining, snapshot.UpdatedAt)
 }
 
 func (store *Store) readRetryBackoffs() (retryBackoffSnapshot, error) {
-	snapshot := retryBackoffSnapshot{Version: 1}
+	snapshot := retryBackoffSnapshot{Version: 1, UpdatedAt: make(map[string]int64)}
 	path := filepath.Join(store.root, "retry-backoff.json")
 	info, err := os.Lstat(path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -151,7 +169,7 @@ func (store *Store) readRetryBackoffs() (retryBackoffSnapshot, error) {
 	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
 		return snapshot, errors.New("routing retry backoff snapshot has trailing data")
 	}
-	if snapshot.Version != 1 || len(snapshot.Backoffs) > maxRetryBackoffs {
+	if snapshot.Version != 1 || len(snapshot.Backoffs) > maxRetryBackoffs || len(snapshot.UpdatedAt) > maxRetryBackoffUpdates {
 		return snapshot, errors.New("unsupported or oversized routing retry backoff snapshot")
 	}
 	seen := make(map[string]bool, len(snapshot.Backoffs))
@@ -164,10 +182,16 @@ func (store *Store) readRetryBackoffs() (retryBackoffSnapshot, error) {
 		}
 		seen[backoff.AccountID] = true
 	}
+	for accountID, updatedAt := range snapshot.UpdatedAt {
+		probe := routingentity.RetryBackoff{AccountID: accountID, UntilUnix: 1}
+		if err := probe.Validate(); err != nil || updatedAt <= 0 {
+			return snapshot, errors.New("routing retry backoff snapshot has invalid update metadata")
+		}
+	}
 	return snapshot, nil
 }
 
-func (store *Store) writeRetryBackoffs(backoffs []routingentity.RetryBackoff) error {
+func (store *Store) writeRetryBackoffs(backoffs []routingentity.RetryBackoff, updatedAt map[string]int64) error {
 	values := append([]routingentity.RetryBackoff(nil), backoffs...)
 	sort.Slice(values, func(i, j int) bool {
 		if values[i].UntilUnix != values[j].UntilUnix {
@@ -175,7 +199,7 @@ func (store *Store) writeRetryBackoffs(backoffs []routingentity.RetryBackoff) er
 		}
 		return values[i].AccountID < values[j].AccountID
 	})
-	content, err := json.Marshal(retryBackoffSnapshot{Version: 1, Backoffs: values})
+	content, err := json.Marshal(retryBackoffSnapshot{Version: 1, Backoffs: values, UpdatedAt: updatedAt})
 	if err != nil {
 		return err
 	}
@@ -200,4 +224,34 @@ func retainRetryBackoffs(backoffs []routingentity.RetryBackoff, now time.Time) [
 		active = active[:maxRetryBackoffs]
 	}
 	return active
+}
+
+func retainRetryBackoffUpdates(updatedAt map[string]int64, now time.Time) map[string]int64 {
+	cutoff := now.Add(-retryBackoffUpdateRetention).UnixMilli()
+	for accountID, mutation := range updatedAt {
+		if mutation < cutoff {
+			delete(updatedAt, accountID)
+		}
+	}
+	if len(updatedAt) <= maxRetryBackoffUpdates {
+		return updatedAt
+	}
+	type update struct {
+		accountID string
+		mutation  int64
+	}
+	values := make([]update, 0, len(updatedAt))
+	for accountID, mutation := range updatedAt {
+		values = append(values, update{accountID: accountID, mutation: mutation})
+	}
+	sort.Slice(values, func(i, j int) bool {
+		if values[i].mutation != values[j].mutation {
+			return values[i].mutation > values[j].mutation
+		}
+		return values[i].accountID < values[j].accountID
+	})
+	for _, value := range values[maxRetryBackoffUpdates:] {
+		delete(updatedAt, value.accountID)
+	}
+	return updatedAt
 }

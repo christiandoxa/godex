@@ -23,7 +23,7 @@ type AutoRedeemer interface {
 type routingStateRepository interface {
 	LoadRetryBackoffs(context.Context, time.Time) ([]routingentity.RetryBackoff, error)
 	SetRetryBackoff(context.Context, routingentity.RetryBackoff, time.Time) error
-	ClearRetryBackoff(context.Context, string) error
+	ClearRetryBackoff(context.Context, string, time.Time) error
 	LoadTransportBackoffs(context.Context, time.Time) ([]routingentity.TransportBackoff, error)
 	SetTransportBackoff(context.Context, routingentity.TransportBackoff, time.Time) error
 	ClearTransportBackoff(context.Context, string, string) error

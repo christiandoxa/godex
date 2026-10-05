@@ -44,7 +44,7 @@ func (router *Router) clearRetryBackoff(ctx context.Context, accountID string) {
 	}
 	router.mu.Unlock()
 	if router.state != nil {
-		_ = router.state.ClearRetryBackoff(ctx, accountID)
+		_ = router.state.ClearRetryBackoff(ctx, accountID, router.now())
 	}
 }
 
