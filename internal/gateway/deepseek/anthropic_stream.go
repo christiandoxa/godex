@@ -14,8 +14,20 @@ func deepSeekAnthropicSSE(body io.ReadCloser, requestMetadata map[string]any) io
 }
 
 func deepSeekAnthropicSSEWithRequestID(body io.ReadCloser, requestMetadata map[string]any, requestID uint64) io.ReadCloser {
+	return deepSeekAnthropicSSEWithConversation(body, requestMetadata, requestID, deepSeekConversationStore{}, nil)
+}
+
+func deepSeekAnthropicSSEWithConversation(
+	body io.ReadCloser,
+	requestMetadata map[string]any,
+	requestID uint64,
+	conversations deepSeekConversationStore,
+	conversationMessages []any,
+) io.ReadCloser {
 	reader, writer := io.Pipe()
-	go pumpDeepSeekAnthropicSSE(body, writer, requestMetadata, requestID)
+	go pumpDeepSeekAnthropicSSE(
+		body, writer, requestMetadata, requestID, conversations, conversationMessages,
+	)
 	return &anthropicPipeBody{reader: reader, source: body}
 }
 
@@ -36,10 +48,20 @@ func (body *anthropicPipeBody) Close() error {
 	return body.err
 }
 
-func pumpDeepSeekAnthropicSSE(body io.ReadCloser, writer *io.PipeWriter, requestMetadata map[string]any, requestID uint64) {
+func pumpDeepSeekAnthropicSSE(
+	body io.ReadCloser,
+	writer *io.PipeWriter,
+	requestMetadata map[string]any,
+	requestID uint64,
+	conversations deepSeekConversationStore,
+	conversationMessages []any,
+) {
 	defer body.Close()
 	decoder := sse.NewDecoder(nativeMessagesMaxBytes)
-	state := anthropicStreamState{requestID: requestID, requestMetadata: requestMetadata}
+	state := anthropicStreamState{
+		requestID: requestID, requestMetadata: requestMetadata,
+		conversations: conversations, conversationMessages: cloneDeepSeekMessages(conversationMessages),
+	}
 	buffer := make([]byte, 32<<10)
 	for {
 		read, err := body.Read(buffer)

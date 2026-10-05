@@ -1,10 +1,7 @@
 package deepseek
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	redacthelper "github.com/christiandoxa/godex/internal/helper/redact"
@@ -114,10 +111,6 @@ func (state *anthropicStreamState) failed(code, message string, now time.Time) (
 	}), true, nil
 }
 
-func anthropicStreamFallbackID(now time.Time) string {
-	var value [12]byte
-	if _, err := rand.Read(value[:]); err == nil {
-		return "resp_deepseek_" + hex.EncodeToString(value[:])
-	}
-	return fmt.Sprintf("resp_deepseek_%d", now.UnixNano())
+func anthropicStreamFallbackID(time.Time) string {
+	return deepSeekResponseFallbackID()
 }

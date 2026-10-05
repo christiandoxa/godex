@@ -10,22 +10,24 @@ import (
 )
 
 type anthropicStreamState struct {
-	requestID       uint64
-	sequenceNumber  uint64
-	id              string
-	model           string
-	createdAt       time.Time
-	blocks          map[uint64]*anthropicStreamBlock
-	blockOrder      []*anthropicStreamBlock
-	inputTokens     uint64
-	outputTokens    uint64
-	serverToolUse   map[string]any
-	reasoningText   strings.Builder
-	reasoningAdded  bool
-	stopReason      any
-	hasStopReason   bool
-	requestMetadata map[string]any
-	completed       bool
+	requestID            uint64
+	sequenceNumber       uint64
+	id                   string
+	model                string
+	createdAt            time.Time
+	blocks               map[uint64]*anthropicStreamBlock
+	blockOrder           []*anthropicStreamBlock
+	inputTokens          uint64
+	outputTokens         uint64
+	serverToolUse        map[string]any
+	reasoningText        strings.Builder
+	reasoningAdded       bool
+	stopReason           any
+	hasStopReason        bool
+	requestMetadata      map[string]any
+	conversationMessages []any
+	conversations        deepSeekConversationStore
+	completed            bool
 }
 
 type anthropicStreamBlock struct {
@@ -349,6 +351,11 @@ func (state *anthropicStreamState) messageStopped(now time.Time) ([]byte, bool, 
 		"type": "response.completed", "sequence_number": state.nextSequenceNumber(),
 		"created_at": createdAt.Unix(), "response": response,
 	}))
+	if encodedSource, encodeErr := json.Marshal(responseSource); encodeErr == nil {
+		messages := cloneDeepSeekMessages(state.conversationMessages)
+		messages = append(messages, deepSeekAnthropicAssistantMessages(encodedSource)...)
+		state.conversations.insert(state.id, messages)
+	}
 	state.completed = true
 	return bytes.Join(events, nil), true, nil
 }

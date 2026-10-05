@@ -37,6 +37,10 @@ func ResponsesRequest(body []byte, options RequestOptions) ([]byte, error) {
 }
 
 func TranslateResponsesRequest(body []byte, options RequestOptions) (TranslatedRequest, error) {
+	return translateResponsesRequestWithHistory(body, options, nil)
+}
+
+func translateResponsesRequestWithHistory(body []byte, options RequestOptions, history []any) (TranslatedRequest, error) {
 	object, err := parseResponsesObject(body)
 	if err != nil {
 		return TranslatedRequest{}, err
@@ -44,6 +48,10 @@ func TranslateResponsesRequest(body []byte, options RequestOptions) (TranslatedR
 	parts, err := translateRequestParts(object, options)
 	if err != nil {
 		return TranslatedRequest{}, err
+	}
+	parts.messages = repairDeepSeekToolCallAdjacency(mergeDeepSeekHistory(history, parts.messages))
+	if parts.thinking {
+		parts.messages = normalizeDeepSeekThinkingToolCallMessages(parts.messages)
 	}
 	metadata, err := deepSeekResponseMetadata(object, parts.thinking)
 	if err != nil {
@@ -61,6 +69,17 @@ func TranslateResponsesRequest(body []byte, options RequestOptions) (TranslatedR
 }
 
 func parseResponsesObject(body []byte) (map[string]any, error) {
+	object, err := parseResponsesObjectWithoutValidation(body)
+	if err != nil {
+		return nil, err
+	}
+	if err := rejectRequestFields(object); err != nil {
+		return nil, err
+	}
+	return object, nil
+}
+
+func parseResponsesObjectWithoutValidation(body []byte) (map[string]any, error) {
 	if len(body) > requestMaxBytes {
 		return nil, fmt.Errorf("DeepSeek Responses request exceeds %d bytes", requestMaxBytes)
 	}
@@ -73,9 +92,6 @@ func parseResponsesObject(body []byte) (map[string]any, error) {
 	object, ok := root.(map[string]any)
 	if !ok {
 		return nil, errors.New("DeepSeek Responses request body must be a JSON object")
-	}
-	if err := rejectRequestFields(object); err != nil {
-		return nil, err
 	}
 	return object, nil
 }
@@ -265,9 +281,6 @@ func rejectBetaAndContinuationFields(object map[string]any) error {
 		if err := validateDeepSeekWebSearchOptions(options); err != nil {
 			return err
 		}
-	}
-	if previous, ok := object["previous_response_id"].(string); ok && strings.TrimSpace(previous) != "" {
-		return errors.New("DeepSeek previous_response_id continuation replay is not implemented yet")
 	}
 	return nil
 }

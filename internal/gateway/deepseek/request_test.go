@@ -116,7 +116,7 @@ func TestDeepSeekResponsesRequestTranslatesHistoryAndRoles(t *testing.T) {
 		t.Fatal(err)
 	}
 	messages := decodeDeepSeekRequest(t, translated)["messages"].([]any)
-	if len(messages) != 5 {
+	if len(messages) != 4 {
 		t.Fatalf("messages = %#v", messages)
 	}
 	if messages[0].(map[string]any)["role"] != "system" || messages[1].(map[string]any)["role"] != "user" {
@@ -130,10 +130,6 @@ func TestDeepSeekResponsesRequestTranslatesHistoryAndRoles(t *testing.T) {
 	if output["role"] != "tool" || output["tool_call_id"] != "call_1" || output["content"] != `{"ok":true}` {
 		t.Fatalf("tool output = %#v", output)
 	}
-	shell := messages[4].(map[string]any)["tool_calls"].([]any)[0].(map[string]any)["function"].(map[string]any)
-	if shell["name"] != "exec_command" || shell["arguments"] != `{"cmd":"pwd"}` {
-		t.Fatalf("shell call = %#v", shell)
-	}
 }
 
 func TestDeepSeekResponsesRequestRejectsUnsupportedControls(t *testing.T) {
@@ -146,7 +142,6 @@ func TestDeepSeekResponsesRequestRejectsUnsupportedControls(t *testing.T) {
 		{`{"input":"x","top_logprobs":2}`, "requires logprobs=true"},
 		{`{"input":"x","stop_sequences":["1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17"]}`, "at most 16"},
 		{`{"input":"x","reasoning":{"summary":"auto"}}`, "reasoning.summary"},
-		{`{"input":"x","previous_response_id":"resp_1"}`, "previous_response_id"},
 		{`{"input":[{"type":"message","content":[{"type":"input_image","image_url":"x"}]}]}`, "text-only"},
 	}
 	for _, fixture := range fixtures {

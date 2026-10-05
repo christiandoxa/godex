@@ -59,9 +59,7 @@ func TestDeepSeekResponsesToolShapingMatchesTaggedContract(t *testing.T) {
 			name: "missing call id uses tagged fallback",
 			call: map[string]any{"function": map[string]any{"name": "lookup", "arguments": `{}`}},
 			check: func(t *testing.T, response map[string]any) {
-				if got := deepSeekTestTool(t, response)["call_id"]; got != "call_0" {
-					t.Fatalf("fallback call id = %v", got)
-				}
+				assertDeepSeekUUIDv7(t, deepSeekTestTool(t, response)["call_id"], "call_deepseek_")
 			},
 		},
 		{
@@ -132,7 +130,9 @@ func TestDeepSeekResponseDefaultsUseTaggedTimeAndToolID(t *testing.T) {
 	if err := json.Unmarshal(translated, &response); err != nil {
 		t.Fatal(err)
 	}
-	if response["id"] != "chatcmpl_prodex" || response["model"] != "deepseek-chat" || response["created_at"] != float64(42) || deepSeekTestTool(t, response)["call_id"] != "call_0" {
+	assertDeepSeekUUIDv7(t, response["id"], "resp_deepseek_")
+	assertDeepSeekUUIDv7(t, deepSeekTestTool(t, response)["call_id"], "call_deepseek_")
+	if response["model"] != "deepseek-chat" || response["created_at"] != float64(42) {
 		t.Fatalf("DeepSeek response defaults = %#v", response)
 	}
 }

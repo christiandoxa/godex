@@ -1,6 +1,9 @@
 package deepseek
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestTranslateDeepSeekSSEDataRejectsMalformedJSON(t *testing.T) {
 	if _, _, err := translateDeepSeekSSEData([]byte("{bad")); err == nil {
@@ -8,14 +11,17 @@ func TestTranslateDeepSeekSSEDataRejectsMalformedJSON(t *testing.T) {
 	}
 }
 
-func TestTranslateDeepSeekSSEDataSkipsToolCallWithoutArgumentDelta(t *testing.T) {
+func TestTranslateDeepSeekSSEDataAddsToolItemBeforeArgumentDelta(t *testing.T) {
 	data := []byte(`{"choices":[{"delta":{"tool_calls":[{"id":"call_1","function":{"name":"lookup"}}]}}]}`)
-	if _, supported, err := translateDeepSeekSSEData(data); err != nil || supported {
-		t.Fatalf("tool call without argument delta = supported:%t err:%v", supported, err)
+	event, supported, err := translateDeepSeekSSEData(data)
+	if err != nil || !supported || !strings.Contains(string(event), "response.output_item.added") ||
+		!strings.Contains(string(event), `"call_id":"call_1"`) {
+		t.Fatalf("tool call without argument delta = %q supported:%t err:%v", event, supported, err)
 	}
 
 	data = []byte(`{"choices":[{"delta":{"tool_calls":[]}}]}`)
-	if event, supported, err := translateDeepSeekSSEData(data); err != nil || !supported || string(event) != "event: response.output_text.delta\ndata: {\"delta\":\"\",\"type\":\"response.output_text.delta\"}\n\n" {
+	if event, supported, err := translateDeepSeekSSEData(data); err != nil || !supported ||
+		!strings.Contains(string(event), "response.created") || strings.Contains(string(event), "response.output_text.delta") {
 		t.Fatalf("empty tool-call delta = %q supported:%t err:%v", event, supported, err)
 	}
 }

@@ -25,11 +25,12 @@ const (
 )
 
 type RuntimeTransport struct {
-	client       *http.Client
-	upstream     *url.URL
-	betaUpstream *url.URL
-	apiKey       string
-	options      RequestOptions
+	client        *http.Client
+	upstream      *url.URL
+	betaUpstream  *url.URL
+	apiKey        string
+	options       RequestOptions
+	conversations deepSeekConversationStore
 }
 
 func NewRuntimeTransport(apiURL, apiKey string, client *http.Client) (*RuntimeTransport, error) {
@@ -59,6 +60,7 @@ func NewRuntimeTransportWithOptions(apiURL, apiKey string, options RequestOption
 	}
 	return &RuntimeTransport{
 		client: cloneClient(client), upstream: parsed, betaUpstream: betaUpstream, apiKey: apiKey, options: options,
+		conversations: newDeepSeekConversationStore(),
 	}, nil
 }
 
@@ -80,10 +82,12 @@ func (transport *RuntimeTransport) Execute(ctx context.Context, input proxymodel
 }
 
 type deepSeekResponseAttempt struct {
-	body           []byte
-	route          route
-	nativeMessages bool
-	metadata       map[string]any
+	body                 []byte
+	route                route
+	nativeMessages       bool
+	metadata             map[string]any
+	conversationMessages []any
+	conversations        deepSeekConversationStore
 }
 
 type deepSeekPrecommitState struct {
@@ -99,8 +103,9 @@ func (transport *RuntimeTransport) executeResponses(ctx context.Context, input p
 		models = []string{"deepseek-v4-pro", "deepseek-v4-flash"}
 	}
 	firstEventRetryUsed := input.FirstEventRetryUsed
+	conversations := transport.conversationsForRequest(input)
 	for index, candidate := range models {
-		attempt, err := transport.prepareResponseAttempt(input, current, candidate)
+		attempt, err := transport.prepareResponseAttempt(input, current, candidate, conversations)
 		if err != nil {
 			return nil, err
 		}
@@ -123,17 +128,19 @@ func (transport *RuntimeTransport) executeResponses(ctx context.Context, input p
 	return nil, errors.New("DeepSeek runtime model fallback produced no attempts")
 }
 
-func (transport *RuntimeTransport) prepareResponseAttempt(input proxymodel.Request, current route, candidate string) (deepSeekResponseAttempt, error) {
-	translated, err := TranslateResponsesRequest(input.Body, RequestOptions{
+func (transport *RuntimeTransport) prepareResponseAttempt(input proxymodel.Request, current route, candidate string, conversations deepSeekConversationStore) (deepSeekResponseAttempt, error) {
+	history := deepSeekConversationHistoryForRequest(input.Body, conversations)
+	translated, err := translateResponsesRequestWithHistory(input.Body, RequestOptions{
 		Model: candidate, StrictTools: transport.options.StrictTools, WebSearchMode: transport.options.WebSearchMode,
-	})
+	}, history)
 	if err != nil {
 		return deepSeekResponseAttempt{}, &proxymodel.Error{StatusCode: http.StatusBadRequest, Message: err.Error()}
 	}
 	attempt := deepSeekResponseAttempt{
-		body: translated.Body, route: current, metadata: translated.ResponseMetadata,
+		body: translated.Body, route: current, metadata: translated.ResponseMetadata, conversations: conversations,
 		nativeMessages: nativeMessagesMode(transport.options.WebSearchMode) && nativeMessagesContext(translated.Body),
 	}
+	attempt.conversationMessages = deepSeekTranslatedConversationMessages(translated.Body)
 	if !attempt.nativeMessages {
 		return attempt, nil
 	}
@@ -163,9 +170,11 @@ func (transport *RuntimeTransport) finishResponseAttempt(
 ) (*proxymodel.Response, bool, bool, error) {
 	if response.StatusCode >= 200 && response.StatusCode < 300 {
 		if attempt.nativeMessages {
-			return transport.finishNativeResponse(ctx, input, response, attempt.metadata, firstEventRetryUsed, hasNextModel)
+			return transport.finishNativeResponse(ctx, input, response, attempt, firstEventRetryUsed, hasNextModel)
 		}
-		translated, err := translateResponseWithMetadata(response, attempt.metadata)
+		translated, err := translateResponseWithConversation(
+			response, attempt.metadata, attempt.conversations, attempt.conversationMessages, input.RequestID,
+		)
 		return translated, false, firstEventRetryUsed, err
 	}
 	buffered, err := bufferError(response)
@@ -183,7 +192,7 @@ func (transport *RuntimeTransport) finishNativeResponse(
 	ctx context.Context,
 	input proxymodel.Request,
 	response *http.Response,
-	metadata map[string]any,
+	attempt deepSeekResponseAttempt,
 	firstEventRetryUsed bool,
 	hasNextModel bool,
 ) (*proxymodel.Response, bool, bool, error) {
@@ -194,7 +203,9 @@ func (transport *RuntimeTransport) finishNativeResponse(
 	if precommit.retry {
 		return nil, true, precommit.retryUsed, nil
 	}
-	translated, err := translateAnthropicResponseWithRequestID(response, metadata, input.RequestID)
+	translated, err := translateAnthropicResponseWithConversation(
+		response, attempt.metadata, input.RequestID, attempt.conversations, attempt.conversationMessages,
+	)
 	if err != nil {
 		return nil, false, precommit.retryUsed, err
 	}

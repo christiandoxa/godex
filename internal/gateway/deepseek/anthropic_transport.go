@@ -15,12 +15,24 @@ func translateAnthropicResponse(response *http.Response, requestMetadata map[str
 }
 
 func translateAnthropicResponseWithRequestID(response *http.Response, requestMetadata map[string]any, requestID uint64) (*proxymodel.Response, error) {
+	return translateAnthropicResponseWithConversation(response, requestMetadata, requestID, deepSeekConversationStore{}, nil)
+}
+
+func translateAnthropicResponseWithConversation(
+	response *http.Response,
+	requestMetadata map[string]any,
+	requestID uint64,
+	conversations deepSeekConversationStore,
+	conversationMessages []any,
+) (*proxymodel.Response, error) {
 	contentType := strings.ToLower(response.Header.Get(contentTypeHeader))
 	if strings.Contains(contentType, "text/event-stream") {
 		return &proxymodel.Response{
 			StatusCode: response.StatusCode,
 			Header:     translatedHeaders(response.Header, "text/event-stream; charset=utf-8"),
-			Body:       deepSeekAnthropicSSEWithRequestID(response.Body, requestMetadata, requestID), Trailer: response.Trailer,
+			Body: deepSeekAnthropicSSEWithConversation(
+				response.Body, requestMetadata, requestID, conversations, conversationMessages,
+			), Trailer: response.Trailer,
 		}, nil
 	}
 	defer response.Body.Close()
@@ -39,5 +51,6 @@ func translateAnthropicResponseWithRequestID(response *http.Response, requestMet
 	if err != nil {
 		return nil, err
 	}
+	deepSeekStoreAnthropicConversation(conversations, conversationMessages, body, translated)
 	return translatedDeepSeekResponseWithContentType(response, translated, nil, "application/json; charset=utf-8")
 }

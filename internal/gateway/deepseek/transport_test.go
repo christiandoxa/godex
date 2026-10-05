@@ -452,11 +452,24 @@ func TestDeepSeekResponsesTranslateStreamWithProviderShaping(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "event: response.function_call_arguments.delta\ndata: {\"call_id\":\"call_shell\",\"delta\":\"{\\\"cmd\\\":\\\"ls\\\"}\",\"type\":\"response.function_call_arguments.delta\"}\n\n" +
-		"event: response.output_text.delta\ndata: {\"delta\":\"\",\"type\":\"response.output_text.delta\"}\n\n" +
-		"event: response.output_text.delta\ndata: {\"delta\":\"\",\"type\":\"response.output_text.delta\"}\n\n" +
-		"event: response.completed\ndata: {}\n\n"
-	if response.StatusCode != http.StatusOK || string(body) != want {
+	text := string(body)
+	for _, want := range []string{
+		"event: response.created",
+		"event: response.output_item.added",
+		"event: response.function_call_arguments.delta",
+		`"call_id":"call_shell"`,
+		`"delta":"{\"cmd\":\"ls\"}"`,
+		"event: response.reasoning_summary_text.delta",
+		`"delta":"thinking"`,
+		"event: response.output_item.done",
+		`"arguments":"{\"cmd\":\"rtk ls\"}"`,
+		"event: response.completed",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("translated DeepSeek stream missing %q: %s", want, body)
+		}
+	}
+	if response.StatusCode != http.StatusOK || strings.Contains(text, `"delta":""`) {
 		t.Fatalf("translated DeepSeek stream = status:%d body:%s", response.StatusCode, body)
 	}
 }
@@ -489,13 +502,12 @@ func TestDeepSeekBufferedResponseUsesTaggedSparseDefaults(t *testing.T) {
 	if err := json.Unmarshal(body, &value); err != nil {
 		t.Fatal(err)
 	}
-	if value["id"] != "chatcmpl_prodex" || value["model"] != "deepseek-chat" {
+	assertDeepSeekUUIDv7(t, value["id"], "resp_deepseek_")
+	if value["model"] != "deepseek-chat" {
 		t.Fatalf("sparse DeepSeek response defaults = %#v", value)
 	}
 	tool := value["output"].([]any)[0].(map[string]any)
-	if tool["call_id"] != "call_0" {
-		t.Fatalf("sparse DeepSeek tool-call ID = %#v", tool)
-	}
+	assertDeepSeekUUIDv7(t, tool["call_id"], "call_deepseek_")
 }
 
 func TestDeepSeekMetadataMergeMatchesProdexShallowObjectPolicy(t *testing.T) {

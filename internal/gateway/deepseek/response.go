@@ -149,7 +149,7 @@ func deepSeekResponseCallID(call map[string]any) string {
 	if id, ok := call["id"].(string); ok {
 		return id
 	}
-	return "call_0"
+	return deepSeekCallFallbackID()
 }
 
 func deepSeekSplitToolName(name string) (string, string) {
@@ -163,6 +163,20 @@ func deepSeekSplitToolName(name string) (string, string) {
 		shortName := strings.TrimSpace(name[index+len(separator):])
 		if namespace != "" && shortName != "" {
 			return namespace, shortName
+		}
+	}
+	return "", name
+}
+
+func deepSeekStreamSplitToolName(name string) (string, string) {
+	name = strings.TrimSpace(name)
+	if index := strings.LastIndex(name, "--"); index > 0 && index+2 < len(name) {
+		return name[:index], name[index+2:]
+	}
+	if strings.HasPrefix(name, "mcp__") {
+		rest := strings.TrimPrefix(name, "mcp__")
+		if index := strings.LastIndex(rest, "__"); index > 0 && index+2 < len(rest) {
+			return "mcp__" + rest[:index], rest[index+2:]
 		}
 	}
 	return "", name

@@ -16,10 +16,23 @@ import (
 )
 
 func translateResponseWithMetadata(response *http.Response, requestMetadata map[string]any) (*proxymodel.Response, error) {
+	return translateResponseWithConversation(response, requestMetadata, deepSeekConversationStore{}, nil, 0)
+}
+
+func translateResponseWithConversation(
+	response *http.Response,
+	requestMetadata map[string]any,
+	conversations deepSeekConversationStore,
+	conversationMessages []any,
+	requestID uint64,
+) (*proxymodel.Response, error) {
 	contentType := strings.ToLower(response.Header.Get(contentTypeHeader))
 	if strings.Contains(contentType, "text/event-stream") {
 		header := translatedHeaders(response.Header, "text/event-stream")
-		return &proxymodel.Response{StatusCode: response.StatusCode, Header: header, Body: deepSeekChatSSE(response.Body), Trailer: response.Trailer}, nil
+		return &proxymodel.Response{
+			StatusCode: response.StatusCode, Header: header,
+			Body: deepSeekChatSSEWithConversation(response.Body, requestID, conversationMessages, requestMetadata, conversations), Trailer: response.Trailer,
+		}, nil
 	}
 	defer response.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(response.Body, bodyMaxBytes+1))
@@ -33,7 +46,11 @@ func translateResponseWithMetadata(response *http.Response, requestMetadata map[
 	if err != nil {
 		return nil, err
 	}
-	return translatedDeepSeekResponse(response, translated, requestMetadata)
+	result, err := translatedDeepSeekResponse(response, translated, requestMetadata)
+	if err == nil {
+		deepSeekStoreBufferedConversation(conversations, conversationMessages, body, translated)
+	}
+	return result, err
 }
 
 func translatedHeaders(source http.Header, contentType string) http.Header {
@@ -126,7 +143,7 @@ func deepSeekResponseOptions() chatcompat.ResponseOptions {
 		ProviderKey:        deepSeekProviderKey,
 		AdapterLabel:       "DeepSeek",
 		DefaultModel:       "deepseek-chat",
-		FallbackResponseID: func() string { return "chatcmpl_prodex" },
+		FallbackResponseID: deepSeekResponseFallbackID,
 	}
 }
 

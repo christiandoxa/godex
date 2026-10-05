@@ -174,7 +174,16 @@ func deepSeekToolCallItem(item map[string]any, kind string) (map[string]any, err
 			arguments = firstValue(item, "input", deepSeekArgumentsKey)
 		}
 	}
-	return assistantToolCall(callID, name, arguments), nil
+	message := assistantToolCall(callID, name, arguments)
+	if signature, _ := item["gemini_thought_signature"].(string); strings.TrimSpace(signature) != "" {
+		calls, _ := message["tool_calls"].([]any)
+		if len(calls) > 0 {
+			if call, ok := calls[0].(map[string]any); ok {
+				call["gemini_thought_signature"] = signature
+			}
+		}
+	}
+	return message, nil
 }
 
 func deepSeekShellCallItem(item map[string]any) (map[string]any, error) {

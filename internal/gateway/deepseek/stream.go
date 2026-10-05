@@ -1,20 +1,31 @@
 package deepseek
 
 import (
-	"encoding/json"
 	"errors"
 	"io"
+	"time"
 
 	"github.com/christiandoxa/godex/internal/helper/sse"
 )
 
 func deepSeekChatSSE(body io.ReadCloser) io.ReadCloser {
+	return deepSeekChatSSEWithConversation(body, 0, nil, nil, deepSeekConversationStore{})
+}
+
+func deepSeekChatSSEWithConversation(
+	body io.ReadCloser,
+	requestID uint64,
+	conversationMessages []any,
+	responseMetadata map[string]any,
+	conversations deepSeekConversationStore,
+) io.ReadCloser {
 	reader, writer := io.Pipe()
-	go pumpDeepSeekChatSSE(body, writer)
+	state := newDeepSeekChatStreamState(requestID, conversationMessages, responseMetadata, conversations)
+	go pumpDeepSeekChatSSE(body, writer, state)
 	return reader
 }
 
-func pumpDeepSeekChatSSE(body io.ReadCloser, writer *io.PipeWriter) {
+func pumpDeepSeekChatSSE(body io.ReadCloser, writer *io.PipeWriter, state *deepSeekChatStreamState) {
 	defer body.Close()
 	decoder := sse.NewDecoder(streamEventMaxBytes)
 	buffer := make([]byte, 32<<10)
@@ -22,7 +33,7 @@ func pumpDeepSeekChatSSE(body io.ReadCloser, writer *io.PipeWriter) {
 		read, err := body.Read(buffer)
 		if read > 0 {
 			for _, event := range decoder.Feed(buffer[:read]) {
-				translated, supported, translateErr := translateDeepSeekSSEData(event)
+				translated, supported, translateErr := state.observe(event)
 				if translateErr != nil {
 					_ = writer.CloseWithError(translateErr)
 					return
@@ -36,65 +47,31 @@ func pumpDeepSeekChatSSE(body io.ReadCloser, writer *io.PipeWriter) {
 			}
 		}
 		if err != nil {
-			if errors.Is(err, io.EOF) {
-				_ = writer.Close()
-			} else {
-				_ = writer.CloseWithError(err)
+			if !state.completed {
+				message := "DeepSeek stream failed"
+				if errors.Is(err, io.EOF) {
+					message = "unexpected end of DeepSeek stream"
+				}
+				failed, supported, failErr := state.failed("provider_stream_error", message)
+				if failErr != nil {
+					_ = writer.CloseWithError(failErr)
+					return
+				}
+				if supported {
+					if _, writeErr := writer.Write(failed); writeErr != nil {
+						_ = writer.CloseWithError(writeErr)
+						return
+					}
+				}
 			}
+			_ = writer.Close()
 			return
 		}
 	}
 }
 
 func translateDeepSeekSSEData(data []byte) ([]byte, bool, error) {
-	if string(data) == "[DONE]" {
-		return []byte("event: response.completed\ndata: {}\n\n"), true, nil
-	}
-	var root map[string]any
-	if err := json.Unmarshal(data, &root); err != nil || root == nil {
-		return nil, false, errors.New("failed to parse DeepSeek SSE JSON")
-	}
-	choices, ok := root["choices"].([]any)
-	if !ok || len(choices) == 0 {
-		return nil, false, nil
-	}
-	choice, ok := choices[0].(map[string]any)
-	if !ok {
-		return nil, false, nil
-	}
-	rawDelta, ok := choice["delta"]
-	if !ok {
-		return nil, false, nil
-	}
-	delta, _ := rawDelta.(map[string]any)
-	if calls, ok := delta["tool_calls"].([]any); ok && len(calls) > 0 {
-		call, ok := calls[0].(map[string]any)
-		if !ok {
-			return nil, false, nil
-		}
-		function, ok := call["function"].(map[string]any)
-		if !ok {
-			return nil, false, nil
-		}
-		arguments, ok := function["arguments"].(string)
-		if !ok {
-			return nil, false, nil
-		}
-		payload := map[string]any{"delta": arguments, "type": "response.function_call_arguments.delta"}
-		if id, ok := call["id"].(string); ok {
-			payload["call_id"] = id
-		}
-		return deepSeekStreamEvent("response.function_call_arguments.delta", payload), true, nil
-	}
-	// DeepSeek emits empty text deltas for present deltas without text or tool arguments.
-	text, _ := delta["content"].(string)
-	return deepSeekStreamEvent("response.output_text.delta", map[string]any{
-		"delta": text,
-		"type":  "response.output_text.delta",
-	}), true, nil
-}
-
-func deepSeekStreamEvent(name string, payload map[string]any) []byte {
-	content, _ := json.Marshal(payload)
-	return []byte("event: " + name + "\ndata: " + string(content) + "\n\n")
+	state := newDeepSeekChatStreamState(0, nil, nil, deepSeekConversationStore{})
+	state.createdAt = time.Unix(0, 0)
+	return state.observe(data)
 }
