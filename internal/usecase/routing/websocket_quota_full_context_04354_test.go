@@ -206,7 +206,7 @@ func TestProdex04354WebSocketSessionQuotaUsesOneLastChanceProfileWithoutWaiting(
 	}
 }
 
-func TestProdex04354WebSocketContextConstraintRejectsLastChanceFallback(t *testing.T) {
+func TestProdex04355WebSocketContextConstraintSignalsFullContextWhenLastChanceExists(t *testing.T) {
 	gateway := &websocketDispatchGateway{responses: []*proxymodel.Response{
 		websocketCommittedTestResponse("resp-main"),
 		websocketQuotaFailureResponse(),
@@ -231,28 +231,17 @@ func TestProdex04354WebSocketContextConstraintRejectsLastChanceFallback(t *testi
 	}
 	router.quarantineAccount(websocketQuotaOwnerB, time.Minute)
 
-	quota, err := router.Forward(t.Context(), websocketDispatchRequest(
+	signal, err := router.Forward(t.Context(), websocketDispatchRequest(
 		"{\"type\":\"response.create\",\"session_id\":\"session-context\",\"previous_response_id\":\"resp-main\",\"input\":[{\"type\":\"custom_tool_call_output\",\"call_id\":\"call-1\",\"output\":\"done\"}]}", 106,
 	))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer quota.Close()
-	if quota.Result.AccountID != websocketQuotaOwnerA ||
-		quota.Result.Response.PrecommitFailure == nil ||
-		quota.Result.Response.PrecommitFailure.Code != "insufficient_quota" ||
-		strings.Join(gateway.accounts, ",") != websocketQuotaOwnerA+","+websocketQuotaOwnerA {
-		t.Fatalf("context-constrained quota used last chance: account=%q response=%#v attempts=%v",
-			quota.Result.AccountID, quota.Result.Response, gateway.accounts)
-	}
-	owner, err := router.affinity.owner(
-		t.Context(), affinityKeys{session: "session-context"}, router.now(),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if owner != websocketQuotaOwnerA {
-		t.Fatalf("context-constrained quota released session owner: %q", owner)
+	defer signal.Close()
+	assertProdex04355FullContextSignal(t, signal, websocketQuotaOwnerA)
+	assertProdex04355AffinityReleased(t, router, "resp-main", "session-context")
+	if strings.Join(gateway.accounts, ",") != websocketQuotaOwnerA+","+websocketQuotaOwnerA {
+		t.Fatalf("full-context signal upstream attempts = %v", gateway.accounts)
 	}
 }
 

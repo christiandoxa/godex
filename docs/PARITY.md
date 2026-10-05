@@ -1,8 +1,8 @@
-# Prodex 0.435.4 parity audit
+# Prodex 0.435.5 parity audit
 
-Reference: exact Prodex tag `0.435.4`, commit
-`8583f6026f157bcf349d6efd9940a7e19b3b7d0f`. The tag's `Cargo.toml` declares
-`0.435.4`, and its compatibility audit names Codex `rust-v0.160.0` at commit
+Reference: exact Prodex tag `0.435.5`, commit
+`24223c315e7a30f527328f62c632a481411552cb`. The tag's `Cargo.toml` declares
+`0.435.5`, and its compatibility audit names Codex `rust-v0.160.0` at commit
 `a956835d020762cb2b570053af06f643a11c0ecc`. Comparison reads use tagged Prodex
 Git objects rather than the mutable Prodex checkout. The audited Codex commit is
 not present in this local checkout, so it is treated as release-audit evidence
@@ -13,7 +13,7 @@ checkpoint, not the current parity target.
 
 ## 1:1 parity expansion
 
-The project target is now feature-for-feature parity with Prodex `0.435.4`, not
+The project target is now feature-for-feature parity with Prodex `0.435.5`, not
 only the historical OpenAI/Codex core boundary. The core closure below remains a
 verified baseline while additional surfaces are implemented. Current expansion
 checkpoints add standalone/external profile registration and copy workflows,
@@ -31,9 +31,9 @@ Full parity remains open while any gap below remains.
 The earlier core checkpoint closed practical parity for the declared
 OpenAI/Codex account, isolated profile, session, and foreground managed HTTP/SSE
 scope against its then-current baseline. It does not close feature-for-feature
-parity with Prodex 0.435.4. The preserved audit read tagged Prodex source
+parity with Prodex 0.435.5. The preserved audit read tagged Prodex source
 alongside Godex production code, callers, tests, and Codex 0.159.2. The active
-expansion baseline is Prodex 0.435.4 / Codex 0.160.0; the earlier audit found
+expansion baseline is Prodex 0.435.5 / Codex 0.160.0; the earlier audit found
 and closed these gaps:
 
 - Import identity now comes from the same credential snapshot that is staged,
@@ -205,13 +205,21 @@ and eligibility validation stays in the runtime use case.
   soft and rotates the same request when a fallback is ready. The tagged
   `Ready` / `LastChance` / `Unavailable` quota-fallback policy is also enforced:
   a context-free session may use one otherwise-healthy profile through transient
-  quarantine/backoff without waiting, context-constrained continuations never
-  use that last chance, and the profile hard in-flight cap remains authoritative.
-  With no legal fallback, the original quota failure and ownership remain.
-  Message-level quota never spends an auto-redeem credit. Public E2E regressions
-  cover A -> signal -> reconnect/full-context -> B. With Responses, Realtime/live,
-  stale/invalid continuation handling, commitment, backpressure, and quota recovery
-  all closed, the Prodex 0.435.4 WebSocket surface is now considered parity-complete.
+  quarantine/backoff without waiting, ordinary context-constrained continuation
+  fallback does not use that last chance, and the profile hard in-flight cap remains
+  authoritative. Prodex `0.435.5` adds one deliberate exception for recovery: when
+  a hard-affinity previous+session continuation is quota-blocked before send, or its
+  owner returns a precommit quota failure, Godex evaluates fallback availability as
+  a future full-context request. A `Ready` or bounded `LastChance` fallback therefore
+  produces the tagged 400 `previous_response_not_found` signal, releases the failed
+  owner's previous/turn/session affinity, and lets the client's full-context replay
+  bind a healthy profile without waiting through soft quarantine. A hard in-flight
+  cap, fully exhausted pool, or otherwise unavailable fallback remains terminal and
+  retains ownership. Message-level quota never spends an auto-redeem credit. Public
+  E2E regressions cover both response-time A -> signal -> reconnect/full-context -> B
+  and the new pre-send blocked-owner path. With Responses, Realtime/live, stale/invalid
+  continuation handling, commitment, backpressure, and quota recovery all closed, the
+  Prodex 0.435.5 WebSocket surface is now considered parity-complete.
 - Full native-home import remains unsupported. Godex imports auth only, leaves
   source settings, rollouts, and databases intact, and keeps managed homes isolated.
 - The `0.435.1` hotfix adds no user-facing command surface; its material Godex

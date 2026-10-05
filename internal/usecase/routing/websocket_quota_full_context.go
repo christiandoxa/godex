@@ -25,6 +25,52 @@ type websocketQuotaFallbackDecision struct {
 	account proxymodel.Account
 }
 
+func (router *Router) handleBoundWebSocketPreSendQuotaBlock(
+	ctx context.Context,
+	request proxymodel.Request,
+	accounts []proxymodel.Account,
+	account proxymodel.Account,
+) (proxymodel.Forwarded, bool, error) {
+	if !request.WebSocketMessage || !router.boundWebSocketQuotaBlocked(account) {
+		return proxymodel.Forwarded{}, false, nil
+	}
+	metadata := parseWebSocketRequestMetadata(request)
+	if metadata.previousResponseID == "" || metadata.sessionID == "" {
+		return proxymodel.Forwarded{}, false, nil
+	}
+	decision := router.websocketQuotaFallbackDecisionWithContext(
+		request, accounts, account, false,
+	)
+	if decision.kind == websocketQuotaFallbackUnavailable {
+		return proxymodel.Forwarded{}, false, nil
+	}
+	if err := router.affinity.forgetOwned(
+		ctx,
+		account.ID,
+		affinityKeys{
+			previous: metadata.previousResponseID,
+			turn:     metadata.turnState,
+			session:  metadata.sessionID,
+		},
+		router.now(),
+	); err != nil {
+		return proxymodel.Forwarded{}, true, err
+	}
+	return proxymodel.Forwarded{
+		Response:  websocketQuotaFullContextSignalResponse(),
+		AccountID: account.ID,
+		Failed:    true,
+	}, true, nil
+}
+
+func (router *Router) boundWebSocketQuotaBlocked(account proxymodel.Account) bool {
+	now := router.now()
+	if account.EligibleAfter.After(now) {
+		return true
+	}
+	return router.quotaBlockedAccount(account.ID) && router.isQuarantined(account.ID, now)
+}
+
 func (router *Router) handleBoundWebSocketResponse(
 	ctx context.Context,
 	request proxymodel.Request,
@@ -62,10 +108,12 @@ func (router *Router) handleBoundWebSocketQuota(
 	pending *pendingResponse,
 ) (proxymodel.Forwarded, error) {
 	metadata := parseWebSocketRequestMetadata(request)
-	decision := router.websocketQuotaFallbackDecision(request, accounts, account, metadata)
 
 	if metadata.previousResponseID != "" {
-		if metadata.sessionID == "" || decision.kind != websocketQuotaFallbackReady {
+		decision := router.websocketQuotaFallbackDecisionWithContext(
+			request, accounts, account, false,
+		)
+		if metadata.sessionID == "" || decision.kind == websocketQuotaFallbackUnavailable {
 			return pendingForwarded(account.ID, outcome, pending), nil
 		}
 		if err := router.affinity.forgetOwned(
@@ -89,6 +137,7 @@ func (router *Router) handleBoundWebSocketQuota(
 		}, nil
 	}
 
+	decision := router.websocketQuotaFallbackDecision(request, accounts, account, metadata)
 	if metadata.turnState != "" {
 		return pendingForwarded(account.ID, outcome, pending), nil
 	}
@@ -117,10 +166,21 @@ func (router *Router) websocketQuotaFallbackDecision(
 	failed proxymodel.Account,
 	metadata websocketRequestMetadata,
 ) websocketQuotaFallbackDecision {
-	now := router.now()
 	hasContextConstraint := metadata.previousResponseID != "" ||
 		metadata.requiresPreviousResponseAffinity ||
 		metadata.turnState != ""
+	return router.websocketQuotaFallbackDecisionWithContext(
+		request, accounts, failed, hasContextConstraint,
+	)
+}
+
+func (router *Router) websocketQuotaFallbackDecisionWithContext(
+	request proxymodel.Request,
+	accounts []proxymodel.Account,
+	failed proxymodel.Account,
+	hasContextConstraint bool,
+) websocketQuotaFallbackDecision {
+	now := router.now()
 
 	var lastChance *proxymodel.Account
 	for _, candidate := range accounts {
@@ -151,6 +211,35 @@ func (router *Router) websocketQuotaFallbackDecision(
 		}
 	}
 	return websocketQuotaFallbackDecision{kind: websocketQuotaFallbackUnavailable}
+}
+
+func (router *Router) websocketQuotaReplayLastChance(
+	request proxymodel.Request,
+	accounts []proxymodel.Account,
+) (proxymodel.Account, bool) {
+	if !request.WebSocketMessage {
+		return proxymodel.Account{}, false
+	}
+	metadata := parseWebSocketRequestMetadata(request)
+	if metadata.sessionID == "" || metadata.previousResponseID != "" || metadata.turnState != "" {
+		return proxymodel.Account{}, false
+	}
+	now := router.now()
+	for _, blocked := range accounts {
+		if blocked.ID == "" || blocked.Home == "" || !blocked.Enabled {
+			continue
+		}
+		if !blocked.EligibleAfter.After(now) && !router.quotaBlockedAccount(blocked.ID) {
+			continue
+		}
+		decision := router.websocketQuotaFallbackDecisionWithContext(
+			request, accounts, blocked, false,
+		)
+		if decision.kind == websocketQuotaFallbackLastChance {
+			return decision.account, true
+		}
+	}
+	return proxymodel.Account{}, false
 }
 
 func sameWebSocketProvider(left, right proxymodel.Account) bool {

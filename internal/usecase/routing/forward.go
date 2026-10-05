@@ -18,6 +18,9 @@ func (router *Router) forwardBound(
 	if err != nil {
 		return proxymodel.Forwarded{}, err
 	}
+	if result, handled, err := router.handleBoundWebSocketPreSendQuotaBlock(ctx, request, accounts, account); handled || err != nil {
+		return result, err
+	}
 	account, err = router.prepareBoundOwner(ctx, request, accounts, account)
 	if err != nil {
 		return proxymodel.Forwarded{}, err

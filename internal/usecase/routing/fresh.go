@@ -15,6 +15,9 @@ func (router *Router) forwardFresh(
 ) (proxymodel.Forwarded, error) {
 	candidates := router.candidates(accounts, router.now())
 	if len(candidates) == 0 {
+		if account, ok := router.websocketQuotaReplayLastChance(request, accounts); ok {
+			return router.forwardWebSocketQuotaLastChance(ctx, request, account)
+		}
 		return router.forwardFreshWithoutCandidates(ctx, request, accounts)
 	}
 	var last *pendingResponse
@@ -30,6 +33,9 @@ func (router *Router) forwardFresh(
 		request.FirstEventRetryUsed = firstEventRetryUsed
 		current := freshRetryCandidates(router, candidates, retryable, router.now())
 		if len(current) == 0 {
+			if lastChance, ok := router.websocketQuotaReplayLastChance(request, accounts); ok {
+				return router.forwardWebSocketQuotaLastChance(ctx, request, lastChance)
+			}
 			if recoverySweeps > 0 && !autoRedeemAttempted {
 				autoRedeemAttempted = true
 				remaining := freshAutoRedeemPool(accounts, excluded)
