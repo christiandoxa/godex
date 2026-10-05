@@ -255,7 +255,7 @@ func mergeAnthropicResponseMetadata(body []byte, metadata map[string]any) ([]byt
 }
 
 func nativeMessagesFallbackAllowed(mode string) bool {
-	return mode == "auto"
+	return mode == "" || mode == "auto"
 }
 
 func nativeMessagesMode(mode string) bool {

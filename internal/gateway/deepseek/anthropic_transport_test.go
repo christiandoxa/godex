@@ -87,6 +87,41 @@ func TestDeepSeekAutoWebSearchUsesNativeMessagesAndMapsJSON(t *testing.T) {
 	}
 }
 
+func TestDeepSeekAnthropicModeSelectsNativeMessages(t *testing.T) {
+	var path, apiKey, authorization string
+	var body map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		path = request.URL.Path
+		apiKey = request.Header.Get("x-api-key")
+		authorization = request.Header.Get("Authorization")
+		_ = json.NewDecoder(request.Body).Decode(&body)
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(writer, `{"id":"msg_anthropic","model":"deepseek-v4-pro","content":[]}`)
+	}))
+	defer server.Close()
+	transport, err := NewRuntimeTransportWithOptions(server.URL, "fixture-key", RequestOptions{
+		WebSearchMode: "anthropic",
+	}, server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer transport.Close()
+	response, err := transport.Execute(context.Background(), proxymodel.Request{
+		Method: http.MethodPost, Path: mountPath + "/responses",
+		Body: []byte(`{"model":"deepseek-v4-pro","input":"find it","web_search_options":{}}`),
+	}, proxymodel.Account{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if path != "/anthropic/v1/messages" || apiKey != "fixture-key" || authorization != "" {
+		t.Fatalf("native Messages route/auth = %q / %q / %q", path, apiKey, authorization)
+	}
+	if body["model"] != "deepseek-v4-pro" || body["tools"] == nil {
+		t.Fatalf("native Messages request = %#v", body)
+	}
+}
+
 func TestDeepSeekNativeMessagesMapsInstructionsToolCallsAndChoice(t *testing.T) {
 	translated, err := TranslateResponsesRequest([]byte(`{
 		"instructions":"Be concise.",
@@ -154,16 +189,18 @@ func TestDeepSeekAnthropicRequestNormalizesNamespacedToolCalls(t *testing.T) {
 
 func TestDeepSeekWebSearchModeFallbackPolicy(t *testing.T) {
 	for _, test := range []struct {
+		name          string
 		mode          string
 		wantPath      string
 		wantSearch    bool
 		wantLocalFail bool
 	}{
-		{mode: "openai_chat", wantPath: "/chat/completions", wantSearch: true},
-		{mode: "auto", wantPath: "/chat/completions", wantSearch: false},
-		{mode: "anthropic", wantLocalFail: true},
+		{name: "openai chat", mode: "openai_chat", wantPath: "/chat/completions", wantSearch: true},
+		{name: "unset defaults to auto", mode: "", wantPath: "/chat/completions", wantSearch: false},
+		{name: "auto", mode: "auto", wantPath: "/chat/completions", wantSearch: false},
+		{name: "anthropic rejects unsafe fallback", mode: "anthropic", wantLocalFail: true},
 	} {
-		t.Run(test.mode, func(t *testing.T) {
+		t.Run(test.name, func(t *testing.T) {
 			var path string
 			var body map[string]any
 			calls := 0

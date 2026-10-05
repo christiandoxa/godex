@@ -75,6 +75,62 @@ func TestAnthropicStreamReasoningEventsUseResponsesIndexZero(t *testing.T) {
 	}
 }
 
+func TestAnthropicStreamOmitsEmptyTextAndPreservesWhitespace(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		delta      string
+		wantDelta  bool
+		wantOutput int
+		wantText   string
+	}{
+		{name: "empty", delta: `{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":""}}`},
+		{name: "whitespace", delta: `{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" "}}`, wantDelta: true, wantOutput: 1, wantText: " "},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			now := time.Unix(123, 0)
+			state := anthropicStreamState{}
+			if _, _, err := state.translate([]byte(`{"type":"message_start","message":{"id":"msg_text"}}`), now); err != nil {
+				t.Fatal(err)
+			}
+			if _, _, err := state.translate([]byte(`{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`), now); err != nil {
+				t.Fatal(err)
+			}
+			delta, emitted, err := state.translate([]byte(test.delta), now)
+			if err != nil || emitted != test.wantDelta || (len(delta) > 0) != test.wantDelta {
+				t.Fatalf("text delta = %q / emitted:%t / err:%v", delta, emitted, err)
+			}
+			if test.wantText != "" && !strings.Contains(string(delta), `"delta":" "`) {
+				t.Fatalf("whitespace delta was lost: %s", delta)
+			}
+
+			completed, emitted, err := state.translate([]byte(`{"type":"message_stop"}`), now)
+			if err != nil || !emitted {
+				t.Fatalf("message_stop = %q / emitted:%t / err:%v", completed, emitted, err)
+			}
+			var response map[string]any
+			for _, data := range sse.NewDecoder(streamEventMaxBytes).Feed(completed) {
+				var event map[string]any
+				if err := json.Unmarshal(data, &event); err != nil {
+					t.Fatal(err)
+				}
+				if event["type"] == "response.completed" {
+					response = event["response"].(map[string]any)
+				}
+			}
+			output := response["output"].([]any)
+			if len(output) != test.wantOutput {
+				t.Fatalf("completed output = %#v", output)
+			}
+			if test.wantText != "" {
+				content := output[0].(map[string]any)["content"].([]any)
+				if got := content[0].(map[string]any)["text"]; got != test.wantText {
+					t.Fatalf("completed text = %#v", got)
+				}
+			}
+		})
+	}
+}
+
 func TestAnthropicResponseToolNameRestoresNamespace(t *testing.T) {
 	response, err := deepSeekAnthropicResponse([]byte(`{
 		"id":"msg_tool","content":[{"type":"tool_use","id":"call_tool","name":"files--read_file","input":{}}]

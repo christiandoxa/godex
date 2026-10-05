@@ -104,6 +104,9 @@ func (state *anthropicStreamState) blockStarted(root map[string]any) ([]byte, bo
 	}
 	index := integerValue(root["index"])
 	streamBlock := state.rememberStreamBlock(index, kind, block)
+	if kind == "text" {
+		streamBlock.value["text"] = ""
+	}
 	if kind == "web_search_tool_result" {
 		return state.finishWebSearch(block)
 	}
@@ -199,6 +202,9 @@ func (state *anthropicStreamState) textBlockDelta(block *anthropicStreamBlock, d
 		return nil, false, nil
 	}
 	text := stringOr(delta["text"], "")
+	if text == "" {
+		return nil, false, nil
+	}
 	block.value["text"] = stringOr(block.value["text"], "") + text
 	var events [][]byte
 	if !block.added {
@@ -287,6 +293,9 @@ func (state *anthropicStreamState) messageStopped(now time.Time) ([]byte, bool, 
 	}
 	content := make([]any, 0, len(state.blockOrder))
 	for _, block := range state.blockOrder {
+		if block.kind == "text" && stringOr(block.value["text"], "") == "" {
+			continue
+		}
 		if block.partialJSON.Len() > 0 {
 			var input any
 			if err := json.Unmarshal([]byte(block.partialJSON.String()), &input); err != nil {
