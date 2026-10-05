@@ -75,7 +75,7 @@ func matchingReports(account accountentity.Account, stored []sessionentity.Sessi
 
 func sessionReport(account accountentity.Account, stored sessionentity.Session) sessionmodel.Report {
 	return sessionmodel.Report{
-		ID: stored.ID, ThreadName: stored.ThreadName,
+		ID: stored.ID, ThreadName: stored.ThreadName, Preview: stored.Preview,
 		UpdatedAt: stored.UpdatedAt, UpdatedUnix: stored.UpdatedUnix, CWD: stored.CWD,
 		ModelProvider: stored.ModelProvider, Source: stored.Source, Path: stored.Path, ParentThreadID: stored.ParentThreadID,
 		Profile: account.Name, AccountID: account.ID,

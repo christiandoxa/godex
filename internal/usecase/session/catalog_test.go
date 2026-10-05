@@ -197,7 +197,7 @@ func TestResumeLastUsesNewestActiveTopLevelSessionInCurrentDirectory(t *testing.
 	if err := catalog.ResumeArguments(t.Context(), input); err != nil {
 		t.Fatal(err)
 	}
-	if launcher.account != "two" || !reflect.DeepEqual(launcher.args, []string{"resume", "b666", "continue"}) {
+	if launcher.account != "two" || !reflect.DeepEqual(launcher.args, []string{"resume", "b777", "continue"}) {
 		t.Fatalf("default last launch = %#v", launcher)
 	}
 
@@ -206,7 +206,7 @@ func TestResumeLastUsesNewestActiveTopLevelSessionInCurrentDirectory(t *testing.
 	if err := catalog.ResumeArguments(t.Context(), input); err != nil {
 		t.Fatal(err)
 	}
-	if launcher.account != "two" || !reflect.DeepEqual(launcher.args, []string{"resume", "b999", "--all", "continue"}) {
+	if launcher.account != "two" || !reflect.DeepEqual(launcher.args, []string{"resume", "b777", "--all", "continue"}) {
 		t.Fatalf("all last launch = %#v", launcher)
 	}
 
@@ -217,5 +217,35 @@ func TestResumeLastUsesNewestActiveTopLevelSessionInCurrentDirectory(t *testing.
 	}
 	if launcher.account != "two" || !reflect.DeepEqual(launcher.args, []string{"resume", "b555", "--all", "--include-non-interactive", "continue"}) {
 		t.Fatalf("non-interactive last launch = %#v", launcher)
+	}
+}
+
+func TestResumeNameUsesActiveInteractiveDisplayLabelOnly(t *testing.T) {
+	launcher := &launcherFake{}
+	catalog := NewCatalog(accountsFake{}, readerFake{map[string][]sessionentity.Session{
+		"one": {
+			{ID: "a100", ThreadName: "Named", Preview: "ignored preview", Source: "cli", UpdatedUnix: 10, Path: "/profiles/one/sessions/a100.jsonl"},
+			{ID: "a200", Preview: "Preview label", Source: "vscode", UpdatedUnix: 20, Path: "/profiles/one/sessions/a200.jsonl"},
+			{ID: "a300", ThreadName: "Exec label", Source: "exec", UpdatedUnix: 30, Path: "/profiles/one/sessions/a300.jsonl"},
+		},
+		"two": {
+			{ID: "b100", ThreadName: "Archived label", Source: "cli", UpdatedUnix: 40, Path: "/profiles/two/archived_sessions/b100.jsonl"},
+			{ID: "b200", ThreadName: "Custom label", Source: "custom", UpdatedUnix: 50, Path: "/profiles/two/sessions/b200.jsonl"},
+		},
+	}}, launcher)
+
+	for selector, wantID := range map[string]string{"Named": "a100", "Preview label": "a200"} {
+		input := sessionmodel.Launch{SessionSelector: selector, IDIndex: 1, Arguments: []string{"resume", selector}}
+		if err := catalog.ResumeArguments(t.Context(), input); err != nil {
+			t.Fatalf("resume %q: %v", selector, err)
+		}
+		if !reflect.DeepEqual(launcher.args, []string{"resume", wantID}) {
+			t.Fatalf("resume %q args = %#v", selector, launcher.args)
+		}
+	}
+	for _, selector := range []string{"Exec label", "Archived label", "Custom label"} {
+		if _, err := catalog.Resolve(t.Context(), selector); err == nil {
+			t.Fatalf("non-native-visible name %q resolved", selector)
+		}
 	}
 }

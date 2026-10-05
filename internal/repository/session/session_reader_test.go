@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	sessionentity "github.com/christiandoxa/godex/internal/entity/session"
 )
 
 const threadID = "00000000-0000-4000-8000-000000000001"
@@ -31,7 +33,7 @@ func TestReaderUsesRolloutMetadataAndLatestIndexName(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(reports) != 1 || reports[0].ThreadName != "latest" || reports[0].CWD != "/synthetic/project" || reports[0].ParentThreadID != "parent" || reports[0].ID != threadID {
+	if len(reports) != 1 || reports[0].ThreadName != "latest" || reports[0].CWD != "/synthetic/project" || reports[0].ParentThreadID != "parent" || reports[0].Source != "subagent" || reports[0].ID != threadID {
 		t.Fatalf("reports = %#v", reports)
 	}
 }
@@ -116,5 +118,68 @@ func TestReaderExtractsCodexSessionSource(t *testing.T) {
 	}
 	if len(reports) != 1 || reports[0].Source != "exec" {
 		t.Fatalf("session source = %#v", reports)
+	}
+}
+
+func TestReaderClassifiesCodex160SessionSources(t *testing.T) {
+	tests := []struct {
+		name   string
+		source string
+		want   string
+	}{
+		{"cli", `"cli"`, "cli"},
+		{"vscode", `"vscode"`, "vscode"},
+		{"exec", `"exec"`, "exec"},
+		{"mcp", `"mcp"`, "mcp"},
+		{"custom", `{"custom":"desktop"}`, "custom"},
+		{"internal", `{"internal":"guardian"}`, "internal"},
+		{"subagent", `{"subagent":{"review":{}}}`, "subagent"},
+		{"unknown", `"future-source"`, "unknown"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var report sessionentity.Session
+			applySessionMetadata(&report, []byte(`{"type":"session_meta","payload":{"id":"`+threadID+`","source":`+test.source+`}}`))
+			if report.Source != test.want {
+				t.Fatalf("source %s = %q, want %q", test.source, report.Source, test.want)
+			}
+		})
+	}
+}
+
+func TestReaderExtractsCodex160PreviewFromFirstUserMessage(t *testing.T) {
+	home := t.TempDir()
+	directory := filepath.Join(home, "sessions", "2026", "10", "05")
+	if err := os.MkdirAll(directory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(directory, "rollout-2026-10-05T00-00-00-"+threadID+".jsonl")
+	content := strings.Join([]string{
+		`{"timestamp":"2026-10-05T00:00:00Z","type":"session_meta","payload":{"session_id":"` + threadID + `","id":"` + threadID + `","timestamp":"2026-10-05T00:00:00Z","cwd":"/repo","originator":"codex","cli_version":"0.160.0","source":"cli","model_provider":"openai","history_mode":"legacy"}}`,
+		`{"timestamp":"2026-10-05T00:00:01Z","type":"event_msg","payload":{"type":"user_message","message":"system prelude\n## My request for Codex:\nFix the picker","kind":"plain"}}`,
+		`{"timestamp":"2026-10-05T00:00:02Z","type":"event_msg","payload":{"type":"user_message","message":"later message","kind":"plain"}}`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	reports, err := NewReader().List(t.Context(), home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reports) != 1 || reports[0].ID != threadID || reports[0].Source != "cli" ||
+		reports[0].Preview != "Fix the picker" || reports[0].CWD != "/repo" || reports[0].ModelProvider != "openai" {
+		t.Fatalf("Codex 0.160 report = %#v", reports)
+	}
+}
+
+func TestSessionPreviewReadsResponseItemUserTextOnly(t *testing.T) {
+	var report sessionentity.Session
+	applySessionMetadata(&report, []byte(`{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"ignore"}]}}`))
+	if report.Preview != "" {
+		t.Fatalf("assistant preview = %q", report.Preview)
+	}
+	applySessionMetadata(&report, []byte(`{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"first"},{"type":"input_image","image_url":"data:"},{"type":"input_text","text":"second"}]}}`))
+	if report.Preview != "first\nsecond" {
+		t.Fatalf("user preview = %q", report.Preview)
 	}
 }

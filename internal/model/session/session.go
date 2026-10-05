@@ -3,6 +3,7 @@ package session
 type Report struct {
 	ID                string `json:"id"`
 	ThreadName        string `json:"thread_name,omitempty"`
+	Preview           string `json:"-"`
 	UpdatedAt         string `json:"updated_at,omitempty"`
 	CWD               string `json:"cwd,omitempty"`
 	Profile           string `json:"profile"`

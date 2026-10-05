@@ -29,7 +29,8 @@ func (service *Catalog) Resolve(ctx context.Context, selector string) (sessionmo
 		if strings.HasPrefix(strings.ToLower(report.ID), strings.ToLower(selector)) {
 			prefix = append(prefix, report)
 		}
-		if report.ThreadName == selector {
+		if !sessionReportArchived(report.Path) && sessionReportSourceAllowed(report, false) &&
+			sessionDisplayLabel(report) == selector {
 			names = append(names, report)
 		}
 	}
@@ -100,15 +101,19 @@ func (catalog *Catalog) resolveLast(ctx context.Context, args []string) (session
 	}
 	includeNonInteractive := sessionArgumentPresent(args, "--include-non-interactive")
 	for _, report := range reports {
-		if report.ParentThreadID != "" || sessionReportArchived(report.Path) {
-			continue
-		}
-		if !includeNonInteractive && sessionReportNonInteractive(report) {
+		if sessionReportArchived(report.Path) || !sessionReportSourceAllowed(report, includeNonInteractive) {
 			continue
 		}
 		return catalog.withOwner(ctx, report)
 	}
 	return sessionmodel.Report{}, fmt.Errorf("no resumable session was found")
+}
+
+func sessionDisplayLabel(report sessionmodel.Report) string {
+	if name := strings.TrimSpace(report.ThreadName); name != "" {
+		return name
+	}
+	return strings.TrimSpace(report.Preview)
 }
 
 func sessionArgumentPresent(args []string, name string) bool {
@@ -120,9 +125,16 @@ func sessionArgumentPresent(args []string, name string) bool {
 	return false
 }
 
-func sessionReportNonInteractive(report sessionmodel.Report) bool {
+func sessionReportSourceAllowed(report sessionmodel.Report, includeNonInteractive bool) bool {
 	source := strings.ToLower(strings.TrimSpace(report.Source))
-	return source != "" && source != "cli"
+	switch source {
+	case "", "cli", "vscode":
+		return true
+	case "exec", "mcp":
+		return includeNonInteractive
+	default:
+		return false
+	}
 }
 
 func sessionReportArchived(path string) bool {

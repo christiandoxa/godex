@@ -17,6 +17,9 @@ func applySessionMetadata(report *sessionentity.Session, line []byte) {
 	metadata := objectValue(value["metadata"])
 	payloadMetadata := objectValue(payload["metadata"])
 	typeName := stringValue(value["type"])
+	if report.Preview == "" {
+		report.Preview = sessionPreview(typeName, payload)
+	}
 
 	if typeName != "" && typeName != "session_meta" && typeName != "turn_context" {
 		return
@@ -42,7 +45,9 @@ func applySessionMetadata(report *sessionentity.Session, line []byte) {
 	); provider != "" {
 		report.ModelProvider = provider
 	}
-	if source := firstString(payload["source"], value["source"]); source != "" {
+	if source := sessionSourceKind(payload["source"]); source != "" {
+		report.Source = source
+	} else if source := sessionSourceKind(value["source"]); source != "" {
 		report.Source = source
 	}
 	if parent := sessionParentThreadID(value, payload); parent != "" {
@@ -91,4 +96,73 @@ func firstString(values ...any) string {
 		}
 	}
 	return ""
+}
+
+func sessionSourceKind(value any) string {
+	switch typed := value.(type) {
+	case string:
+		source := strings.ToLower(strings.TrimSpace(typed))
+		switch source {
+		case "cli", "vscode", "exec", "mcp", "unknown":
+			return source
+		case "appserver", "app_server":
+			return "mcp"
+		case "":
+			return ""
+		default:
+			return "unknown"
+		}
+	case map[string]any:
+		for _, kind := range []string{"custom", "internal", "subagent"} {
+			if _, ok := typed[kind]; ok {
+				return kind
+			}
+		}
+		return "unknown"
+	default:
+		return ""
+	}
+}
+
+const codexUserMessagePrefix = "## My request for Codex:"
+
+func sessionPreview(typeName string, payload map[string]any) string {
+	var preview string
+	switch typeName {
+	case "event_msg":
+		if stringValue(payload["type"]) == "user_message" {
+			preview = stringValue(payload["message"])
+		}
+	case "response_item":
+		if stringValue(payload["type"]) == "message" && strings.EqualFold(stringValue(payload["role"]), "user") {
+			preview = responseItemUserText(payload["content"])
+		}
+	}
+	return stripCodexUserMessagePrefix(preview)
+}
+
+func responseItemUserText(value any) string {
+	items, ok := value.([]any)
+	if !ok {
+		return ""
+	}
+	parts := make([]string, 0, len(items))
+	for _, item := range items {
+		object := objectValue(item)
+		if stringValue(object["type"]) != "input_text" {
+			continue
+		}
+		if text := stringValue(object["text"]); text != "" {
+			parts = append(parts, text)
+		}
+	}
+	return strings.Join(parts, "\n")
+}
+
+func stripCodexUserMessagePrefix(text string) string {
+	text = strings.TrimSpace(text)
+	if index := strings.Index(text, codexUserMessagePrefix); index >= 0 {
+		return strings.TrimSpace(text[index+len(codexUserMessagePrefix):])
+	}
+	return text
 }

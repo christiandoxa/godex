@@ -4,6 +4,7 @@ package session
 type Session struct {
 	ID             string
 	ThreadName     string
+	Preview        string
 	UpdatedAt      string
 	CWD            string
 	ModelProvider  string
