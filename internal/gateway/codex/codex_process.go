@@ -17,12 +17,17 @@ import (
 const codexFileCredentialConfig = "cli_auth_credentials_store = \"file\"\n"
 
 type CodexProcess struct {
-	binary   string
-	terminal Terminal
+	binary          string
+	terminal        Terminal
+	sharedCodexHome string
 }
 
 func NewCodexProcess(binary string, terminal Terminal) *CodexProcess {
 	return &CodexProcess{binary: binary, terminal: terminal}
+}
+
+func (process *CodexProcess) SetSharedCodexHome(home string) {
+	process.sharedCodexHome = strings.TrimSpace(home)
 }
 
 func (process *CodexProcess) Login(
@@ -87,7 +92,7 @@ func (process *CodexProcess) run(ctx context.Context, codexHome string, argument
 	}
 	defer release()
 	command := exec.CommandContext(ctx, binary, arguments...)
-	command.Env = environmentWith("CODEX_HOME", codexHome)
+	command.Env = codexThreadIndexEnvironment(codexHome, process.sharedCodexHome)
 	command.Stdin = process.terminal.Stdin
 	command.Stdout = process.terminal.Stdout
 	command.Stderr = process.terminal.Stderr

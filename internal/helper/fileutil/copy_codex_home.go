@@ -226,3 +226,42 @@ func sameCodexPath(left, right string) bool {
 	}
 	return filepath.Clean(left) == filepath.Clean(right)
 }
+
+// MergeCodexDirectory copies the contents of one Codex state directory into an
+// existing destination using the same atomic-file and symlink policy as
+// CopyCodexHome. The source directory itself is left in place for the caller to
+// remove only after the merge succeeds.
+func MergeCodexDirectory(source, destination string) error {
+	sourcePath, err := filepath.Abs(source)
+	if err != nil {
+		return fmt.Errorf("resolve Codex merge source: %w", err)
+	}
+	info, err := os.Lstat(sourcePath)
+	if err != nil {
+		return err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+		return errors.New("Codex merge source is not a real directory")
+	}
+	destinationPath, err := filepath.Abs(destination)
+	if err != nil {
+		return fmt.Errorf("resolve Codex merge destination: %w", err)
+	}
+	if sameCodexPath(sourcePath, destinationPath) {
+		return errors.New("Codex merge source and destination are the same path")
+	}
+	if err := ensurePrivateCodexDirectory(destinationPath); err != nil {
+		return err
+	}
+	sourceRoot, err := filepath.EvalSymlinks(sourcePath)
+	if err != nil {
+		return fmt.Errorf("resolve Codex merge source: %w", err)
+	}
+	return copyCodexDirectory(sourceRoot, sourcePath, destinationPath, false)
+}
+
+// CopyCodexFile atomically copies one regular Codex state file while preserving
+// its permissions and access/modified timestamps.
+func CopyCodexFile(source, destination string) error {
+	return copyCodexRegularFile(source, destination)
+}

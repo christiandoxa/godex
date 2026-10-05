@@ -110,6 +110,7 @@ func run() int {
 	runner.SetQuotaPreflight(quotaStatus)
 	runner.SetUpstreamURL(settings.UpstreamURL)
 	runner.SetCurrentCodexHome(settings.CurrentCodexHome)
+	runner.SetSharedCodexHome(settings.SharedCodexHome)
 	runner.SetProviderCredentialResolver(providerkeygateway.NewSource())
 	runner.SetAntigravityProcess(antigravityProcess)
 	runner.SetAntigravitySessionLocker(codex.SessionLocker{})

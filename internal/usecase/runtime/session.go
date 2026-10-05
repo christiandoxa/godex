@@ -38,6 +38,9 @@ func (runner *Runner) pinnedAccounts(ctx context.Context, preferredID string, pr
 
 // The rollout home and upstream account can differ after precommit rotation.
 func (runner *Runner) RunSession(ctx context.Context, homeID, ownerID string, args []string) (err error) {
+	if err := runner.prepareSharedAccountHomes(ctx); err != nil {
+		return err
+	}
 	accounts, err := runner.accounts.List(ctx)
 	if err != nil {
 		return err

@@ -225,7 +225,7 @@ func TestProxyChildEnvironmentScrubsProviderAPISecretsForExternalProviders(t *te
 	t.Setenv("GODEX_UNRELATED_ENV", "keep-me")
 	home := t.TempDir()
 
-	external := strings.Join(proxyChildEnvironment(home, "anthropic"), "\n")
+	external := strings.Join(proxyChildEnvironment(home, "anthropic", ""), "\n")
 	for key := range secretEnvironment {
 		if strings.Contains(external, key+"=") {
 			t.Fatalf("external-provider secret environment %q leaked", key)
@@ -242,8 +242,39 @@ func TestProxyChildEnvironmentScrubsProviderAPISecretsForExternalProviders(t *te
 		}
 	}
 
-	openAI := strings.Join(proxyChildEnvironment(home, ""), "\n")
+	openAI := strings.Join(proxyChildEnvironment(home, "", ""), "\n")
 	if !strings.Contains(openAI, "ANTHROPIC_API_KEY=anthropic-one") {
 		t.Fatal("managed OpenAI child environment was unexpectedly scrubbed")
+	}
+}
+
+func TestRunThroughProxyUsesSharedSQLiteHomeForNativePicker(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("helper uses a POSIX executable and symlink setup")
+	}
+	root := t.TempDir()
+	home := filepath.Join(root, "profile")
+	shared := filepath.Join(root, "shared")
+	if err := os.MkdirAll(home, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	record := filepath.Join(root, "record")
+	t.Setenv("GODEX_PROXY_RECORD", record)
+	script := writeProxyHelper(t, `printf '%s\n%s\n' "$CODEX_HOME" "$CODEX_SQLITE_HOME" > "$GODEX_PROXY_RECORD"`)
+	process := NewCodexProcess(script, Terminal{})
+	process.SetSharedCodexHome(shared)
+	if err := process.PrepareSharedSessionHome(home, shared); err != nil {
+		t.Fatal(err)
+	}
+	if err := process.RunThroughProxy(t.Context(), home, "http://127.0.0.1:1234", []string{"resume"}); err != nil {
+		t.Fatal(err)
+	}
+	content, err := os.ReadFile(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(content)), "\n")
+	if len(lines) != 2 || lines[0] != home || lines[1] != shared {
+		t.Fatalf("native picker homes = %#v, want [%q %q]", lines, home, shared)
 	}
 }

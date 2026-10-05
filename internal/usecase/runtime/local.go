@@ -25,6 +25,9 @@ func (runner *Runner) activeAccount(ctx context.Context, selector string) (accou
 
 // Local native commands neither consume quota nor advance account rotation.
 func (runner *Runner) RunLocal(ctx context.Context, selector string, args []string) (err error) {
+	if err := runner.prepareSharedAccountHomes(ctx); err != nil {
+		return err
+	}
 	account, err := runner.activeAccount(ctx, selector)
 	if err != nil {
 		return err
@@ -42,6 +45,9 @@ func (runner *Runner) RunLocal(ctx context.Context, selector string, args []stri
 }
 
 func (runner *Runner) RunCurrent(ctx context.Context, selector string, args []string) (err error) {
+	if err := runner.prepareSharedAccountHomes(ctx); err != nil {
+		return err
+	}
 	account, err := runner.activeAccount(ctx, selector)
 	if err != nil {
 		return err

@@ -87,7 +87,7 @@ func (process *CodexProcess) runThroughProxy(
 	}
 	defer release()
 	command := exec.CommandContext(ctx, binary, arguments...)
-	command.Env = proxyChildEnvironment(codexHome, provider)
+	command.Env = proxyChildEnvironment(codexHome, provider, process.sharedCodexHome)
 	command.Stdin = process.terminal.Stdin
 	command.Stdout = process.terminal.Stdout
 	command.Stderr = process.terminal.Stderr
@@ -100,8 +100,8 @@ func (process *CodexProcess) runThroughProxy(
 	return nil
 }
 
-func proxyChildEnvironment(codexHome, provider string) []string {
-	environment := environmentWith("CODEX_HOME", codexHome)
+func proxyChildEnvironment(codexHome, provider, sharedCodexHome string) []string {
+	environment := codexThreadIndexEnvironment(codexHome, sharedCodexHome)
 	if strings.TrimSpace(provider) == "" {
 		return environment
 	}

@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -748,5 +749,51 @@ func TestRunAutoRedeemAllowsExplicitExhaustedAccountIntoProxyOnly(t *testing.T) 
 	}
 	if strings.Join(preflight.calls, ",") != "one" {
 		t.Fatalf("explicit auto-redeem preflight calls = %#v", preflight.calls)
+	}
+}
+
+type sharedSessionPreparingProcess struct {
+	prepared []string
+	shared   []string
+	runHome  string
+	runArgs  []string
+}
+
+func (process *sharedSessionPreparingProcess) PrepareSharedSessionHome(home, shared string) error {
+	process.prepared = append(process.prepared, home)
+	process.shared = append(process.shared, shared)
+	return nil
+}
+
+func (process *sharedSessionPreparingProcess) Run(_ context.Context, home string, args []string) error {
+	if len(process.prepared) != 2 {
+		return errors.New("native child started before all managed homes were prepared")
+	}
+	process.runHome = home
+	process.runArgs = append([]string(nil), args...)
+	return nil
+}
+
+func TestRunPreparesAllManagedHomesForNativeSharedSessionPicker(t *testing.T) {
+	accounts := &fakeLaunchAccounts{
+		accounts: []accountentity.Account{
+			{ID: "one", Name: "one", Enabled: true},
+			{ID: "two", Name: "two", Enabled: true},
+		},
+		homes: map[string]string{"one": "/profiles/one", "two": "/profiles/two"},
+	}
+	process := &sharedSessionPreparingProcess{}
+	runner := NewRunner(accounts, process, nil)
+	runner.SetSharedCodexHome("/shared/codex")
+
+	if err := runner.Run(t.Context(), "one", []string{"resume"}); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(process.prepared, []string{"/profiles/one", "/profiles/two"}) ||
+		!reflect.DeepEqual(process.shared, []string{"/shared/codex", "/shared/codex"}) {
+		t.Fatalf("shared preparation = homes %#v roots %#v", process.prepared, process.shared)
+	}
+	if process.runHome != "/profiles/one" || !reflect.DeepEqual(process.runArgs, []string{"resume"}) {
+		t.Fatalf("native picker launch = home %q args %#v", process.runHome, process.runArgs)
 	}
 }

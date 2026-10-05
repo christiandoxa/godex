@@ -49,6 +49,7 @@ type Runner struct {
 	credentials     providerCredentialResolver
 	antigravity     antigravityProcess
 	antigravityHome string
+	sharedCodexHome string
 	sessionLocker   codexSessionLocker
 	autoRedeem      bool
 }
@@ -75,6 +76,13 @@ func (runner *Runner) SetCurrentCodexHome(home string) {
 	runner.currentHome = home
 }
 
+func (runner *Runner) SetSharedCodexHome(home string) {
+	runner.sharedCodexHome = home
+	if setter, ok := runner.process.(interface{ SetSharedCodexHome(string) }); ok {
+		setter.SetSharedCodexHome(home)
+	}
+}
+
 func (runner *Runner) SetProviderCredentialResolver(resolver providerCredentialResolver) {
 	runner.credentials = resolver
 }
@@ -97,6 +105,9 @@ func (runner *Runner) CurrentCodexHome() string {
 }
 
 func (runner *Runner) Run(ctx context.Context, selector string, arguments []string) (runErr error) {
+	if err := runner.prepareSharedAccountHomes(ctx); err != nil {
+		return err
+	}
 	selected, exhausted, err := runner.selectForLaunch(ctx, selector)
 	if err != nil {
 		return err
