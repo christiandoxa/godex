@@ -48,7 +48,7 @@ func (process *CodexProcess) PingOpenAI(ctx context.Context, target pingmodel.Ta
 	if err != nil {
 		return pingmodel.ProcessResult{}, err
 	}
-	if err := secureCodexHome(target.CodexHome); err != nil {
+	if err := secureCodexHomeWithShared(target.CodexHome, process.sharedCodexHome); err != nil {
 		return pingmodel.ProcessResult{}, err
 	}
 	arguments, err := pingModelContextArguments(target.CodexHome, pingArguments(options))

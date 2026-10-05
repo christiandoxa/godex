@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync/atomic"
 
@@ -13,17 +14,41 @@ import (
 
 var sharedSessionLinkSequence atomic.Uint64
 
-var sharedSessionDirectories = [...]string{
+var sharedCodexDirectories = [...]string{
 	"sessions",
 	"archived_sessions",
 	"attachments",
 	"image_attachments",
 	"shell_snapshots",
+	"memories",
+	"memories_extensions",
+	"rules",
+	"skills",
+	"agents",
+	"plugins",
+	filepath.Join(".tmp", "plugins"),
+	filepath.Join(".tmp", "marketplaces"),
+}
+
+var sharedCodexStaticFiles = [...]string{
+	"history.jsonl",
+	"config.toml",
+	"managed_config.toml",
+	"environments.toml",
+	"AGENTS.md",
+	"AGENTS.override.md",
+	"goals_1.sqlite",
+	"goals_1.sqlite-shm",
+	"goals_1.sqlite-wal",
+	filepath.Join(".tmp", "plugins.sha"),
+	filepath.Join(".tmp", "known_marketplaces.json"),
+	filepath.Join(".tmp", "app-server-remote-plugin-sync-v1"),
 }
 
 // PrepareSharedSessionHome projects the session/index state needed by native
-// Codex resume/fork onto one shared root while keeping profile credentials and
-// configuration local. This preserves the native Codex picker UI instead of
+// Codex resume/fork onto one shared root while keeping profile credentials local.
+// Configuration and other native Codex state follow the exact Prodex runtime manifest.
+// This preserves the native Codex picker UI instead of
 // reimplementing it in Godex.
 func (process *CodexProcess) PrepareSharedSessionHome(profileHome, sharedHome string) error {
 	if strings.TrimSpace(sharedHome) == "" {
@@ -45,20 +70,22 @@ func (process *CodexProcess) PrepareSharedSessionHome(profileHome, sharedHome st
 		return fmt.Errorf("prepare shared Codex home: %w", err)
 	}
 
-	for _, name := range sharedSessionDirectories {
+	for _, name := range sharedCodexDirectories {
 		if err := migrateSharedCodexEntry(profileHome, sharedHome, name, true); err != nil {
 			return err
 		}
 	}
-	entries, err := os.ReadDir(profileHome)
-	if err != nil {
-		return fmt.Errorf("read managed Codex home: %w", err)
-	}
-	for _, entry := range entries {
-		if !sharedSessionSQLiteName(entry.Name()) {
-			continue
+	for _, name := range sharedCodexStaticFiles {
+		if err := migrateSharedCodexEntry(profileHome, sharedHome, name, false); err != nil {
+			return err
 		}
-		if err := migrateSharedCodexEntry(profileHome, sharedHome, entry.Name(), false); err != nil {
+	}
+	dynamic, err := sharedCodexDynamicFiles(profileHome, sharedHome)
+	if err != nil {
+		return err
+	}
+	for _, name := range dynamic {
+		if err := migrateSharedCodexEntry(profileHome, sharedHome, name, false); err != nil {
 			return err
 		}
 	}
@@ -88,15 +115,16 @@ func migrateSharedCodexEntry(profileHome, sharedHome, name string, directory boo
 			if err := ensureRealCodexDirectory(shared); err != nil {
 				return fmt.Errorf("create shared Codex state %s: %w", name, err)
 			}
-			return installSharedStateLink(local, shared, true)
+		} else if err := os.MkdirAll(filepath.Dir(shared), 0o700); err != nil {
+			return fmt.Errorf("create shared Codex state parent %s: %w", name, err)
 		}
-		return nil
+		return installSharedStateLink(local, shared, directory)
 	}
 	if err != nil {
 		return fmt.Errorf("inspect managed Codex state %s: %w", name, err)
 	}
 	if metadata.Mode()&os.ModeSymlink != 0 {
-		return migrateExistingSharedStateLink(local, shared, directory)
+		return migrateExistingSharedStateLink(local, shared, name, directory)
 	}
 	if directory {
 		if !metadata.IsDir() {
@@ -109,14 +137,14 @@ func migrateSharedCodexEntry(profileHome, sharedHome, name string, directory boo
 		if !metadata.Mode().IsRegular() {
 			return fmt.Errorf("managed Codex state %s is not a regular file", local)
 		}
-		if err := migrateSharedStateFile(local, shared); err != nil {
+		if err := migrateSharedStateFile(local, shared, name); err != nil {
 			return fmt.Errorf("migrate shared Codex file %s: %w", name, err)
 		}
 	}
 	return installSharedStateLink(local, shared, directory)
 }
 
-func migrateExistingSharedStateLink(local, shared string, directory bool) error {
+func migrateExistingSharedStateLink(local, shared, name string, directory bool) error {
 	target, err := filepath.EvalSymlinks(local)
 	if errors.Is(err, os.ErrNotExist) {
 		if err := removeSharedStateLink(local); err != nil {
@@ -136,11 +164,11 @@ func migrateExistingSharedStateLink(local, shared string, directory bool) error 
 		return nil
 	}
 	if directory {
-		if err := migrateSharedStateDirectory(target, shared); err != nil {
+		if err := mergeSharedStateDirectoryTarget(target, shared); err != nil {
 			return err
 		}
 	} else if _, err := os.Stat(target); err == nil {
-		if err := migrateSharedStateFileFromLink(target, shared); err != nil {
+		if err := migrateSharedStateFileFromLink(target, shared, name); err != nil {
 			return err
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
@@ -150,6 +178,32 @@ func migrateExistingSharedStateLink(local, shared string, directory bool) error 
 		return err
 	}
 	return installSharedStateLink(local, shared, directory)
+}
+
+func mergeSharedStateDirectoryTarget(source, shared string) error {
+	info, err := os.Lstat(source)
+	if err != nil {
+		return err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+		return fmt.Errorf("legacy shared Codex state %s must be a real directory", source)
+	}
+	if _, err := os.Lstat(shared); errors.Is(err, os.ErrNotExist) {
+		if err := ensureRealCodexDirectory(shared); err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
+	} else {
+		sharedInfo, err := os.Lstat(shared)
+		if err != nil {
+			return err
+		}
+		if sharedInfo.Mode()&os.ModeSymlink != 0 || !sharedInfo.IsDir() {
+			return fmt.Errorf("shared Codex state %s must be a real directory", shared)
+		}
+	}
+	return fileutil.MergeCodexDirectory(source, shared)
 }
 
 func migrateSharedStateDirectory(local, shared string) error {
@@ -169,7 +223,7 @@ func migrateSharedStateDirectory(local, shared string) error {
 	return os.RemoveAll(local)
 }
 
-func migrateSharedStateFile(local, shared string) error {
+func migrateSharedStateFile(local, shared, name string) error {
 	if _, err := os.Lstat(shared); errors.Is(err, os.ErrNotExist) {
 		if err := os.MkdirAll(filepath.Dir(shared), 0o700); err != nil {
 			return err
@@ -187,17 +241,28 @@ func migrateSharedStateFile(local, shared string) error {
 	if err := requireRegularSharedStateFile(shared); err != nil {
 		return err
 	}
-	// Prodex treats an existing shared SQLite/config-like file as authoritative.
+	if filepath.Base(name) == "history.jsonl" {
+		if err := fileutil.MergeCodexHistory(local, shared); err != nil {
+			return err
+		}
+	}
+	// Except history, Prodex treats an existing shared file as authoritative.
 	return os.Remove(local)
 }
 
-func migrateSharedStateFileFromLink(target, shared string) error {
+func migrateSharedStateFileFromLink(target, shared, name string) error {
 	if _, err := os.Lstat(shared); errors.Is(err, os.ErrNotExist) {
 		return fileutil.CopyCodexFile(target, shared)
 	} else if err != nil {
 		return err
 	}
-	return requireRegularSharedStateFile(shared)
+	if err := requireRegularSharedStateFile(shared); err != nil {
+		return err
+	}
+	if filepath.Base(name) == "history.jsonl" {
+		return fileutil.MergeCodexHistory(target, shared)
+	}
+	return nil
 }
 
 func requireRegularSharedStateFile(path string) error {
@@ -281,7 +346,29 @@ func sameCodexHome(left, right string) bool {
 	return filepath.Clean(leftAbsolute) == filepath.Clean(rightAbsolute)
 }
 
-func sharedSessionSQLiteName(name string) bool {
+func sharedCodexDynamicFiles(roots ...string) ([]string, error) {
+	seen := map[string]struct{}{}
+	for _, root := range roots {
+		entries, err := os.ReadDir(root)
+		if err != nil {
+			return nil, fmt.Errorf("read Codex state root %s: %w", root, err)
+		}
+		for _, entry := range entries {
+			name := entry.Name()
+			if sharedCodexSQLiteName(name) || sharedCodexProfileConfigName(name) {
+				seen[name] = struct{}{}
+			}
+		}
+	}
+	result := make([]string, 0, len(seen))
+	for name := range seen {
+		result = append(result, name)
+	}
+	sort.Strings(result)
+	return result, nil
+}
+
+func sharedCodexSQLiteName(name string) bool {
 	validPrefix := false
 	for _, prefix := range []string{"state_", "logs_", "goals_", "memories_"} {
 		if strings.HasPrefix(name, prefix) {
@@ -293,4 +380,17 @@ func sharedSessionSQLiteName(name string) bool {
 		return false
 	}
 	return strings.HasSuffix(name, ".sqlite") || strings.HasSuffix(name, ".sqlite-shm") || strings.HasSuffix(name, ".sqlite-wal")
+}
+
+func sharedCodexProfileConfigName(name string) bool {
+	profile, ok := strings.CutSuffix(name, ".config.toml")
+	if !ok || profile == "" {
+		return false
+	}
+	for _, r := range profile {
+		if !(r >= 'a' && r <= 'z') && !(r >= 'A' && r <= 'Z') && !(r >= '0' && r <= '9') && r != '_' && r != '-' {
+			return false
+		}
+	}
+	return true
 }

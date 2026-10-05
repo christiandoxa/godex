@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
 	proxyconfig "github.com/christiandoxa/godex/internal/model/proxy"
@@ -75,8 +76,8 @@ func (fake *fakeProcess) Run(_ context.Context, home string, arguments []string)
 func TestRunUsesSelectedProfilesAndPreservesArguments(t *testing.T) {
 	accounts := &fakeLaunchAccounts{
 		accounts: []accountentity.Account{
-			{ID: "one", Name: "one", Enabled: true},
-			{ID: "two", Name: "two", Enabled: true},
+			{ID: "two", Name: "aaa", Enabled: true, CreatedAt: time.Unix(20, 0)},
+			{ID: "one", Name: "zzz", Enabled: true, CreatedAt: time.Unix(10, 0)},
 		},
 		homes: map[string]string{"one": "/profiles/one", "two": "/profiles/two"},
 	}

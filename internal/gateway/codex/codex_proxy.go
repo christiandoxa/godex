@@ -74,7 +74,7 @@ func (process *CodexProcess) runThroughProxy(
 	if err != nil {
 		return err
 	}
-	if err := secureCodexHome(codexHome); err != nil {
+	if err := secureCodexHomeWithShared(codexHome, process.sharedCodexHome); err != nil {
 		return err
 	}
 	arguments, err = proxyArguments(endpoint, arguments)

@@ -83,7 +83,7 @@ func (process *CodexProcess) run(ctx context.Context, codexHome string, argument
 	if err != nil {
 		return err
 	}
-	if err := secureCodexHome(codexHome); err != nil {
+	if err := secureCodexHomeWithShared(codexHome, process.sharedCodexHome); err != nil {
 		return err
 	}
 	release, err := (SessionLocker{}).LockCodexSessionsForChild(ctx, codexHome)
@@ -177,6 +177,10 @@ func prepareCodexHome(path string) error {
 }
 
 func secureCodexHome(path string) error {
+	return secureCodexHomeWithShared(path, "")
+}
+
+func secureCodexHomeWithShared(path, sharedHome string) error {
 	if err := validateCodexHomePath(path); err != nil {
 		return err
 	}
@@ -199,6 +203,12 @@ func secureCodexHome(path string) error {
 		if err != nil {
 			return fmt.Errorf("inspect Codex %s: %w", name, err)
 		}
+		if name == "config.toml" && info.Mode()&os.ModeSymlink != 0 {
+			if err := secureSharedCodexConfig(file, sharedHome); err != nil {
+				return fmt.Errorf("secure Codex config.toml: %w", err)
+			}
+			continue
+		}
 		if !info.Mode().IsRegular() {
 			return fmt.Errorf("codex %s is not a regular file", name)
 		}
@@ -207,6 +217,52 @@ func secureCodexHome(path string) error {
 		}
 	}
 	return nil
+}
+
+func secureSharedCodexConfig(linkPath, sharedHome string) error {
+	if strings.TrimSpace(sharedHome) == "" {
+		return errors.New("shared Codex config link is unavailable without a shared home")
+	}
+	if err := validateCodexHomePath(sharedHome); err != nil {
+		return fmt.Errorf("invalid shared Codex home: %w", err)
+	}
+	sharedInfo, err := os.Lstat(sharedHome)
+	if err != nil {
+		return fmt.Errorf("inspect shared Codex home: %w", err)
+	}
+	if sharedInfo.Mode()&os.ModeSymlink != 0 || !sharedInfo.IsDir() {
+		return errors.New("shared Codex home must be a real directory")
+	}
+	target := filepath.Join(sharedHome, "config.toml")
+	linkTarget, err := os.Readlink(linkPath)
+	if err != nil {
+		return err
+	}
+	if !filepath.IsAbs(linkTarget) {
+		linkTarget = filepath.Join(filepath.Dir(linkPath), linkTarget)
+	}
+	linkTarget, err = filepath.Abs(linkTarget)
+	if err != nil {
+		return err
+	}
+	expected, err := filepath.Abs(target)
+	if err != nil {
+		return err
+	}
+	if filepath.Clean(linkTarget) != filepath.Clean(expected) {
+		return errors.New("config.toml points outside the configured shared Codex home")
+	}
+	targetInfo, err := os.Lstat(target)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if targetInfo.Mode()&os.ModeSymlink != 0 || !targetInfo.Mode().IsRegular() {
+		return errors.New("shared config.toml must be a real regular file")
+	}
+	return os.Chmod(target, 0o600)
 }
 
 func validateCodexHomePath(path string) error {

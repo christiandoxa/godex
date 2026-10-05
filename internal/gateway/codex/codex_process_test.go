@@ -343,3 +343,69 @@ func fileMode(t *testing.T, path string) os.FileMode {
 	}
 	return info.Mode()
 }
+
+func TestSecureCodexHomeAllowsOnlyConfiguredSharedConfigLink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink setup requires Windows privileges")
+	}
+	root := t.TempDir()
+	profile := filepath.Join(root, "profile")
+	shared := filepath.Join(root, "shared")
+	outside := filepath.Join(root, "outside.toml")
+	if err := os.MkdirAll(profile, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(shared, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(profile, "auth.json"), []byte(`{"auth_mode":"chatgpt"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	sharedConfig := filepath.Join(shared, "config.toml")
+	if err := os.WriteFile(sharedConfig, []byte("model = \"gpt-5\"\n"), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	configLink := filepath.Join(profile, "config.toml")
+	if err := os.Symlink(sharedConfig, configLink); err != nil {
+		t.Fatal(err)
+	}
+	if err := secureCodexHomeWithShared(profile, shared); err != nil {
+		t.Fatalf("expected shared config link rejected: %v", err)
+	}
+	info, err := os.Stat(sharedConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("shared config mode = %o, want 600", info.Mode().Perm())
+	}
+
+	if err := os.Remove(configLink); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(outside, []byte("outside"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, configLink); err != nil {
+		t.Fatal(err)
+	}
+	if err := secureCodexHomeWithShared(profile, shared); err == nil || !strings.Contains(err.Error(), "points outside") {
+		t.Fatalf("outside config link error = %v", err)
+	}
+
+	if err := os.Remove(configLink); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(sharedConfig); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, sharedConfig); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(sharedConfig, configLink); err != nil {
+		t.Fatal(err)
+	}
+	if err := secureCodexHomeWithShared(profile, shared); err == nil || !strings.Contains(err.Error(), "real regular file") {
+		t.Fatalf("shared config symlink error = %v", err)
+	}
+}

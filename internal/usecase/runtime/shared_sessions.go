@@ -3,7 +3,10 @@ package runtime
 import (
 	"context"
 	"errors"
+	"sort"
 	"strings"
+
+	accountentity "github.com/christiandoxa/godex/internal/entity/account"
 )
 
 type sharedSessionPreparer interface {
@@ -22,6 +25,19 @@ func (runner *Runner) prepareSharedAccountHomes(ctx context.Context) (err error)
 	if err != nil {
 		return err
 	}
+	accounts = append([]accountentity.Account(nil), accounts...)
+	sort.SliceStable(accounts, func(i, j int) bool {
+		if !accounts[i].CreatedAt.Equal(accounts[j].CreatedAt) {
+			if accounts[i].CreatedAt.IsZero() {
+				return false
+			}
+			if accounts[j].CreatedAt.IsZero() {
+				return true
+			}
+			return accounts[i].CreatedAt.Before(accounts[j].CreatedAt)
+		}
+		return accounts[i].ID < accounts[j].ID
+	})
 	ids := make([]string, 0, len(accounts))
 	for _, account := range accounts {
 		if account.ID != "" {
