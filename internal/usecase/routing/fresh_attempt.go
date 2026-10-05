@@ -5,6 +5,7 @@ import (
 	"time"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
+	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
 
 func (router *Router) tryFreshCandidates(
@@ -18,6 +19,14 @@ func (router *Router) tryFreshCandidates(
 	sawTransient := false
 	sawSaturated := false
 	for _, account := range candidates {
+		allowed, err := router.reserveRouteCircuitProbe(ctx, account.ID, request.QuotaSelection, router.now())
+		if err != nil {
+			return proxymodel.Forwarded{}, false, sawTransient, sawSaturated, err
+		}
+		if !allowed {
+			sawTransient = true
+			continue
+		}
 		request.FirstEventRetryUsed = *firstEventRetryUsed
 		result, found, pending, saturated, err := router.tryFreshCandidate(ctx, request, candidates, account)
 		if err != nil || found {
@@ -37,9 +46,10 @@ func (router *Router) tryFreshCandidates(
 			}
 			sawTransient = sawTransient || pending.transient
 			replacePending(last, pending)
-			if pending.quota && compactQuotaFallbackExhaustedForRequest(request, candidates, account.ID, excluded) {
-				result, finishErr := finishFresh(last)
-				return result, true, sawTransient, sawSaturated, finishErr
+			if pending.quota && request.QuotaSelection.RouteKind == quotamodel.RouteKindCompact &&
+				compactQuotaFallbackExhausted(candidates, account.ID, excluded) {
+				result, err := finishFresh(last)
+				return result, true, sawTransient, sawSaturated, err
 			}
 		}
 	}
@@ -131,8 +141,16 @@ func (router *Router) tryFreshAutoRedeem(
 	request proxymodel.Request,
 	accounts []proxymodel.Account,
 ) (proxymodel.Forwarded, bool, error) {
+	accounts = router.previousResponseFailureAccounts(accounts, request, router.now())
+	if len(accounts) == 0 {
+		return proxymodel.Forwarded{}, false, nil
+	}
 	redeemed, ok, err := router.tryAutoRedeem(ctx, accounts, "", request)
 	if err != nil || !ok {
+		return proxymodel.Forwarded{}, false, err
+	}
+	allowed, err := router.reserveRouteCircuitProbe(ctx, redeemed.ID, request.QuotaSelection, router.now())
+	if err != nil || !allowed {
 		return proxymodel.Forwarded{}, false, err
 	}
 	result, redeemErr := router.redeemedAttempt(ctx, request, redeemed)
@@ -155,8 +173,9 @@ func (router *Router) freshAttempt(
 		if ctx.Err() != nil {
 			return nil, nil, false, ctx.Err()
 		}
+		router.recordRouteFailure(ctx, account.ID, request.QuotaSelection)
 		if isTransportFailure(err) {
-			router.persistTransportBackoff(ctx, account.ID, request)
+			router.persistTransportBackoff(ctx, account.ID, request.QuotaSelection)
 		}
 		return nil, &pendingResponse{accountID: account.ID, transient: true}, false, nil
 	}
@@ -169,8 +188,9 @@ func (router *Router) freshAttempt(
 			return nil, nil, false, ctx.Err()
 		}
 		if pending != nil && pending.transient {
+			router.recordRouteFailure(ctx, account.ID, request.QuotaSelection)
 			if isTransportFailure(err) {
-				router.persistTransportBackoff(ctx, account.ID, request)
+				router.persistTransportBackoff(ctx, account.ID, request.QuotaSelection)
 			}
 			pending.close()
 			return nil, &pendingResponse{accountID: account.ID, transient: true}, false, nil
@@ -182,11 +202,12 @@ func (router *Router) freshAttempt(
 	}
 	if outcome.kind == responsePass {
 		router.clearQuotaBlocked(account.ID)
-		router.clearCommittedBackoffs(ctx, account.ID, request, response, outcome)
+		router.recordRouteOutcome(ctx, account.ID, request.QuotaSelection, response, outcome)
 		result := &proxymodel.Forwarded{Response: response, Prefix: pending.prefix, AccountID: account.ID, Failed: outcome.failed}
 		return result, nil, false, nil
 	}
-	router.applyRetryOutcome(ctx, account.ID, request, outcome)
+	router.recordRouteOutcome(ctx, account.ID, request.QuotaSelection, response, outcome)
+	router.applyRetryOutcome(ctx, account.ID, request.QuotaSelection, outcome)
 	pending.firstEventRetry = outcome.firstEventRetry
 	pending.accountID = account.ID
 	pending.authFailure = outcome.kind == responseAuthFailure
@@ -195,9 +216,10 @@ func (router *Router) freshAttempt(
 	return nil, pending, false, nil
 }
 
-func (router *Router) applyRetryOutcome(ctx context.Context, accountID string, request proxymodel.Request, outcome responseOutcome) {
+func (router *Router) applyRetryOutcome(ctx context.Context, accountID string, selection quotamodel.Selection, outcome responseOutcome) {
 	if outcome.quota {
 		router.markQuotaBlocked(accountID)
+		router.cacheQuotaFailure(accountID, selection, outcome.quarantine)
 	} else {
 		router.clearQuotaBlocked(accountID)
 	}
@@ -205,12 +227,12 @@ func (router *Router) applyRetryOutcome(ctx context.Context, accountID string, r
 		router.quarantineAuthFailure(accountID, 60*time.Second)
 		return
 	}
-	if outcome.kind == responseRetry {
-		if outcome.transport {
-			router.persistTransportBackoff(ctx, accountID, request)
-		} else {
-			router.persistRetryBackoff(ctx, accountID, outcome.quarantine)
+	if outcome.kind == responseRetry && !outcome.transport {
+		duration := outcome.quarantine
+		if duration <= 0 {
+			duration = defaultProfileRetryBackoff
 		}
+		router.persistRetryBackoff(ctx, accountID, duration)
 	}
 }
 

@@ -1,7 +1,6 @@
 package routing
 
 import (
-	"encoding/json"
 	providerentity "github.com/christiandoxa/godex/internal/entity/provider"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	"io"
@@ -20,13 +19,16 @@ const (
 )
 
 type responseOutcome struct {
-	kind            responseKind
-	quarantine      time.Duration
-	failed          bool
-	quota           bool
-	transient       bool
-	firstEventRetry bool
-	transport       bool
+	kind                      responseKind
+	quarantine                time.Duration
+	failed                    bool
+	quota                     bool
+	transient                 bool
+	transport                 bool
+	healthPenalty             uint8
+	firstEventRetry           bool
+	invalidPreviousResponseID bool
+	previousResponseNotFound  bool
 }
 
 type pendingResponse struct {
@@ -75,19 +77,26 @@ func (proxy *Router) classify(response *proxymodel.Response, providerKind string
 		}
 		return responseOutcome{
 			kind: responseRetry, quarantine: cooldown,
-			quota:     classification.Class == providerentity.ErrorQuota,
-			transient: classification.Class == providerentity.ErrorRateLimit || classification.Class == providerentity.ErrorTransient,
+			quota:         classification.Class == providerentity.ErrorQuota,
+			transient:     classification.Class == providerentity.ErrorRateLimit || classification.Class == providerentity.ErrorTransient,
+			healthPenalty: transientHealthPenalty(classification.Class),
 		}, pending, nil
 	case response.StatusCode == http.StatusInternalServerError ||
 		response.StatusCode == http.StatusBadGateway ||
 		response.StatusCode == http.StatusServiceUnavailable ||
 		response.StatusCode == http.StatusGatewayTimeout:
-		return responseOutcome{kind: responseRetry, transient: true}, pending, nil
+		return responseOutcome{kind: responseRetry, transient: true, healthPenalty: 2}, pending, nil
 	case response.StatusCode == http.StatusBadRequest || response.StatusCode == http.StatusForbidden:
 		prefix, complete, err := inspectResponse(response.Body, proxy.maxInspect)
 		pending.prefix = prefix
 		if err != nil {
 			return responseOutcome{}, pending, err
+		}
+		if response.StatusCode == http.StatusBadRequest && complete && invalidPreviousResponseID(prefix) {
+			return responseOutcome{kind: responsePass, failed: true, invalidPreviousResponseID: true}, pending, nil
+		}
+		if response.StatusCode == http.StatusBadRequest && complete && previousResponseNotFound(prefix) {
+			return responseOutcome{kind: responsePass, failed: true, previousResponseNotFound: true}, pending, nil
 		}
 		if complete && isQuotaResponse(prefix) {
 			return responseOutcome{kind: responseRetry, quarantine: 30 * time.Second, quota: true}, pending, nil
@@ -125,23 +134,42 @@ func (proxy *Router) classifySpecialResponse(
 
 func (proxy *Router) classifyPrecommitFailure(response *proxymodel.Response, pending *pendingResponse) (responseOutcome, *pendingResponse, error) {
 	failure := response.PrecommitFailure
+	if strings.EqualFold(strings.TrimSpace(failure.Code), "previous_response_not_found") {
+		return responseOutcome{kind: responsePass, failed: true, previousResponseNotFound: true}, pending, nil
+	}
+	transport := failure.Transport
 	classification := providerentity.ClassifyProviderCode(failure.Code)
-	if failure.Transport {
+	if transport {
 		classification = providerentity.ClassifyError(http.StatusBadGateway, nil)
 	}
 	if response.FirstEventRetryUsed || response.FirstEventCommitted || !providerentity.RetryableAcrossCredentials(classification.Class) {
-		return responseOutcome{kind: responsePass, failed: true}, pending, nil
+		return responseOutcome{kind: responsePass, failed: true, transport: transport}, pending, nil
 	}
 	if classification.Class == providerentity.ErrorAuth {
-		return responseOutcome{kind: responseAuthFailure, failed: true, firstEventRetry: true}, pending, nil
+		return responseOutcome{kind: responseAuthFailure, failed: true, transport: transport, firstEventRetry: true}, pending, nil
 	}
 	return responseOutcome{
 		kind: responseRetry, quarantine: classification.Cooldown, failed: true,
 		quota:           classification.Class == providerentity.ErrorQuota,
 		transient:       classification.Class == providerentity.ErrorRateLimit || classification.Class == providerentity.ErrorTransient,
+		transport:       transport,
+		healthPenalty:   precommitHealthPenalty(classification.Class, transport),
 		firstEventRetry: true,
-		transport:       failure.Transport,
 	}, pending, nil
+}
+
+func transientHealthPenalty(class providerentity.ErrorClass) uint8 {
+	if class == providerentity.ErrorTransient {
+		return 2
+	}
+	return 0
+}
+
+func precommitHealthPenalty(class providerentity.ErrorClass, transport bool) uint8 {
+	if transport {
+		return 0
+	}
+	return transientHealthPenalty(class)
 }
 
 func retryAfter(headers http.Header, now time.Time) time.Duration {
@@ -186,61 +214,6 @@ func inspectResponse(body io.Reader, limit int64) ([]byte, bool, error) {
 	return data, int64(len(data)) <= limit, nil
 }
 
-func isQuotaResponse(body []byte) bool {
-	var value any
-	if json.Unmarshal(body, &value) != nil {
-		return false
-	}
-	return quotaValue(value)
-}
-
-func quotaValue(value any) bool {
-	switch typed := value.(type) {
-	case map[string]any:
-		return quotaMapValue(typed)
-	case []any:
-		return quotaSliceValue(typed)
-	}
-	return false
-}
-
-func quotaMapValue(values map[string]any) bool {
-	for key, child := range values {
-		if quotaFieldValue(key, child) || quotaValue(child) {
-			return true
-		}
-	}
-	return false
-}
-
-func quotaSliceValue(values []any) bool {
-	for _, child := range values {
-		if quotaValue(child) {
-			return true
-		}
-	}
-	return false
-}
-
-func quotaFieldValue(key string, value any) bool {
-	switch key {
-	case "code", "type", "error_code", "status":
-		text, ok := value.(string)
-		return ok && quotaCode(text)
-	default:
-		return false
-	}
-}
-
-func quotaCode(value string) bool {
-	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "rate_limit_exceeded", "insufficient_quota", "quota_exceeded", "usage_limit_reached":
-		return true
-	default:
-		return false
-	}
-}
-
 func (proxy *Router) classifyExternalProvider(
 	response *proxymodel.Response,
 	pending *pendingResponse,
@@ -265,7 +238,7 @@ func (proxy *Router) classifyExternalProvider(
 			kind: responseRetry, quarantine: maxDuration(retryAfter(response.Header, proxy.now()), classification.Cooldown), transient: true,
 		}, pending, nil
 	case providerentity.ErrorTransient:
-		return responseOutcome{kind: responseRetry, quarantine: classification.Cooldown, transient: true}, pending, nil
+		return responseOutcome{kind: responseRetry, quarantine: classification.Cooldown, transient: true, healthPenalty: 2}, pending, nil
 	default:
 		return responseOutcome{kind: responsePass}, pending, nil
 	}

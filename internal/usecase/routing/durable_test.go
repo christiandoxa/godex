@@ -25,6 +25,20 @@ func (f *bindingsFake) Load(context.Context) ([]routingentity.Binding, error) {
 func (f *bindingsFake) AcquireConversation(context.Context) (func() error, error) {
 	return func() error { return nil }, nil
 }
+func (f *bindingsFake) Remove(_ context.Context, keys []string) error {
+	removed := make(map[string]bool, len(keys))
+	for _, key := range keys {
+		removed[key] = true
+	}
+	values := f.values[:0]
+	for _, binding := range f.values {
+		if !removed[binding.Key] {
+			values = append(values, binding)
+		}
+	}
+	f.values = values
+	return nil
+}
 
 func TestDurableOwnerBeyondCacheCapacity(t *testing.T) {
 	now := time.Now()
@@ -78,6 +92,23 @@ func TestDurableAffinityRecoversAfterExpiryAndDoesNotWritePerChunk(t *testing.T)
 		if strings.Contains(binding.Key, "synthetic") {
 			t.Fatal("raw continuity metadata persisted")
 		}
+	}
+}
+
+func TestForgetRemovesCachedAndPersistedConversationOwnership(t *testing.T) {
+	repository := &bindingsFake{}
+	store := newAffinityStore()
+	store.repository = repository
+	keys := affinityKeys{session: "synthetic-session", previous: "synthetic-response"}
+	if err := store.remember(context.Background(), strings.Repeat("a", 32), keys, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.forget(context.Background(), keys); err != nil {
+		t.Fatal(err)
+	}
+	owner, err := store.owner(context.Background(), keys, time.Now())
+	if err != nil || owner != "" || len(repository.values) != 0 {
+		t.Fatalf("forgotten conversation owner = %q, persisted bindings = %d, error = %v", owner, len(repository.values), err)
 	}
 }
 

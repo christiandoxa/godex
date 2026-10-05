@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -8,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestProxyCompactRecoversAcrossSelectionSweeps(t *testing.T) {
@@ -42,7 +44,22 @@ func TestProxyCompactRecoversAcrossSelectionSweeps(t *testing.T) {
 	}))
 	defer upstream.Close()
 
-	proxy := newTestProxy(t, upstream.URL, accounts)
+	now := time.Unix(10_000, 0)
+	proxy := newTestProxyWithConfig(t, ProxyConfig{
+		ListenAddr: "127.0.0.1:0", UpstreamURL: upstream.URL,
+		Accounts: func(context.Context) ([]RuntimeAccount, error) { return accounts, nil },
+		Now: func() time.Time {
+			mu.Lock()
+			defer mu.Unlock()
+			return now
+		},
+		Wait: func(_ context.Context, delay time.Duration) error {
+			mu.Lock()
+			now = now.Add(delay)
+			mu.Unlock()
+			return nil
+		},
+	})
 	response := doProxyJSON(
 		t,
 		proxy.URL+"/backend-api/prodex/v1/responses/compact",

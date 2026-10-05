@@ -38,20 +38,23 @@ func (store *Store) LoadTransportBackoffs(ctx context.Context, now time.Time) ([
 		return nil, fmt.Errorf("lock routing transport backoff store: %w", err)
 	}
 	defer release()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	snapshot, err := store.readTransportBackoffs()
 	if err != nil {
 		return nil, fmt.Errorf("read routing transport backoff store: %w", err)
 	}
-	softLimit := now.Add(routingentity.InitialTransportBackoffDuration).Unix()
-	active := make([]routingentity.TransportBackoff, 0, len(snapshot.Backoffs))
+	minimumUntil := now.Add(routingentity.InitialTransportBackoffDuration).Unix()
+	active := snapshot.Backoffs[:0]
 	changed := false
 	for _, backoff := range snapshot.Backoffs {
 		if backoff.UntilUnix <= now.Unix() {
 			changed = true
 			continue
 		}
-		if backoff.UntilUnix > softLimit {
-			backoff.UntilUnix = softLimit
+		if backoff.UntilUnix > minimumUntil {
+			backoff.UntilUnix = minimumUntil
 			changed = true
 		}
 		active = append(active, backoff)
@@ -82,24 +85,23 @@ func (store *Store) SetTransportBackoff(ctx context.Context, backoff routingenti
 		return fmt.Errorf("lock routing transport backoff store: %w", err)
 	}
 	defer release()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	snapshot, err := store.readTransportBackoffs()
 	if err != nil {
 		return fmt.Errorf("read routing transport backoff store: %w", err)
 	}
-	replaced := false
 	for index, current := range snapshot.Backoffs {
 		if current.AccountID == backoff.AccountID && current.Route == backoff.Route {
-			if current.UntilUnix > backoff.UntilUnix {
-				backoff = current
+			if current.UntilUnix >= backoff.UntilUnix {
+				return nil
 			}
 			snapshot.Backoffs[index] = backoff
-			replaced = true
-			break
+			return store.writeTransportBackoffs(retainTransportBackoffs(snapshot.Backoffs, now))
 		}
 	}
-	if !replaced {
-		snapshot.Backoffs = append(snapshot.Backoffs, backoff)
-	}
+	snapshot.Backoffs = append(snapshot.Backoffs, backoff)
 	return store.writeTransportBackoffs(retainTransportBackoffs(snapshot.Backoffs, now))
 }
 
@@ -107,8 +109,7 @@ func (store *Store) ClearTransportBackoff(ctx context.Context, accountID, route 
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	probe := routingentity.TransportBackoff{AccountID: accountID, Route: route, UntilUnix: 1}
-	if err := probe.Validate(); err != nil {
+	if err := (routingentity.TransportBackoff{AccountID: accountID, Route: route, UntilUnix: 1}).Validate(); err != nil {
 		return err
 	}
 	if err := store.prepare(); err != nil {
@@ -119,6 +120,9 @@ func (store *Store) ClearTransportBackoff(ctx context.Context, accountID, route 
 		return fmt.Errorf("lock routing transport backoff store: %w", err)
 	}
 	defer release()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	snapshot, err := store.readTransportBackoffs()
 	if err != nil {
 		return fmt.Errorf("read routing transport backoff store: %w", err)
@@ -143,14 +147,14 @@ func (store *Store) readTransportBackoffs() (transportBackoffSnapshot, error) {
 		return snapshot, nil
 	}
 	if err != nil {
-		return snapshot, err
+		return snapshot, fmt.Errorf("stat routing transport backoff snapshot: %w", err)
 	}
 	if !info.Mode().IsRegular() || info.Size() > maxTransportBackoffBytes {
 		return snapshot, errors.New("routing transport backoff snapshot must be a bounded regular file")
 	}
 	file, err := os.Open(path)
 	if err != nil {
-		return snapshot, err
+		return snapshot, fmt.Errorf("open routing transport backoff snapshot: %w", err)
 	}
 	defer file.Close()
 	decoder := json.NewDecoder(io.LimitReader(file, maxTransportBackoffBytes+1))
@@ -180,14 +184,13 @@ func (store *Store) readTransportBackoffs() (transportBackoffSnapshot, error) {
 }
 
 func (store *Store) writeTransportBackoffs(backoffs []routingentity.TransportBackoff) error {
-	values := append([]routingentity.TransportBackoff(nil), backoffs...)
-	sort.Slice(values, func(i, j int) bool {
-		if values[i].AccountID != values[j].AccountID {
-			return values[i].AccountID < values[j].AccountID
+	sort.Slice(backoffs, func(i, j int) bool {
+		if backoffs[i].AccountID != backoffs[j].AccountID {
+			return backoffs[i].AccountID < backoffs[j].AccountID
 		}
-		return values[i].Route < values[j].Route
+		return backoffs[i].Route < backoffs[j].Route
 	})
-	content, err := json.Marshal(transportBackoffSnapshot{Version: 1, Backoffs: values})
+	content, err := json.Marshal(transportBackoffSnapshot{Version: 1, Backoffs: backoffs})
 	if err != nil {
 		return err
 	}
@@ -196,7 +199,7 @@ func (store *Store) writeTransportBackoffs(backoffs []routingentity.TransportBac
 }
 
 func retainTransportBackoffs(backoffs []routingentity.TransportBackoff, now time.Time) []routingentity.TransportBackoff {
-	active := make([]routingentity.TransportBackoff, 0, len(backoffs))
+	active := backoffs[:0]
 	for _, backoff := range backoffs {
 		if backoff.UntilUnix > now.Unix() {
 			active = append(active, backoff)

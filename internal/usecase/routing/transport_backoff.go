@@ -12,50 +12,32 @@ import (
 	"time"
 
 	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
-	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
+	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
 
-type transportBackoffKey struct {
-	accountID string
-	route     string
-}
-
-func transportRoute(request proxymodel.Request) string {
-	if request.WebSocketMessage {
-		return "websocket"
-	}
-	path := strings.ToLower(strings.TrimSpace(request.Path))
-	switch {
-	case strings.HasSuffix(path, "/responses/compact"):
-		return "compact"
-	case strings.HasSuffix(path, "/responses"):
-		return "responses"
-	default:
-		return "standard"
-	}
-}
-
-func (router *Router) persistTransportBackoff(ctx context.Context, accountID string, request proxymodel.Request) {
-	if ctx.Err() != nil || accountID == "" {
+func (router *Router) persistTransportBackoff(ctx context.Context, accountID string, selection quotamodel.Selection) {
+	route := routeHealthRoute(selection.RouteKind)
+	if ctx.Err() != nil || accountID == "" || route == "" {
 		return
 	}
-	key := transportBackoffKey{accountID: accountID, route: transportRoute(request)}
-	router.transportBackoffMu.Lock()
-	defer router.transportBackoffMu.Unlock()
+	router.transportMu.Lock()
+	defer router.transportMu.Unlock()
 
 	now := router.now()
+	key := routeHealthKey{accountID: accountID, route: route}
 	router.mu.Lock()
 	current, exists := router.transportBackoffs[key]
 	router.mu.Unlock()
-	seconds := int64(15)
+	seconds := int64(routingentity.InitialTransportBackoffDuration / time.Second)
 	if exists && current.UntilUnix > now.Unix() {
 		remaining := current.UntilUnix - now.Unix()
-		seconds = min(max(remaining*2, int64(15)), int64(120))
+		seconds = min(max(remaining*2, seconds), int64(routingentity.MaxTransportBackoffDuration/time.Second))
 	}
-	backoff := routingentity.TransportBackoff{
-		AccountID: accountID, Route: key.route, UntilUnix: now.Unix() + seconds,
-	}
+	backoff := routingentity.TransportBackoff{AccountID: accountID, Route: route, UntilUnix: now.Unix() + seconds}
 	router.mu.Lock()
+	if router.transportBackoffs == nil {
+		router.transportBackoffs = make(map[routeHealthKey]routingentity.TransportBackoff)
+	}
 	if current, exists := router.transportBackoffs[key]; exists && current.UntilUnix > backoff.UntilUnix {
 		backoff = current
 	}
@@ -66,23 +48,27 @@ func (router *Router) persistTransportBackoff(ctx context.Context, accountID str
 	}
 }
 
-func (router *Router) clearTransportBackoff(ctx context.Context, accountID string, request proxymodel.Request) {
-	if ctx.Err() != nil || accountID == "" {
+func (router *Router) clearTransportBackoff(ctx context.Context, accountID string, selection quotamodel.Selection) {
+	route := routeHealthRoute(selection.RouteKind)
+	if ctx.Err() != nil || accountID == "" || route == "" {
 		return
 	}
-	key := transportBackoffKey{accountID: accountID, route: transportRoute(request)}
-	router.transportBackoffMu.Lock()
-	defer router.transportBackoffMu.Unlock()
+	router.transportMu.Lock()
+	defer router.transportMu.Unlock()
 	router.mu.Lock()
-	delete(router.transportBackoffs, key)
+	delete(router.transportBackoffs, routeHealthKey{accountID: accountID, route: route})
 	router.mu.Unlock()
 	if router.state != nil {
-		_ = router.state.ClearTransportBackoff(ctx, accountID, key.route)
+		_ = router.state.ClearTransportBackoff(ctx, accountID, route)
 	}
 }
 
-func (router *Router) transportBackoffRemaining(accountID string, request proxymodel.Request, now time.Time) time.Duration {
-	key := transportBackoffKey{accountID: accountID, route: transportRoute(request)}
+func (router *Router) transportBackoffRemaining(accountID string, selection quotamodel.Selection, now time.Time) time.Duration {
+	route := routeHealthRoute(selection.RouteKind)
+	if accountID == "" || route == "" {
+		return 0
+	}
+	key := routeHealthKey{accountID: accountID, route: route}
 	router.mu.Lock()
 	defer router.mu.Unlock()
 	backoff, exists := router.transportBackoffs[key]
@@ -105,6 +91,9 @@ func isTransportFailure(err error) bool {
 	}
 	for cause := err; cause != nil; cause = errors.Unwrap(cause) {
 		if _, wrappedURL := cause.(*url.Error); wrappedURL {
+			if transportFailureMessage(cause.Error()) {
+				return true
+			}
 			continue
 		}
 		if _, network := cause.(net.Error); network {
@@ -119,22 +108,30 @@ func isTransportFailure(err error) bool {
 			return true
 		}
 	}
-	return transportFailureMessage(err.Error())
+	return false
 }
 
 func transportFailureMessage(message string) bool {
-	message = strings.ToLower(message)
+	message = strings.ToLower(strings.TrimSpace(message))
 	for _, marker := range []string{
+		"dns",
 		"failed to lookup address information",
 		"no such host",
-		"tls handshake",
-		"handshake timed out",
-		"connection reset",
+		"name or service not known",
 		"connection refused",
+		"timed out",
+		"timeout",
+		"tls",
+		"handshake",
+		"certificate",
+		"connection reset",
 		"broken pipe",
 		"unexpected eof",
-		"stream closed before response.completed",
+		"connection aborted",
 		"connection closed before message completed",
+		"stream closed before response.completed",
+		"closed before response.completed",
+		"unable to connect",
 	} {
 		if strings.Contains(message, marker) {
 			return true

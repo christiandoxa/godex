@@ -98,7 +98,7 @@ func run() int {
 		router, err := newRuntimeRouter(config, runtimeRouterDependencies{
 			process: process, copilotSource: copilotSource, claudeSource: claudeSource,
 			kiroSource: kiroSource, providerCatalogs: providerCatalogs,
-			bindings: bindings, autoRedeemer: autoRedeemer,
+			bindings: bindings, autoRedeemer: autoRedeemer, quota: quotaStatus,
 		})
 		if err != nil {
 			return nil, err
@@ -170,6 +170,7 @@ type runtimeRouterDependencies struct {
 	providerCatalogs *runtimerepo.ProviderCatalogStore
 	bindings         *routingrepo.Store
 	autoRedeemer     *quotausecase.AutoRedeemer
+	quota            *quotausecase.Status
 }
 
 func newRuntimeRouter(
@@ -190,8 +191,9 @@ func newRuntimeRouter(
 	return routingusecase.NewRouter(routingusecase.Config{
 		Gateway: gateway, Accounts: runtimeAccountSource(config.Accounts, gateway),
 		PreferredAccount: config.PreferredAccount, Bindings: dependencies.bindings,
-		RoutingState: dependencies.bindings,
-		AutoRedeem:   config.AutoRedeem, Redeemer: dependencies.autoRedeemer,
+		RoutingState:   dependencies.bindings,
+		QuotaPreflight: dependencies.quota,
+		AutoRedeem:     config.AutoRedeem, Redeemer: dependencies.autoRedeemer,
 	})
 }
 

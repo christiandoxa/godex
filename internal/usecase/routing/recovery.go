@@ -5,6 +5,7 @@ import (
 	"time"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
+	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
 
 const maxFreshRecoveryWait = 30 * time.Second
@@ -28,9 +29,9 @@ func (router *Router) waitForFreshRecovery(
 }
 
 func (router *Router) freshRecoveryDelay(
-	request proxymodel.Request,
 	candidates []proxymodel.Account,
 	retryable map[string]bool,
+	selection quotamodel.Selection,
 	requestID uint64,
 	sweep int,
 ) (time.Duration, bool) {
@@ -45,9 +46,13 @@ func (router *Router) freshRecoveryDelay(
 			retryable[account.ID] = false
 			continue
 		}
-		retryRemaining := router.quarantineRemaining(account.ID, now)
-		transportRemaining := router.transportBackoffRemaining(account.ID, request, now)
-		remaining := max(retryRemaining, transportRemaining)
+		remaining := router.quarantineRemaining(account.ID, now)
+		if transportRemaining := router.transportBackoffRemaining(account.ID, selection, now); transportRemaining > remaining {
+			remaining = transportRemaining
+		}
+		if circuitRemaining := router.routeCircuitRemaining(account.ID, selection, now); circuitRemaining > remaining {
+			remaining = circuitRemaining
+		}
 		if remaining <= 0 {
 			ready = true
 			continue

@@ -3,8 +3,10 @@ package routing
 import (
 	"context"
 	"net/http"
+	"time"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
+	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
 
 func (router *Router) forwardBound(
@@ -12,6 +14,7 @@ func (router *Router) forwardBound(
 	request proxymodel.Request,
 	accounts []proxymodel.Account,
 	owner string,
+	keys *affinityKeys,
 ) (proxymodel.Forwarded, error) {
 	account, err := boundOwnerAccount(accounts, owner)
 	if err != nil {
@@ -25,9 +28,17 @@ func (router *Router) forwardBound(
 		return proxymodel.Forwarded{}, err
 	}
 	response, err := router.executeWithProfileInflightWait(ctx, request, account, true)
+	failed := false
+	if err == nil && !request.WebSocketMessage {
+		response, failed, err = router.recoverInvalidPreviousResponse(ctx, request, account, response, keys)
+	}
 	if err != nil {
+		if ctx.Err() != nil {
+			return proxymodel.Forwarded{}, ctx.Err()
+		}
+		router.recordRouteFailure(ctx, account.ID, request.QuotaSelection)
 		if isTransportFailure(err) {
-			router.persistTransportBackoff(ctx, account.ID, request)
+			router.persistTransportBackoff(ctx, account.ID, request.QuotaSelection)
 		}
 		return proxymodel.Forwarded{}, &proxymodel.Error{
 			StatusCode: http.StatusBadGateway,
@@ -36,6 +47,9 @@ func (router *Router) forwardBound(
 	}
 	if request.WebSocketMessage {
 		return router.handleBoundWebSocketResponse(ctx, request, accounts, account, response)
+	}
+	if !router.autoRedeem {
+		return router.legacyBoundResponse(ctx, request, account, response, failed), nil
 	}
 	return router.handleBoundResponse(ctx, request, accounts, account, response)
 }
@@ -61,7 +75,20 @@ func (router *Router) prepareBoundOwner(
 	if !account.Enabled {
 		return proxymodel.Account{}, boundOwnerUnavailable()
 	}
-	if router.autoRedeem && router.boundOwnerBlocked(account) {
+	affinity := requestRoutingAffinity(request)
+	hardAffinity := affinity.hasAffinity()
+	hardQuotaAffinity := affinity.previous != "" || affinity.turn != "" ||
+		(request.QuotaSelection.RouteKind == quotamodel.RouteKindCompact && affinity.session != "")
+	if !hardQuotaAffinity && account.EligibleAfter.After(router.now()) {
+		refreshed, checked, err := router.refreshQuotaExcluded(ctx, []proxymodel.Account{account}, request.QuotaSelection, router.now())
+		if err != nil {
+			return proxymodel.Account{}, err
+		}
+		if checked {
+			account = refreshed[0]
+		}
+	}
+	if router.autoRedeem && !hardAffinity && router.boundOwnerBlocked(account, hardAffinity, request.QuotaSelection) {
 		redeemed, ok, err := router.tryAutoRedeem(ctx, accounts, account.ID, request)
 		if err != nil {
 			return proxymodel.Account{}, err
@@ -70,15 +97,17 @@ func (router *Router) prepareBoundOwner(
 			account = redeemed
 		}
 	}
-	if router.boundOwnerBlocked(account) {
+	if router.boundOwnerBlocked(account, hardAffinity, request.QuotaSelection) {
 		return proxymodel.Account{}, boundOwnerUnavailable()
 	}
 	return account, nil
 }
 
-func (router *Router) boundOwnerBlocked(account proxymodel.Account) bool {
+func (router *Router) boundOwnerBlocked(account proxymodel.Account, hardAffinity bool, selection quotamodel.Selection) bool {
 	now := router.now()
-	return router.isQuarantined(account.ID, now) || account.EligibleAfter.After(now)
+	return router.isQuarantined(account.ID, now) ||
+		(!hardAffinity && router.transportBackoffRemaining(account.ID, selection, now) > 0) ||
+		(!hardAffinity && account.EligibleAfter.After(now))
 }
 
 func boundOwnerUnavailable() error {
@@ -86,6 +115,20 @@ func boundOwnerUnavailable() error {
 		StatusCode: http.StatusServiceUnavailable,
 		Message:    "conversation owner is temporarily unavailable; continuity was preserved",
 	}
+}
+
+func (router *Router) legacyBoundResponse(
+	ctx context.Context,
+	request proxymodel.Request,
+	account proxymodel.Account,
+	response *proxymodel.Response,
+	failed bool,
+) proxymodel.Forwarded {
+	router.recordRouteOutcome(ctx, account.ID, request.QuotaSelection, response, responseOutcome{kind: responsePass, failed: failed})
+	if response.StatusCode == http.StatusUnauthorized {
+		router.quarantineAuthFailure(account.ID, time.Minute)
+	}
+	return proxymodel.Forwarded{Response: response, AccountID: account.ID, Failed: failed}
 }
 
 func (router *Router) handleBoundResponse(
@@ -97,8 +140,8 @@ func (router *Router) handleBoundResponse(
 ) (proxymodel.Forwarded, error) {
 	outcome, pending, err := router.classify(response, account.Provider.Kind)
 	if err != nil {
-		if isTransportFailure(err) {
-			router.persistTransportBackoff(ctx, account.ID, request)
+		if pending != nil && pending.transient {
+			router.recordRouteFailure(ctx, account.ID, request.QuotaSelection)
 		}
 		closePendingResponse(pending)
 		return proxymodel.Forwarded{}, &proxymodel.Error{
@@ -106,13 +149,13 @@ func (router *Router) handleBoundResponse(
 			Message:    "conversation owner response failed before commitment",
 		}
 	}
+	router.recordRouteOutcome(ctx, account.ID, request.QuotaSelection, response, outcome)
 	if outcome.kind == responsePass {
 		router.clearQuotaBlocked(account.ID)
-		router.clearCommittedBackoffs(ctx, account.ID, request, response, outcome)
 		return pendingForwarded(account.ID, outcome, pending), nil
 	}
-	router.applyRetryOutcome(ctx, account.ID, request, outcome)
-	if !router.autoRedeem || !outcome.quota {
+	router.applyRetryOutcome(ctx, account.ID, request.QuotaSelection, outcome)
+	if !outcome.quota {
 		return pendingForwarded(account.ID, outcome, pending), nil
 	}
 	return router.tryBoundRedeemedRetry(ctx, request, accounts, account.ID, outcome, pending)

@@ -4,6 +4,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
 
 type WebSocketPolicy struct {
@@ -20,6 +22,7 @@ type Request struct {
 	Method, Path, RawPath, RawQuery string
 	Header                          http.Header
 	Body                            []byte
+	QuotaSelection                  quotamodel.Selection
 	WebSocketMessage                bool
 	WebSocketSessionID              uint64
 	WebSocketPolicy                 WebSocketPolicy
@@ -44,6 +47,7 @@ type PrecommitFailure struct {
 	Code                      string
 	Transport                 bool
 	InvalidPreviousResponseID bool
+	StaleContinuation         bool
 }
 type Forwarded struct {
 	Response  *Response

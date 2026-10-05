@@ -143,6 +143,76 @@ func TestAvailabilityUsesObservedResetAndFiniteUnknownRetry(t *testing.T) {
 	}
 }
 
+func TestAvailabilityForRouteUsesLunaReserveOnlyForLuna(t *testing.T) {
+	now := time.Unix(10, 0)
+	used := int64(100)
+	reset := int64(100)
+	reserveUsed := int64(20)
+	allowed := false
+	usage := quotamodel.Usage{
+		Allowed: &allowed,
+		Primary: &quotamodel.Window{UsedPercent: &used, ResetAt: &reset},
+		AdditionalRateLimits: []quotamodel.AdditionalRateLimit{{
+			LimitID: "base_model_inference", LimitName: "gpt-luna-reserve",
+			MeteredFeature: "base_model_inference", NormalModelSlug: "gpt-5.6-luna",
+			Primary: &quotamodel.Window{UsedPercent: &reserveUsed},
+		}},
+	}
+	account := accountentity.Account{ID: "one", Enabled: true}
+	status := NewStatus(fakeAccounts{}, fakeUsage{byHome: map[string]quotamodel.Usage{"/managed/one": usage}})
+	status.now = func() time.Time { return now }
+	selection := quotamodel.Selection{RouteKind: quotamodel.RouteKindResponses, RequestedModel: "gpt-5.6-luna"}
+
+	availability, err := status.AvailabilityForRoute(context.Background(), account, selection)
+	if err != nil || !availability.Ready {
+		t.Fatalf("Luna reserve availability = %+v, err = %v", availability, err)
+	}
+	selection.RequestedModel = "gpt-5.6-sol"
+	availability, err = status.AvailabilityForRoute(context.Background(), account, selection)
+	if err != nil || availability.Ready || !availability.RetryAt.Equal(time.Unix(reset, 0)) {
+		t.Fatalf("regular model availability = %+v, err = %v", availability, err)
+	}
+}
+
+func TestAvailabilityForResponsesIgnoresExhaustedWeeklyWindow(t *testing.T) {
+	now := time.Unix(10, 0)
+	primaryUsed, secondaryUsed := int64(80), int64(100)
+	primaryReset, secondaryReset := int64(100), int64(200)
+	account := accountentity.Account{ID: "one", Enabled: true}
+	status := NewStatus(fakeAccounts{}, fakeUsage{byHome: map[string]quotamodel.Usage{
+		"/managed/one": {
+			Primary:   &quotamodel.Window{UsedPercent: &primaryUsed, ResetAt: &primaryReset},
+			Secondary: &quotamodel.Window{UsedPercent: &secondaryUsed, ResetAt: &secondaryReset},
+		},
+	}})
+	status.now = func() time.Time { return now }
+
+	availability, err := status.AvailabilityForRoute(context.Background(), account, quotamodel.Selection{
+		RouteKind: quotamodel.RouteKindResponses,
+	})
+	if err != nil || !availability.Ready {
+		t.Fatalf("Responses availability = %+v, err = %v", availability, err)
+	}
+	availability, err = status.Availability(context.Background(), account)
+	if err != nil || availability.Ready {
+		t.Fatalf("launch availability = %+v, err = %v", availability, err)
+	}
+}
+
+func TestAvailabilityForRouteTreatsRetiredSparkAsUnavailable(t *testing.T) {
+	account := accountentity.Account{ID: "one", Enabled: true}
+	status := NewStatus(fakeAccounts{}, fakeUsage{byHome: map[string]quotamodel.Usage{
+		"/managed/one": {PlanType: "plus"},
+	}})
+	status.now = func() time.Time { return time.Unix(10, 0) }
+	availability, err := status.AvailabilityForRoute(context.Background(), account, quotamodel.Selection{
+		RouteKind: quotamodel.RouteKindResponses, RequestedModel: "GPT_5 3_CODEX_SPARK",
+	})
+	if err != nil || availability.Ready || availability.RetryAt.IsZero() {
+		t.Fatalf("retired Spark availability = %+v, err = %v", availability, err)
+	}
+}
+
 type fakeRawUsage struct {
 	home string
 	body []byte

@@ -651,13 +651,15 @@ func TestProxyStartsOnLoopbackAndCloses(t *testing.T) {
 
 func newTestProxy(t *testing.T, upstream string, accounts []RuntimeAccount) *httptest.Server {
 	t.Helper()
-	proxy, err := newProxyForTest(ProxyConfig{
-		ListenAddr:  "127.0.0.1:0",
-		UpstreamURL: upstream,
-		Accounts: func(context.Context) ([]RuntimeAccount, error) {
-			return accounts, nil
-		},
+	return newTestProxyWithConfig(t, ProxyConfig{
+		ListenAddr: "127.0.0.1:0", UpstreamURL: upstream,
+		Accounts: func(context.Context) ([]RuntimeAccount, error) { return accounts, nil },
 	})
+}
+
+func newTestProxyWithConfig(t *testing.T, config ProxyConfig) *httptest.Server {
+	t.Helper()
+	proxy, err := newProxyForTest(config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -705,24 +707,26 @@ func doProxyJSON(t *testing.T, endpoint, body string, headers map[string]string)
 	return response
 }
 
-func TestProxyRejectsWebsocketUpgradeBeforeUpstream(t *testing.T) {
+func TestProxyRejectsUnsupportedWebsocketPathBeforeUpstream(t *testing.T) {
 	accounts := testRuntimeAccounts(t, "A", "token-a", "B", "token-b")
 	upstream := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { t.Error("unexpected upstream upgrade") }))
 	defer upstream.Close()
 	proxy := newTestProxy(t, upstream.URL, accounts)
-	request, err := http.NewRequest(http.MethodGet, proxy.URL+"/backend-api/codex/responses", nil)
+	request, err := http.NewRequest(http.MethodGet, proxy.URL+"/unsupported", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	request.Header.Set("Connection", "Upgrade")
+	request.Header.Set("Connection", "keep-alive, Upgrade")
 	request.Header.Set("Upgrade", "websocket")
+	request.Header.Set("Sec-WebSocket-Version", "13")
+	request.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer response.Body.Close()
-	if response.StatusCode != http.StatusBadRequest {
-		t.Fatalf("upgrade status = %d, want %d", response.StatusCode, http.StatusBadRequest)
+	if response.StatusCode != http.StatusNotFound {
+		t.Fatalf("unsupported websocket path status = %d", response.StatusCode)
 	}
 }
 

@@ -41,12 +41,15 @@ func (store *Store) LoadRetryBackoffs(ctx context.Context, now time.Time) ([]rou
 		return nil, fmt.Errorf("lock routing retry backoff store: %w", err)
 	}
 	defer release()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	snapshot, err := store.readRetryBackoffs()
 	if err != nil {
 		return nil, fmt.Errorf("read routing retry backoff store: %w", err)
 	}
 	maximum := now.Add(routingentity.MaxRetryBackoffDuration).Unix()
-	active := make([]routingentity.RetryBackoff, 0, len(snapshot.Backoffs))
+	active := snapshot.Backoffs[:0]
 	for _, backoff := range snapshot.Backoffs {
 		if backoff.UntilUnix > maximum {
 			return nil, errors.New("routing retry backoff exceeds maximum duration")
@@ -76,6 +79,9 @@ func (store *Store) SetRetryBackoff(ctx context.Context, backoff routingentity.R
 		return fmt.Errorf("lock routing retry backoff store: %w", err)
 	}
 	defer release()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	snapshot, err := store.readRetryBackoffs()
 	if err != nil {
 		return fmt.Errorf("read routing retry backoff store: %w", err)
@@ -108,8 +114,7 @@ func (store *Store) ClearRetryBackoff(ctx context.Context, accountID string, now
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	probe := routingentity.RetryBackoff{AccountID: accountID, UntilUnix: 1}
-	if err := probe.Validate(); err != nil {
+	if err := routingentity.ValidateAccountID(accountID); err != nil {
 		return err
 	}
 	if err := store.prepare(); err != nil {
@@ -120,6 +125,9 @@ func (store *Store) ClearRetryBackoff(ctx context.Context, accountID string, now
 		return fmt.Errorf("lock routing retry backoff store: %w", err)
 	}
 	defer release()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	snapshot, err := store.readRetryBackoffs()
 	if err != nil {
 		return fmt.Errorf("read routing retry backoff store: %w", err)
@@ -183,8 +191,7 @@ func (store *Store) readRetryBackoffs() (retryBackoffSnapshot, error) {
 		seen[backoff.AccountID] = true
 	}
 	for accountID, updatedAt := range snapshot.UpdatedAt {
-		probe := routingentity.RetryBackoff{AccountID: accountID, UntilUnix: 1}
-		if err := probe.Validate(); err != nil || updatedAt <= 0 {
+		if err := routingentity.ValidateAccountID(accountID); err != nil || updatedAt <= 0 {
 			return snapshot, errors.New("routing retry backoff snapshot has invalid update metadata")
 		}
 	}
@@ -192,14 +199,13 @@ func (store *Store) readRetryBackoffs() (retryBackoffSnapshot, error) {
 }
 
 func (store *Store) writeRetryBackoffs(backoffs []routingentity.RetryBackoff, updatedAt map[string]int64) error {
-	values := append([]routingentity.RetryBackoff(nil), backoffs...)
-	sort.Slice(values, func(i, j int) bool {
-		if values[i].UntilUnix != values[j].UntilUnix {
-			return values[i].UntilUnix > values[j].UntilUnix
+	sort.Slice(backoffs, func(i, j int) bool {
+		if backoffs[i].UntilUnix != backoffs[j].UntilUnix {
+			return backoffs[i].UntilUnix > backoffs[j].UntilUnix
 		}
-		return values[i].AccountID < values[j].AccountID
+		return backoffs[i].AccountID < backoffs[j].AccountID
 	})
-	content, err := json.Marshal(retryBackoffSnapshot{Version: 1, Backoffs: values, UpdatedAt: updatedAt})
+	content, err := json.Marshal(retryBackoffSnapshot{Version: 1, Backoffs: backoffs, UpdatedAt: updatedAt})
 	if err != nil {
 		return err
 	}
@@ -208,7 +214,7 @@ func (store *Store) writeRetryBackoffs(backoffs []routingentity.RetryBackoff, up
 }
 
 func retainRetryBackoffs(backoffs []routingentity.RetryBackoff, now time.Time) []routingentity.RetryBackoff {
-	active := make([]routingentity.RetryBackoff, 0, len(backoffs))
+	active := backoffs[:0]
 	for _, backoff := range backoffs {
 		if backoff.UntilUnix > now.Unix() {
 			active = append(active, backoff)
@@ -227,6 +233,9 @@ func retainRetryBackoffs(backoffs []routingentity.RetryBackoff, now time.Time) [
 }
 
 func retainRetryBackoffUpdates(updatedAt map[string]int64, now time.Time) map[string]int64 {
+	if len(updatedAt) == 0 {
+		return updatedAt
+	}
 	cutoff := now.Add(-retryBackoffUpdateRetention).UnixMilli()
 	for accountID, mutation := range updatedAt {
 		if mutation < cutoff {

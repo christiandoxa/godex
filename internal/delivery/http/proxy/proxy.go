@@ -33,6 +33,7 @@ type Proxy struct {
 	listener                  net.Listener
 	done                      chan struct{}
 	endpoint                  string
+	tunnels                   map[*websocketTunnel]struct{}
 	responsesWebSocketTunnels map[*responsesWebSocketTunnel]struct{}
 	closing                   bool
 }
@@ -57,6 +58,7 @@ func NewProxy(config Config) (*Proxy, error) {
 	proxy := &Proxy{
 		router: config.Router, activity: config.Activity, listenAddr: config.ListenAddr,
 		maxRequest: config.MaxRequestBytes, maxInspect: config.MaxInspectBytes,
+		tunnels:                   make(map[*websocketTunnel]struct{}),
 		responsesWebSocketTunnels: make(map[*responsesWebSocketTunnel]struct{}),
 	}
 	proxy.server = &http.Server{
@@ -94,12 +96,19 @@ func (proxy *Proxy) Close(ctx context.Context) error {
 	proxy.mu.Lock()
 	proxy.closing = true
 	done := proxy.done
-	tunnels := make([]*responsesWebSocketTunnel, 0, len(proxy.responsesWebSocketTunnels))
-	for tunnel := range proxy.responsesWebSocketTunnels {
+	tunnels := make([]*websocketTunnel, 0, len(proxy.tunnels))
+	for tunnel := range proxy.tunnels {
 		tunnels = append(tunnels, tunnel)
+	}
+	responsesTunnels := make([]*responsesWebSocketTunnel, 0, len(proxy.responsesWebSocketTunnels))
+	for tunnel := range proxy.responsesWebSocketTunnels {
+		responsesTunnels = append(responsesTunnels, tunnel)
 	}
 	proxy.mu.Unlock()
 	for _, tunnel := range tunnels {
+		tunnel.close()
+	}
+	for _, tunnel := range responsesTunnels {
 		tunnel.close()
 	}
 	if done == nil {
@@ -121,48 +130,50 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 	activity := proxy.startActivity(request)
 	activityContext := context.WithoutCancel(request.Context())
 	defer proxy.finishActivity(activityContext, activity)
-	if isWebSocketUpgradeRequest(request) {
+	lifecycle := &requestLifecycle{}
+	websocket := isWebSocketUpgradeRequest(request)
+	websocketKey := ""
+	var body []byte
+	if websocket {
 		if status, message := websocketRequestError(request); status != 0 {
 			activity.fail(status, message)
 			http.Error(writer, message, status)
 			return
 		}
-		if !websocketUsesMessageRouting(request.URL.Path) {
-			activity.fail(http.StatusUpgradeRequired, "websocket route is not enabled yet")
-			http.Error(writer, "Godex WebSocket support is currently limited to Responses", http.StatusUpgradeRequired)
+		websocketKey = websocketRequestKey(request)
+		if websocketUsesMessageRouting(request.URL.Path) {
+			if err := proxy.forwardResponsesWebSocket(writer, request, activity, lifecycle, websocketKey); err != nil {
+				if lifecycle.canAttempt() {
+					activity.fail(http.StatusBadGateway, "websocket handshake failed before commitment")
+					http.Error(writer, "websocket handshake failed", http.StatusBadGateway)
+				} else {
+					lifecycle.failAfterCommit()
+				}
+			}
+			if !lifecycle.canAttempt() {
+				activity.finishLifecycle(lifecycle)
+			}
 			return
 		}
-		lifecycle := &requestLifecycle{}
-		err := proxy.forwardResponsesWebSocket(
-			writer, request, activity, lifecycle, websocketRequestKey(request),
-		)
+	} else {
+		var err error
+		body, err = readLimited(request.Body, proxy.maxRequest)
 		if err != nil {
-			if lifecycle.canAttempt() {
-				activity.fail(http.StatusBadGateway, "websocket handshake failed before commitment")
-				http.Error(writer, "websocket handshake failed", http.StatusBadGateway)
+			if request.Context().Err() == nil {
+				activity.fail(http.StatusRequestEntityTooLarge, "request body exceeded safe retry limit")
+				http.Error(writer, "request body is too large for safe retry", http.StatusRequestEntityTooLarge)
 			} else {
-				lifecycle.failAfterCommit()
+				activity.fail(0, "request canceled")
 			}
+			return
 		}
-		activity.finishLifecycle(lifecycle)
-		return
 	}
-	if request.Header.Get("Upgrade") != "" {
-		activity.fail(http.StatusUpgradeRequired, "websocket upgrade is not supported")
-		http.Error(writer, "Godex requires Codex HTTP/SSE model transport", http.StatusUpgradeRequired)
-		return
-	}
-	body, err := readLimited(request.Body, proxy.maxRequest)
-	if err != nil {
-		if request.Context().Err() == nil {
-			activity.fail(http.StatusRequestEntityTooLarge, "request body exceeded safe retry limit")
-			http.Error(writer, "request body is too large for safe retry", http.StatusRequestEntityTooLarge)
-		} else {
-			activity.fail(0, "request canceled")
-		}
-		return
-	}
-	exchange, err := proxy.router.Forward(request.Context(), proxymodel.Request{RequestID: activity.sequence, Method: request.Method, Path: request.URL.Path, RawPath: request.URL.EscapedPath(), RawQuery: request.URL.RawQuery, Header: request.Header.Clone(), Body: body})
+	exchange, err := proxy.router.Forward(request.Context(), proxymodel.Request{
+		RequestID: activity.sequence, Method: request.Method, Path: request.URL.Path,
+		RawPath: request.URL.EscapedPath(), RawQuery: request.URL.RawQuery,
+		Header: request.Header.Clone(), Body: body,
+		QuotaSelection: quotaSelection(request.URL.Path, websocket, body),
+	})
 	if err != nil {
 		if request.Context().Err() != nil {
 			activity.fail(0, "request canceled")
@@ -183,8 +194,21 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 	if result.Failed {
 		result.AccountID = ""
 	}
-	lifecycle := &requestLifecycle{}
 	defer activity.finishLifecycle(lifecycle)
+	if websocket && result.Response.StatusCode == http.StatusSwitchingProtocols {
+		if err := proxy.forwardWebSocket(writer, result.Response, lifecycle, websocketKey); err != nil {
+			if lifecycle.canAttempt() {
+				activity.fail(http.StatusBadGateway, "upstream websocket handshake failed before commitment")
+			} else {
+				lifecycle.failAfterCommit()
+			}
+		}
+		return
+	}
+	if websocket {
+		result.Response.Header = result.Response.Header.Clone()
+		result.Response.Header.Del("Set-Cookie")
+	}
 	proxy.forwardResponse(request.Context(), writer, result.Response, result.Prefix, result.AccountID, lifecycle)
 }
 

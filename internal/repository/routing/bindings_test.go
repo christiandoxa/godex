@@ -60,3 +60,22 @@ func TestThreadOwnershipDoesNotExpire(t *testing.T) {
 		t.Fatalf("forgotten thread: %v", err)
 	}
 }
+
+func TestRemoveRoutingBindingsPreservesUnrelatedOwners(t *testing.T) {
+	store := NewStore(t.TempDir())
+	first := routingentity.Binding{Kind: "session", Key: strings.Repeat("a", 64), AccountID: strings.Repeat("c", 32), UpdatedUnix: 1}
+	second := routingentity.Binding{Kind: "thread", Key: strings.Repeat("b", 64), AccountID: strings.Repeat("d", 32), UpdatedUnix: 2}
+	if _, err := store.Merge(context.Background(), []routingentity.Binding{first, second}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Remove(context.Background(), []string{first.Key}); err != nil {
+		t.Fatal(err)
+	}
+	values, err := store.Load(context.Background())
+	if err != nil || len(values) != 1 || values[0].Key != second.Key {
+		t.Fatalf("remaining routing bindings = %#v, error = %v", values, err)
+	}
+	if err := store.Remove(context.Background(), []string{"unsafe"}); err == nil {
+		t.Fatal("invalid routing key accepted")
+	}
+}

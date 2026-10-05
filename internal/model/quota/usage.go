@@ -11,13 +11,25 @@ type ResetCredits struct {
 }
 
 type Usage struct {
-	PlanType         string
-	RateLimitPresent bool
-	Allowed          *bool
-	LimitReached     *bool
-	Primary          *Window
-	Secondary        *Window
-	ResetCredits     *ResetCredits
+	PlanType             string
+	RateLimitPresent     bool
+	Allowed              *bool
+	LimitReached         *bool
+	Primary              *Window
+	Secondary            *Window
+	AdditionalRateLimits []AdditionalRateLimit
+	ResetCredits         *ResetCredits
+}
+
+type AdditionalRateLimit struct {
+	LimitID         string
+	LimitName       string
+	MeteredFeature  string
+	NormalModelSlug string
+	Allowed         *bool
+	LimitReached    *bool
+	Primary         *Window
+	Secondary       *Window
 }
 
 type Report struct {

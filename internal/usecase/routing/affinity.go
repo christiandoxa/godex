@@ -25,6 +25,10 @@ type affinityKeys struct {
 	thread   string
 }
 
+func (keys affinityKeys) hasAffinity() bool {
+	return keys.previous != "" || keys.turn != "" || keys.session != "" || keys.thread != ""
+}
+
 func (keys affinityKeys) entries() []routingentity.Binding {
 	values := make([]routingentity.Binding, 0, 4)
 	for _, item := range []struct{ kind, value string }{{"previous", keys.previous}, {"turn", keys.turn}, {"session", keys.session}, {"thread", keys.thread}} {
@@ -32,8 +36,7 @@ func (keys affinityKeys) entries() []routingentity.Binding {
 		if value == "" || len(value) > maxAffinityValue {
 			continue
 		}
-		digest := sha256.Sum256([]byte(item.kind + ":" + value))
-		values = append(values, routingentity.Binding{Key: hex.EncodeToString(digest[:]), Kind: item.kind})
+		values = append(values, routingentity.Binding{Key: affinityDigest(item.kind, value), Kind: item.kind})
 	}
 	return values
 }
@@ -56,6 +59,7 @@ type affinityValue struct {
 type bindingRepository interface {
 	Load(context.Context) ([]routingentity.Binding, error)
 	Merge(context.Context, []routingentity.Binding) ([]routingentity.Binding, error)
+	Remove(context.Context, []string) error
 	AcquireConversation(context.Context) (func() error, error)
 }
 
@@ -63,6 +67,7 @@ type affinityStore struct {
 	repository bindingRepository
 	mu         sync.Mutex
 	values     map[string]affinityValue
+	turnStates map[string]responseTurnState
 	sequence   uint64
 }
 
@@ -194,6 +199,11 @@ func (store *affinityStore) pruneLocked(now time.Time) {
 			delete(store.values, key)
 		}
 	}
+	for key, value := range store.turnStates {
+		if !value.expires.After(now) {
+			delete(store.turnStates, key)
+		}
+	}
 	// ponytail: bounded O(n) eviction; use a heap only if affinity volume grows.
 	for len(store.values) > affinityMaxValues {
 		oldestKey := ""
@@ -204,6 +214,16 @@ func (store *affinityStore) pruneLocked(now time.Time) {
 			}
 		}
 		delete(store.values, oldestKey)
+	}
+	for len(store.turnStates) > affinityMaxValues {
+		oldestKey := ""
+		var oldest uint64
+		for key, value := range store.turnStates {
+			if oldestKey == "" || value.sequence < oldest {
+				oldestKey, oldest = key, value.sequence
+			}
+		}
+		delete(store.turnStates, oldestKey)
 	}
 }
 
@@ -217,4 +237,9 @@ func (store *affinityStore) loadLocked(bindings []routingentity.Binding, keys []
 		store.values[binding.Key] = affinityValue{accountID: binding.AccountID, expires: now.Add(affinityTTL), sequence: store.sequence, persistedAt: time.Unix(binding.UpdatedUnix, 0)}
 	}
 	store.pruneLocked(now)
+}
+
+func affinityDigest(kind, value string) string {
+	digest := sha256.Sum256([]byte(kind + ":" + value))
+	return hex.EncodeToString(digest[:])
 }

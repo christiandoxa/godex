@@ -42,7 +42,10 @@ func (router *Router) handleBoundWebSocketPreSendQuotaBlock(
 		request, accounts, account, false,
 	)
 	if decision.kind == websocketQuotaFallbackUnavailable {
-		return proxymodel.Forwarded{}, false, nil
+		return proxymodel.Forwarded{}, true, &proxymodel.Error{
+			StatusCode: http.StatusServiceUnavailable,
+			Message:    "websocket quota fallback is unavailable",
+		}
 	}
 	if err := router.affinity.forgetOwned(
 		ctx,
@@ -80,9 +83,6 @@ func (router *Router) handleBoundWebSocketResponse(
 ) (proxymodel.Forwarded, error) {
 	outcome, pending, err := router.classify(response, account.Provider.Kind)
 	if err != nil {
-		if isTransportFailure(err) {
-			router.persistTransportBackoff(ctx, account.ID, request)
-		}
 		closePendingResponse(pending)
 		return proxymodel.Forwarded{}, &proxymodel.Error{
 			StatusCode: http.StatusBadGateway,
@@ -91,10 +91,9 @@ func (router *Router) handleBoundWebSocketResponse(
 	}
 	if outcome.kind == responsePass {
 		router.clearQuotaBlocked(account.ID)
-		router.clearCommittedBackoffs(ctx, account.ID, request, response, outcome)
 		return pendingForwarded(account.ID, outcome, pending), nil
 	}
-	router.applyRetryOutcome(ctx, account.ID, request, outcome)
+	router.applyRetryOutcome(ctx, account.ID, request.QuotaSelection, outcome)
 	if !outcome.quota {
 		return pendingForwarded(account.ID, outcome, pending), nil
 	}
@@ -274,9 +273,6 @@ func (router *Router) forwardWebSocketQuotaLastChance(
 		if ctx.Err() != nil {
 			return proxymodel.Forwarded{}, ctx.Err()
 		}
-		if isTransportFailure(err) {
-			router.persistTransportBackoff(ctx, account.ID, request)
-		}
 		return proxymodel.Forwarded{}, &proxymodel.Error{
 			StatusCode: http.StatusBadGateway,
 			Message:    "websocket quota last-chance profile could not be reached",
@@ -290,9 +286,6 @@ func (router *Router) forwardWebSocketQuotaLastChance(
 	}
 	outcome, pending, err := router.classify(response, account.Provider.Kind)
 	if err != nil {
-		if isTransportFailure(err) {
-			router.persistTransportBackoff(ctx, account.ID, request)
-		}
 		closePendingResponse(pending)
 		return proxymodel.Forwarded{}, &proxymodel.Error{
 			StatusCode: http.StatusBadGateway,
@@ -301,9 +294,8 @@ func (router *Router) forwardWebSocketQuotaLastChance(
 	}
 	if outcome.kind == responsePass {
 		router.clearQuotaBlocked(account.ID)
-		router.clearCommittedBackoffs(ctx, account.ID, request, response, outcome)
 	} else {
-		router.applyRetryOutcome(ctx, account.ID, request, outcome)
+		router.applyRetryOutcome(ctx, account.ID, request.QuotaSelection, outcome)
 	}
 	return pendingForwarded(account.ID, outcome, pending), nil
 }

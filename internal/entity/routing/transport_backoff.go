@@ -1,7 +1,6 @@
 package routing
 
 import (
-	"encoding/hex"
 	"errors"
 	"time"
 )
@@ -18,11 +17,8 @@ type TransportBackoff struct {
 }
 
 func (backoff TransportBackoff) Validate() error {
-	if len(backoff.AccountID) != 32 || backoff.UntilUnix <= 0 || !validTransportRoute(backoff.Route) {
+	if !validAccountID(backoff.AccountID) || !validRoute(backoff.Route) || backoff.UntilUnix <= 0 {
 		return errors.New("invalid routing transport backoff")
-	}
-	if _, err := hex.DecodeString(backoff.AccountID); err != nil {
-		return errors.New("invalid routing transport backoff account")
 	}
 	return nil
 }
@@ -33,13 +29,4 @@ func (backoff TransportBackoff) Remaining(now time.Time) time.Duration {
 		return 0
 	}
 	return remaining
-}
-
-func validTransportRoute(route string) bool {
-	switch route {
-	case "responses", "standard", "compact", "websocket":
-		return true
-	default:
-		return false
-	}
 }

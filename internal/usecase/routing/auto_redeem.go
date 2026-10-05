@@ -6,6 +6,7 @@ import (
 	"time"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
+	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
 
 func (router *Router) tryAutoRedeem(
@@ -17,7 +18,7 @@ func (router *Router) tryAutoRedeem(
 	if !router.autoRedeem || router.redeemer == nil {
 		return proxymodel.Account{}, false, nil
 	}
-	pool := router.autoRedeemAccounts(accounts, preferredID)
+	pool := router.autoRedeemAccounts(accounts, preferredID, request.QuotaSelection)
 	if len(pool) == 0 {
 		return proxymodel.Account{}, false, nil
 	}
@@ -39,7 +40,11 @@ func (router *Router) tryAutoRedeem(
 	return proxymodel.Account{}, false, errors.New("auto-redeem returned an unknown runtime account")
 }
 
-func (router *Router) autoRedeemAccounts(accounts []proxymodel.Account, preferredID string) []proxymodel.Account {
+func (router *Router) autoRedeemAccounts(
+	accounts []proxymodel.Account,
+	preferredID string,
+	selection quotamodel.Selection,
+) []proxymodel.Account {
 	now := router.now()
 	result := make([]proxymodel.Account, 0, len(accounts))
 	for _, account := range accounts {
@@ -47,6 +52,9 @@ func (router *Router) autoRedeemAccounts(accounts []proxymodel.Account, preferre
 			continue
 		}
 		if preferredID != "" && account.ID != preferredID {
+			continue
+		}
+		if preferredID == "" && router.routeCircuitRemaining(account.ID, selection, now) > 0 {
 			continue
 		}
 		if preferredID == "" && router.isQuarantined(account.ID, now) && !router.quotaBlockedAccount(account.ID) {
@@ -62,21 +70,15 @@ func (router *Router) redeemedAttempt(
 	request proxymodel.Request,
 	account proxymodel.Account,
 ) (proxymodel.Forwarded, error) {
-	response, err := router.executeWithProfileInflightWait(ctx, request, account, false)
+	response, err := router.execute(ctx, request, account)
 	if err != nil {
 		if ctx.Err() != nil {
 			return proxymodel.Forwarded{}, ctx.Err()
-		}
-		if isTransportFailure(err) {
-			router.persistTransportBackoff(ctx, account.ID, request)
 		}
 		return proxymodel.Forwarded{}, &proxymodel.Error{StatusCode: 502, Message: "auto-redeemed account could not be reached"}
 	}
 	outcome, pending, err := router.classify(response, account.Provider.Kind)
 	if err != nil {
-		if isTransportFailure(err) {
-			router.persistTransportBackoff(ctx, account.ID, request)
-		}
 		if pending != nil {
 			pending.close()
 		}
@@ -84,9 +86,8 @@ func (router *Router) redeemedAttempt(
 	}
 	if outcome.kind == responsePass {
 		router.clearQuotaBlocked(account.ID)
-		router.clearCommittedBackoffs(ctx, account.ID, request, response, outcome)
 	} else {
-		router.applyRetryOutcome(ctx, account.ID, request, outcome)
+		router.applyRetryOutcome(ctx, account.ID, request.QuotaSelection, outcome)
 	}
 	return proxymodel.Forwarded{
 		Response: pending.response, Prefix: pending.prefix, AccountID: account.ID,

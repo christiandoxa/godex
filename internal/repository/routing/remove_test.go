@@ -8,7 +8,7 @@ import (
 	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
 )
 
-func TestRemoveRoutingBindingsPreservesUnrelatedOwners(t *testing.T) {
+func TestRemovePreviousRoutingBindingPreservesUnrelatedOwners(t *testing.T) {
 	store := NewStore(t.TempDir())
 	ownerA := strings.Repeat("1", 32)
 	ownerB := strings.Repeat("2", 32)

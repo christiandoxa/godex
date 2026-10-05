@@ -15,6 +15,8 @@ type rawQuotaUsage struct {
 	RateLimitsSnake           json.RawMessage            `json:"rate_limits"`
 	RateLimitsByID            map[string]json.RawMessage `json:"rateLimitsByLimitId"`
 	RateLimitsByIDSnake       map[string]json.RawMessage `json:"rate_limits_by_limit_id"`
+	AdditionalRateLimits      json.RawMessage            `json:"additional_rate_limits"`
+	AdditionalRateLimitsCamel json.RawMessage            `json:"additionalRateLimits"`
 	OrdinaryUsageAllowed      *bool                      `json:"ordinaryUsageAllowed"`
 	OrdinaryUsageAllowedSnake *bool                      `json:"ordinary_usage_allowed"`
 	RateLimitReachedType      json.RawMessage            `json:"rate_limit_reached_type"`
@@ -31,6 +33,14 @@ type rawQuotaPair struct {
 	Allowed         *bool           `json:"allowed"`
 	LimitReached    *bool           `json:"limit_reached"`
 	LimitReachedAlt *bool           `json:"limitReached"`
+	LimitID         string          `json:"limit_id"`
+	LimitIDCamel    string          `json:"limitId"`
+	LimitName       string          `json:"limit_name"`
+	LimitNameCamel  string          `json:"limitName"`
+	Feature         string          `json:"metered_feature"`
+	FeatureCamel    string          `json:"meteredFeature"`
+	ModelSlug       string          `json:"normal_model_slug"`
+	ModelSlugCamel  string          `json:"normalModelSlug"`
 	Primary         json.RawMessage `json:"primary"`
 	PrimaryWindow   json.RawMessage `json:"primary_window"`
 	PrimaryCamel    json.RawMessage `json:"primaryWindow"`
@@ -56,7 +66,8 @@ func decodeQuotaUsage(body []byte) (quotamodel.Usage, error) {
 		return quotamodel.Usage{}, errors.New("decode quota response")
 	}
 	pairRaw := firstRaw(raw.RateLimit, raw.RateLimits, raw.RateLimitsSnake)
-	if indexed := firstIndexed(raw.RateLimitsByID, raw.RateLimitsByIDSnake); len(indexed) > 0 {
+	indexed := firstIndexed(raw.RateLimitsByID, raw.RateLimitsByIDSnake)
+	if len(indexed) > 0 {
 		if codexPair, ok := indexed["codex"]; ok {
 			pairRaw = codexPair
 		}
@@ -74,6 +85,13 @@ func decodeQuotaUsage(body []byte) (quotamodel.Usage, error) {
 		Allowed: pair.Allowed, LimitReached: pair.LimitReached,
 		Primary: pair.Primary, Secondary: pair.Secondary,
 	}
+	additional, err := decodeAdditionalQuotaLimits(
+		firstRaw(raw.AdditionalRateLimits, raw.AdditionalRateLimitsCamel), indexed,
+	)
+	if err != nil {
+		return quotamodel.Usage{}, err
+	}
+	usage.AdditionalRateLimits = additional
 	if credits := firstResetCredits(raw.ResetCredits, raw.ResetCreditsCamel); credits != nil {
 		if available := firstInt64(credits.AvailableCount, credits.AvailableCountSnake); available != nil {
 			usage.ResetCredits = &quotamodel.ResetCredits{AvailableCount: *available}

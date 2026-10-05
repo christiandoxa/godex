@@ -9,6 +9,7 @@ import (
 	"time"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
+	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
 
 type fakeRoutingRedeemer struct {
@@ -144,7 +145,7 @@ func TestAutoRedeemHardAffinityRetriesSameOwnerOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := router.forwardBound(context.Background(), proxymodel.Request{}, accounts, "owner")
+	result, err := router.forwardBound(context.Background(), proxymodel.Request{}, accounts, "owner", &affinityKeys{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -193,7 +194,7 @@ func TestAutoRedeemDoesNotTreatTransientQuarantineAsCreditCandidate(t *testing.T
 
 func TestQuotaOutcomeMarksAndSuccessfulRetryClearsQuotaMarker(t *testing.T) {
 	router := &Router{now: time.Now, quarantine: make(map[string]quarantineState), quotaBlocked: make(map[string]bool)}
-	router.applyRetryOutcome(context.Background(), "a", proxymodel.Request{}, responseOutcome{kind: responseRetry, quarantine: time.Second, quota: true})
+	router.applyRetryOutcome(context.Background(), "a", quotamodel.Selection{}, responseOutcome{kind: responseRetry, quarantine: time.Second, quota: true})
 	if !router.quotaBlockedAccount("a") {
 		t.Fatal("quota marker was not set")
 	}

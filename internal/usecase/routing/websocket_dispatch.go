@@ -23,9 +23,15 @@ func requestRoutingAffinity(request proxymodel.Request) affinityKeys {
 		return keys
 	}
 	metadata := parseWebSocketRequestMetadata(request)
-	keys.previous = metadata.previousResponseID
-	keys.session = metadata.sessionID
-	keys.turn = metadata.turnState
+	if metadata.previousResponseID != "" {
+		keys.previous = metadata.previousResponseID
+	}
+	if metadata.sessionID != "" {
+		keys.session = metadata.sessionID
+	}
+	if metadata.turnState != "" {
+		keys.turn = metadata.turnState
+	}
 	return keys
 }
 
@@ -44,6 +50,16 @@ func (router *Router) executeRouted(
 	}
 
 	metadata := parseWebSocketRequestMetadata(request)
+	routingAffinity := requestRoutingAffinity(request)
+	if metadata.previousResponseID == "" {
+		metadata.previousResponseID = routingAffinity.previous
+	}
+	if metadata.sessionID == "" {
+		metadata.sessionID = routingAffinity.session
+	}
+	if metadata.turnState == "" {
+		metadata.turnState = routingAffinity.turn
+	}
 	policy := request.WebSocketPolicy
 	policy.PromoteCommittedProfile =
 		!hardAffinity && metadata.previousResponseID == "" && metadata.turnState == ""
@@ -59,6 +75,7 @@ func (router *Router) executeRouted(
 		return nil, err
 	}
 	authReloadUsed := false
+	ownerTransportRetryUsed := false
 	previousRetryIndex := 0
 	current := request
 	for {
@@ -72,6 +89,12 @@ func (router *Router) executeRouted(
 		if response.StatusCode == http.StatusUnauthorized && !authReloadUsed {
 			closeWebSocketRoutingResponse(response)
 			authReloadUsed = true
+			continue
+		}
+		if !ownerTransportRetryUsed && hardAffinity &&
+			websocketOwnerTransportRecovery(response, metadata.previousResponseID) {
+			closeWebSocketRoutingResponse(response)
+			ownerTransportRetryUsed = true
 			continue
 		}
 		if !websocketPreviousResponseNotFound(response, metadata.previousResponseID) {
@@ -142,6 +165,15 @@ func websocketPreviousResponseNotFound(
 		)
 }
 
+func websocketOwnerTransportRecovery(response *proxymodel.Response, previousResponseID string) bool {
+	return response != nil &&
+		strings.TrimSpace(previousResponseID) != "" &&
+		!response.FirstEventCommitted &&
+		response.PrecommitFailure != nil &&
+		response.PrecommitFailure.Transport &&
+		strings.TrimSpace(response.WebSocketTurnState) != ""
+}
+
 func websocketTurnStateOverride(
 	request proxymodel.Request,
 	turnState string,
@@ -151,6 +183,7 @@ func websocketTurnStateOverride(
 		request.Header = make(http.Header)
 	}
 	request.Header.Set("x-codex-turn-state", turnState)
+	request.FirstEventRetryUsed = true
 	request.WebSocketPolicy.TurnStateOverride = true
 	return request
 }

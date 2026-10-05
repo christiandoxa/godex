@@ -121,13 +121,15 @@ func (gateway *prodex04354CrossRequestGateway) Execute(
 ) (*proxymodel.Response, error) {
 	gateway.calls = append(gateway.calls, account.ID)
 	status := http.StatusOK
+	body := "{}"
 	if len(gateway.calls) <= 2 {
-		status = http.StatusServiceUnavailable
+		status = http.StatusTooManyRequests
+		body = `{"error":{"code":"rate_limit_exceeded"}}`
 	}
 	return &proxymodel.Response{
 		StatusCode: status,
 		Header:     make(http.Header),
-		Body:       io.NopCloser(strings.NewReader("{}")),
+		Body:       io.NopCloser(strings.NewReader(body)),
 	}, nil
 }
 

@@ -13,6 +13,7 @@ import (
 
 	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
+	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 	routingrepo "github.com/christiandoxa/godex/internal/repository/routing"
 )
 
@@ -53,7 +54,11 @@ func transportParityAccounts() []proxymodel.Account {
 }
 
 func transportParityRequest(path string) proxymodel.Request {
-	return proxymodel.Request{Method: http.MethodPost, Path: path, Header: make(http.Header)}
+	selection := quotamodel.Selection{RouteKind: quotamodel.RouteKindStandard}
+	if path == "/responses" {
+		selection.RouteKind = quotamodel.RouteKindResponses
+	}
+	return proxymodel.Request{Method: http.MethodPost, Path: path, Header: make(http.Header), QuotaSelection: selection}
 }
 
 func TestProdex04355TransportBackoffSurvivesRestartAndStaysRouteScoped(t *testing.T) {
@@ -140,8 +145,8 @@ func TestProdex04355TransportBackoffDoublesAndCaps(t *testing.T) {
 	}
 	request := transportParityRequest("/responses")
 	for _, wantSeconds := range []int64{15, 30, 60, 120, 120} {
-		router.persistTransportBackoff(t.Context(), transportAccountA, request)
-		got := router.transportBackoffRemaining(transportAccountA, request, now)
+		router.persistTransportBackoff(t.Context(), transportAccountA, request.QuotaSelection)
+		got := router.transportBackoffRemaining(transportAccountA, request.QuotaSelection, now)
 		if got != time.Duration(wantSeconds)*time.Second {
 			t.Fatalf("transport backoff = %s, want %ds", got, wantSeconds)
 		}
@@ -209,7 +214,7 @@ func TestProdex04355HardAffinityBypassesTransportBackoff(t *testing.T) {
 	}
 	request := transportParityRequest("/responses")
 	request.Body = []byte(`{"session_id":"session-hard-transport"}`)
-	router.persistTransportBackoff(t.Context(), transportAccountA, request)
+	router.persistTransportBackoff(t.Context(), transportAccountA, request.QuotaSelection)
 
 	exchange, err := router.Forward(t.Context(), request)
 	if err != nil {

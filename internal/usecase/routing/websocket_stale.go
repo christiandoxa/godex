@@ -24,9 +24,12 @@ func staleWebSocketContinuationResponse(response *proxymodel.Response) *proxymod
 	headers := make(http.Header)
 	headers.Set("Content-Type", "application/json")
 	return &proxymodel.Response{
-		StatusCode:          http.StatusConflict,
-		Header:              headers,
-		Body:                io.NopCloser(bytes.NewReader(translated)),
+		StatusCode: http.StatusConflict,
+		Header:     headers,
+		Body:       io.NopCloser(bytes.NewReader(translated)),
+		PrecommitFailure: &proxymodel.PrecommitFailure{
+			Code: "previous_response_not_found", StaleContinuation: true,
+		},
 		FirstEventCommitted: true,
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"time"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
@@ -70,6 +71,8 @@ type Status struct {
 	external      map[string]externalProfileGateway
 	modelProvider modelProviderInspector
 	now           func() time.Time
+	usageMu       sync.Mutex
+	usageCache    map[string]usageSnapshot
 }
 
 func NewStatus(accounts accountStore, usage usageGateway) *Status {

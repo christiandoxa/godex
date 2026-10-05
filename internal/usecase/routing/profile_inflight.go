@@ -97,7 +97,13 @@ func (router *Router) tryExecuteWithProfileInflight(
 	if !acquired {
 		return nil, false, nil
 	}
-	response, err := router.executeRouted(ctx, request, account, hardAffinity)
+	var response *proxymodel.Response
+	var err error
+	if request.WebSocketMessage {
+		response, err = router.executeRouted(ctx, request, account, hardAffinity)
+	} else {
+		response, err = router.executeAccount(ctx, request, account)
+	}
 	if err != nil {
 		release()
 		return nil, true, err

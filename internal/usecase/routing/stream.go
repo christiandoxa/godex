@@ -74,6 +74,12 @@ func streamOutcome(data []byte, headers http.Header, now time.Time, providerKind
 	case "response.created", "response.in_progress":
 		return responseOutcome{}, true
 	case "error", "response.failed":
+		if invalidPreviousResponseID(data) {
+			return responseOutcome{kind: responsePass, failed: true, invalidPreviousResponseID: true}, false
+		}
+		if previousResponseNotFound(data) {
+			return responseOutcome{kind: responsePass, failed: true, previousResponseNotFound: true}, false
+		}
 		classification := providerentity.ClassifyError(http.StatusOK, data)
 		switch classification.Class {
 		case providerentity.ErrorQuota:
@@ -92,7 +98,7 @@ func streamOutcome(data []byte, headers http.Header, now time.Time, providerKind
 			}, false
 		case providerentity.ErrorTransient:
 			return responseOutcome{
-				kind: responseRetry, failed: true, transient: true, firstEventRetry: true,
+				kind: responseRetry, failed: true, transient: true, healthPenalty: 2, firstEventRetry: true,
 			}, false
 		}
 		if isQuotaResponse(data) {

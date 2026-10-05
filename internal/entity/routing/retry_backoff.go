@@ -1,7 +1,6 @@
 package routing
 
 import (
-	"encoding/hex"
 	"errors"
 	"time"
 )
@@ -14,11 +13,8 @@ type RetryBackoff struct {
 }
 
 func (backoff RetryBackoff) Validate() error {
-	if len(backoff.AccountID) != 32 || backoff.UntilUnix <= 0 {
+	if !validAccountID(backoff.AccountID) || backoff.UntilUnix <= 0 {
 		return errors.New("invalid routing retry backoff")
-	}
-	if _, err := hex.DecodeString(backoff.AccountID); err != nil {
-		return errors.New("invalid routing retry backoff account")
 	}
 	return nil
 }

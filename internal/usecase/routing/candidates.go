@@ -45,24 +45,5 @@ func (proxy *Router) candidates(accounts []proxymodel.Account, now time.Time) []
 		}
 		available = append(available, account)
 	}
-	if len(available) == 0 {
-		return nil
-	}
-	proxy.mu.Lock()
-	start := proxy.cursor % len(available)
-	if !proxy.preferredUsed {
-		proxy.preferredUsed = true
-		for index, account := range available {
-			if account.ID == proxy.preferred {
-				start = index
-				break
-			}
-		}
-	}
-	proxy.cursor = (start + 1) % len(available)
-	proxy.mu.Unlock()
-	ordered := make([]proxymodel.Account, 0, len(available))
-	ordered = append(ordered, available[start:]...)
-	ordered = append(ordered, available[:start]...)
-	return ordered
+	return available
 }

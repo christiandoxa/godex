@@ -22,8 +22,18 @@ func requestAffinity(request proxymodel.Request, body []byte) affinityKeys {
 		return keys
 	}
 	keys.previous = objectString(object, "previous_response_id")
+	if keys.previous == "" {
+		if response, ok := nestedAffinityObject("response", object["response"]); ok {
+			keys.previous = objectString(response, "previous_response_id")
+		}
+	}
 	if keys.session == "" {
 		keys.session = objectString(object, "session_id", "conversation_id", "thread_id")
+		if keys.session == "" {
+			if metadata, ok := object["client_metadata"].(map[string]any); ok {
+				keys.session = objectString(metadata, "session_id")
+			}
+		}
 	}
 	return keys
 }

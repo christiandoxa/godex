@@ -9,6 +9,7 @@ import (
 	"time"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
+	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
 
 type prodex04354CompactGateway struct {
@@ -65,8 +66,9 @@ func TestProdex04354CompactQuotaFallbackHonorsRequestLocalExclusions(t *testing.
 	}
 
 	exchange, err := router.Forward(context.Background(), proxymodel.Request{
-		Path:   "/backend-api/codex/responses/compact",
-		Header: make(http.Header),
+		Path:           "/backend-api/codex/responses/compact",
+		Header:         make(http.Header),
+		QuotaSelection: quotamodel.Selection{RouteKind: quotamodel.RouteKindCompact},
 	})
 	if err != nil {
 		t.Fatal(err)

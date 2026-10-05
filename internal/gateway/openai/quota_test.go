@@ -185,3 +185,56 @@ func TestDecodeQuotaUsagePreservesRateLimitPresence(t *testing.T) {
 		t.Fatalf("empty rate_limit object lost presence: %+v", empty)
 	}
 }
+
+func TestDecodeQuotaUsageReadsModelSpecificAdditionalRateLimits(t *testing.T) {
+	usage, err := decodeQuotaUsage([]byte(`{
+		"rate_limit": {"allowed": false, "primary_window": {"used_percent": 100}},
+		"additional_rate_limits": [{
+			"limit_id": "base_model_inference",
+			"limit_name": "gpt-luna-reserve",
+			"metered_feature": "base_model_inference",
+			"normal_model_slug": "gpt-5.6-luna",
+			"rate_limit": {
+				"primary_window": {"used_percent": 20, "reset_at": 200},
+				"secondary_window": {"used_percent": 30, "reset_at": 300}
+			}
+		}]
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(usage.AdditionalRateLimits) != 1 {
+		t.Fatalf("additional rate limits = %+v", usage.AdditionalRateLimits)
+	}
+	reserve := usage.AdditionalRateLimits[0]
+	if reserve.LimitID != "base_model_inference" || reserve.LimitName != "gpt-luna-reserve" ||
+		reserve.MeteredFeature != "base_model_inference" || reserve.NormalModelSlug != "gpt-5.6-luna" ||
+		reserve.Primary == nil || reserve.Primary.UsedPercent == nil || *reserve.Primary.UsedPercent != 20 {
+		t.Fatalf("reserve bucket = %+v", reserve)
+	}
+}
+
+func TestDecodeQuotaUsageReadsIndexedAdditionalRateLimits(t *testing.T) {
+	usage, err := decodeQuotaUsage([]byte(`{
+		"rateLimitsByLimitId": {
+			"codex": {"primary": {"usedPercent": 100}},
+			"base_model_inference": {
+				"limitName": "gpt-luna-reserve",
+				"normalModelSlug": "gpt-5.6-luna",
+				"primary": {"usedPercent": 20}
+			}
+		}
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(usage.AdditionalRateLimits) != 1 {
+		t.Fatalf("indexed additional rate limits = %+v", usage.AdditionalRateLimits)
+	}
+	reserve := usage.AdditionalRateLimits[0]
+	if reserve.LimitID != "base_model_inference" || reserve.LimitName != "gpt-luna-reserve" ||
+		reserve.NormalModelSlug != "gpt-5.6-luna" || reserve.Primary == nil || reserve.Primary.UsedPercent == nil ||
+		*reserve.Primary.UsedPercent != 20 {
+		t.Fatalf("indexed reserve bucket = %+v", reserve)
+	}
+}

@@ -74,6 +74,9 @@ func (proxy *Proxy) recordActivity(ctx context.Context, event runtimemodel.Event
 }
 
 func (activity *requestActivity) finishLifecycle(lifecycle *requestLifecycle) {
+	if activity.failed {
+		return
+	}
 	switch lifecycle.phase {
 	case requestCompleted:
 		return
