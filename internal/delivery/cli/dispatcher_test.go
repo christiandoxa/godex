@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +15,7 @@ import (
 	profileentity "github.com/christiandoxa/godex/internal/entity/profile"
 	"github.com/christiandoxa/godex/internal/gateway/codex"
 	updategateway "github.com/christiandoxa/godex/internal/gateway/update"
+	authmodel "github.com/christiandoxa/godex/internal/model/auth"
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 	accountrepo "github.com/christiandoxa/godex/internal/repository/account"
 	profilerepo "github.com/christiandoxa/godex/internal/repository/profile"
@@ -113,14 +116,26 @@ func (dispatcherLoginAccounts) CommitLogin(_ context.Context, candidate accounte
 	return candidate, nil
 }
 
+func (dispatcherLoginAccounts) CommitImportCurrent(_ context.Context, candidate accountentity.Account, _ string) (accountentity.Account, error) {
+	return candidate, nil
+}
+
+func (dispatcherLoginAccounts) List(context.Context) ([]accountentity.Account, error) {
+	return nil, nil
+}
+
 type dispatcherLoginCodex struct{}
 
 func (dispatcherLoginCodex) Login(context.Context, string, bool) (accountentity.Identity, error) {
 	return accountentity.Identity{Email: "login@example.com", ChatGPTAccountID: "login-account"}, nil
 }
 
-func (dispatcherLoginCodex) ImportCurrent(context.Context, string, string) (accountentity.Identity, error) {
-	return accountentity.Identity{Email: "<redacted>", ChatGPTAccountID: "<redacted>"}, nil
+func (dispatcherLoginCodex) StageImportCurrentAuth(context.Context, string, string, bool) (authmodel.ImportCurrentIdentity, error) {
+	return authmodel.ImportCurrentIdentity{Email: "<redacted>", ChatGPTAccountID: "<redacted>"}, nil
+}
+
+func (dispatcherLoginCodex) CompleteImportCurrentHome(context.Context, string, string) error {
+	return nil
 }
 
 func TestDispatcherRoutesCommandDomains(t *testing.T) {
@@ -144,6 +159,68 @@ func TestDispatcherRoutesCommandDomains(t *testing.T) {
 	}
 	if !strings.Contains(output.String(), "work") || !process.called {
 		t.Fatalf("dispatcher output/arguments = %q, %#v", output.String(), process.arguments)
+	}
+}
+
+func TestDispatcherImportCurrentCopiesNativeHomeAndActivates(t *testing.T) {
+	accounts := accountrepo.NewFileStore(t.TempDir())
+	source := t.TempDir()
+	if err := os.Chmod(source, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	authJSON := `{"auth_mode":"chatgpt","tokens":{"access_token":"opaque","account_id":"dispatcher-account"}}`
+	if err := os.WriteFile(filepath.Join(source, "auth.json"), []byte(authJSON), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "history.jsonl"), []byte("native history"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "config.toml"), []byte("model = \"source-model\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(source, "packages", "standalone"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "packages", "standalone", "codex"), []byte("installer-owned"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	process := codex.NewCodexProcess("codex", codex.Terminal{})
+	importer := authusecase.NewImportCurrent(accounts, process, source)
+	var output bytes.Buffer
+	app := New(nil, importer, accounts, nil, nil, nil, &output)
+
+	if err := app.Run(context.Background(), []string{"profile", "import-current", "main"}); err != nil {
+		t.Fatal(err)
+	}
+	current, err := accounts.Current(context.Background())
+	if err != nil || current.Name != "main" {
+		t.Fatalf("active imported profile = %#v err=%v", current, err)
+	}
+	home := accounts.CodexHome(current.ID)
+	for relative, expected := range map[string]string{
+		"history.jsonl": "native history",
+		"config.toml":   "model = \"source-model\"\n",
+	} {
+		content, err := os.ReadFile(filepath.Join(home, relative))
+		if err != nil || string(content) != expected {
+			t.Fatalf("imported %s = %q err=%v", relative, content, err)
+		}
+	}
+	if _, err := os.Lstat(filepath.Join(home, "packages")); !os.IsNotExist(err) {
+		t.Fatalf("installer-owned root packages copied: %v", err)
+	}
+	if !strings.Contains(output.String(), "Imported current Codex login as main") {
+		t.Fatalf("import-current output = %q", output.String())
+	}
+}
+
+func TestHelpDocumentsImportCurrentInsecureFlag(t *testing.T) {
+	var output bytes.Buffer
+	if err := New(nil, nil, nil, nil, nil, nil, &output).Run(context.Background(), []string{"help"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), "godex profile import-current [name] [--insecure]") {
+		t.Fatalf("import-current help missing --insecure: %q", output.String())
 	}
 }
 

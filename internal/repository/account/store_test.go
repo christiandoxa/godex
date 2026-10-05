@@ -396,6 +396,69 @@ func commitTestAccount(t *testing.T, store *FileStore, name, email, accountID st
 	return committed
 }
 
+func TestCommitImportCurrentRejectsRequestedNameWithoutSuffixing(t *testing.T) {
+	store := newTestStore(t)
+	commitTestAccount(t, store, "default", "one@example.com", "account-1")
+	candidate := newTestAccount(t, "default", "two@example.com", "account-2", time.Unix(2, 0))
+	staged := stagedHome(t, store)
+
+	if _, err := store.CommitImportCurrent(context.Background(), candidate, staged); err == nil ||
+		!strings.Contains(err.Error(), `profile "default" already exists`) {
+		t.Fatalf("import-current name collision = %v", err)
+	}
+	accounts, err := store.List(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(accounts) != 1 || accounts[0].Name != "default" {
+		t.Fatalf("accounts after collision = %#v", accounts)
+	}
+}
+
+func TestCommitImportCurrentDeduplicatesAuthAndActivatesInSameCommit(t *testing.T) {
+	store := newTestStore(t)
+	primary := commitTestAccount(t, store, "primary", "one@example.com", "account-1")
+	other := commitTestAccount(t, store, "other", "two@example.com", "account-2")
+	if _, err := store.SetActive(context.Background(), other.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.SetEnabled(context.Background(), primary.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	keepPath := filepath.Join(store.CodexHome(primary.ID), "history.jsonl")
+	if err := os.WriteFile(keepPath, []byte("existing history"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	staged := stagedHome(t, store)
+	if err := os.WriteFile(filepath.Join(staged, "auth.json"), []byte(`{"synthetic":"fresh"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(staged, "history.jsonl"), []byte("copied history"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	candidate := newTestAccount(t, "duplicate", "one@example.com", "account-1", time.Unix(3, 0))
+
+	committed, err := store.CommitImportCurrent(context.Background(), candidate, staged)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if committed.ID != primary.ID || committed.Name != "primary" || !committed.Enabled {
+		t.Fatalf("committed duplicate = %#v", committed)
+	}
+	current, err := store.Current(context.Background())
+	if err != nil || current.ID != primary.ID || !current.Enabled {
+		t.Fatalf("active duplicate = %#v err=%v", current, err)
+	}
+	history, err := os.ReadFile(keepPath)
+	if err != nil || string(history) != "existing history" {
+		t.Fatalf("existing native state = %q err=%v", history, err)
+	}
+	auth, err := os.ReadFile(filepath.Join(store.CodexHome(primary.ID), "auth.json"))
+	if err != nil || string(auth) != `{"synthetic":"fresh"}` {
+		t.Fatalf("updated auth = %q err=%v", auth, err)
+	}
+}
+
 func TestCommitLoginSuffixesCollidingDefaultNames(t *testing.T) {
 	store := newTestStore(t)
 	first := newTestAccount(t, "person", "person@one.example", "account-1", time.Unix(1, 0))

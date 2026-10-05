@@ -28,7 +28,11 @@ func (store *FileStore) CommitLogin(
 
 	var committed entity.Account
 	err := store.withLock(ctx, func() error {
-		account, err := store.commitLoginLocked(candidate, stagedCodexHome, rename)
+		state, err := store.readState()
+		if err != nil {
+			return err
+		}
+		account, err := store.commitLoginStateLocked(state, candidate, stagedCodexHome, rename, false)
 		if err != nil {
 			return err
 		}
@@ -38,17 +42,58 @@ func (store *FileStore) CommitLogin(
 	return committed, err
 }
 
-func (store *FileStore) commitLoginLocked(candidate entity.Account, stagedCodexHome string, rename bool) (entity.Account, error) {
-	state, err := store.readState()
-	if err != nil {
+// CommitImportCurrent applies the copy-current profile contract under one state lock:
+// the requested name must still be free, duplicate identity updates only auth, and
+// the resulting profile becomes active in the same persisted transaction.
+func (store *FileStore) CommitImportCurrent(
+	ctx context.Context,
+	candidate entity.Account,
+	stagedCodexHome string,
+) (entity.Account, error) {
+	if err := entity.ValidateAccount(candidate); err != nil {
+		return entity.Account{}, err
+	}
+	if err := store.Prepare(); err != nil {
+		return entity.Account{}, err
+	}
+	if err := store.validateStagedHome(stagedCodexHome); err != nil {
 		return entity.Account{}, err
 	}
 
+	var committed entity.Account
+	err := store.withLock(ctx, func() error {
+		state, err := store.readState()
+		if err != nil {
+			return err
+		}
+		if nameInUse(state.Accounts, candidate.Name, -1) {
+			return fmt.Errorf("profile %q already exists", candidate.Name)
+		}
+		account, err := store.commitLoginStateLocked(state, candidate, stagedCodexHome, false, true)
+		if err != nil {
+			return err
+		}
+		committed = account
+		return nil
+	})
+	return committed, err
+}
+
+func (store *FileStore) commitLoginStateLocked(
+	state stateFile,
+	candidate entity.Account,
+	stagedCodexHome string,
+	rename bool,
+	activate bool,
+) (entity.Account, error) {
 	nextID := cursorAccountID(state)
 	hadEnabled := len(orderedEnabledIndexes(state.Accounts)) > 0
 	candidate, existingIndex, err := mergeLoginCandidate(state.Accounts, candidate, rename)
 	if err != nil {
 		return entity.Account{}, err
+	}
+	if activate {
+		candidate.Enabled = true
 	}
 
 	release, err := store.acquireProfile(candidate.ID)
@@ -57,6 +102,10 @@ func (store *FileStore) commitLoginLocked(candidate entity.Account, stagedCodexH
 	}
 	defer release()
 	updateLoginState(&state, candidate, existingIndex, nextID, hadEnabled)
+	if activate {
+		state.ActiveAccountID = candidate.ID
+		state.RotationCursor = accountPosition(state.Accounts, candidate.ID)
+	}
 	kind, base := "profile", store.accountDir(candidate.ID)
 	if existingIndex >= 0 {
 		kind, base = "auth", store.CodexHome(candidate.ID)+string(os.PathSeparator)+"auth.json"

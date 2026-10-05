@@ -310,7 +310,7 @@ Usage:
   godex profile use --profile NAME
                                Set the active profile
   godex profile remove NAME [--delete-home]
-  godex profile import-current [name]
+  godex profile import-current [name] [--insecure]
                                Import the current Codex ChatGPT login
   godex account use <selector>  Choose the first account for account rotation
   godex account enable/disable <sel>
