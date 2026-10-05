@@ -78,8 +78,11 @@ func (router *Router) redeemedAttempt(
 	}
 	if outcome.kind == responsePass {
 		router.clearQuotaBlocked(account.ID)
+		if retryBackoffCommitSuccess(response, outcome) {
+			router.clearRetryBackoff(ctx, account.ID)
+		}
 	} else {
-		router.applyRetryOutcome(account.ID, outcome)
+		router.applyRetryOutcome(ctx, account.ID, outcome)
 	}
 	return proxymodel.Forwarded{
 		Response: pending.response, Prefix: pending.prefix, AccountID: account.ID,

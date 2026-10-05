@@ -176,10 +176,13 @@ func (router *Router) freshAttempt(
 	}
 	if outcome.kind == responsePass {
 		router.clearQuotaBlocked(account.ID)
+		if retryBackoffCommitSuccess(response, outcome) {
+			router.clearRetryBackoff(ctx, account.ID)
+		}
 		result := &proxymodel.Forwarded{Response: response, Prefix: pending.prefix, AccountID: account.ID, Failed: outcome.failed}
 		return result, nil, false, nil
 	}
-	router.applyRetryOutcome(account.ID, outcome)
+	router.applyRetryOutcome(ctx, account.ID, outcome)
 	pending.firstEventRetry = outcome.firstEventRetry
 	pending.accountID = account.ID
 	pending.authFailure = outcome.kind == responseAuthFailure
@@ -188,7 +191,7 @@ func (router *Router) freshAttempt(
 	return nil, pending, false, nil
 }
 
-func (router *Router) applyRetryOutcome(accountID string, outcome responseOutcome) {
+func (router *Router) applyRetryOutcome(ctx context.Context, accountID string, outcome responseOutcome) {
 	if outcome.quota {
 		router.markQuotaBlocked(accountID)
 	} else {
@@ -198,8 +201,8 @@ func (router *Router) applyRetryOutcome(accountID string, outcome responseOutcom
 		router.quarantineAuthFailure(accountID, 60*time.Second)
 		return
 	}
-	if outcome.quarantine > 0 {
-		router.quarantineAccount(accountID, outcome.quarantine)
+	if outcome.kind == responseRetry {
+		router.persistRetryBackoff(ctx, accountID, outcome.quarantine)
 	}
 }
 

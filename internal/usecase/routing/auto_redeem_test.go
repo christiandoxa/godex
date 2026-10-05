@@ -193,7 +193,7 @@ func TestAutoRedeemDoesNotTreatTransientQuarantineAsCreditCandidate(t *testing.T
 
 func TestQuotaOutcomeMarksAndSuccessfulRetryClearsQuotaMarker(t *testing.T) {
 	router := &Router{now: time.Now, quarantine: make(map[string]quarantineState), quotaBlocked: make(map[string]bool)}
-	router.applyRetryOutcome("a", responseOutcome{kind: responseRetry, quarantine: time.Second, quota: true})
+	router.applyRetryOutcome(context.Background(), "a", responseOutcome{kind: responseRetry, quarantine: time.Second, quota: true})
 	if !router.quotaBlockedAccount("a") {
 		t.Fatal("quota marker was not set")
 	}

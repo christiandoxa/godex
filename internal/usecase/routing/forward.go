@@ -3,7 +3,6 @@ package routing
 import (
 	"context"
 	"net/http"
-	"time"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
@@ -34,9 +33,6 @@ func (router *Router) forwardBound(
 	}
 	if request.WebSocketMessage {
 		return router.handleBoundWebSocketResponse(ctx, request, accounts, account, response)
-	}
-	if !router.autoRedeem {
-		return router.legacyBoundResponse(account, response), nil
 	}
 	return router.handleBoundResponse(ctx, request, accounts, account, response)
 }
@@ -89,16 +85,6 @@ func boundOwnerUnavailable() error {
 	}
 }
 
-func (router *Router) legacyBoundResponse(
-	account proxymodel.Account,
-	response *proxymodel.Response,
-) proxymodel.Forwarded {
-	if response.StatusCode == http.StatusUnauthorized {
-		router.quarantineAuthFailure(account.ID, time.Minute)
-	}
-	return proxymodel.Forwarded{Response: response, AccountID: account.ID}
-}
-
 func (router *Router) handleBoundResponse(
 	ctx context.Context,
 	request proxymodel.Request,
@@ -116,10 +102,13 @@ func (router *Router) handleBoundResponse(
 	}
 	if outcome.kind == responsePass {
 		router.clearQuotaBlocked(account.ID)
+		if retryBackoffCommitSuccess(response, outcome) {
+			router.clearRetryBackoff(ctx, account.ID)
+		}
 		return pendingForwarded(account.ID, outcome, pending), nil
 	}
-	router.applyRetryOutcome(account.ID, outcome)
-	if !outcome.quota {
+	router.applyRetryOutcome(ctx, account.ID, outcome)
+	if !router.autoRedeem || !outcome.quota {
 		return pendingForwarded(account.ID, outcome, pending), nil
 	}
 	return router.tryBoundRedeemedRetry(ctx, request, accounts, account.ID, outcome, pending)

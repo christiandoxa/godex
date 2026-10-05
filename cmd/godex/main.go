@@ -190,7 +190,8 @@ func newRuntimeRouter(
 	return routingusecase.NewRouter(routingusecase.Config{
 		Gateway: gateway, Accounts: runtimeAccountSource(config.Accounts, gateway),
 		PreferredAccount: config.PreferredAccount, Bindings: dependencies.bindings,
-		AutoRedeem: config.AutoRedeem, Redeemer: dependencies.autoRedeemer,
+		RoutingState: dependencies.bindings,
+		AutoRedeem:   config.AutoRedeem, Redeemer: dependencies.autoRedeemer,
 	})
 }
 

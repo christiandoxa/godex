@@ -3,11 +3,13 @@ package routing
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
+	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
@@ -16,6 +18,12 @@ type gateway interface {
 }
 type AutoRedeemer interface {
 	Try(context.Context, []proxymodel.Account, string, proxymodel.Request) (string, bool, error)
+}
+
+type retryBackoffRepository interface {
+	LoadRetryBackoffs(context.Context, time.Time) ([]routingentity.RetryBackoff, error)
+	SetRetryBackoff(context.Context, routingentity.RetryBackoff, time.Time) error
+	ClearRetryBackoff(context.Context, string) error
 }
 
 type Config struct {
@@ -28,6 +36,7 @@ type Config struct {
 	MaxInspectBytes          int64
 	Gateway                  gateway
 	Bindings                 bindingRepository
+	RoutingState             retryBackoffRepository
 	AutoRedeem               bool
 	Redeemer                 AutoRedeemer
 }
@@ -40,7 +49,9 @@ type Router struct {
 	wait                     func(context.Context, time.Duration) error
 	maxInspect               int64
 	affinity                 *affinityStore
+	retryBackoffs            retryBackoffRepository
 	mu                       sync.Mutex
+	retryBackoffMu           sync.Mutex
 	cursor                   int
 	preferredUsed            bool
 	inflight                 map[string]int
@@ -83,6 +94,19 @@ func NewRouter(config Config) (*Router, error) {
 		quotaBlocked: make(map[string]bool), autoRedeem: config.AutoRedeem, redeemer: config.Redeemer,
 	}
 	router.affinity.repository = config.Bindings
+	router.retryBackoffs = config.RoutingState
+	if config.RoutingState != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		now := config.Now()
+		backoffs, err := config.RoutingState.LoadRetryBackoffs(ctx, now)
+		if err != nil {
+			return nil, fmt.Errorf("load routing retry backoffs: %w", err)
+		}
+		for _, backoff := range backoffs {
+			router.replaceRetryQuarantine(backoff.AccountID, backoff.Remaining(now))
+		}
+	}
 	return router, nil
 }
 

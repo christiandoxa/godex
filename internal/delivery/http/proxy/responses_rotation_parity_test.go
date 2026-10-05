@@ -308,9 +308,10 @@ func TestProxyResponsesStopsRecoveryWhenRequestIsCanceled(t *testing.T) {
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("canceled recovery request error = %v, attempts %v, waits %d", err, seen, waits)
 	}
-	want := []string{
-		"Bearer token-a", "Bearer token-b", "Bearer token-a", "Bearer token-b", "Bearer token-a", "Bearer token-b",
-	}
+	// Prodex recovery includes retry-backoff deadlines. Once both profiles have
+	// failed with overload-class 503s, later sweeps wait for recovery instead of
+	// dispatching the same profiles again before their cooldown expires.
+	want := []string{"Bearer token-a", "Bearer token-b"}
 	if !reflect.DeepEqual(seen, want) || waits != 3 {
 		t.Fatalf("canceled recovery trace/waits = %#v/%d", seen, waits)
 	}
