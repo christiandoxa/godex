@@ -26,6 +26,7 @@ type responseOutcome struct {
 	quota           bool
 	transient       bool
 	firstEventRetry bool
+	transport       bool
 }
 
 type pendingResponse struct {
@@ -139,6 +140,7 @@ func (proxy *Router) classifyPrecommitFailure(response *proxymodel.Response, pen
 		quota:           classification.Class == providerentity.ErrorQuota,
 		transient:       classification.Class == providerentity.ErrorRateLimit || classification.Class == providerentity.ErrorTransient,
 		firstEventRetry: true,
+		transport:       failure.Transport,
 	}, pending, nil
 }
 

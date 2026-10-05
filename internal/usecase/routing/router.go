@@ -20,10 +20,13 @@ type AutoRedeemer interface {
 	Try(context.Context, []proxymodel.Account, string, proxymodel.Request) (string, bool, error)
 }
 
-type retryBackoffRepository interface {
+type routingStateRepository interface {
 	LoadRetryBackoffs(context.Context, time.Time) ([]routingentity.RetryBackoff, error)
 	SetRetryBackoff(context.Context, routingentity.RetryBackoff, time.Time) error
 	ClearRetryBackoff(context.Context, string) error
+	LoadTransportBackoffs(context.Context, time.Time) ([]routingentity.TransportBackoff, error)
+	SetTransportBackoff(context.Context, routingentity.TransportBackoff, time.Time) error
+	ClearTransportBackoff(context.Context, string, string) error
 }
 
 type Config struct {
@@ -36,7 +39,7 @@ type Config struct {
 	MaxInspectBytes          int64
 	Gateway                  gateway
 	Bindings                 bindingRepository
-	RoutingState             retryBackoffRepository
+	RoutingState             routingStateRepository
 	AutoRedeem               bool
 	Redeemer                 AutoRedeemer
 }
@@ -49,9 +52,10 @@ type Router struct {
 	wait                     func(context.Context, time.Duration) error
 	maxInspect               int64
 	affinity                 *affinityStore
-	retryBackoffs            retryBackoffRepository
+	state                    routingStateRepository
 	mu                       sync.Mutex
 	retryBackoffMu           sync.Mutex
+	transportBackoffMu       sync.Mutex
 	cursor                   int
 	preferredUsed            bool
 	inflight                 map[string]int
@@ -60,6 +64,7 @@ type Router struct {
 	profileInflightWait      profileInflightWaitFunc
 	quarantine               map[string]quarantineState
 	quotaBlocked             map[string]bool
+	transportBackoffs        map[transportBackoffKey]routingentity.TransportBackoff
 	autoRedeem               bool
 	redeemer                 AutoRedeemer
 	conversations            map[string]*conversationLock
@@ -91,10 +96,11 @@ func NewRouter(config Config) (*Router, error) {
 		affinity: newAffinityStore(), quarantine: make(map[string]quarantineState),
 		inflight: make(map[string]int), inflightChanged: make(chan struct{}),
 		profileInflightHardLimit: config.ProfileInflightHardLimit, profileInflightWait: config.ProfileInflightWait,
-		quotaBlocked: make(map[string]bool), autoRedeem: config.AutoRedeem, redeemer: config.Redeemer,
+		quotaBlocked: make(map[string]bool), transportBackoffs: make(map[transportBackoffKey]routingentity.TransportBackoff),
+		autoRedeem: config.AutoRedeem, redeemer: config.Redeemer,
 	}
 	router.affinity.repository = config.Bindings
-	router.retryBackoffs = config.RoutingState
+	router.state = config.RoutingState
 	if config.RoutingState != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
@@ -105,6 +111,13 @@ func NewRouter(config Config) (*Router, error) {
 		}
 		for _, backoff := range backoffs {
 			router.replaceRetryQuarantine(backoff.AccountID, backoff.Remaining(now))
+		}
+		transportBackoffs, err := config.RoutingState.LoadTransportBackoffs(ctx, now)
+		if err != nil {
+			return nil, fmt.Errorf("load routing transport backoffs: %w", err)
+		}
+		for _, backoff := range transportBackoffs {
+			router.transportBackoffs[transportBackoffKey{accountID: backoff.AccountID, route: backoff.Route}] = backoff
 		}
 	}
 	return router, nil

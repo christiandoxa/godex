@@ -28,6 +28,7 @@ func (router *Router) waitForFreshRecovery(
 }
 
 func (router *Router) freshRecoveryDelay(
+	request proxymodel.Request,
 	candidates []proxymodel.Account,
 	retryable map[string]bool,
 	requestID uint64,
@@ -44,7 +45,9 @@ func (router *Router) freshRecoveryDelay(
 			retryable[account.ID] = false
 			continue
 		}
-		remaining := router.quarantineRemaining(account.ID, now)
+		retryRemaining := router.quarantineRemaining(account.ID, now)
+		transportRemaining := router.transportBackoffRemaining(account.ID, request, now)
+		remaining := max(retryRemaining, transportRemaining)
 		if remaining <= 0 {
 			ready = true
 			continue

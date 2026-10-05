@@ -31,7 +31,7 @@ func (router *Router) forwardFresh(
 	autoRedeemAttempted := false
 	for recoverySweeps := 0; ; {
 		request.FirstEventRetryUsed = firstEventRetryUsed
-		current := freshRetryCandidates(router, candidates, retryable, router.now())
+		current := freshRetryCandidates(router, request, candidates, retryable, router.now())
 		if len(current) == 0 {
 			if lastChance, ok := router.websocketQuotaReplayLastChance(request, accounts); ok {
 				return router.forwardWebSocketQuotaLastChance(ctx, request, lastChance)
@@ -48,7 +48,7 @@ func (router *Router) forwardFresh(
 					}
 				}
 			}
-			delay, ok := router.freshRecoveryDelay(candidates, retryable, request.RequestID, recoverySweeps)
+			delay, ok := router.freshRecoveryDelay(request, candidates, retryable, request.RequestID, recoverySweeps)
 			if !ok {
 				break
 			}
@@ -92,7 +92,7 @@ func (router *Router) forwardFresh(
 		if !transient || !hasRetryableFreshAccount(retryable) {
 			break
 		}
-		delay, ok := router.freshRecoveryDelay(candidates, retryable, request.RequestID, recoverySweeps)
+		delay, ok := router.freshRecoveryDelay(request, candidates, retryable, request.RequestID, recoverySweeps)
 		if !ok {
 			break
 		}
@@ -122,6 +122,7 @@ func (router *Router) forwardFresh(
 
 func freshRetryCandidates(
 	router *Router,
+	request proxymodel.Request,
 	candidates []proxymodel.Account,
 	retryable map[string]bool,
 	now time.Time,
@@ -129,7 +130,8 @@ func freshRetryCandidates(
 	result := make([]proxymodel.Account, 0, len(candidates))
 	for _, account := range candidates {
 		if retryable[account.ID] && account.Enabled && !account.EligibleAfter.After(now) &&
-			!router.isQuarantined(account.ID, now) {
+			!router.isQuarantined(account.ID, now) &&
+			router.transportBackoffRemaining(account.ID, request, now) <= 0 {
 			result = append(result, account)
 		}
 	}

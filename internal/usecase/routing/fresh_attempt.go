@@ -155,6 +155,9 @@ func (router *Router) freshAttempt(
 		if ctx.Err() != nil {
 			return nil, nil, false, ctx.Err()
 		}
+		if isTransportFailure(err) {
+			router.persistTransportBackoff(ctx, account.ID, request)
+		}
 		return nil, &pendingResponse{accountID: account.ID, transient: true}, false, nil
 	}
 	outcome, pending, err := router.classify(response, account.Provider.Kind)
@@ -166,6 +169,9 @@ func (router *Router) freshAttempt(
 			return nil, nil, false, ctx.Err()
 		}
 		if pending != nil && pending.transient {
+			if isTransportFailure(err) {
+				router.persistTransportBackoff(ctx, account.ID, request)
+			}
 			pending.close()
 			return nil, &pendingResponse{accountID: account.ID, transient: true}, false, nil
 		}
@@ -176,13 +182,11 @@ func (router *Router) freshAttempt(
 	}
 	if outcome.kind == responsePass {
 		router.clearQuotaBlocked(account.ID)
-		if retryBackoffCommitSuccess(response, outcome) {
-			router.clearRetryBackoff(ctx, account.ID)
-		}
+		router.clearCommittedBackoffs(ctx, account.ID, request, response, outcome)
 		result := &proxymodel.Forwarded{Response: response, Prefix: pending.prefix, AccountID: account.ID, Failed: outcome.failed}
 		return result, nil, false, nil
 	}
-	router.applyRetryOutcome(ctx, account.ID, outcome)
+	router.applyRetryOutcome(ctx, account.ID, request, outcome)
 	pending.firstEventRetry = outcome.firstEventRetry
 	pending.accountID = account.ID
 	pending.authFailure = outcome.kind == responseAuthFailure
@@ -191,7 +195,7 @@ func (router *Router) freshAttempt(
 	return nil, pending, false, nil
 }
 
-func (router *Router) applyRetryOutcome(ctx context.Context, accountID string, outcome responseOutcome) {
+func (router *Router) applyRetryOutcome(ctx context.Context, accountID string, request proxymodel.Request, outcome responseOutcome) {
 	if outcome.quota {
 		router.markQuotaBlocked(accountID)
 	} else {
@@ -202,7 +206,11 @@ func (router *Router) applyRetryOutcome(ctx context.Context, accountID string, o
 		return
 	}
 	if outcome.kind == responseRetry {
-		router.persistRetryBackoff(ctx, accountID, outcome.quarantine)
+		if outcome.transport {
+			router.persistTransportBackoff(ctx, accountID, request)
+		} else {
+			router.persistRetryBackoff(ctx, accountID, outcome.quarantine)
+		}
 	}
 }
 

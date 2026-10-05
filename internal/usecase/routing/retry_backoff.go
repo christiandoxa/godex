@@ -27,8 +27,8 @@ func (router *Router) persistRetryBackoff(ctx context.Context, accountID string,
 	defer router.retryBackoffMu.Unlock()
 	// Latest failure wins, including a shorter Retry-After than an older failure.
 	router.replaceRetryQuarantine(accountID, time.Duration(seconds)*time.Second)
-	if router.retryBackoffs != nil {
-		_ = router.retryBackoffs.SetRetryBackoff(ctx, backoff, now)
+	if router.state != nil {
+		_ = router.state.SetRetryBackoff(ctx, backoff, now)
 	}
 }
 
@@ -43,8 +43,8 @@ func (router *Router) clearRetryBackoff(ctx context.Context, accountID string) {
 		delete(router.quarantine, accountID)
 	}
 	router.mu.Unlock()
-	if router.retryBackoffs != nil {
-		_ = router.retryBackoffs.ClearRetryBackoff(ctx, accountID)
+	if router.state != nil {
+		_ = router.state.ClearRetryBackoff(ctx, accountID)
 	}
 }
 
@@ -63,4 +63,18 @@ func (router *Router) replaceRetryQuarantine(accountID string, duration time.Dur
 
 func retryBackoffCommitSuccess(response *proxymodel.Response, outcome responseOutcome) bool {
 	return response != nil && !outcome.failed && response.StatusCode >= http.StatusOK && response.StatusCode < http.StatusBadRequest
+}
+
+func (router *Router) clearCommittedBackoffs(
+	ctx context.Context,
+	accountID string,
+	request proxymodel.Request,
+	response *proxymodel.Response,
+	outcome responseOutcome,
+) {
+	if !retryBackoffCommitSuccess(response, outcome) {
+		return
+	}
+	router.clearRetryBackoff(ctx, accountID)
+	router.clearTransportBackoff(ctx, accountID, request)
 }

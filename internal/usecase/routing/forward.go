@@ -26,6 +26,9 @@ func (router *Router) forwardBound(
 	}
 	response, err := router.executeWithProfileInflightWait(ctx, request, account, true)
 	if err != nil {
+		if isTransportFailure(err) {
+			router.persistTransportBackoff(ctx, account.ID, request)
+		}
 		return proxymodel.Forwarded{}, &proxymodel.Error{
 			StatusCode: http.StatusBadGateway,
 			Message:    "conversation owner could not be reached; continuity was preserved",
@@ -94,6 +97,9 @@ func (router *Router) handleBoundResponse(
 ) (proxymodel.Forwarded, error) {
 	outcome, pending, err := router.classify(response, account.Provider.Kind)
 	if err != nil {
+		if isTransportFailure(err) {
+			router.persistTransportBackoff(ctx, account.ID, request)
+		}
 		closePendingResponse(pending)
 		return proxymodel.Forwarded{}, &proxymodel.Error{
 			StatusCode: http.StatusBadGateway,
@@ -102,12 +108,10 @@ func (router *Router) handleBoundResponse(
 	}
 	if outcome.kind == responsePass {
 		router.clearQuotaBlocked(account.ID)
-		if retryBackoffCommitSuccess(response, outcome) {
-			router.clearRetryBackoff(ctx, account.ID)
-		}
+		router.clearCommittedBackoffs(ctx, account.ID, request, response, outcome)
 		return pendingForwarded(account.ID, outcome, pending), nil
 	}
-	router.applyRetryOutcome(ctx, account.ID, outcome)
+	router.applyRetryOutcome(ctx, account.ID, request, outcome)
 	if !router.autoRedeem || !outcome.quota {
 		return pendingForwarded(account.ID, outcome, pending), nil
 	}

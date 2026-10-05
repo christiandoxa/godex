@@ -67,10 +67,16 @@ func (router *Router) redeemedAttempt(
 		if ctx.Err() != nil {
 			return proxymodel.Forwarded{}, ctx.Err()
 		}
+		if isTransportFailure(err) {
+			router.persistTransportBackoff(ctx, account.ID, request)
+		}
 		return proxymodel.Forwarded{}, &proxymodel.Error{StatusCode: 502, Message: "auto-redeemed account could not be reached"}
 	}
 	outcome, pending, err := router.classify(response, account.Provider.Kind)
 	if err != nil {
+		if isTransportFailure(err) {
+			router.persistTransportBackoff(ctx, account.ID, request)
+		}
 		if pending != nil {
 			pending.close()
 		}
@@ -78,11 +84,9 @@ func (router *Router) redeemedAttempt(
 	}
 	if outcome.kind == responsePass {
 		router.clearQuotaBlocked(account.ID)
-		if retryBackoffCommitSuccess(response, outcome) {
-			router.clearRetryBackoff(ctx, account.ID)
-		}
+		router.clearCommittedBackoffs(ctx, account.ID, request, response, outcome)
 	} else {
-		router.applyRetryOutcome(ctx, account.ID, outcome)
+		router.applyRetryOutcome(ctx, account.ID, request, outcome)
 	}
 	return proxymodel.Forwarded{
 		Response: pending.response, Prefix: pending.prefix, AccountID: account.ID,
