@@ -64,6 +64,29 @@ func newCLIActivity() *runtimeusecase.Activity {
 	}, cliActivityVersion{})
 }
 
+func TestProdex04356InfoProcessSummaryMatchesTaggedShape(t *testing.T) {
+	if got := formatInfoProcessSummary(nil); got != "No" {
+		t.Fatalf("empty process summary = %q, want No", got)
+	}
+	processes := []statusProcessInfo{
+		{pid: 10, command: "run", runtime: true},
+		{pid: 11, command: "status"},
+		{pid: 12, command: "super", runtime: true},
+		{pid: 13, command: "doctor"},
+		{pid: 14, command: "gateway", runtime: true},
+		{pid: 15, command: "quota"},
+		{pid: 16, command: "run", runtime: true},
+	}
+	want := "Yes (7 total, 4 runtime; processes: 10/run, 11/status, 12/super, 13/doctor, 14/gateway, 15/quota (+1 more))"
+	if got := formatInfoProcessSummary(processes); got != want {
+		t.Fatalf("process summary = %q, want %q", got, want)
+	}
+	total, runtime := statusProcessCounts(processes)
+	if total != 7 || runtime != 4 {
+		t.Fatalf("process counts = %d/%d, want 7/4", total, runtime)
+	}
+}
+
 func TestInfoTextAndJSON(t *testing.T) {
 	activity := newCLIActivity()
 	var text bytes.Buffer

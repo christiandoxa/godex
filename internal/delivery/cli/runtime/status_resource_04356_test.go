@@ -75,21 +75,26 @@ func TestProdex04356StatusFieldsExposeUnavailableResources(t *testing.T) {
 
 func TestProdex04356StatusProcessClassificationMatchesRuntimeCommands(t *testing.T) {
 	for _, fixture := range []struct {
-		argv []string
-		want bool
+		argv      []string
+		want      bool
+		wantLabel string
 	}{
-		{[]string{"godex"}, true},
-		{[]string{"godex", "run", "exec", "hello"}, true},
-		{[]string{"godex", "super"}, true},
-		{[]string{"godex", "gateway"}, true},
-		{[]string{"godex", "__runtime-broker"}, true},
-		{[]string{"godex", "status"}, false},
-		{[]string{"godex", "__mcp-jsonl-bridge"}, false},
-		{[]string{"godex", "__sub-agent-exec"}, false},
-		{[]string{"godex", "exec", "hello"}, true},
+		{[]string{"godex"}, true, "run"},
+		{[]string{"godex", "run", "exec", "hello"}, true, "run"},
+		{[]string{"godex", "super"}, true, "super"},
+		{[]string{"godex", "s"}, true, "super"},
+		{[]string{"godex", "gateway"}, true, "gateway"},
+		{[]string{"godex", "__runtime-broker"}, true, "__runtime-broker"},
+		{[]string{"godex", "status"}, false, "status"},
+		{[]string{"godex", "__mcp-jsonl-bridge"}, false, "__mcp-jsonl-bridge"},
+		{[]string{"godex", "__sub-agent-exec"}, false, "__sub-agent-exec"},
+		{[]string{"godex", "exec", "hello"}, true, "run"},
 	} {
 		if got := godexCommandLaunchesRuntime(fixture.argv); got != fixture.want {
 			t.Fatalf("runtime classification %#v = %t, want %t", fixture.argv, got, fixture.want)
+		}
+		if got := godexProcessLabel(fixture.argv); got != fixture.wantLabel {
+			t.Fatalf("process label %#v = %q, want %q", fixture.argv, got, fixture.wantLabel)
 		}
 	}
 }

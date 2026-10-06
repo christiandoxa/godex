@@ -10,6 +10,7 @@ import (
 
 type statusProcessInfo struct {
 	pid     int
+	command string
 	runtime bool
 }
 
@@ -112,7 +113,7 @@ func collectGodexProcesses() []statusProcessInfo {
 			continue
 		}
 		processes = append(processes, statusProcessInfo{
-			pid: pid, runtime: godexCommandLaunchesRuntime(span),
+			pid: pid, command: godexProcessLabel(span), runtime: godexCommandLaunchesRuntime(span),
 		})
 	}
 	return processes
@@ -147,6 +148,58 @@ func godexArgvSpan(command string, args []string, currentBase string) ([]string,
 		}
 	}
 	return nil, false
+}
+
+func godexProcessLabel(argv []string) string {
+	if len(argv) <= 1 {
+		return "run"
+	}
+	switch argv[1] {
+	case "profile":
+		return "profile"
+	case "use":
+		return "use"
+	case "current":
+		return "current"
+	case "info":
+		return "info"
+	case "status":
+		return "status"
+	case "log":
+		return "log"
+	case "session":
+		return "session"
+	case "doctor":
+		return "doctor"
+	case "login":
+		return "login"
+	case "logout":
+		return "logout"
+	case "update":
+		return "update"
+	case "quota":
+		return "quota"
+	case "redeem":
+		return "redeem"
+	case "ping":
+		return "ping"
+	case "run":
+		return "run"
+	case "super", "s":
+		return "super"
+	case "gateway":
+		return "gateway"
+	case "__super-expose":
+		return "super-expose"
+	case "__runtime-broker":
+		return "__runtime-broker"
+	case "__mcp-jsonl-bridge":
+		return "__mcp-jsonl-bridge"
+	case "__sub-agent-exec":
+		return "__sub-agent-exec"
+	default:
+		return "run"
+	}
 }
 
 func godexCommandLaunchesRuntime(argv []string) bool {
