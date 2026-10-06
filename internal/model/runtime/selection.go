@@ -13,6 +13,11 @@ type Selection struct {
 	ContextWindow         *uint64
 	AutoCompactTokenLimit *uint64
 	AutoRedeem            bool
+	AutoRotate            bool
+	NoAutoRotate          bool
+	SkipQuotaCheck        bool
+	NoProxy               bool
+	FullAccess            bool
 }
 
 func (selection Selection) Empty() bool {
@@ -27,5 +32,10 @@ func (selection Selection) Empty() bool {
 		selection.Model == "" &&
 		selection.ContextWindow == nil &&
 		selection.AutoCompactTokenLimit == nil &&
-		!selection.AutoRedeem
+		!selection.AutoRedeem &&
+		!selection.AutoRotate &&
+		!selection.NoAutoRotate &&
+		!selection.SkipQuotaCheck &&
+		!selection.NoProxy &&
+		!selection.FullAccess
 }

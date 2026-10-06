@@ -26,6 +26,7 @@ func runProfilelessProviderSelection(
 	runner *runtimeusecase.Runner,
 	selection runtimemodel.Selection,
 	arguments []string,
+	launchOptions runtimeusecase.RuntimeLaunchOptions,
 ) error {
 	if selection.Provider == kiroProviderKind {
 		return providerCredentialRequired(kiroProviderKind)
@@ -45,7 +46,7 @@ func runProfilelessProviderSelection(
 	if err := runtimeusecase.ApplyProviderSelectionLimits(&provider, selection.ContextWindow, selection.AutoCompactTokenLimit); err != nil {
 		return err
 	}
-	return runner.RunProviderAPIKeys(ctx, "", provider, keys, arguments)
+	return runner.RunProviderAPIKeysWithOptions(ctx, "", provider, keys, arguments, launchOptions)
 }
 
 func runProviderSelection(
@@ -54,6 +55,7 @@ func runProviderSelection(
 	profiles launchProfiles,
 	selection runtimemodel.Selection,
 	arguments []string,
+	launchOptions runtimeusecase.RuntimeLaunchOptions,
 ) error {
 	if selection.Provider != anthropicProviderKind && selection.Provider != copilotProviderKind &&
 		selection.Provider != deepSeekProviderKind && selection.Provider != geminiProviderKind &&
@@ -65,7 +67,7 @@ func runProviderSelection(
 		return err
 	}
 	if selection.Provider == kiroProviderKind {
-		return runKiroProviderSelection(ctx, runner, profiles, selection, target, found, arguments)
+		return runKiroProviderSelection(ctx, runner, profiles, selection, target, found, arguments, launchOptions)
 	}
 	keys, err := runner.ProviderAPIKeys(selection.Provider, selection.APIKey)
 	if err != nil {
@@ -74,22 +76,23 @@ func runProviderSelection(
 	if len(keys) > 0 {
 		return runProviderAPIKeySelection(ctx, runner, providerAPIKeyRequest{
 			profiles: profiles, selection: selection, target: target, found: found,
-			keys: keys, arguments: arguments,
+			keys: keys, arguments: arguments, launchOptions: launchOptions,
 		})
 	}
 	if selection.Provider == anthropicProviderKind {
-		return runProviderOAuthSelection(ctx, runner, profiles, selection, target, found, arguments)
+		return runProviderOAuthSelection(ctx, runner, profiles, selection, target, found, arguments, launchOptions)
 	}
 	return providerCredentialRequired(selection.Provider)
 }
 
 type providerAPIKeyRequest struct {
-	profiles  launchProfiles
-	selection runtimemodel.Selection
-	target    profilemodel.LaunchTarget
-	found     bool
-	keys      []string
-	arguments []string
+	profiles      launchProfiles
+	selection     runtimemodel.Selection
+	target        profilemodel.LaunchTarget
+	found         bool
+	keys          []string
+	arguments     []string
+	launchOptions runtimeusecase.RuntimeLaunchOptions
 }
 
 func runProviderAPIKeySelection(
@@ -120,11 +123,11 @@ func runProviderAPIKeySelection(
 		return err
 	}
 	if request.found && request.target.AccountID != "" {
-		return runner.RunProviderAPIKeysAccount(
-			ctx, request.target.AccountID, provider, request.keys, request.arguments,
+		return runner.RunProviderAPIKeysAccountWithOptions(
+			ctx, request.target.AccountID, provider, request.keys, request.arguments, request.launchOptions,
 		)
 	}
-	return runner.RunProviderAPIKeys(ctx, home, provider, request.keys, request.arguments)
+	return runner.RunProviderAPIKeysWithOptions(ctx, home, provider, request.keys, request.arguments, request.launchOptions)
 }
 
 func runKiroProviderSelection(
@@ -135,6 +138,7 @@ func runKiroProviderSelection(
 	target profilemodel.LaunchTarget,
 	found bool,
 	arguments []string,
+	launchOptions runtimeusecase.RuntimeLaunchOptions,
 ) (runErr error) {
 	if !found || target.Provider != kiroProviderKind {
 		return providerCredentialRequired(kiroProviderKind)
@@ -151,7 +155,7 @@ func runKiroProviderSelection(
 	); err != nil {
 		return err
 	}
-	return runner.RunProviderProfile(ctx, target.CodexHome, provider, arguments)
+	return runner.RunProviderProfileWithOptions(ctx, target.CodexHome, provider, arguments, launchOptions)
 }
 
 func runProviderOAuthSelection(
@@ -162,6 +166,7 @@ func runProviderOAuthSelection(
 	target profilemodel.LaunchTarget,
 	found bool,
 	arguments []string,
+	launchOptions runtimeusecase.RuntimeLaunchOptions,
 ) error {
 	if !found || target.Provider != anthropicProviderKind {
 		return errors.New("godex run --provider anthropic requires a Claude profile, --api-key, or ANTHROPIC_API_KEY(S)")
@@ -177,13 +182,17 @@ func runProviderOAuthSelection(
 	if err := runtimeusecase.ApplyProviderSelectionLimits(&provider, selection.ContextWindow, selection.AutoCompactTokenLimit); err != nil {
 		return err
 	}
-	pool, err := profiles.ProviderLaunchPool(ctx, target.Name, anthropicProviderKind, selection.Profile == "")
+	allowRotate := selection.Profile == ""
+	if launchOptions.AllowAutoRotate != nil && !*launchOptions.AllowAutoRotate {
+		allowRotate = false
+	}
+	pool, err := profiles.ProviderLaunchPool(ctx, target.Name, anthropicProviderKind, allowRotate)
 	if err != nil {
 		return err
 	}
 	return runProviderPool(ctx, runner, providerPoolRequest{
 		profiles: profiles, selected: target, provider: provider, pool: pool,
-		arguments: arguments, apiURLOverride: selection.BaseURL,
+		arguments: arguments, apiURLOverride: selection.BaseURL, launchOptions: launchOptions,
 	})
 }
 

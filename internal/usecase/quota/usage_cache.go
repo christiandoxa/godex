@@ -30,25 +30,47 @@ func (status *Status) cachedAvailabilityUsageWithPolicy(
 	selection *quotamodel.Selection,
 	noProxy bool,
 ) (quotamodel.Usage, quotamodel.Source, error) {
+	return status.cachedAvailabilityUsageAtPolicy(ctx, accountID, home, selection, "", noProxy)
+}
+
+func (status *Status) cachedAvailabilityUsageAtPolicy(
+	ctx context.Context,
+	accountID, home string,
+	selection *quotamodel.Selection,
+	baseURL string,
+	noProxy bool,
+) (quotamodel.Usage, quotamodel.Source, error) {
 	now := status.now()
-	if usage, ok := status.cachedLiveUsage(home, now); ok {
-		return usage, quotamodel.SourceLive, nil
+	baseURL = strings.TrimSpace(baseURL)
+	if baseURL == "" {
+		if usage, ok := status.cachedLiveUsage(home, now); ok {
+			return usage, quotamodel.SourceLive, nil
+		}
 	}
 
 	var usage quotamodel.Usage
 	var err error
-	if noProxy {
+	switch {
+	case baseURL != "" || noProxy:
 		if policy, ok := status.usage.(policyUsageGateway); ok {
-			usage, err = policy.FetchAtPolicy(ctx, home, "", true)
+			usage, err = policy.FetchAtPolicy(ctx, home, baseURL, noProxy)
+		} else if baseURL != "" && !noProxy {
+			if override, ok := status.usage.(overrideUsageGateway); ok {
+				usage, err = override.FetchAt(ctx, home, baseURL)
+			} else {
+				err = errors.New("quota base URL override is not supported")
+			}
 		} else {
 			err = statusNoProxyUnsupported()
 		}
-	} else {
+	default:
 		usage, err = status.usage.Fetch(ctx, home)
 	}
 	if err == nil {
-		status.storeUsage(home, usage, now)
-		status.storeUsageSnapshot(ctx, accountID, usage, now)
+		if baseURL == "" {
+			status.storeUsage(home, usage, now)
+			status.storeUsageSnapshot(ctx, accountID, usage, now)
+		}
 		return usage, quotamodel.SourceLive, nil
 	}
 	if snapshot, ok := status.cachedPersistedSnapshot(ctx, accountID, now); ok {

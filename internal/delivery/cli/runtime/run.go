@@ -44,6 +44,7 @@ func Run(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionus
 		return runDryRun(ctx, runner, nil, selection, codexArguments, out, "")
 	}
 	runner.SetAutoRedeem(selection.AutoRedeem)
+	launchOptions := runRuntimeLaunchOptions(selection)
 	if selection.Profile != "" {
 		return errors.New("--profile requires profile-aware runtime dispatch")
 	}
@@ -51,9 +52,9 @@ func Run(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionus
 		return runner.RunLocalProvider(ctx, selection.Account, localProviderConfig(selection), codexArguments)
 	}
 	if selection.Provider != "" {
-		return runProfilelessProviderSelection(ctx, runner, selection, codexArguments)
+		return runProfilelessProviderSelection(ctx, runner, selection, codexArguments, launchOptions)
 	}
-	return runParsed(ctx, runner, sessions, selection.Account, codexArguments)
+	return runParsedWithOptions(ctx, runner, sessions, selection.Account, codexArguments, launchOptions)
 }
 
 func RunProfiles(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionusecase.Catalog, profiles launchProfiles, arguments []string, out io.Writer) error {
@@ -71,7 +72,7 @@ func RunProfiles(ctx context.Context, runner *runtimeusecase.Runner, sessions *s
 		return runDryRun(ctx, runner, profiles, selection, codexArguments, out, "")
 	}
 	runner.SetAutoRedeem(selection.AutoRedeem)
-	return runProfileSelection(ctx, runner, sessions, profiles, selection, codexArguments)
+	return runProfileSelection(ctx, runner, sessions, profiles, selection, codexArguments, runRuntimeLaunchOptions(selection))
 }
 
 func RunHome(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionusecase.Catalog, home string, arguments []string, out io.Writer) error {
@@ -92,6 +93,7 @@ func RunHome(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessi
 		return runDryRun(ctx, runner, nil, selection, codexArguments, out, home)
 	}
 	runner.SetAutoRedeem(selection.AutoRedeem)
+	launchOptions := runRuntimeLaunchOptions(selection)
 	if selection.URL != "" {
 		if selection.Account != "" {
 			return runner.RunLocalProvider(ctx, selection.Account, localProviderConfig(selection), codexArguments)
@@ -99,17 +101,25 @@ func RunHome(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessi
 		return runner.RunLocalProviderHome(ctx, home, localProviderConfig(selection), codexArguments)
 	}
 	if selection.Account != "" {
-		return runParsed(ctx, runner, sessions, selection.Account, codexArguments)
+		return runParsedWithOptions(ctx, runner, sessions, selection.Account, codexArguments, launchOptions)
 	}
 	return runner.RunHome(ctx, home, codexArguments)
 }
 
-func runProfileSelection(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionusecase.Catalog, profiles launchProfiles, selection runtimemodel.Selection, codexArguments []string) error {
+func runProfileSelection(
+	ctx context.Context,
+	runner *runtimeusecase.Runner,
+	sessions *sessionusecase.Catalog,
+	profiles launchProfiles,
+	selection runtimemodel.Selection,
+	codexArguments []string,
+	launchOptions runtimeusecase.RuntimeLaunchOptions,
+) error {
 	if selection.URL != "" {
 		return runLocalProviderSelection(ctx, runner, profiles, selection, codexArguments)
 	}
 	if selection.Provider != "" {
-		return runProviderSelection(ctx, runner, profiles, selection, codexArguments)
+		return runProviderSelection(ctx, runner, profiles, selection, codexArguments, launchOptions)
 	}
 	if selection.Profile != "" {
 		if profiles == nil {
@@ -119,10 +129,10 @@ func runProfileSelection(ctx context.Context, runner *runtimeusecase.Runner, ses
 		if err != nil {
 			return err
 		}
-		return runLaunchTarget(ctx, runner, sessions, profiles, target, codexArguments, false)
+		return runLaunchTarget(ctx, runner, sessions, profiles, target, codexArguments, false, launchOptions)
 	}
 	if selection.Account != "" {
-		return runParsed(ctx, runner, sessions, selection.Account, codexArguments)
+		return runParsedWithOptions(ctx, runner, sessions, selection.Account, codexArguments, launchOptions)
 	}
 	if profiles != nil {
 		target, active, err := profiles.ActiveLaunch(ctx)
@@ -130,10 +140,10 @@ func runProfileSelection(ctx context.Context, runner *runtimeusecase.Runner, ses
 			return err
 		}
 		if active {
-			return runLaunchTarget(ctx, runner, sessions, profiles, target, codexArguments, true)
+			return runLaunchTarget(ctx, runner, sessions, profiles, target, codexArguments, true, launchOptions)
 		}
 	}
-	return runParsed(ctx, runner, sessions, "", codexArguments)
+	return runParsedWithOptions(ctx, runner, sessions, "", codexArguments, launchOptions)
 }
 
 func runLaunchTarget(
@@ -144,9 +154,10 @@ func runLaunchTarget(
 	target profilemodel.LaunchTarget,
 	arguments []string,
 	allowRotate bool,
+	launchOptions runtimeusecase.RuntimeLaunchOptions,
 ) (runErr error) {
 	if target.AccountID != "" {
-		return runParsed(ctx, runner, sessions, target.AccountID, arguments)
+		return runParsedWithOptions(ctx, runner, sessions, target.AccountID, arguments, launchOptions)
 	}
 	if profiles == nil || target.Name == "" {
 		return errors.New("profile launch metadata is incomplete")
@@ -156,12 +167,16 @@ func runLaunchTarget(
 		return err
 	}
 	if provider.Kind == "copilot" || provider.Kind == "anthropic" || provider.Kind == "kiro" {
+		if launchOptions.AllowAutoRotate != nil && !*launchOptions.AllowAutoRotate {
+			allowRotate = false
+		}
 		pool, err := profiles.ProviderLaunchPool(ctx, target.Name, target.Provider, allowRotate)
 		if err != nil {
 			return err
 		}
 		return runProviderPool(ctx, runner, providerPoolRequest{
 			profiles: profiles, selected: target, provider: provider, pool: pool, arguments: arguments,
+			launchOptions: launchOptions,
 		})
 	}
 	release, err := profiles.AcquireLaunch(ctx, target.Name)
@@ -175,10 +190,10 @@ func runLaunchTarget(
 			return err
 		}
 		if compatible {
-			return runner.RunOpenAICompatibleProfile(ctx, target.CodexHome, baseURL, arguments)
+			return runner.RunOpenAICompatibleProfileWithOptions(ctx, target.CodexHome, baseURL, arguments, launchOptions)
 		}
 	}
-	return runStandaloneProfile(ctx, runner, target.CodexHome, provider, arguments)
+	return runStandaloneProfileWithOptions(ctx, runner, target.CodexHome, provider, arguments, launchOptions)
 }
 
 type providerPoolRequest struct {
@@ -188,6 +203,7 @@ type providerPoolRequest struct {
 	pool           []profilemodel.LaunchTarget
 	arguments      []string
 	apiURLOverride string
+	launchOptions  runtimeusecase.RuntimeLaunchOptions
 }
 
 func runProviderPool(
@@ -221,8 +237,8 @@ func runProviderPool(
 		return err
 	}
 	defer func() { runErr = errors.Join(runErr, release()) }()
-	return runner.RunProviderProfiles(
-		ctx, request.selected.CodexHome, request.provider, runtimeProfiles, request.arguments,
+	return runner.RunProviderProfilesWithOptions(
+		ctx, request.selected.CodexHome, request.provider, runtimeProfiles, request.arguments, request.launchOptions,
 	)
 }
 
@@ -257,11 +273,22 @@ func optionalProviderValue(value *string) string {
 }
 
 func runStandaloneProfile(ctx context.Context, runner *runtimeusecase.Runner, home string, provider proxymodel.Provider, arguments []string) error {
+	return runStandaloneProfileWithOptions(ctx, runner, home, provider, arguments, runtimeusecase.RuntimeLaunchOptions{})
+}
+
+func runStandaloneProfileWithOptions(
+	ctx context.Context,
+	runner *runtimeusecase.Runner,
+	home string,
+	provider proxymodel.Provider,
+	arguments []string,
+	launchOptions runtimeusecase.RuntimeLaunchOptions,
+) error {
 	runModel := func(args []string) error {
 		if provider.Kind == "" {
-			return runner.RunProfile(ctx, home, args)
+			return runner.RunProfileWithOptions(ctx, home, args, launchOptions)
 		}
-		return runner.RunProviderProfile(ctx, home, provider, args)
+		return runner.RunProviderProfileWithOptions(ctx, home, provider, args, launchOptions)
 	}
 	if index, args := sessionArgument(arguments); index >= 0 {
 		_ = index
@@ -294,32 +321,64 @@ func runStandaloneLoginStatus(ctx context.Context, runner *runtimeusecase.Runner
 }
 
 func runParsed(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionusecase.Catalog, selector string, codexArguments []string) error {
+	return runParsedWithOptions(ctx, runner, sessions, selector, codexArguments, runtimeusecase.RuntimeLaunchOptions{})
+}
+
+func runParsedWithOptions(
+	ctx context.Context,
+	runner *runtimeusecase.Runner,
+	sessions *sessionusecase.Catalog,
+	selector string,
+	codexArguments []string,
+	launchOptions runtimeusecase.RuntimeLaunchOptions,
+) error {
 	if index, args := sessionArgument(codexArguments); index >= 0 {
-		return runSessionArgument(ctx, sessions, selector, args, index)
+		return runSessionArgumentWithLauncher(
+			ctx, sessions, selector, args, index,
+			runSessionLauncher{runner: runner, options: launchOptions},
+		)
 	}
 	if index := nativeCommandIndex(codexArguments); index >= 0 {
 		if handled, err := runNativeCommand(ctx, runner, selector, codexArguments, index); handled {
 			return err
 		}
 	}
-	return runner.Run(ctx, selector, codexArguments)
+	return runner.RunWithOptions(ctx, selector, codexArguments, launchOptions)
 }
 
 func runSessionArgument(ctx context.Context, sessions *sessionusecase.Catalog, selector string, args []string, index int) error {
 	if sessions == nil {
 		return errors.New("session support is not configured")
 	}
+	return runSessionArgumentWithLauncher(ctx, sessions, selector, args, index, nil)
+}
+
+func runSessionArgumentWithLauncher(
+	ctx context.Context,
+	sessions *sessionusecase.Catalog,
+	selector string,
+	args []string,
+	index int,
+	launcher sessionusecase.Launcher,
+) error {
+	if sessions == nil {
+		return errors.New("session support is not configured")
+	}
 	command := nativeCommandIndex(args)
 	local := command >= 0 && localSessionCommand(args[command])
 	prefix, sessionSelector := splitThreadSelector(args[index])
-	return sessions.ResumeArguments(ctx, sessionmodel.Launch{
+	launch := sessionmodel.Launch{
 		AccountSelector: selector,
 		SessionSelector: sessionSelector,
 		IDIndex:         index,
 		IDPrefix:        prefix,
 		Arguments:       args,
 		Local:           local,
-	})
+	}
+	if launcher != nil {
+		return sessions.ResumeArgumentsWithLauncher(ctx, launch, launcher)
+	}
+	return sessions.ResumeArguments(ctx, launch)
 }
 
 func localSessionCommand(command string) bool {

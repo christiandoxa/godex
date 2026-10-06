@@ -27,7 +27,18 @@ func (runner *Runner) selectForLaunch(ctx context.Context, selector string) (acc
 }
 
 func (runner *Runner) selectForLaunchWithPolicy(ctx context.Context, selector string, noProxy bool) (accountentity.Account, map[string]time.Time, error) {
-	if runner.quota == nil {
+	return runner.selectForLaunchWithRuntimePolicy(ctx, selector, "", noProxy, false, runner.autoRedeem)
+}
+
+func (runner *Runner) selectForLaunchWithRuntimePolicy(
+	ctx context.Context,
+	selector string,
+	baseURL string,
+	noProxy bool,
+	skipQuota bool,
+	autoRedeem bool,
+) (accountentity.Account, map[string]time.Time, error) {
+	if skipQuota || runner.quota == nil {
 		selected, err := runner.accounts.SelectForLaunch(ctx, selector)
 		return selected, nil, err
 	}
@@ -35,11 +46,11 @@ func (runner *Runner) selectForLaunchWithPolicy(ctx context.Context, selector st
 	if err != nil {
 		return accountentity.Account{}, nil, err
 	}
-	snapshot, err := runner.probeCandidatesWithPolicy(ctx, candidates, noProxy)
+	snapshot, err := runner.probeCandidatesWithRuntimePolicy(ctx, candidates, baseURL, noProxy)
 	if err != nil {
 		return accountentity.Account{}, nil, err
 	}
-	return runner.commitCandidate(ctx, candidates, snapshot)
+	return runner.commitCandidateWithAutoRedeem(ctx, candidates, snapshot, autoRedeem)
 }
 
 func (runner *Runner) probeCandidates(ctx context.Context, candidates []accountentity.Account) (candidateSnapshot, error) {
@@ -47,9 +58,18 @@ func (runner *Runner) probeCandidates(ctx context.Context, candidates []accounte
 }
 
 func (runner *Runner) probeCandidatesWithPolicy(ctx context.Context, candidates []accountentity.Account, noProxy bool) (candidateSnapshot, error) {
+	return runner.probeCandidatesWithRuntimePolicy(ctx, candidates, "", noProxy)
+}
+
+func (runner *Runner) probeCandidatesWithRuntimePolicy(
+	ctx context.Context,
+	candidates []accountentity.Account,
+	baseURL string,
+	noProxy bool,
+) (candidateSnapshot, error) {
 	snapshot := candidateSnapshot{exhausted: make(map[string]time.Time)}
 	for _, candidate := range candidates {
-		probe := runner.probeCandidateWithPolicy(ctx, candidate, noProxy)
+		probe := runner.probeCandidateWithRuntimePolicy(ctx, candidate, baseURL, noProxy)
 		if ctx.Err() != nil {
 			return candidateSnapshot{}, ctx.Err()
 		}
@@ -77,8 +97,29 @@ func (runner *Runner) probeCandidate(ctx context.Context, candidate accountentit
 }
 
 func (runner *Runner) probeCandidateWithPolicy(ctx context.Context, candidate accountentity.Account, noProxy bool) quotaProbe {
+	return runner.probeCandidateWithRuntimePolicy(ctx, candidate, "", noProxy)
+}
+
+func (runner *Runner) probeCandidateWithRuntimePolicy(
+	ctx context.Context,
+	candidate accountentity.Account,
+	baseURL string,
+	noProxy bool,
+) quotaProbe {
 	retryAt := time.Now().Add(time.Minute)
-	if noProxy {
+	if baseURL != "" || noProxy {
+		if quota, ok := runner.quota.(interface {
+			AvailabilityAtPolicy(context.Context, accountentity.Account, string, bool) (quotamodel.Availability, error)
+		}); ok {
+			availability, err := quota.AvailabilityAtPolicy(ctx, candidate, baseURL, noProxy)
+			if !availability.RetryAt.IsZero() {
+				retryAt = availability.RetryAt
+			}
+			return quotaProbe{ready: availability.Ready, retryAt: retryAt, err: err}
+		}
+		if baseURL != "" {
+			return quotaProbe{retryAt: retryAt, err: errors.New("quota base URL override is not supported")}
+		}
 		if quota, ok := runner.quota.(interface {
 			AvailabilityWithPolicy(context.Context, accountentity.Account, bool) (quotamodel.Availability, error)
 		}); ok {
@@ -103,6 +144,15 @@ func (runner *Runner) probeCandidateWithPolicy(ctx context.Context, candidate ac
 }
 
 func (runner *Runner) commitCandidate(ctx context.Context, candidates []accountentity.Account, snapshot candidateSnapshot) (accountentity.Account, map[string]time.Time, error) {
+	return runner.commitCandidateWithAutoRedeem(ctx, candidates, snapshot, runner.autoRedeem)
+}
+
+func (runner *Runner) commitCandidateWithAutoRedeem(
+	ctx context.Context,
+	candidates []accountentity.Account,
+	snapshot candidateSnapshot,
+	autoRedeem bool,
+) (accountentity.Account, map[string]time.Time, error) {
 	if snapshot.firstReady != nil {
 		selected, err := runner.accounts.SelectForLaunch(ctx, snapshot.firstReady.ID)
 		return selected, snapshot.exhausted, err
@@ -114,7 +164,7 @@ func (runner *Runner) commitCandidate(ctx context.Context, candidates []accounte
 	if len(candidates) == 0 {
 		return accountentity.Account{}, snapshot.exhausted, errors.New("no enabled account is available")
 	}
-	if runner.autoRedeem {
+	if autoRedeem {
 		selected, err := runner.accounts.SelectForLaunch(ctx, candidates[0].ID)
 		return selected, snapshot.exhausted, err
 	}

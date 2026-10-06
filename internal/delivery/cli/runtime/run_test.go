@@ -15,6 +15,8 @@ import (
 	sessionentity "github.com/christiandoxa/godex/internal/entity/session"
 	"github.com/christiandoxa/godex/internal/gateway/codex"
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
+	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
+	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
 	sessionusecase "github.com/christiandoxa/godex/internal/usecase/session"
 )
@@ -65,6 +67,179 @@ func (process *fakeRunnerProcess) Run(_ context.Context, home string, arguments 
 	process.home = home
 	process.arguments = append([]string(nil), arguments...)
 	return nil
+}
+
+type runPolicyAccounts struct {
+	values []accountentity.Account
+	homes  map[string]string
+}
+
+func (accounts *runPolicyAccounts) LaunchCandidates(_ context.Context, selector string) ([]accountentity.Account, error) {
+	if selector == "" {
+		return append([]accountentity.Account(nil), accounts.values...), nil
+	}
+	for _, account := range accounts.values {
+		if account.ID == selector || account.Name == selector {
+			return []accountentity.Account{account}, nil
+		}
+	}
+	return nil, errors.New("account not found")
+}
+
+func (accounts *runPolicyAccounts) SelectForLaunch(_ context.Context, selector string) (accountentity.Account, error) {
+	if selector == "" {
+		if len(accounts.values) == 0 {
+			return accountentity.Account{}, errors.New("no accounts")
+		}
+		return accounts.values[0], nil
+	}
+	for _, account := range accounts.values {
+		if account.ID == selector || account.Name == selector {
+			return account, nil
+		}
+	}
+	return accountentity.Account{}, errors.New("account not found")
+}
+
+func (accounts *runPolicyAccounts) List(context.Context) ([]accountentity.Account, error) {
+	return append([]accountentity.Account(nil), accounts.values...), nil
+}
+
+func (accounts *runPolicyAccounts) CodexHome(id string) string { return accounts.homes[id] }
+
+type runPolicyQuota struct{ calls int }
+
+func (quota *runPolicyQuota) Ready(context.Context, accountentity.Account) (bool, error) {
+	quota.calls++
+	return false, errors.New("quota probe should have been skipped")
+}
+
+type runBaseURLQuota struct {
+	baseURL string
+	noProxy bool
+	calls   int
+}
+
+func (*runBaseURLQuota) Ready(context.Context, accountentity.Account) (bool, error) {
+	return false, errors.New("legacy quota Ready must not handle base URL override")
+}
+
+func (quota *runBaseURLQuota) AvailabilityAtPolicy(
+	_ context.Context,
+	_ accountentity.Account,
+	baseURL string,
+	noProxy bool,
+) (quotamodel.Availability, error) {
+	quota.calls++
+	quota.baseURL = baseURL
+	quota.noProxy = noProxy
+	return quotamodel.Availability{Ready: true}, nil
+}
+
+type runPolicyProcess struct {
+	home      string
+	arguments []string
+}
+
+func (*runPolicyProcess) Run(context.Context, string, []string) error { return nil }
+func (*runPolicyProcess) CheckProxySupport(context.Context) error     { return nil }
+func (process *runPolicyProcess) RunThroughProxy(_ context.Context, home, _ string, arguments []string) error {
+	process.home = home
+	process.arguments = append([]string(nil), arguments...)
+	return nil
+}
+
+func TestProdex04356RunPolicyFlagsReachLaunchWithoutLeakingToCodex(t *testing.T) {
+	root := t.TempDir()
+	one := filepath.Join(root, "one")
+	two := filepath.Join(root, "two")
+	for _, home := range []string{one, two} {
+		if err := os.MkdirAll(home, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	accounts := &runPolicyAccounts{
+		values: []accountentity.Account{
+			{ID: "one", Name: "one", Enabled: true},
+			{ID: "two", Name: "two", Enabled: true},
+		},
+		homes: map[string]string{"one": one, "two": two},
+	}
+	quota := &runPolicyQuota{}
+	process := &runPolicyProcess{}
+	var captured proxymodel.Config
+	proxy := &gatewayTestProxy{}
+	runner := runtimeusecase.NewRunner(accounts, process, func(config proxymodel.Config) (runtimeusecase.Proxy, error) {
+		captured = config
+		return proxy, nil
+	})
+	runner.SetQuotaPreflight(quota)
+	if err := Run(t.Context(), runner, nil, []string{
+		"--account", "one",
+		"--skip-quota-check",
+		"--no-proxy",
+		"--no-auto-rotate",
+		"--full-access",
+		"--",
+		"exec", "hello",
+	}, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if quota.calls != 0 {
+		t.Fatalf("skip-quota-check still probed quota %d time(s)", quota.calls)
+	}
+	if !captured.SkipQuotaPreflight || !captured.UpstreamNoProxy {
+		t.Fatalf("run policy did not reach proxy config: %#v", captured)
+	}
+	routed, err := captured.Accounts(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(routed) != 1 || routed[0].ID != "one" {
+		t.Fatalf("no-auto-rotate pool = %#v", routed)
+	}
+	joined := strings.Join(process.arguments, "\n")
+	if !strings.Contains(joined, "--dangerously-bypass-approvals-and-sandbox") {
+		t.Fatalf("full-access child argv = %#v", process.arguments)
+	}
+	for _, forbidden := range []string{"--skip-quota-check", "--no-proxy", "--no-auto-rotate", "--full-access"} {
+		if strings.Contains(joined, forbidden) {
+			t.Fatalf("wrapper flag %q leaked to Codex argv: %#v", forbidden, process.arguments)
+		}
+	}
+}
+
+func TestProdex04356RunBaseURLOverridesQuotaAndRuntimeUpstream(t *testing.T) {
+	home := t.TempDir()
+	accounts := &runPolicyAccounts{
+		values: []accountentity.Account{{ID: "one", Name: "one", Enabled: true}},
+		homes:  map[string]string{"one": home},
+	}
+	quota := &runBaseURLQuota{}
+	process := &runPolicyProcess{}
+	var captured proxymodel.Config
+	proxy := &gatewayTestProxy{}
+	runner := runtimeusecase.NewRunner(accounts, process, func(config proxymodel.Config) (runtimeusecase.Proxy, error) {
+		captured = config
+		return proxy, nil
+	})
+	runner.SetUpstreamURL("https://default.example.test/backend-api")
+	runner.SetQuotaPreflight(quota)
+	const override = "https://override.example.test/backend-api"
+	if err := Run(t.Context(), runner, nil, []string{
+		"--account", "one",
+		"--base-url", override,
+		"--no-proxy",
+		"--", "exec", "hello",
+	}, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if quota.calls != 1 || quota.baseURL != override || !quota.noProxy {
+		t.Fatalf("quota override calls/base/no-proxy = %d / %q / %t", quota.calls, quota.baseURL, quota.noProxy)
+	}
+	if captured.UpstreamURL != override || !captured.UpstreamNoProxy {
+		t.Fatalf("runtime upstream override = %#v", captured)
+	}
 }
 
 func TestRunAndLaunchDelegateToRunner(t *testing.T) {

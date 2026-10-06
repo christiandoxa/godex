@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
@@ -133,7 +134,13 @@ func (runner *Runner) RunWithOptions(
 	if err := runner.prepareSharedAccountHomes(ctx); err != nil {
 		return err
 	}
-	selected, exhausted, err := runner.selectForLaunchWithPolicy(ctx, selector, options.UpstreamNoProxy)
+	autoRedeem := runner.autoRedeem
+	if options.AutoRedeem != nil {
+		autoRedeem = *options.AutoRedeem
+	}
+	selected, exhausted, err := runner.selectForLaunchWithRuntimePolicy(
+		ctx, selector, options.UpstreamURL, options.UpstreamNoProxy, options.SkipQuotaPreflight, autoRedeem,
+	)
 	if err != nil {
 		return err
 	}
@@ -187,6 +194,7 @@ type RuntimeLaunchOptions struct {
 	AutoRedeem          *bool
 	AllowAutoRotate     *bool
 	SuperOverlay        bool
+	UpstreamURL         string
 	UpstreamNoProxy     bool
 	PresidioEnabled     bool
 	PresidioRequired    bool
@@ -262,7 +270,11 @@ func (runner *Runner) launchHomeWithOptions(
 	if options.AutoRedeem != nil {
 		autoRedeem = *options.AutoRedeem
 	}
-	config := runtimeProxyConfig(ctx, runner.upstream, preferredID, provider, credentials, profiles, autoRedeem)
+	upstream := runner.upstream
+	if override := strings.TrimSpace(options.UpstreamURL); override != "" {
+		upstream = override
+	}
+	config := runtimeProxyConfig(ctx, upstream, preferredID, provider, credentials, profiles, autoRedeem)
 	config.SmartContextEnabled = options.SmartContextEnabled
 	config.SkipQuotaPreflight = options.SkipQuotaPreflight
 	config.UpstreamNoProxy = options.UpstreamNoProxy

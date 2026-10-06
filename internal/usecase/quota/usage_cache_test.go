@@ -42,6 +42,56 @@ func TestAvailabilitySharesFiveMinuteUsageSnapshotWithRouteChecks(t *testing.T) 
 	}
 }
 
+type overridePolicyUsage struct {
+	fetchCalls  int
+	policyCalls int
+	baseURL     string
+	noProxy     bool
+}
+
+func (usage *overridePolicyUsage) Fetch(context.Context, string) (quotamodel.Usage, error) {
+	usage.fetchCalls++
+	return quotamodel.Usage{}, nil
+}
+
+func (usage *overridePolicyUsage) FetchAtPolicy(
+	_ context.Context,
+	_ string,
+	baseURL string,
+	noProxy bool,
+) (quotamodel.Usage, error) {
+	usage.policyCalls++
+	usage.baseURL = baseURL
+	usage.noProxy = noProxy
+	used := int64(100)
+	reset := time.Unix(10_000, 0).Unix()
+	return quotamodel.Usage{Primary: &quotamodel.Window{UsedPercent: &used, ResetAt: &reset}}, nil
+}
+
+func TestProdex04356AvailabilityBaseURLBypassesDefaultLiveCache(t *testing.T) {
+	account := accountentity.Account{ID: "one", Name: "one", Enabled: true}
+	usage := &overridePolicyUsage{}
+	status := NewStatus(fakeAccounts{accounts: []accountentity.Account{account}, current: account}, usage)
+	status.now = func() time.Time { return time.Unix(100, 0) }
+
+	defaultAvailability, err := status.Availability(context.Background(), account)
+	if err != nil || !defaultAvailability.Ready {
+		t.Fatalf("default availability = %+v, err=%v", defaultAvailability, err)
+	}
+	const baseURL = "https://override.example.test/backend-api"
+	overrideAvailability, err := status.AvailabilityAtPolicy(context.Background(), account, baseURL, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if overrideAvailability.Ready {
+		t.Fatalf("override reused default live cache: %+v", overrideAvailability)
+	}
+	if usage.fetchCalls != 1 || usage.policyCalls != 1 || usage.baseURL != baseURL || !usage.noProxy {
+		t.Fatalf("usage calls/default/policy/base/no-proxy = %d/%d/%q/%t",
+			usage.fetchCalls, usage.policyCalls, usage.baseURL, usage.noProxy)
+	}
+}
+
 func TestQuotaPressureMatchesRouteBandsPlanScaleAndResetCost(t *testing.T) {
 	now := time.Unix(100, 0)
 	weeklyUsed, fiveHourUsed := int64(50), int64(80)

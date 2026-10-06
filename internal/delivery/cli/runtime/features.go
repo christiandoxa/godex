@@ -32,9 +32,9 @@ type runtimeFeatures struct {
 
 func (features *runtimeFeatures) consume(arguments []string, index int) (next int, handled bool, err error) {
 	switch arguments[index] {
-	case "--no-presidio", "--no-sub-agent", "--no-auto-rotate", "--full-access":
+	case "--no-presidio", "--no-sub-agent":
 		return index + 1, true, nil
-	case "--presidio", "--sub-agent", "--auto-rotate", "--skip-quota-check", "--no-proxy":
+	case "--presidio", "--sub-agent":
 		features.nativeOptions = append(features.nativeOptions, arguments[index])
 		return index + 1, true, nil
 	}

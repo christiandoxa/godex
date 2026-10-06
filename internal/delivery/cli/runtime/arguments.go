@@ -52,8 +52,24 @@ func consumeWrapperArgument(
 		selection.DryRun = true
 		return index + 1, true, nil
 	}
-	if arguments[index] == "--auto-redeem" {
+	switch arguments[index] {
+	case "--auto-redeem":
 		selection.AutoRedeem = true
+		return index + 1, true, nil
+	case "--auto-rotate":
+		selection.AutoRotate = true
+		return index + 1, true, nil
+	case "--no-auto-rotate":
+		selection.NoAutoRotate = true
+		return index + 1, true, nil
+	case "--skip-quota-check":
+		selection.SkipQuotaCheck = true
+		return index + 1, true, nil
+	case "--no-proxy":
+		selection.NoProxy = true
+		return index + 1, true, nil
+	case "--full-access":
+		selection.FullAccess = true
 		return index + 1, true, nil
 	}
 	if next, handled, err := consumeSelectorArgument(arguments, index, selection); handled {
@@ -176,6 +192,9 @@ func finishRunArguments(
 	}
 	codexArguments := append(features.nativeOptions, featureArguments...)
 	codexArguments = append(codexArguments, remaining...)
+	if selection.FullAccess && selection.CLI != "agy" {
+		codexArguments = ensureRunFullAccess(codexArguments)
+	}
 	if selection.CLI == "agy" && codexResumeRequested(codexArguments) {
 		return runtimemodel.Selection{}, nil, errors.New("resume is unsupported for native Antigravity")
 	}
@@ -185,7 +204,19 @@ func finishRunArguments(
 	return selection, codexArguments, nil
 }
 
+func ensureRunFullAccess(arguments []string) []string {
+	for _, argument := range arguments {
+		if argument == "--dangerously-bypass-approvals-and-sandbox" {
+			return arguments
+		}
+	}
+	return append([]string{"--dangerously-bypass-approvals-and-sandbox"}, arguments...)
+}
+
 func validateRunSelection(selection runtimemodel.Selection) error {
+	if selection.AutoRotate && selection.NoAutoRotate {
+		return errors.New("--auto-rotate conflicts with --no-auto-rotate")
+	}
 	if selection.CLI != "" {
 		if selection.CLI != "agy" {
 			return fmt.Errorf("invalid --cli: supported values are agy, got %q", selection.CLI)
@@ -197,7 +228,8 @@ func validateRunSelection(selection runtimemodel.Selection) error {
 			return errors.New("--cli agy cannot use Godex accounts or profiles")
 		}
 		if selection.APIKey != "" || selection.BaseURL != "" || selection.URL != "" ||
-			selection.ContextWindow != nil || selection.AutoCompactTokenLimit != nil || selection.AutoRedeem {
+			selection.ContextWindow != nil || selection.AutoCompactTokenLimit != nil || selection.AutoRedeem ||
+			selection.AutoRotate || selection.SkipQuotaCheck || selection.NoProxy {
 			return errors.New("selected options are unsupported for native Antigravity")
 		}
 	}
@@ -210,8 +242,6 @@ func validateRunSelection(selection runtimemodel.Selection) error {
 		return errors.New("--base-url conflicts with --url")
 	case selection.Provider == "" && selection.APIKey != "":
 		return errors.New("--api-key requires --provider")
-	case selection.Provider == "" && selection.BaseURL != "":
-		return errors.New("--base-url requires --provider")
 	case (selection.ContextWindow != nil || selection.AutoCompactTokenLimit != nil) &&
 		selection.Provider == "" && selection.URL == "":
 		return errors.New("context-window options require --provider or --url")

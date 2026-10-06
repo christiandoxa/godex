@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -84,7 +85,6 @@ func TestParseRunArgumentsProviderValidationAndLiteralSeparator(t *testing.T) {
 	for _, arguments := range [][]string{
 		{"--provider", "unknown"},
 		{"--api-key", "secret"},
-		{"--base-url", "https://example.test"},
 		{"--provider", "anthropic", "--account", "work"},
 	} {
 		if _, _, err := parseRunArguments(arguments); err == nil {
@@ -99,6 +99,20 @@ func TestParseRunArgumentsProviderValidationAndLiteralSeparator(t *testing.T) {
 	}
 	if selection.Provider != "anthropic" || selection.APIKey != "" ||
 		len(arguments) != 2 || arguments[0] != "--api-key" {
+		t.Fatalf("selection/arguments = %#v / %#v", selection, arguments)
+	}
+}
+
+func TestProdex04356RunBaseURLAcceptedWithoutProvider(t *testing.T) {
+	selection, arguments, err := parseRunArguments([]string{
+		"--base-url", "https://override.example.test/backend-api",
+		"--", "exec", "hello",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if selection.Provider != "" || selection.BaseURL != "https://override.example.test/backend-api" ||
+		len(arguments) != 2 || arguments[0] != "exec" {
 		t.Fatalf("selection/arguments = %#v / %#v", selection, arguments)
 	}
 }
@@ -178,6 +192,35 @@ func TestParseRunArgumentsSupportsNativeAntigravityAndRejectsUnsupportedOptions(
 	_, _, err = parseRunArguments([]string{"--provider", "gemini", "--cli", "agy", "--api-key", secret})
 	if err == nil || strings.Contains(err.Error(), secret) {
 		t.Fatalf("native Antigravity API-key error = %v", err)
+	}
+}
+
+func TestProdex04356RunWrapperPolicyFlagsDoNotLeakToCodex(t *testing.T) {
+	selection, arguments, err := parseRunArguments([]string{
+		"--no-proxy",
+		"--skip-quota-check",
+		"--no-auto-rotate",
+		"--full-access",
+		"--",
+		"exec", "hello",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = selection
+	for _, forbidden := range []string{"--no-proxy", "--skip-quota-check", "--no-auto-rotate", "--full-access"} {
+		if slices.Contains(arguments, forbidden) {
+			t.Fatalf("wrapper flag %q leaked to Codex argv: %#v", forbidden, arguments)
+		}
+	}
+	if !slices.Contains(arguments, "--dangerously-bypass-approvals-and-sandbox") {
+		t.Fatalf("full access did not project Codex bypass flag: %#v", arguments)
+	}
+}
+
+func TestProdex04356RunAutoRotateFlagsConflict(t *testing.T) {
+	if _, _, err := parseRunArguments([]string{"--auto-rotate", "--no-auto-rotate"}); err == nil {
+		t.Fatal("auto-rotate/no-auto-rotate conflict unexpectedly accepted")
 	}
 }
 
