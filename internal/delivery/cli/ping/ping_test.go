@@ -21,6 +21,16 @@ func (fake *fakeRunner) Run(_ context.Context, options pingmodel.Options) (pingm
 	return fake.report, fake.err
 }
 
+func TestProdex04356PingHelpShowsVisibleProfileAlias(t *testing.T) {
+	_, err := parseArguments([]string{"openai", "--help"})
+	if err == nil {
+		t.Fatal("ping --help unexpectedly succeeded")
+	}
+	if !strings.Contains(err.Error(), "-p|--profile") && !strings.Contains(err.Error(), "-p NAME|--profile") {
+		t.Fatalf("ping help missing visible --profile alias: %q", err.Error())
+	}
+}
+
 func TestPingParsesOpenAIOptionsAndRendersHumanOutput(t *testing.T) {
 	first := int64(12)
 	completion := int64(34)

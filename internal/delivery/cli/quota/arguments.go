@@ -203,4 +203,4 @@ func quotaOptionValue(arguments []string, index int, argument string, names ...s
 	return "", index, errors.New("quota option requires a value")
 }
 
-const quotaUsage = "usage: godex quota [-p NAME|selector] [--all] [--auth AUTH] [--provider PROVIDER] [--detail] [--raw] [--once|--watch] [--base-url URL]"
+const quotaUsage = "usage: godex quota [-p|--profile NAME] [--all] [--auth AUTH] [--provider PROVIDER] [--detail] [--raw] [--once] [--base-url URL]"

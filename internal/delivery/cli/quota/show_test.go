@@ -45,6 +45,20 @@ func (fake *fakeStatus) Run(_ context.Context, options quotausecase.Options) ([]
 	}}, nil
 }
 
+func TestProdex04356QuotaHelpShowsVisibleProfileAliasAndHidesWatch(t *testing.T) {
+	_, err := parseArguments([]string{"--help"})
+	if err == nil {
+		t.Fatal("quota --help unexpectedly succeeded")
+	}
+	text := err.Error()
+	if !strings.Contains(text, "-p|--profile") && !strings.Contains(text, "-p NAME|--profile") {
+		t.Fatalf("quota help missing visible --profile alias: %q", text)
+	}
+	if strings.Contains(text, "--watch") {
+		t.Fatalf("quota help exposed hidden --watch compatibility flag: %q", text)
+	}
+}
+
 func TestQuotaDefaultsToDetailedAllProfileViewLikeProdex(t *testing.T) {
 	options, err := parseArguments(nil)
 	if err != nil {

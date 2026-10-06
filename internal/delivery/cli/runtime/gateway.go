@@ -231,7 +231,7 @@ func parseGatewayArguments(arguments []string) (gatewayOptions, error) {
 			index++
 			continue
 		case "--help", "-h":
-			return gatewayOptions{}, errors.New("usage: godex gateway [--listen ADDR] [--provider PROVIDER] [--base-url URL] [--api-key KEY] [--smart-context] [--presidio|--no-presidio]")
+			return gatewayOptions{}, errors.New("usage: godex gateway [--listen ADDR] [--provider PROVIDER] [--base-url|--url URL] [--api-key KEY] [--smart-context] [--presidio|--no-presidio]")
 		}
 
 		if value, consumed, ok, err := namedOptionValue(arguments, index, "--listen"); ok {

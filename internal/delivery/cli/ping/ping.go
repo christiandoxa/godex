@@ -46,7 +46,7 @@ func Run(ctx context.Context, probe runner, out io.Writer, arguments []string) e
 
 func parseArguments(arguments []string) (pingmodel.Options, error) {
 	if len(arguments) == 0 || arguments[0] != "openai" {
-		return pingmodel.Options{}, errors.New("usage: godex ping openai [-p NAME] [--model MODEL] [--base-url URL] [--no-proxy] [--json]")
+		return pingmodel.Options{}, errors.New("usage: godex ping openai [-p|--profile NAME] [--model MODEL] [--base-url URL] [--no-proxy] [--json]")
 	}
 	options := pingmodel.Options{}
 	for index := 1; index < len(arguments); index++ {
@@ -69,7 +69,7 @@ func consumeArgument(arguments []string, index int, options *pingmodel.Options) 
 		options.JSON = true
 		return index, nil
 	case "--help", "-h":
-		return index, errors.New("usage: godex ping openai [-p NAME] [--model MODEL] [--base-url URL] [--no-proxy] [--json]")
+		return index, errors.New("usage: godex ping openai [-p|--profile NAME] [--model MODEL] [--base-url URL] [--no-proxy] [--json]")
 	}
 	for _, option := range []struct {
 		name string

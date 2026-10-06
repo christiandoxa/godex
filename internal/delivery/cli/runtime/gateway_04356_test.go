@@ -52,6 +52,17 @@ func (fake *gatewayTestProxy) Close(context.Context) error {
 	return nil
 }
 
+func TestProdex04356GatewayHelpShowsVisibleURLAlias(t *testing.T) {
+	_, err := parseGatewayArguments([]string{"--help"})
+	if err == nil {
+		t.Fatal("gateway --help unexpectedly succeeded")
+	}
+	text := err.Error()
+	if !strings.Contains(text, "--base-url") || !strings.Contains(text, "--url") {
+		t.Fatalf("gateway help missing visible --url alias: %q", text)
+	}
+}
+
 func TestProdex04356GatewayCLIUsesFixedOpenAIMountAndCloses(t *testing.T) {
 	proxy := &gatewayTestProxy{}
 	var config proxymodel.Config

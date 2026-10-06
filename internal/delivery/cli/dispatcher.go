@@ -401,12 +401,12 @@ Usage:
   godex account enable/disable <sel>
                                Retain a profile while controlling eligibility
   godex account remove <sel>    Remove an account
-  godex quota [-p NAME] [--all] [--auth AUTH] [--provider PROVIDER]
+  godex quota [-p|--profile NAME] [--all] [--auth AUTH] [--provider PROVIDER]
               [--detail] [--raw] [--once] [--base-url URL]
                                Watch or snapshot filtered profile quota
   godex redeem PROFILE [-y|--yes] [--base-url URL] [--no-proxy]
                                Redeem one OpenAI reset credit manually
-  godex ping openai [-p NAME] [--model MODEL] [--base-url URL] [--no-proxy] [--json]
+  godex ping openai [-p|--profile NAME] [--model MODEL] [--base-url URL] [--no-proxy] [--json]
                                Run a cost-bearing OpenAI application diagnostic
   godex update                  Update from the latest verified GitHub release
   godex run [options] [CLI args...]
