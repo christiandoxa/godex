@@ -24,17 +24,24 @@ type prodex04356Step struct {
 }
 
 type prodex04356Gateway struct {
-	steps []prodex04356Step
-	calls []string
+	steps    []prodex04356Step
+	calls    []string
+	requests []proxymodel.Request
 }
 
 func (gateway *prodex04356Gateway) Execute(
 	_ context.Context,
-	_ proxymodel.Request,
+	request proxymodel.Request,
 	account proxymodel.Account,
 ) (*proxymodel.Response, error) {
 	index := len(gateway.calls)
 	gateway.calls = append(gateway.calls, account.ID)
+	captured := request
+	captured.Body = append([]byte(nil), request.Body...)
+	if request.Header != nil {
+		captured.Header = request.Header.Clone()
+	}
+	gateway.requests = append(gateway.requests, captured)
 	if index >= len(gateway.steps) {
 		return nil, errors.New("unexpected extra upstream attempt")
 	}
@@ -232,6 +239,86 @@ func TestProdex04356ResponsesHardAffinityFailureSignalsFullContextReplayWithoutS
 	if got := strings.Join(gateway.calls, ","); got != "account-a,account-b" ||
 		replay.Result.AccountID != "account-b" || replay.Result.Response.StatusCode != http.StatusOK {
 		t.Fatalf("replay calls/owner/status = %s/%s/%d", got, replay.Result.AccountID, replay.Result.Response.StatusCode)
+	}
+}
+
+func TestProdex04356HTTPPreviousAndSessionRetryableFailureSignalsFullContextBeforeFallback(t *testing.T) {
+	for _, fixture := range []struct {
+		name string
+		body string
+		step prodex04356Step
+	}{
+		{
+			name: "message quota",
+			body: "{\"previous_response_id\":\"resp-session\",\"session_id\":\"sess-replayable\",\"input\":[{\"type\":\"message\",\"role\":\"user\",\"content\":\"continue after quota pressure\"}]}",
+			step: prodex04356Step{account: "account-a", status: http.StatusTooManyRequests, body: "{\"error\":{\"code\":\"insufficient_quota\"}}"},
+		},
+		{
+			name: "tool output quota",
+			body: "{\"previous_response_id\":\"resp-session\",\"session_id\":\"sess-replayable\",\"input\":[{\"type\":\"function_call_output\",\"call_id\":\"call-1\",\"output\":\"ok\"}]}",
+			step: prodex04356Step{account: "account-a", status: http.StatusTooManyRequests, body: "{\"error\":{\"code\":\"insufficient_quota\"}}"},
+		},
+		{
+			name: "message transport",
+			body: "{\"previous_response_id\":\"resp-session\",\"session_id\":\"sess-replayable\",\"input\":[{\"type\":\"message\",\"role\":\"user\",\"content\":\"continue after transport failure\"}]}",
+			step: prodex04356Step{account: "account-a", err: errors.New("connection reset by peer")},
+		},
+	} {
+		t.Run(fixture.name, func(t *testing.T) {
+			gateway := &prodex04356Gateway{steps: []prodex04356Step{
+				fixture.step,
+				{account: "account-b", status: http.StatusOK, body: "{\"id\":\"must-not-run\"}"},
+			}}
+			router := newProdex04356Router(t, gateway, prodex04356Accounts())
+			if err := router.affinity.remember(
+				t.Context(), "account-a", affinityKeys{previous: "resp-session"}, router.now(),
+			); err != nil {
+				t.Fatal(err)
+			}
+
+			exchange, err := router.Forward(t.Context(), proxymodel.Request{
+				Method:         http.MethodPost,
+				Header:         make(http.Header),
+				Body:           []byte(fixture.body),
+				QuotaSelection: quotamodel.Selection{RouteKind: quotamodel.RouteKindResponses},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			payload, readErr := io.ReadAll(exchange.Result.Response.Body)
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			_ = exchange.Close()
+
+			previousOwner, previousErr := router.affinity.owner(
+				t.Context(), affinityKeys{previous: "resp-session"}, router.now(),
+			)
+			if previousErr != nil {
+				t.Fatal(previousErr)
+			}
+			sessionOwner, sessionErr := router.affinity.owner(
+				t.Context(), affinityKeys{session: "sess-replayable"}, router.now(),
+			)
+			if sessionErr != nil {
+				t.Fatal(sessionErr)
+			}
+			capturedBody := ""
+			if len(gateway.requests) > 0 {
+				capturedBody = string(gateway.requests[0].Body)
+			}
+			if got := strings.Join(gateway.calls, ","); got != "account-a" ||
+				exchange.Result.Response.StatusCode != http.StatusBadRequest ||
+				!strings.Contains(string(payload), "previous_response_not_found") ||
+				previousOwner != "" || sessionOwner != "" ||
+				len(gateway.requests) != 1 || capturedBody != fixture.body {
+				t.Fatalf(
+					"calls/status/body/owners/requests = %s/%d/%s/%q,%q/%d:%q",
+					got, exchange.Result.Response.StatusCode, payload,
+					previousOwner, sessionOwner, len(gateway.requests), capturedBody,
+				)
+			}
+		})
 	}
 }
 
