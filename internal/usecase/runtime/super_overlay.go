@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
@@ -18,6 +19,8 @@ var superOverlaySharedDirectories = []string{
 	"attachments",
 	"image_attachments",
 }
+
+const superOverlayTextReadLimit = 512 * 1024
 
 var superOverlayAppCacheDirectories = []string{
 	"cache/codex_apps_server_info",
@@ -62,7 +65,7 @@ func PrepareSuperOverlay(managedRoot, baseHome string) (*SuperOverlay, error) {
 		return cleanup(err)
 	}
 	for _, relative := range superOverlayAppCacheDirectories {
-		if err := removeSuperOverlayPath(filepath.Join(overlay, relative)); err != nil {
+		if err := removeSuperOverlayDirectoryPath(filepath.Join(overlay, relative)); err != nil {
 			return cleanup(err)
 		}
 	}
@@ -72,7 +75,7 @@ func PrepareSuperOverlay(managedRoot, baseHome string) (*SuperOverlay, error) {
 	if err := shareSuperOverlayRolloutState(base, overlay); err != nil {
 		return cleanup(err)
 	}
-	if err := configureSuperOverlayFullAccess(overlay); err != nil {
+	if err := configureSuperOverlay(overlay); err != nil {
 		return cleanup(err)
 	}
 	return &SuperOverlay{Home: overlay}, nil
@@ -210,7 +213,7 @@ func copySuperOverlaySymlinkedFile(sourceRoot, sourcePath, destinationPath strin
 		return err
 	}
 	if !info.Mode().IsRegular() {
-		return nil
+		return fmt.Errorf("%s is not a file", target)
 	}
 	return copySuperOverlayFile(target, destinationPath)
 }
@@ -225,22 +228,48 @@ func pathWithinRoot(root, candidate string) bool {
 }
 
 func copySuperOverlayFile(source, destination string) error {
+	before, err := os.Lstat(source)
+	if err != nil {
+		return err
+	}
+	if !before.Mode().IsRegular() {
+		return fmt.Errorf("%s is not a file", source)
+	}
 	input, err := os.Open(source)
 	if err != nil {
 		return err
 	}
 	defer input.Close()
+	after, err := input.Stat()
+	if err != nil {
+		return err
+	}
+	if !after.Mode().IsRegular() || !os.SameFile(before, after) {
+		return fmt.Errorf("source file changed while opening %s", source)
+	}
 	if err := os.MkdirAll(filepath.Dir(destination), 0o700); err != nil {
 		return err
 	}
-	output, err := os.OpenFile(destination, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
+	output, err := os.OpenFile(destination, os.O_CREATE|os.O_EXCL|os.O_WRONLY, before.Mode().Perm())
 	if err != nil {
 		return err
 	}
 	_, copyErr := io.Copy(output, input)
 	syncErr := output.Sync()
 	closeErr := output.Close()
-	return errors.Join(copyErr, syncErr, closeErr)
+	if err := errors.Join(copyErr, syncErr, closeErr); err != nil {
+		_ = os.Remove(destination)
+		return err
+	}
+	if err := os.Chmod(destination, before.Mode().Perm()); err != nil {
+		_ = os.Remove(destination)
+		return err
+	}
+	if err := os.Chtimes(destination, before.ModTime(), before.ModTime()); err != nil {
+		_ = os.Remove(destination)
+		return err
+	}
+	return nil
 }
 
 func shareSuperOverlayHistory(base, overlay string) error {
@@ -303,6 +332,23 @@ func replaceSuperOverlayWithSymlink(target, link string, directory bool) error {
 	return createSuperOverlaySymlink(target, link, directory)
 }
 
+func removeSuperOverlayDirectoryPath(path string) error {
+	info, err := os.Lstat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return os.Remove(path)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("%s is not a directory", path)
+	}
+	return os.RemoveAll(path)
+}
+
 func removeSuperOverlayPath(path string) error {
 	info, err := os.Lstat(path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -317,27 +363,104 @@ func removeSuperOverlayPath(path string) error {
 	return os.RemoveAll(path)
 }
 
-func configureSuperOverlayFullAccess(overlay string) error {
-	path := filepath.Join(overlay, "config.toml")
-	var document map[string]any
-	content, err := os.ReadFile(path)
-	switch {
-	case err == nil && strings.TrimSpace(string(content)) != "":
-		if err := toml.Unmarshal(content, &document); err != nil {
-			return fmt.Errorf("parse overlay config: %w", err)
-		}
-	case err == nil || errors.Is(err, os.ErrNotExist):
-		document = make(map[string]any)
-	default:
+const legacyCavemanInstructionsSHA256 = "a07e8d5167e454f7637eb0e35230a84987c537ae98d6f795d246338b652810f1"
+
+func configureSuperOverlay(overlay string) error {
+	configPath := filepath.Join(overlay, "config.toml")
+	if err := removeLegacyCavemanConfig(configPath); err != nil {
 		return err
 	}
-	document["approval_policy"] = "never"
-	document["sandbox_mode"] = "danger-full-access"
+	for _, relative := range []string{
+		".tmp/marketplaces/prodex-caveman",
+		"plugins/cache/prodex-caveman",
+	} {
+		if err := removeSuperOverlayDirectoryPath(filepath.Join(overlay, relative)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func removeLegacyCavemanConfig(path string) error {
+	info, err := os.Lstat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() || info.Size() > superOverlayTextReadLimit {
+		return nil
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	content, readErr := io.ReadAll(io.LimitReader(file, superOverlayTextReadLimit+1))
+	closeErr := file.Close()
+	if err := errors.Join(readErr, closeErr); err != nil {
+		return err
+	}
+	if len(content) > superOverlayTextReadLimit {
+		return nil
+	}
+	if strings.TrimSpace(string(content)) == "" {
+		return nil
+	}
+	var document map[string]any
+	if err := toml.Unmarshal(content, &document); err != nil {
+		return fmt.Errorf("parse overlay config: %w", err)
+	}
+	changed := removeLegacyCavemanTableEntry(document, "marketplaces", "prodex-caveman")
+	changed = removeLegacyCavemanTableEntry(document, "plugins", "caveman@prodex-caveman") || changed
+	changed = removeLegacyCavemanInstructions(document) || changed
+	if !changed {
+		return nil
+	}
 	rendered, err := toml.Marshal(document)
 	if err != nil {
-		return fmt.Errorf("render overlay config: %w", err)
+		return fmt.Errorf("render Godex Super overlay config: %w", err)
 	}
 	return os.WriteFile(path, rendered, 0o600)
+}
+
+func removeLegacyCavemanTableEntry(document map[string]any, parent, key string) bool {
+	child, ok := document[parent].(map[string]any)
+	if !ok {
+		return false
+	}
+	if _, exists := child[key]; !exists {
+		return false
+	}
+	delete(child, key)
+	if len(child) == 0 {
+		delete(document, parent)
+	}
+	return true
+}
+
+func removeLegacyCavemanInstructions(document map[string]any) bool {
+	instructions, ok := document["developer_instructions"].(string)
+	if !ok {
+		return false
+	}
+	paragraphs := strings.Split(instructions, "\n\n")
+	retained := paragraphs[:0]
+	for _, paragraph := range paragraphs {
+		digest := fmt.Sprintf("%x", sha256.Sum256([]byte(paragraph)))
+		if digest != legacyCavemanInstructionsSHA256 {
+			retained = append(retained, paragraph)
+		}
+	}
+	if len(retained) == len(paragraphs) {
+		return false
+	}
+	if len(retained) == 0 {
+		delete(document, "developer_instructions")
+	} else {
+		document["developer_instructions"] = strings.Join(retained, "\n\n")
+	}
+	return true
 }
 
 func superOverlayMode(path string) (fs.FileMode, error) {
