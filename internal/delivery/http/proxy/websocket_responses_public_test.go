@@ -159,6 +159,39 @@ func TestPublicResponsesWebSocketRoutesMessagesThroughCommittedOwners(t *testing
 	}
 }
 
+func TestPublicResponsesWebSocketAbsorbsResponseProcessedMessages(t *testing.T) {
+	gateway := &responsesPublicGateway{closed: make(chan uint64, 1)}
+	proxy := newResponsesPublicProxy(t, gateway)
+	server := httptest.NewServer(proxy.server.Handler)
+	defer server.Close()
+
+	connection, reader := dialResponsesPublicWebSocket(t, server.URL, "/backend-api/codex/responses")
+	defer connection.Close()
+	status, _ := readResponsesPublicHandshake(t, reader)
+	if status != http.StatusSwitchingProtocols {
+		t.Fatalf("handshake status = %d", status)
+	}
+
+	processed := []byte(`{"type":"response.processed","response_id":"resp-processed"}`)
+	create := []byte(`{"type":"response.create","response":{}}`)
+	frames := append(protocolClientFrame(1, true, processed, true), protocolClientFrame(1, true, create, true)...)
+	if _, err := connection.Write(frames); err != nil {
+		t.Fatal(err)
+	}
+	_ = connection.SetReadDeadline(time.Now().Add(time.Second))
+	if got := readResponsesPublicTextFrame(t, reader); !strings.Contains(got, `"id":"resp-1"`) {
+		t.Fatalf("create response = %q", got)
+	}
+
+	gateway.mu.Lock()
+	calls := len(gateway.bodies)
+	bodies := append([]string(nil), gateway.bodies...)
+	gateway.mu.Unlock()
+	if calls != 1 || len(bodies) != 1 || bodies[0] != string(create) {
+		t.Fatalf("processed message reached gateway: calls=%d bodies=%q", calls, bodies)
+	}
+}
+
 func TestPublicResponsesWebSocketRejectsBinaryAndContinues(t *testing.T) {
 	gateway := &responsesPublicGateway{closed: make(chan uint64, 1)}
 	proxy := newResponsesPublicProxy(t, gateway)

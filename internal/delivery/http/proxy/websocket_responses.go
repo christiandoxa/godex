@@ -68,6 +68,9 @@ func (proxy *Proxy) forwardResponsesWebSocket(
 			}
 			continue
 		}
+		if isResponseProcessedMessage(payload) {
+			continue
+		}
 
 		if proxy.redactor != nil && len(payload) > 0 {
 			redacted, err := proxy.redactor.Redact(sessionContext, payload)

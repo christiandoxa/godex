@@ -11,7 +11,7 @@ import (
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
-// Defer only startup metadata. Output, unknown events, or the byte ceiling commit
+// Defer known startup events. Output, unknown events, or the byte ceiling commit
 // the original stream; a later failure can never trigger another account.
 func (router *Router) inspectStream(response *proxymodel.Response, pending *pendingResponse, providerKind string) (responseOutcome, *pendingResponse, error) {
 	decoder := sse.NewDecoder(int(router.maxInspect))
@@ -71,7 +71,15 @@ func streamOutcome(data []byte, headers http.Header, now time.Time, providerKind
 		return responseOutcome{kind: responsePass}, false
 	}
 	switch event.Type {
-	case "response.created", "response.in_progress":
+	case "codex.rate_limits",
+		"codex.response.metadata",
+		"response.metadata",
+		"response.created",
+		"response.in_progress",
+		"response.queued",
+		"response.output_item.added",
+		"response.content_part.added",
+		"response.reasoning_summary_part.added":
 		return responseOutcome{}, true
 	case "error", "response.failed":
 		if invalidPreviousResponseID(data) {
@@ -79,6 +87,11 @@ func streamOutcome(data []byte, headers http.Header, now time.Time, providerKind
 		}
 		if previousResponseNotFound(data) {
 			return responseOutcome{kind: responsePass, failed: true, previousResponseNotFound: true}, false
+		}
+		if !externalProviderKind(providerKind) && openAIProfileUnavailable(data) {
+			return responseOutcome{
+				kind: responseRetry, failed: true, profileUnavailable: true, firstEventRetry: true,
+			}, false
 		}
 		classification := providerentity.ClassifyError(http.StatusOK, data)
 		switch classification.Class {
