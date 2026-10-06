@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/christiandoxa/godex/internal/helper/fileutil"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
@@ -25,6 +27,112 @@ type LocalProviderConfig struct {
 	Model                 string
 	ContextWindow         *uint64
 	AutoCompactTokenLimit *uint64
+}
+
+func PrepareLocalRewriteOverlayAuth(home string) error {
+	home, err := validateRuntimeHome(home)
+	if err != nil {
+		return err
+	}
+	content := []byte("{\n  \"auth_mode\": \"apikey\",\n  \"OPENAI_API_KEY\": \"godex-runtime-provider\",\n  \"tokens\": null,\n  \"last_refresh\": null,\n  \"agent_identity\": null\n}\n")
+	_, err = fileutil.AtomicWrite(filepath.Join(home, "auth.json"), content)
+	return err
+}
+
+func LocalRewriteProvider(config LocalProviderConfig) (proxymodel.Provider, error) {
+	baseURL, err := localProviderBaseURL(config.URL)
+	if err != nil {
+		return proxymodel.Provider{}, err
+	}
+	model := strings.TrimSpace(config.Model)
+	if model == "" {
+		model = localDefaultModel
+	}
+	contextWindow := localDefaultContextWindow
+	if config.ContextWindow != nil && *config.ContextWindow > 1 {
+		contextWindow = *config.ContextWindow
+	}
+	autoCompact := localDefaultAutoCompactLimit
+	if config.AutoCompactTokenLimit != nil && *config.AutoCompactTokenLimit > 0 {
+		autoCompact = *config.AutoCompactTokenLimit
+	}
+	if autoCompact >= contextWindow {
+		autoCompact = contextWindow - 1
+	}
+	return proxymodel.Provider{
+		Kind: "local", Name: localProviderName, APIURL: baseURL, DefaultModel: model,
+		ContextWindow: int64(contextWindow), AutoCompactLimit: int64(autoCompact),
+	}, nil
+}
+
+func (runner *Runner) RunLocalRewriteWithOptions(
+	ctx context.Context, selector string, config LocalProviderConfig, args []string, options RuntimeLaunchOptions,
+) (runErr error) {
+	account, err := runner.activeAccount(ctx, selector)
+	if err != nil {
+		if selector == "" && strings.TrimSpace(runner.currentHome) != "" {
+			return runner.RunLocalRewriteHomeWithOptions(ctx, runner.currentHome, config, args, options)
+		}
+		return err
+	}
+	if !account.Enabled {
+		return errors.New("selected account is disabled")
+	}
+	if leases, ok := runner.accounts.(interface {
+		AcquireProfiles(context.Context, []string) (func() error, error)
+	}); ok {
+		release, err := leases.AcquireProfiles(ctx, []string{account.ID})
+		if err != nil {
+			return err
+		}
+		defer func() { runErr = errors.Join(runErr, release()) }()
+	}
+	return runner.RunLocalRewriteHomeWithOptions(ctx, runner.accounts.CodexHome(account.ID), config, args, options)
+}
+
+func (runner *Runner) RunLocalRewriteAccountWithOptions(
+	ctx context.Context, accountID string, config LocalProviderConfig, args []string, options RuntimeLaunchOptions,
+) (runErr error) {
+	if runner.accounts == nil {
+		return errors.New("runtime account source is not configured")
+	}
+	accounts, err := runner.accounts.List(ctx)
+	if err != nil {
+		return err
+	}
+	found := false
+	for _, account := range accounts {
+		if account.ID == accountID && account.Enabled {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return errors.New("selected account is unavailable")
+	}
+	release, err := runner.pinProfiles(ctx, []string{accountID})
+	if err != nil {
+		return err
+	}
+	defer func() { runErr = errors.Join(runErr, release()) }()
+	return runner.RunLocalRewriteHomeWithOptions(ctx, runner.accounts.CodexHome(accountID), config, args, options)
+}
+
+func (runner *Runner) RunLocalRewriteHomeWithOptions(
+	ctx context.Context, codexHome string, config LocalProviderConfig, args []string, options RuntimeLaunchOptions,
+) error {
+	home, err := validateRuntimeHome(codexHome)
+	if err != nil {
+		return err
+	}
+	provider, err := LocalRewriteProvider(config)
+	if err != nil {
+		return err
+	}
+	id := profileRoutingID("local:" + home)
+	return runner.launchHomeWithOptions(ctx, home, id, provider, nil, []proxymodel.Account{{
+		ID: id, Home: home, Enabled: true, Provider: provider,
+	}}, args, options)
 }
 
 func (runner *Runner) RunLocalProvider(

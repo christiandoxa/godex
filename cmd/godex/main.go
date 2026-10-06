@@ -23,6 +23,7 @@ import (
 	geminigateway "github.com/christiandoxa/godex/internal/gateway/gemini"
 	githubgateway "github.com/christiandoxa/godex/internal/gateway/github"
 	kirogateway "github.com/christiandoxa/godex/internal/gateway/kiro"
+	localrewritegateway "github.com/christiandoxa/godex/internal/gateway/localrewrite"
 	"github.com/christiandoxa/godex/internal/gateway/openai"
 	providerkeygateway "github.com/christiandoxa/godex/internal/gateway/providerkey"
 	quotagateway "github.com/christiandoxa/godex/internal/gateway/quota"
@@ -262,6 +263,8 @@ func newRuntimeGateway(
 		return geminigateway.NewRuntimePool(config.Provider.APIURL, config.ProviderCredentials, client)
 	case "kiro":
 		return newKiroRuntimeGateway(config, kiroSource)
+	case "local":
+		return localrewritegateway.NewTransport(config.Provider.APIURL, client)
 	default:
 		return nil, fmt.Errorf("runtime provider %q is not implemented", config.Provider.Kind)
 	}

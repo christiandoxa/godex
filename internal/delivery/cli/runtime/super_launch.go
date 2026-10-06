@@ -61,6 +61,46 @@ func (launcher superSessionLauncher) RunSession(ctx context.Context, homeID, own
 	)
 }
 
+type superLocalSessionLauncher struct {
+	runner  *runtimeusecase.Runner
+	config  runtimeusecase.LocalProviderConfig
+	options runtimeusecase.RuntimeLaunchOptions
+}
+
+func (launcher superLocalSessionLauncher) Run(ctx context.Context, selector string, args []string) error {
+	return launcher.runner.RunLocalRewriteWithOptions(ctx, selector, launcher.config, ensureSuperFullAccess(args), launcher.options)
+}
+
+func (launcher superLocalSessionLauncher) RunLocal(ctx context.Context, selector string, args []string) error {
+	return launcher.runner.RunLocalRewriteAccountWithOptions(ctx, selector, launcher.config, ensureSuperFullAccess(args), launcher.options)
+}
+
+func (launcher superLocalSessionLauncher) RunSession(ctx context.Context, homeID, _ string, args []string) error {
+	return launcher.runner.RunLocalRewriteAccountWithOptions(ctx, homeID, launcher.config, ensureSuperFullAccess(args), launcher.options)
+}
+
+func superLocalRuntimeLaunchOptions(options superOptions) runtimeusecase.RuntimeLaunchOptions {
+	launch := superRuntimeLaunchOptions(options)
+	prior := launch.OverlayPrepare
+	launch.OverlayPrepare = func(home string) error {
+		if err := runtimeusecase.PrepareLocalRewriteOverlayAuth(home); err != nil {
+			return err
+		}
+		if prior != nil {
+			return prior(home)
+		}
+		return nil
+	}
+	return launch
+}
+
+func superLocalProviderConfig(options superOptions) runtimeusecase.LocalProviderConfig {
+	return runtimeusecase.LocalProviderConfig{
+		URL: options.localURL, Model: options.model,
+		ContextWindow: options.contextWindow, AutoCompactTokenLimit: options.autoCompact,
+	}
+}
+
 func launchSuperProfiles(
 	ctx context.Context,
 	runner *runtimeusecase.Runner,
@@ -72,7 +112,7 @@ func launchSuperProfiles(
 		return errors.New("runtime support is not configured")
 	}
 	if options.localURL != "" {
-		return errors.New("Godex Super local --url requires local-rewrite proxy support that is not implemented yet")
+		return launchSuperLocal(ctx, runner, sessions, profiles, options)
 	}
 	if options.cli == "agy" {
 		return runner.RunAntigravity(ctx, options.model, options.codexArgs)
@@ -122,6 +162,68 @@ func launchSuperProfiles(
 		}
 	}
 	return runner.RunWithOptions(ctx, "", launchArguments, launchOptions)
+}
+
+func launchSuperLocal(
+	ctx context.Context,
+	runner *runtimeusecase.Runner,
+	sessions *sessionusecase.Catalog,
+	profiles launchProfiles,
+	options superOptions,
+) (runErr error) {
+	config := superLocalProviderConfig(options)
+	launchOptions := superLocalRuntimeLaunchOptions(options)
+	launchArguments := superPreparedCodexArgs(options)
+	if index, args := sessionArgument(options.codexArgs); index >= 0 {
+		if sessions == nil {
+			return errors.New("session support is not configured")
+		}
+		prefix, selector := splitThreadSelector(args[index])
+		return sessions.ResumeArgumentsWithLauncher(ctx, sessionmodel.Launch{
+			SessionSelector: selector, IDIndex: index, IDPrefix: prefix, Arguments: args, Local: true,
+		}, superLocalSessionLauncher{runner: runner, config: config, options: launchOptions})
+	}
+	if options.profile != "" {
+		if profiles == nil {
+			return errors.New("--profile requires profile-aware Super dispatch")
+		}
+		target, err := profiles.ResolveLaunch(ctx, options.profile)
+		if err != nil {
+			return err
+		}
+		if target.AccountID != "" {
+			return runner.RunLocalRewriteWithOptions(ctx, target.AccountID, config, launchArguments, launchOptions)
+		}
+		if strings.TrimSpace(target.Name) == "" {
+			return errors.New("profile launch metadata is incomplete")
+		}
+		release, err := profiles.AcquireLaunch(ctx, target.Name)
+		if err != nil {
+			return err
+		}
+		defer func() { runErr = errors.Join(runErr, release()) }()
+		return runner.RunLocalRewriteHomeWithOptions(ctx, target.CodexHome, config, launchArguments, launchOptions)
+	}
+	if profiles != nil {
+		target, active, err := profiles.ActiveLaunch(ctx)
+		if err != nil {
+			return err
+		}
+		if active {
+			if target.AccountID != "" {
+				return runner.RunLocalRewriteWithOptions(ctx, target.AccountID, config, launchArguments, launchOptions)
+			}
+			if strings.TrimSpace(target.Name) != "" {
+				release, err := profiles.AcquireLaunch(ctx, target.Name)
+				if err != nil {
+					return err
+				}
+				defer func() { runErr = errors.Join(runErr, release()) }()
+			}
+			return runner.RunLocalRewriteHomeWithOptions(ctx, target.CodexHome, config, launchArguments, launchOptions)
+		}
+	}
+	return runner.RunLocalRewriteWithOptions(ctx, "", config, launchArguments, launchOptions)
 }
 
 func launchSuperTarget(

@@ -77,7 +77,11 @@ func (process *CodexProcess) runThroughProxy(
 	if err := secureCodexHomeWithShared(codexHome, process.sharedCodexHome); err != nil {
 		return err
 	}
-	arguments, err = proxyArguments(endpoint, arguments)
+	if provider == "local" {
+		arguments, err = localProxyArguments(endpoint, arguments)
+	} else {
+		arguments, err = proxyArguments(endpoint, arguments)
+	}
 	if err != nil {
 		return err
 	}
@@ -128,6 +132,34 @@ func proxyChildEnvironment(codexHome, provider, sharedCodexHome string) []string
 		filtered = append(filtered, entry)
 	}
 	return filtered
+}
+
+func localProxyArguments(endpoint string, arguments []string) ([]string, error) {
+	endpoint = strings.TrimRight(strings.TrimSpace(endpoint), "/")
+	if endpoint == "" {
+		return nil, errors.New("proxy endpoint is required")
+	}
+	if containsProxyOverride(arguments) {
+		return nil, errors.New("codex arguments cannot override Godex routing or credential storage")
+	}
+	if err := validateRuntimeURL(endpoint); err != nil {
+		return nil, err
+	}
+	managed := managedModelArguments(endpoint + "/v1")
+	for index := 0; index+1 < len(managed); index += 2 {
+		value := managed[index+1]
+		value = strings.ReplaceAll(value, "godex-openai", "godex-local")
+		value = strings.ReplaceAll(value, "OpenAI through Godex", "Godex Local")
+		managed[index+1] = value
+	}
+	filtered := managed[:0]
+	for index := 0; index+1 < len(managed); index += 2 {
+		if strings.Contains(managed[index+1], ".supports_standalone_web_search=") {
+			continue
+		}
+		filtered = append(filtered, managed[index], managed[index+1])
+	}
+	return scopeModelArguments(arguments, filtered), nil
 }
 
 func proxyArguments(endpoint string, arguments []string) ([]string, error) {

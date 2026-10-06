@@ -278,3 +278,50 @@ func TestRunThroughProxyUsesSharedSQLiteHomeForNativePicker(t *testing.T) {
 		t.Fatalf("native picker homes = %#v, want [%q %q]", lines, home, shared)
 	}
 }
+
+func TestProdex04356LocalProxyArgumentsRetargetOnlyLocalProviderBaseURL(t *testing.T) {
+	args, err := localProxyArguments(
+		"http://127.0.0.1:4455",
+		[]string{"-c", "model=\"qwen-local\"", "exec", "review"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rendered := strings.Join(args, "\n")
+	for _, want := range []string{
+		"model_provider=\"godex-local\"",
+		"model_providers.godex-local.name=\"Godex Local\"",
+		"model_providers.godex-local.base_url=\"http://127.0.0.1:4455/v1\"",
+		"model_providers.godex-local.wire_api=\"responses\"",
+		"model_providers.godex-local.requires_openai_auth=true",
+		"model_providers.godex-local.supports_websockets=false",
+		"model=\"qwen-local\"",
+	} {
+		if !strings.Contains(rendered, want) {
+			t.Fatalf("local proxy args missing %q: %#v", want, args)
+		}
+	}
+	for _, forbidden := range []string{
+		"model_provider=\"godex-openai\"",
+		"model_providers.godex-openai.",
+		"supports_standalone_web_search=true",
+		"/backend-api/godex",
+	} {
+		if strings.Contains(rendered, forbidden) {
+			t.Fatalf("local proxy args retained %q: %#v", forbidden, args)
+		}
+	}
+}
+
+func TestProdex04356LocalProxyArgumentsKeepManagedRoutingNonOverridable(t *testing.T) {
+	for _, args := range [][]string{
+		{"-c", "model_provider=\"evil\""},
+		{"-c", "model_providers.godex-local.base_url=\"https://outside.test\""},
+		{"--local-provider", "ollama"},
+		{"--remote", "ws://127.0.0.1:1"},
+	} {
+		if _, err := localProxyArguments("http://127.0.0.1:4455", args); err == nil {
+			t.Fatalf("local routing override accepted: %#v", args)
+		}
+	}
+}

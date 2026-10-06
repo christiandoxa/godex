@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -156,14 +157,14 @@ func TestProdex04356SuperLaunchDeepSeekAPIKeyFixedPoolUsesOverlay(t *testing.T) 
 	}
 }
 
-func TestProdex04356SuperLaunchFailsClosedOnlyForUnimplementedLocalRewrite(t *testing.T) {
+func TestProdex04356SuperLocalRewriteRequiresResolvableBaseHome(t *testing.T) {
 	runner := runtimeusecase.NewRunner(nil, &kiroShortcutProcess{}, nil)
 	options, err := parseSuperArguments([]string{"--url", "http://127.0.0.1:11434/v1"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	err = launchSuperProfiles(t.Context(), runner, nil, nil, options)
-	if err == nil || !strings.Contains(err.Error(), "not implemented yet") {
+	if err == nil || !strings.Contains(err.Error(), "active account lookup is not configured") {
 		t.Fatalf("local Super launch = %v", err)
 	}
 }
@@ -378,5 +379,190 @@ func TestProdex04356SuperRejectsExplicitSubAgentRecursion(t *testing.T) {
 	}
 	if options.subAgent.enabled {
 		t.Fatal("--no-sub-agent unexpectedly enabled recursion")
+	}
+}
+
+type localSuperCaptureProcess struct {
+	home, endpoint, provider string
+	arguments                []string
+	auth                     map[string]any
+}
+
+func (*localSuperCaptureProcess) Run(context.Context, string, []string) error {
+	return errors.New("local Super must use runtime rewrite proxy")
+}
+
+func (*localSuperCaptureProcess) CheckProxySupport(context.Context) error { return nil }
+
+func (process *localSuperCaptureProcess) RunThroughProxy(_ context.Context, home, endpoint string, arguments []string) error {
+	return process.capture(home, endpoint, arguments, "")
+}
+
+func (process *localSuperCaptureProcess) RunThroughProxyProvider(
+	_ context.Context,
+	home, endpoint string,
+	arguments []string,
+	provider string,
+) error {
+	return process.capture(home, endpoint, arguments, provider)
+}
+
+func (process *localSuperCaptureProcess) capture(home, endpoint string, arguments []string, provider string) error {
+	process.home, process.endpoint, process.provider = home, endpoint, provider
+	process.arguments = append([]string(nil), arguments...)
+	content, err := os.ReadFile(filepath.Join(home, "auth.json"))
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(content, &process.auth)
+}
+
+func TestProdex04356SuperLocalRewriteUsesOverlayProxyAndSyntheticAuth(t *testing.T) {
+	baseHome := t.TempDir()
+	baseAuth := []byte("{\"auth_mode\":\"apikey\",\"OPENAI_API_KEY\":\"profile-secret\"}\n")
+	if err := os.WriteFile(filepath.Join(baseHome, "auth.json"), baseAuth, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(baseHome, "config.toml"), []byte("model = \"base\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	process := &localSuperCaptureProcess{}
+	var captured proxyconfig.Config
+	runner := runtimeusecase.NewRunner(nil, process, func(config proxyconfig.Config) (runtimeusecase.Proxy, error) {
+		captured = config
+		return &kiroShortcutProxy{}, nil
+	})
+	runner.SetCurrentCodexHome(baseHome)
+	runner.SetManagedProfilesRoot(filepath.Join(t.TempDir(), "profiles"))
+
+	options, err := parseSuperArguments([]string{
+		"--url", "http://127.0.0.1:11434",
+		"--model", "qwen-local",
+		"--context-window", "262144",
+		"--auto-compact-token-limit", "240000",
+		"--no-proxy",
+		"exec", "review",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := launchSuperProfiles(t.Context(), runner, nil, nil, options); err != nil {
+		t.Fatal(err)
+	}
+
+	if captured.Provider.Kind != "local" ||
+		captured.Provider.APIURL != "http://127.0.0.1:11434/v1" ||
+		captured.Provider.DefaultModel != "qwen-local" ||
+		captured.Provider.ContextWindow != 262144 ||
+		captured.Provider.AutoCompactLimit != 240000 {
+		t.Fatalf("local provider config = %#v", captured.Provider)
+	}
+	if !captured.SmartContextEnabled || !captured.SkipQuotaPreflight || !captured.UpstreamNoProxy {
+		t.Fatalf("local proxy policy = %#v", captured)
+	}
+	accounts, err := captured.Accounts(t.Context())
+	if err != nil || len(accounts) != 1 || accounts[0].Provider.Kind != "local" ||
+		accounts[0].Home != baseHome {
+		t.Fatalf("local routing accounts = %#v err=%v", accounts, err)
+	}
+
+	if process.home == baseHome || process.endpoint != "http://127.0.0.1:4567" || process.provider != "local" {
+		t.Fatalf("local child = home:%q endpoint:%q provider:%q", process.home, process.endpoint, process.provider)
+	}
+	if process.auth["auth_mode"] != "apikey" ||
+		process.auth["OPENAI_API_KEY"] != "godex-runtime-provider" {
+		t.Fatalf("overlay auth = %#v", process.auth)
+	}
+	for _, want := range []string{
+		"model=\"qwen-local\"",
+		"model_context_window=262144",
+		"model_auto_compact_token_limit=240000",
+		"model_reasoning_summary=\"none\"",
+		"web_search=\"disabled\"",
+		"features.apps=false",
+		"features.js_repl=false",
+		"features.image_generation=false",
+		"--dangerously-bypass-approvals-and-sandbox",
+	} {
+		if !slices.Contains(process.arguments, want) {
+			t.Fatalf("local child args missing %q: %#v", want, process.arguments)
+		}
+	}
+	if _, err := os.Stat(process.home); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("local overlay survived child exit: %v", err)
+	}
+	after, err := os.ReadFile(filepath.Join(baseHome, "auth.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(after) != string(baseAuth) {
+		t.Fatalf("base auth changed: %q", after)
+	}
+}
+
+func TestProdex04356SuperLocalRewriteResumeKeepsSessionHomeAndSyntheticTransport(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "home")
+	owner := filepath.Join(root, "owner")
+	for _, path := range []string{home, owner} {
+		if err := os.MkdirAll(path, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(path, "config.toml"), []byte("model = \"base\"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(path, "auth.json"), []byte("{\"auth_mode\":\"apikey\",\"OPENAI_API_KEY\":\"profile-secret\"}\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	accounts := superSessionAccounts{homes: map[string]string{"home": home, "owner": owner}}
+	process := &localSuperCaptureProcess{}
+	var captured proxyconfig.Config
+	runner := runtimeusecase.NewRunner(accounts, process, func(config proxyconfig.Config) (runtimeusecase.Proxy, error) {
+		captured = config
+		return &kiroShortcutProxy{}, nil
+	})
+	runner.SetManagedProfilesRoot(filepath.Join(root, "profiles"))
+	const sessionID = "00000000-0000-4000-8000-000000000456"
+	catalog := sessionusecase.NewCatalog(accounts, superSessionReader{home: home, id: sessionID}, runner)
+	catalog.SetOwnerLookup(func(context.Context, string) (string, error) { return "owner", nil })
+
+	options, err := parseSuperArguments([]string{
+		"--url", "http://127.0.0.1:11434",
+		"--model", "qwen-local",
+		sessionID, "continue",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := launchSuperProfiles(t.Context(), runner, catalog, nil, options); err != nil {
+		t.Fatal(err)
+	}
+	routed, err := captured.Accounts(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if captured.Provider.Kind != "local" || len(routed) != 1 || routed[0].Home != home ||
+		routed[0].Provider.Kind != "local" {
+		t.Fatalf("local resume routing = provider:%#v accounts:%#v", captured.Provider, routed)
+	}
+	if process.provider != "local" || process.home == home {
+		t.Fatalf("local resume child = provider:%q home:%q", process.provider, process.home)
+	}
+	if process.auth["OPENAI_API_KEY"] != "godex-runtime-provider" {
+		t.Fatalf("local resume overlay auth = %#v", process.auth)
+	}
+	joined := strings.Join(process.arguments, "\n")
+	for _, want := range []string{
+		"--dangerously-bypass-approvals-and-sandbox",
+		"resume",
+		sessionID,
+		"continue",
+		"model=\"qwen-local\"",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("local resume args missing %q: %#v", want, process.arguments)
+		}
 	}
 }
