@@ -285,7 +285,7 @@ func (router *Router) resolveOwner(
 			return "", nil, err
 		}
 	}
-	if owner == "" && opaqueContinuation(keys) &&
+	if owner == "" && opaqueContinuation(keys, selection) &&
 		(keys.previous == "" || !router.hasPreviousResponseFailure(keys.previous, selection)) {
 		if durableRelease != nil {
 			_ = durableRelease()
@@ -299,8 +299,11 @@ func stableConversation(keys affinityKeys) bool {
 	return keys.thread != "" || keys.session != ""
 }
 
-func opaqueContinuation(keys affinityKeys) bool {
-	return keys.previous != "" || keys.turn != ""
+func opaqueContinuation(keys affinityKeys, selection quotamodel.Selection) bool {
+	if keys.previous != "" {
+		return true
+	}
+	return keys.turn != "" && selection.RouteKind != quotamodel.RouteKindCompact
 }
 
 func (router *Router) routeRequest(ctx context.Context, request proxymodel.Request, accounts []proxymodel.Account, owner string, keys *affinityKeys) (proxymodel.Forwarded, error) {
