@@ -10,6 +10,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	runtimecli "github.com/christiandoxa/godex/internal/delivery/cli/runtime"
+	presidiogateway "github.com/christiandoxa/godex/internal/gateway/presidio"
 )
 
 type optionalTool struct {
@@ -22,60 +25,110 @@ type optionalTool struct {
 }
 
 type optionalToolSnapshot struct {
-	tools []optionalTool
+	tools   []optionalTool
+	program string
 }
 
 var semanticVersionPattern = regexp.MustCompile("[0-9]+[.][0-9]+[.][0-9]+(?:-[0-9A-Za-z.-]+)?")
 
 func discoverOptionalTools() optionalToolSnapshot {
-	specs := []struct {
-		id      string
-		kind    string
-		command string
-		minimum string
-	}{
-		{"caveman", "CodexPlugin", "", "2.3.1"},
-		{"rtk", "Command", "rtk", "0.46.0"},
-		{"codebase-memory-mcp", "McpServer", "codebase-memory-mcp", "0.9.1-rc.1"},
-		{"playwright-mcp", "McpServer", "playwright-mcp", "0.0.79"},
-		{"ponytail", "CodexPlugin", "", "4.9.0"},
-		{"presidio", "Service", "", ""},
+	program, _ := os.Executable()
+	if resolved, err := filepath.EvalSymlinks(program); err == nil {
+		program = resolved
 	}
-	result := optionalToolSnapshot{tools: make([]optionalTool, 0, len(specs))}
-	for _, spec := range specs {
+	result := optionalToolSnapshot{tools: make([]optionalTool, 0, 6), program: program}
+	for _, spec := range []struct {
+		id   string
+		kind string
+	}{
+		{"caveman", "CodexPlugin"},
+		{"rtk", "Command"},
+		{"codebase-memory-mcp", "McpServer"},
+		{"playwright-mcp", "McpServer"},
+		{"ponytail", "CodexPlugin"},
+		{"presidio", "Service"},
+	} {
+		if spec.id == "presidio" {
+			result.tools = append(result.tools, discoverExposePresidio())
+			continue
+		}
 		tool := optionalTool{id: spec.id, kind: spec.kind}
-		if spec.command == "" {
-			tool.detail = "integration is unavailable in this Godex build"
-			result.tools = append(result.tools, tool)
-			continue
-		}
-		path, err := exec.LookPath(spec.command)
-		if err != nil {
-			tool.detail = "not found"
-			result.tools = append(result.tools, tool)
-			continue
-		}
-		version, err := probeOptionalToolVersion(path)
-		if err != nil {
-			tool.path = path
-			tool.detail = err.Error()
-			result.tools = append(result.tools, tool)
-			continue
-		}
-		if compareSemver(version, spec.minimum) < 0 {
-			tool.path = path
-			tool.version = version
-			tool.detail = fmt.Sprintf("version %s is older than minimum %s", version, spec.minimum)
+		path, ok := runtimecli.ResolveSuperOptionalTool(spec.id)
+		if !ok {
+			tool.detail = "not found or incompatible"
 			result.tools = append(result.tools, tool)
 			continue
 		}
 		tool.available = true
 		tool.path = path
-		tool.version = version
+		tool.version = exposeResolvedToolVersion(spec.id, path)
 		tool.detail = "installed and validated for Godex Super launch"
 		result.tools = append(result.tools, tool)
 	}
 	return result
+}
+
+func exposeResolvedToolVersion(id, path string) string {
+	switch id {
+	case "caveman", "ponytail":
+		if version := filepath.Base(path); semanticVersionPattern.MatchString(version) {
+			return version
+		}
+	case "rtk", "codebase-memory-mcp":
+		if version, err := probeOptionalToolVersion(path); err == nil {
+			return version
+		}
+	case "playwright-mcp":
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		output, err := exec.CommandContext(ctx, path, "--no-install", "@playwright/mcp", "--version").CombinedOutput()
+		if err == nil && ctx.Err() == nil {
+			if match := semanticVersionPattern.FindString(string(output)); match != "" {
+				return match
+			}
+		}
+	}
+	return ""
+}
+
+func discoverExposePresidio() optionalTool {
+	tool := optionalTool{id: "presidio", kind: "Service"}
+	root := strings.TrimSpace(os.Getenv("GODEX_HOME"))
+	if root == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			tool.detail = "Presidio health could not be validated"
+			return tool
+		}
+		root = filepath.Join(home, ".godex")
+	}
+	config, _, err := presidiogateway.LoadConfig(root)
+	if err != nil {
+		tool.detail = "Presidio health could not be validated"
+		return tool
+	}
+	if config.Timeout < 100*time.Millisecond {
+		config.Timeout = 100 * time.Millisecond
+	}
+	if config.Timeout > time.Second {
+		config.Timeout = time.Second
+	}
+	redactor, err := presidiogateway.NewRedactor(config)
+	if err != nil {
+		tool.detail = "Presidio health could not be validated"
+		return tool
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	analyzer := redactor.Probe(ctx, config.AnalyzerURL)
+	anonymizer := redactor.Probe(ctx, config.AnonymizerURL)
+	if analyzer.OK && anonymizer.OK {
+		tool.available = true
+		tool.detail = "Presidio Analyzer and Anonymizer are healthy"
+		return tool
+	}
+	tool.detail = "Presidio Analyzer or Anonymizer is not healthy"
+	return tool
 }
 
 func probeOptionalToolVersion(path string) (string, error) {
@@ -159,8 +212,9 @@ func (snapshot optionalToolSnapshot) resolveProgram(program string, args []strin
 	if !ok {
 		return program, args, "", nil
 	}
-	if alias == "playwright" {
-		return "", nil, "", fmt.Errorf("optional tool playwright is unavailable: integrated Playwright activation is not implemented yet")
+	integratedPlaywright := alias == "playwright"
+	if integratedPlaywright {
+		alias = "playwright-mcp"
 	}
 	tool, known := snapshot.tool(alias)
 	if !known {
@@ -169,10 +223,40 @@ func (snapshot optionalToolSnapshot) resolveProgram(program string, args []strin
 	if !tool.available {
 		return "", nil, "", fmt.Errorf("optional tool %s is unavailable: %s", alias, tool.detail)
 	}
-	if tool.path == "" {
-		return "", nil, "", fmt.Errorf("validated optional tool %s has no executable path", alias)
+	switch alias {
+	case "rtk", "codebase-memory-mcp":
+		if tool.path == "" {
+			return "", nil, "", fmt.Errorf("validated optional tool %s has no executable path", alias)
+		}
+		return tool.path, args, tool.id, nil
+	case "playwright-mcp":
+		if !integratedPlaywright {
+			if tool.path == "" {
+				return "", nil, "", errorsNew("validated Playwright MCP has no npx executable path")
+			}
+			prefix := []string{"--no-install", "@playwright/mcp"}
+			return tool.path, append(prefix, args...), tool.id, nil
+		}
+		if snapshot.program == "" {
+			return "", nil, "", errorsNew("Godex executable is unavailable for integrated Playwright")
+		}
+		prefix := []string{"super", "--no-sub-agent", "--no-presidio", "--tool", "playwright"}
+		return snapshot.program, append(prefix, args...), tool.id, nil
+	case "caveman", "ponytail":
+		if snapshot.program == "" {
+			return "", nil, "", errorsNew("Godex executable is unavailable for plugin activation")
+		}
+		prefix := []string{"super", "--no-sub-agent", "--no-presidio", "--tool", alias}
+		return snapshot.program, append(prefix, args...), tool.id, nil
+	case "presidio":
+		if snapshot.program == "" {
+			return "", nil, "", errorsNew("Godex executable is unavailable for Presidio activation")
+		}
+		prefix := []string{"super", "--no-sub-agent", "--presidio"}
+		return snapshot.program, append(prefix, args...), tool.id, nil
+	default:
+		return "", nil, "", fmt.Errorf("optional tool %s is unavailable", alias)
 	}
-	return tool.path, args, tool.id, nil
 }
 
 func (snapshot optionalToolSnapshot) applyEnvironment(environment map[string]string) {
@@ -191,7 +275,11 @@ func (snapshot optionalToolSnapshot) applyEnvironment(environment map[string]str
 		case "codebase-memory-mcp":
 			environment["GODEX_EXPOSE_CODEBASE_MEMORY_BIN"] = tool.path
 		case "playwright-mcp":
-			environment["GODEX_EXPOSE_PLAYWRIGHT_BIN"] = tool.path
+			environment["GODEX_EXPOSE_PLAYWRIGHT_NPX"] = tool.path
+		case "caveman":
+			environment["GODEX_EXPOSE_CAVEMAN_ROOT"] = tool.path
+		case "ponytail":
+			environment["GODEX_EXPOSE_PONYTAIL_ROOT"] = tool.path
 		}
 	}
 	basePath := environment["PATH"]
@@ -205,6 +293,9 @@ func (snapshot optionalToolSnapshot) applyEnvironment(environment map[string]str
 	}
 	environment["PATH"] = strings.Join(dirs, string(os.PathListSeparator))
 	environment["GODEX_EXPOSE_OPTIONAL_TOOLS"] = strings.Join(snapshot.availableIDs(), ",")
+	if tool, ok := snapshot.tool("presidio"); ok && tool.available {
+		environment["GODEX_EXPOSE_PRESIDIO_READY"] = "1"
+	}
 }
 
 func (snapshot optionalToolSnapshot) instructions() string {
@@ -221,7 +312,22 @@ func (snapshot optionalToolSnapshot) instructions() string {
 		if tool.version != "" {
 			version = " (" + tool.version + ")"
 		}
-		lines = append(lines, fmt.Sprintf("- %s%s [%s]: available.", tool.id, version, tool.kind))
+		invocation := ""
+		switch tool.id {
+		case "rtk":
+			invocation = "program optional:rtk; use it for noisy shell output"
+		case "codebase-memory-mcp":
+			invocation = "program optional:codebase-memory-mcp; one-shot structural navigation is available"
+		case "playwright-mcp":
+			invocation = "program optional:playwright-mcp starts the validated MCP package via npx; program optional:playwright launches noninteractive Godex Super with Playwright enabled"
+		case "caveman":
+			invocation = "program optional:caveman launches noninteractive Godex Super with the validated Caveman plugin enabled"
+		case "ponytail":
+			invocation = "program optional:ponytail launches noninteractive Godex Super with the validated Ponytail plugin enabled"
+		case "presidio":
+			invocation = "program optional:presidio launches noninteractive Godex Super with Presidio enabled"
+		}
+		lines = append(lines, fmt.Sprintf("- %s%s [%s]: %s.", tool.id, version, tool.kind, invocation))
 	}
 	return strings.Join(lines, "\n")
 }
