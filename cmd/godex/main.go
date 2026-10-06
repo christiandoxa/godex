@@ -117,6 +117,7 @@ func run() int {
 	runner.SetUpstreamURL(settings.UpstreamURL)
 	runner.SetCurrentCodexHome(settings.CurrentCodexHome)
 	runner.SetSharedCodexHome(settings.SharedCodexHome)
+	runner.SetManagedProfilesRoot(filepath.Join(settings.Home, "profiles"))
 	runner.SetProviderCredentialResolver(providerkeygateway.NewSource())
 	runner.SetAntigravityProcess(antigravityProcess)
 	runner.SetAntigravitySessionLocker(codex.SessionLocker{})

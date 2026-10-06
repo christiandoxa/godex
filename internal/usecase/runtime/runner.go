@@ -39,19 +39,20 @@ type providerCredentialResolver interface {
 }
 
 type Runner struct {
-	accounts        launchAccounts
-	process         codexProcess
-	newProxy        ProxyFactory
-	quota           quotaPreflight
-	catalog         providerCatalogStore
-	upstream        string
-	currentHome     string
-	credentials     providerCredentialResolver
-	antigravity     antigravityProcess
-	antigravityHome string
-	sharedCodexHome string
-	sessionLocker   codexSessionLocker
-	autoRedeem      bool
+	accounts            launchAccounts
+	process             codexProcess
+	newProxy            ProxyFactory
+	quota               quotaPreflight
+	catalog             providerCatalogStore
+	upstream            string
+	currentHome         string
+	credentials         providerCredentialResolver
+	antigravity         antigravityProcess
+	antigravityHome     string
+	sharedCodexHome     string
+	managedProfilesRoot string
+	sessionLocker       codexSessionLocker
+	autoRedeem          bool
 }
 
 func NewRunner(accounts launchAccounts, process codexProcess, newProxy ProxyFactory) *Runner {
@@ -74,6 +75,12 @@ func (runner *Runner) SetUpstreamURL(upstream string) {
 
 func (runner *Runner) SetCurrentCodexHome(home string) {
 	runner.currentHome = home
+}
+
+func (runner *Runner) SetManagedProfilesRoot(root string) {
+	if runner != nil {
+		runner.managedProfilesRoot = root
+	}
 }
 
 func (runner *Runner) SetSharedCodexHome(home string) {
@@ -136,6 +143,12 @@ func (runner *Runner) launch(ctx context.Context, homeID, preferredID string, pr
 	return runner.launchHome(ctx, runner.accounts.CodexHome(homeID), preferredID, proxyconfig.Provider{}, nil, profiles, arguments)
 }
 
+type RuntimeLaunchOptions struct {
+	SmartContextEnabled bool
+	SkipQuotaPreflight  bool
+	AutoRedeem          *bool
+}
+
 func (runner *Runner) launchHome(
 	ctx context.Context,
 	home, preferredID string,
@@ -143,6 +156,20 @@ func (runner *Runner) launchHome(
 	credentials []proxyconfig.ProviderCredential,
 	profiles []proxyconfig.Account,
 	arguments []string,
+) error {
+	return runner.launchHomeWithOptions(
+		ctx, home, preferredID, provider, credentials, profiles, arguments, RuntimeLaunchOptions{},
+	)
+}
+
+func (runner *Runner) launchHomeWithOptions(
+	ctx context.Context,
+	home, preferredID string,
+	provider proxyconfig.Provider,
+	credentials []proxyconfig.ProviderCredential,
+	profiles []proxyconfig.Account,
+	arguments []string,
+	options RuntimeLaunchOptions,
 ) error {
 	proxyRunner, ok := runner.process.(proxyCodex)
 	if !ok {
@@ -158,7 +185,14 @@ func (runner *Runner) launchHome(
 	if err != nil {
 		return err
 	}
-	proxy, err := runner.newProxy(runtimeProxyConfig(ctx, runner.upstream, preferredID, provider, credentials, profiles, runner.autoRedeem))
+	autoRedeem := runner.autoRedeem
+	if options.AutoRedeem != nil {
+		autoRedeem = *options.AutoRedeem
+	}
+	config := runtimeProxyConfig(ctx, runner.upstream, preferredID, provider, credentials, profiles, autoRedeem)
+	config.SmartContextEnabled = options.SmartContextEnabled
+	config.SkipQuotaPreflight = options.SkipQuotaPreflight
+	proxy, err := runner.newProxy(config)
 	if err != nil {
 		return err
 	}
