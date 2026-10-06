@@ -146,6 +146,7 @@ func TestProdex04356StandardBoundSessionRetryableFailuresRotateAndRebind(t *test
 		err    error
 	}{
 		{name: "generic 429", status: 429, body: `{"error":{"message":"Too Many Requests"}}`},
+		{name: "quota", status: 429, body: `{"error":{"code":"insufficient_quota"}}`},
 		{name: "rate limit", status: 429, body: `{"error":{"code":"rate_limit_exceeded"}}`},
 		{name: "overload", status: 503, body: `{"error":{"code":"server_is_overloaded"}}`},
 		{name: "profile unavailable", status: 403, body: `{"detail":{"code":"deactivated_workspace"}}`},
@@ -231,6 +232,63 @@ func TestProdex04356ResponsesHardAffinityFailureSignalsFullContextReplayWithoutS
 	if got := strings.Join(gateway.calls, ","); got != "account-a,account-b" ||
 		replay.Result.AccountID != "account-b" || replay.Result.Response.StatusCode != http.StatusOK {
 		t.Fatalf("replay calls/owner/status = %s/%s/%d", got, replay.Result.AccountID, replay.Result.Response.StatusCode)
+	}
+}
+
+func TestProdex04356ResponsesHardAffinityRetryableMatrixSignalsFullContextWithoutSession(t *testing.T) {
+	fixtures := []struct {
+		name   string
+		status int
+		body   string
+		err    error
+	}{
+		{name: "quota", status: 429, body: `{"error":{"code":"insufficient_quota"}}`},
+		{name: "rate limit", status: 429, body: `{"error":{"code":"rate_limit_exceeded"}}`},
+		{name: "overload", status: 503, body: `{"error":{"code":"server_is_overloaded"}}`},
+		{name: "auth", status: 401, body: `{"error":{"code":"authentication_error"}}`},
+		{name: "profile unavailable", status: 403, body: `{"detail":{"code":"deactivated_workspace"}}`},
+		{name: "transport", err: errors.New("connection reset by peer")},
+	}
+	for _, fixture := range fixtures {
+		t.Run(fixture.name, func(t *testing.T) {
+			gateway := &prodex04356Gateway{steps: []prodex04356Step{
+				{account: "account-a", status: fixture.status, body: fixture.body, err: fixture.err},
+			}}
+			router := newProdex04356Router(t, gateway, prodex04356Accounts())
+			if err := router.affinity.remember(
+				t.Context(), "account-a", affinityKeys{previous: "resp-matrix"}, router.now(),
+			); err != nil {
+				t.Fatal(err)
+			}
+
+			exchange, err := router.Forward(t.Context(), proxymodel.Request{
+				Method: http.MethodPost, Header: make(http.Header),
+				Body:           []byte(`{"previous_response_id":"resp-matrix","input":[{"type":"function_call_output","call_id":"call-1","output":"done"}]}`),
+				QuotaSelection: quotamodel.Selection{RouteKind: quotamodel.RouteKindResponses},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			payload, readErr := io.ReadAll(exchange.Result.Response.Body)
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			_ = exchange.Close()
+			owner, ownerErr := router.affinity.owner(
+				t.Context(), affinityKeys{previous: "resp-matrix"}, router.now(),
+			)
+			if ownerErr != nil {
+				t.Fatal(ownerErr)
+			}
+			if got := strings.Join(gateway.calls, ","); got != "account-a" ||
+				exchange.Result.Response.StatusCode != http.StatusBadRequest ||
+				!strings.Contains(string(payload), "previous_response_not_found") ||
+				!strings.Contains(string(payload), "Previous response was not found. Retrying the full request.") ||
+				owner != "" {
+				t.Fatalf("signal calls/status/body/owner = %s/%d/%s/%q",
+					got, exchange.Result.Response.StatusCode, payload, owner)
+			}
+		})
 	}
 }
 
@@ -334,36 +392,54 @@ func TestProdex04356CompactPreviousAffinityRetryableFailuresSignalFullContext(t 
 	}
 }
 
-func TestProdex04356CompactSessionRetryableFailureRotatesAndRebinds(t *testing.T) {
-	gateway := &prodex04356Gateway{steps: []prodex04356Step{
-		{account: "account-a", status: 429, body: `{"error":{"code":"rate_limit_exceeded"}}`},
-		{account: "account-b", status: http.StatusOK, body: `{"id":"compact-b"}`},
-	}}
-	router := newProdex04356Router(t, gateway, prodex04356Accounts())
-	if err := router.affinity.remember(
-		t.Context(), "account-a", affinityKeys{session: "compact-session"}, router.now(),
-	); err != nil {
-		t.Fatal(err)
+func TestProdex04356CompactSessionRetryableFailuresRotateAndRebind(t *testing.T) {
+	fixtures := []struct {
+		name   string
+		status int
+		body   string
+		err    error
+	}{
+		{name: "quota", status: 429, body: `{"error":{"code":"insufficient_quota"}}`},
+		{name: "rate limit", status: 429, body: `{"error":{"code":"rate_limit_exceeded"}}`},
+		{name: "overload", status: 503, body: `{"error":{"code":"server_is_overloaded"}}`},
+		{name: "auth", status: 401, body: `{"error":{"code":"authentication_error"}}`},
+		{name: "profile unavailable", status: 403, body: `{"detail":{"code":"deactivated_workspace"}}`},
+		{name: "transport", err: errors.New("connection reset by peer")},
 	}
-	exchange, err := router.Forward(t.Context(), proxymodel.Request{
-		Method:         http.MethodPost,
-		Header:         http.Header{"X-Codex-Session-Id": []string{"compact-session"}},
-		Body:           []byte(`{"input":[{"role":"user","content":"compact"}]}`),
-		QuotaSelection: quotamodel.Selection{RouteKind: quotamodel.RouteKindCompact},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer exchange.Close()
-	owner, ownerErr := router.affinity.owner(
-		t.Context(), affinityKeys{session: "compact-session"}, router.now(),
-	)
-	if ownerErr != nil {
-		t.Fatal(ownerErr)
-	}
-	if got := strings.Join(gateway.calls, ","); got != "account-a,account-b" ||
-		exchange.Result.AccountID != "account-b" || owner != "account-b" {
-		t.Fatalf("compact session calls/result/owner = %s/%s/%s", got, exchange.Result.AccountID, owner)
+	for _, fixture := range fixtures {
+		t.Run(fixture.name, func(t *testing.T) {
+			gateway := &prodex04356Gateway{steps: []prodex04356Step{
+				{account: "account-a", status: fixture.status, body: fixture.body, err: fixture.err},
+				{account: "account-b", status: http.StatusOK, body: `{"id":"compact-b"}`},
+			}}
+			router := newProdex04356Router(t, gateway, prodex04356Accounts())
+			if err := router.affinity.remember(
+				t.Context(), "account-a", affinityKeys{session: "compact-session"}, router.now(),
+			); err != nil {
+				t.Fatal(err)
+			}
+			exchange, err := router.Forward(t.Context(), proxymodel.Request{
+				Method:         http.MethodPost,
+				Header:         http.Header{"X-Codex-Session-Id": []string{"compact-session"}},
+				Body:           []byte(`{"input":[{"role":"user","content":"compact"}]}`),
+				QuotaSelection: quotamodel.Selection{RouteKind: quotamodel.RouteKindCompact},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer exchange.Close()
+			owner, ownerErr := router.affinity.owner(
+				t.Context(), affinityKeys{session: "compact-session"}, router.now(),
+			)
+			if ownerErr != nil {
+				t.Fatal(ownerErr)
+			}
+			if got := strings.Join(gateway.calls, ","); got != "account-a,account-b" ||
+				exchange.Result.AccountID != "account-b" || owner != "account-b" {
+				t.Fatalf("compact session calls/result/owner = %s/%s/%s",
+					got, exchange.Result.AccountID, owner)
+			}
+		})
 	}
 }
 
