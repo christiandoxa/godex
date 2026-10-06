@@ -215,7 +215,7 @@ func (catalog *Catalog) validateImportedProfile(ctx context.Context, source prof
 	case profileentity.ProviderGemini:
 		_, err := inspectGeminiSecret(source)
 		return err
-	case profileentity.ProviderCopilot:
+	case profileentity.ProviderCopilot, profileentity.ProviderAgy:
 		if len(source.SecretFiles) != 0 {
 			return fmt.Errorf("profile %q contains unexpected provider secret files", source.Name)
 		}

@@ -47,7 +47,7 @@ func (catalog *Catalog) applyImportAction(ctx context.Context, action importActi
 			return catalog.profiles.ImportBundleProfile(ctx, action.target.Profile, map[string][]byte{"auth.json": authBytes}, journalID)
 		}
 		return catalog.replaceImportedAuth(ctx, action.target, authBytes)
-	case profileentity.ProviderAnthropic, profileentity.ProviderGemini, profileentity.ProviderKiro, profileentity.ProviderCopilot:
+	case profileentity.ProviderAnthropic, profileentity.ProviderGemini, profileentity.ProviderKiro, profileentity.ProviderCopilot, profileentity.ProviderAgy:
 		secrets, err := providerSecrets(action.source)
 		if err != nil {
 			return err

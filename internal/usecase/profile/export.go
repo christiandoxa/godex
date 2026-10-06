@@ -70,7 +70,7 @@ func (catalog *Catalog) exportProfile(ctx context.Context, report Report) (profi
 		return catalog.exportAnthropicProfile(ctx, report)
 	case profileentity.ProviderKiro:
 		return catalog.exportKiroProfile(ctx, report)
-	case profileentity.ProviderCopilot:
+	case profileentity.ProviderCopilot, profileentity.ProviderAgy:
 		return exportMetadataProfile(report), nil
 	default:
 		return profilemodel.ExportedProfile{}, fmt.Errorf("profile provider %q export is not implemented yet", report.Profile.Provider.Kind)
