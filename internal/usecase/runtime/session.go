@@ -37,7 +37,16 @@ func (runner *Runner) pinnedAccounts(ctx context.Context, preferredID string, pr
 }
 
 // The rollout home and upstream account can differ after precommit rotation.
-func (runner *Runner) RunSession(ctx context.Context, homeID, ownerID string, args []string) (err error) {
+func (runner *Runner) RunSession(ctx context.Context, homeID, ownerID string, args []string) error {
+	return runner.RunSessionWithOptions(ctx, homeID, ownerID, args, RuntimeLaunchOptions{})
+}
+
+func (runner *Runner) RunSessionWithOptions(
+	ctx context.Context,
+	homeID, ownerID string,
+	args []string,
+	options RuntimeLaunchOptions,
+) (err error) {
 	if err := runner.prepareSharedAccountHomes(ctx); err != nil {
 		return err
 	}
@@ -63,5 +72,5 @@ func (runner *Runner) RunSession(ctx context.Context, homeID, ownerID string, ar
 		return err
 	}
 	defer func() { err = errors.Join(err, release()) }()
-	return runner.launch(ctx, homeID, ownerID, []proxymodel.Account{*owner}, args)
+	return runner.launchWithOptions(ctx, homeID, ownerID, []proxymodel.Account{*owner}, args, options)
 }

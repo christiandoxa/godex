@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	accountentity "github.com/christiandoxa/godex/internal/entity/account"
 	proxyconfig "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
@@ -149,5 +150,102 @@ func TestProdex04356RuntimeSuperOverlayRequiresManagedRoot(t *testing.T) {
 	)
 	if err == nil || !strings.Contains(err.Error(), "managed profile root") {
 		t.Fatalf("missing managed root = %v", err)
+	}
+}
+
+func TestProdex04356RuntimeSuperSessionKeepsOwnerWhileOverlayingRolloutHome(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "home")
+	owner := filepath.Join(root, "owner")
+	for _, path := range []string{home, owner} {
+		if err := os.MkdirAll(path, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(path, "config.toml"), []byte("model = \"gpt-5.4\"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	accounts := &fakeLaunchAccounts{
+		accounts: []accountentity.Account{
+			{ID: "home", Name: "home", Enabled: true},
+			{ID: "owner", Name: "owner", Enabled: true},
+		},
+		homes: map[string]string{"home": home, "owner": owner},
+	}
+	process := &fakeProxyProcess{}
+	proxy := &fakeProxy{}
+	var config proxyconfig.Config
+	runner := NewRunner(accounts, process, func(got proxyconfig.Config) (Proxy, error) {
+		config = got
+		return proxy, nil
+	})
+	runner.SetManagedProfilesRoot(filepath.Join(root, "profiles"))
+	runner.SetUpstreamURL("https://chatgpt.com/backend-api")
+
+	err := runner.RunSessionWithOptions(
+		context.Background(), "home", "owner", []string{"resume", "thread-id"},
+		RuntimeLaunchOptions{
+			SuperOverlay: true, SmartContextEnabled: true,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.PreferredAccount != "owner" {
+		t.Fatalf("session preferred owner = %q", config.PreferredAccount)
+	}
+	routed, err := config.Accounts(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(routed) != 1 || routed[0].ID != "owner" || routed[0].Home != owner {
+		t.Fatalf("session routed accounts = %#v", routed)
+	}
+	if process.home == home || !strings.HasPrefix(filepath.Base(process.home), ".godex-overlay-") {
+		t.Fatalf("session child did not use rollout overlay: %q", process.home)
+	}
+}
+
+func TestProdex04356RuntimeSuperProviderAPIKeysKeepsCredentialPool(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "home")
+	if err := os.MkdirAll(home, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte("model = \"gpt-5.4\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	process := &fakeProxyProcess{}
+	proxy := &fakeProxy{}
+	var config proxyconfig.Config
+	runner := NewRunner(nil, process, func(got proxyconfig.Config) (Proxy, error) {
+		config = got
+		return proxy, nil
+	})
+	runner.SetManagedProfilesRoot(filepath.Join(root, "profiles"))
+	provider := DeepSeekProvider("deepseek-api-key", "")
+
+	err := runner.RunProviderAPIKeysWithOptions(
+		context.Background(), home, provider, []string{"key-a", "key-b"}, nil,
+		RuntimeLaunchOptions{
+			SuperOverlay: true, SmartContextEnabled: true, SkipQuotaPreflight: true,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.Provider.Kind != "deepseek" || len(config.ProviderCredentials) != 2 ||
+		!config.SmartContextEnabled || !config.SkipQuotaPreflight {
+		t.Fatalf("provider Super config = %#v", config)
+	}
+	routed, err := config.Accounts(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(routed) != 2 || routed[0].Home != home || routed[1].Home != home {
+		t.Fatalf("provider routing homes = %#v", routed)
+	}
+	if process.home == home || !strings.HasPrefix(filepath.Base(process.home), ".godex-overlay-") {
+		t.Fatalf("provider child did not use overlay: %q", process.home)
 	}
 }

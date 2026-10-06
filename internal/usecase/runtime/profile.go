@@ -17,15 +17,37 @@ const runtimeProviderKindRequired = "runtime provider kind is required"
 // The routing ID is local metadata only; OpenAI credentials and workspace IDs
 // continue to come from Codex-owned auth.json in the profile home.
 func (runner *Runner) RunProfile(ctx context.Context, codexHome string, args []string) error {
+	return runner.RunProfileWithOptions(ctx, codexHome, args, RuntimeLaunchOptions{})
+}
+
+func (runner *Runner) RunProfileWithOptions(
+	ctx context.Context,
+	codexHome string,
+	args []string,
+	options RuntimeLaunchOptions,
+) error {
 	home, err := validateRuntimeHome(codexHome)
 	if err != nil {
 		return err
 	}
 	profileID := profileRoutingID(home)
-	return runner.launchHome(ctx, home, profileID, proxymodel.Provider{}, nil, []proxymodel.Account{{ID: profileID, Home: home, Enabled: true}}, args)
+	return runner.launchHomeWithOptions(
+		ctx, home, profileID, proxymodel.Provider{}, nil,
+		[]proxymodel.Account{{ID: profileID, Home: home, Enabled: true}}, args, options,
+	)
 }
 
 func (runner *Runner) RunProviderProfile(ctx context.Context, codexHome string, provider proxymodel.Provider, args []string) error {
+	return runner.RunProviderProfileWithOptions(ctx, codexHome, provider, args, RuntimeLaunchOptions{})
+}
+
+func (runner *Runner) RunProviderProfileWithOptions(
+	ctx context.Context,
+	codexHome string,
+	provider proxymodel.Provider,
+	args []string,
+	options RuntimeLaunchOptions,
+) error {
 	home, err := validateRuntimeHome(codexHome)
 	if err != nil {
 		return err
@@ -34,7 +56,11 @@ func (runner *Runner) RunProviderProfile(ctx context.Context, codexHome string, 
 		return errors.New(runtimeProviderKindRequired)
 	}
 	profileID := profileRoutingID(provider.Kind + ":" + home)
-	return runner.launchHome(ctx, home, profileID, provider, nil, []proxymodel.Account{{ID: profileID, Home: home, Enabled: true, Provider: provider}}, args)
+	return runner.launchHomeWithOptions(
+		ctx, home, profileID, provider, nil,
+		[]proxymodel.Account{{ID: profileID, Home: home, Enabled: true, Provider: provider}},
+		args, options,
+	)
 }
 
 func (runner *Runner) RunProviderProfiles(
@@ -43,6 +69,19 @@ func (runner *Runner) RunProviderProfiles(
 	provider proxymodel.Provider,
 	profiles []proxymodel.ProviderProfile,
 	args []string,
+) error {
+	return runner.RunProviderProfilesWithOptions(
+		ctx, codexHome, provider, profiles, args, RuntimeLaunchOptions{},
+	)
+}
+
+func (runner *Runner) RunProviderProfilesWithOptions(
+	ctx context.Context,
+	codexHome string,
+	provider proxymodel.Provider,
+	profiles []proxymodel.ProviderProfile,
+	args []string,
+	options RuntimeLaunchOptions,
 ) error {
 	home, err := validateRuntimeHome(codexHome)
 	if err != nil {
@@ -73,7 +112,7 @@ func (runner *Runner) RunProviderProfiles(
 	if preferredID == "" {
 		return errors.New("selected runtime provider profile is missing from the launch pool")
 	}
-	return runner.launchHome(ctx, home, preferredID, provider, nil, accounts, args)
+	return runner.launchHomeWithOptions(ctx, home, preferredID, provider, nil, accounts, args, options)
 }
 
 func (runner *Runner) RunProviderAPIKeys(
@@ -83,11 +122,24 @@ func (runner *Runner) RunProviderAPIKeys(
 	apiKeys []string,
 	args []string,
 ) error {
+	return runner.RunProviderAPIKeysWithOptions(
+		ctx, codexHome, provider, apiKeys, args, RuntimeLaunchOptions{},
+	)
+}
+
+func (runner *Runner) RunProviderAPIKeysWithOptions(
+	ctx context.Context,
+	codexHome string,
+	provider proxymodel.Provider,
+	apiKeys []string,
+	args []string,
+	options RuntimeLaunchOptions,
+) error {
 	home, preferredID, accounts, credentials, err := runner.providerAPIKeyPool(codexHome, provider, apiKeys)
 	if err != nil {
 		return err
 	}
-	return runner.launchHome(ctx, home, preferredID, provider, credentials, accounts, args)
+	return runner.launchHomeWithOptions(ctx, home, preferredID, provider, credentials, accounts, args, options)
 }
 
 func (runner *Runner) providerAPIKeyPool(
@@ -148,6 +200,19 @@ func (runner *Runner) RunProviderAPIKeysAccount(
 	provider proxymodel.Provider,
 	apiKeys []string,
 	args []string,
+) error {
+	return runner.RunProviderAPIKeysAccountWithOptions(
+		ctx, accountID, provider, apiKeys, args, RuntimeLaunchOptions{},
+	)
+}
+
+func (runner *Runner) RunProviderAPIKeysAccountWithOptions(
+	ctx context.Context,
+	accountID string,
+	provider proxymodel.Provider,
+	apiKeys []string,
+	args []string,
+	options RuntimeLaunchOptions,
 ) (runErr error) {
 	accountID = strings.TrimSpace(accountID)
 	if accountID == "" {
@@ -159,7 +224,7 @@ func (runner *Runner) RunProviderAPIKeysAccount(
 	}
 	defer func() { runErr = errors.Join(runErr, release()) }()
 	home := runner.accounts.CodexHome(accountID)
-	return runner.RunProviderAPIKeys(ctx, home, provider, apiKeys, args)
+	return runner.RunProviderAPIKeysWithOptions(ctx, home, provider, apiKeys, args, options)
 }
 
 func providerCredentialRoutingID(provider proxymodel.Provider, secret string) string {

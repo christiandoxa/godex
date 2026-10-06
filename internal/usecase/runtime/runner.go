@@ -111,7 +111,16 @@ func (runner *Runner) CurrentCodexHome() string {
 	return runner.currentHome
 }
 
-func (runner *Runner) Run(ctx context.Context, selector string, arguments []string) (runErr error) {
+func (runner *Runner) Run(ctx context.Context, selector string, arguments []string) error {
+	return runner.RunWithOptions(ctx, selector, arguments, RuntimeLaunchOptions{})
+}
+
+func (runner *Runner) RunWithOptions(
+	ctx context.Context,
+	selector string,
+	arguments []string,
+	options RuntimeLaunchOptions,
+) (runErr error) {
 	if err := runner.prepareSharedAccountHomes(ctx); err != nil {
 		return err
 	}
@@ -132,15 +141,28 @@ func (runner *Runner) Run(ctx context.Context, selector string, arguments []stri
 		return err
 	}
 	defer func() { runErr = errors.Join(runErr, release()) }()
-	return runner.launch(ctx, selected.ID, selected.ID, profiles, arguments)
+	return runner.launchWithOptions(ctx, selected.ID, selected.ID, profiles, arguments, options)
 }
 
-func (runner *Runner) launch(ctx context.Context, homeID, preferredID string, profiles []proxyconfig.Account, arguments []string) (runErr error) {
+func (runner *Runner) launch(ctx context.Context, homeID, preferredID string, profiles []proxyconfig.Account, arguments []string) error {
+	return runner.launchWithOptions(ctx, homeID, preferredID, profiles, arguments, RuntimeLaunchOptions{})
+}
+
+func (runner *Runner) launchWithOptions(
+	ctx context.Context,
+	homeID, preferredID string,
+	profiles []proxyconfig.Account,
+	arguments []string,
+	options RuntimeLaunchOptions,
+) (runErr error) {
 	profiles, err := runner.pinnedAccounts(ctx, preferredID, profiles)
 	if err != nil {
 		return err
 	}
-	return runner.launchHome(ctx, runner.accounts.CodexHome(homeID), preferredID, proxyconfig.Provider{}, nil, profiles, arguments)
+	return runner.launchHomeWithOptions(
+		ctx, runner.accounts.CodexHome(homeID), preferredID,
+		proxyconfig.Provider{}, nil, profiles, arguments, options,
+	)
 }
 
 type RuntimeLaunchOptions struct {
