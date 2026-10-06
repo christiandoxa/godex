@@ -364,9 +364,9 @@ func TestRunHomeLocalProviderKeepsResolvedHome(t *testing.T) {
 	}
 	joined := strings.Join(process.arguments, "\n")
 	for _, expected := range []string{
-		"model_provider=\"prodex-local\"",
+		"model_provider=\"godex-local\"",
 		"model=\"qwen3-coder\"",
-		"model_providers.prodex-local.base_url=\"http://127.0.0.1:8131/v1\"",
+		"model_providers.godex-local.base_url=\"http://127.0.0.1:8131/v1\"",
 	} {
 		if !strings.Contains(joined, expected) {
 			t.Fatalf("local provider args missing %q: %#v", expected, process.arguments)

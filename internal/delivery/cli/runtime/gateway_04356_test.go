@@ -78,7 +78,7 @@ func TestProdex04356GatewayCLIUsesFixedOpenAIMountAndCloses(t *testing.T) {
 	}
 	for _, want := range []string{
 		"Status: listening",
-		"Endpoint: http://127.0.0.1:4321/backend-api/prodex",
+		"Endpoint: http://127.0.0.1:4321/backend-api/godex",
 		"Provider: openai",
 		"Stop: Ctrl-C",
 	} {
