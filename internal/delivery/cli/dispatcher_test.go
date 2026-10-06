@@ -538,3 +538,12 @@ func TestProdex04356SuperCommandsAreExplicitGodexCommands(t *testing.T) {
 		}
 	}
 }
+
+func TestProdex04356HiddenSuperExposeIsExplicitAndSilent(t *testing.T) {
+	if !IsExplicitGodexCommand("__super-expose") {
+		t.Fatal("__super-expose must not fall through to native Codex dispatch")
+	}
+	if shouldShowUpdateNotice([]string{"__super-expose", "exec"}) {
+		t.Fatal("hidden Super expose must not emit update notices")
+	}
+}

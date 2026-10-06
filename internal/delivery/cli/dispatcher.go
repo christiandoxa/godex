@@ -17,6 +17,7 @@ import (
 	runtimebrokercli "github.com/christiandoxa/godex/internal/delivery/cli/runtimebroker"
 	sessioncli "github.com/christiandoxa/godex/internal/delivery/cli/session"
 	subagentcli "github.com/christiandoxa/godex/internal/delivery/cli/subagent"
+	superexposecli "github.com/christiandoxa/godex/internal/delivery/cli/superexpose"
 	updatecli "github.com/christiandoxa/godex/internal/delivery/cli/update"
 	authusecase "github.com/christiandoxa/godex/internal/usecase/auth"
 	pingusecase "github.com/christiandoxa/godex/internal/usecase/ping"
@@ -36,7 +37,7 @@ func IsExplicitGodexCommand(command string) bool {
 	case "login", "logout", "accounts", "current", importCurrentCommand,
 		"account", "profile", "use", "remove", "run", "super", "s", "gateway", "quota", "redeem",
 		"ping", "update", "session", "info", "status", "log", "doctor",
-		"__mcp-jsonl-bridge", "__sub-agent-exec", "__runtime-broker",
+		"__mcp-jsonl-bridge", "__sub-agent-exec", "__runtime-broker", "__super-expose",
 		"version", "--version", "-version", "help", "--help", "-h":
 		return true
 	default:
@@ -152,6 +153,8 @@ func (app *App) Run(ctx context.Context, arguments []string) error {
 		return mcpbridgecli.RunArguments(ctx, arguments[1:], app.in, app.out)
 	case "__sub-agent-exec":
 		return subagentcli.RunArguments(ctx, arguments[1:], app.out, app.errOut)
+	case "__super-expose":
+		return superexposecli.Run(ctx, arguments[1:], app.out, app.errOut)
 	case "version", "--version", "-version":
 		_, err := fmt.Fprintln(app.out, version.String())
 		return err
@@ -270,7 +273,7 @@ func shouldShowUpdateNotice(arguments []string) bool {
 	}
 	switch arguments[0] {
 	case "info", "log", "ping", "update", "version", "--version", "-version", "help", "--help", "-h",
-		"__mcp-jsonl-bridge", "__sub-agent-exec", "__runtime-broker":
+		"__mcp-jsonl-bridge", "__sub-agent-exec", "__runtime-broker", "__super-expose":
 		return false
 	case "quota":
 		for _, argument := range arguments[1:] {
