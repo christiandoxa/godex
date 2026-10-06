@@ -15,6 +15,7 @@ import (
 	quotacli "github.com/christiandoxa/godex/internal/delivery/cli/quota"
 	runtimecli "github.com/christiandoxa/godex/internal/delivery/cli/runtime"
 	sessioncli "github.com/christiandoxa/godex/internal/delivery/cli/session"
+	subagentcli "github.com/christiandoxa/godex/internal/delivery/cli/subagent"
 	updatecli "github.com/christiandoxa/godex/internal/delivery/cli/update"
 	authusecase "github.com/christiandoxa/godex/internal/usecase/auth"
 	pingusecase "github.com/christiandoxa/godex/internal/usecase/ping"
@@ -33,7 +34,8 @@ func IsExplicitGodexCommand(command string) bool {
 	switch command {
 	case "login", "logout", "accounts", "current", importCurrentCommand,
 		"account", "profile", "use", "remove", "run", "gateway", "quota", "redeem",
-		"ping", "update", "session", "info", "status", "log", "doctor", "__mcp-jsonl-bridge",
+		"ping", "update", "session", "info", "status", "log", "doctor",
+		"__mcp-jsonl-bridge", "__sub-agent-exec",
 		"version", "--version", "-version", "help", "--help", "-h":
 		return true
 	default:
@@ -136,6 +138,8 @@ func (app *App) Run(ctx context.Context, arguments []string) error {
 		return runtimecli.DoctorWithErrorOutput(ctx, app.doctor, app.out, app.errOut, arguments[1:])
 	case "__mcp-jsonl-bridge":
 		return mcpbridgecli.RunArguments(ctx, arguments[1:], app.in, app.out)
+	case "__sub-agent-exec":
+		return subagentcli.RunArguments(ctx, arguments[1:], app.out, app.errOut)
 	case "version", "--version", "-version":
 		_, err := fmt.Fprintln(app.out, version.String())
 		return err
@@ -253,7 +257,8 @@ func shouldShowUpdateNotice(arguments []string) bool {
 		return true
 	}
 	switch arguments[0] {
-	case "info", "log", "ping", "update", "version", "--version", "-version", "help", "--help", "-h", "__mcp-jsonl-bridge":
+	case "info", "log", "ping", "update", "version", "--version", "-version", "help", "--help", "-h",
+		"__mcp-jsonl-bridge", "__sub-agent-exec":
 		return false
 	case "quota":
 		for _, argument := range arguments[1:] {

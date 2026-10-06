@@ -16,6 +16,19 @@ func TryAcquire(path string) (func() error, error) { return tryAcquire(path, fal
 // TryRead lets managed children share a home while mutations require exclusivity.
 func TryRead(path string) (func() error, error) { return tryAcquire(path, true) }
 
+// TryAcquireExisting locks a pre-created regular file and never creates it.
+func TryAcquireExisting(path string) (func() error, error) {
+	file, err := openExistingLockFile(path)
+	if err != nil {
+		return nil, err
+	}
+	if err := lockDescriptor(file, false); err != nil {
+		_ = file.Close()
+		return nil, err
+	}
+	return file.Close, nil
+}
+
 func tryAcquire(path string, shared bool) (func() error, error) {
 	file, err := openLockFile(path)
 	if err != nil {
@@ -26,6 +39,23 @@ func tryAcquire(path string, shared bool) (func() error, error) {
 		return nil, err
 	}
 	return file.Close, nil
+}
+
+func openExistingLockFile(path string) (*os.File, error) {
+	root, err := os.OpenRoot(filepath.Dir(path))
+	if err != nil {
+		return nil, err
+	}
+	defer root.Close()
+	name := filepath.Base(path)
+	info, err := root.Lstat(name)
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, errors.New("lock path must be a regular file")
+	}
+	return root.OpenFile(name, os.O_RDWR, 0o600)
 }
 
 func openLockFile(path string) (*os.File, error) {

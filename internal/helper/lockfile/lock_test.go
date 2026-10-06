@@ -112,3 +112,26 @@ func TestConcurrentFirstAcquireCreatesPersistentLockFile(t *testing.T) {
 		t.Fatalf("lock mode = %v", info.Mode())
 	}
 }
+
+func TestTryAcquireExistingNeverCreatesSlot(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "slot-00.lock")
+	if _, err := TryAcquireExisting(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("missing existing slot = %v", err)
+	}
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("missing slot was created: %v", err)
+	}
+	if err := os.WriteFile(path, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	release, err := TryAcquireExisting(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := TryAcquireExisting(path); !errors.Is(err, ErrBusy) {
+		t.Fatalf("contended existing slot = %v", err)
+	}
+	if err := release(); err != nil {
+		t.Fatal(err)
+	}
+}

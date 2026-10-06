@@ -385,6 +385,12 @@ func exitCode(ctx context.Context, err error) int {
 			}
 		}
 	}
+	var coded interface{ ExitCode() int }
+	if errors.As(err, &coded) {
+		if code := coded.ExitCode(); code >= 0 {
+			return code
+		}
+	}
 	if errors.Is(ctx.Err(), context.Canceled) || errors.Is(err, context.Canceled) {
 		return 130
 	}

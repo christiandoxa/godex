@@ -344,3 +344,14 @@ func TestProdex04356GatewaySkipQuotaPreflightReachesRoutingConfig(t *testing.T) 
 		t.Fatal("normal runtime routing config lost quota preflight")
 	}
 }
+
+type syntheticCodedError struct{ code int }
+
+func (err syntheticCodedError) Error() string { return "synthetic coded error" }
+func (err syntheticCodedError) ExitCode() int { return err.code }
+
+func TestProdex04356ExitCodePreservesInternalCodedError(t *testing.T) {
+	if got := exitCode(context.Background(), syntheticCodedError{code: 75}); got != 75 {
+		t.Fatalf("coded exit = %d, want 75", got)
+	}
+}

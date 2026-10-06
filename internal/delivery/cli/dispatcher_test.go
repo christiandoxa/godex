@@ -512,3 +512,12 @@ func TestProdex04356GatewayIsExplicitGodexCommand(t *testing.T) {
 		t.Fatal("gateway must not fall through to native Codex dispatch")
 	}
 }
+
+func TestProdex04356HiddenSubAgentExecIsExplicitGodexCommand(t *testing.T) {
+	if !IsExplicitGodexCommand("__sub-agent-exec") {
+		t.Fatal("hidden sub-agent launcher fell through to Codex runtime dispatch")
+	}
+	if shouldShowUpdateNotice([]string{"__sub-agent-exec", "--config", "x", "--task-file", "y"}) {
+		t.Fatal("hidden sub-agent launcher unexpectedly checks for updates")
+	}
+}
