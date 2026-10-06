@@ -16,13 +16,29 @@ import (
 func superRuntimeLaunchOptions(options superOptions) runtimeusecase.RuntimeLaunchOptions {
 	autoRedeem := options.autoRedeem
 	allowRotate := !options.noAutoRotate
-	return runtimeusecase.RuntimeLaunchOptions{
+	launch := runtimeusecase.RuntimeLaunchOptions{
 		SmartContextEnabled: true,
 		SkipQuotaPreflight:  options.skipQuota,
 		AutoRedeem:          &autoRedeem,
 		AllowAutoRotate:     &allowRotate,
 		SuperOverlay:        true,
 	}
+	if options.subAgent.enabled {
+		config := runtimeusecase.SuperSubAgentConfig{
+			Provider:             options.subAgent.provider,
+			Model:                options.subAgent.model,
+			Effort:               options.subAgent.effort,
+			LocalURL:             options.subAgent.url,
+			MaxConcurrency:       options.subAgent.maxConcurrency,
+			MaxConcurrencySource: options.subAgent.maxConcurrencySource,
+			PresidioEnabled:      superPresidioEnabled(options),
+			RequiredTools:        append([]string(nil), options.requiredTools...),
+		}
+		launch.OverlayPrepare = func(home string) error {
+			return runtimeusecase.PrepareSuperSubAgentOverlay(home, config)
+		}
+	}
+	return launch
 }
 
 type superSessionLauncher struct {

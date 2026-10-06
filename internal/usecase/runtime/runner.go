@@ -178,6 +178,7 @@ type RuntimeLaunchOptions struct {
 	AutoRedeem          *bool
 	AllowAutoRotate     *bool
 	SuperOverlay        bool
+	OverlayPrepare      func(string) error
 }
 
 func (runner *Runner) launchHome(
@@ -211,6 +212,11 @@ func (runner *Runner) launchHomeWithOptions(
 			return err
 		}
 		defer func() { runErr = errors.Join(runErr, overlay.Close()) }()
+		if options.OverlayPrepare != nil {
+			if err := options.OverlayPrepare(overlay.Home); err != nil {
+				return err
+			}
+		}
 		home = overlay.Home
 	}
 	proxyRunner, ok := runner.process.(proxyCodex)

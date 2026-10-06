@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"slices"
 	"strconv"
@@ -20,14 +21,15 @@ var superDefaultTools = []string{
 }
 
 type superSubAgent struct {
-	enabled          bool
-	disabled         bool
-	detailConfigured bool
-	provider         string
-	model            string
-	effort           string
-	url              string
-	maxConcurrency   uint16
+	enabled              bool
+	disabled             bool
+	detailConfigured     bool
+	provider             string
+	model                string
+	effort               string
+	url                  string
+	maxConcurrency       uint16
+	maxConcurrencySource string
 }
 
 type superOptions struct {
@@ -91,8 +93,9 @@ func parseSuperArguments(arguments []string) (superOptions, error) {
 		smartContext: true,
 		superMode:    true,
 		subAgent: superSubAgent{
-			provider:       "openai",
-			maxConcurrency: 4,
+			provider:             "openai",
+			maxConcurrency:       4,
+			maxConcurrencySource: "default",
 		},
 	}
 	arguments = rewriteSuperProviderAlias(arguments)
@@ -388,6 +391,11 @@ func consumeSuperSubAgentArgument(arguments []string, index int, options *superO
 		}
 		options.subAgent.detailConfigured = true
 		options.subAgent.maxConcurrency = parsed
+		if strings.EqualFold(strings.TrimSpace(value), "default") {
+			options.subAgent.maxConcurrencySource = "default"
+		} else {
+			options.subAgent.maxConcurrencySource = "custom"
+		}
 		return index + consumed, true, nil
 	}
 	return index, false, nil
@@ -463,6 +471,9 @@ func consumeSuperFeatureArgument(arguments []string, index int, options *superOp
 }
 
 func validateSuperOptions(options superOptions) error {
+	if _, active := os.LookupEnv("GODEX_SUB_AGENT"); active && options.subAgent.enabled {
+		return errors.New("--sub-agent cannot be re-enabled while GODEX_SUB_AGENT is set")
+	}
 	if options.directAutoRotate && options.directNoAutoRotate {
 		return errors.New("--auto-rotate conflicts with --no-auto-rotate")
 	}

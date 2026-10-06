@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -263,5 +264,113 @@ func TestProdex04356SuperLaunchBareSessionPreservesOwnerAndInjectsFullAccessAfte
 	}
 	if !captured.SmartContextEnabled {
 		t.Fatal("Super session lost Smart Context")
+	}
+}
+
+type superSubAgentCaptureProcess struct {
+	spec   map[string]any
+	agents string
+}
+
+func (*superSubAgentCaptureProcess) Run(context.Context, string, []string) error {
+	return errors.New("proxy path expected")
+}
+
+func (*superSubAgentCaptureProcess) CheckProxySupport(context.Context) error { return nil }
+
+func (process *superSubAgentCaptureProcess) RunThroughProxy(_ context.Context, home, _ string, _ []string) error {
+	return process.capture(home)
+}
+
+func (process *superSubAgentCaptureProcess) RunThroughProxyProvider(_ context.Context, home, _ string, _ []string, _ string) error {
+	return process.capture(home)
+}
+
+func (process *superSubAgentCaptureProcess) capture(home string) error {
+	content, err := os.ReadFile(filepath.Join(home, "sub-agent-launch.json"))
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(content, &process.spec); err != nil {
+		return err
+	}
+	agents, err := os.ReadFile(filepath.Join(home, "AGENTS.md"))
+	if err != nil {
+		return err
+	}
+	process.agents = string(agents)
+	return nil
+}
+
+func TestProdex04356SuperLaunchWritesInheritedSubAgentOverlayBeforeChild(t *testing.T) {
+	home := t.TempDir()
+	if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte("model = \"auto\""), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	profiles := &kiroShortcutProfiles{target: profilemodel.LaunchTarget{
+		Name: "kiro-main", CodexHome: home, Provider: "kiro",
+		ProviderConfig: profilemodel.ProviderSnapshot{Kind: "kiro"},
+	}}
+	process := &superSubAgentCaptureProcess{}
+	runner := runtimeusecase.NewRunner(nil, process, func(proxyconfig.Config) (runtimeusecase.Proxy, error) {
+		return &kiroShortcutProxy{}, nil
+	})
+	runner.SetManagedProfilesRoot(filepath.Join(t.TempDir(), "profiles"))
+
+	options, err := parseSuperArguments([]string{
+		"--provider", "kiro",
+		"--sub-agent",
+		"--sub-agent-provider", "deepseek",
+		"--sub-agent-model", "deepseek-chat",
+		"--sub-agent-model-reasoning-effort", "high",
+		"--sub-agent-max-concurrency", "7",
+		"--presidio",
+		"--require-tool", "rtk",
+		"exec", "review",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := launchSuperProfiles(t.Context(), runner, nil, profiles, options); err != nil {
+		t.Fatal(err)
+	}
+	if process.spec["provider"] != "deepseek" ||
+		process.spec["model"] != "deepseek-chat" ||
+		process.spec["effort"] != "high" ||
+		process.spec["presidio-enabled"] != true ||
+		process.spec["recursion-marker"] != "GODEX_SUB_AGENT" {
+		t.Fatalf("sub-agent launch spec = %#v", process.spec)
+	}
+	maximum, ok := process.spec["max-concurrency"].(map[string]any)
+	if !ok || maximum["value"] != float64(7) || maximum["source"] != "custom" {
+		t.Fatalf("sub-agent max concurrency = %#v", process.spec["max-concurrency"])
+	}
+	required, ok := process.spec["required-tools"].([]any)
+	if !ok || len(required) != 1 || required[0] != "rtk" {
+		t.Fatalf("sub-agent required tools = %#v", process.spec["required-tools"])
+	}
+	for _, want := range []string{
+		"Inherited Presidio: enabled",
+		"Inherited required tools: rtk",
+		"Maximum active sub-agents: 7 (custom)",
+	} {
+		if !strings.Contains(process.agents, want) {
+			t.Fatalf("sub-agent AGENTS block missing %q", want)
+		}
+	}
+}
+
+func TestProdex04356SuperRejectsExplicitSubAgentRecursion(t *testing.T) {
+	t.Setenv("GODEX_SUB_AGENT", "1")
+	if _, err := parseSuperArguments([]string{"--sub-agent"}); err == nil ||
+		!strings.Contains(err.Error(), "cannot be re-enabled") {
+		t.Fatalf("recursive sub-agent enable = %v", err)
+	}
+	options, err := parseSuperArguments([]string{"--no-sub-agent"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if options.subAgent.enabled {
+		t.Fatal("--no-sub-agent unexpectedly enabled recursion")
 	}
 }
