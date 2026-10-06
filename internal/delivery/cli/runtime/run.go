@@ -30,6 +30,9 @@ type launchProfiles interface {
 }
 
 func Run(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionusecase.Catalog, arguments []string, out io.Writer) error {
+	if runHelpRequested(arguments) {
+		return printRunHelp(out)
+	}
 	selection, codexArguments, err := parseRunArguments(arguments)
 	if err != nil {
 		return err
@@ -58,6 +61,9 @@ func Run(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionus
 }
 
 func RunProfiles(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionusecase.Catalog, profiles launchProfiles, arguments []string, out io.Writer) error {
+	if runHelpRequested(arguments) {
+		return printRunHelp(out)
+	}
 	selection, codexArguments, err := parseRunArguments(arguments)
 	if err != nil {
 		return err
@@ -76,6 +82,9 @@ func RunProfiles(ctx context.Context, runner *runtimeusecase.Runner, sessions *s
 }
 
 func RunHome(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionusecase.Catalog, home string, arguments []string, out io.Writer) error {
+	if runHelpRequested(arguments) {
+		return printRunHelp(out)
+	}
 	selection, codexArguments, err := parseRunArguments(arguments)
 	if err != nil {
 		return err
