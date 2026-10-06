@@ -16,7 +16,7 @@ type reader interface {
 	List(context.Context, string) ([]sessionentity.Session, error)
 }
 
-type launcher interface {
+type Launcher interface {
 	Run(context.Context, string, []string) error
 	RunLocal(context.Context, string, []string) error
 	RunSession(context.Context, string, string, []string) error
@@ -25,11 +25,11 @@ type launcher interface {
 type Catalog struct {
 	accounts    accountStore
 	reader      reader
-	launcher    launcher
+	launcher    Launcher
 	ownerLookup func(context.Context, string) (string, error)
 }
 
-func NewCatalog(accounts accountStore, reader reader, launcher launcher) *Catalog {
+func NewCatalog(accounts accountStore, reader reader, launcher Launcher) *Catalog {
 	return &Catalog{accounts: accounts, reader: reader, launcher: launcher}
 }
 

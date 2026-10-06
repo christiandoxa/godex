@@ -249,3 +249,23 @@ func TestResumeNameUsesActiveInteractiveDisplayLabelOnly(t *testing.T) {
 		}
 	}
 }
+
+func TestProdex04356ResumeArgumentsWithLauncherPreservesResolutionAndOverridesDispatch(t *testing.T) {
+	catalog, defaultLauncher := testCatalog()
+	override := &launcherFake{}
+	input := sessionmodel.Launch{
+		SessionSelector: "b1",
+		IDIndex:         2,
+		Arguments:       []string{"exec", "resume", "b1", "continue", "--json"},
+	}
+	if err := catalog.ResumeArgumentsWithLauncher(t.Context(), input, override); err != nil {
+		t.Fatal(err)
+	}
+	if defaultLauncher.account != "" || len(defaultLauncher.args) != 0 {
+		t.Fatalf("default launcher was invoked: %#v", defaultLauncher)
+	}
+	if override.account != "two" ||
+		!reflect.DeepEqual(override.args, []string{"exec", "resume", "b111", "continue", "--json"}) {
+		t.Fatalf("override launcher lost session resolution: %#v", override)
+	}
+}

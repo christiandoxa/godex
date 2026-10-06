@@ -60,7 +60,15 @@ func (catalog *Catalog) Resume(ctx context.Context, selector string) error {
 }
 
 func (catalog *Catalog) ResumeArguments(ctx context.Context, input sessionmodel.Launch) error {
-	if catalog.launcher == nil {
+	return catalog.ResumeArgumentsWithLauncher(ctx, input, catalog.launcher)
+}
+
+func (catalog *Catalog) ResumeArgumentsWithLauncher(
+	ctx context.Context,
+	input sessionmodel.Launch,
+	launcher Launcher,
+) error {
+	if launcher == nil {
 		return fmt.Errorf("session resume launcher is not configured")
 	}
 	var report sessionmodel.Report
@@ -81,9 +89,9 @@ func (catalog *Catalog) ResumeArguments(ctx context.Context, input sessionmodel.
 		return err
 	}
 	if input.Local {
-		return catalog.launcher.RunLocal(ctx, report.AccountID, args)
+		return launcher.RunLocal(ctx, report.AccountID, args)
 	}
-	return catalog.launcher.RunSession(ctx, report.AccountID, report.UpstreamAccountID, args)
+	return launcher.RunSession(ctx, report.AccountID, report.UpstreamAccountID, args)
 }
 
 func (catalog *Catalog) resolveLast(ctx context.Context, args []string) (sessionmodel.Report, error) {
