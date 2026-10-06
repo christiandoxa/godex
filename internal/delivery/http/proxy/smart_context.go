@@ -15,14 +15,15 @@ import (
 )
 
 const (
-	smartContextDuplicateTextMinBytes = 1024
-	smartContextAdmissionMinBodyBytes = 512
-	smartContextHTTPRewriteMaxBytes   = 256 * 1024
-	smartContextJSONMaxDepth          = 64
-	smartContextJSONMaxNodes          = 50_000
-	smartContextDuplicatePlanMax      = 50_000
-	smartContextTokenSavingsFloor     = 128
-	smartContextTokenSavingsPercent   = 3
+	smartContextDuplicateTextMinBytes    = 1024
+	smartContextAdmissionMinBodyBytes    = 512
+	smartContextHTTPRewriteMaxBytes      = 256 * 1024
+	smartContextWebSocketRewriteMaxBytes = 96 * 1024
+	smartContextJSONMaxDepth             = 64
+	smartContextJSONMaxNodes             = 50_000
+	smartContextDuplicatePlanMax         = 50_000
+	smartContextTokenSavingsFloor        = 128
+	smartContextTokenSavingsPercent      = 3
 )
 
 const smartContextInlineReferenceProtocol = "Godex context reference protocol v1: a 'godex-context-ref' value is byte-for-byte identical to the referenced 'original-input[N]' value in this request. Resolve it only from that earlier input item and verify its SHA-256 'sc2:' digest and byte length. No external retrieval is available."
@@ -43,15 +44,20 @@ var (
 	smartContextTokenizerErr  error
 )
 
-func prepareSmartContextHTTPBody(enabled bool, path string, headers http.Header, body []byte) smartContextRewrite {
+func prepareSmartContextBody(enabled bool, path string, headers http.Header, body []byte, maxBytes int, websocket bool) smartContextRewrite {
 	original := smartContextRewrite{Body: body}
 	if !enabled ||
 		len(body) < smartContextAdmissionMinBodyBytes ||
-		len(body) > smartContextHTTPRewriteMaxBytes ||
+		len(body) > maxBytes ||
 		!utf8.Valid(body) ||
-		quotaSelection(path, false, body).RouteKind != quotamodel.RouteKindResponses ||
 		smartContextExactRequested(headers) ||
 		!smartContextJSONContentType(headers.Get("Content-Type")) {
+		return original
+	}
+	if !websocket && quotaSelection(path, false, body).RouteKind != quotamodel.RouteKindResponses {
+		return original
+	}
+	if websocket && smartContextWebSocketGenerateFalse(body) {
 		return original
 	}
 
@@ -139,6 +145,27 @@ func prepareSmartContextHTTPBody(enabled bool, path string, headers http.Header,
 		return original
 	}
 	return smartContextRewrite{Body: candidateBody, Rewritten: true}
+}
+
+func prepareSmartContextHTTPBody(enabled bool, path string, headers http.Header, body []byte) smartContextRewrite {
+	return prepareSmartContextBody(enabled, path, headers, body, smartContextHTTPRewriteMaxBytes, false)
+}
+
+func prepareSmartContextWebSocketBody(enabled bool, path string, headers http.Header, body []byte) smartContextRewrite {
+	return prepareSmartContextBody(enabled, path, headers, body, smartContextWebSocketRewriteMaxBytes, true)
+}
+
+func smartContextWebSocketGenerateFalse(body []byte) bool {
+	value, ok := smartContextParseJSON(body)
+	if !ok {
+		return false
+	}
+	object, ok := value.(map[string]any)
+	if !ok || object["type"] != "response.create" {
+		return false
+	}
+	generate, ok := object["generate"].(bool)
+	return ok && !generate
 }
 
 func smartContextParseJSON(body []byte) (any, bool) {

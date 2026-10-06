@@ -69,6 +69,11 @@ func (proxy *Proxy) forwardResponsesWebSocket(
 			continue
 		}
 
+		smart := prepareSmartContextWebSocketBody(
+			proxy.smartContextEnabled, request.URL.Path, request.Header, payload,
+		)
+		payload = smart.Body
+
 		forwarded, err := proxy.router.Forward(sessionContext, proxymodel.Request{
 			RequestID:          proxy.sequence.Add(1),
 			Method:             request.Method,
