@@ -311,14 +311,16 @@ func TestRuntimeTransportFallsBackToNextModelBeforeCommit(t *testing.T) {
 	}
 }
 
-func TestRuntimeTransportStructured429FallsBackButBare429DoesNot(t *testing.T) {
+func TestProdex04356RuntimeTransportGeneric429FallsBackBeforeCommit(t *testing.T) {
 	for _, test := range []struct {
 		name     string
 		body     string
 		attempts int
 	}{
 		{"structured", `{"error":{"code":"rate_limit_exceeded"}}`, 2},
-		{"bare", `{"error":{"message":"too many requests"}}`, 1},
+		{"bare", `{"error":{"message":"too many requests"}}`, 2},
+		{"model not supported", `{"error":{"code":"model_not_supported"}}`, 2},
+		{"invalid request", `{"error":{"type":"invalid_request_error"}}`, 1},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			assertRuntime429Attempts(t, test.body, test.attempts)
@@ -354,7 +356,7 @@ func assertRuntime429Attempts(t *testing.T, errorBody string, wantAttempts int) 
 		t.Fatalf("calls = %d, want %d", calls, wantAttempts)
 	}
 	if wantAttempts == 1 && response.StatusCode != http.StatusTooManyRequests {
-		t.Fatalf("bare 429 status = %d", response.StatusCode)
+		t.Fatalf("terminal 429 status = %d", response.StatusCode)
 	}
 }
 

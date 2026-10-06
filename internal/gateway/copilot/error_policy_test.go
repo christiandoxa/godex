@@ -14,8 +14,9 @@ func TestCopilotProviderErrorClassificationMatchesRetryPolicy(t *testing.T) {
 		{500, `{"error":{"code":"model_not_supported"}}`, copilotErrorNotFound, true},
 		{503, `{"error":{"message":"backend overloaded"}}`, copilotErrorTransient, true},
 		{429, `{"error":{"code":"rate_limit_exceeded"}}`, copilotErrorRateLimit, true},
-		{429, `{"error":{"message":"too many requests"}}`, copilotErrorOther, false},
-		{429, `{"error":{"code":"model_not_supported"}}`, copilotErrorNotFound, false},
+		{429, `{"error":{"message":"too many requests"}}`, copilotErrorRateLimit, true},
+		{429, `{"error":{"code":"model_not_supported"}}`, copilotErrorNotFound, true},
+		{429, `{"error":{"type":"invalid_request_error"}}`, copilotErrorOther, false},
 	}
 	for _, test := range tests {
 		body := []byte(test.body)

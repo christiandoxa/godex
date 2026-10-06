@@ -233,3 +233,66 @@ func TestSortRuntimeAccountsPreservesExplicitProviderRouteOrder(t *testing.T) {
 		t.Fatalf("provider route order = %#v", accounts)
 	}
 }
+
+func TestProdex04356CopilotGeneric429RotatesCredentialBeforeCommit(t *testing.T) {
+	proxy := &Router{now: func() time.Time { return time.Unix(10, 0) }, maxInspect: 1024}
+	for _, fixture := range []struct {
+		name string
+		body string
+		kind responseKind
+	}{
+		{name: "generic", body: `{"error":{"message":"too many requests"}}`, kind: responseRetry},
+		{name: "invalid request", body: `{"error":{"type":"invalid_request_error"}}`, kind: responsePass},
+		{name: "model not supported", body: `{"error":{"code":"model_not_supported"}}`, kind: responsePass},
+	} {
+		t.Run(fixture.name, func(t *testing.T) {
+			response := &proxymodel.Response{
+				StatusCode: http.StatusTooManyRequests,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(strings.NewReader(fixture.body)),
+			}
+			outcome, pending, err := proxy.classify(response, "copilot")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer pending.close()
+			if outcome.kind != fixture.kind {
+				t.Fatalf("outcome = %#v, want kind %d", outcome, fixture.kind)
+			}
+		})
+	}
+
+	accounts := []proxymodel.Account{
+		{ID: "account-a", Home: "/a", Enabled: true, Provider: proxymodel.Provider{Kind: "copilot"}},
+		{ID: "account-b", Home: "/b", Enabled: true, Provider: proxymodel.Provider{Kind: "copilot"}},
+	}
+	gateway := &externalRetryGateway{responses: map[string]struct {
+		status int
+		body   string
+	}{
+		"account-a": {http.StatusTooManyRequests, `{"error":{"message":"too many requests"}}`},
+		"account-b": {http.StatusOK, `{}`},
+	}}
+	router, err := NewRouter(Config{
+		Gateway: gateway,
+		Accounts: func(context.Context) ([]proxymodel.Account, error) {
+			return accounts, nil
+		},
+		PreferredAccount: "account-a",
+		MaxInspectBytes:  1024,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	exchange, err := router.Forward(t.Context(), proxymodel.Request{Header: make(http.Header)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer exchange.Close()
+	if got := strings.Join(gateway.calls, ","); got != "account-a,account-b" ||
+		exchange.Result.AccountID != "account-b" ||
+		exchange.Result.Response.StatusCode != http.StatusOK {
+		t.Fatalf("Copilot generic 429 calls/owner/status = %s/%s/%d",
+			got, exchange.Result.AccountID, exchange.Result.Response.StatusCode)
+	}
+}

@@ -19,8 +19,8 @@ const (
 
 func copilotModelRetryAllowed(status int, body []byte) bool {
 	class := classifyCopilotProviderError(status, body)
-	if status == 429 {
-		return class == copilotErrorQuota || class == copilotErrorRateLimit || class == copilotErrorTransient
+	if status == 429 && !copilotRetryable429Body(body) {
+		return false
 	}
 	return class == copilotErrorQuota || class == copilotErrorRateLimit || class == copilotErrorTransient || class == copilotErrorNotFound
 }
@@ -33,10 +33,31 @@ func classifyCopilotProviderError(status int, body []byte) copilotProviderErrorC
 			class = candidate
 		}
 	}
+	if class == copilotErrorOther && status == 429 && copilotRetryable429Body(body) {
+		return copilotErrorRateLimit
+	}
 	if class == copilotErrorOther && status >= 500 {
 		return copilotErrorTransient
 	}
 	return class
+}
+
+func copilotRetryable429Body(body []byte) bool {
+	text := strings.ToLower(string(body))
+	for _, marker := range []string{
+		"invalid_prompt",
+		"bio_policy",
+		"cyber_policy",
+		"content_policy",
+		"invalid_request_error",
+		"invalid_request",
+		"context_length_exceeded",
+	} {
+		if strings.Contains(text, marker) {
+			return false
+		}
+	}
+	return true
 }
 
 func classifyCopilotErrorSignal(status int, code, text string, useStatus bool) copilotProviderErrorClass {
