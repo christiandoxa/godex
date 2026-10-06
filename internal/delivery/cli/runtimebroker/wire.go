@@ -105,7 +105,7 @@ type Registry struct {
 	SmartContextEnabled  bool    `json:"smart_context_enabled"`
 	CurrentProfile       string  `json:"current_profile"`
 	InstanceID           string  `json:"instance_id"`
-	ProdexVersion        *string `json:"prodex_version,omitempty"`
+	GodexVersion         *string `json:"godex_version,omitempty"`
 	ExecutablePath       *string `json:"executable_path,omitempty"`
 	ExecutableSHA256     *string `json:"executable_sha256,omitempty"`
 	OpenAIMountPath      *string `json:"openai_mount_path,omitempty"`
@@ -120,7 +120,7 @@ type Health struct {
 	ActiveRequests    int     `json:"active_requests"`
 	InstanceID        string  `json:"instance_id"`
 	PersistenceRole   string  `json:"persistence_role"`
-	ProdexVersion     *string `json:"prodex_version,omitempty"`
+	GodexVersion      *string `json:"godex_version,omitempty"`
 	ExecutablePath    *string `json:"executable_path,omitempty"`
 	ExecutableSHA256  *string `json:"executable_sha256,omitempty"`
 }

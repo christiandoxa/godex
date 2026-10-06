@@ -521,3 +521,12 @@ func TestProdex04356HiddenSubAgentExecIsExplicitGodexCommand(t *testing.T) {
 		t.Fatal("hidden sub-agent launcher unexpectedly checks for updates")
 	}
 }
+
+func TestProdex04356HiddenRuntimeBrokerIsExplicitAndSilentFromUpdateNotice(t *testing.T) {
+	if !IsExplicitGodexCommand("__runtime-broker") {
+		t.Fatal("__runtime-broker must not fall through to native Codex dispatch")
+	}
+	if shouldShowUpdateNotice([]string{"__runtime-broker"}) {
+		t.Fatal("hidden runtime broker must not emit update notices")
+	}
+}

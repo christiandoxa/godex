@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	runtimemodel "github.com/christiandoxa/godex/internal/model/runtime"
 )
@@ -38,6 +39,16 @@ type activeRequestHandler struct {
 	changed    chan struct{}
 	limits     admissionLimits
 	activity   activityRecorder
+
+	admissionsTotal            [admissionLaneCount]uint64
+	releasesTotal              [admissionLaneCount]uint64
+	globalLimitRejectionsTotal [admissionLaneCount]uint64
+	laneLimitRejectionsTotal   [admissionLaneCount]uint64
+	releaseUnderflowsTotal     [admissionLaneCount]uint64
+	activeReleaseUnderflows    uint64
+	waitTotalNS                uint64
+	waitCount                  uint64
+	waitMaxNS                  uint64
 }
 
 func newActiveRequestHandler(next http.Handler, globalOverride int) http.Handler {
@@ -146,6 +157,10 @@ func admissionLaneForRequest(request *http.Request) admissionLane {
 }
 
 func (handler *activeRequestHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	if strings.HasPrefix(request.URL.Path, "/__godex/runtime/") || strings.HasPrefix(request.URL.Path, "/__prodex/runtime/") {
+		handler.next.ServeHTTP(writer, request)
+		return
+	}
 	lane := admissionLaneForRequest(request)
 	if !handler.acquireRequest(request, lane) {
 		return
@@ -167,23 +182,51 @@ func (handler *activeRequestHandler) acquireRequest(request *http.Request, lane 
 }
 
 func (handler *activeRequestHandler) acquireWithMetadata(ctx context.Context, lane admissionLane, path, transport string) bool {
+	var waitStarted time.Time
 	for {
 		handler.mu.Lock()
 		if handler.active < handler.limits.global && handler.laneActive[lane] < handler.limits.lane[lane] {
 			handler.active++
 			handler.laneActive[lane]++
+			handler.admissionsTotal[lane]++
+			if !waitStarted.IsZero() {
+				handler.recordWaitLocked(time.Since(waitStarted))
+			}
 			handler.mu.Unlock()
 			return true
 		}
 		active, globalLimit := handler.active, handler.limits.global
 		laneActive, laneLimit := handler.laneActive[lane], handler.limits.lane[lane]
+		if active >= globalLimit {
+			handler.globalLimitRejectionsTotal[lane]++
+		} else {
+			handler.laneLimitRejectionsTotal[lane]++
+		}
+		if waitStarted.IsZero() {
+			waitStarted = time.Now()
+		}
 		changed := handler.changed
 		handler.mu.Unlock()
 		handler.recordAdmissionPressure(ctx, lane, path, transport, active, globalLimit, laneActive, laneLimit)
 
 		if !handler.wait(ctx, changed) {
+			handler.mu.Lock()
+			handler.recordWaitLocked(time.Since(waitStarted))
+			handler.mu.Unlock()
 			return false
 		}
+	}
+}
+
+func (handler *activeRequestHandler) recordWaitLocked(duration time.Duration) {
+	if duration < 0 {
+		return
+	}
+	ns := uint64(duration)
+	handler.waitTotalNS += ns
+	handler.waitCount++
+	if ns > handler.waitMaxNS {
+		handler.waitMaxNS = ns
 	}
 }
 
@@ -224,11 +267,68 @@ func (handler *activeRequestHandler) release(lane admissionLane) {
 	handler.mu.Lock()
 	if handler.active > 0 {
 		handler.active--
+	} else {
+		handler.activeReleaseUnderflows++
 	}
 	if handler.laneActive[lane] > 0 {
 		handler.laneActive[lane]--
+		handler.releasesTotal[lane]++
+	} else {
+		handler.releaseUnderflowsTotal[lane]++
 	}
 	close(handler.changed)
 	handler.changed = make(chan struct{})
 	handler.mu.Unlock()
+}
+
+type admissionWaitSnapshot struct {
+	TotalNS uint64
+	Count   uint64
+	MaxNS   uint64
+}
+
+type admissionLaneSnapshot struct {
+	Active                     int
+	Limit                      int
+	AdmissionsTotal            uint64
+	ReleasesTotal              uint64
+	GlobalLimitRejectionsTotal uint64
+	LaneLimitRejectionsTotal   uint64
+	ReleaseUnderflowsTotal     uint64
+}
+
+type admissionSnapshot struct {
+	GlobalLimit                    int
+	Lanes                          [admissionLaneCount]admissionLaneSnapshot
+	Wait                           admissionWaitSnapshot
+	ActiveRequestReleaseUnderflows uint64
+}
+
+func (handler *activeRequestHandler) snapshot() admissionSnapshot {
+	if handler == nil {
+		return admissionSnapshot{}
+	}
+	handler.mu.Lock()
+	defer handler.mu.Unlock()
+	snapshot := admissionSnapshot{
+		GlobalLimit: handler.limits.global,
+		Wait: admissionWaitSnapshot{
+			TotalNS: handler.waitTotalNS,
+			Count:   handler.waitCount,
+			MaxNS:   handler.waitMaxNS,
+		},
+		ActiveRequestReleaseUnderflows: handler.activeReleaseUnderflows,
+	}
+	for lane := admissionLane(0); lane < admissionLaneCount; lane++ {
+		snapshot.Lanes[lane] = admissionLaneSnapshot{
+			Active:                     handler.laneActive[lane],
+			Limit:                      handler.limits.lane[lane],
+			AdmissionsTotal:            handler.admissionsTotal[lane],
+			ReleasesTotal:              handler.releasesTotal[lane],
+			GlobalLimitRejectionsTotal: handler.globalLimitRejectionsTotal[lane],
+			LaneLimitRejectionsTotal:   handler.laneLimitRejectionsTotal[lane],
+			ReleaseUnderflowsTotal:     handler.releaseUnderflowsTotal[lane],
+		}
+	}
+	return snapshot
 }

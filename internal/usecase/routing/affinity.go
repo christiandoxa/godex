@@ -68,15 +68,26 @@ type verifiedBindingRepository interface {
 }
 
 type affinityStore struct {
-	repository bindingRepository
-	mu         sync.Mutex
-	values     map[string]affinityValue
-	turnStates map[string]responseTurnState
-	sequence   uint64
+	repository         bindingRepository
+	mu                 sync.Mutex
+	values             map[string]affinityValue
+	turnStates         map[string]responseTurnState
+	statuses           map[string]continuationStatus
+	clock              func() time.Time
+	persistenceEnabled func() bool
+	sequence           uint64
 }
 
 func newAffinityStore() *affinityStore {
-	return &affinityStore{values: make(map[string]affinityValue)}
+	return &affinityStore{
+		values:   make(map[string]affinityValue),
+		statuses: make(map[string]continuationStatus),
+		clock:    time.Now,
+	}
+}
+
+func (store *affinityStore) writesEnabled() bool {
+	return store.persistenceEnabled == nil || store.persistenceEnabled()
 }
 
 func (store *affinityStore) owner(ctx context.Context, keys affinityKeys, now time.Time) (string, error) {
@@ -86,7 +97,17 @@ func (store *affinityStore) owner(ctx context.Context, keys affinityKeys, now ti
 	if err := store.loadMissingLocked(ctx, keys, now); err != nil {
 		return "", err
 	}
-	return store.ownerLocked(keys)
+	owner, err := store.ownerLocked(keys)
+	if err == nil && owner != "" {
+		entries := make([]bindingEntry, 0, len(keys.entries()))
+		for _, entry := range continuationEntries(keys) {
+			if _, ok := store.values[entry.Key]; ok {
+				entries = append(entries, entry)
+			}
+		}
+		store.touchContinuationEntriesLocked(entries, now, false)
+	}
+	return owner, err
 }
 
 func (store *affinityStore) loadMissingLocked(ctx context.Context, keys affinityKeys, now time.Time) error {
@@ -148,6 +169,7 @@ func (store *affinityStore) remember(ctx context.Context, accountID string, keys
 		return err
 	}
 	store.refreshLocked(accountID, keyValues, now)
+	store.touchContinuationEntriesLocked(continuationEntries(keys), now, false)
 	store.pruneLocked(now)
 	return nil
 }
@@ -166,7 +188,7 @@ func (store *affinityStore) rememberVerified(ctx context.Context, accountID stri
 	if err := store.loadMissingLocked(ctx, keys, now); err != nil {
 		return err
 	}
-	if repository, ok := store.repository.(verifiedBindingRepository); ok {
+	if repository, ok := store.repository.(verifiedBindingRepository); ok && store.writesEnabled() {
 		updates := make([]routingentity.Binding, 0, len(keys.entries()))
 		for _, entry := range keys.entries() {
 			updates = append(updates, routingentity.Binding{
@@ -178,6 +200,7 @@ func (store *affinityStore) rememberVerified(ctx context.Context, accountID stri
 			return err
 		}
 		store.loadLocked(bindings, keyValues, now)
+		store.touchContinuationEntriesLocked(continuationEntries(keys), now, true)
 		return nil
 	}
 	for _, key := range keyValues {
@@ -192,6 +215,7 @@ func (store *affinityStore) rememberVerified(ctx context.Context, accountID stri
 		store.sequence++
 		store.values[key] = affinityValue{accountID: owner, expires: now.Add(affinityTTL), sequence: store.sequence}
 	}
+	store.touchContinuationEntriesLocked(continuationEntries(keys), now, true)
 	store.pruneLocked(now)
 	return nil
 }
@@ -206,7 +230,7 @@ func (store *affinityStore) checkConflictsLocked(accountID string, keys []string
 }
 
 func (store *affinityStore) persistLocked(ctx context.Context, accountID string, keys affinityKeys, now time.Time) error {
-	if store.repository == nil {
+	if store.repository == nil || !store.writesEnabled() {
 		return nil
 	}
 	updates := make([]routingentity.Binding, 0, len(keys.values()))

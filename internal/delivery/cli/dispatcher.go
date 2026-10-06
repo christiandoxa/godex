@@ -14,6 +14,7 @@ import (
 	profilecli "github.com/christiandoxa/godex/internal/delivery/cli/profile"
 	quotacli "github.com/christiandoxa/godex/internal/delivery/cli/quota"
 	runtimecli "github.com/christiandoxa/godex/internal/delivery/cli/runtime"
+	runtimebrokercli "github.com/christiandoxa/godex/internal/delivery/cli/runtimebroker"
 	sessioncli "github.com/christiandoxa/godex/internal/delivery/cli/session"
 	subagentcli "github.com/christiandoxa/godex/internal/delivery/cli/subagent"
 	updatecli "github.com/christiandoxa/godex/internal/delivery/cli/update"
@@ -35,7 +36,7 @@ func IsExplicitGodexCommand(command string) bool {
 	case "login", "logout", "accounts", "current", importCurrentCommand,
 		"account", "profile", "use", "remove", "run", "gateway", "quota", "redeem",
 		"ping", "update", "session", "info", "status", "log", "doctor",
-		"__mcp-jsonl-bridge", "__sub-agent-exec",
+		"__mcp-jsonl-bridge", "__sub-agent-exec", "__runtime-broker",
 		"version", "--version", "-version", "help", "--help", "-h":
 		return true
 	default:
@@ -57,6 +58,7 @@ type App struct {
 	profiles   *profileusecase.Catalog
 	nativeAuth *authusecase.Native
 	sessions   *sessionusecase.Catalog
+	broker     *runtimebrokercli.Command
 	out        io.Writer
 	errOut     io.Writer
 	in         io.Reader
@@ -136,6 +138,14 @@ func (app *App) Run(ctx context.Context, arguments []string) error {
 		return runtimecli.Log(ctx, app.activity, app.out, arguments[1:])
 	case "doctor":
 		return runtimecli.DoctorWithErrorOutput(ctx, app.doctor, app.out, app.errOut, arguments[1:])
+	case "__runtime-broker":
+		if len(arguments) != 1 {
+			return fmt.Errorf("__runtime-broker does not accept arguments")
+		}
+		if app.broker == nil {
+			return fmt.Errorf("runtime broker support is not configured")
+		}
+		return app.broker.Run(ctx, app.in)
 	case "__mcp-jsonl-bridge":
 		return mcpbridgecli.RunArguments(ctx, arguments[1:], app.in, app.out)
 	case "__sub-agent-exec":
@@ -258,7 +268,7 @@ func shouldShowUpdateNotice(arguments []string) bool {
 	}
 	switch arguments[0] {
 	case "info", "log", "ping", "update", "version", "--version", "-version", "help", "--help", "-h",
-		"__mcp-jsonl-bridge", "__sub-agent-exec":
+		"__mcp-jsonl-bridge", "__sub-agent-exec", "__runtime-broker":
 		return false
 	case "quota":
 		for _, argument := range arguments[1:] {
@@ -381,6 +391,8 @@ func (app *App) SetErrorOutput(stderr io.Writer) {
 }
 
 func (app *App) SetSessions(catalog *sessionusecase.Catalog) { app.sessions = catalog }
+
+func (app *App) SetRuntimeBroker(command *runtimebrokercli.Command) { app.broker = command }
 
 func (app *App) SetProfiles(catalog *profileusecase.Catalog) { app.profiles = catalog }
 

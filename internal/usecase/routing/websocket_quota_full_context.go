@@ -355,7 +355,7 @@ func (store *affinityStore) forgetOwned(
 	if len(remove) == 0 {
 		return nil
 	}
-	if remover, ok := store.repository.(affinityBindingRemover); ok {
+	if remover, ok := store.repository.(affinityBindingRemover); ok && store.writesEnabled() {
 		if err := remover.Remove(ctx, remove); err != nil {
 			return err
 		}

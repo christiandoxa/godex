@@ -9,17 +9,55 @@ import (
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
-const gatewayOpenAIMountPath = "/backend-api/prodex"
+const gatewayOpenAIMountPath = "/backend-api/godex"
 
 type GatewayStartOptions struct {
 	ListenAddr  string
 	UpstreamURL string
+	Broker      *proxymodel.BrokerConfig
 }
 
 type Gateway struct {
 	proxy   Proxy
 	release func() error
 	once    sync.Once
+}
+
+func (gateway *Gateway) SetPersistenceEnabled(enabled bool) {
+	if gateway == nil || gateway.proxy == nil {
+		return
+	}
+	if target, ok := gateway.proxy.(interface{ SetPersistenceEnabled(bool) }); ok {
+		target.SetPersistenceEnabled(enabled)
+	}
+}
+
+func (gateway *Gateway) SetPersistenceRole(role string) {
+	if gateway == nil || gateway.proxy == nil {
+		return
+	}
+	if target, ok := gateway.proxy.(interface{ SetBrokerPersistenceRole(string) }); ok {
+		target.SetBrokerPersistenceRole(role)
+	}
+}
+
+func (gateway *Gateway) RecordBrokerLog(line string) {
+	if gateway == nil || gateway.proxy == nil {
+		return
+	}
+	if target, ok := gateway.proxy.(interface{ RecordBrokerLog(string) }); ok {
+		target.RecordBrokerLog(line)
+	}
+}
+
+func (gateway *Gateway) ActiveRequests() int {
+	if gateway == nil || gateway.proxy == nil {
+		return 0
+	}
+	if active, ok := gateway.proxy.(interface{ ActiveRequests() int }); ok {
+		return active.ActiveRequests()
+	}
+	return 0
 }
 
 func (gateway *Gateway) Endpoint() string {
@@ -77,7 +115,7 @@ func (runner *Runner) StartGatewayAccount(
 		return nil, err
 	}
 	account := proxymodel.Account{ID: accountID, Home: home, Enabled: true}
-	gateway, err := runner.startGateway(ctx, options, proxymodel.Provider{}, nil, []proxymodel.Account{account}, accountID)
+	gateway, err := runner.startGateway(ctx, options, proxymodel.Provider{}, nil, []proxymodel.Account{account}, accountID, true)
 	if err != nil {
 		_ = release()
 		return nil, err
@@ -104,7 +142,7 @@ func (runner *Runner) StartGatewayProfile(
 	account := proxymodel.Account{
 		ID: accountID, Home: home, Enabled: true, Provider: provider,
 	}
-	return runner.startGateway(ctx, options, provider, nil, []proxymodel.Account{account}, accountID)
+	return runner.startGateway(ctx, options, provider, nil, []proxymodel.Account{account}, accountID, true)
 }
 
 func (runner *Runner) StartGatewayAPIKeys(
@@ -119,7 +157,47 @@ func (runner *Runner) StartGatewayAPIKeys(
 		return nil, err
 	}
 	_ = home
-	return runner.startGateway(ctx, options, provider, credentials, accounts, preferred)
+	return runner.startGateway(ctx, options, provider, credentials, accounts, preferred, true)
+}
+
+func (runner *Runner) StartBrokerGateway(
+	ctx context.Context,
+	preferredAccountID string,
+	options GatewayStartOptions,
+) (*Gateway, error) {
+	preferredAccountID = strings.TrimSpace(preferredAccountID)
+	if preferredAccountID == "" {
+		return nil, errors.New("runtime broker preferred account is required")
+	}
+	if err := runner.prepareSharedAccountHomes(ctx); err != nil {
+		return nil, err
+	}
+	profiles, err := runner.proxyAccounts(ctx, nil, "", preferredAccountID)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(profiles))
+	for _, profile := range profiles {
+		ids = append(ids, profile.ID)
+	}
+	release, err := runner.pinProfiles(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	profiles, err = runner.pinnedAccounts(ctx, preferredAccountID, profiles)
+	if err != nil {
+		_ = release()
+		return nil, err
+	}
+	gateway, err := runner.startGateway(
+		ctx, options, proxymodel.Provider{}, nil, profiles, preferredAccountID, false,
+	)
+	if err != nil {
+		_ = release()
+		return nil, err
+	}
+	gateway.release = release
+	return gateway, nil
 }
 
 func (runner *Runner) startGateway(
@@ -129,6 +207,7 @@ func (runner *Runner) startGateway(
 	credentials []proxymodel.ProviderCredential,
 	accounts []proxymodel.Account,
 	preferredID string,
+	skipQuotaPreflight bool,
 ) (*Gateway, error) {
 	if runner == nil || runner.newProxy == nil {
 		return nil, errors.New("runtime proxy factory is not configured")
@@ -142,7 +221,8 @@ func (runner *Runner) startGateway(
 	}
 	config := runtimeProxyConfig(ctx, upstream, preferredID, provider, credentials, accounts, false)
 	config.ListenAddr = strings.TrimSpace(options.ListenAddr)
-	config.SkipQuotaPreflight = true
+	config.SkipQuotaPreflight = skipQuotaPreflight
+	config.Broker = options.Broker
 	proxy, err := runner.newProxy(config)
 	if err != nil {
 		return nil, err

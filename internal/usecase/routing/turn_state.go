@@ -98,7 +98,7 @@ func (store *affinityStore) rememberResponseTurnStateForHome(
 		len(turnState) > maxAffinityValue || strings.ContainsAny(turnState, "\r\n") {
 		return
 	}
-	if repository, ok := store.repository.(turnStateRepository); ok && profileHome != "" {
+	if repository, ok := store.repository.(turnStateRepository); ok && profileHome != "" && store.writesEnabled() {
 		// The per-profile sidecar is optional; never fail a response because it could not be written.
 		_ = repository.SaveResponseTurnState(
 			ctx, profileHome, affinityDigest("previous", responseID), turnState, now.Add(affinityTTL),

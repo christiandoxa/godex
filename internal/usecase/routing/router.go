@@ -75,43 +75,82 @@ type Config struct {
 }
 
 type Router struct {
-	source                    func(context.Context) ([]proxymodel.Account, error)
-	gateway                   gateway
-	quota                     quotaPreflight
-	state                     routingStateRepository
-	activity                  ActivityRecorder
-	preferred                 string
-	now                       func() time.Time
-	wait                      func(context.Context, time.Duration) error
-	maxInspect                int64
-	affinity                  *affinityStore
-	mu                        sync.Mutex
-	retryBackoffMu            sync.Mutex
-	transportMu               sync.Mutex
-	routeHealthMu             sync.Mutex
-	routeMemoryMu             sync.Mutex
-	routeCircuitMu            sync.Mutex
-	previousResponseFailureMu sync.Mutex
-	promptCacheMu             sync.Mutex
-	selectionSequence         atomic.Uint64
-	cursor                    int
-	preferredUsed             bool
-	inflight                  map[string]int
-	inflightChanged           chan struct{}
-	profileInflightHardLimit  int
-	profileInflightWait       profileInflightWaitFunc
-	quarantine                map[string]quarantineState
-	quotaBlocked              map[string]bool
-	quotaChecks               map[quotaCheckKey]quotaCheck
-	routeHealth               map[routeHealthKey]routingentity.RouteHealthScore
-	routeMemory               map[routeMemoryKey]routingentity.RouteMemoryScore
-	routeCircuits             map[routeHealthKey]routingentity.RouteCircuit
-	transportBackoffs         map[routeHealthKey]routingentity.TransportBackoff
-	previousResponseFailures  map[previousResponseFailureKey]routingentity.PreviousResponseFailure
-	promptCacheBindings       map[string]promptCacheBinding
-	autoRedeem                bool
-	redeemer                  AutoRedeemer
-	conversations             map[string]*conversationLock
+	source                                func(context.Context) ([]proxymodel.Account, error)
+	gateway                               gateway
+	quota                                 quotaPreflight
+	state                                 routingStateRepository
+	activity                              ActivityRecorder
+	preferred                             string
+	now                                   func() time.Time
+	wait                                  func(context.Context, time.Duration) error
+	maxInspect                            int64
+	affinity                              *affinityStore
+	mu                                    sync.Mutex
+	retryBackoffMu                        sync.Mutex
+	transportMu                           sync.Mutex
+	routeHealthMu                         sync.Mutex
+	routeMemoryMu                         sync.Mutex
+	routeCircuitMu                        sync.Mutex
+	previousResponseFailureMu             sync.Mutex
+	promptCacheMu                         sync.Mutex
+	selectionSequence                     atomic.Uint64
+	persistenceEnabled                    atomic.Bool
+	cursor                                int
+	preferredUsed                         bool
+	inflight                              map[string]int
+	inflightChanged                       chan struct{}
+	profileInflightHardLimit              int
+	profileInflightWait                   profileInflightWaitFunc
+	profileInflightAdmissionsTotal        uint64
+	profileInflightReleasesTotal          uint64
+	profileInflightReleaseUnderflowsTotal uint64
+	quarantine                            map[string]quarantineState
+	quotaBlocked                          map[string]bool
+	quotaChecks                           map[quotaCheckKey]quotaCheck
+	routeHealth                           map[routeHealthKey]routingentity.RouteHealthScore
+	routeMemory                           map[routeMemoryKey]routingentity.RouteMemoryScore
+	routeCircuits                         map[routeHealthKey]routingentity.RouteCircuit
+	transportBackoffs                     map[routeHealthKey]routingentity.TransportBackoff
+	previousResponseFailures              map[previousResponseFailureKey]routingentity.PreviousResponseFailure
+	promptCacheBindings                   map[string]promptCacheBinding
+	autoRedeem                            bool
+	redeemer                              AutoRedeemer
+	conversations                         map[string]*conversationLock
+}
+
+func (router *Router) SetPersistenceEnabled(enabled bool) {
+	if router == nil {
+		return
+	}
+	router.persistenceEnabled.Store(enabled)
+}
+
+func (router *Router) persistenceWritesEnabled() bool {
+	return router != nil && router.persistenceEnabled.Load()
+}
+
+func (router *Router) SetPreferredAccount(accountID string) {
+	if router == nil {
+		return
+	}
+	router.mu.Lock()
+	router.preferred = strings.TrimSpace(accountID)
+	router.preferredUsed = false
+	router.mu.Unlock()
+}
+
+func (router *Router) ReleaseSessionAffinity(ctx context.Context, sessionID string) error {
+	if router == nil {
+		return nil
+	}
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return nil
+	}
+	if err := router.affinity.forget(ctx, affinityKeys{session: sessionID}); err != nil {
+		return err
+	}
+	return router.affinity.forget(ctx, affinityKeys{session: "__compact_session__:" + sessionID})
 }
 
 func NewRouter(config Config) (*Router, error) {
@@ -156,7 +195,10 @@ func NewRouter(config Config) (*Router, error) {
 		autoRedeem:               config.AutoRedeem, redeemer: config.Redeemer,
 	}
 	router.selectionSequence.Store(config.SelectionSequenceSeed)
+	router.persistenceEnabled.Store(true)
 	router.affinity.repository = config.Bindings
+	router.affinity.clock = router.now
+	router.affinity.persistenceEnabled = router.persistenceWritesEnabled
 	if config.RoutingState != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()

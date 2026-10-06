@@ -39,7 +39,7 @@ func TestProdex04356GatewayAccountUsesFixedProfileWithoutQuotaPreflight(t *testi
 	if len(got) != 1 || got[0].ID != "one" || got[0].Home != "/profiles/one" || !got[0].Enabled {
 		t.Fatalf("gateway fixed pool = %#v", got)
 	}
-	if gateway.Endpoint() != "http://127.0.0.1:1234/backend-api/prodex" {
+	if gateway.Endpoint() != "http://127.0.0.1:1234/backend-api/godex" {
 		t.Fatalf("gateway endpoint = %q", gateway.Endpoint())
 	}
 	if err := gateway.Close(t.Context()); err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 )
 
 func (store *affinityStore) forget(ctx context.Context, keys affinityKeys) error {
@@ -16,13 +17,14 @@ func (store *affinityStore) forget(ctx context.Context, keys affinityKeys) error
 	}
 	store.mu.Lock()
 	defer store.mu.Unlock()
-	if store.repository != nil {
+	if store.repository != nil && store.writesEnabled() {
 		if err := store.repository.Remove(ctx, values); err != nil {
 			return fmt.Errorf("remove conversation affinity: %w", err)
 		}
 	}
 	for _, key := range values {
 		delete(store.values, key)
+		store.removeContinuationStatusLocked(key)
 	}
 	return nil
 }
@@ -44,16 +46,21 @@ func (store *affinityStore) forgetDeadResponse(
 	if binding, ok := store.values[key]; ok && binding.accountID != accountID {
 		return nil
 	}
-	if repository, ok := store.repository.(responseTurnStateRemover); ok && profileHome != "" {
+	if repository, ok := store.repository.(responseTurnStateRemover); ok && profileHome != "" && store.writesEnabled() {
 		if err := repository.RemoveResponseTurnState(ctx, profileHome, key); err != nil {
 			return fmt.Errorf("remove stale response turn state: %w", err)
 		}
 	}
-	if store.repository != nil {
+	if store.repository != nil && store.writesEnabled() {
 		if err := store.repository.Remove(ctx, []string{key}); err != nil {
 			return fmt.Errorf("remove stale response binding: %w", err)
 		}
 	}
+	now := time.Now()
+	if store.clock != nil {
+		now = store.clock()
+	}
+	store.markContinuationDeadLocked("response", key, now)
 	delete(store.values, key)
 	if state, ok := store.turnStates[key]; ok && state.accountID == accountID {
 		delete(store.turnStates, key)
@@ -84,12 +91,19 @@ func (store *affinityStore) forgetAccount(ctx context.Context, accountID string,
 			values = append(values, key)
 		}
 	}
-	if store.repository != nil && len(values) > 0 {
+	if store.repository != nil && len(values) > 0 && store.writesEnabled() {
 		if err := store.repository.Remove(ctx, values); err != nil {
 			return fmt.Errorf("remove account affinity: %w", err)
 		}
 	}
+	now := time.Now()
+	if store.clock != nil {
+		now = store.clock()
+	}
 	for _, key := range values {
+		if status, ok := store.statuses[key]; ok {
+			store.markContinuationDeadLocked(status.kind, key, now)
+		}
 		delete(store.values, key)
 	}
 	return nil

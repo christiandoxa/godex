@@ -26,7 +26,7 @@ func (router *Router) openRouteCircuit(ctx context.Context, accountID string, se
 	if exists {
 		previousCircuit = &previous
 	}
-	if router.state != nil {
+	if router.state != nil && router.persistenceWritesEnabled() {
 		circuit, opened, err := router.state.OpenRouteCircuit(ctx, accountID, route, healthScore, now)
 		if err == nil {
 			if opened {
@@ -60,7 +60,7 @@ func (router *Router) clearRouteCircuit(ctx context.Context, accountID string, s
 		delete(router.routeCircuits, key)
 	}
 	router.mu.Unlock()
-	if exists && router.state != nil {
+	if exists && router.state != nil && router.persistenceWritesEnabled() {
 		_ = router.state.ClearRouteCircuit(ctx, accountID, route)
 	}
 }
@@ -102,7 +102,7 @@ func (router *Router) reserveRouteCircuitProbe(
 	if !exists {
 		return true, nil
 	}
-	if router.state != nil {
+	if router.state != nil && router.persistenceWritesEnabled() {
 		updated, allowed, err := router.state.ReserveRouteCircuitProbe(ctx, accountID, route, healthScore, now)
 		if err != nil {
 			return false, err

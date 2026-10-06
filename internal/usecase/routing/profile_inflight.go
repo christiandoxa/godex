@@ -78,16 +78,23 @@ func (router *Router) tryAcquireProfileInflight(
 		return nil, false
 	}
 	router.inflight[accountID] = current + weight
+	router.profileInflightAdmissionsTotal++
 	router.mu.Unlock()
 
 	var once sync.Once
 	return func() {
 		once.Do(func() {
 			router.mu.Lock()
-			if router.inflight[accountID] <= weight {
-				delete(router.inflight, accountID)
+			current := router.inflight[accountID]
+			if current <= 0 {
+				router.profileInflightReleaseUnderflowsTotal++
 			} else {
-				router.inflight[accountID] -= weight
+				router.profileInflightReleasesTotal++
+				if current <= weight {
+					delete(router.inflight, accountID)
+				} else {
+					router.inflight[accountID] = current - weight
+				}
 			}
 			close(router.inflightChanged)
 			router.inflightChanged = make(chan struct{})

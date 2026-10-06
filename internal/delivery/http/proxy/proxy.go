@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -18,6 +19,7 @@ import (
 type Config struct {
 	Router                           *routingusecase.Router
 	Activity                         activityRecorder
+	Broker                           *proxymodel.BrokerConfig
 	ListenAddr                       string
 	ActiveRequestLimit               int
 	MaxRequestBytes, MaxInspectBytes int64
@@ -29,7 +31,11 @@ type Proxy struct {
 	maxRequest, maxInspect    int64
 	mu                        sync.Mutex
 	sequence                  atomic.Uint64
+	activeRequests            atomic.Int64
 	activity                  activityRecorder
+	broker                    *proxymodel.BrokerConfig
+	brokerLog                 *brokerLiveLog
+	admission                 *activeRequestHandler
 	listener                  net.Listener
 	done                      chan struct{}
 	endpoint                  string
@@ -56,13 +62,20 @@ func NewProxy(config Config) (*Proxy, error) {
 		config.MaxInspectBytes = 64 << 10
 	}
 	proxy := &Proxy{
-		router: config.Router, activity: config.Activity, listenAddr: config.ListenAddr,
+		router: config.Router, activity: config.Activity, broker: config.Broker, listenAddr: config.ListenAddr,
 		maxRequest: config.MaxRequestBytes, maxInspect: config.MaxInspectBytes,
 		tunnels:                   make(map[*websocketTunnel]struct{}),
 		responsesWebSocketTunnels: make(map[*responsesWebSocketTunnel]struct{}),
 	}
+	if config.Broker != nil {
+		proxy.brokerLog = &brokerLiveLog{}
+	}
+	handler := newActiveRequestHandlerWithRecorder(proxy, config.ActiveRequestLimit, config.Activity)
+	if admission, ok := handler.(*activeRequestHandler); ok {
+		proxy.admission = admission
+	}
 	proxy.server = &http.Server{
-		Handler:           newActiveRequestHandlerWithRecorder(proxy, config.ActiveRequestLimit, config.Activity),
+		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 90 * time.Second,
 	}
 	return proxy, nil
@@ -83,9 +96,47 @@ func (proxy *Proxy) Start() error {
 	proxy.listener = listener
 	proxy.endpoint = "http://" + listener.Addr().String()
 	proxy.done = make(chan struct{})
+	if proxy.brokerLog != nil {
+		proxy.brokerLog.append(fmt.Sprintf(
+			"runtime_broker_started listen_addr=%s current_profile=%s",
+			listener.Addr().String(), proxy.broker.CurrentProfile,
+		))
+	}
 	go func() { _ = proxy.server.Serve(listener); close(proxy.done) }()
 	return nil
 }
+func (proxy *Proxy) SetPersistenceEnabled(enabled bool) {
+	if proxy == nil || proxy.router == nil {
+		return
+	}
+	proxy.router.SetPersistenceEnabled(enabled)
+}
+
+func (proxy *Proxy) SetBrokerPersistenceRole(role string) {
+	if proxy == nil {
+		return
+	}
+	proxy.mu.Lock()
+	defer proxy.mu.Unlock()
+	if proxy.broker != nil {
+		proxy.broker.PersistenceRole = strings.TrimSpace(role)
+	}
+}
+
+func (proxy *Proxy) RecordBrokerLog(line string) {
+	if proxy == nil || proxy.brokerLog == nil {
+		return
+	}
+	proxy.brokerLog.append(line)
+}
+
+func (proxy *Proxy) ActiveRequests() int {
+	if proxy == nil {
+		return 0
+	}
+	return int(proxy.activeRequests.Load())
+}
+
 func (proxy *Proxy) Endpoint() string {
 	proxy.mu.Lock()
 	defer proxy.mu.Unlock()
@@ -127,6 +178,11 @@ func (proxy *Proxy) Close(ctx context.Context) error {
 	}
 }
 func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	if proxy.handleBrokerAdmin(writer, request) {
+		return
+	}
+	proxy.activeRequests.Add(1)
+	defer proxy.activeRequests.Add(-1)
 	activity := proxy.startActivity(request)
 	activityContext := context.WithoutCancel(request.Context())
 	defer proxy.finishActivity(activityContext, activity)

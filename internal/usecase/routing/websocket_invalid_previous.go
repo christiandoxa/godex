@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
@@ -34,11 +35,16 @@ func (store *affinityStore) forgetPreviousResponse(
 	if current, ok := store.values[key]; ok && current.accountID != accountID {
 		return nil
 	}
-	if remover, ok := store.repository.(affinityBindingRemover); ok {
+	if remover, ok := store.repository.(affinityBindingRemover); ok && store.writesEnabled() {
 		if err := remover.Remove(ctx, []string{key}); err != nil {
 			return fmt.Errorf("remove dead previous-response binding: %w", err)
 		}
 	}
+	now := time.Now()
+	if store.clock != nil {
+		now = store.clock()
+	}
+	store.markContinuationDeadLocked("response", key, now)
 	delete(store.values, key)
 	return nil
 }

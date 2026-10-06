@@ -2,6 +2,7 @@ package routing
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
@@ -89,7 +90,7 @@ func (router *Router) recordPreviousResponseFailure(
 	}
 	responseKey := affinityDigest("previous", responseID)
 	key := previousResponseFailureKey{accountID: accountID, responseKey: responseKey, route: route}
-	if repository, ok := router.state.(previousResponseFailureRepository); ok {
+	if repository, ok := router.state.(previousResponseFailureRepository); ok && router.persistenceWritesEnabled() {
 		if failure, err := repository.RecordPreviousResponseFailure(ctx, accountID, responseKey, route, now); err == nil {
 			router.storePreviousResponseFailure(key, failure, now)
 			return failure.Score
@@ -120,6 +121,10 @@ func (router *Router) notePreviousResponseNotFound(
 ) error {
 	now := router.now()
 	failures := router.recordPreviousResponseFailure(ctx, account.ID, responseID, selection, now)
+	if responseID = strings.TrimSpace(responseID); responseID != "" {
+		responseKey := affinityDigest("previous", responseID)
+		router.affinity.markContinuationSuspect("response", responseKey, now)
+	}
 	if failures < routingentity.PreviousResponseFailureThreshold {
 		return nil
 	}
@@ -197,7 +202,7 @@ func (router *Router) clearPreviousResponseFailures(
 		return
 	}
 	responseKey := affinityDigest("previous", responseID)
-	if repository, ok := router.state.(previousResponseFailureRepository); ok {
+	if repository, ok := router.state.(previousResponseFailureRepository); ok && router.persistenceWritesEnabled() {
 		_ = repository.ClearPreviousResponseFailures(ctx, accountID, responseKey)
 	}
 	router.previousResponseFailureMu.Lock()

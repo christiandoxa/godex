@@ -19,6 +19,22 @@ type Account struct {
 	Provider      Provider
 }
 
+type BrokerConfig struct {
+	BrokerKey         string
+	InstanceID        string
+	AdminToken        string
+	CurrentProfile    string
+	StartedAt         int64
+	IncludeCodeReview bool
+	GodexVersion      string
+	ExecutablePath    string
+	ExecutableSHA256  string
+	PersistenceRole   string
+	ResolveProfile    func(context.Context, string) (string, error)
+	OnActivated       func(context.Context, string) error
+	LogRecovery       func(context.Context, string) error
+}
+
 type Config struct {
 	Context             context.Context
 	UpstreamURL         string
@@ -28,5 +44,6 @@ type Config struct {
 	ProviderCredentials []ProviderCredential
 	AutoRedeem          bool
 	SkipQuotaPreflight  bool
+	Broker              *BrokerConfig
 	Accounts            func(context.Context) ([]Account, error)
 }

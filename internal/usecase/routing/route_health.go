@@ -121,7 +121,7 @@ func (router *Router) setRouteHealth(ctx context.Context, accountID string, sele
 	}
 	key := routeHealthKey{accountID: accountID, route: route}
 	now := router.now()
-	if router.state != nil {
+	if router.state != nil && router.persistenceWritesEnabled() {
 		router.routeHealthMu.Lock()
 		updated, err := router.state.SetRouteHealth(ctx, accountID, route, value, now)
 		router.routeHealthMu.Unlock()
@@ -163,7 +163,7 @@ func (router *Router) adjustRouteHealth(ctx context.Context, accountID string, s
 			return
 		}
 	}
-	if router.state != nil {
+	if router.state != nil && router.persistenceWritesEnabled() {
 		router.routeHealthMu.Lock()
 		updated, err := router.state.AdjustRouteHealth(ctx, accountID, route, delta, router.now())
 		if err == nil {

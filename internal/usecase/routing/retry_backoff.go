@@ -22,7 +22,7 @@ func (router *Router) persistRetryBackoff(ctx context.Context, accountID string,
 	defer router.retryBackoffMu.Unlock()
 	now := router.now()
 	router.quarantineAccount(accountID, duration)
-	if router.state == nil {
+	if router.state == nil || !router.persistenceWritesEnabled() {
 		return
 	}
 	seconds := int64((duration + time.Second - 1) / time.Second)
@@ -42,7 +42,7 @@ func (router *Router) clearRetryBackoff(ctx context.Context, accountID string) {
 		delete(router.quarantine, accountID)
 	}
 	router.mu.Unlock()
-	if router.state != nil {
+	if router.state != nil && router.persistenceWritesEnabled() {
 		_ = router.state.ClearRetryBackoff(ctx, accountID, router.now())
 	}
 }

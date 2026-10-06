@@ -12,6 +12,7 @@ import (
 
 	"github.com/christiandoxa/godex/internal/config"
 	"github.com/christiandoxa/godex/internal/delivery/cli"
+	runtimebrokercli "github.com/christiandoxa/godex/internal/delivery/cli/runtimebroker"
 	proxyhttp "github.com/christiandoxa/godex/internal/delivery/http/proxy"
 	antigravitygateway "github.com/christiandoxa/godex/internal/gateway/antigravity"
 	claudegateway "github.com/christiandoxa/godex/internal/gateway/claude"
@@ -106,7 +107,7 @@ func run() int {
 			return nil, err
 		}
 		return proxyhttp.NewProxy(proxyhttp.Config{
-			Router: router, Activity: activity, ListenAddr: config.ListenAddr,
+			Router: router, Activity: activity, Broker: config.Broker, ListenAddr: config.ListenAddr,
 		})
 	})
 	runner := runtimeusecase.NewRunner(store, process, factory)
@@ -136,6 +137,12 @@ func run() int {
 	profiles.SetCopilotSource(copilotSource)
 	quotaStatus.SetExternalProvider("copilot", copilotSource)
 	application.SetProfiles(profiles)
+	brokerStore, err := runtimebrokercli.NewStore(settings.Home)
+	if err != nil {
+		_, _ = fmt.Fprintln(os.Stderr, errorPrefix, err)
+		return 1
+	}
+	application.SetRuntimeBroker(runtimebrokercli.NewCommand(runner, profiles, brokerStore, activity, version.Version))
 	activity.SetProfiles(profiles)
 	quotaStatus.SetProfiles(profiles)
 	application.SetRedeemer(quotausecase.NewRedeemer(profiles, quotaClient))

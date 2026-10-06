@@ -18,7 +18,7 @@ func (router *Router) mutateRouteMemory(
 	}
 	now := router.now()
 	key := routeMemoryKey{accountID: accountID, route: route, kind: kind}
-	if router.state != nil {
+	if router.state != nil && router.persistenceWritesEnabled() {
 		router.routeMemoryMu.Lock()
 		updated, err := router.state.MutateRouteMemory(ctx, accountID, route, kind, now, mutation)
 		router.routeMemoryMu.Unlock()

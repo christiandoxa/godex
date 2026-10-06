@@ -49,6 +49,27 @@ func (store *Store) EnsureLockPath(key string) string {
 	return filepath.Join(store.home, "runtime-broker-"+key+"-ensure")
 }
 
+func (store *Store) OwnerLockPath() string {
+	return filepath.Join(store.home, "runtime-owner.lock")
+}
+
+func (store *Store) TryAcquireOwner() (func() error, bool, error) {
+	if store == nil {
+		return nil, false, errors.New("runtime broker store is not configured")
+	}
+	if err := store.ensureHome(); err != nil {
+		return nil, false, err
+	}
+	release, err := lockfile.TryAcquire(store.OwnerLockPath())
+	if errors.Is(err, lockfile.ErrBusy) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	return release, true, nil
+}
+
 func (store *Store) SaveArtifacts(
 	ctx context.Context,
 	key string,
@@ -133,6 +154,29 @@ func (store *Store) saveRegistryUnlocked(key string, registry Registry) error {
 		return fmt.Errorf("write runtime broker registry: %w", err)
 	}
 	return nil
+}
+
+func (store *Store) UpdateCurrentProfile(
+	ctx context.Context,
+	key, instanceID, currentProfile string,
+) error {
+	if !validID(key) || !validID(instanceID) || currentProfile == "" || len(currentProfile) > 256 {
+		return errors.New("runtime broker registry update is invalid")
+	}
+	if err := store.ensureHome(); err != nil {
+		return err
+	}
+	release, err := lockfile.Acquire(ctx, store.RegistryPath(key)+".lock")
+	if err != nil {
+		return err
+	}
+	defer release()
+	registry, found := store.loadRegistryUnlocked(key)
+	if !found || registry.InstanceID != instanceID {
+		return errors.New("runtime broker registry instance changed")
+	}
+	registry.CurrentProfile = currentProfile
+	return store.saveRegistryUnlocked(key, registry)
 }
 
 func (store *Store) LoadRegistry(ctx context.Context, key string) (Registry, bool, error) {
