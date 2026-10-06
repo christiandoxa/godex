@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
+	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
 const (
@@ -27,6 +29,38 @@ func (runner *Runner) RunOpenAICompatibleProfile(
 		return err
 	}
 	return runner.process.Run(ctx, home, prepared)
+}
+
+func OpenAICompatibleRewriteProvider(baseURL string) (proxymodel.Provider, error) {
+	validated, err := openAICompatibleBaseURL(baseURL)
+	if err != nil {
+		return proxymodel.Provider{}, err
+	}
+	return proxymodel.Provider{
+		Kind: "openai-compatible", Name: openAICompatibleProviderName, APIURL: validated,
+	}, nil
+}
+
+func (runner *Runner) RunOpenAICompatibleProfileWithOptions(
+	ctx context.Context,
+	codexHome, baseURL string,
+	arguments []string,
+	options RuntimeLaunchOptions,
+) error {
+	home, err := validateRuntimeHome(codexHome)
+	if err != nil {
+		return err
+	}
+	provider, err := OpenAICompatibleRewriteProvider(baseURL)
+	if err != nil {
+		return err
+	}
+	id := profileRoutingID("openai-compatible:" + home)
+	return runner.launchHomeWithOptions(
+		ctx, home, id, provider, nil,
+		[]proxymodel.Account{{ID: id, Home: home, Enabled: true, Provider: provider}},
+		arguments, options,
+	)
 }
 
 func openAICompatibleArguments(baseURL string, arguments []string) ([]string, error) {

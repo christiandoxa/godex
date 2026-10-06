@@ -78,9 +78,12 @@ func (process *CodexProcess) runThroughProxy(
 	if err := secureCodexHomeWithShared(codexHome, process.sharedCodexHome); err != nil {
 		return err
 	}
-	if provider == "local" {
+	switch provider {
+	case "local":
 		arguments, err = localProxyArguments(endpoint, arguments)
-	} else {
+	case "openai-compatible":
+		arguments, err = openAICompatibleProxyArguments(endpoint, arguments)
+	default:
 		arguments, err = proxyArguments(endpoint, arguments)
 	}
 	if err != nil {
@@ -161,6 +164,33 @@ func prependCodexHomeBin(environment []string, codexHome string) []string {
 		filtered = append(filtered, "PATH="+bin)
 	}
 	return filtered
+}
+
+func openAICompatibleProxyArguments(endpoint string, arguments []string) ([]string, error) {
+	endpoint = strings.TrimRight(strings.TrimSpace(endpoint), "/")
+	if endpoint == "" {
+		return nil, errors.New("proxy endpoint is required")
+	}
+	if containsProxyOverride(arguments) {
+		return nil, errors.New("codex arguments cannot override Godex routing or credential storage")
+	}
+	if err := validateRuntimeURL(endpoint); err != nil {
+		return nil, err
+	}
+	values := []string{
+		"cli_auth_credentials_store=\"file\"",
+		"model_provider=\"godex-openai-compatible\"",
+		"model_providers.godex-openai-compatible.name=\"OpenAI-compatible through Godex\"",
+		"model_providers.godex-openai-compatible.base_url=" + strconv.Quote(endpoint+"/v1"),
+		"model_providers.godex-openai-compatible.wire_api=\"responses\"",
+		"model_providers.godex-openai-compatible.requires_openai_auth=true",
+		"model_providers.godex-openai-compatible.supports_websockets=false",
+	}
+	managed := make([]string, 0, len(values)*2)
+	for _, value := range values {
+		managed = append(managed, "-c", value)
+	}
+	return scopeModelArguments(arguments, managed), nil
 }
 
 func localProxyArguments(endpoint string, arguments []string) ([]string, error) {

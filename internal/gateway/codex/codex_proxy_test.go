@@ -355,3 +355,30 @@ func TestProdex04356ProxyChildEnvironmentPrependsOverlayBinAndClearsRTKControls(
 		t.Fatalf("PRODEX_RTK_DISABLE_AUTO_WRAP leaked into child: %#v", values)
 	}
 }
+
+func TestProdex04356OpenAICompatibleProxyArgumentsRetargetProfileThroughGodex(t *testing.T) {
+	args, err := openAICompatibleProxyArguments(
+		"http://127.0.0.1:4455",
+		[]string{"-c", "model=\"profile-model\"", "exec", "review"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rendered := strings.Join(args, "\n")
+	for _, want := range []string{
+		"model_provider=\"godex-openai-compatible\"",
+		"model_providers.godex-openai-compatible.name=\"OpenAI-compatible through Godex\"",
+		"model_providers.godex-openai-compatible.base_url=\"http://127.0.0.1:4455/v1\"",
+		"model_providers.godex-openai-compatible.wire_api=\"responses\"",
+		"model_providers.godex-openai-compatible.requires_openai_auth=true",
+		"model_providers.godex-openai-compatible.supports_websockets=false",
+		"model=\"profile-model\"",
+	} {
+		if !strings.Contains(rendered, want) {
+			t.Fatalf("compatible proxy args missing %q: %#v", want, args)
+		}
+	}
+	if strings.Contains(rendered, "godex-local") || strings.Contains(rendered, "godex-openai\"") {
+		t.Fatalf("compatible proxy args used wrong provider: %#v", args)
+	}
+}

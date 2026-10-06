@@ -2,8 +2,11 @@ package runtime
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
 func TestOpenAICompatibleArgumentsMatchProdexProfileProvider(t *testing.T) {
@@ -49,5 +52,35 @@ func TestRunOpenAICompatibleProfileRunsDirectWithoutProxy(t *testing.T) {
 	}
 	if len(process.homes) != 1 || process.homes[0] != home || len(process.args) != 1 || !strings.Contains(strings.Join(process.args[0], "\n"), `model_provider="godex-openai-compatible"`) {
 		t.Fatalf("direct process = homes:%#v args:%#v", process.homes, process.args)
+	}
+}
+
+func TestProdex04356RunOpenAICompatibleProfileWithOptionsUsesRuntimeProxy(t *testing.T) {
+	home := t.TempDir()
+	process := &fakeProxyProcess{}
+	proxy := &fakeProxy{}
+	var captured proxymodel.Config
+	runner := NewRunner(nil, process, func(got proxymodel.Config) (Proxy, error) {
+		captured = got
+		return proxy, nil
+	})
+	runner.SetManagedProfilesRoot(filepath.Join(t.TempDir(), "profiles"))
+
+	if err := runner.RunOpenAICompatibleProfileWithOptions(
+		t.Context(), home, "https://example.test/v1",
+		[]string{"exec", "hello"},
+		RuntimeLaunchOptions{SuperOverlay: true, SmartContextEnabled: true},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if captured.Provider.Kind != "openai-compatible" ||
+		captured.Provider.APIURL != "https://example.test/v1" ||
+		!captured.SmartContextEnabled {
+		t.Fatalf("compatible runtime config = %#v", captured)
+	}
+	if process.home == home ||
+		process.endpoint != "http://127.0.0.1:1234" ||
+		!strings.Contains(strings.Join(process.arguments, "\n"), "exec") {
+		t.Fatalf("compatible child = home:%q endpoint:%q args:%#v", process.home, process.endpoint, process.arguments)
 	}
 }

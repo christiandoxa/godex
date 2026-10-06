@@ -127,3 +127,29 @@ func TestProdex04356LocalRewriteAcceptsManagedMountAndRejectsUnsafeTargets(t *te
 		t.Fatalf("unsupported route = %v", err)
 	}
 }
+
+func TestProdex04356OpenAICompatibleRewritePreservesProfileAuthorization(t *testing.T) {
+	var authorization string
+	upstream := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		authorization = request.Header.Get("Authorization")
+		writer.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	transport, err := NewTransportWithAuthPolicy(upstream.URL+"/v1", upstream.Client(), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := transport.Execute(t.Context(), proxymodel.Request{
+		Method: http.MethodPost,
+		Path:   "/v1/responses",
+		Header: http.Header{"Authorization": {"Bearer profile-api-key"}},
+	}, proxymodel.Account{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = response.Body.Close()
+	if authorization != "Bearer profile-api-key" {
+		t.Fatalf("preserved authorization = %q", authorization)
+	}
+}

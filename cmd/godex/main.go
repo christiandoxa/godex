@@ -276,6 +276,8 @@ func newRuntimeGateway(
 		return newKiroRuntimeGateway(config, kiroSource)
 	case "local":
 		return localrewritegateway.NewTransport(config.Provider.APIURL, client)
+	case "openai-compatible":
+		return localrewritegateway.NewTransportWithAuthPolicy(config.Provider.APIURL, client, true)
 	default:
 		return nil, fmt.Errorf("runtime provider %q is not implemented", config.Provider.Kind)
 	}

@@ -658,3 +658,81 @@ func TestProdex04356SuperProfilesActivatesResolvedToolsBeforeRuntimeChild(t *tes
 		t.Fatalf("Super tool overlay survived cleanup: %v", err)
 	}
 }
+
+type superCompatibleProfiles struct {
+	target  profilemodel.LaunchTarget
+	baseURL string
+}
+
+func (profiles *superCompatibleProfiles) ResolveLaunch(_ context.Context, name string) (profilemodel.LaunchTarget, error) {
+	if name != profiles.target.Name {
+		return profilemodel.LaunchTarget{}, errors.New("unexpected profile")
+	}
+	return profiles.target, nil
+}
+func (profiles *superCompatibleProfiles) ActiveLaunch(context.Context) (profilemodel.LaunchTarget, bool, error) {
+	return profiles.target, true, nil
+}
+func (profiles *superCompatibleProfiles) AcquireLaunch(context.Context, string) (func() error, error) {
+	return func() error { return nil }, nil
+}
+func (*superCompatibleProfiles) ProviderLaunchPool(context.Context, string, string, bool) ([]profilemodel.LaunchTarget, error) {
+	return nil, errors.New("unexpected provider pool")
+}
+func (*superCompatibleProfiles) ResolveProviderLaunch(context.Context, string, string) (profilemodel.LaunchTarget, bool, error) {
+	return profilemodel.LaunchTarget{}, false, errors.New("unexpected provider resolution")
+}
+func (*superCompatibleProfiles) AcquireLaunchPool(context.Context, []string) (func() error, error) {
+	return nil, errors.New("unexpected acquire launch pool")
+}
+func (profiles *superCompatibleProfiles) OpenAICompatibleBaseURL(context.Context, string) (string, bool, error) {
+	return profiles.baseURL, true, nil
+}
+
+func TestProdex04356SuperOpenAICompatibleProfileUsesRewriteProxyAndPreservesProfileAuth(t *testing.T) {
+	home := t.TempDir()
+	if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte("model = \"profile-model\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, "auth.json"), []byte("{\"auth_mode\":\"apikey\",\"OPENAI_API_KEY\":\"profile-secret\"}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	profiles := &superCompatibleProfiles{
+		target: profilemodel.LaunchTarget{
+			Name: "compatible-main", CodexHome: home, Provider: "openai",
+		},
+		baseURL: "https://compatible.example.test/v1",
+	}
+	process := &localSuperCaptureProcess{}
+	var captured proxyconfig.Config
+	runner := runtimeusecase.NewRunner(nil, process, func(config proxyconfig.Config) (runtimeusecase.Proxy, error) {
+		captured = config
+		return &kiroShortcutProxy{}, nil
+	})
+	runner.SetManagedProfilesRoot(filepath.Join(t.TempDir(), "profiles"))
+
+	options, err := parseSuperArguments([]string{
+		"--profile", "compatible-main",
+		"exec", "review",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := launchSuperProfiles(t.Context(), runner, nil, profiles, options); err != nil {
+		t.Fatal(err)
+	}
+	if captured.Provider.Kind != "openai-compatible" ||
+		captured.Provider.APIURL != "https://compatible.example.test/v1" ||
+		!captured.SmartContextEnabled {
+		t.Fatalf("compatible Super config = %#v", captured)
+	}
+	if process.provider != "openai-compatible" || process.home == home {
+		t.Fatalf("compatible Super child = provider:%q home:%q", process.provider, process.home)
+	}
+	if process.auth["OPENAI_API_KEY"] != "profile-secret" {
+		t.Fatalf("compatible overlay auth was not preserved: %#v", process.auth)
+	}
+	if process.auth["OPENAI_API_KEY"] == "godex-runtime-provider" {
+		t.Fatal("compatible profile auth was replaced by local synthetic credential")
+	}
+}

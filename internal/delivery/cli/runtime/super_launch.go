@@ -3,7 +3,6 @@ package runtime
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
@@ -297,9 +296,8 @@ func launchSuperTarget(
 			return err
 		}
 		if compatible {
-			return fmt.Errorf(
-				"Godex Super profile %q uses OpenAI-compatible base URL %s and requires local-rewrite proxy support",
-				target.Name, baseURL,
+			return runner.RunOpenAICompatibleProfileWithOptions(
+				ctx, target.CodexHome, baseURL, launchArguments, launchOptions,
 			)
 		}
 	}

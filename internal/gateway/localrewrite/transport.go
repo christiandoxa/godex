@@ -15,11 +15,16 @@ import (
 const ProviderRuntimeAPIKey = "godex-runtime-provider"
 
 type Transport struct {
-	base   *url.URL
-	client *http.Client
+	base         *url.URL
+	client       *http.Client
+	preserveAuth bool
 }
 
 func NewTransport(baseURL string, client *http.Client) (*Transport, error) {
+	return NewTransportWithAuthPolicy(baseURL, client, false)
+}
+
+func NewTransportWithAuthPolicy(baseURL string, client *http.Client, preserveAuth bool) (*Transport, error) {
 	parsed, err := url.Parse(strings.TrimSpace(baseURL))
 	if err != nil || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" ||
 		parsed.ForceQuery || parsed.Fragment != "" ||
@@ -30,7 +35,7 @@ func NewTransport(baseURL string, client *http.Client) (*Transport, error) {
 		client = http.DefaultClient
 	}
 	copyClient := *client
-	return &Transport{base: parsed, client: &copyClient}, nil
+	return &Transport{base: parsed, client: &copyClient, preserveAuth: preserveAuth}, nil
 }
 
 func (transport *Transport) Close() {
@@ -54,7 +59,9 @@ func (transport *Transport) Execute(
 		return nil, err
 	}
 	request.Header = localRewriteHeaders(input.Header)
-	request.Header.Set("Authorization", "Bearer "+ProviderRuntimeAPIKey)
+	if !transport.preserveAuth {
+		request.Header.Set("Authorization", "Bearer "+ProviderRuntimeAPIKey)
+	}
 	response, err := transport.client.Do(request)
 	if err != nil {
 		return nil, err
