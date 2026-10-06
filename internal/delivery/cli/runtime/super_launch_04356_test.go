@@ -1,11 +1,13 @@
 package runtime
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -386,6 +388,9 @@ type localSuperCaptureProcess struct {
 	home, endpoint, provider string
 	arguments                []string
 	auth                     map[string]any
+	config                   string
+	agents                   string
+	rtkReady                 bool
 }
 
 func (*localSuperCaptureProcess) Run(context.Context, string, []string) error {
@@ -414,7 +419,23 @@ func (process *localSuperCaptureProcess) capture(home, endpoint string, argument
 	if err != nil {
 		return err
 	}
-	return json.Unmarshal(content, &process.auth)
+	if err := json.Unmarshal(content, &process.auth); err != nil {
+		return err
+	}
+	if config, readErr := os.ReadFile(filepath.Join(home, "config.toml")); readErr == nil {
+		process.config = string(config)
+	}
+	if agents, readErr := os.ReadFile(filepath.Join(home, "AGENTS.md")); readErr == nil {
+		process.agents = string(agents)
+	}
+	rtkPath := filepath.Join(home, "bin", "rtk")
+	if goruntime.GOOS == "windows" {
+		rtkPath += ".cmd"
+	}
+	if info, statErr := os.Stat(rtkPath); statErr == nil && info.Mode().IsRegular() {
+		process.rtkReady = true
+	}
+	return nil
 }
 
 func TestProdex04356SuperLocalRewriteUsesOverlayProxyAndSyntheticAuth(t *testing.T) {
@@ -564,5 +585,73 @@ func TestProdex04356SuperLocalRewriteResumeKeepsSessionHomeAndSyntheticTransport
 		if !strings.Contains(joined, want) {
 			t.Fatalf("local resume args missing %q: %#v", want, process.arguments)
 		}
+	}
+}
+
+func TestProdex04356SuperProfilesActivatesResolvedToolsBeforeRuntimeChild(t *testing.T) {
+	baseHome := t.TempDir()
+	if err := os.WriteFile(filepath.Join(baseHome, "auth.json"), []byte("{\"auth_mode\":\"apikey\",\"OPENAI_API_KEY\":\"profile-secret\"}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(baseHome, "config.toml"), []byte("model = \"base\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(baseHome, "AGENTS.md"), []byte("base instructions\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	rtk := filepath.Join(t.TempDir(), "rtk")
+	codebase := filepath.Join(t.TempDir(), "codebase-memory-mcp")
+	for _, path := range []string{rtk, codebase} {
+		if err := os.WriteFile(path, []byte("fixture"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	process := &localSuperCaptureProcess{}
+	runner := runtimeusecase.NewRunner(nil, process, func(proxyconfig.Config) (runtimeusecase.Proxy, error) {
+		return &kiroShortcutProxy{}, nil
+	})
+	runner.SetCurrentCodexHome(baseHome)
+	runner.SetManagedProfilesRoot(filepath.Join(t.TempDir(), "profiles"))
+
+	lookup := func(tool string) (string, bool) {
+		switch tool {
+		case "rtk":
+			return rtk, true
+		case "codebase-memory-mcp":
+			return codebase, true
+		default:
+			return "", false
+		}
+	}
+	if err := superProfilesWithToolLookup(
+		t.Context(), runner, nil, nil, &bytes.Buffer{},
+		[]string{"--url", "http://127.0.0.1:11434", "exec", "review"},
+		lookup,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if !process.rtkReady {
+		t.Fatal("resolved RTK was not activated in overlay bin")
+	}
+	for _, want := range []string{
+		"[mcp_servers.codebase-memory-mcp]",
+		"__mcp-jsonl-bridge",
+		codebase,
+	} {
+		if !strings.Contains(process.config, want) {
+			t.Fatalf("activated config missing %q:\n%s", want, process.config)
+		}
+	}
+	for _, want := range []string{
+		"@" + filepath.Join(process.home, "RTK.md"),
+		"@" + filepath.Join(process.home, "SUPER_OPTIMIZERS.md"),
+	} {
+		if !strings.Contains(process.agents, want) {
+			t.Fatalf("activated AGENTS missing %q:\n%s", want, process.agents)
+		}
+	}
+	if _, err := os.Stat(process.home); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("Super tool overlay survived cleanup: %v", err)
 	}
 }

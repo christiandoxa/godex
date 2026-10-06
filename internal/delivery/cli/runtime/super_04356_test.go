@@ -208,10 +208,10 @@ func TestProdex04356SuperDryRunIsSideEffectFreeAndRedactsAPIKey(t *testing.T) {
 	}
 }
 
-func TestProdex04356SuperDoesNotSilentlyLaunchIncompleteRuntime(t *testing.T) {
+func TestProdex04356StandaloneSuperHelperRequiresRuntimeDependencies(t *testing.T) {
 	err := superWithToolLookup(context.Background(), &bytes.Buffer{}, nil,
 		func(tool string) (string, bool) { return "/tools/" + tool, true })
-	if err == nil || !strings.Contains(err.Error(), "runtime activation is not implemented yet") {
-		t.Fatalf("non-dry-run Super = %v", err)
+	if err == nil || !strings.Contains(err.Error(), "runtime dependencies are required") {
+		t.Fatalf("standalone non-dry-run Super = %v", err)
 	}
 }

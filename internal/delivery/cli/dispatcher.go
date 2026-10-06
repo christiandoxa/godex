@@ -114,7 +114,13 @@ func (app *App) Run(ctx context.Context, arguments []string) error {
 	case "run":
 		return app.runRuntime(ctx, arguments[1:])
 	case "super", "s":
-		return runtimecli.Super(ctx, app.out, arguments[1:])
+		if app.runtime == nil {
+			return fmt.Errorf("runtime support is not configured")
+		}
+		if app.profiles != nil {
+			return runtimecli.SuperProfiles(ctx, app.runtime, app.sessions, app.profiles, app.out, arguments[1:])
+		}
+		return runtimecli.SuperProfiles(ctx, app.runtime, app.sessions, nil, app.out, arguments[1:])
 	case "gateway":
 		return runtimecli.Gateway(ctx, app.runtime, app.profiles, app.out, arguments[1:])
 	case "quota":

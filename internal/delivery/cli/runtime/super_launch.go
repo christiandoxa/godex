@@ -24,6 +24,22 @@ func superRuntimeLaunchOptions(options superOptions) runtimeusecase.RuntimeLaunc
 		SuperOverlay:        true,
 		UpstreamNoProxy:     options.noProxy,
 	}
+	prepares := make([]func(string) error, 0, 2)
+	if options.toolResolutionDone {
+		tools := make([]runtimeusecase.SuperOptionalTool, 0, len(options.resolvedTools))
+		for _, status := range options.resolvedTools {
+			if status.service || !status.resolved {
+				continue
+			}
+			tools = append(tools, runtimeusecase.SuperOptionalTool{
+				Name: status.name, Path: status.path, Required: status.required,
+			})
+		}
+		presidio := superPresidioEnabled(options)
+		prepares = append(prepares, func(home string) error {
+			return runtimeusecase.PrepareSuperToolsOverlay(home, tools, presidio)
+		})
+	}
 	if options.subAgent.enabled {
 		config := runtimeusecase.SuperSubAgentConfig{
 			Provider:             options.subAgent.provider,
@@ -35,8 +51,18 @@ func superRuntimeLaunchOptions(options superOptions) runtimeusecase.RuntimeLaunc
 			PresidioEnabled:      superPresidioEnabled(options),
 			RequiredTools:        append([]string(nil), options.requiredTools...),
 		}
-		launch.OverlayPrepare = func(home string) error {
+		prepares = append(prepares, func(home string) error {
 			return runtimeusecase.PrepareSuperSubAgentOverlay(home, config)
+		})
+	}
+	if len(prepares) > 0 {
+		launch.OverlayPrepare = func(home string) error {
+			for _, prepare := range prepares {
+				if err := prepare(home); err != nil {
+					return err
+				}
+			}
+			return nil
 		}
 	}
 	return launch

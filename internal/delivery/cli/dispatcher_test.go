@@ -17,6 +17,7 @@ import (
 	updategateway "github.com/christiandoxa/godex/internal/gateway/update"
 	authmodel "github.com/christiandoxa/godex/internal/model/auth"
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
+	proxyconfig "github.com/christiandoxa/godex/internal/model/proxy"
 	accountrepo "github.com/christiandoxa/godex/internal/repository/account"
 	profilerepo "github.com/christiandoxa/godex/internal/repository/profile"
 	updaterepo "github.com/christiandoxa/godex/internal/repository/update"
@@ -545,5 +546,85 @@ func TestProdex04356HiddenSuperExposeIsExplicitAndSilent(t *testing.T) {
 	}
 	if shouldShowUpdateNotice([]string{"__super-expose", "exec"}) {
 		t.Fatal("hidden Super expose must not emit update notices")
+	}
+}
+
+type dispatcherSuperProcess struct {
+	home, endpoint, provider string
+	arguments                []string
+}
+
+func (*dispatcherSuperProcess) Run(context.Context, string, []string) error {
+	return errors.New("Super production launch must use runtime proxy")
+}
+
+func (*dispatcherSuperProcess) CheckProxySupport(context.Context) error { return nil }
+
+func (process *dispatcherSuperProcess) RunThroughProxy(
+	_ context.Context, home, endpoint string, arguments []string,
+) error {
+	process.home, process.endpoint = home, endpoint
+	process.arguments = append([]string(nil), arguments...)
+	return nil
+}
+
+func (process *dispatcherSuperProcess) RunThroughProxyProvider(
+	_ context.Context, home, endpoint string, arguments []string, provider string,
+) error {
+	process.home, process.endpoint, process.provider = home, endpoint, provider
+	process.arguments = append([]string(nil), arguments...)
+	return nil
+}
+
+type dispatcherSuperProxy struct{}
+
+func (*dispatcherSuperProxy) Start() error                { return nil }
+func (*dispatcherSuperProxy) Endpoint() string            { return "http://127.0.0.1:4567" }
+func (*dispatcherSuperProxy) Close(context.Context) error { return nil }
+
+func TestProdex04356DispatcherSuperUsesProductionRuntimeLaunch(t *testing.T) {
+	t.Setenv("PATH", "")
+	baseHome := t.TempDir()
+	if err := os.WriteFile(filepath.Join(baseHome, "config.toml"), []byte("model = \"base\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(baseHome, "auth.json"), []byte("{\"auth_mode\":\"apikey\",\"OPENAI_API_KEY\":\"base\"}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	process := &dispatcherSuperProcess{}
+	var captured proxyconfig.Config
+	runner := runtimeusecase.NewRunner(nil, process, func(config proxyconfig.Config) (runtimeusecase.Proxy, error) {
+		captured = config
+		return &dispatcherSuperProxy{}, nil
+	})
+	runner.SetCurrentCodexHome(baseHome)
+	runner.SetManagedProfilesRoot(filepath.Join(t.TempDir(), "profiles"))
+	app := New(nil, nil, nil, runner, nil, nil, &bytes.Buffer{})
+
+	if err := app.Run(t.Context(), []string{
+		"s", "--url", "http://127.0.0.1:11434", "--model", "qwen-local", "exec", "hello",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if captured.Provider.Kind != "local" || captured.Provider.APIURL != "http://127.0.0.1:11434/v1" ||
+		!captured.SmartContextEnabled || !captured.SkipQuotaPreflight {
+		t.Fatalf("production Super proxy config = %#v", captured)
+	}
+	if process.provider != "local" || process.endpoint != "http://127.0.0.1:4567" || process.home == baseHome {
+		t.Fatalf("production Super child = home:%q endpoint:%q provider:%q", process.home, process.endpoint, process.provider)
+	}
+	joined := strings.Join(process.arguments, "\n")
+	for _, want := range []string{
+		"--dangerously-bypass-approvals-and-sandbox",
+		"exec",
+		"hello",
+		"model=\"qwen-local\"",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("production Super args missing %q: %#v", want, process.arguments)
+		}
+	}
+	if _, err := os.Stat(process.home); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("production Super overlay survived cleanup: %v", err)
 	}
 }

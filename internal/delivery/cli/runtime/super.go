@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"slices"
 	"strconv"
 	"strings"
+
+	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
+	sessionusecase "github.com/christiandoxa/godex/internal/usecase/session"
 )
 
 var superDefaultTools = []string{
@@ -60,6 +62,8 @@ type superOptions struct {
 	fullAccess         bool
 	smartContext       bool
 	superMode          bool
+	resolvedTools      []superToolStatus
+	toolResolutionDone bool
 }
 
 type superToolStatus struct {
@@ -81,10 +85,57 @@ func superWithToolLookup(_ context.Context, out io.Writer, arguments []string, l
 	if err != nil {
 		return err
 	}
-	if !options.dryRun {
-		return errors.New("Godex Super runtime activation is not implemented yet; use --dry-run to inspect the resolved launch")
+	tools, err := resolveSuperTools(options, lookup)
+	if err != nil {
+		return err
 	}
-	return renderSuperDryRun(out, options, lookup)
+	options.resolvedTools = tools
+	options.toolResolutionDone = true
+	if !options.dryRun {
+		return errors.New("Godex Super runtime dependencies are required for non-dry-run launch")
+	}
+	return renderSuperDryRunResolved(out, options, tools)
+}
+
+func SuperProfiles(
+	ctx context.Context,
+	runner *runtimeusecase.Runner,
+	sessions *sessionusecase.Catalog,
+	profiles launchProfiles,
+	out io.Writer,
+	arguments []string,
+) error {
+	return superProfilesWithToolLookup(
+		ctx, runner, sessions, profiles, out, arguments, defaultSuperToolLookup,
+	)
+}
+
+func superProfilesWithToolLookup(
+	ctx context.Context,
+	runner *runtimeusecase.Runner,
+	sessions *sessionusecase.Catalog,
+	profiles launchProfiles,
+	out io.Writer,
+	arguments []string,
+	lookup superToolLookup,
+) error {
+	options, err := parseSuperArguments(arguments)
+	if err != nil {
+		return err
+	}
+	tools, err := resolveSuperTools(options, lookup)
+	if err != nil {
+		return err
+	}
+	options.resolvedTools = tools
+	options.toolResolutionDone = true
+	if options.dryRun {
+		return renderSuperDryRunResolved(out, options, tools)
+	}
+	if superPresidioEnabled(options) {
+		return errors.New("Godex Super Presidio runtime activation is not implemented yet")
+	}
+	return launchSuperProfiles(ctx, runner, sessions, profiles, options)
 }
 
 func parseSuperArguments(arguments []string) (superOptions, error) {
@@ -517,10 +568,18 @@ func validateSuperOptions(options superOptions) error {
 }
 
 func renderSuperDryRun(out io.Writer, options superOptions, lookup superToolLookup) error {
-	tools, err := resolveSuperTools(options, lookup)
-	if err != nil {
-		return err
+	tools := options.resolvedTools
+	if !options.toolResolutionDone {
+		var err error
+		tools, err = resolveSuperTools(options, lookup)
+		if err != nil {
+			return err
+		}
 	}
+	return renderSuperDryRunResolved(out, options, tools)
+}
+
+func renderSuperDryRunResolved(out io.Writer, options superOptions, tools []superToolStatus) error {
 	profile := "(active/default)"
 	if options.profile != "" {
 		profile = options.profile
@@ -613,23 +672,6 @@ func resolveSuperTools(options superOptions, lookup superToolLookup) ([]superToo
 		statuses = append(statuses, status)
 	}
 	return statuses, nil
-}
-
-func defaultSuperToolLookup(tool string) (string, bool) {
-	candidates := map[string][]string{
-		"caveman":             {"caveman"},
-		"rtk":                 {"rtk"},
-		"codebase-memory-mcp": {"codebase-memory-mcp"},
-		"playwright-mcp":      {"playwright-mcp"},
-		"ponytail":            {"ponytail"},
-	}[tool]
-	for _, candidate := range candidates {
-		path, err := exec.LookPath(candidate)
-		if err == nil {
-			return path, true
-		}
-	}
-	return "", false
 }
 
 func normalizeSuperTool(value string) (string, error) {

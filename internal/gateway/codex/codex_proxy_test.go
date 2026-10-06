@@ -325,3 +325,33 @@ func TestProdex04356LocalProxyArgumentsKeepManagedRoutingNonOverridable(t *testi
 		}
 	}
 }
+
+func TestProdex04356ProxyChildEnvironmentPrependsOverlayBinAndClearsRTKControls(t *testing.T) {
+	home := t.TempDir()
+	bin := filepath.Join(home, "bin")
+	if err := os.MkdirAll(bin, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", filepath.Join(t.TempDir(), "ambient"))
+	t.Setenv("PRODEX_RTK_AUTO_WRAP_DEPTH", "9")
+	t.Setenv("PRODEX_RTK_DISABLE_AUTO_WRAP", "1")
+
+	environment := proxyChildEnvironment(home, "", "")
+	values := make(map[string]string)
+	for _, entry := range environment {
+		key, value, found := strings.Cut(entry, "=")
+		if found {
+			values[strings.ToUpper(key)] = value
+		}
+	}
+	parts := filepath.SplitList(values["PATH"])
+	if len(parts) == 0 || parts[0] != bin {
+		t.Fatalf("child PATH = %q, want overlay bin first", values["PATH"])
+	}
+	if _, ok := values["PRODEX_RTK_AUTO_WRAP_DEPTH"]; ok {
+		t.Fatalf("PRODEX_RTK_AUTO_WRAP_DEPTH leaked into child: %#v", values)
+	}
+	if _, ok := values["PRODEX_RTK_DISABLE_AUTO_WRAP"]; ok {
+		t.Fatalf("PRODEX_RTK_DISABLE_AUTO_WRAP leaked into child: %#v", values)
+	}
+}

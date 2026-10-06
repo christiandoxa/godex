@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -106,6 +107,7 @@ func (process *CodexProcess) runThroughProxy(
 
 func proxyChildEnvironment(codexHome, provider, sharedCodexHome string) []string {
 	environment := codexThreadIndexEnvironment(codexHome, sharedCodexHome)
+	environment = prependCodexHomeBin(environment, codexHome)
 	if strings.TrimSpace(provider) == "" {
 		return environment
 	}
@@ -130,6 +132,33 @@ func proxyChildEnvironment(codexHome, provider, sharedCodexHome string) []string
 			continue
 		}
 		filtered = append(filtered, entry)
+	}
+	return filtered
+}
+
+func prependCodexHomeBin(environment []string, codexHome string) []string {
+	bin := filepath.Join(codexHome, "bin")
+	info, err := os.Stat(bin)
+	if err != nil || !info.IsDir() {
+		return environment
+	}
+	filtered := make([]string, 0, len(environment)+1)
+	pathSet := false
+	for _, entry := range environment {
+		key, value, found := strings.Cut(entry, "=")
+		if found && (strings.EqualFold(key, "PRODEX_RTK_AUTO_WRAP_DEPTH") ||
+			strings.EqualFold(key, "PRODEX_RTK_DISABLE_AUTO_WRAP")) {
+			continue
+		}
+		if found && strings.EqualFold(key, "PATH") {
+			filtered = append(filtered, "PATH="+bin+string(os.PathListSeparator)+value)
+			pathSet = true
+			continue
+		}
+		filtered = append(filtered, entry)
+	}
+	if !pathSet {
+		filtered = append(filtered, "PATH="+bin)
 	}
 	return filtered
 }
