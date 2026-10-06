@@ -283,6 +283,7 @@ func TestUpdateNoticeEligibilityMatchesReadOnlyAndMinimalSurfaces(t *testing.T) 
 		{"run", "--provider", "gemini", "--cli", "agy", "resume", "thread"},
 		{"help"},
 		{"--version"},
+		{"__mcp-jsonl-bridge", "server"},
 	} {
 		if shouldShowUpdateNotice(arguments) {
 			t.Fatalf("arguments %#v unexpectedly show update notice", arguments)
@@ -497,5 +498,11 @@ func TestDispatcherDirectAPIKeyLoginCreatesOpenAICompatibleProfile(t *testing.T)
 	}
 	if strings.Contains(output.String(), "fixture-direct-api-key") {
 		t.Fatalf("API key leaked into direct login output: %q", output.String())
+	}
+}
+
+func TestProdex04355HiddenMCPBridgeIsExplicitGodexCommand(t *testing.T) {
+	if !IsExplicitGodexCommand("__mcp-jsonl-bridge") {
+		t.Fatal("hidden MCP bridge fell through to Codex runtime dispatch")
 	}
 }
