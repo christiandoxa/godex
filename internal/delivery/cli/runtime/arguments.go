@@ -171,9 +171,6 @@ func finishRunArguments(
 		}
 		return runtimemodel.Selection{}, nil, errors.New("selected options are unsupported for native Antigravity")
 	}
-	if selection.DryRun && selection.CLI != "agy" {
-		return runtimemodel.Selection{}, nil, errors.New("--dry-run requires --cli agy")
-	}
 	if selection.CLI == "agy" && len(featureArguments) > 0 {
 		return runtimemodel.Selection{}, nil, errors.New("selected options are unsupported for native Antigravity")
 	}

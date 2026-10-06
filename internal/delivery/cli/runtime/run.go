@@ -40,6 +40,9 @@ func Run(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessionus
 		}
 		return runner.RunAntigravity(ctx, selection.Model, codexArguments)
 	}
+	if selection.DryRun {
+		return runDryRun(ctx, runner, nil, selection, codexArguments, out, "")
+	}
 	runner.SetAutoRedeem(selection.AutoRedeem)
 	if selection.Profile != "" {
 		return errors.New("--profile requires profile-aware runtime dispatch")
@@ -64,6 +67,9 @@ func RunProfiles(ctx context.Context, runner *runtimeusecase.Runner, sessions *s
 		}
 		return runner.RunAntigravity(ctx, selection.Model, codexArguments)
 	}
+	if selection.DryRun {
+		return runDryRun(ctx, runner, profiles, selection, codexArguments, out, "")
+	}
 	runner.SetAutoRedeem(selection.AutoRedeem)
 	return runProfileSelection(ctx, runner, sessions, profiles, selection, codexArguments)
 }
@@ -79,10 +85,13 @@ func RunHome(ctx context.Context, runner *runtimeusecase.Runner, sessions *sessi
 		}
 		return runner.RunAntigravity(ctx, selection.Model, codexArguments)
 	}
-	runner.SetAutoRedeem(selection.AutoRedeem)
 	if selection.Profile != "" {
 		return errors.New("--profile cannot override an already resolved profile home")
 	}
+	if selection.DryRun {
+		return runDryRun(ctx, runner, nil, selection, codexArguments, out, home)
+	}
+	runner.SetAutoRedeem(selection.AutoRedeem)
 	if selection.URL != "" {
 		if selection.Account != "" {
 			return runner.RunLocalProvider(ctx, selection.Account, localProviderConfig(selection), codexArguments)

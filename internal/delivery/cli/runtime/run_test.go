@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -124,6 +125,89 @@ func TestRunNativeAntigravityDryRunPrintsDiagnosticsWithoutLaunching(t *testing.
 	}
 	if process.preparedHome != "/synthetic/shared-codex" || len(process.arguments) != 0 {
 		t.Fatalf("dry-run prepared %q and launched arguments %#v", process.preparedHome, process.arguments)
+	}
+}
+
+func TestProdex04356RunDryRunResolvesActiveProfileWithoutLaunching(t *testing.T) {
+	home := t.TempDir()
+	if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte("model_provider = \"openai\"\nmodel = \"profile-model\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	profiles := &fakeLocalLaunchProfiles{
+		target: profilemodel.LaunchTarget{Name: "work", CodexHome: home, Provider: "openai"},
+		active: true,
+	}
+	process := &fakeRunnerProcess{}
+	runner := runtimeusecase.NewRunner(&fakeRunnerAccounts{}, process, nil)
+	var output bytes.Buffer
+	err := RunProfiles(t.Context(), runner, nil, profiles, []string{
+		"--dry-run", "--", "--model", "cli-model", "exec", "hello",
+	}, &output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := output.String()
+	for _, want := range []string{
+		"Godex dry run: launch diagnostics",
+		"Flow: run",
+		"Binary: codex",
+		"Provider: godex-openai",
+		"Model: cli-model",
+		"CODEX_HOME: <CODEX_HOME>",
+		"Runtime proxy: would be enabled with mount /backend-api/godex",
+		"Profile: (active/default)",
+		"Codex/TUI not started because --dry-run was set.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("dry-run output missing %q:\n%s", want, text)
+		}
+	}
+	if strings.Contains(text, home) {
+		t.Fatalf("dry-run leaked private home: %s", text)
+	}
+	if process.home != "" || len(process.arguments) != 0 || len(profiles.acquired) != 0 || profiles.released != 0 {
+		t.Fatalf("dry-run launched/acquired: process=%q %#v leases=%v/%d", process.home, process.arguments, profiles.acquired, profiles.released)
+	}
+}
+
+func TestProdex04356RunDryRunExplicitProfileRedactsSecretsAndPaths(t *testing.T) {
+	home := t.TempDir()
+	profiles := &fakeLocalLaunchProfiles{
+		target: profilemodel.LaunchTarget{Name: "private-profile", CodexHome: home, Provider: "openai"},
+	}
+	process := &fakeRunnerProcess{}
+	runner := runtimeusecase.NewRunner(&fakeRunnerAccounts{}, process, nil)
+	secret := "sk-" + strings.Repeat("x", 24)
+	var output bytes.Buffer
+	err := RunProfiles(t.Context(), runner, nil, profiles, []string{
+		"--dry-run", "--profile", "private-profile", "--",
+		"-c", "model=\"dry-model\"",
+		"-c", "model_catalog_json=\"" + filepath.Join(home, "models.json") + "\"",
+		"--header", "Authorization: Bearer " + secret,
+	}, &output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := output.String()
+	for _, want := range []string{
+		"Provider: godex-openai",
+		"Model: dry-model",
+		"Profile: <configured>",
+		"<redacted-path>",
+		"<redacted>",
+		"Codex/TUI not started because --dry-run was set.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("dry-run output missing %q:\n%s", want, text)
+		}
+	}
+	for _, leaked := range []string{home, "private-profile", secret, "Authorization: Bearer " + secret} {
+		if strings.Contains(text, leaked) {
+			t.Fatalf("dry-run leaked %q:\n%s", leaked, text)
+		}
+	}
+	if len(profiles.acquired) != 0 || profiles.released != 0 || process.home != "" || len(process.arguments) != 0 {
+		t.Fatalf("dry-run caused launch side effects: leases=%v/%d process=%q %#v", profiles.acquired, profiles.released, process.home, process.arguments)
 	}
 }
 
@@ -324,6 +408,13 @@ func (fake *fakeLocalLaunchProfiles) ResolveLaunch(_ context.Context, name strin
 
 func (fake *fakeLocalLaunchProfiles) ActiveLaunch(context.Context) (profilemodel.LaunchTarget, bool, error) {
 	return fake.target, fake.active, nil
+}
+
+func (fake *fakeLocalLaunchProfiles) CurrentLaunch(context.Context) (profilemodel.LaunchTarget, error) {
+	if !fake.active {
+		return profilemodel.LaunchTarget{}, errors.New("no active profile")
+	}
+	return fake.target, nil
 }
 
 func (fake *fakeLocalLaunchProfiles) AcquireLaunch(_ context.Context, name string) (func() error, error) {

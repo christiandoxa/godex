@@ -164,8 +164,9 @@ func TestParseRunArgumentsSupportsNativeAntigravityAndRejectsUnsupportedOptions(
 	if err != nil || !selection.DryRun || !reflect.DeepEqual(arguments, []string{"exec", "review"}) {
 		t.Fatalf("native Antigravity dry-run = %#v / %#v, err=%v", selection, arguments, err)
 	}
-	if _, _, err := parseRunArguments([]string{"--provider", "gemini", "--dry-run"}); err == nil {
-		t.Fatal("dry-run without native Antigravity unexpectedly accepted")
+	selection, arguments, err = parseRunArguments([]string{"--provider", "gemini", "--dry-run"})
+	if err != nil || !selection.DryRun || selection.Provider != "gemini" || len(arguments) != 0 {
+		t.Fatalf("generic provider dry-run = %#v / %#v, err=%v", selection, arguments, err)
 	}
 	selection, arguments, err = parseRunArguments([]string{
 		"--provider", "gemini", "--cli", "agy", "--", "--dry-run",
@@ -177,6 +178,18 @@ func TestParseRunArgumentsSupportsNativeAntigravityAndRejectsUnsupportedOptions(
 	_, _, err = parseRunArguments([]string{"--provider", "gemini", "--cli", "agy", "--api-key", secret})
 	if err == nil || strings.Contains(err.Error(), secret) {
 		t.Fatalf("native Antigravity API-key error = %v", err)
+	}
+}
+
+func TestProdex04356RunDryRunAcceptedWithoutNativeCLI(t *testing.T) {
+	selection, arguments, err := parseRunArguments([]string{
+		"--dry-run", "--", "--model", "gpt-test", "exec", "hello",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !selection.DryRun || !reflect.DeepEqual(arguments, []string{"--model", "gpt-test", "exec", "hello"}) {
+		t.Fatalf("generic dry-run = %#v / %#v", selection, arguments)
 	}
 }
 

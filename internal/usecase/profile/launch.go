@@ -50,6 +50,14 @@ func (catalog *Catalog) AcquireLaunch(ctx context.Context, name string) (func() 
 	return catalog.profiles.Acquire(ctx, name)
 }
 
+func (catalog *Catalog) CurrentLaunch(ctx context.Context) (profilemodel.LaunchTarget, error) {
+	report, err := catalog.Current(ctx)
+	if err != nil {
+		return profilemodel.LaunchTarget{}, err
+	}
+	return launchTarget(report), nil
+}
+
 func (catalog *Catalog) ActiveLaunch(ctx context.Context) (profilemodel.LaunchTarget, bool, error) {
 	profile, active, err := catalog.ActiveStandalone(ctx)
 	if err != nil || !active {

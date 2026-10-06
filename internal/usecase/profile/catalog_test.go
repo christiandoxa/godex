@@ -96,6 +96,26 @@ func TestCatalogBridgesAccountProfilesAndNewProfiles(t *testing.T) {
 	}
 }
 
+func TestProdex04356CurrentLaunchResolvesManagedAccountReadOnly(t *testing.T) {
+	repo := profilerepo.NewStore(t.TempDir())
+	accounts := &fakeAccounts{
+		values:  []accountentity.Account{{ID: "account-id", Name: "managed", Enabled: true}},
+		current: "account-id",
+	}
+	catalog := NewCatalog(repo, accounts, filepath.Join(t.TempDir(), "current"))
+	target, err := catalog.CurrentLaunch(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if target.Name != "managed" || target.AccountID != "account-id" ||
+		target.CodexHome != accounts.CodexHome("account-id") || target.Provider != "openai" {
+		t.Fatalf("current launch = %#v", target)
+	}
+	if accounts.current != "account-id" {
+		t.Fatalf("current launch mutated account selection: %q", accounts.current)
+	}
+}
+
 func TestCatalogRejectsDuplicateNamesAndHomes(t *testing.T) {
 	repo := profilerepo.NewStore(t.TempDir())
 	accounts := &fakeAccounts{values: []accountentity.Account{{ID: "account-id", Name: "legacy", Enabled: true}}, current: "account-id"}
