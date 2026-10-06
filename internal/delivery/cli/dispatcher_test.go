@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -626,5 +627,98 @@ func TestProdex04356DispatcherSuperUsesProductionRuntimeLaunch(t *testing.T) {
 	}
 	if _, err := os.Stat(process.home); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("production Super overlay survived cleanup: %v", err)
+	}
+}
+
+func TestProdex04356SuperExposeAliasScannerMatchesTaggedProductionRules(t *testing.T) {
+	tests := []struct {
+		name string
+		in   []string
+		want []string
+		ok   bool
+	}{
+		{
+			name: "simple",
+			in:   []string{"s", "expose", "exec", "--listen", "127.0.0.1:0"},
+			want: []string{"exec", "--listen", "127.0.0.1:0"},
+			ok:   true,
+		},
+		{
+			name: "profile value named expose",
+			in:   []string{"s", "--profile", "expose", "--dry-run"},
+			ok:   false,
+		},
+		{
+			name: "profile equals leaves alias visible",
+			in:   []string{"super", "--profile=main", "expose", "--no-tunnel"},
+			want: []string{"--profile=main", "--no-tunnel"},
+			ok:   true,
+		},
+		{
+			name: "options on both sides",
+			in:   []string{"s", "--no-presidio", "--model", "model-before", "expose", "--name", "api", "--no-tunnel"},
+			want: []string{"--no-presidio", "--model", "model-before", "--name", "api", "--no-tunnel"},
+			ok:   true,
+		},
+		{
+			name: "literal boundary",
+			in:   []string{"s", "--", "expose"},
+			ok:   false,
+		},
+		{
+			name: "opaque positional stops scan",
+			in:   []string{"s", "exec", "expose"},
+			ok:   false,
+		},
+		{
+			name: "api key value named expose",
+			in:   []string{"s", "--api-key", "expose", "--dry-run"},
+			ok:   false,
+		},
+		{
+			name: "newer override remains historically unpaired",
+			in:   []string{"s", "--web-search", "expose", "--dry-run"},
+			want: []string{"--web-search", "--dry-run"},
+			ok:   true,
+		},
+		{
+			name: "cli remains historically unpaired and stops on value",
+			in:   []string{"s", "--cli", "agy", "expose"},
+			ok:   false,
+		},
+	}
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			got, ok := superExposeAlias(testCase.in)
+			if ok != testCase.ok {
+				t.Fatalf("rewrite = %#v, %t; want ok=%t", got, ok, testCase.ok)
+			}
+			if ok && !slices.Equal(got, testCase.want) {
+				t.Fatalf("rewrite = %#v, want %#v", got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestProdex04356DispatcherSuperExposeAliasRunsHiddenExposePath(t *testing.T) {
+	var out bytes.Buffer
+	app := New(nil, nil, nil, nil, nil, nil, &out)
+	app.SetErrorOutput(&bytes.Buffer{})
+	if err := app.Run(t.Context(), []string{
+		"s", "--no-presidio", "--model", "model-before",
+		"expose", "exec", "--listen", "127.0.0.1:0", "--no-tunnel", "--dry-run",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	text := out.String()
+	for _, want := range []string{
+		"Godex Super expose dry run",
+		"Mode: exec",
+		"Listen: 127.0.0.1:0",
+		"Tunnel: disabled (local only)",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("alias dry-run missing %q: %s", want, text)
+		}
 	}
 }

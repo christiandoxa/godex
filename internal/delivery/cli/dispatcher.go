@@ -85,6 +85,9 @@ func (app *App) Run(ctx context.Context, arguments []string) error {
 	if len(arguments) == 0 {
 		return app.runRuntime(ctx, nil)
 	}
+	if exposeArguments, ok := superExposeAlias(arguments); ok {
+		return superexposecli.Run(ctx, exposeArguments, app.out, app.errOut)
+	}
 
 	switch arguments[0] {
 	case "login":
@@ -168,6 +171,57 @@ func (app *App) Run(ctx context.Context, arguments []string) error {
 		return printHelp(app.out)
 	default:
 		return app.runRuntime(ctx, arguments)
+	}
+}
+
+func superExposeAlias(arguments []string) ([]string, bool) {
+	if len(arguments) < 2 || arguments[0] != "super" && arguments[0] != "s" {
+		return nil, false
+	}
+	exposeIndex := -1
+	for index := 1; index < len(arguments); {
+		argument := arguments[index]
+		if argument == "--" {
+			return nil, false
+		}
+		if argument == "expose" {
+			exposeIndex = index
+			break
+		}
+		if !strings.HasPrefix(argument, "-") {
+			return nil, false
+		}
+		if superExposeOptionTakesValue(argument) && !strings.Contains(argument, "=") {
+			index += 2
+		} else {
+			index++
+		}
+	}
+	if exposeIndex < 0 {
+		return nil, false
+	}
+	rewritten := make([]string, 0, len(arguments)-2)
+	rewritten = append(rewritten, arguments[1:exposeIndex]...)
+	rewritten = append(rewritten, arguments[exposeIndex+1:]...)
+	return rewritten, true
+}
+
+func superExposeOptionTakesValue(argument string) bool {
+	name := argument
+	if before, _, ok := strings.Cut(argument, "="); ok {
+		name = before
+	}
+	switch name {
+	case "--provider", "--api-key",
+		"--sub-agent-provider", "--sub-agent-model", "--sub-agent-model-reasoning-effort",
+		"--sub-agent-url", "--sub-agent-max-concurrency",
+		"--model", "--local-model", "--profile", "-p", "--base-url", "--url",
+		"--context-window", "--local-context-window",
+		"--auto-compact-token-limit", "--local-auto-compact-token-limit",
+		"--tool", "--require-tool", "-c":
+		return true
+	default:
+		return false
 	}
 }
 

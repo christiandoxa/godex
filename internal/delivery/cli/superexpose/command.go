@@ -85,13 +85,19 @@ func Run(ctx context.Context, arguments []string, out, errOut io.Writer) error {
 
 func parseArguments(arguments []string) (Options, error) {
 	options := Options{Mode: "full", Listen: defaultListen}
-	index := 0
-	if len(arguments) > 0 && (arguments[0] == "full" || arguments[0] == "exec") {
-		options.Mode = arguments[0]
-		index++
-	}
-	for index < len(arguments) {
+	modeSeen := false
+	for index := 0; index < len(arguments); {
 		argument := arguments[index]
+		if argument == "--" {
+			options.SuperArgs = append(options.SuperArgs, arguments[index:]...)
+			break
+		}
+		if !modeSeen && (argument == "full" || argument == "exec") {
+			options.Mode = argument
+			modeSeen = true
+			index++
+			continue
+		}
 		switch argument {
 		case "--no-tunnel":
 			options.NoTunnel = true
@@ -130,6 +136,14 @@ func parseArguments(arguments []string) (Options, error) {
 			index += consumed
 			continue
 		}
+		if superExposeEmbeddedOptionTakesValue(argument) && !strings.Contains(argument, "=") {
+			if index+1 >= len(arguments) || arguments[index+1] == "--" {
+				return Options{}, fmt.Errorf("%s requires a value", argument)
+			}
+			options.SuperArgs = append(options.SuperArgs, argument, arguments[index+1])
+			index += 2
+			continue
+		}
 		options.SuperArgs = append(options.SuperArgs, argument)
 		index++
 	}
@@ -140,6 +154,29 @@ func parseArguments(arguments []string) (Options, error) {
 		return Options{}, errors.New("--tunnel conflicts with --openai-tunnel-id")
 	}
 	return options, nil
+}
+
+func superExposeEmbeddedOptionTakesValue(argument string) bool {
+	name := argument
+	if before, _, ok := strings.Cut(argument, "="); ok {
+		name = before
+	}
+	switch name {
+	case "--profile", "-p", "--provider", "--cli", "--api-key",
+		"--base-url", "--url", "--model", "--local-model",
+		"--context-window", "--local-context-window",
+		"--auto-compact-token-limit", "--local-auto-compact-token-limit",
+		"--tool", "--require-tool",
+		"--sub-agent-provider", "--sub-agent-model", "--sub-agent-model-reasoning-effort",
+		"--sub-agent-url", "--sub-agent-max-concurrency",
+		"--web-search", "--rollout-budget-tokens", "--rollout-budget-reminders",
+		"--rollout-budget-sampling-weight", "--rollout-budget-prefill-weight",
+		"--current-time-reminder-interval", "--current-time-clock-source",
+		"-c", "--config":
+		return true
+	default:
+		return false
+	}
 }
 
 func optionValue(arguments []string, index int, name string) (string, int, bool, error) {
