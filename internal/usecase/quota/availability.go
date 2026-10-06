@@ -13,14 +13,14 @@ func (status *Status) Availability(ctx context.Context, account accountentity.Ac
 	if !account.Enabled {
 		return quotamodel.Availability{}, nil
 	}
-	usage, err := status.cachedAvailabilityUsage(ctx, status.accounts.CodexHome(account.ID))
+	usage, source, err := status.cachedAvailabilityUsage(ctx, account.ID, status.accounts.CodexHome(account.ID), nil)
 	if err != nil {
 		return quotamodel.Availability{}, err
 	}
 	now := status.now()
 	ready := quotaState(quotamodel.Report{Enabled: true, Usage: usage}, now) != "exhausted"
 	if ready {
-		return quotamodel.Availability{Ready: true}, nil
+		return quotamodel.Availability{Ready: true, Source: source}, nil
 	}
 	retry := time.Time{}
 	for _, window := range []*quotamodel.Window{usage.Primary, usage.Secondary} {
@@ -38,7 +38,7 @@ func (status *Status) Availability(ctx context.Context, account accountentity.Ac
 	if retry.IsZero() {
 		retry = now.Add(time.Minute)
 	}
-	return quotamodel.Availability{RetryAt: retry}, nil
+	return quotamodel.Availability{RetryAt: retry, Source: source}, nil
 }
 
 func (status *Status) AvailabilityForRoute(
@@ -49,11 +49,13 @@ func (status *Status) AvailabilityForRoute(
 	if !account.Enabled {
 		return quotamodel.Availability{}, nil
 	}
-	usage, err := status.cachedAvailabilityUsage(ctx, status.accounts.CodexHome(account.ID))
+	usage, source, err := status.cachedAvailabilityUsage(ctx, account.ID, status.accounts.CodexHome(account.ID), &selection)
 	if err != nil {
 		return quotamodel.Availability{}, err
 	}
-	return routeAvailability(usage, selection, status.now()), nil
+	availability := routeAvailability(usage, selection, status.now())
+	availability.Source = source
+	return availability, nil
 }
 
 func (status *Status) CachedAvailabilityForRoute(
@@ -64,11 +66,13 @@ func (status *Status) CachedAvailabilityForRoute(
 	if !account.Enabled {
 		return quotamodel.Availability{}, false
 	}
-	usage, ok := status.cachedUsage(status.accounts.CodexHome(account.ID), now)
+	usage, source, ok := status.cachedUsageWithSource(context.Background(), account.ID, status.accounts.CodexHome(account.ID), now, &selection)
 	if !ok {
 		return quotamodel.Availability{}, false
 	}
-	return routeAvailability(usage, selection, now), true
+	availability := routeAvailability(usage, selection, now)
+	availability.Source = source
+	return availability, true
 }
 
 func routeAvailability(usage quotamodel.Usage, selection quotamodel.Selection, now time.Time) quotamodel.Availability {

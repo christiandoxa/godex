@@ -8,10 +8,12 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
 	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
+	"github.com/christiandoxa/godex/internal/helper/sse"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 	runtimemodel "github.com/christiandoxa/godex/internal/model/runtime"
@@ -64,6 +66,7 @@ type Config struct {
 	Wait                     func(context.Context, time.Duration) error
 	ProfileInflightWait      profileInflightWaitFunc
 	ProfileInflightHardLimit int
+	SelectionSequenceSeed    uint64
 	MaxInspectBytes          int64
 	Gateway                  gateway
 	Bindings                 bindingRepository
@@ -89,6 +92,8 @@ type Router struct {
 	routeMemoryMu             sync.Mutex
 	routeCircuitMu            sync.Mutex
 	previousResponseFailureMu sync.Mutex
+	promptCacheMu             sync.Mutex
+	selectionSequence         atomic.Uint64
 	cursor                    int
 	preferredUsed             bool
 	inflight                  map[string]int
@@ -103,6 +108,7 @@ type Router struct {
 	routeCircuits             map[routeHealthKey]routingentity.RouteCircuit
 	transportBackoffs         map[routeHealthKey]routingentity.TransportBackoff
 	previousResponseFailures  map[previousResponseFailureKey]routingentity.PreviousResponseFailure
+	promptCacheBindings       map[string]promptCacheBinding
 	autoRedeem                bool
 	redeemer                  AutoRedeemer
 	conversations             map[string]*conversationLock
@@ -127,6 +133,9 @@ func NewRouter(config Config) (*Router, error) {
 	if config.ProfileInflightWait == nil {
 		config.ProfileInflightWait = waitProfileInflightSignalOrEpoch
 	}
+	if config.SelectionSequenceSeed == 0 {
+		config.SelectionSequenceSeed = newSelectionSequenceSeed()
+	}
 	router := &Router{
 		source: config.Accounts, gateway: config.Gateway,
 		quota:     config.QuotaPreflight,
@@ -143,8 +152,10 @@ func NewRouter(config Config) (*Router, error) {
 		routeCircuits:            make(map[routeHealthKey]routingentity.RouteCircuit),
 		transportBackoffs:        make(map[routeHealthKey]routingentity.TransportBackoff),
 		previousResponseFailures: make(map[previousResponseFailureKey]routingentity.PreviousResponseFailure),
+		promptCacheBindings:      make(map[string]promptCacheBinding),
 		autoRedeem:               config.AutoRedeem, redeemer: config.Redeemer,
 	}
+	router.selectionSequence.Store(config.SelectionSequenceSeed)
 	router.affinity.repository = config.Bindings
 	if config.RoutingState != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -206,6 +217,8 @@ func (exchange *Exchange) Close() error {
 }
 
 func (router *Router) Forward(ctx context.Context, request proxymodel.Request) (*Exchange, error) {
+	request.SelectionSequence = router.selectionSequence.Add(1)
+	promptCacheKey := requestPromptCacheKey(request)
 	keys := requestRoutingAffinity(request)
 	release, err := router.acquireConversation(ctx, keys)
 	if err != nil {
@@ -235,7 +248,7 @@ func (router *Router) Forward(ctx context.Context, request proxymodel.Request) (
 		return nil, err
 	}
 	if err := router.bindSuccessfulResponse(
-		ctx, &result, accounts, keys, request.WebSocketMessage, request.QuotaSelection,
+		ctx, &result, accounts, keys, request.WebSocketMessage, request.QuotaSelection, promptCacheKey,
 	); err != nil {
 		return nil, err
 	}
@@ -304,6 +317,7 @@ func (router *Router) bindSuccessfulResponse(
 	keys affinityKeys,
 	websocketMessage bool,
 	selection quotamodel.Selection,
+	promptCacheKey string,
 ) error {
 	if result.Response.PrecommitFailure != nil && result.Response.PrecommitFailure.StaleContinuation {
 		result.Failed = true
@@ -313,6 +327,7 @@ func (router *Router) bindSuccessfulResponse(
 		return nil
 	}
 	router.clearPreviousResponseFailures(ctx, result.AccountID, keys.previous)
+	router.rememberPromptCacheOwner(result.AccountID, promptCacheKey, router.now())
 	if websocketMessage {
 		if result.Response.WebSocketResponseID != "" {
 			keys.previous = result.Response.WebSocketResponseID
@@ -359,6 +374,21 @@ func (router *Router) bindSuccessfulResponse(
 	if err := router.Observe(ctx, result.AccountID, result.Response.Header, result.Prefix, stream); err != nil {
 		result.Response.Body.Close()
 		return err
+	}
+	if promptCacheKey != "" {
+		if len(result.Prefix) > 0 {
+			if stream {
+				decoder := sse.NewDecoder(int(router.maxInspect))
+				for _, event := range decoder.Feed(result.Prefix) {
+					router.observePromptCachePayload(result.AccountID, promptCacheKey, event)
+				}
+			} else {
+				router.observePromptCachePayload(result.AccountID, promptCacheKey, result.Prefix)
+			}
+		}
+		if stream {
+			router.wrapPromptCacheSSEObservation(result.AccountID, promptCacheKey, result.Response)
+		}
 	}
 	if stream {
 		router.wrapResponsesStreamLatency(result.AccountID, selection, result.Response, len(result.Prefix) > 0)

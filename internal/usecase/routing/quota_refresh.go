@@ -19,6 +19,7 @@ type quotaCheck struct {
 	retryAt            time.Time
 	ready              bool
 	pressure           quotamodel.Pressure
+	source             quotamodel.Source
 	keepLaunchDeadline bool
 }
 
@@ -80,7 +81,7 @@ func (router *Router) getQuotaCheck(
 	}
 	state := quotaCheck{
 		checkedAt: now, ready: err != nil || availability.Ready,
-		retryAt: availability.RetryAt, pressure: availability.Pressure,
+		retryAt: availability.RetryAt, pressure: availability.Pressure, source: availability.Source,
 	}
 	router.storeQuotaCheck(key, state)
 	return state, nil

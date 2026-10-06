@@ -30,14 +30,23 @@ func (router *Router) requestCandidatesMode(
 	now time.Time,
 	consumeRotation bool,
 ) []proxymodel.Account {
+	return router.requestCandidatesModeWithRank(accounts, selection, now, consumeRotation, candidateRankContext{})
+}
+
+func (router *Router) requestCandidatesModeWithRank(
+	accounts []proxymodel.Account,
+	selection quotamodel.Selection,
+	now time.Time,
+	consumeRotation bool,
+	rank candidateRankContext,
+) []proxymodel.Account {
 	router.refreshCachedQuotaChecks(accounts, selection, now)
 	candidates := router.candidates(accounts, now)
-	order := router.orderCandidatesWithoutRotation
-	if consumeRotation {
-		order = router.orderCandidates
+	order := func(values []proxymodel.Account) []proxymodel.Account {
+		return router.orderCandidatesModeWithRank(values, selection, now, consumeRotation, rank)
 	}
 	if len(candidates) < 2 {
-		return order(candidates, selection, now)
+		return order(candidates)
 	}
 
 	blocked := make([]bool, len(candidates))
@@ -50,7 +59,7 @@ func (router *Router) requestCandidatesMode(
 		}
 	}
 	if !availableAlternative {
-		return order(candidates, selection, now)
+		return order(candidates)
 	}
 
 	filtered := make([]proxymodel.Account, 0, len(candidates))
@@ -59,7 +68,7 @@ func (router *Router) requestCandidatesMode(
 			filtered = append(filtered, account)
 		}
 	}
-	return order(filtered, selection, now)
+	return order(filtered)
 }
 
 func (router *Router) refreshCachedQuotaChecks(
@@ -85,7 +94,7 @@ func (router *Router) refreshCachedQuotaChecks(
 			continue
 		}
 		router.storeQuotaCheck(quotaCheckKey{accountID: account.ID, selection: selection}, quotaCheck{
-			checkedAt: now, ready: availability.Ready, retryAt: availability.RetryAt, pressure: availability.Pressure,
+			checkedAt: now, ready: availability.Ready, retryAt: availability.RetryAt, pressure: availability.Pressure, source: availability.Source,
 		})
 	}
 }

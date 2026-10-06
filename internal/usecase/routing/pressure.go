@@ -18,129 +18,233 @@ const (
 )
 
 type candidateLoad struct {
-	backoff          time.Duration
+	backoff          candidateBackoffSortKey
 	providerPriority uint8
 	inflight         int
 	health           uint32
 	pressure         quotamodel.Pressure
+	quotaSource      quotamodel.Source
 	soft             bool
+	promptPriority   uint8
+	promptScore      uint64
+	orderIndex       int
+	jitter           uint64
+	sourceIndex      int
+}
+
+type candidateRankContext struct {
+	promptCacheKey    string
+	selectionSequence uint64
 }
 
 func (router *Router) orderCandidates(accounts []proxymodel.Account, selection quotamodel.Selection, now time.Time) []proxymodel.Account {
-	return router.orderCandidatesMode(accounts, selection, now, true)
+	return router.orderCandidatesModeWithRank(accounts, selection, now, true, candidateRankContext{})
 }
 
 func (router *Router) orderCandidatesWithoutRotation(accounts []proxymodel.Account, selection quotamodel.Selection, now time.Time) []proxymodel.Account {
-	return router.orderCandidatesMode(accounts, selection, now, false)
+	return router.orderCandidatesModeWithRank(accounts, selection, now, false, candidateRankContext{})
 }
 
 func (router *Router) orderCandidatesMode(accounts []proxymodel.Account, selection quotamodel.Selection, now time.Time, consumeRotation bool) []proxymodel.Account {
+	return router.orderCandidatesModeWithRank(accounts, selection, now, consumeRotation, candidateRankContext{})
+}
+
+func candidateRankContextForRequest(request proxymodel.Request) candidateRankContext {
+	sequence := request.SelectionSequence
+	if sequence == 0 {
+		sequence = request.RequestID
+	}
+	return candidateRankContext{promptCacheKey: requestPromptCacheKey(request), selectionSequence: sequence}
+}
+
+func (router *Router) orderCandidatesModeWithRank(
+	accounts []proxymodel.Account,
+	selection quotamodel.Selection,
+	now time.Time,
+	consumeRotation bool,
+	rank candidateRankContext,
+) []proxymodel.Account {
 	if len(accounts) < 2 {
 		return accounts
 	}
+	accounts = append([]proxymodel.Account(nil), accounts...)
 	loads := make(map[string]candidateLoad, len(accounts))
+
 	router.mu.Lock()
 	preferred := router.preferred
 	usePreferred := consumeRotation && !router.preferredUsed
 	softLimit := defaultInflightSoftLimit
+	quotaChecks := make(map[string]quotaCheck, len(accounts))
+	inflight := make(map[string]int, len(accounts))
+	retryUntil := make(map[string]time.Time, len(accounts))
 	for _, account := range accounts {
-		state, cached := router.quotaChecks[quotaCheckKey{accountID: account.ID, selection: selection}]
+		quotaChecks[account.ID] = router.quotaChecks[quotaCheckKey{accountID: account.ID, selection: selection}]
+		inflight[account.ID] = router.inflight[account.ID]
+		if state, exists := router.quarantine[account.ID]; exists {
+			if !state.until.After(now) {
+				delete(router.quarantine, account.ID)
+			} else if !state.authFailure {
+				retryUntil[account.ID] = state.until
+			}
+		}
+	}
+	router.mu.Unlock()
+
+	promptOwner := router.promptCacheOwner(rank.promptCacheKey, now)
+	route := routeHealthRoute(selection.RouteKind)
+	for index, account := range accounts {
+		state, cached := quotaChecks[account.ID]
 		fresh := cached && now.Sub(state.checkedAt) >= 0 && now.Sub(state.checkedAt) < quotaCheckFreshness
 		pressure := state.pressure
 		if !fresh || (!pressure.Known && pressure.Band == 0 && pressure.Total == 0) {
 			pressure = unknownPressure()
 		}
-		backoff := time.Duration(0)
-		if state, exists := router.quarantine[account.ID]; exists {
-			if state.until.After(now) {
-				backoff = state.until.Sub(now)
-			} else {
-				delete(router.quarantine, account.ID)
-			}
-		}
-		transportKey := routeHealthKey{accountID: account.ID, route: routeHealthRoute(selection.RouteKind)}
-		if state, exists := router.transportBackoffs[transportKey]; exists {
-			if remaining := state.Remaining(now); remaining > backoff {
-				backoff = remaining
-			} else if remaining == 0 {
-				delete(router.transportBackoffs, transportKey)
-			}
-		}
-		if remaining := router.routeCircuits[transportKey].Remaining(now); remaining > backoff {
-			backoff = remaining
+		circuitUntil := router.routeCircuitUntil(account.ID, selection, now)
+		transportUntil := router.transportBackoffUntil(account.ID, selection, now)
+		promptPriority, promptScore := promptCacheAffinitySortKey(rank.promptCacheKey, promptOwner, account.ID)
+		orderIndex := account.RouteOrder
+		if orderIndex <= 0 {
+			orderIndex = index + 1
 		}
 		loads[account.ID] = candidateLoad{
-			backoff:          backoff,
-			providerPriority: runtimeProviderPriority(account),
-			inflight:         router.inflight[account.ID],
-			health:           router.routeCompositeHealthScoreLocked(account.ID, routeHealthRoute(selection.RouteKind), now),
-			pressure:         pressure,
-			soft:             router.inflight[account.ID] >= softLimit,
+			backoff:          profileBackoffSortKey(circuitUntil, transportUntil, retryUntil[account.ID], now),
+			providerPriority: runtimeProviderPriority(account), inflight: inflight[account.ID],
+			health: router.routeCompositeHealthScore(account.ID, route, now), pressure: pressure, quotaSource: state.source,
+			soft:           inflight[account.ID] >= softLimit,
+			promptPriority: promptPriority, promptScore: promptScore, orderIndex: orderIndex,
+			jitter: selectionJitter(rank.selectionSequence, account.ID, selection.RouteKind), sourceIndex: index,
 		}
 	}
-	router.mu.Unlock()
 
-	sort.SliceStable(accounts, func(i, j int) bool {
-		left, right := loads[accounts[i].ID], loads[accounts[j].ID]
-		if left.backoff != right.backoff {
-			if left.backoff == 0 {
-				return true
-			}
-			if right.backoff == 0 {
-				return false
-			}
-			return left.backoff < right.backoff
+	ready := make([]proxymodel.Account, 0, len(accounts))
+	fallback := make([]proxymodel.Account, 0, len(accounts))
+	for _, account := range accounts {
+		load := loads[account.ID]
+		if load.backoff.class == 0 && !load.soft {
+			ready = append(ready, account)
+		} else {
+			fallback = append(fallback, account)
 		}
-		if left.soft != right.soft {
-			return !left.soft
-		}
-		if left.providerPriority != right.providerPriority {
-			return left.providerPriority < right.providerPriority
-		}
-		if order := compareQuotaPressure(left.pressure, right.pressure); order != 0 {
+	}
+	sort.SliceStable(ready, func(i, j int) bool { return candidateReadyLess(ready[i], ready[j], loads, selection.RouteKind) })
+	sort.SliceStable(fallback, func(i, j int) bool {
+		left, right := loads[fallback[i].ID], loads[fallback[j].ID]
+		if order := compareBackoffSortKey(left.backoff, right.backoff); order != 0 {
 			return order < 0
 		}
-		if left.inflight != right.inflight {
-			return left.inflight < right.inflight
-		}
-		if left.health != right.health {
-			return left.health < right.health
-		}
-		if accounts[i].RouteOrder > 0 && accounts[j].RouteOrder > 0 && accounts[i].RouteOrder != accounts[j].RouteOrder {
-			return accounts[i].RouteOrder < accounts[j].RouteOrder
-		}
-		return accounts[i].ID < accounts[j].ID
+		return candidateReadyLess(fallback[i], fallback[j], loads, selection.RouteKind)
 	})
+	ordered := append(ready, fallback...)
+	if len(ordered) == 0 {
+		return ordered
+	}
 
 	if usePreferred {
-		for index, account := range accounts {
-			if account.ID == preferred {
-				if loads[account.ID].backoff == 0 {
-					router.mu.Lock()
-					router.preferredUsed = true
-					router.mu.Unlock()
-					return rotateAccounts(accounts, index)
-				}
-				break
+		for index, account := range ordered {
+			if account.ID == preferred && preferredCurrentCandidateAllowed(
+				loads[account.ID], selection.RouteKind, rank.promptCacheKey, promptOwner, preferred, len(ready) > 1,
+			) {
+				router.mu.Lock()
+				router.preferredUsed = true
+				router.mu.Unlock()
+				return rotateAccounts(ordered, index)
 			}
 		}
 	}
-	best := loads[accounts[0].ID]
-	if best.backoff > 0 || !consumeRotation {
-		return accounts
+	if len(ready) == 0 || !consumeRotation {
+		return ordered
 	}
+	best := loads[ordered[0].ID]
 	last := 1
-	for last < len(accounts) && candidateRankEqual(best, loads[accounts[last].ID]) {
+	for last < len(ready) && candidateRankEqual(best, loads[ordered[last].ID], selection.RouteKind) {
 		last++
 	}
 	if last < 2 {
-		return accounts
+		return ordered
 	}
 	router.mu.Lock()
-	start := router.cursor % last
-	router.cursor = (start + 1) % last
+	rotationStart := router.cursor % last
+	router.cursor = (rotationStart + 1) % last
 	router.mu.Unlock()
-	return append(rotateAccounts(accounts[:last], start), accounts[last:]...)
+	return append(rotateAccounts(ordered[:last], rotationStart), ordered[last:]...)
+}
+
+func preferredCurrentCandidateAllowed(
+	load candidateLoad,
+	route quotamodel.RouteKind,
+	promptCacheKey, promptOwner, preferred string,
+	hasAlternative bool,
+) bool {
+	if load.backoff.class != 0 || load.soft || load.health > 0 {
+		return false
+	}
+	if hasAlternative && (route == quotamodel.RouteKindResponses || route == quotamodel.RouteKindWebSocket) &&
+		load.quotaSource == quotamodel.SourcePersistedSnapshot {
+		return false
+	}
+	if !hasAlternative || strings.TrimSpace(promptCacheKey) == "" {
+		return true
+	}
+	if route != quotamodel.RouteKindResponses && route != quotamodel.RouteKindWebSocket {
+		return true
+	}
+	return strings.TrimSpace(promptOwner) == preferred
+}
+
+func candidateReadyLess(leftAccount, rightAccount proxymodel.Account, loads map[string]candidateLoad, route quotamodel.RouteKind) bool {
+	left, right := loads[leftAccount.ID], loads[rightAccount.ID]
+	if left.providerPriority != right.providerPriority {
+		return left.providerPriority < right.providerPriority
+	}
+	if order := compareQuotaPressure(left.pressure, right.pressure); order != 0 {
+		return order < 0
+	}
+	if order := compareQuotaSource(left.quotaSource, right.quotaSource, route); order != 0 {
+		return order < 0
+	}
+	if left.inflight != right.inflight {
+		return left.inflight < right.inflight
+	}
+	if left.health != right.health {
+		return left.health < right.health
+	}
+	if left.promptPriority != right.promptPriority {
+		return left.promptPriority < right.promptPriority
+	}
+	if left.promptScore != right.promptScore {
+		return left.promptScore < right.promptScore
+	}
+	if left.orderIndex != right.orderIndex {
+		return left.orderIndex < right.orderIndex
+	}
+	if left.jitter != right.jitter {
+		return left.jitter < right.jitter
+	}
+	return left.sourceIndex < right.sourceIndex
+}
+
+func compareQuotaSource(left, right quotamodel.Source, route quotamodel.RouteKind) int {
+	if route != quotamodel.RouteKindResponses && route != quotamodel.RouteKindWebSocket {
+		return 0
+	}
+	rank := func(source quotamodel.Source) int {
+		switch source {
+		case quotamodel.SourceLive:
+			return 0
+		case quotamodel.SourcePersistedSnapshot:
+			return 1
+		default:
+			return 2
+		}
+	}
+	leftRank, rightRank := rank(left), rank(right)
+	if leftRank < rightRank {
+		return -1
+	}
+	if leftRank > rightRank {
+		return 1
+	}
+	return 0
 }
 
 func unknownPressure() quotamodel.Pressure {
@@ -172,9 +276,12 @@ func compareQuotaPressure(left, right quotamodel.Pressure) int {
 	return 0
 }
 
-func candidateRankEqual(left, right candidateLoad) bool {
-	return left.backoff == right.backoff && left.soft == right.soft && left.providerPriority == right.providerPriority &&
-		left.inflight == right.inflight && left.health == right.health && compareQuotaPressure(left.pressure, right.pressure) == 0
+func candidateRankEqual(left, right candidateLoad, route quotamodel.RouteKind) bool {
+	return left.backoff.class == 0 && right.backoff.class == 0 && !left.soft && !right.soft &&
+		left.providerPriority == right.providerPriority && left.inflight == right.inflight && left.health == right.health &&
+		left.promptPriority == right.promptPriority && left.promptScore == right.promptScore &&
+		compareQuotaSource(left.quotaSource, right.quotaSource, route) == 0 &&
+		compareQuotaPressure(left.pressure, right.pressure) == 0
 }
 
 func runtimeProviderPriority(account proxymodel.Account) uint8 {

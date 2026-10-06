@@ -27,6 +27,11 @@ type usageGateway interface {
 	Fetch(context.Context, string) (quotamodel.Usage, error)
 }
 
+type usageSnapshotStore interface {
+	Load(context.Context, string) (quotamodel.UsageSnapshot, bool, error)
+	Save(context.Context, string, quotamodel.UsageSnapshot) error
+}
+
 type rawUsageGateway interface {
 	FetchRaw(context.Context, string) ([]byte, error)
 }
@@ -73,6 +78,8 @@ type Status struct {
 	now           func() time.Time
 	usageMu       sync.Mutex
 	usageCache    map[string]usageSnapshot
+	snapshotCache map[string]quotamodel.UsageSnapshot
+	snapshots     usageSnapshotStore
 }
 
 func NewStatus(accounts accountStore, usage usageGateway) *Status {
@@ -83,6 +90,13 @@ func NewStatus(accounts accountStore, usage usageGateway) *Status {
 }
 
 func (status *Status) SetProfiles(profiles profileSource) { status.profiles = profiles }
+
+func (status *Status) SetUsageSnapshotStore(store usageSnapshotStore) {
+	status.usageMu.Lock()
+	defer status.usageMu.Unlock()
+	status.snapshots = store
+	status.snapshotCache = make(map[string]quotamodel.UsageSnapshot)
+}
 
 func (status *Status) SetVirtual(virtual virtualGateway) { status.virtual = virtual }
 

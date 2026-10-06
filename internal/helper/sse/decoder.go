@@ -75,3 +75,20 @@ func (decoder *Decoder) endLine() []byte {
 	decoder.data = append(decoder.data, '\n')
 	return nil
 }
+
+// Finish flushes a final unterminated line/event without exceeding decoder bounds.
+func (decoder *Decoder) Finish() [][]byte {
+	var events [][]byte
+	if len(decoder.line) > 0 {
+		if data := decoder.endLine(); data != nil {
+			events = append(events, data)
+		}
+		decoder.line = decoder.line[:0]
+	}
+	if data := decoder.endLine(); data != nil {
+		events = append(events, data)
+	}
+	decoder.line = decoder.line[:0]
+	decoder.skipLF = false
+	return events
+}

@@ -34,3 +34,17 @@ func TestDecoderSkipsOversizedEventsAndRecovers(t *testing.T) {
 		t.Fatalf("decoder did not recover: %q", events)
 	}
 }
+
+func TestDecoderFinishFlushesPendingFinalEvent(t *testing.T) {
+	decoder := NewDecoder(128)
+	if events := decoder.Feed([]byte("data: {\"usage\":1}")); len(events) != 0 {
+		t.Fatalf("unterminated event emitted early: %q", events)
+	}
+	events := decoder.Finish()
+	if len(events) != 1 || string(events[0]) != `{"usage":1}` {
+		t.Fatalf("Finish events = %q", events)
+	}
+	if events := decoder.Finish(); len(events) != 0 {
+		t.Fatalf("second Finish re-emitted data: %q", events)
+	}
+}

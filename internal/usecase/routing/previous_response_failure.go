@@ -247,11 +247,8 @@ func (router *Router) requestCandidatesForRequestMode(
 	now time.Time,
 	consumeRotation bool,
 ) []proxymodel.Account {
-	var candidates []proxymodel.Account
-	if consumeRotation {
-		candidates = router.requestCandidates(accounts, request.QuotaSelection, now)
-	} else {
-		candidates = router.requestCandidatesWithoutRotation(accounts, request.QuotaSelection, now)
-	}
+	candidates := router.requestCandidatesModeWithRank(
+		accounts, request.QuotaSelection, now, consumeRotation, candidateRankContextForRequest(request),
+	)
 	return router.previousResponseFailureAccounts(candidates, request, now)
 }

@@ -28,6 +28,7 @@ import (
 	proxyconfig "github.com/christiandoxa/godex/internal/model/proxy"
 	"github.com/christiandoxa/godex/internal/repository/account"
 	profilerepo "github.com/christiandoxa/godex/internal/repository/profile"
+	quotarepo "github.com/christiandoxa/godex/internal/repository/quota"
 	routingrepo "github.com/christiandoxa/godex/internal/repository/routing"
 	runtimerepo "github.com/christiandoxa/godex/internal/repository/runtime"
 	sessionrepo "github.com/christiandoxa/godex/internal/repository/session"
@@ -80,6 +81,7 @@ func run() int {
 		return 1
 	}
 	quotaStatus := quotausecase.NewStatus(store, quotaClient)
+	quotaStatus.SetUsageSnapshotStore(quotarepo.NewUsageSnapshotStore(settings.Home))
 	quotaStatus.SetModelProviderInspector(process)
 	quotaStatus.SetExternalProvider("gemini", geminigateway.ProfileQuota{})
 	autoRedeemer := quotausecase.NewAutoRedeemer(quotaClient)

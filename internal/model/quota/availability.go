@@ -6,6 +6,7 @@ type Availability struct {
 	Ready    bool
 	RetryAt  time.Time
 	Pressure Pressure
+	Source   Source
 }
 
 type Pressure struct {

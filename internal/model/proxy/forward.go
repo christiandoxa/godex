@@ -19,6 +19,7 @@ type WebSocketPolicy struct {
 
 type Request struct {
 	RequestID                       uint64
+	SelectionSequence               uint64
 	Method, Path, RawPath, RawQuery string
 	Header                          http.Header
 	Body                            []byte
