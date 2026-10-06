@@ -147,6 +147,7 @@ type RuntimeLaunchOptions struct {
 	SmartContextEnabled bool
 	SkipQuotaPreflight  bool
 	AutoRedeem          *bool
+	SuperOverlay        bool
 }
 
 func (runner *Runner) launchHome(
@@ -170,7 +171,18 @@ func (runner *Runner) launchHomeWithOptions(
 	profiles []proxyconfig.Account,
 	arguments []string,
 	options RuntimeLaunchOptions,
-) error {
+) (runErr error) {
+	if options.SuperOverlay {
+		if runner == nil || runner.managedProfilesRoot == "" {
+			return errors.New("managed profile root is not configured for Godex Super")
+		}
+		overlay, err := PrepareSuperOverlay(runner.managedProfilesRoot, home)
+		if err != nil {
+			return err
+		}
+		defer func() { runErr = errors.Join(runErr, overlay.Close()) }()
+		home = overlay.Home
+	}
 	proxyRunner, ok := runner.process.(proxyCodex)
 	if !ok {
 		return runner.process.Run(ctx, home, arguments)
@@ -203,7 +215,7 @@ func (runner *Runner) launchHomeWithOptions(
 	if err := proxy.Start(); err != nil {
 		return err
 	}
-	runErr := runner.runThroughRuntimeProxy(ctx, proxyRunner, home, proxy.Endpoint(), runtimeArguments, provider.Kind)
+	runErr = runner.runThroughRuntimeProxy(ctx, proxyRunner, home, proxy.Endpoint(), runtimeArguments, provider.Kind)
 	return closeRuntimeProxy(ctx, proxy, runErr)
 }
 
