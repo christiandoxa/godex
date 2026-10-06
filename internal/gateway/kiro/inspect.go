@@ -168,6 +168,9 @@ func firstPositiveUint64(object map[string]any, keys ...string) uint64 {
 }
 
 func findModels(value any) ([]any, bool) {
+	if models, ok := value.([]any); ok {
+		return models, true
+	}
 	root, ok := value.(map[string]any)
 	if !ok {
 		return nil, false

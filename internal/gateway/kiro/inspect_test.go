@@ -100,3 +100,23 @@ func TestProdex04356KiroCatalogNormalizationParity(t *testing.T) {
 		t.Fatalf("empty description = %#v, exists=%t", description, exists)
 	}
 }
+
+func TestProdex04356KiroCatalogAcceptsArrayRoot(t *testing.T) {
+	text := `[{"model_id":"model-a","model_name":"Model A"}]`
+	normalized, err := normalizeModelCatalogText(text)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var value map[string]any
+	if err := json.Unmarshal([]byte(normalized), &value); err != nil {
+		t.Fatal(err)
+	}
+	models, _ := value["models"].([]any)
+	if len(models) != 1 {
+		t.Fatalf("normalized root-array models = %#v", models)
+	}
+	model, _ := models[0].(map[string]any)
+	if model["id"] != "model-a" || model["name"] != "Model A" {
+		t.Fatalf("normalized root-array model = %#v", model)
+	}
+}
