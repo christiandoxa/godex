@@ -30,7 +30,7 @@ func (status *Status) inspectProfileQuotaTarget(ctx context.Context, target prof
 func codexModelProviderQuota(setting profilemodel.ModelProviderSetting) *quotamodel.ExternalInfo {
 	name := fmt.Sprintf("Custom provider (%s)", setting.ProviderID)
 	switch {
-	case strings.EqualFold(setting.ProviderID, "prodex-local"):
+	case strings.EqualFold(setting.ProviderID, "godex-local"), strings.EqualFold(setting.ProviderID, "prodex-local"):
 		name = "Local OpenAI-compatible"
 	case strings.EqualFold(setting.ProviderID, "prodex-deepseek"):
 		name = "DeepSeek"
@@ -66,7 +66,7 @@ func profileProviderFilterMatches(filter string, inspected inspectedProfileQuota
 	case "deepseek":
 		return strings.EqualFold(inspected.modelProvider.ProviderID, "prodex-deepseek")
 	case "local":
-		return strings.EqualFold(inspected.modelProvider.ProviderID, "prodex-local")
+		return strings.EqualFold(inspected.modelProvider.ProviderID, "godex-local") || strings.EqualFold(inspected.modelProvider.ProviderID, "prodex-local")
 	default:
 		return false
 	}

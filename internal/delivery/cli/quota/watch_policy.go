@@ -136,7 +136,7 @@ func (filter quotaProviderFilter) matches(report quotamodel.Report) bool {
 				return true
 			}
 		case quotaProviderLocal:
-			if strings.EqualFold(info.Provider, "Local OpenAI-compatible") || strings.EqualFold(info.Account, "prodex-local") {
+			if strings.EqualFold(info.Provider, "Local OpenAI-compatible") || (strings.EqualFold(info.Account, "godex-local") || strings.EqualFold(info.Account, "prodex-local")) {
 				return true
 			}
 		}

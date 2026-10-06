@@ -91,7 +91,7 @@ func (source *Source) fetchUserInfoBody(ctx context.Context, host, token string)
 	}
 	request.Header.Set("Authorization", "Bearer "+token)
 	request.Header.Set("Accept", "application/json")
-	request.Header.Set("User-Agent", "prodex/0.435.1")
+	request.Header.Set("User-Agent", "godex/0.435.1")
 	response, err := source.client.Do(request)
 	if err != nil {
 		if ctx.Err() != nil {

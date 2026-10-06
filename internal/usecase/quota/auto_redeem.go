@@ -218,7 +218,7 @@ func autoRedeemRequestID(now time.Time, random io.Reader) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return "prodex-auto-redeem-" + formatUUID(id), nil
+	return "godex-auto-redeem-" + formatUUID(id), nil
 }
 
 func redeemUUIDv7(now time.Time, random io.Reader) ([16]byte, error) {

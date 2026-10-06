@@ -22,9 +22,9 @@ beta_base_url = "https://deepseek.example.test/beta/"
 	}
 	lookup := func(key string) (string, bool) {
 		values := map[string]string{
-			"PRODEX_DEEPSEEK_STRICT_TOOLS":    "false",
-			"PRODEX_DEEPSEEK_WEB_SEARCH_MODE": "auto",
-			"PRODEX_DEEPSEEK_BETA_BASE_URL":   "https://env.example.test/beta",
+			"GODEX_DEEPSEEK_STRICT_TOOLS":    "false",
+			"GODEX_DEEPSEEK_WEB_SEARCH_MODE": "auto",
+			"GODEX_DEEPSEEK_BETA_BASE_URL":   "https://env.example.test/beta",
 		}
 		value, ok := values[key]
 		return value, ok
@@ -49,10 +49,10 @@ func TestDeepSeekRuntimeSettingsEnvironmentAndDefaultsMatchProdex(t *testing.T) 
 	}
 
 	values := map[string]string{
-		"PRODEX_DEEPSEEK_STRICT_TOOLS":                  "YES",
-		"PRODEX_DEEPSEEK_WEB_SEARCH_MODE":               "openai_chat",
-		"PRODEX_DEEPSEEK_BETA_BASE_URL":                 "https://env.example.test/beta/",
-		"PRODEX_RUNTIME_PROXY_SSE_LOOKAHEAD_TIMEOUT_MS": "1250",
+		"GODEX_DEEPSEEK_STRICT_TOOLS":                  "YES",
+		"GODEX_DEEPSEEK_WEB_SEARCH_MODE":               "openai_chat",
+		"GODEX_DEEPSEEK_BETA_BASE_URL":                 "https://env.example.test/beta/",
+		"GODEX_RUNTIME_PROXY_SSE_LOOKAHEAD_TIMEOUT_MS": "1250",
 	}
 	settings, err = deepSeekRuntimeSettings(t.TempDir(), func(key string) (string, bool) {
 		value, ok := values[key]
@@ -69,7 +69,7 @@ func TestDeepSeekRuntimeSettingsEnvironmentAndDefaultsMatchProdex(t *testing.T) 
 func TestDeepSeekRuntimeSettingsAcceptsProdexWebSearchModes(t *testing.T) {
 	for _, mode := range []string{"auto", "off", "openai_chat", "anthropic"} {
 		settings, err := deepSeekRuntimeSettings(t.TempDir(), func(key string) (string, bool) {
-			return mode, key == "PRODEX_DEEPSEEK_WEB_SEARCH_MODE"
+			return mode, key == "GODEX_DEEPSEEK_WEB_SEARCH_MODE"
 		})
 		if err != nil || settings.webSearchMode != mode {
 			t.Fatalf("mode %q settings = %#v, error = %v", mode, settings, err)
@@ -86,10 +86,10 @@ beta_base_url = "https://config.example.test/beta"
 `), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("PRODEX_DEEPSEEK_STRICT_TOOLS", "false")
-	t.Setenv("PRODEX_DEEPSEEK_WEB_SEARCH_MODE", "openai_chat")
-	t.Setenv("PRODEX_DEEPSEEK_BETA_BASE_URL", "https://env.example.test/beta")
-	t.Setenv("PRODEX_RUNTIME_PROXY_SSE_LOOKAHEAD_TIMEOUT_MS", "1250")
+	t.Setenv("GODEX_DEEPSEEK_STRICT_TOOLS", "false")
+	t.Setenv("GODEX_DEEPSEEK_WEB_SEARCH_MODE", "openai_chat")
+	t.Setenv("GODEX_DEEPSEEK_BETA_BASE_URL", "https://env.example.test/beta")
+	t.Setenv("GODEX_RUNTIME_PROXY_SSE_LOOKAHEAD_TIMEOUT_MS", "1250")
 
 	provider, profiles, err := (&Runner{}).prepareProviderLaunch(home, proxymodel.Provider{Kind: "deepseek"}, []proxymodel.Account{{ID: "key"}})
 	if err != nil {
@@ -107,12 +107,12 @@ func TestDeepSeekRuntimeSettingsRejectInvalidValues(t *testing.T) {
 	fixtures := []struct {
 		key, value, want string
 	}{
-		{"PRODEX_DEEPSEEK_STRICT_TOOLS", " true ", "must not contain whitespace"},
-		{"PRODEX_DEEPSEEK_STRICT_TOOLS", "maybe", "must be true or false"},
-		{"PRODEX_DEEPSEEK_WEB_SEARCH_MODE", "enabled", "must be auto, off, openai_chat, or anthropic"},
-		{"PRODEX_DEEPSEEK_BETA_BASE_URL", "https://user:pass@example.test", "must be an http(s) URL"},
-		{"PRODEX_RUNTIME_PROXY_SSE_LOOKAHEAD_TIMEOUT_MS", "0", "must be greater than zero"},
-		{"PRODEX_RUNTIME_PROXY_SSE_LOOKAHEAD_TIMEOUT_MS", "nope", "must be an unsigned integer"},
+		{"GODEX_DEEPSEEK_STRICT_TOOLS", " true ", "must not contain whitespace"},
+		{"GODEX_DEEPSEEK_STRICT_TOOLS", "maybe", "must be true or false"},
+		{"GODEX_DEEPSEEK_WEB_SEARCH_MODE", "enabled", "must be auto, off, openai_chat, or anthropic"},
+		{"GODEX_DEEPSEEK_BETA_BASE_URL", "https://user:pass@example.test", "must be an http(s) URL"},
+		{"GODEX_RUNTIME_PROXY_SSE_LOOKAHEAD_TIMEOUT_MS", "0", "must be greater than zero"},
+		{"GODEX_RUNTIME_PROXY_SSE_LOOKAHEAD_TIMEOUT_MS", "nope", "must be an unsigned integer"},
 	}
 	for _, fixture := range fixtures {
 		_, err := deepSeekRuntimeSettings(t.TempDir(), func(key string) (string, bool) {
@@ -156,5 +156,26 @@ beta_base_url = "https://shared.example.test/beta"
 	}
 	if settings.webSearchMode != "anthropic" || settings.betaBaseURL != "https://shared.example.test/beta" {
 		t.Fatalf("symlink settings = %#v", settings)
+	}
+}
+
+func TestDeepSeekRuntimeSettingsAcceptsLegacyProdexEnvironmentAlias(t *testing.T) {
+	values := map[string]string{
+		"PRODEX_DEEPSEEK_STRICT_TOOLS":                  "true",
+		"PRODEX_DEEPSEEK_WEB_SEARCH_MODE":               "anthropic",
+		"PRODEX_DEEPSEEK_BETA_BASE_URL":                 "https://legacy.example.test/beta",
+		"PRODEX_RUNTIME_PROXY_SSE_LOOKAHEAD_TIMEOUT_MS": "1500",
+	}
+	settings, err := deepSeekRuntimeSettings(t.TempDir(), func(key string) (string, bool) {
+		value, ok := values[key]
+		return value, ok
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !settings.strictTools || settings.webSearchMode != "anthropic" ||
+		settings.betaBaseURL != "https://legacy.example.test/beta" ||
+		settings.sseLookaheadTimeout != 1500*time.Millisecond {
+		t.Fatalf("legacy settings = %#v", settings)
 	}
 }

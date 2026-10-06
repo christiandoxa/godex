@@ -137,7 +137,7 @@ func assertKiroCompactRoute(t *testing.T, transport *RuntimeTransport) {
 	}
 	body, _ := io.ReadAll(compact.Body)
 	compact.Body.Close()
-	if compact.Header.Get("X-Prodex-Compact-Mode") != "semantic" || compact.Header.Get("X-Prodex-Compact-Provider") != "kiro" || !strings.Contains(string(body), "semantic summary") {
+	if compact.Header.Get("X-Godex-Compact-Mode") != "semantic" || compact.Header.Get("X-Godex-Compact-Provider") != "kiro" || !strings.Contains(string(body), "semantic summary") {
 		t.Fatalf("Compact = headers:%v body:%s", compact.Header, body)
 	}
 }

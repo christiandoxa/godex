@@ -292,11 +292,12 @@ func monitorKiroStreamIdle(
 }
 
 func (source *Source) streamIdleTimeout() time.Duration {
-	const envName = "PRODEX_RUNTIME_PROXY_STREAM_IDLE_TIMEOUT_MS"
 	if source != nil && source.getenv != nil {
-		if raw := strings.TrimSpace(source.getenv(envName)); raw != "" {
-			if milliseconds, err := strconv.ParseUint(raw, 10, 64); err == nil && milliseconds > 0 {
-				return time.Duration(milliseconds) * time.Millisecond
+		for _, envName := range []string{"GODEX_RUNTIME_PROXY_STREAM_IDLE_TIMEOUT_MS", "PRODEX_RUNTIME_PROXY_STREAM_IDLE_TIMEOUT_MS"} {
+			if raw := strings.TrimSpace(source.getenv(envName)); raw != "" {
+				if milliseconds, err := strconv.ParseUint(raw, 10, 64); err == nil && milliseconds > 0 {
+					return time.Duration(milliseconds) * time.Millisecond
+				}
 			}
 		}
 	}

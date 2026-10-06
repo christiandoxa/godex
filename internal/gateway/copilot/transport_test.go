@@ -30,7 +30,7 @@ func TestRuntimeTransportForwardsResponsesWithReferenceHeaders(t *testing.T) {
 	}
 	body := []byte(`{"model":"codex","input":[{"type":"message","role":"assistant","content":[{"type":"input_image","file_id":"file-1"}]},{"type":"compaction","encrypted_content":"keep"}],"reasoning":{"encrypted_content":"drop"}}`)
 	response, err := transport.Execute(context.Background(), proxymodel.Request{
-		Method: http.MethodPost, Path: "/backend-api/prodex/responses", RawQuery: "stream=true", Body: body,
+		Method: http.MethodPost, Path: "/backend-api/godex/responses", RawQuery: "stream=true", Body: body,
 	}, proxymodel.Account{})
 	if err != nil {
 		t.Fatal(err)
@@ -80,7 +80,7 @@ func TestRuntimeTransportMapsCompactAndLegacyPaths(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{"/backend-api/prodex/responses/compact", "/backend-api/prodex/v1/responses"} {
+	for _, path := range []string{"/backend-api/godex/responses/compact", "/backend-api/prodex/v1/responses"} {
 		response, err := transport.Execute(context.Background(), proxymodel.Request{Method: http.MethodPost, Path: path, Body: []byte(`{"model":"gpt-5.3-codex"}`)}, proxymodel.Account{})
 		if err != nil {
 			t.Fatal(err)
@@ -97,11 +97,12 @@ func TestCopilotRuntimeRouteMatchesProdexV1SurfaceExactly(t *testing.T) {
 		path string
 		want string
 	}{
+		{"/backend-api/godex/responses", "/responses"},
 		{"/backend-api/prodex/responses", "/responses"},
-		{"/backend-api/prodex/v1/responses", "/responses"},
-		{"/backend-api/prodex/responses/compact", "/responses/compact"},
-		{"/backend-api/prodex/v1/chat/completions", "/chat/completions"},
-		{"/backend-api/prodex/v1/messages", "/messages"},
+		{"/backend-api/godex/v1/responses", "/responses"},
+		{"/backend-api/godex/responses/compact", "/responses/compact"},
+		{"/backend-api/godex/v1/chat/completions", "/chat/completions"},
+		{"/backend-api/godex/v1/messages", "/messages"},
 	} {
 		route, err := copilotRuntimeRoute(fixture.path)
 		if err != nil || route.kind != copilotRouteUpstream || route.upstreamPath != fixture.want {
@@ -109,12 +110,12 @@ func TestCopilotRuntimeRouteMatchesProdexV1SurfaceExactly(t *testing.T) {
 		}
 	}
 	for _, path := range []string{
-		"/backend-api/prodex/v2/responses",
-		"/backend-api/prodex/v1.2/responses",
-		"/backend-api/prodex/v1/responses/compact/",
-		"/backend-api/prodex/v1//responses",
-		"/backend-api/prodex/v1/%2e%2e/responses",
-		"/backend-api/prodex/tenant/v1/responses",
+		"/backend-api/godex/v2/responses",
+		"/backend-api/godex/v1.2/responses",
+		"/backend-api/godex/v1/responses/compact/",
+		"/backend-api/godex/v1//responses",
+		"/backend-api/godex/v1/%2e%2e/responses",
+		"/backend-api/godex/tenant/v1/responses",
 	} {
 		if _, err := copilotRuntimeRoute(path); err == nil {
 			t.Fatalf("unsupported route %q unexpectedly accepted", path)
@@ -133,7 +134,7 @@ func TestRuntimeTransportRejectsUnsupportedRoutesAndUnsafeURL(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := transport.Execute(context.Background(), proxymodel.Request{
-		Method: http.MethodPost, Path: "/backend-api/prodex/embeddings", Body: []byte(`{}`),
+		Method: http.MethodPost, Path: "/backend-api/godex/embeddings", Body: []byte(`{}`),
 	}, proxymodel.Account{}); err == nil {
 		t.Fatal("unsupported embeddings route unexpectedly accepted")
 	}

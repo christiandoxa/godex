@@ -19,13 +19,13 @@ type deepSeekCatalogSeed struct {
 }
 
 var deepSeekCatalogSeeds = []deepSeekCatalogSeed{
-	{"auto", "DeepSeek Auto", "Prodex DeepSeek fallback chain routed through current DeepSeek models."},
-	{"pro", "DeepSeek Pro", "Prodex DeepSeek Pro alias routed through DeepSeek V4 Pro."},
-	{"flash", "DeepSeek Flash", "Prodex DeepSeek Flash alias routed through DeepSeek V4 Flash."},
-	{"deepseek-v4-pro", "DeepSeek V4 Pro", "DeepSeek V4 Pro routed through the Prodex Responses adapter."},
-	{"deepseek-v4-flash", "DeepSeek V4 Flash", "DeepSeek V4 Flash routed through the Prodex Responses adapter."},
-	{"deepseek-chat", "DeepSeek Chat", "DeepSeek chat compatibility model routed through the Prodex Responses adapter."},
-	{"deepseek-reasoner", "DeepSeek Reasoner", "DeepSeek reasoner compatibility model routed through the Prodex Responses adapter."},
+	{"auto", "DeepSeek Auto", "Godex DeepSeek fallback chain routed through current DeepSeek models."},
+	{"pro", "DeepSeek Pro", "Godex DeepSeek Pro alias routed through DeepSeek V4 Pro."},
+	{"flash", "DeepSeek Flash", "Godex DeepSeek Flash alias routed through DeepSeek V4 Flash."},
+	{"deepseek-v4-pro", "DeepSeek V4 Pro", "DeepSeek V4 Pro routed through the Godex Responses adapter."},
+	{"deepseek-v4-flash", "DeepSeek V4 Flash", "DeepSeek V4 Flash routed through the Godex Responses adapter."},
+	{"deepseek-chat", "DeepSeek Chat", "DeepSeek chat compatibility model routed through the Godex Responses adapter."},
+	{"deepseek-reasoner", "DeepSeek Reasoner", "DeepSeek reasoner compatibility model routed through the Godex Responses adapter."},
 }
 
 func buildDeepSeekCodexCatalog(provider proxymodel.Provider, arguments []string) ([]map[string]any, error) {
@@ -70,7 +70,7 @@ func deepSeekCatalogMetadata(slug string) (string, string) {
 			return seed.name, seed.description
 		}
 	}
-	return slug, "DeepSeek model routed through the Prodex Responses adapter."
+	return slug, "DeepSeek model routed through the Godex Responses adapter."
 }
 
 func deepSeekCodexCatalogModel(slug, displayName, description string, priority int, contextWindow, autoCompact uint64) map[string]any {

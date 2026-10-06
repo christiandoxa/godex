@@ -45,6 +45,13 @@ type deepSeekSettings struct {
 	sseLookaheadTimeout time.Duration
 }
 
+func lookupDeepSeekRuntimeEnv(lookup func(string) (string, bool), canonical, legacy string) (string, bool) {
+	if value, found := lookup(canonical); found {
+		return value, true
+	}
+	return lookup(legacy)
+}
+
 func deepSeekRuntimeSettings(home string, lookup func(string) (string, bool)) (deepSeekSettings, error) {
 	config := readDeepSeekConfig(home)
 	strict, err := deepSeekStrictTools(config, lookup)
@@ -70,8 +77,8 @@ func deepSeekRuntimeSettings(home string, lookup func(string) (string, bool)) (d
 }
 
 func deepSeekSSELookaheadTimeout(lookup func(string) (string, bool)) (time.Duration, error) {
-	const key = "PRODEX_RUNTIME_PROXY_SSE_LOOKAHEAD_TIMEOUT_MS"
-	value, found := lookup(key)
+	const key = "GODEX_RUNTIME_PROXY_SSE_LOOKAHEAD_TIMEOUT_MS"
+	value, found := lookupDeepSeekRuntimeEnv(lookup, key, "PRODEX_RUNTIME_PROXY_SSE_LOOKAHEAD_TIMEOUT_MS")
 	if !found {
 		return time.Second, nil
 	}
@@ -123,11 +130,12 @@ func deepSeekStrictTools(config map[string]any, lookup func(string) (string, boo
 			}
 		}
 	}
-	value, found := lookup("PRODEX_DEEPSEEK_STRICT_TOOLS")
+	const key = "GODEX_DEEPSEEK_STRICT_TOOLS"
+	value, found := lookupDeepSeekRuntimeEnv(lookup, key, "PRODEX_DEEPSEEK_STRICT_TOOLS")
 	if !found {
 		return false, nil
 	}
-	return deepSeekBool("PRODEX_DEEPSEEK_STRICT_TOOLS", value)
+	return deepSeekBool(key, value)
 }
 
 func deepSeekWebSearchMode(config map[string]any, lookup func(string) (string, bool)) (string, error) {
@@ -140,11 +148,12 @@ func deepSeekWebSearchMode(config map[string]any, lookup func(string) (string, b
 			return deepSeekWebSearchValue("deepseek.web_search_mode", text)
 		}
 	}
-	value, found := lookup("PRODEX_DEEPSEEK_WEB_SEARCH_MODE")
+	const key = "GODEX_DEEPSEEK_WEB_SEARCH_MODE"
+	value, found := lookupDeepSeekRuntimeEnv(lookup, key, "PRODEX_DEEPSEEK_WEB_SEARCH_MODE")
 	if !found {
 		return "auto", nil
 	}
-	return deepSeekWebSearchValue("PRODEX_DEEPSEEK_WEB_SEARCH_MODE", value)
+	return deepSeekWebSearchValue(key, value)
 }
 
 func deepSeekBetaBaseURL(config map[string]any, lookup func(string) (string, bool)) (string, error) {
@@ -157,11 +166,12 @@ func deepSeekBetaBaseURL(config map[string]any, lookup func(string) (string, boo
 			return validateDeepSeekURL("deepseek.beta_base_url", text)
 		}
 	}
-	value, found := lookup("PRODEX_DEEPSEEK_BETA_BASE_URL")
+	const key = "GODEX_DEEPSEEK_BETA_BASE_URL"
+	value, found := lookupDeepSeekRuntimeEnv(lookup, key, "PRODEX_DEEPSEEK_BETA_BASE_URL")
 	if !found {
 		return "https://api.deepseek.com/beta", nil
 	}
-	return validateDeepSeekURL("PRODEX_DEEPSEEK_BETA_BASE_URL", value)
+	return validateDeepSeekURL(key, value)
 }
 
 func deepSeekBool(name, value string) (bool, error) {

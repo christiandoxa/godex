@@ -169,10 +169,10 @@ func TestAnthropicRuntimeModelsAndCompactAreLocal(t *testing.T) {
 	compactBody, _ := io.ReadAll(compact.Body)
 	compact.Body.Close()
 	if called || compact.StatusCode != http.StatusOK ||
-		compact.Header.Get("X-Prodex-Compact-Mode") != "local-fallback" ||
-		compact.Header.Get("X-Prodex-Compact-Provider") != "anthropic" ||
-		compact.Header.Get("X-Prodex-Compact-Degraded") != "true" ||
-		compact.Header.Get("X-Prodex-Compact-Reason") != "local-policy" ||
+		compact.Header.Get("X-Godex-Compact-Mode") != "local-fallback" ||
+		compact.Header.Get("X-Godex-Compact-Provider") != "anthropic" ||
+		compact.Header.Get("X-Godex-Compact-Degraded") != "true" ||
+		compact.Header.Get("X-Godex-Compact-Reason") != "local-policy" ||
 		!strings.Contains(string(compactBody), "retain compact context") {
 		t.Fatalf("compact = called:%t status:%d headers:%v body:%s", called, compact.StatusCode, compact.Header, compactBody)
 	}

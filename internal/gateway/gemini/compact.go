@@ -65,7 +65,7 @@ func semanticCompactRequest(body []byte) ([]byte, error) {
 	value["stream"] = false
 	value["store"] = false
 	value["parallel_tool_calls"] = false
-	value["prodex_gemini_compaction"] = true
+	value["godex_gemini_compaction"] = true
 	for _, key := range []string{"include", "previous_response_id", "prompt_cache_key", "text", "tool_choice", "tools"} {
 		delete(value, key)
 	}

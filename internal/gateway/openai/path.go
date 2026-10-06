@@ -18,17 +18,16 @@ func upstreamPath(basePath, requestPath string) string {
 }
 
 func normalizeOpenAIPath(requestPath string) string {
-	const (
-		mountPath    = backendAPIPath + "/prodex"
-		upstreamPath = backendAPIPath + "/codex"
-	)
-	if suffix, ok := strings.CutPrefix(requestPath, mountPath+"/v"); ok {
-		if slash := strings.IndexByte(suffix, '/'); slash > 0 && legacyVersionSegment(suffix[:slash]) {
-			return upstreamPath + suffix[slash:]
+	const upstreamPath = backendAPIPath + "/codex"
+	for _, mountPath := range []string{backendAPIPath + "/godex", backendAPIPath + "/prodex"} {
+		if suffix, ok := strings.CutPrefix(requestPath, mountPath+"/v"); ok {
+			if slash := strings.IndexByte(suffix, '/'); slash > 0 && legacyVersionSegment(suffix[:slash]) {
+				return upstreamPath + suffix[slash:]
+			}
 		}
-	}
-	if suffix, ok := strings.CutPrefix(requestPath, mountPath); ok && (suffix == "" || strings.HasPrefix(suffix, "/")) {
-		return upstreamPath + suffix
+		if suffix, ok := strings.CutPrefix(requestPath, mountPath); ok && (suffix == "" || strings.HasPrefix(suffix, "/")) {
+			return upstreamPath + suffix
+		}
 	}
 	return requestPath
 }

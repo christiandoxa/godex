@@ -22,13 +22,13 @@ func TestLocalProviderArgumentsMatchProdexConfigContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{
-		`model_provider="prodex-local"`,
+		`model_provider="godex-local"`,
 		`model="qwen3-coder"`,
-		`model_providers.prodex-local.name="Prodex Local"`,
-		`model_providers.prodex-local.base_url="http://127.0.0.1:8131/v1"`,
-		`model_providers.prodex-local.wire_api="responses"`,
-		`model_providers.prodex-local.requires_openai_auth=true`,
-		`model_providers.prodex-local.supports_websockets=false`,
+		`model_providers.godex-local.name="Godex Local"`,
+		`model_providers.godex-local.base_url="http://127.0.0.1:8131/v1"`,
+		`model_providers.godex-local.wire_api="responses"`,
+		`model_providers.godex-local.requires_openai_auth=true`,
+		`model_providers.godex-local.supports_websockets=false`,
 		`model_context_window=8192`,
 		`model_auto_compact_token_limit=7000`,
 		`model_reasoning_summary="none"`,
@@ -65,7 +65,7 @@ func TestLocalProviderArgumentsUseDefaultsAndClampCompactLimit(t *testing.T) {
 	joined := strings.Join(arguments, "\n")
 	for _, expected := range []string{
 		`model="unsloth/qwen3.5-35b-a3b"`,
-		`model_providers.prodex-local.base_url="https://local.example.test/custom"`,
+		`model_providers.godex-local.base_url="https://local.example.test/custom"`,
 		`model_context_window=1000`,
 		`model_auto_compact_token_limit=999`,
 	} {
@@ -112,7 +112,7 @@ func TestRunLocalProviderBypassesProxyAndQuotaSelection(t *testing.T) {
 	if proxyCalled || len(process.homes) != 1 || process.homes[0] != home {
 		t.Fatalf("local provider used proxy/home = %t / %#v", proxyCalled, process.homes)
 	}
-	if len(process.args) != 1 || !strings.Contains(strings.Join(process.args[0], "\n"), `model_provider="prodex-local"`) {
+	if len(process.args) != 1 || !strings.Contains(strings.Join(process.args[0], "\n"), `model_provider="godex-local"`) {
 		t.Fatalf("process args = %#v", process.args)
 	}
 }

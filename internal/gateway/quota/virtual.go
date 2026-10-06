@@ -119,6 +119,9 @@ func (virtual *Virtual) fetchDeepSeek(ctx context.Context, key, explicitBaseURL 
 func (virtual *Virtual) deepSeekBaseURL(explicit string) (string, error) {
 	base := strings.TrimSpace(explicit)
 	if base == "" {
+		base = strings.TrimSpace(virtual.getenv("GODEX_DEEPSEEK_BASE_URL"))
+	}
+	if base == "" {
 		base = strings.TrimSpace(virtual.getenv("PRODEX_DEEPSEEK_BASE_URL"))
 	}
 	if base == "" {

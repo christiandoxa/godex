@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-const runtimeMountPath = "/backend-api/prodex"
+const runtimeMountPath = "/backend-api/godex"
 
 type runtimeRouteKind uint8
 
@@ -25,6 +25,9 @@ type runtimeRoute struct {
 
 func kiroRuntimeRoute(path string) (runtimeRoute, error) {
 	suffix, ok := strings.CutPrefix(path, runtimeMountPath)
+	if !ok {
+		suffix, ok = strings.CutPrefix(path, "/backend-api/prodex")
+	}
 	if !ok || (suffix != "" && !strings.HasPrefix(suffix, "/")) {
 		return runtimeRoute{}, errors.New("Kiro runtime received an unsupported proxy path")
 	}

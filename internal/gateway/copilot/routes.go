@@ -44,6 +44,9 @@ func copilotRuntimeRoute(path string) (copilotRoute, error) {
 
 func copilotMountedSuffix(path string) (string, error) {
 	suffix, ok := strings.CutPrefix(path, copilotMountPath)
+	if !ok {
+		suffix, ok = strings.CutPrefix(path, "/backend-api/prodex")
+	}
 	if !ok || (suffix != "" && !strings.HasPrefix(suffix, "/")) {
 		return "", errors.New("Copilot runtime received an unsupported proxy path")
 	}

@@ -33,7 +33,7 @@ func (process *CodexProcess) CheckProxySupport(ctx context.Context) error {
 	defer func(path string) {
 		_ = os.RemoveAll(path)
 	}(home)
-	configArguments := managedModelArguments("http://127.0.0.1:1/backend-api/prodex")
+	configArguments := managedModelArguments("http://127.0.0.1:1/backend-api/godex")
 	arguments := append([]string{"--strict-config"}, configArguments...)
 	// Stdio EOF validates configuration and exits without accepting any work.
 	arguments = append(arguments, "exec-server", "--listen", "stdio")
@@ -141,7 +141,7 @@ func proxyArguments(endpoint string, arguments []string) ([]string, error) {
 	if err := validateRuntimeURL(endpoint); err != nil {
 		return nil, err
 	}
-	return scopeModelArguments(arguments, managedModelArguments(endpoint+"/backend-api/prodex")), nil
+	return scopeModelArguments(arguments, managedModelArguments(endpoint+"/backend-api/godex")), nil
 }
 
 func containsProxyOverride(arguments []string) bool {

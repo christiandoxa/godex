@@ -25,7 +25,7 @@ func TestLocalFallbackMatchesProdexCompactContract(t *testing.T) {
 			t.Fatalf("compact text missing %q: %s", expected, text)
 		}
 	}
-	if response.StatusCode != 200 || response.Header.Get("X-Prodex-Compact-Mode") != "local-fallback" || response.Header.Get("X-Prodex-Compact-Provider") != "anthropic" || response.Header.Get("X-Prodex-Compact-Degraded") != "true" || response.Header.Get("X-Prodex-Compact-Reason") != "local-policy" {
+	if response.StatusCode != 200 || response.Header.Get("X-Godex-Compact-Mode") != "local-fallback" || response.Header.Get("X-Godex-Compact-Provider") != "anthropic" || response.Header.Get("X-Godex-Compact-Degraded") != "true" || response.Header.Get("X-Godex-Compact-Reason") != "local-policy" {
 		t.Fatalf("compact response = status:%d headers:%v", response.StatusCode, response.Header)
 	}
 }
@@ -43,7 +43,7 @@ func TestLocalSummaryRetainsOnlyRecentBoundedSnippets(t *testing.T) {
 }
 
 func TestLocalSummaryMalformedAndEmptyInput(t *testing.T) {
-	if got := LocalSummary([]byte("{bad")); got != "Local Prodex compact fallback could not parse the compact request body." {
+	if got := LocalSummary([]byte("{bad")); got != "Local Godex compact fallback could not parse the compact request body." {
 		t.Fatalf("malformed summary = %q", got)
 	}
 	got := LocalSummary([]byte(`{"input":[]}`))

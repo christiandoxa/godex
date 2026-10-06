@@ -103,7 +103,7 @@ func addThinkingToolChoiceMetadata(metadata, object map[string]any, thinking boo
 	provider := ensureDeepSeekMetadata(metadata)
 	provider["omitted_tool_choice"] = map[string]any{
 		"from":   choice,
-		"reason": "DeepSeek thinking mode currently rejects explicit tool_choice on the OpenAI Chat route, so Prodex omits it while preserving translated function tools",
+		"reason": "DeepSeek thinking mode currently rejects explicit tool_choice on the OpenAI Chat route, so Godex omits it while preserving translated function tools",
 	}
 }
 

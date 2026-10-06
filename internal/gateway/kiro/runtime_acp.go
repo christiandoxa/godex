@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -153,7 +152,7 @@ func (source *Source) startACPChild(ctx context.Context, home, model, effort str
 	}
 	command := exec.CommandContext(ctx, source.binary(), arguments...)
 	command.Dir = filepath.Clean(home)
-	ownsProcessGroup := strings.TrimSpace(source.getenv("PRODEX_SUB_AGENT")) == ""
+	ownsProcessGroup := strings.TrimSpace(source.getenv("GODEX_SUB_AGENT")) == "" && strings.TrimSpace(source.getenv("PRODEX_SUB_AGENT")) == ""
 	configureACPProcess(command, ownsProcessGroup)
 	command.Env = mergedEnvironment(source.databaseEnvironment(
 		filepath.Join(credential.dataDir, kiroDatabaseFileName),
@@ -368,7 +367,7 @@ func acpInitializeRequest(id uint64) map[string]any {
 				"fs":       map[string]any{"readTextFile": false, "writeTextFile": false},
 				"terminal": false, "auth": map[string]any{"terminal": false},
 			},
-			"clientInfo": map[string]any{"name": "prodex", "title": "Prodex", "version": "0.435.1"},
+			"clientInfo": map[string]any{"name": "godex", "title": "Godex", "version": "0.435.1"},
 		},
 	}
 }
@@ -389,7 +388,7 @@ func handleACPServerRequest(writer *bufio.Writer, envelope acpEnvelope) (bool, e
 		return false, nil
 	}
 	response := unsupportedACPServerRequest(envelope.ID)
-	if envelope.Method == "session/request_permission" && os.Getenv("PRODEX_SUB_AGENT") != "" {
+	if envelope.Method == "session/request_permission" && kiroSubAgent() {
 		response = permissionACPServerResponse(envelope.ID, envelope.Params)
 	}
 	if err := writeACPRequest(writer, response); err != nil {

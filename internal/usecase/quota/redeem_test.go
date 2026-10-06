@@ -53,7 +53,7 @@ func TestRedeemerPreparesNearResetAndExecutesSelectedProfile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Outcome != quotamodel.RedeemReset || gateway.consume != "/profiles/main" || !strings.HasPrefix(result.RequestID, "prodex-manual-redeem-") {
+	if result.Outcome != quotamodel.RedeemReset || gateway.consume != "/profiles/main" || !strings.HasPrefix(result.RequestID, "godex-manual-redeem-") {
 		t.Fatalf("result = %+v, consume = %q", result, gateway.consume)
 	}
 	if !strings.Contains(result.RequestID, "-") || result.RequestID != gateway.requestID {

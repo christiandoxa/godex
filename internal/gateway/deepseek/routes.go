@@ -11,7 +11,7 @@ import (
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
-const mountPath = "/backend-api/prodex"
+const mountPath = "/backend-api/godex"
 
 type routeKind uint8
 
@@ -31,6 +31,9 @@ type route struct {
 
 func runtimeRoute(path string) (route, error) {
 	suffix, ok := strings.CutPrefix(path, mountPath)
+	if !ok {
+		suffix, ok = strings.CutPrefix(path, "/backend-api/prodex")
+	}
 	if !ok || (suffix != "" && !strings.HasPrefix(suffix, "/")) {
 		return route{}, errors.New("DeepSeek runtime received an unsupported proxy path")
 	}

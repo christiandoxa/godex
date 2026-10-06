@@ -108,7 +108,7 @@ func (builder *kiroCatalogBuilder) appendModel(slug, display, description string
 		compact = modelContext * 95 / 100
 	}
 	builder.models = append(builder.models, externalCodexCatalogModel(
-		slug, valueOr(display, slug), valueOr(description, "Kiro model exposed through the Prodex Responses adapter."),
+		slug, valueOr(display, slug), valueOr(description, "Kiro model exposed through the Godex Responses adapter."),
 		len(builder.models)+1, modelContext, compact, builder.entries,
 	))
 	return nil

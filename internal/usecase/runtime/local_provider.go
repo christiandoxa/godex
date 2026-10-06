@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	localProviderID              = "prodex-local"
-	localProviderName            = "Prodex Local"
+	localProviderID              = "godex-local"
+	localProviderName            = "Godex Local"
 	localProviderConfigPrefix    = "model_providers." + localProviderID
 	localDefaultModel            = "unsloth/qwen3.5-35b-a3b"
 	localDefaultContextWindow    = uint64(16_384)

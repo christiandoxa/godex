@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	recursionMarker     = "PRODEX_SUB_AGENT"
-	launcherMarker      = "PRODEX_SUB_AGENT_LAUNCHER"
+	recursionMarker     = "GODEX_SUB_AGENT"
+	launcherMarker      = "GODEX_SUB_AGENT_LAUNCHER"
 	configMaxBytes      = 65_536
 	hardMaxConcurrency  = 64
 	concurrencyExitCode = 75

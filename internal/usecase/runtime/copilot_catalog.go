@@ -215,7 +215,7 @@ func copilotCatalogMetadata(
 	entries []proxymodel.ProviderCatalogEntry,
 ) (string, string) {
 	fallbackName := strings.TrimSpace(slug)
-	fallbackDescription := "External provider model routed through the Prodex Responses adapter."
+	fallbackDescription := "External provider model routed through the Godex Responses adapter."
 	if entry := proxymodel.ResolveProviderCatalogEntry(entries, slug); entry != nil {
 		fallbackName = entry.DisplayName
 		fallbackDescription = entry.Description

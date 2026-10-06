@@ -115,5 +115,5 @@ func anthropicCatalogMetadata(
 	if entry := proxymodel.ResolveProviderCatalogEntry(entries, slug); entry != nil {
 		return entry.DisplayName, entry.Description
 	}
-	return strings.TrimSpace(slug), "External provider model routed through the Prodex Responses adapter."
+	return strings.TrimSpace(slug), "External provider model routed through the Godex Responses adapter."
 }

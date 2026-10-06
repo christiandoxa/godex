@@ -99,10 +99,10 @@ func TestAutoRedeemerSelectsBestPoolCandidateAndRefreshesBeforeRetry(t *testing.
 	if len(gateway.consumes) != 1 || gateway.consumes[0] != "/plus-best" {
 		t.Fatalf("consumes = %#v", gateway.consumes)
 	}
-	if !strings.HasPrefix(gateway.requestID, "prodex-auto-redeem-") {
+	if !strings.HasPrefix(gateway.requestID, "godex-auto-redeem-") {
 		t.Fatalf("request id = %q", gateway.requestID)
 	}
-	parts := strings.Split(strings.TrimPrefix(gateway.requestID, "prodex-auto-redeem-"), "-")
+	parts := strings.Split(strings.TrimPrefix(gateway.requestID, "godex-auto-redeem-"), "-")
 	if len(parts) != 5 || len(parts[2]) != 4 || parts[2][0] != '7' {
 		t.Fatalf("request id is not UUIDv7: %q", gateway.requestID)
 	}

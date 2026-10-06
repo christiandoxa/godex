@@ -340,7 +340,7 @@ func TestDeepSeekModelsAndCompactAreLocal(t *testing.T) {
 	}
 	compactBody, _ := io.ReadAll(compact.Body)
 	compact.Body.Close()
-	if called || compact.Header.Get("X-Prodex-Compact-Provider") != "deepseek" || !strings.Contains(string(compactBody), "retain me") {
+	if called || compact.Header.Get("X-Godex-Compact-Provider") != "deepseek" || !strings.Contains(string(compactBody), "retain me") {
 		t.Fatalf("local endpoints = called:%t headers:%v body:%s", called, compact.Header, compactBody)
 	}
 }

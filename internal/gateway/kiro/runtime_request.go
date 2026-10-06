@@ -115,7 +115,7 @@ func parseKiroMessagesRequestForAgent(body []byte, subAgent bool) (runtimeReques
 }
 
 func kiroSubAgent() bool {
-	return os.Getenv("PRODEX_SUB_AGENT") != ""
+	return os.Getenv("GODEX_SUB_AGENT") != "" || os.Getenv("PRODEX_SUB_AGENT") != ""
 }
 
 func stripKiroExternalToolControls(object map[string]any, subAgent bool) {

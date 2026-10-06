@@ -124,7 +124,7 @@ func manualRedeemRequestID(now time.Time, random io.Reader) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return "prodex-manual-redeem-" + formatUUID(id), nil
+	return "godex-manual-redeem-" + formatUUID(id), nil
 }
 
 func formatUUID(id [16]byte) string {

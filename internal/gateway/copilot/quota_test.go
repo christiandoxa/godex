@@ -256,7 +256,7 @@ func TestCopilotProfileQuotaRawMatchesProdexUserAgentAndHTTPErrorDetail(t *testi
 	_, err := source.FetchQuotaRaw(context.Background(), profilemodel.QuotaTarget{
 		Provider: "copilot", ProviderConfig: profilemodel.ProviderSnapshot{Kind: "copilot", Host: &host, Login: &login},
 	})
-	if userAgent != "prodex/0.435.1" {
+	if userAgent != "godex/0.435.1" {
 		t.Fatalf("User-Agent = %q", userAgent)
 	}
 	if err == nil || !strings.Contains(err.Error(), "Copilot account query failed (HTTP 403) at "+server.URL+"/copilot_internal/user") ||

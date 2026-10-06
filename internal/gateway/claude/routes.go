@@ -11,7 +11,7 @@ import (
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
-const anthropicMountPath = "/backend-api/prodex"
+const anthropicMountPath = "/backend-api/godex"
 
 type runtimeRouteKind uint8
 
@@ -31,6 +31,9 @@ type runtimeRoute struct {
 
 func anthropicRuntimeRoute(path string) (runtimeRoute, error) {
 	suffix, ok := strings.CutPrefix(path, anthropicMountPath)
+	if !ok {
+		suffix, ok = strings.CutPrefix(path, "/backend-api/prodex")
+	}
 	if !ok || (suffix != "" && !strings.HasPrefix(suffix, "/")) {
 		return runtimeRoute{}, errors.New("Anthropic runtime received an unsupported proxy path")
 	}

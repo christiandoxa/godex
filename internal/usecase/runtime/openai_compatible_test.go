@@ -13,12 +13,12 @@ func TestOpenAICompatibleArgumentsMatchProdexProfileProvider(t *testing.T) {
 	}
 	joined := strings.Join(arguments, "\n")
 	for _, expected := range []string{
-		`model_provider="prodex-openai-compatible"`,
-		`model_providers.prodex-openai-compatible.name="OpenAI-compatible"`,
-		`model_providers.prodex-openai-compatible.base_url="http://127.0.0.1:11434/v1"`,
-		`model_providers.prodex-openai-compatible.wire_api="responses"`,
-		`model_providers.prodex-openai-compatible.requires_openai_auth=true`,
-		`model_providers.prodex-openai-compatible.supports_websockets=false`,
+		`model_provider="godex-openai-compatible"`,
+		`model_providers.godex-openai-compatible.name="OpenAI-compatible"`,
+		`model_providers.godex-openai-compatible.base_url="http://127.0.0.1:11434/v1"`,
+		`model_providers.godex-openai-compatible.wire_api="responses"`,
+		`model_providers.godex-openai-compatible.requires_openai_auth=true`,
+		`model_providers.godex-openai-compatible.supports_websockets=false`,
 	} {
 		if !strings.Contains(joined, expected) {
 			t.Fatalf("arguments missing %q: %#v", expected, arguments)
@@ -47,7 +47,7 @@ func TestRunOpenAICompatibleProfileRunsDirectWithoutProxy(t *testing.T) {
 	if err := runner.RunOpenAICompatibleProfile(context.Background(), home, "https://example.test/v1", []string{"exec", "hello"}); err != nil {
 		t.Fatal(err)
 	}
-	if len(process.homes) != 1 || process.homes[0] != home || len(process.args) != 1 || !strings.Contains(strings.Join(process.args[0], "\n"), `model_provider="prodex-openai-compatible"`) {
+	if len(process.homes) != 1 || process.homes[0] != home || len(process.args) != 1 || !strings.Contains(strings.Join(process.args[0], "\n"), `model_provider="godex-openai-compatible"`) {
 		t.Fatalf("direct process = homes:%#v args:%#v", process.homes, process.args)
 	}
 }

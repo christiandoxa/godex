@@ -86,19 +86,20 @@ func websocketEffectivePath(path string) string {
 }
 
 func websocketMountSuffixStart(path string) int {
-	const legacy = "/backend-api/prodex/v"
-	const mount = "/backend-api/prodex"
-	if strings.HasPrefix(path, legacy) {
-		versionStart := len(legacy)
-		if slashOffset := strings.IndexByte(path[versionStart:], '/'); slashOffset >= 0 {
-			slash := versionStart + slashOffset
-			if websocketLegacyVersionSegment(path[versionStart:slash]) {
-				return slash
+	for _, mount := range []string{"/backend-api/godex", "/backend-api/prodex"} {
+		legacy := mount + "/v"
+		if strings.HasPrefix(path, legacy) {
+			versionStart := len(legacy)
+			if slashOffset := strings.IndexByte(path[versionStart:], '/'); slashOffset >= 0 {
+				slash := versionStart + slashOffset
+				if websocketLegacyVersionSegment(path[versionStart:slash]) {
+					return slash
+				}
 			}
 		}
-	}
-	if strings.HasPrefix(path, mount) && (len(path) == len(mount) || len(path) > len(mount) && path[len(mount)] == '/') {
-		return len(mount)
+		if strings.HasPrefix(path, mount) && (len(path) == len(mount) || len(path) > len(mount) && path[len(mount)] == '/') {
+			return len(mount)
+		}
 	}
 	return -1
 }

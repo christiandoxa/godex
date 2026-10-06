@@ -17,14 +17,14 @@ const (
 	CapabilityVersion   = 1
 	CapabilityMaxBytes  = 8 * 1024
 	SecretMaxBytes      = 4 * 1024
-	OpenAIMountPath     = "/backend-api/prodex"
-	AdminTokenHeader    = "X-Prodex-Admin-Token"
-	HealthPath          = "/__prodex/runtime/health"
-	MetricsPath         = "/__prodex/runtime/metrics"
-	ActivatePath        = "/__prodex/runtime/activate"
-	ReleaseAffinityPath = "/__prodex/runtime/session-affinity/release"
-	LogSnapshotPath     = "/__prodex/runtime/log/snapshot"
-	LogEventPath        = "/__prodex/runtime/log/event"
+	OpenAIMountPath     = "/backend-api/godex"
+	AdminTokenHeader    = "X-Godex-Admin-Token"
+	HealthPath          = "/__godex/runtime/health"
+	MetricsPath         = "/__godex/runtime/metrics"
+	ActivatePath        = "/__godex/runtime/activate"
+	ReleaseAffinityPath = "/__godex/runtime/session-affinity/release"
+	LogSnapshotPath     = "/__godex/runtime/log/snapshot"
+	LogEventPath        = "/__godex/runtime/log/event"
 )
 
 type Secret struct {

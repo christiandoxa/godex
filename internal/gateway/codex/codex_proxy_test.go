@@ -92,7 +92,7 @@ printf '%s\n' "$@" > "$GODEX_PROXY_RECORD.args"`)
 		t.Fatalf("child home = %q, err = %v", childHome, err)
 	}
 	arguments, err := os.ReadFile(record + ".args")
-	if err != nil || !strings.Contains(string(arguments), `model_providers.godex-openai.base_url="http://127.0.0.1:1234/backend-api/prodex"`) || !strings.Contains(string(arguments), "--model\nsynthetic") {
+	if err != nil || !strings.Contains(string(arguments), `model_providers.godex-openai.base_url="http://127.0.0.1:1234/backend-api/godex"`) || !strings.Contains(string(arguments), "--model\nsynthetic") {
 		t.Fatalf("child arguments = %q, err = %v", arguments, err)
 	}
 	if err := NewCodexProcess(script, Terminal{}).RunThroughProxy(context.Background(), home, "http://127.0.0.1:1234", []string{"-c", "openai_base_url=https://outside"}); err == nil {

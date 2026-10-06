@@ -17,7 +17,7 @@ func TestACPRequestShapesMatchProdex(t *testing.T) {
 	}
 	params := initialize["params"].(map[string]any)
 	client := params["clientInfo"].(map[string]any)
-	if params["protocolVersion"] != 1 || client["name"] != "prodex" || client["title"] != "Prodex" || client["version"] != "0.435.1" {
+	if params["protocolVersion"] != 1 || client["name"] != "godex" || client["title"] != "Godex" || client["version"] != "0.435.1" {
 		t.Fatalf("initialize params = %#v", params)
 	}
 	newSession := acpSessionNewRequest(2, "/tmp/prodex")

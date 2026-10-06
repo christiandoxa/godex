@@ -12,6 +12,7 @@ func removeHopHeaders(headers http.Header) {
 		name := strings.ToLower(strings.TrimSpace(key))
 		if httpheader.IsRequestTransport(name) || connectionHeaders[http.CanonicalHeaderKey(key)] ||
 			strings.HasPrefix(name, "sec-websocket-") ||
+			strings.HasPrefix(name, "x-godex-internal-") ||
 			strings.HasPrefix(name, "x-prodex-internal-") ||
 			name == "authorization" || name == "chatgpt-account-id" {
 			delete(headers, key)

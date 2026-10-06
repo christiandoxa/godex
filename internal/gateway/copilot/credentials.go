@@ -67,8 +67,10 @@ func (source *Source) readSDKToken(ctx context.Context, host, login string) (str
 }
 
 func (source *Source) copilotBinary() string {
-	if override := strings.TrimSpace(source.getenv("PRODEX_COPILOT_BIN")); override != "" {
-		return override
+	for _, key := range []string{"GODEX_COPILOT_BIN", "PRODEX_COPILOT_BIN"} {
+		if override := strings.TrimSpace(source.getenv(key)); override != "" {
+			return override
+		}
 	}
 	if path, err := exec.LookPath("copilot"); err == nil {
 		return path

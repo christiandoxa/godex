@@ -104,8 +104,10 @@ func (source *Source) readModelCatalog(ctx context.Context, databasePath, region
 }
 
 func (source *Source) binary() string {
-	if override := strings.TrimSpace(source.getenv("PRODEX_KIRO_BIN")); override != "" {
-		return override
+	for _, key := range []string{"GODEX_KIRO_BIN", "PRODEX_KIRO_BIN"} {
+		if override := strings.TrimSpace(source.getenv(key)); override != "" {
+			return override
+		}
 	}
 	for _, candidate := range []string{"kiro-cli-chat", "kiro-cli"} {
 		if path, err := source.lookupPath(candidate); err == nil && strings.TrimSpace(path) != "" {

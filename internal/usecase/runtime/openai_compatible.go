@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	openAICompatibleProviderID   = "prodex-openai-compatible"
+	openAICompatibleProviderID   = "godex-openai-compatible"
 	openAICompatibleProviderName = "OpenAI-compatible"
 )
 

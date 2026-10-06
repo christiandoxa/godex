@@ -11,10 +11,11 @@ func TestUpstreamPathMatchesCodexMount(t *testing.T) {
 		path string
 		want string
 	}{
-		{name: "responses", base: "/backend-api", path: "/backend-api/prodex/responses", want: "/backend-api/codex/responses"},
-		{name: "legacy version", base: "/backend-api", path: "/backend-api/prodex/v1/responses", want: "/backend-api/codex/responses"},
+		{name: "responses", base: "/backend-api", path: "/backend-api/godex/responses", want: "/backend-api/codex/responses"},
+		{name: "legacy version", base: "/backend-api", path: "/backend-api/godex/v1/responses", want: "/backend-api/codex/responses"},
 		{name: "already normalized", base: "/backend-api", path: "/backend-api/codex/responses", want: "/backend-api/codex/responses"},
-		{name: "custom base", base: "/backend-api-v2", path: "/backend-api/prodex/responses", want: "/backend-api-v2/backend-api/codex/responses"},
+		{name: "legacy prodex alias", base: "/backend-api", path: "/backend-api/prodex/responses", want: "/backend-api/codex/responses"},
+		{name: "custom base", base: "/backend-api-v2", path: "/backend-api/godex/responses", want: "/backend-api-v2/backend-api/codex/responses"},
 		{name: "standard v1", base: "/backend-api", path: "/v1/responses", want: "/backend-api/v1/responses"},
 		{name: "pathless base", base: "", path: "/v1/responses", want: "/v1/responses"},
 	}

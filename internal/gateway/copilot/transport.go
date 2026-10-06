@@ -17,7 +17,7 @@ import (
 
 const (
 	copilotRuntimeUserAgent = "copilot/1.0.65 (client/github/cli)"
-	copilotMountPath        = "/backend-api/prodex"
+	copilotMountPath        = "/backend-api/godex"
 )
 
 type RuntimeTransport struct {

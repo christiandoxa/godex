@@ -39,7 +39,7 @@ func TestPrepareCodexHomeWritesPrivateFileStoreConfig(t *testing.T) {
 
 func TestManagedArgumentsValidateURLs(t *testing.T) {
 	args, err := proxyArguments("http://127.0.0.1:1234", nil)
-	if err != nil || !strings.Contains(strings.Join(args, " "), `base_url="http://127.0.0.1:1234/backend-api/prodex"`) {
+	if err != nil || !strings.Contains(strings.Join(args, " "), `base_url="http://127.0.0.1:1234/backend-api/godex"`) {
 		t.Fatalf("managed URL arguments invalid")
 	}
 	for _, url := range []string{"https://user:pass@example.test", "file:///tmp/path", "https://example.test?secret=value"} {
