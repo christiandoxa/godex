@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 
 	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
@@ -27,12 +28,24 @@ func Info(ctx context.Context, activity *runtimeusecase.Activity, out io.Writer,
 	processes := collectGodexProcesses()
 	processCount, runtimeProcessCount := statusProcessCounts(processes)
 	processSummary := formatInfoProcessSummary(processes)
+	runtimeLogsDirectory := filepath.Join(overview.GodexHome, "logs")
+	runtimeLogsSummary := formatRuntimeLogsSummary(runtimeLogsDirectory, "jsonl")
+	proxyContract := runtimeProxyContractSummary()
 	if jsonOutput {
 		value := map[string]any{
-			"version":               version.String(),
-			"active_profile":        overview.ActiveProfile,
-			"profile_count":         overview.ProfileCount,
-			"provider":              "openai",
+			"version":        version.String(),
+			"active_profile": overview.ActiveProfile,
+			"profile_count":  overview.ProfileCount,
+			"provider":       "openai",
+			"runtime_policy": nil,
+			"runtime_logs": map[string]any{
+				"directory": runtimeLogsDirectory,
+				"format":    "jsonl",
+			},
+			"secret_backend": map[string]any{
+				"backend":         "file",
+				"keyring_service": nil,
+			},
 			"process_count":         processCount,
 			"runtime_process_count": runtimeProcessCount,
 			"runtime_load": map[string]any{
@@ -40,7 +53,12 @@ func Info(ctx context.Context, activity *runtimeusecase.Activity, out io.Writer,
 				"recent_selection_events": overview.RecentEvents,
 			},
 			"fields": map[string]string{
-				"Godex processes": processSummary,
+				"Runtime policy":         "disabled",
+				"Runtime preset":         "default",
+				"Runtime proxy contract": proxyContract,
+				"Runtime logs":           runtimeLogsSummary,
+				"Secret backend":         "file",
+				"Godex processes":        processSummary,
 			},
 			"overview": overview,
 		}
@@ -56,6 +74,11 @@ func Info(ctx context.Context, activity *runtimeusecase.Activity, out io.Writer,
 		{"Active profile", valueOrDash(overview.ActiveProfile)},
 		{"Provider", "openai"},
 		{"Enabled profiles", fmt.Sprint(overview.EnabledCount)},
+		{"Runtime policy", "disabled"},
+		{"Runtime preset", "default"},
+		{"Runtime proxy contract", proxyContract},
+		{"Secret backend", "file"},
+		{"Runtime logs", runtimeLogsSummary},
 		{"Runtime inflight", fmt.Sprint(overview.Inflight)},
 		{"Recent runtime events", fmt.Sprint(overview.RecentEvents)},
 		{"Godex version", version.String()},
@@ -126,4 +149,21 @@ func formatInfoProcessSummary(processes []statusProcessInfo) string {
 		summary += fmt.Sprintf(" (+%d more)", remaining)
 	}
 	return summary + ")"
+}
+
+func runtimeProxyContractSummary() string {
+	return strings.Join([]string{
+		"scoped gateway",
+		"policy-visible selection",
+		"bounded precommit retry",
+		"cheap hot path",
+		"quota/transport split",
+		"structured observability",
+		"connection reuse",
+		"profile-isolated secrets",
+	}, ", ")
+}
+
+func formatRuntimeLogsSummary(directory, format string) string {
+	return directory + " (" + format + ")"
 }

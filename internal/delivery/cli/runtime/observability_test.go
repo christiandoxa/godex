@@ -93,7 +93,16 @@ func TestInfoTextAndJSON(t *testing.T) {
 	if err := Info(context.Background(), activity, &text, nil); err != nil {
 		t.Fatal(err)
 	}
-	for _, expected := range []string{"Profiles: 2", "Active profile: work", "Codex version: codex-cli 0.159.2"} {
+	for _, expected := range []string{
+		"Profiles: 2",
+		"Active profile: work",
+		"Runtime policy: disabled",
+		"Runtime preset: default",
+		"Runtime proxy contract: scoped gateway, policy-visible selection, bounded precommit retry",
+		"Secret backend: file",
+		"Runtime logs: /managed/logs (jsonl)",
+		"Codex version: codex-cli 0.159.2",
+	} {
 		if !strings.Contains(text.String(), expected) {
 			t.Fatalf("text info missing %q: %s", expected, text.String())
 		}
@@ -106,8 +115,28 @@ func TestInfoTextAndJSON(t *testing.T) {
 	if err := json.Unmarshal(raw.Bytes(), &value); err != nil {
 		t.Fatal(err)
 	}
-	if value["active_profile"] != "work" || value["token_usage"] != "unavailable" {
+	runtimeLogs, _ := value["runtime_logs"].(map[string]any)
+	secretBackend, _ := value["secret_backend"].(map[string]any)
+	fields, _ := value["fields"].(map[string]any)
+	if value["active_profile"] != "work" ||
+		value["token_usage"] != "unavailable" ||
+		value["runtime_policy"] != nil ||
+		runtimeLogs["directory"] != "/managed/logs" ||
+		runtimeLogs["format"] != "jsonl" ||
+		secretBackend["backend"] != "file" ||
+		fields["Runtime policy"] != "disabled" ||
+		fields["Runtime preset"] != "default" ||
+		!strings.Contains(fields["Runtime proxy contract"].(string), "bounded precommit retry") {
 		t.Fatalf("json info = %#v", value)
+	}
+}
+
+func TestProdex04356InfoRuntimeSummaryPartsMatchTaggedShapes(t *testing.T) {
+	if got := runtimeProxyContractSummary(); got != "scoped gateway, policy-visible selection, bounded precommit retry, cheap hot path, quota/transport split, structured observability, connection reuse, profile-isolated secrets" {
+		t.Fatalf("runtime proxy contract = %q", got)
+	}
+	if got := formatRuntimeLogsSummary("/tmp/godex", "jsonl"); got != "/tmp/godex (jsonl)" {
+		t.Fatalf("runtime logs summary = %q", got)
 	}
 }
 
