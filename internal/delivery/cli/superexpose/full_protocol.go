@@ -23,6 +23,12 @@ func canonicalExposeTool(name string) string {
 		return godexListToolName
 	case godexExecToolName, legacyExecToolName:
 		return godexExecToolName
+	case godexSessionPromptWriteToolName, legacySessionPromptWriteToolName:
+		return godexSessionPromptWriteToolName
+	case godexSessionPreemptToolName, legacySessionPreemptToolName:
+		return godexSessionPreemptToolName
+	case godexSessionOutputReadToolName, legacySessionOutputReadToolName:
+		return godexSessionOutputReadToolName
 	default:
 		return name
 	}
@@ -32,6 +38,9 @@ func (handler *execMCPHandler) callTool(ctx context.Context, name string, argume
 	tool := canonicalExposeTool(name)
 	if handler.mode != "full" && tool != godexExecToolName {
 		return nil, errors.New("tool is not exposed by this endpoint")
+	}
+	if sessionTool(tool) {
+		return handler.callSessionTool(tool, arguments)
 	}
 	switch tool {
 	case godexExecToolName:
@@ -97,6 +106,9 @@ func (handler *execMCPHandler) callTool(ctx context.Context, name string, argume
 
 func validateToolArguments(name string, arguments map[string]any) error {
 	tool := canonicalExposeTool(name)
+	if sessionTool(tool) {
+		return validateSessionToolArguments(tool, arguments)
+	}
 	allowed := map[string]bool{}
 	switch tool {
 	case godexStartToolName:

@@ -29,21 +29,27 @@ var mcpProtocolVersions = []string{
 }
 
 const (
-	godexStartToolName  = "godex_super_start"
-	godexStatusToolName = "godex_super_status"
-	godexEventsToolName = "godex_super_events"
-	godexResultToolName = "godex_super_result"
-	godexCancelToolName = "godex_super_cancel"
-	godexListToolName   = "godex_super_list"
-	godexExecToolName   = "godex_super_exec"
+	godexStartToolName              = "godex_super_start"
+	godexStatusToolName             = "godex_super_status"
+	godexEventsToolName             = "godex_super_events"
+	godexResultToolName             = "godex_super_result"
+	godexCancelToolName             = "godex_super_cancel"
+	godexListToolName               = "godex_super_list"
+	godexExecToolName               = "godex_super_exec"
+	godexSessionPromptWriteToolName = "godex_session_prompt_write"
+	godexSessionPreemptToolName     = "godex_session_preempt"
+	godexSessionOutputReadToolName  = "godex_session_output_read"
 
-	legacyStartToolName  = "prodex_super_start"
-	legacyStatusToolName = "prodex_super_status"
-	legacyEventsToolName = "prodex_super_events"
-	legacyResultToolName = "prodex_super_result"
-	legacyCancelToolName = "prodex_super_cancel"
-	legacyListToolName   = "prodex_super_list"
-	legacyExecToolName   = "prodex_super_exec"
+	legacyStartToolName              = "prodex_super_start"
+	legacyStatusToolName             = "prodex_super_status"
+	legacyEventsToolName             = "prodex_super_events"
+	legacyResultToolName             = "prodex_super_result"
+	legacyCancelToolName             = "prodex_super_cancel"
+	legacyListToolName               = "prodex_super_list"
+	legacyExecToolName               = "prodex_super_exec"
+	legacySessionPromptWriteToolName = "prodex_session_prompt_write"
+	legacySessionPreemptToolName     = "prodex_session_preempt"
+	legacySessionOutputReadToolName  = "prodex_session_output_read"
 )
 
 type execMCPHandler struct {
@@ -54,6 +60,7 @@ type execMCPHandler struct {
 	workspace     string
 	mode          string
 	runs          *runManager
+	sessions      *existingSessionService
 	optionalTools optionalToolSnapshot
 	rate          rateLimiter
 }
@@ -247,7 +254,9 @@ func (handler *execMCPHandler) initialize(protocolVersion string) map[string]any
 func (handler *execMCPHandler) toolsList() map[string]any {
 	tools := []any{handler.execToolDefinition()}
 	if handler.mode == "full" {
-		tools = append(handler.lifecycleToolDefinitions(), tools...)
+		full := handler.lifecycleToolDefinitions()
+		full = append(full, handler.sessionToolDefinitions()...)
+		tools = append(full, tools...)
 	}
 	return map[string]any{
 		"resultType": "complete",

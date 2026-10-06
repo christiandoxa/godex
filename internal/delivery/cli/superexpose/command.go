@@ -198,12 +198,14 @@ func runExecServer(ctx context.Context, options Options, out, errOut io.Writer) 
 	endpoint := "http://" + listener.Addr().String() + expectedPath
 	tools := discoverOptionalTools()
 	var runs *runManager
+	var sessions *existingSessionService
 	if options.Mode == "full" {
 		runs, err = newRunManager(workspace, options.SuperArgs, instanceID, displayName)
 		if err != nil {
 			return err
 		}
 		defer runs.shutdown()
+		sessions = newExistingSessionService(systemSessionProcessInspector{}, systemSessionQueueControl{})
 	}
 	handler := &execMCPHandler{
 		expectedPath:  expectedPath,
@@ -213,6 +215,7 @@ func runExecServer(ctx context.Context, options Options, out, errOut io.Writer) 
 		workspace:     workspace,
 		mode:          options.Mode,
 		runs:          runs,
+		sessions:      sessions,
 		optionalTools: tools,
 	}
 	server := &http.Server{
