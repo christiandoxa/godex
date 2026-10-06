@@ -19,7 +19,7 @@ import (
 func nativeAntigravityArguments(arguments []string) ([]string, bool) {
 	if len(arguments) > 0 && arguments[0] == "run" {
 		arguments = arguments[1:]
-	} else if len(arguments) > 0 && cli.IsExplicitGodexCommand(arguments[0]) {
+	} else if len(arguments) > 0 && cli.IsExplicitGodexCommand(arguments[0]) && arguments[0] != "super" && arguments[0] != "s" {
 		return nil, false
 	}
 	arguments = runtimecli.NormalizeNativeAntigravityArguments(arguments)

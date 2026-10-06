@@ -530,3 +530,11 @@ func TestProdex04356HiddenRuntimeBrokerIsExplicitAndSilentFromUpdateNotice(t *te
 		t.Fatal("hidden runtime broker must not emit update notices")
 	}
 }
+
+func TestProdex04356SuperCommandsAreExplicitGodexCommands(t *testing.T) {
+	for _, command := range []string{"super", "s"} {
+		if !IsExplicitGodexCommand(command) {
+			t.Fatalf("%s must not fall through to native Codex dispatch", command)
+		}
+	}
+}
