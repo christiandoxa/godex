@@ -506,3 +506,9 @@ func TestProdex04355HiddenMCPBridgeIsExplicitGodexCommand(t *testing.T) {
 		t.Fatal("hidden MCP bridge fell through to Codex runtime dispatch")
 	}
 }
+
+func TestProdex04356GatewayIsExplicitGodexCommand(t *testing.T) {
+	if !IsExplicitGodexCommand("gateway") {
+		t.Fatal("gateway must not fall through to native Codex dispatch")
+	}
+}

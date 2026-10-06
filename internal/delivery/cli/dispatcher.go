@@ -32,7 +32,7 @@ const importCurrentCommand = "import-current"
 func IsExplicitGodexCommand(command string) bool {
 	switch command {
 	case "login", "logout", "accounts", "current", importCurrentCommand,
-		"account", "profile", "use", "remove", "run", "quota", "redeem",
+		"account", "profile", "use", "remove", "run", "gateway", "quota", "redeem",
 		"ping", "update", "session", "info", "status", "log", "doctor", "__mcp-jsonl-bridge",
 		"version", "--version", "-version", "help", "--help", "-h":
 		return true
@@ -108,6 +108,8 @@ func (app *App) Run(ctx context.Context, arguments []string) error {
 		return accountcli.Remove(ctx, app.accounts, app.out, arguments[1:])
 	case "run":
 		return app.runRuntime(ctx, arguments[1:])
+	case "gateway":
+		return runtimecli.Gateway(ctx, app.runtime, app.profiles, app.out, arguments[1:])
 	case "quota":
 		if app.quota == nil {
 			return fmt.Errorf("quota support is not configured")

@@ -22,9 +22,11 @@ type Account struct {
 type Config struct {
 	Context             context.Context
 	UpstreamURL         string
+	ListenAddr          string
 	PreferredAccount    string
 	Provider            Provider
 	ProviderCredentials []ProviderCredential
 	AutoRedeem          bool
+	SkipQuotaPreflight  bool
 	Accounts            func(context.Context) ([]Account, error)
 }

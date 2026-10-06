@@ -17,6 +17,7 @@ import (
 	"github.com/christiandoxa/godex/internal/config"
 	proxyconfig "github.com/christiandoxa/godex/internal/model/proxy"
 	updaterepo "github.com/christiandoxa/godex/internal/repository/update"
+	quotausecase "github.com/christiandoxa/godex/internal/usecase/quota"
 )
 
 const antigravityLoginCaptureEnv = "GODEX_ANTIGRAVITY_LOGIN_CAPTURE"
@@ -329,5 +330,17 @@ func TestNewRuntimeGatewayPassesDeepSeekRuntimeSettings(t *testing.T) {
 	response.Body.Close()
 	if path != "/tenant/beta/chat/completions" || searchMode != "medium" {
 		t.Fatalf("DeepSeek composed gateway request = %q / %q", path, searchMode)
+	}
+}
+
+func TestProdex04356GatewaySkipQuotaPreflightReachesRoutingConfig(t *testing.T) {
+	dependencies := runtimeRouterDependencies{quota: &quotausecase.Status{}}
+	skipped := runtimeRoutingConfig(proxyconfig.Config{SkipQuotaPreflight: true}, dependencies, nil)
+	if skipped.QuotaPreflight != nil {
+		t.Fatal("gateway routing config retained quota preflight")
+	}
+	normal := runtimeRoutingConfig(proxyconfig.Config{}, dependencies, nil)
+	if normal.QuotaPreflight == nil {
+		t.Fatal("normal runtime routing config lost quota preflight")
 	}
 }

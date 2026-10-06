@@ -83,18 +83,36 @@ func (runner *Runner) RunProviderAPIKeys(
 	apiKeys []string,
 	args []string,
 ) error {
+	home, preferredID, accounts, credentials, err := runner.providerAPIKeyPool(codexHome, provider, apiKeys)
+	if err != nil {
+		return err
+	}
+	return runner.launchHome(ctx, home, preferredID, provider, credentials, accounts, args)
+}
+
+func (runner *Runner) providerAPIKeyPool(
+	codexHome string,
+	provider proxymodel.Provider,
+	apiKeys []string,
+) (
+	string,
+	string,
+	[]proxymodel.Account,
+	[]proxymodel.ProviderCredential,
+	error,
+) {
 	if strings.TrimSpace(provider.Kind) == "" {
-		return errors.New(runtimeProviderKindRequired)
+		return "", "", nil, nil, errors.New(runtimeProviderKindRequired)
 	}
 	if len(apiKeys) == 0 {
-		return errors.New("runtime provider API key pool is empty")
+		return "", "", nil, nil, errors.New("runtime provider API key pool is empty")
 	}
 	if strings.TrimSpace(codexHome) == "" {
 		codexHome = runner.currentHome
 	}
 	home, err := validateRuntimeHome(codexHome)
 	if err != nil {
-		return err
+		return "", "", nil, nil, err
 	}
 	accounts := make([]proxymodel.Account, 0, len(apiKeys))
 	credentials := make([]proxymodel.ProviderCredential, 0, len(apiKeys))
@@ -102,7 +120,7 @@ func (runner *Runner) RunProviderAPIKeys(
 	preferredID := ""
 	for _, apiKey := range apiKeys {
 		if apiKey == "" {
-			return errors.New("runtime provider API key cannot be empty")
+			return "", "", nil, nil, errors.New("runtime provider API key cannot be empty")
 		}
 		id := providerCredentialRoutingID(provider, apiKey)
 		if seen[id] {
@@ -119,9 +137,9 @@ func (runner *Runner) RunProviderAPIKeys(
 		credentials = append(credentials, proxymodel.ProviderCredential{ID: id, Secret: apiKey})
 	}
 	if preferredID == "" {
-		return errors.New("runtime provider API key pool is empty")
+		return "", "", nil, nil, errors.New("runtime provider API key pool is empty")
 	}
-	return runner.launchHome(ctx, home, preferredID, provider, credentials, accounts, args)
+	return home, preferredID, accounts, credentials, nil
 }
 
 func (runner *Runner) RunProviderAPIKeysAccount(

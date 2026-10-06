@@ -105,7 +105,9 @@ func run() int {
 		if err != nil {
 			return nil, err
 		}
-		return proxyhttp.NewProxy(proxyhttp.Config{Router: router, Activity: activity})
+		return proxyhttp.NewProxy(proxyhttp.Config{
+			Router: router, Activity: activity, ListenAddr: config.ListenAddr,
+		})
 	})
 	runner := runtimeusecase.NewRunner(store, process, factory)
 	runner.SetProviderCatalogStore(providerCatalogs)
@@ -191,14 +193,25 @@ func newRuntimeRouter(
 	if err != nil {
 		return nil, err
 	}
-	return routingusecase.NewRouter(routingusecase.Config{
+	return routingusecase.NewRouter(runtimeRoutingConfig(config, dependencies, gateway))
+}
+
+func runtimeRoutingConfig(
+	config proxyconfig.Config,
+	dependencies runtimeRouterDependencies,
+	gateway runtimeGateway,
+) routingusecase.Config {
+	routingConfig := routingusecase.Config{
 		Gateway: gateway, Accounts: runtimeAccountSource(config.Accounts, gateway),
 		PreferredAccount: config.PreferredAccount, Bindings: dependencies.bindings,
-		RoutingState:   dependencies.bindings,
-		QuotaPreflight: dependencies.quota,
-		Activity:       dependencies.activity,
-		AutoRedeem:     config.AutoRedeem, Redeemer: dependencies.autoRedeemer,
-	})
+		RoutingState: dependencies.bindings,
+		Activity:     dependencies.activity,
+		AutoRedeem:   config.AutoRedeem, Redeemer: dependencies.autoRedeemer,
+	}
+	if !config.SkipQuotaPreflight {
+		routingConfig.QuotaPreflight = dependencies.quota
+	}
+	return routingConfig
 }
 
 func newRuntimeGateway(
