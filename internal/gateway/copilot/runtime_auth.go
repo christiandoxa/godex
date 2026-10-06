@@ -42,17 +42,29 @@ func (auth RuntimeAuth) ModelCatalog() []map[string]any {
 }
 
 func (source *Source) NewRuntimeTransport(ctx context.Context, host, login, apiURL string) (*RuntimeTransport, error) {
-	auth, err := source.ResolveRuntimeAuth(ctx, host, login)
+	return source.NewRuntimeTransportWithClient(ctx, host, login, apiURL, source.client)
+}
+
+func (source *Source) NewRuntimeTransportWithClient(
+	ctx context.Context,
+	host, login, apiURL string,
+	client *http.Client,
+) (*RuntimeTransport, error) {
+	auth, err := source.ResolveRuntimeAuthWithClient(ctx, host, login, client)
 	if err != nil {
 		return nil, err
 	}
 	if strings.TrimSpace(apiURL) == "" {
 		apiURL = defaultCopilotAPIURL(host)
 	}
-	return NewRuntimeTransport(apiURL, auth, source.client)
+	return NewRuntimeTransport(apiURL, auth, client)
 }
 
 func (source *Source) ResolveRuntimeAuth(ctx context.Context, host, login string) (RuntimeAuth, error) {
+	return source.ResolveRuntimeAuthWithClient(ctx, host, login, source.client)
+}
+
+func (source *Source) ResolveRuntimeAuthWithClient(ctx context.Context, host, login string, client *http.Client) (RuntimeAuth, error) {
 	config, err := source.readConfig()
 	if err != nil {
 		return RuntimeAuth{}, err
@@ -67,7 +79,10 @@ func (source *Source) ResolveRuntimeAuth(ctx context.Context, host, login string
 	}
 	modelsURL := strings.TrimRight(defaultCopilotAPIURL(host), "/") + "/models"
 	tokenURL := strings.TrimRight(tokenOrigin, "/") + "/copilot_internal/v2/token"
-	auth, err := refreshRuntimeAuth(ctx, source.client, tokenURL, modelsURL, accessToken)
+	if client == nil {
+		client = source.client
+	}
+	auth, err := refreshRuntimeAuth(ctx, client, tokenURL, modelsURL, accessToken)
 	accessToken = ""
 	return auth, err
 }

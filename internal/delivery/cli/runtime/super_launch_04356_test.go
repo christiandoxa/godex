@@ -156,20 +156,26 @@ func TestProdex04356SuperLaunchDeepSeekAPIKeyFixedPoolUsesOverlay(t *testing.T) 
 	}
 }
 
-func TestProdex04356SuperLaunchFailsClosedForUnimplementedLocalRewriteAndNoProxy(t *testing.T) {
+func TestProdex04356SuperLaunchFailsClosedOnlyForUnimplementedLocalRewrite(t *testing.T) {
 	runner := runtimeusecase.NewRunner(nil, &kiroShortcutProcess{}, nil)
-	for _, args := range [][]string{
-		{"--url", "http://127.0.0.1:11434/v1"},
-		{"--no-proxy"},
-	} {
-		options, err := parseSuperArguments(args)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = launchSuperProfiles(t.Context(), runner, nil, nil, options)
-		if err == nil || !strings.Contains(err.Error(), "not implemented yet") {
-			t.Fatalf("Super launch %v = %v", args, err)
-		}
+	options, err := parseSuperArguments([]string{"--url", "http://127.0.0.1:11434/v1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = launchSuperProfiles(t.Context(), runner, nil, nil, options)
+	if err == nil || !strings.Contains(err.Error(), "not implemented yet") {
+		t.Fatalf("local Super launch = %v", err)
+	}
+}
+
+func TestProdex04356SuperNoProxyMapsToUpstreamPolicyWithoutDisablingRuntimeProxy(t *testing.T) {
+	options, err := parseSuperArguments([]string{"--no-proxy"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	launch := superRuntimeLaunchOptions(options)
+	if !launch.UpstreamNoProxy || !launch.SmartContextEnabled || !launch.SuperOverlay {
+		t.Fatalf("no-proxy Super launch options = %#v", launch)
 	}
 }
 

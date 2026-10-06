@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -223,6 +224,19 @@ func runtimeRoutingConfig(
 	return routingConfig
 }
 
+func runtimeUpstreamHTTPClient(noProxy bool) *http.Client {
+	if !noProxy {
+		return nil
+	}
+	transport, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		return &http.Client{Transport: http.DefaultTransport}
+	}
+	clone := transport.Clone()
+	clone.Proxy = nil
+	return &http.Client{Transport: clone}
+}
+
 func newRuntimeGateway(
 	config proxyconfig.Config,
 	process *codex.CodexProcess,
@@ -231,20 +245,21 @@ func newRuntimeGateway(
 	kiroSource *kirogateway.Source,
 	providerCatalogs *runtimerepo.ProviderCatalogStore,
 ) (runtimeGateway, error) {
+	client := runtimeUpstreamHTTPClient(config.UpstreamNoProxy)
 	switch config.Provider.Kind {
 	case "", "openai":
-		return openai.NewTransport(config.UpstreamURL, nil, process)
+		return openai.NewTransport(config.UpstreamURL, client, process)
 	case "copilot":
-		return newCopilotRuntimeGateway(config, copilotSource, providerCatalogs)
+		return newCopilotRuntimeGateway(config, copilotSource, providerCatalogs, client)
 	case "anthropic":
-		return newAnthropicRuntimeGateway(config, claudeSource)
+		return newAnthropicRuntimeGateway(config, claudeSource, client)
 	case "deepseek":
 		return deepseekgateway.NewRuntimePoolWithOptions(config.Provider.APIURL, config.ProviderCredentials, deepseekgateway.RequestOptions{
 			StrictTools: config.Provider.StrictTools, WebSearchMode: config.Provider.WebSearchMode,
 			BetaBaseURL: config.Provider.BetaBaseURL, SSELookaheadTimeout: config.Provider.SSELookaheadTimeout,
-		}, nil)
+		}, client)
 	case "gemini":
-		return geminigateway.NewRuntimePool(config.Provider.APIURL, config.ProviderCredentials, nil)
+		return geminigateway.NewRuntimePool(config.Provider.APIURL, config.ProviderCredentials, client)
 	case "kiro":
 		return newKiroRuntimeGateway(config, kiroSource)
 	default:
@@ -272,6 +287,7 @@ func newKiroRuntimeGateway(config proxyconfig.Config, source *kirogateway.Source
 func newAnthropicRuntimeGateway(
 	config proxyconfig.Config,
 	source *claudegateway.Source,
+	client *http.Client,
 ) (runtimeGateway, error) {
 	if source == nil {
 		return nil, errors.New("Anthropic runtime source is not configured")
@@ -280,7 +296,7 @@ func newAnthropicRuntimeGateway(
 		config.Context = context.Background()
 	}
 	if len(config.ProviderCredentials) > 0 {
-		return claudegateway.NewRuntimeAPIKeyPool(config.Provider.APIURL, config.ProviderCredentials, nil)
+		return claudegateway.NewRuntimeAPIKeyPool(config.Provider.APIURL, config.ProviderCredentials, client)
 	}
 	if config.Accounts == nil {
 		return nil, errors.New("Anthropic runtime account source is not configured")
@@ -289,16 +305,17 @@ func newAnthropicRuntimeGateway(
 	if err != nil {
 		return nil, err
 	}
-	return source.NewRuntimePool(config.Context, accounts)
+	return source.NewRuntimePoolWithClient(config.Context, accounts, client)
 }
 
 func newCopilotRuntimeGateway(
 	config proxyconfig.Config,
 	source *copilotgateway.Source,
 	catalogs *runtimerepo.ProviderCatalogStore,
+	client *http.Client,
 ) (runtimeGateway, error) {
 	if len(config.ProviderCredentials) > 0 {
-		return copilotgateway.NewRuntimeAPIKeyPool(config.Provider.APIURL, config.ProviderCredentials, nil)
+		return copilotgateway.NewRuntimeAPIKeyPool(config.Provider.APIURL, config.ProviderCredentials, client)
 	}
 	if source == nil {
 		return nil, errors.New("Copilot runtime source is not configured")
@@ -313,7 +330,7 @@ func newCopilotRuntimeGateway(
 	if err != nil {
 		return nil, err
 	}
-	pool, err := source.NewRuntimePool(config.Context, accounts)
+	pool, err := source.NewRuntimePoolWithClient(config.Context, accounts, client)
 	if err != nil {
 		return nil, err
 	}

@@ -10,6 +10,7 @@ import (
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
 	proxyconfig "github.com/christiandoxa/godex/internal/model/proxy"
+	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
 
 func TestProdex04356RuntimeLaunchOptionsReachProxyWithoutMutatingDefaults(t *testing.T) {
@@ -319,5 +320,53 @@ func TestProdex04356RuntimeLaunchOptionsFixProviderCredentialPool(t *testing.T) 
 	}
 	if len(config.ProviderCredentials) != 2 {
 		t.Fatalf("credential snapshot should stay complete for gateway setup: %#v", config.ProviderCredentials)
+	}
+}
+
+type noProxyPolicyQuota struct {
+	calls []bool
+}
+
+func (quota *noProxyPolicyQuota) Ready(context.Context, accountentity.Account) (bool, error) {
+	return false, errors.New("legacy Ready unexpectedly used")
+}
+
+func (quota *noProxyPolicyQuota) AvailabilityWithPolicy(
+	_ context.Context,
+	_ accountentity.Account,
+	noProxy bool,
+) (quotamodel.Availability, error) {
+	quota.calls = append(quota.calls, noProxy)
+	return quotamodel.Availability{Ready: true}, nil
+}
+
+func TestProdex04356NoProxyPolicyReachesQuotaAndRuntimeProxy(t *testing.T) {
+	home := t.TempDir()
+	accounts := &fakeLaunchAccounts{
+		accounts: []accountentity.Account{{ID: "one", Name: "one", Enabled: true}},
+		homes:    map[string]string{"one": home},
+	}
+	process := &fakeProxyProcess{}
+	proxy := &fakeProxy{}
+	var config proxyconfig.Config
+	runner := NewRunner(accounts, process, func(got proxyconfig.Config) (Proxy, error) {
+		config = got
+		return proxy, nil
+	})
+	quota := &noProxyPolicyQuota{}
+	runner.SetQuotaPreflight(quota)
+	runner.SetManagedProfilesRoot(filepath.Join(t.TempDir(), "profiles"))
+
+	if err := runner.RunWithOptions(
+		t.Context(), "", nil,
+		RuntimeLaunchOptions{UpstreamNoProxy: true},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if len(quota.calls) != 1 || !quota.calls[0] {
+		t.Fatalf("quota no-proxy calls = %#v", quota.calls)
+	}
+	if !config.UpstreamNoProxy {
+		t.Fatalf("runtime proxy config lost upstream no-proxy: %#v", config)
 	}
 }

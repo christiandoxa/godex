@@ -355,3 +355,20 @@ func TestProdex04356ExitCodePreservesInternalCodedError(t *testing.T) {
 		t.Fatalf("coded exit = %d, want 75", got)
 	}
 }
+
+func TestProdex04356RuntimeUpstreamNoProxyDisablesEnvironmentProxy(t *testing.T) {
+	client := runtimeUpstreamHTTPClient(true)
+	if client == nil {
+		t.Fatal("no-proxy runtime client is nil")
+	}
+	transport, ok := client.Transport.(*http.Transport)
+	if !ok {
+		t.Fatalf("no-proxy transport = %T", client.Transport)
+	}
+	if transport.Proxy != nil {
+		t.Fatal("no-proxy runtime transport retained environment proxy function")
+	}
+	if runtimeUpstreamHTTPClient(false) != nil {
+		t.Fatal("default runtime client should defer to provider defaults")
+	}
+}

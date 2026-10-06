@@ -40,6 +40,10 @@ type overrideUsageGateway interface {
 	FetchAt(context.Context, string, string) (quotamodel.Usage, error)
 }
 
+type policyUsageGateway interface {
+	FetchAtPolicy(context.Context, string, string, bool) (quotamodel.Usage, error)
+}
+
 type rawOverrideUsageGateway interface {
 	FetchRawAt(context.Context, string, string) ([]byte, error)
 }

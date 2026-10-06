@@ -124,7 +124,7 @@ func (runner *Runner) RunWithOptions(
 	if err := runner.prepareSharedAccountHomes(ctx); err != nil {
 		return err
 	}
-	selected, exhausted, err := runner.selectForLaunch(ctx, selector)
+	selected, exhausted, err := runner.selectForLaunchWithPolicy(ctx, selector, options.UpstreamNoProxy)
 	if err != nil {
 		return err
 	}
@@ -178,6 +178,7 @@ type RuntimeLaunchOptions struct {
 	AutoRedeem          *bool
 	AllowAutoRotate     *bool
 	SuperOverlay        bool
+	UpstreamNoProxy     bool
 	OverlayPrepare      func(string) error
 }
 
@@ -253,6 +254,7 @@ func (runner *Runner) launchHomeWithOptions(
 	config := runtimeProxyConfig(ctx, runner.upstream, preferredID, provider, credentials, profiles, autoRedeem)
 	config.SmartContextEnabled = options.SmartContextEnabled
 	config.SkipQuotaPreflight = options.SkipQuotaPreflight
+	config.UpstreamNoProxy = options.UpstreamNoProxy
 	proxy, err := runner.newProxy(config)
 	if err != nil {
 		return err

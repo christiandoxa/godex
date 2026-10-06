@@ -23,6 +23,10 @@ type candidateSnapshot struct {
 }
 
 func (runner *Runner) selectForLaunch(ctx context.Context, selector string) (accountentity.Account, map[string]time.Time, error) {
+	return runner.selectForLaunchWithPolicy(ctx, selector, false)
+}
+
+func (runner *Runner) selectForLaunchWithPolicy(ctx context.Context, selector string, noProxy bool) (accountentity.Account, map[string]time.Time, error) {
 	if runner.quota == nil {
 		selected, err := runner.accounts.SelectForLaunch(ctx, selector)
 		return selected, nil, err
@@ -31,7 +35,7 @@ func (runner *Runner) selectForLaunch(ctx context.Context, selector string) (acc
 	if err != nil {
 		return accountentity.Account{}, nil, err
 	}
-	snapshot, err := runner.probeCandidates(ctx, candidates)
+	snapshot, err := runner.probeCandidatesWithPolicy(ctx, candidates, noProxy)
 	if err != nil {
 		return accountentity.Account{}, nil, err
 	}
@@ -39,9 +43,13 @@ func (runner *Runner) selectForLaunch(ctx context.Context, selector string) (acc
 }
 
 func (runner *Runner) probeCandidates(ctx context.Context, candidates []accountentity.Account) (candidateSnapshot, error) {
+	return runner.probeCandidatesWithPolicy(ctx, candidates, false)
+}
+
+func (runner *Runner) probeCandidatesWithPolicy(ctx context.Context, candidates []accountentity.Account, noProxy bool) (candidateSnapshot, error) {
 	snapshot := candidateSnapshot{exhausted: make(map[string]time.Time)}
 	for _, candidate := range candidates {
-		probe := runner.probeCandidate(ctx, candidate)
+		probe := runner.probeCandidateWithPolicy(ctx, candidate, noProxy)
 		if ctx.Err() != nil {
 			return candidateSnapshot{}, ctx.Err()
 		}
@@ -65,7 +73,22 @@ func (runner *Runner) probeCandidates(ctx context.Context, candidates []accounte
 }
 
 func (runner *Runner) probeCandidate(ctx context.Context, candidate accountentity.Account) quotaProbe {
+	return runner.probeCandidateWithPolicy(ctx, candidate, false)
+}
+
+func (runner *Runner) probeCandidateWithPolicy(ctx context.Context, candidate accountentity.Account, noProxy bool) quotaProbe {
 	retryAt := time.Now().Add(time.Minute)
+	if noProxy {
+		if quota, ok := runner.quota.(interface {
+			AvailabilityWithPolicy(context.Context, accountentity.Account, bool) (quotamodel.Availability, error)
+		}); ok {
+			availability, err := quota.AvailabilityWithPolicy(ctx, candidate, true)
+			if !availability.RetryAt.IsZero() {
+				retryAt = availability.RetryAt
+			}
+			return quotaProbe{ready: availability.Ready, retryAt: retryAt, err: err}
+		}
+	}
 	if quota, ok := runner.quota.(interface {
 		Availability(context.Context, accountentity.Account) (quotamodel.Availability, error)
 	}); ok {

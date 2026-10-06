@@ -10,17 +10,34 @@ import (
 )
 
 func (status *Status) Availability(ctx context.Context, account accountentity.Account) (quotamodel.Availability, error) {
+	return status.AvailabilityWithPolicy(ctx, account, false)
+}
+
+func (status *Status) AvailabilityWithPolicy(
+	ctx context.Context,
+	account accountentity.Account,
+	noProxy bool,
+) (quotamodel.Availability, error) {
 	if !account.Enabled {
 		return quotamodel.Availability{}, nil
 	}
-	usage, source, err := status.cachedAvailabilityUsage(ctx, account.ID, status.accounts.CodexHome(account.ID), nil)
+	usage, source, err := status.cachedAvailabilityUsageWithPolicy(
+		ctx, account.ID, status.accounts.CodexHome(account.ID), nil, noProxy,
+	)
 	if err != nil {
 		return quotamodel.Availability{}, err
 	}
-	now := status.now()
+	return availabilityFromUsage(usage, source, status.now()), nil
+}
+
+func availabilityFromUsage(
+	usage quotamodel.Usage,
+	source quotamodel.Source,
+	now time.Time,
+) quotamodel.Availability {
 	ready := quotaState(quotamodel.Report{Enabled: true, Usage: usage}, now) != "exhausted"
 	if ready {
-		return quotamodel.Availability{Ready: true, Source: source}, nil
+		return quotamodel.Availability{Ready: true, Source: source}
 	}
 	retry := time.Time{}
 	for _, window := range []*quotamodel.Window{usage.Primary, usage.Secondary} {
@@ -38,7 +55,7 @@ func (status *Status) Availability(ctx context.Context, account accountentity.Ac
 	if retry.IsZero() {
 		retry = now.Add(time.Minute)
 	}
-	return quotamodel.Availability{RetryAt: retry, Source: source}, nil
+	return quotamodel.Availability{RetryAt: retry, Source: source}
 }
 
 func (status *Status) AvailabilityForRoute(

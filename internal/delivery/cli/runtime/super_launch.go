@@ -22,6 +22,7 @@ func superRuntimeLaunchOptions(options superOptions) runtimeusecase.RuntimeLaunc
 		AutoRedeem:          &autoRedeem,
 		AllowAutoRotate:     &allowRotate,
 		SuperOverlay:        true,
+		UpstreamNoProxy:     options.noProxy,
 	}
 	if options.subAgent.enabled {
 		config := runtimeusecase.SuperSubAgentConfig{
@@ -72,9 +73,6 @@ func launchSuperProfiles(
 	}
 	if options.localURL != "" {
 		return errors.New("Godex Super local --url requires local-rewrite proxy support that is not implemented yet")
-	}
-	if options.noProxy {
-		return errors.New("Godex Super --no-proxy upstream transport is not implemented yet")
 	}
 	if options.cli == "agy" {
 		return runner.RunAntigravity(ctx, options.model, options.codexArgs)

@@ -2,6 +2,7 @@ package quota
 
 import (
 	"context"
+	"errors"
 	"math"
 	"strings"
 	"time"
@@ -20,12 +21,31 @@ type usageSnapshot struct {
 }
 
 func (status *Status) cachedAvailabilityUsage(ctx context.Context, accountID, home string, selection *quotamodel.Selection) (quotamodel.Usage, quotamodel.Source, error) {
+	return status.cachedAvailabilityUsageWithPolicy(ctx, accountID, home, selection, false)
+}
+
+func (status *Status) cachedAvailabilityUsageWithPolicy(
+	ctx context.Context,
+	accountID, home string,
+	selection *quotamodel.Selection,
+	noProxy bool,
+) (quotamodel.Usage, quotamodel.Source, error) {
 	now := status.now()
 	if usage, ok := status.cachedLiveUsage(home, now); ok {
 		return usage, quotamodel.SourceLive, nil
 	}
 
-	usage, err := status.usage.Fetch(ctx, home)
+	var usage quotamodel.Usage
+	var err error
+	if noProxy {
+		if policy, ok := status.usage.(policyUsageGateway); ok {
+			usage, err = policy.FetchAtPolicy(ctx, home, "", true)
+		} else {
+			err = statusNoProxyUnsupported()
+		}
+	} else {
+		usage, err = status.usage.Fetch(ctx, home)
+	}
 	if err == nil {
 		status.storeUsage(home, usage, now)
 		status.storeUsageSnapshot(ctx, accountID, usage, now)
@@ -38,6 +58,10 @@ func (status *Status) cachedAvailabilityUsage(ctx context.Context, accountID, ho
 		}
 	}
 	return quotamodel.Usage{}, quotamodel.SourceUnknown, err
+}
+
+func statusNoProxyUnsupported() error {
+	return errors.New("quota --no-proxy requires policy-aware usage transport")
 }
 
 func (status *Status) cachedLiveUsage(home string, now time.Time) (quotamodel.Usage, bool) {

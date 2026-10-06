@@ -49,6 +49,10 @@ func NewRuntimeAPIKeyPool(apiURL string, credentials []proxymodel.ProviderCreden
 }
 
 func (source *Source) NewRuntimePool(ctx context.Context, accounts []proxymodel.Account) (*RuntimePool, error) {
+	return source.NewRuntimePoolWithClient(ctx, accounts, source.client)
+}
+
+func (source *Source) NewRuntimePoolWithClient(ctx context.Context, accounts []proxymodel.Account, client *http.Client) (*RuntimePool, error) {
 	pool := &RuntimePool{transports: make(map[string]*RuntimeTransport, len(accounts))}
 	ordered := append([]proxymodel.Account(nil), accounts...)
 	sort.Slice(ordered, func(i, j int) bool { return ordered[i].ID < ordered[j].ID })
@@ -57,8 +61,8 @@ func (source *Source) NewRuntimePool(ctx context.Context, accounts []proxymodel.
 		if account.ID == "" || !account.Enabled || account.Provider.Kind != "copilot" {
 			continue
 		}
-		transport, err := source.NewRuntimeTransport(
-			ctx, account.Provider.Host, account.Provider.Login, account.Provider.APIURL,
+		transport, err := source.NewRuntimeTransportWithClient(
+			ctx, account.Provider.Host, account.Provider.Login, account.Provider.APIURL, client,
 		)
 		if err != nil {
 			failures++
