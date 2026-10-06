@@ -128,3 +128,69 @@ func TestUpdaterReturnsInstallerFailureWithBoundedReport(t *testing.T) {
 		t.Fatalf("report=%+v err=%v", report, err)
 	}
 }
+
+func TestProdex04356UpdateStatusUsesTotalBuildMetadataOrder(t *testing.T) {
+	releases := &fakeReleaseSource{latest: "1.0.0+build.10"}
+	state := &fakeState{}
+	installer := &fakeInstaller{path: "/bin/godex", version: "1.0.0+build.2"}
+	updater := NewUpdater(releases, state, installer, "1.0.0+build.2")
+	report, err := updater.Status(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != updatemodel.UpdateAvailable {
+		t.Fatalf("build metadata status = %q, want %q", report.Status, updatemodel.UpdateAvailable)
+	}
+	decision, err := updateDecision("1.0.0+build.2", "1.0.0+build.10")
+	if err != nil || decision != updatemodel.UpToDate {
+		t.Fatalf("install precedence decision = %q, %v, want up-to-date", decision, err)
+	}
+}
+
+func TestProdex04356UpdateRejectsEmptyBuildMetadata(t *testing.T) {
+	releases := &fakeReleaseSource{latest: "1.0.0+"}
+	state := &fakeState{}
+	installer := &fakeInstaller{path: "/bin/godex", version: "1.0.0"}
+	updater := NewUpdater(releases, state, installer, "1.0.0")
+	if _, err := updater.Status(t.Context()); err == nil {
+		t.Fatal("empty build metadata was accepted")
+	}
+}
+
+func TestProdex04356ReleaseVersionOrderingMatchesTaggedPolicy(t *testing.T) {
+	compare := func(left, right string) int {
+		t.Helper()
+		leftVersion, err := parseVersion(left)
+		if err != nil {
+			t.Fatalf("parse left %q: %v", left, err)
+		}
+		rightVersion, err := parseVersion(right)
+		if err != nil {
+			t.Fatalf("parse right %q: %v", right, err)
+		}
+		return compareVersionsTotal(leftVersion, rightVersion)
+	}
+	for _, fixture := range []struct {
+		left, right string
+		want        int
+	}{
+		{"v0.297.0", "0.296.0", 1},
+		{"1.10.0", "1.9.0", 1},
+		{"1.0.0", "1.0.0-rc.1", 1},
+		{"1.0.0-rc.10", "1.0.0-rc.2", 1},
+		{"1.0.0+build.10", "1.0.0+build.2", 1},
+		{"1.0.0+build-a", "1.0.0+build-b", -1},
+		{"1.0.0", "1.0.0+build.1", -1},
+	} {
+		got := compare(fixture.left, fixture.right)
+		if got != fixture.want {
+			t.Fatalf("compare(%q,%q) = %d, want %d", fixture.left, fixture.right, got, fixture.want)
+		}
+	}
+	if _, err := parseVersion("vv1.0.0"); err == nil {
+		t.Fatal("double v prefix was accepted")
+	}
+	if got := compare("\u2003v1.0.0\u3000", "1.0.0"); got != 0 {
+		t.Fatalf("unicode-trimmed version comparison = %d, want equal", got)
+	}
+}

@@ -57,7 +57,7 @@ func (updater *Updater) Status(ctx context.Context) (updatemodel.Report, error) 
 	if err != nil {
 		return updatemodel.Report{}, err
 	}
-	decision, err := updateDecision(updater.currentVersion, latest)
+	decision, err := updateStatusDecision(updater.currentVersion, latest)
 	if err != nil {
 		return updatemodel.Report{}, err
 	}
@@ -118,6 +118,25 @@ func (updater *Updater) installLatest(ctx context.Context, latest string) (repor
 		return updatemodel.Report{Installed: installed, Latest: latest, Status: updatemodel.UpdateAvailable, Stdout: output.Stdout, Stderr: output.Stderr}, installErr
 	}
 	return updatemodel.Report{Installed: latest, Latest: latest, Status: updatemodel.Updated, Stdout: output.Stdout, Stderr: output.Stderr}, nil
+}
+
+func updateStatusDecision(currentVersion, targetVersion string) (updatemodel.Decision, error) {
+	current, err := parseVersion(currentVersion)
+	if err != nil {
+		return "", fmt.Errorf("invalid installed Godex version: %s", currentVersion)
+	}
+	target, err := parseVersion(targetVersion)
+	if err != nil {
+		return "", fmt.Errorf("invalid target Godex version: %s", targetVersion)
+	}
+	switch compareVersionsTotal(current, target) {
+	case -1:
+		return updatemodel.UpdateAvailable, nil
+	case 0:
+		return updatemodel.UpToDate, nil
+	default:
+		return updatemodel.LocalNewer, nil
+	}
 }
 
 func updateDecision(currentVersion, targetVersion string) (updatemodel.Decision, error) {

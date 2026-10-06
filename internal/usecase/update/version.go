@@ -9,14 +9,25 @@ import (
 type semanticVersion struct {
 	major, minor, patch uint64
 	prerelease          []string
+	build               []string
 }
 
 func parseVersion(value string) (semanticVersion, error) {
-	value = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(value), "v"))
+	value = strings.TrimSpace(value)
+	if strings.HasPrefix(value, "v") {
+		value = value[1:]
+	}
 	if value == "" {
 		return semanticVersion{}, errors.New("empty version")
 	}
-	coreAndPre := strings.SplitN(value, "+", 2)[0]
+
+	coreAndPre, buildText, hasBuild := strings.Cut(value, "+")
+	if hasBuild {
+		if buildText == "" || strings.Contains(buildText, "+") {
+			return semanticVersion{}, errors.New("invalid build metadata")
+		}
+	}
+
 	parts := strings.SplitN(coreAndPre, "-", 2)
 	core := strings.Split(parts[0], ".")
 	if len(core) != 3 {
@@ -34,20 +45,29 @@ func parseVersion(value string) (semanticVersion, error) {
 		values[index] = parsed
 	}
 	version := semanticVersion{major: values[0], minor: values[1], patch: values[2]}
-	if len(parts) == 1 {
-		return version, nil
-	}
-	if parts[1] == "" {
-		return semanticVersion{}, errors.New("empty prerelease")
-	}
-	for _, identifier := range strings.Split(parts[1], ".") {
-		if !validPrereleaseIdentifier(identifier) {
-			return semanticVersion{}, errors.New("invalid prerelease identifier")
+
+	if len(parts) == 2 {
+		if parts[1] == "" {
+			return semanticVersion{}, errors.New("empty prerelease")
 		}
-		if numericIdentifier(identifier) && len(identifier) > 1 && identifier[0] == '0' {
-			return semanticVersion{}, errors.New("numeric prerelease identifier has a leading zero")
+		for _, identifier := range strings.Split(parts[1], ".") {
+			if !validPrereleaseIdentifier(identifier) {
+				return semanticVersion{}, errors.New("invalid prerelease identifier")
+			}
+			if numericIdentifier(identifier) && len(identifier) > 1 && identifier[0] == '0' {
+				return semanticVersion{}, errors.New("numeric prerelease identifier has a leading zero")
+			}
+			version.prerelease = append(version.prerelease, identifier)
 		}
-		version.prerelease = append(version.prerelease, identifier)
+	}
+
+	if hasBuild {
+		for _, identifier := range strings.Split(buildText, ".") {
+			if !validPrereleaseIdentifier(identifier) {
+				return semanticVersion{}, errors.New("invalid build metadata identifier")
+			}
+			version.build = append(version.build, identifier)
+		}
 	}
 	return version, nil
 }
@@ -62,6 +82,69 @@ func compareVersions(left, right semanticVersion) int {
 		}
 	}
 	return comparePrerelease(left.prerelease, right.prerelease)
+}
+
+func compareVersionsTotal(left, right semanticVersion) int {
+	if comparison := compareVersions(left, right); comparison != 0 {
+		return comparison
+	}
+	return compareBuildMetadata(left.build, right.build)
+}
+
+func compareBuildMetadata(left, right []string) int {
+	if len(left) == 0 && len(right) == 0 {
+		return 0
+	}
+	if len(left) == 0 {
+		return -1
+	}
+	if len(right) == 0 {
+		return 1
+	}
+	for index := 0; index < min(len(left), len(right)); index++ {
+		if comparison := compareBuildIdentifier(left[index], right[index]); comparison != 0 {
+			return comparison
+		}
+	}
+	if len(left) < len(right) {
+		return -1
+	}
+	if len(left) > len(right) {
+		return 1
+	}
+	return 0
+}
+
+func compareBuildIdentifier(left, right string) int {
+	leftNumeric, rightNumeric := numericIdentifier(left), numericIdentifier(right)
+	if leftNumeric && !rightNumeric {
+		return -1
+	}
+	if !leftNumeric && rightNumeric {
+		return 1
+	}
+	if !leftNumeric {
+		return strings.Compare(left, right)
+	}
+
+	leftSignificant := strings.TrimLeft(left, "0")
+	rightSignificant := strings.TrimLeft(right, "0")
+	if len(leftSignificant) < len(rightSignificant) {
+		return -1
+	}
+	if len(leftSignificant) > len(rightSignificant) {
+		return 1
+	}
+	if comparison := strings.Compare(leftSignificant, rightSignificant); comparison != 0 {
+		return comparison
+	}
+	if len(left) < len(right) {
+		return -1
+	}
+	if len(left) > len(right) {
+		return 1
+	}
+	return 0
 }
 
 func comparePrerelease(left, right []string) int {
