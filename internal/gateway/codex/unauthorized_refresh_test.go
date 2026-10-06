@@ -51,7 +51,9 @@ func TestProdex04356RefreshUnauthorizedAuthUsesExactOAuthContract(t *testing.T) 
 	if got.AccessToken != "new-access" || got.AccountID != "account-a" {
 		t.Fatalf("refreshed auth = %#v", got)
 	}
-	if requestBody["client_id"] != chatGPTAuthRefreshClientID ||
+	if chatGPTAuthRefreshURL != "https://auth.openai.com/oauth/token" ||
+		refreshTokenOverrideEnv != "CODEX_REFRESH_TOKEN_URL_OVERRIDE" ||
+		requestBody["client_id"] != "app_EMoamEEZ73f0CkXaXp7hrann" ||
 		requestBody["grant_type"] != "refresh_token" ||
 		requestBody["refresh_token"] != "old-refresh" ||
 		originator != "codex_cli_rs" {
