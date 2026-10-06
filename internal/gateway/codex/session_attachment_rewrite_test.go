@@ -1,9 +1,11 @@
 package codex
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -169,5 +171,43 @@ func TestRewriteSessionAttachmentPreservesSourceModeAndModifiedTime(t *testing.T
 	}
 	if info.Mode().Perm() != 0o640 || !info.ModTime().Equal(modified) {
 		t.Fatalf("stable metadata = mode:%o mtime:%s", info.Mode().Perm(), info.ModTime())
+	}
+}
+
+func TestProdex04356AttachmentScannerNeverRewindsAcrossEscapedNewline(t *testing.T) {
+	home := t.TempDir()
+	root := t.TempDir()
+	firstID := "11111111-2222-4333-8444-555555555555"
+	secondID := "66666666-7777-4888-8999-aaaaaaaaaaaa"
+	oldFirst := filepath.Join(root, "deleted-overlay", "attachments", firstID, "pasted-text-1.txt")
+	oldSecond := filepath.Join(root, "deleted-overlay", "attachments", secondID, "image-1.png")
+	stableFirst := filepath.Join(home, "attachments", firstID, "pasted-text-1.txt")
+	stableSecond := filepath.Join(home, "attachments", secondID, "image-1.png")
+	for path, contents := range map[string]string{
+		stableFirst:  "stable text",
+		stableSecond: "stable image",
+	} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	payload := `{"type":"response_item","payload":{"text":` +
+		strconv.Quote(oldFirst+"\n"+oldSecond) + `}}`
+	rewritten, err := rewriteSessionPersistedAttachmentPaths(home, payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var value map[string]any
+	if err := json.Unmarshal([]byte(rewritten), &value); err != nil {
+		t.Fatalf("rewritten session is invalid JSON: %v body=%s", err, rewritten)
+	}
+	nested, _ := value["payload"].(map[string]any)
+	text, _ := nested["text"].(string)
+	if !strings.Contains(text, stableFirst) || !strings.Contains(text, stableSecond) ||
+		strings.Contains(text, "deleted-overlay") {
+		t.Fatalf("rewritten attachment text = %q", text)
 	}
 }

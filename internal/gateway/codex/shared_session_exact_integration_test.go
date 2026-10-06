@@ -15,15 +15,15 @@ import (
 func TestExactCodex160SharedSessionPickerListsAllManagedProfiles(t *testing.T) {
 	binary := strings.TrimSpace(os.Getenv("GODEX_TEST_CODEX_BIN"))
 	if binary == "" {
-		t.Skip("set GODEX_TEST_CODEX_BIN to exact Codex 0.160.0 for native picker integration")
+		t.Skip("set GODEX_TEST_CODEX_BIN to exact Codex 0.160.1 for native picker integration")
 	}
 	versionCommand := exec.Command(binary, "--version")
 	version, err := versionCommand.Output()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(version), "0.160.0") {
-		t.Fatalf("integration requires Codex 0.160.0, got %q", strings.TrimSpace(string(version)))
+	if !strings.Contains(string(version), "0.160.1") {
+		t.Fatalf("integration requires Codex 0.160.1, got %q", strings.TrimSpace(string(version)))
 	}
 
 	root := t.TempDir()
@@ -68,7 +68,7 @@ func TestExactCodex160SharedSessionPickerListsAllManagedProfiles(t *testing.T) {
 	reader := bufio.NewReader(stdout)
 	if err := writeCodexAppServerMessage(stdin, map[string]any{
 		"id": 1, "method": "initialize",
-		"params": map[string]any{"clientInfo": map[string]string{"name": "godex-parity-test", "version": "0.435.5"}},
+		"params": map[string]any{"clientInfo": map[string]string{"name": "godex-parity-test", "version": "0.435.6"}},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +132,7 @@ func writeExactCodex160Rollout(t *testing.T, home, id, cwd string) {
 			"timestamp":         "2026-10-05T00:00:00Z",
 			"cwd":               cwd,
 			"originator":        "codex_cli_rs",
-			"cli_version":       "0.160.0",
+			"cli_version":       "0.160.1",
 			"source":            "cli",
 			"model_provider":    "openai",
 			"base_instructions": nil,

@@ -75,3 +75,28 @@ func kiroAuthFixture(t *testing.T, value map[string]any) string {
 	}
 	return string(content)
 }
+
+func TestProdex04356KiroCatalogNormalizationParity(t *testing.T) {
+	input := []any{
+		map[string]any{
+			"id": " primary ", "model_id": "ignored-alias", "name": " ", "modelName": "Display",
+			"description": "details", "context_window_tokens": float64(0), "contextWindowTokens": float64(456),
+		},
+		map[string]any{"modelId": "PRIMARY", "name": "duplicate"},
+		map[string]any{"slug": "other", "description": ""},
+	}
+	models := normalizeModels(input)
+	if len(models) != 2 {
+		t.Fatalf("normalized model count = %d, want 2: %#v", len(models), models)
+	}
+	if models[0]["id"] != "primary" || models[0]["name"] != "Display" || models[0]["description"] != "details" || models[0]["context_window_tokens"] != uint64(456) {
+		t.Fatalf("primary model = %#v", models[0])
+	}
+	if models[1]["id"] != "other" || models[1]["name"] != "other" {
+		t.Fatalf("other model = %#v", models[1])
+	}
+	description, exists := models[1]["description"]
+	if !exists || description != "" {
+		t.Fatalf("empty description = %#v, exists=%t", description, exists)
+	}
+}

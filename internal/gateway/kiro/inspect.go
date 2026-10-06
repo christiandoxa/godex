@@ -127,10 +127,11 @@ func normalizeModels(models []any) []map[string]any {
 			continue
 		}
 		id := firstString(model, "id", "model_id", "modelId", "slug", "model")
-		if id == "" || seen[id] {
+		key := strings.ToLower(id)
+		if id == "" || seen[key] {
 			continue
 		}
-		seen[id] = true
+		seen[key] = true
 		name := firstString(model, "name", "model_name", "modelName")
 		if name == "" {
 			name = id
@@ -138,7 +139,7 @@ func normalizeModels(models []any) []map[string]any {
 		item := map[string]any{
 			"id": id, "name": name, "object": "model", "owned_by": "kiro-cli",
 		}
-		if description := firstString(model, "description"); description != "" {
+		if description, ok := model["description"].(string); ok {
 			item["description"] = description
 		}
 		if contextWindow := firstPositiveUint64(model, "context_window_tokens", "contextWindowTokens"); contextWindow > 0 {

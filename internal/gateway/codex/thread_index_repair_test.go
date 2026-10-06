@@ -61,7 +61,7 @@ func TestCodexThreadIndexProtocolMatchesProdexClientInfoAndIgnoresForeignStringI
 		t.Fatal(err)
 	}
 	client := initialize["params"].(map[string]any)["clientInfo"].(map[string]any)
-	if client["name"] != "prodex-thread-index-reconciliation" || client["version"] != "0.435.5" {
+	if client["name"] != "prodex-thread-index-reconciliation" || client["version"] != "0.435.6" {
 		t.Fatalf("clientInfo = %#v", client)
 	}
 }

@@ -77,3 +77,25 @@ func TestSessionAttachmentPolicyUsesEarliestAttachmentSeparatorVariant(t *testin
 		t.Fatalf("second attachment = (%d,%d,%t) %q", start2, end2, ok, text[start2:end2])
 	}
 }
+
+func TestProdex04356SessionScanCursorSkipsJSONEscapes(t *testing.T) {
+	for _, fixture := range []struct {
+		name   string
+		prefix string
+	}{
+		{name: "newline", prefix: `\n`},
+		{name: "unicode", prefix: `\u2028`},
+	} {
+		t.Run(fixture.name, func(t *testing.T) {
+			path := `/tmp/deleted-overlay/attachments/11111111-2222-4333-8444-555555555555/image-1.png`
+			text := fixture.prefix + path
+			start, end, ok := nextSessionAttachmentPath(text, 0)
+			if !ok {
+				t.Fatal("attachment path was not found")
+			}
+			if got := text[start:end]; got != path {
+				t.Fatalf("attachment range = %q, want %q", got, path)
+			}
+		})
+	}
+}

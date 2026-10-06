@@ -28,23 +28,25 @@ func nextSessionClipboardPath(contents string, cursor int) (int, int, bool) {
 	if cursor < 0 || cursor > len(contents) {
 		return 0, 0, false
 	}
-	relative := strings.Index(contents[cursor:], sessionClipboardMarker)
+	scanCursor := sessionScanCursor(contents, cursor)
+	relative := strings.Index(contents[scanCursor:], sessionClipboardMarker)
 	if relative < 0 {
 		return 0, 0, false
 	}
-	markerStart := cursor + relative
-	return expandSessionPath(contents, markerStart, len(sessionClipboardMarker))
+	markerStart := scanCursor + relative
+	return expandSessionPath(contents, markerStart, len(sessionClipboardMarker), scanCursor)
 }
 
 func nextSessionAttachmentPath(contents string, cursor int) (int, int, bool) {
 	if cursor < 0 || cursor > len(contents) {
 		return 0, 0, false
 	}
+	scanCursor := sessionScanCursor(contents, cursor)
 	markers := [...]string{"/attachments/", `/attachments\`, `\attachments/`, `\attachments\`}
 	best := -1
 	for _, marker := range markers {
-		if relative := strings.Index(contents[cursor:], marker); relative >= 0 {
-			candidate := cursor + relative
+		if relative := strings.Index(contents[scanCursor:], marker); relative >= 0 {
+			candidate := scanCursor + relative
 			if best < 0 || candidate < best {
 				best = candidate
 			}
@@ -53,12 +55,33 @@ func nextSessionAttachmentPath(contents string, cursor int) (int, int, bool) {
 	if best < 0 {
 		return 0, 0, false
 	}
-	return expandSessionPath(contents, best, len("/attachments/"))
+	return expandSessionPath(contents, best, len("/attachments/"), scanCursor)
 }
 
-func expandSessionPath(contents string, markerStart, markerLength int) (int, int, bool) {
+func sessionScanCursor(contents string, cursor int) int {
+	if cursor < 0 || cursor >= len(contents) || contents[cursor] != 92 || cursor+1 >= len(contents) {
+		return cursor
+	}
+	switch contents[cursor+1] {
+	case 117:
+		if cursor+6 <= len(contents) {
+			return cursor + 6
+		}
+	case 34, 98, 102, 110, 114, 116:
+		return cursor + 2
+	}
+	return cursor
+}
+
+func expandSessionPath(contents string, markerStart, markerLength, floor int) (int, int, bool) {
+	if floor < 0 {
+		floor = 0
+	}
+	if floor > markerStart {
+		floor = markerStart
+	}
 	pathStart := markerStart
-	for pathStart > 0 && sessionPathByte(contents[pathStart-1]) {
+	for pathStart > floor && sessionPathByte(contents[pathStart-1]) {
 		pathStart--
 	}
 	pathEnd := markerStart + markerLength

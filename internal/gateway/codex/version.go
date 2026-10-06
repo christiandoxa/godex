@@ -9,7 +9,7 @@ import (
 
 const (
 	MinimumVersion = "0.153.2"
-	AuditedVersion = "0.160.0"
+	AuditedVersion = "0.160.1"
 )
 
 var codexVersionPattern = regexp.MustCompile(`(?:^|[^0-9])([0-9]+)\.([0-9]+)\.([0-9]+)(?:[^0-9]|$)`)
