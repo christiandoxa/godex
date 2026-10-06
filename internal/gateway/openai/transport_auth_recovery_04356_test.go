@@ -18,6 +18,22 @@ type authReloadSequence struct {
 	reads  int
 }
 
+type authRefreshSequence struct {
+	authReloadSequence
+	refreshed    proxymodel.Auth
+	refreshErr   error
+	refreshCalls int
+}
+
+func (reader *authRefreshSequence) RefreshUnauthorizedAuth(
+	context.Context,
+	string,
+	proxymodel.Auth,
+) (proxymodel.Auth, error) {
+	reader.refreshCalls++
+	return reader.refreshed, reader.refreshErr
+}
+
 func (reader *authReloadSequence) ReadAuth(context.Context, string) (proxymodel.Auth, error) {
 	reader.mu.Lock()
 	defer reader.mu.Unlock()
@@ -88,5 +104,45 @@ func TestProdex04356UnauthorizedReloadRetriesOnlyWhenAuthChanged(t *testing.T) {
 					response.StatusCode, seen, fixture.wantStatus, fixture.wantSeen)
 			}
 		})
+	}
+}
+
+func TestProdex04356UnauthorizedRefreshRetriesAfterUnchangedReload(t *testing.T) {
+	var seen []string
+	upstream := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		seen = append(seen, request.Header.Get("Authorization"))
+		if request.Header.Get("Authorization") == "Bearer refreshed-token" {
+			writer.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(writer, "ok")
+			return
+		}
+		writer.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer upstream.Close()
+
+	reader := &authRefreshSequence{
+		authReloadSequence: authReloadSequence{values: []proxymodel.Auth{
+			{AccessToken: "old-token", AccountID: "account"},
+			{AccessToken: "old-token", AccountID: "account"},
+		}},
+		refreshed: proxymodel.Auth{AccessToken: "refreshed-token", AccountID: "account"},
+	}
+	transport, err := NewTransport(upstream.URL, nil, reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer transport.Close()
+	response, err := transport.Execute(t.Context(), proxymodel.Request{
+		Method: http.MethodPost, Path: "/responses", Header: make(http.Header),
+	}, proxymodel.Account{ID: "profile-a", Home: "/profile-a", Enabled: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK ||
+		reader.refreshCalls != 1 ||
+		strings.Join(seen, ",") != "Bearer old-token,Bearer refreshed-token" {
+		t.Fatalf("refresh status/calls/seen = %d/%d/%v",
+			response.StatusCode, reader.refreshCalls, seen)
 	}
 }

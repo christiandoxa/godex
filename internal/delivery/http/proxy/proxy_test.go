@@ -315,6 +315,51 @@ func TestProxyRetriesUnauthorizedAccountAfterReload(t *testing.T) {
 	}
 }
 
+func TestProdex04356ProxyRetriesUnauthorizedAccountAfterOAuthRefresh(t *testing.T) {
+	accounts := testRuntimeAccounts(t, "A", "token-a", "B", "token-b")
+	authPath := filepath.Join(accounts[0].Home, "auth.json")
+	if err := os.WriteFile(authPath, []byte(`{"auth_mode":"chatgpt","tokens":{"access_token":"token-a","refresh_token":"refresh-a","account_id":"workspace-A"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	refreshCalls := 0
+	refreshServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		refreshCalls++
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(writer, `{"access_token":"token-a-refreshed","refresh_token":"refresh-a-next"}`)
+	}))
+	defer refreshServer.Close()
+	t.Setenv("CODEX_REFRESH_TOKEN_URL_OVERRIDE", refreshServer.URL)
+
+	var seen []string
+	upstream := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		authorization := request.Header.Get("Authorization")
+		seen = append(seen, authorization)
+		if authorization == "Bearer token-a-refreshed" {
+			writer.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(writer, "ok")
+			return
+		}
+		writer.WriteHeader(http.StatusUnauthorized)
+		_, _ = io.WriteString(writer, "unauthorized")
+	}))
+	defer upstream.Close()
+
+	proxy := newTestProxy(t, upstream.URL, accounts)
+	response := doProxyJSON(t, proxy.URL+"/backend-api/prodex/responses", "{}", nil)
+	body, err := io.ReadAll(response.Body)
+	_ = response.Body.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.StatusCode != http.StatusOK || string(body) != "ok" ||
+		refreshCalls != 1 ||
+		strings.Join(seen, ",") != "Bearer token-a,Bearer token-a-refreshed" {
+		t.Fatalf("oauth recovery = status %d body %q refresh=%d seen=%v",
+			response.StatusCode, body, refreshCalls, seen)
+	}
+}
+
 func TestProxyReturnsLastUnauthorizedAfterRotation(t *testing.T) {
 	accounts := testRuntimeAccounts(t, "A", "token-a", "B", "token-b")
 	var calls int

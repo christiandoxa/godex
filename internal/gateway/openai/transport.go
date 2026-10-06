@@ -24,6 +24,10 @@ const upstreamIdleTime = 90e9
 type authReader interface {
 	ReadAuth(context.Context, string) (proxymodel.Auth, error)
 }
+
+type unauthorizedAuthRefresher interface {
+	RefreshUnauthorizedAuth(context.Context, string, proxymodel.Auth) (proxymodel.Auth, error)
+}
 type Transport struct {
 	client                   *http.Client
 	upstream                 *url.URL
@@ -67,12 +71,27 @@ func (transport *Transport) execute(ctx context.Context, input proxymodel.Reques
 	if err != nil || response.StatusCode != http.StatusUnauthorized {
 		return response, err
 	}
+
 	reloaded, reloadErr := transport.auth.ReadAuth(ctx, account.Home)
-	if reloadErr != nil || !runtimeAuthChanged(auth, reloaded) {
+	if reloadErr == nil && runtimeAuthChanged(auth, reloaded) {
+		_ = response.Body.Close()
+		auth = reloaded
+		response, err = transport.executeWithAuth(ctx, input, account, websocket, auth)
+		if err != nil || response.StatusCode != http.StatusUnauthorized {
+			return response, err
+		}
+	}
+
+	refresher, ok := transport.auth.(unauthorizedAuthRefresher)
+	if !ok {
+		return response, nil
+	}
+	refreshed, refreshErr := refresher.RefreshUnauthorizedAuth(ctx, account.Home, auth)
+	if refreshErr != nil {
 		return response, nil
 	}
 	_ = response.Body.Close()
-	return transport.executeWithAuth(ctx, input, account, websocket, reloaded)
+	return transport.executeWithAuth(ctx, input, account, websocket, refreshed)
 }
 
 func runtimeAuthChanged(previous, current proxymodel.Auth) bool {
