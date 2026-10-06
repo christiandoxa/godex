@@ -41,7 +41,7 @@ func (router *Router) tryFreshCandidates(
 			if pending.firstEventRetry {
 				*firstEventRetryUsed = true
 			}
-			if pending.authFailure || pending.quota || pending.previousResponseNotFound {
+			if pending.authFailure || pending.quota || pending.profileUnavailable || pending.previousResponseNotFound {
 				retryable[account.ID] = false
 			}
 			sawTransient = sawTransient || pending.transient
@@ -230,6 +230,7 @@ func (router *Router) freshAttempt(
 	pending.accountID = account.ID
 	pending.authFailure = outcome.kind == responseAuthFailure
 	pending.quota = outcome.quota
+	pending.profileUnavailable = outcome.profileUnavailable
 	pending.transient = outcome.transient
 	return nil, pending, false, nil
 }

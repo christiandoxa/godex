@@ -33,7 +33,7 @@ func quotaValue(value any) bool {
 
 func quotaFieldValue(key string, value any) bool {
 	switch key {
-	case "code", "type", "error_code", "status":
+	case "code", "type", "error_code", "status", "reason":
 		text, ok := value.(string)
 		return ok && quotaCode(text)
 	default:
@@ -43,7 +43,9 @@ func quotaFieldValue(key string, value any) bool {
 
 func quotaCode(value string) bool {
 	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "rate_limit_exceeded", "insufficient_quota", "quota_exceeded", "usage_limit_reached":
+	case "insufficient_quota", "credit_balance_exhausted", "organization_spend_limit_exceeded",
+		"project_spend_limit_exceeded", "quota_exhausted", "quota_exceeded", "resource_exhausted",
+		"usage_limit_reached", "usage_not_included", "workspace_member_credits_depleted":
 		return true
 	default:
 		return false

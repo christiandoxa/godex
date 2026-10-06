@@ -149,7 +149,7 @@ func TestWebSocketHardContinuationDoesNotRotateDuringRetryBackoff(t *testing.T) 
 	}
 }
 
-func TestWebSocketStaleContinuationRetainsOwnerForFullContextReplay(t *testing.T) {
+func TestWebSocketPreSendQuotaBlockedContinuationSignalsReplayAndRebinds(t *testing.T) {
 	now := time.Unix(100, 0)
 	accounts := []proxymodel.Account{
 		{ID: "account-a", Home: "synthetic-a", Enabled: true},
@@ -157,7 +157,6 @@ func TestWebSocketStaleContinuationRetainsOwnerForFullContextReplay(t *testing.T
 	}
 	gateway := &websocketMessageRoutingGateway{responses: []*proxymodel.Response{
 		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("first-frame")), WebSocketFrames: true, FirstEventCommitted: true, WebSocketResponseID: "resp_owner"},
-		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("retryable-error-frame")), WebSocketFrames: true, PrecommitFailure: &proxymodel.PrecommitFailure{Code: "previous_response_not_found"}},
 		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("replayed-frame")), WebSocketFrames: true, FirstEventCommitted: true, WebSocketResponseID: "resp_replayed"},
 	}}
 	router, err := NewRouter(Config{
@@ -188,10 +187,15 @@ func TestWebSocketStaleContinuationRetainsOwnerForFullContextReplay(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	if continuation.Result.AccountID != "account-a" ||
-		continuation.Result.Response.PrecommitFailure == nil ||
-		continuation.Result.Response.PrecommitFailure.Code != "previous_response_not_found" {
-		t.Fatalf("stale continuation = %#v", continuation.Result)
+	payload, readErr := io.ReadAll(continuation.Result.Response.Body)
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	if continuation.Result.Response.StatusCode != http.StatusBadRequest ||
+		!strings.Contains(string(payload), "previous_response_not_found") ||
+		len(gateway.requests) != 1 {
+		t.Fatalf("pre-send replay signal = status:%d body:%s calls:%d",
+			continuation.Result.Response.StatusCode, payload, len(gateway.requests))
 	}
 	_ = continuation.Close()
 
@@ -201,9 +205,9 @@ func TestWebSocketStaleContinuationRetainsOwnerForFullContextReplay(t *testing.T
 		t.Fatal(err)
 	}
 	defer replay.Close()
-	if replay.Result.AccountID != "account-a" || len(gateway.requests) != 3 ||
-		gateway.accounts[0] != "account-a" || gateway.accounts[1] != "account-a" ||
-		gateway.accounts[2] != "account-a" || string(gateway.requests[2].Body) != replayBody {
+	if replay.Result.AccountID != "account-b" || len(gateway.requests) != 2 ||
+		gateway.accounts[0] != "account-a" || gateway.accounts[1] != "account-b" ||
+		string(gateway.requests[1].Body) != replayBody {
 		t.Fatalf("full-context replay owner = %q, accounts = %v, requests = %#v", replay.Result.AccountID, gateway.accounts, gateway.requests)
 	}
 }

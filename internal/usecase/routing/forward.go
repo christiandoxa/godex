@@ -36,10 +36,20 @@ func (router *Router) forwardBound(
 		if ctx.Err() != nil {
 			return proxymodel.Forwarded{}, ctx.Err()
 		}
-		if isTransportFailure(err) {
+		transportFailure := isTransportFailure(err)
+		if transportFailure {
 			router.recordTransportExecutionFailure(ctx, account.ID, request.QuotaSelection, err)
 		} else {
 			router.recordRouteFailure(ctx, account.ID, request.QuotaSelection)
+		}
+		if transportFailure {
+			result, handled, recoveryErr := router.recoverBoundRetryableFailure(
+				ctx, request, accounts, account, keys,
+				responseOutcome{kind: responseRetry, transient: true, transport: true}, nil,
+			)
+			if recoveryErr != nil || handled {
+				return result, recoveryErr
+			}
 		}
 		return proxymodel.Forwarded{}, &proxymodel.Error{
 			StatusCode: http.StatusBadGateway,
@@ -66,10 +76,10 @@ func (router *Router) forwardBound(
 	if request.WebSocketMessage {
 		return router.handleBoundWebSocketResponse(ctx, request, accounts, account, response)
 	}
-	if !router.autoRedeem {
-		return router.legacyBoundResponse(ctx, request, account, response, failed), nil
+	if failed {
+		return router.legacyBoundResponse(ctx, request, account, response, true), nil
 	}
-	return router.handleBoundResponse(ctx, request, accounts, account, response)
+	return router.handleBoundResponseWithFailure(ctx, request, accounts, account, response, false, keys)
 }
 
 func boundOwnerAccount(accounts []proxymodel.Account, owner string) (proxymodel.Account, error) {
@@ -156,6 +166,19 @@ func (router *Router) handleBoundResponse(
 	account proxymodel.Account,
 	response *proxymodel.Response,
 ) (proxymodel.Forwarded, error) {
+	keys := requestRoutingAffinity(request)
+	return router.handleBoundResponseWithFailure(ctx, request, accounts, account, response, false, &keys)
+}
+
+func (router *Router) handleBoundResponseWithFailure(
+	ctx context.Context,
+	request proxymodel.Request,
+	accounts []proxymodel.Account,
+	account proxymodel.Account,
+	response *proxymodel.Response,
+	failed bool,
+	keys *affinityKeys,
+) (proxymodel.Forwarded, error) {
 	outcome, pending, err := router.classify(response, account.Provider.Kind)
 	if err != nil {
 		if pending != nil && pending.transient {
@@ -171,16 +194,30 @@ func (router *Router) handleBoundResponse(
 			Message:    "conversation owner response failed before commitment",
 		}
 	}
+	outcome.failed = outcome.failed || failed
 	router.recordRouteOutcome(ctx, account.ID, request.QuotaSelection, response, outcome)
 	if outcome.kind == responsePass {
 		router.clearQuotaBlocked(account.ID)
 		return pendingForwarded(account.ID, outcome, pending), nil
 	}
 	router.applyRetryOutcome(ctx, account.ID, request.QuotaSelection, outcome)
-	if !outcome.quota {
-		return pendingForwarded(account.ID, outcome, pending), nil
+	if outcome.quota && router.autoRedeem {
+		redeemed, ok, redeemErr := router.tryAutoRedeem(ctx, accounts, account.ID, request)
+		if redeemErr != nil {
+			closePendingResponse(pending)
+			return proxymodel.Forwarded{}, redeemErr
+		}
+		if ok {
+			closePendingResponse(pending)
+			return router.redeemedAttempt(ctx, request, redeemed)
+		}
 	}
-	return router.tryBoundRedeemedRetry(ctx, request, accounts, account.ID, outcome, pending)
+	if result, handled, recoveryErr := router.recoverBoundRetryableFailure(
+		ctx, request, accounts, account, keys, outcome, pending,
+	); recoveryErr != nil || handled {
+		return result, recoveryErr
+	}
+	return pendingForwarded(account.ID, outcome, pending), nil
 }
 
 func (router *Router) tryBoundRedeemedRetry(

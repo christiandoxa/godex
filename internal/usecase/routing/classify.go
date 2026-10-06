@@ -1,7 +1,10 @@
 package routing
 
 import (
+	"encoding/json"
+
 	providerentity "github.com/christiandoxa/godex/internal/entity/provider"
+	"github.com/christiandoxa/godex/internal/helper/sse"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	"io"
 	"net/http"
@@ -23,6 +26,7 @@ type responseOutcome struct {
 	quarantine                time.Duration
 	failed                    bool
 	quota                     bool
+	profileUnavailable        bool
 	transient                 bool
 	transport                 bool
 	healthPenalty             uint8
@@ -38,6 +42,7 @@ type pendingResponse struct {
 	firstEventRetry          bool
 	authFailure              bool
 	quota                    bool
+	profileUnavailable       bool
 	transient                bool
 	previousResponseNotFound bool
 }
@@ -67,6 +72,9 @@ func (proxy *Router) classify(response *proxymodel.Response, providerKind string
 			classificationBody = nil
 		}
 		classification := providerentity.ClassifyError(response.StatusCode, classificationBody)
+		if !externalProviderKind(providerKind) {
+			classification = openAI429Classification(classificationBody)
+		}
 		if classification.Class != providerentity.ErrorQuota &&
 			classification.Class != providerentity.ErrorRateLimit &&
 			classification.Class != providerentity.ErrorTransient {
@@ -85,9 +93,12 @@ func (proxy *Router) classify(response *proxymodel.Response, providerKind string
 	case response.StatusCode == http.StatusInternalServerError ||
 		response.StatusCode == http.StatusBadGateway ||
 		response.StatusCode == http.StatusServiceUnavailable ||
-		response.StatusCode == http.StatusGatewayTimeout:
+		response.StatusCode == http.StatusGatewayTimeout ||
+		response.StatusCode == 529:
 		return responseOutcome{kind: responseRetry, transient: true, healthPenalty: 2}, pending, nil
-	case response.StatusCode == http.StatusBadRequest || response.StatusCode == http.StatusForbidden:
+	case response.StatusCode == http.StatusBadRequest ||
+		response.StatusCode == http.StatusPaymentRequired ||
+		response.StatusCode == http.StatusForbidden:
 		prefix, complete, err := inspectResponse(response.Body, proxy.maxInspect)
 		pending.prefix = prefix
 		if err != nil {
@@ -99,7 +110,15 @@ func (proxy *Router) classify(response *proxymodel.Response, providerKind string
 		if response.StatusCode == http.StatusBadRequest && complete && previousResponseNotFound(prefix) {
 			return responseOutcome{kind: responsePass, failed: true, previousResponseNotFound: true}, pending, nil
 		}
-		if complete && isQuotaResponse(prefix) {
+		if !externalProviderKind(providerKind) && complete &&
+			(response.StatusCode == http.StatusPaymentRequired || response.StatusCode == http.StatusForbidden) &&
+			openAIProfileUnavailable(prefix) {
+			return responseOutcome{kind: responseRetry, profileUnavailable: true}, pending, nil
+		}
+		if complete && (isQuotaResponse(prefix) ||
+			(!externalProviderKind(providerKind) &&
+				(response.StatusCode == http.StatusPaymentRequired || response.StatusCode == http.StatusForbidden) &&
+				openAIWorkspaceQuotaResponse(prefix))) {
 			return responseOutcome{kind: responseRetry, quarantine: 30 * time.Second, quota: true}, pending, nil
 		}
 	}
@@ -139,6 +158,14 @@ func (proxy *Router) classifyPrecommitFailure(response *proxymodel.Response, pen
 		return responseOutcome{kind: responsePass, failed: true, previousResponseNotFound: true}, pending, nil
 	}
 	transport := failure.Transport
+	if strings.EqualFold(strings.TrimSpace(failure.Code), "deactivated_workspace") {
+		if response.FirstEventRetryUsed || response.FirstEventCommitted {
+			return responseOutcome{kind: responsePass, failed: true}, pending, nil
+		}
+		return responseOutcome{
+			kind: responseRetry, failed: true, profileUnavailable: true, firstEventRetry: true,
+		}, pending, nil
+	}
 	classification := providerentity.ClassifyProviderCode(failure.Code)
 	if transport {
 		classification = providerentity.ClassifyError(http.StatusBadGateway, nil)
@@ -248,4 +275,109 @@ func (proxy *Router) classifyExternalProvider(
 func externalProviderKind(kind string) bool {
 	kind = strings.ToLower(strings.TrimSpace(kind))
 	return kind != "" && kind != "openai"
+}
+
+func openAI429Classification(body []byte) providerentity.ErrorClassification {
+	rate, quota := openAI429StructuredSignals(body)
+	switch {
+	case rate:
+		return providerentity.ErrorClassification{Class: providerentity.ErrorRateLimit, Cooldown: time.Minute}
+	case quota:
+		return providerentity.ErrorClassification{Class: providerentity.ErrorQuota, Cooldown: 5 * time.Minute}
+	case openAIAuthoritativeQuota429(body):
+		return providerentity.ErrorClassification{Class: providerentity.ErrorQuota, Cooldown: 5 * time.Minute}
+	case generic429NonRetryable(body):
+		return providerentity.ErrorClassification{Class: providerentity.ErrorOther}
+	default:
+		return providerentity.ErrorClassification{Class: providerentity.ErrorRateLimit, Cooldown: time.Minute}
+	}
+}
+
+func openAI429StructuredSignals(body []byte) (rate, quota bool) {
+	var visit func(any)
+	visit = func(current any) {
+		switch typed := current.(type) {
+		case map[string]any:
+			for key, child := range typed {
+				name := strings.ToLower(strings.TrimSpace(key))
+				if name == "code" || name == "type" || name == "status" || name == "reason" {
+					if text, ok := child.(string); ok {
+						switch strings.ToLower(strings.TrimSpace(text)) {
+						case "rate_limit_exceeded", "rate_limit_exceeded_error", "slow_down":
+							rate = true
+						case "insufficient_quota", "credit_balance_exhausted", "organization_spend_limit_exceeded", "project_spend_limit_exceeded", "quota_exhausted", "quota_exceeded", "resource_exhausted", "usage_limit_reached", "usage_not_included", "workspace_member_credits_depleted":
+							quota = true
+						}
+					}
+				}
+				visit(child)
+			}
+		case []any:
+			for _, child := range typed {
+				visit(child)
+			}
+		}
+	}
+	var value any
+	if json.Unmarshal(body, &value) == nil {
+		visit(value)
+		return rate, quota
+	}
+	decoder := sse.NewDecoder(len(body) + 1)
+	events := decoder.Feed(body)
+	events = append(events, decoder.Finish()...)
+	for _, data := range events {
+		value = nil
+		if json.Unmarshal(data, &value) == nil {
+			visit(value)
+		}
+	}
+	return rate, quota
+}
+
+func openAIAuthoritativeQuota429(body []byte) bool {
+	text := strings.ToLower(string(body))
+	return strings.Contains(text, "you've hit your usage limit") ||
+		strings.Contains(text, "you have hit your usage limit") ||
+		strings.Contains(text, "you hit your usage limit")
+}
+
+func generic429NonRetryable(body []byte) bool {
+	text := strings.ToLower(string(body))
+	for _, marker := range []string{
+		"invalid_prompt",
+		"bio_policy",
+		"cyber_policy",
+		"content_policy",
+		"invalid_request_error",
+		"invalid_request",
+		"context_length_exceeded",
+	} {
+		if strings.Contains(text, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func openAIProfileUnavailable(body []byte) bool {
+	return strings.Contains(strings.ToLower(string(body)), "deactivated_workspace")
+}
+
+func openAIWorkspaceQuotaResponse(body []byte) bool {
+	text := strings.ToLower(string(body))
+	return strings.Contains(text, "you've hit your usage limit") ||
+		strings.Contains(text, "you have hit your usage limit") ||
+		strings.Contains(text, "you hit your usage limit") ||
+		strings.Contains(text, "the usage limit has been reached") ||
+		strings.Contains(text, "usage limit has been reached") ||
+		(strings.Contains(text, "usage limit") &&
+			(strings.Contains(text, "try again at") ||
+				strings.Contains(text, "request to your admin") ||
+				strings.Contains(text, "more access now"))) ||
+		strings.Contains(text, "workspace_member_credits_depleted") ||
+		strings.Contains(text, "workspace is out of credits") ||
+		(strings.Contains(text, "out of credits") &&
+			strings.Contains(text, "workspace owner") &&
+			strings.Contains(text, "refill"))
 }

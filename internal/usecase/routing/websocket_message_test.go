@@ -64,7 +64,7 @@ func TestWebSocketContinuationRestoresCachedTurnStateOnOwner(t *testing.T) {
 	}
 }
 
-func TestWebSocketContinuationKeepsOwnerWhenCachedQuotaIsExhausted(t *testing.T) {
+func TestWebSocketContinuationCachedQuotaSignalsFullContextWhenFallbackExists(t *testing.T) {
 	now := time.Unix(100, 0)
 	accounts := []proxymodel.Account{
 		{ID: "account-a", Home: "synthetic-a", Enabled: true},
@@ -72,7 +72,6 @@ func TestWebSocketContinuationKeepsOwnerWhenCachedQuotaIsExhausted(t *testing.T)
 	}
 	gateway := &websocketMessageRoutingGateway{responses: []*proxymodel.Response{
 		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("first-frame")), WebSocketFrames: true, FirstEventCommitted: true, WebSocketResponseID: "resp_owner"},
-		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("second-frame")), WebSocketFrames: true, FirstEventCommitted: true, WebSocketResponseID: "resp_owner_next"},
 	}}
 	redeemer := &fakeRoutingRedeemer{accountID: "account-b", redeemed: true}
 	quota := &routingQuotaAvailabilityFake{}
@@ -107,11 +106,20 @@ func TestWebSocketContinuationKeepsOwnerWhenCachedQuotaIsExhausted(t *testing.T)
 		t.Fatal(err)
 	}
 	defer continuation.Close()
-
-	if continuation.Result.AccountID != "account-a" || len(gateway.requests) != 2 ||
-		len(gateway.accounts) != 2 || gateway.accounts[0] != "account-a" ||
-		gateway.accounts[1] != "account-a" || redeemer.calls != 0 || len(quota.calls) != 0 {
-		t.Fatalf("continuation owner = %q, gateway accounts = %v", continuation.Result.AccountID, gateway.accounts)
+	body, err := io.ReadAll(continuation.Result.Response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner, ownerErr := router.affinity.owner(context.Background(), affinityKeys{previous: "resp_owner"}, now)
+	if ownerErr != nil {
+		t.Fatal(ownerErr)
+	}
+	if continuation.Result.Response.StatusCode != http.StatusBadRequest ||
+		!strings.Contains(string(body), "previous_response_not_found") ||
+		len(gateway.accounts) != 1 || gateway.accounts[0] != "account-a" ||
+		redeemer.calls != 0 || len(quota.calls) != 0 || owner != "" {
+		t.Fatalf("continuation status/body/accounts/owner = %d/%s/%v/%q",
+			continuation.Result.Response.StatusCode, body, gateway.accounts, owner)
 	}
 }
 

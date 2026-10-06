@@ -197,7 +197,7 @@ func TestFreshRouteDoesNotWaitOnPreviouslyQuarantinedAuthFailure(t *testing.T) {
 	now := time.Unix(100, 0)
 	var waits []time.Duration
 	gateway := &sequenceRoutingGateway{responses: map[string][]routingResponseFixture{
-		"a": {{status: http.StatusUnauthorized}, {status: http.StatusUnauthorized}},
+		"a": {{status: http.StatusUnauthorized}},
 	}}
 	router, err := NewRouter(Config{
 		Gateway: gateway,
@@ -223,7 +223,7 @@ func TestFreshRouteDoesNotWaitOnPreviouslyQuarantinedAuthFailure(t *testing.T) {
 	if _, err := router.Forward(context.Background(), proxymodel.Request{}); err == nil {
 		t.Fatal("second request unexpectedly recovered an auth-failed account")
 	}
-	if len(gateway.calls) != 2 || len(waits) != 0 {
-		t.Fatalf("auth retry dispatches/waits = %d/%v, want 2/none", len(gateway.calls), waits)
+	if len(gateway.calls) != 1 || len(waits) != 0 {
+		t.Fatalf("auth retry dispatches/waits = %d/%v, want 1/none", len(gateway.calls), waits)
 	}
 }

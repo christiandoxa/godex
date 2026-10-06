@@ -444,19 +444,9 @@ func (router *Router) executeAccount(ctx context.Context, request proxymodel.Req
 			return router.gateway.Execute(ctx, request, account)
 		})
 	}
-	for reload := 0; reload < 2; reload++ {
-		response, err := router.observedGatewayAttempt(ctx, request, account, func() (*proxymodel.Response, error) {
-			return router.gateway.Execute(ctx, request, account)
-		})
-		if err != nil {
-			return nil, err
-		}
-		if response.StatusCode != http.StatusUnauthorized || reload == 1 {
-			return response, nil
-		}
-		response.Body.Close()
-	}
-	return nil, errors.New("authentication retry failed")
+	return router.observedGatewayAttempt(ctx, request, account, func() (*proxymodel.Response, error) {
+		return router.gateway.Execute(ctx, request, account)
+	})
 }
 
 func (router *Router) Close() {

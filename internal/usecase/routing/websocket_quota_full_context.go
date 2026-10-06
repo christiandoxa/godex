@@ -34,10 +34,7 @@ func (router *Router) handleBoundWebSocketPreSendQuotaBlock(
 	if !request.WebSocketMessage || !router.boundWebSocketQuotaBlocked(account) {
 		return proxymodel.Forwarded{}, false, nil
 	}
-	metadata := parseWebSocketRequestMetadata(request)
-	if metadata.previousResponseID == "" || metadata.sessionID == "" {
-		return proxymodel.Forwarded{}, false, nil
-	}
+	metadata := routedWebSocketRequestMetadata(request)
 	decision := router.websocketQuotaFallbackDecisionWithContext(
 		request, accounts, account, false,
 	)
@@ -47,23 +44,54 @@ func (router *Router) handleBoundWebSocketPreSendQuotaBlock(
 			Message:    "websocket quota fallback is unavailable",
 		}
 	}
+	if metadata.previousResponseID != "" {
+		if err := router.affinity.forgetOwned(
+			ctx,
+			account.ID,
+			affinityKeys{
+				previous: metadata.previousResponseID,
+				turn:     metadata.turnState,
+				session:  metadata.sessionID,
+			},
+			router.now(),
+		); err != nil {
+			return proxymodel.Forwarded{}, true, err
+		}
+		return proxymodel.Forwarded{
+			Response:  websocketQuotaFullContextSignalResponse(),
+			AccountID: account.ID,
+			Failed:    true,
+		}, true, nil
+	}
+	if metadata.sessionID == "" || metadata.turnState != "" {
+		return proxymodel.Forwarded{}, false, nil
+	}
 	if err := router.affinity.forgetOwned(
-		ctx,
-		account.ID,
-		affinityKeys{
-			previous: metadata.previousResponseID,
-			turn:     metadata.turnState,
-			session:  metadata.sessionID,
-		},
-		router.now(),
+		ctx, account.ID, affinityKeys{session: metadata.sessionID}, router.now(),
 	); err != nil {
 		return proxymodel.Forwarded{}, true, err
 	}
-	return proxymodel.Forwarded{
-		Response:  websocketQuotaFullContextSignalResponse(),
-		AccountID: account.ID,
-		Failed:    true,
-	}, true, nil
+	if decision.kind == websocketQuotaFallbackLastChance {
+		result, err := router.forwardWebSocketQuotaLastChance(ctx, request, decision.account)
+		return result, true, err
+	}
+	result, err := router.forwardFresh(ctx, request, accounts)
+	return result, true, err
+}
+
+func routedWebSocketRequestMetadata(request proxymodel.Request) websocketRequestMetadata {
+	metadata := parseWebSocketRequestMetadata(request)
+	affinity := requestRoutingAffinity(request)
+	if metadata.previousResponseID == "" {
+		metadata.previousResponseID = affinity.previous
+	}
+	if metadata.sessionID == "" {
+		metadata.sessionID = affinity.session
+	}
+	if metadata.turnState == "" {
+		metadata.turnState = affinity.turn
+	}
+	return metadata
 }
 
 func (router *Router) boundWebSocketQuotaBlocked(account proxymodel.Account) bool {
@@ -89,20 +117,18 @@ func (router *Router) handleBoundWebSocketResponse(
 			Message:    "conversation owner response failed before commitment",
 		}
 	}
+	router.recordRouteOutcome(ctx, account.ID, request.QuotaSelection, response, outcome)
 	if outcome.kind == responsePass {
 		router.clearQuotaBlocked(account.ID)
 		return pendingForwarded(account.ID, outcome, pending), nil
 	}
 	router.applyRetryOutcome(ctx, account.ID, request.QuotaSelection, outcome)
-	if !outcome.quota {
-		return pendingForwarded(account.ID, outcome, pending), nil
-	}
-	return router.handleBoundWebSocketQuota(
+	return router.handleBoundWebSocketRetryable(
 		ctx, request, accounts, account, outcome, pending,
 	)
 }
 
-func (router *Router) handleBoundWebSocketQuota(
+func (router *Router) handleBoundWebSocketRetryable(
 	ctx context.Context,
 	request proxymodel.Request,
 	accounts []proxymodel.Account,
@@ -110,13 +136,13 @@ func (router *Router) handleBoundWebSocketQuota(
 	outcome responseOutcome,
 	pending *pendingResponse,
 ) (proxymodel.Forwarded, error) {
-	metadata := parseWebSocketRequestMetadata(request)
+	metadata := routedWebSocketRequestMetadata(request)
 
 	if metadata.previousResponseID != "" {
 		decision := router.websocketQuotaFallbackDecisionWithContext(
 			request, accounts, account, false,
 		)
-		if metadata.sessionID == "" || decision.kind == websocketQuotaFallbackUnavailable {
+		if decision.kind == websocketQuotaFallbackUnavailable {
 			return pendingForwarded(account.ID, outcome, pending), nil
 		}
 		if err := router.affinity.forgetOwned(
@@ -158,6 +184,9 @@ func (router *Router) handleBoundWebSocketQuota(
 	}
 	closePendingResponse(pending)
 	if decision.kind == websocketQuotaFallbackLastChance {
+		if !outcome.quota {
+			return pendingForwarded(account.ID, outcome, pending), nil
+		}
 		return router.forwardWebSocketQuotaLastChance(ctx, request, decision.account)
 	}
 	return router.forwardFresh(ctx, request, accounts)

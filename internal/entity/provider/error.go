@@ -162,7 +162,7 @@ func classifyStatusText(status int, body []byte) ErrorClassification {
 		return ErrorClassification{Class: ErrorAuth}
 	case status == 404:
 		return ErrorClassification{Class: ErrorNotFound}
-	case status == 500 || status == 502 || status == 503 || status == 504:
+	case status == 500 || status == 502 || status == 503 || status == 504 || status == 529:
 		return ErrorClassification{Class: ErrorTransient, Cooldown: 10 * time.Second}
 	case strings.Contains(text, "model is not supported"):
 		return ErrorClassification{Class: ErrorNotFound}
@@ -187,9 +187,9 @@ func classifyCode(status int, code string) ErrorClassification {
 func classifyProviderCode(code string) (ErrorClassification, bool) {
 	code = strings.ToLower(strings.TrimSpace(code))
 	switch code {
-	case "unauthenticated", "invalid_api_key", "authentication_error":
+	case "unauthenticated", "unauthorized", "invalid_api_key", "authentication_error":
 		return ErrorClassification{Class: ErrorAuth}, true
-	case "insufficient_quota", "credit_balance_exhausted", "organization_spend_limit_exceeded", "project_spend_limit_exceeded", "quota_exhausted", "quota_exceeded", "resource_exhausted":
+	case "insufficient_quota", "credit_balance_exhausted", "organization_spend_limit_exceeded", "project_spend_limit_exceeded", "quota_exhausted", "quota_exceeded", "resource_exhausted", "usage_limit_reached", "usage_not_included", "workspace_member_credits_depleted":
 		return ErrorClassification{Class: ErrorQuota, Cooldown: 5 * time.Minute}, true
 	case "rate_limit_error", "rate_limit_exceeded", "rate_limit_exceeded_error", "slow_down":
 		return ErrorClassification{Class: ErrorRateLimit, Cooldown: time.Minute}, true

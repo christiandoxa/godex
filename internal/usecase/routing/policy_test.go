@@ -63,7 +63,7 @@ func TestClassifyPreCommitFailures(t *testing.T) {
 	}{
 		{name: "server error", status: http.StatusBadGateway, kind: responseRetry},
 		{name: "rate limit", status: http.StatusTooManyRequests, body: `{"error":{"code":"rate_limit_exceeded"}}`, kind: responseRetry, quarantine: true},
-		{name: "generic rate limit", status: http.StatusTooManyRequests, kind: responsePass},
+		{name: "generic rate limit", status: http.StatusTooManyRequests, kind: responseRetry, quarantine: true},
 		{name: "unauthorized", status: http.StatusUnauthorized, kind: responseAuthFailure},
 		{name: "client error", status: http.StatusBadRequest, body: `{"error":{"code":"invalid_request"}}`, kind: responsePass},
 		{name: "quota body", status: http.StatusForbidden, body: `{"error":{"code":"insufficient_quota"}}`, kind: responseRetry, quarantine: true},
