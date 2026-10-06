@@ -16,6 +16,13 @@ func sessionArgument(arguments []string) (int, []string) {
 	if command < 0 {
 		return -1, args
 	}
+	if explicitSessionSelector(args[command]) {
+		rewritten := make([]string, 0, len(args)+1)
+		rewritten = append(rewritten, args[:command]...)
+		rewritten = append(rewritten, "resume", args[command])
+		rewritten = append(rewritten, args[command+1:]...)
+		return command + 1, rewritten
+	}
 	switch args[command] {
 	case "queue":
 		return queueArgument(args, command+1), args

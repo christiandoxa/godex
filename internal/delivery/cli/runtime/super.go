@@ -131,7 +131,6 @@ func parseSuperArguments(arguments []string) (superOptions, error) {
 	if options.model != "" && options.provider == "" && options.localURL == "" {
 		options.codexArgs = append([]string{"-c", "model=" + strconv.Quote(options.model)}, options.codexArgs...)
 	}
-	options.codexArgs = ensureSuperFullAccess(options.codexArgs)
 	return options, nil
 }
 
@@ -571,7 +570,7 @@ func renderSuperDryRun(out io.Writer, options superOptions, lookup superToolLook
 	} else {
 		fmt.Fprintln(out, "Sub-agent: disabled")
 	}
-	fmt.Fprintf(out, "Codex args: %s\n", renderRedactedArgs(options.codexArgs))
+	fmt.Fprintf(out, "Codex args: %s\n", renderRedactedArgs(superPreparedCodexArgs(options)))
 	fmt.Fprintln(out, "Dry run: overlays and services are not started.")
 	return nil
 }
@@ -681,6 +680,10 @@ func superPresidioEnabled(options superOptions) bool {
 	return slices.Contains(options.requiredTools, "presidio") ||
 		(options.presidio && !options.noPresidio) ||
 		(slices.Contains(options.tools, "presidio") && !options.noPresidio)
+}
+
+func superPreparedCodexArgs(options superOptions) []string {
+	return ensureSuperFullAccess(options.codexArgs)
 }
 
 func ensureSuperFullAccess(arguments []string) []string {

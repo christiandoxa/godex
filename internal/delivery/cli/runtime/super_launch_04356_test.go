@@ -1,0 +1,267 @@
+package runtime
+
+import (
+	"context"
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	accountentity "github.com/christiandoxa/godex/internal/entity/account"
+	sessionentity "github.com/christiandoxa/godex/internal/entity/session"
+	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
+	proxyconfig "github.com/christiandoxa/godex/internal/model/proxy"
+	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
+	sessionusecase "github.com/christiandoxa/godex/internal/usecase/session"
+)
+
+type superCredentialResolver struct {
+	keys map[string][]string
+}
+
+func (resolver superCredentialResolver) APIKeys(provider, explicit string) ([]string, error) {
+	if explicit != "" {
+		return []string{explicit}, nil
+	}
+	return append([]string(nil), resolver.keys[provider]...), nil
+}
+
+func TestProdex04356SuperLaunchKiroProfileUsesOverlaySmartContextAndLease(t *testing.T) {
+	home := t.TempDir()
+	if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte("model = \"auto\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	profiles := &kiroShortcutProfiles{target: profilemodel.LaunchTarget{
+		Name: "kiro-main", CodexHome: home, Provider: "kiro",
+		ProviderConfig: profilemodel.ProviderSnapshot{Kind: "kiro"},
+	}}
+	process := &kiroShortcutProcess{}
+	var captured proxyconfig.Config
+	runner := runtimeusecase.NewRunner(nil, process, func(config proxyconfig.Config) (runtimeusecase.Proxy, error) {
+		captured = config
+		return &kiroShortcutProxy{}, nil
+	})
+	runner.SetManagedProfilesRoot(filepath.Join(t.TempDir(), "profiles"))
+
+	options, err := parseSuperArguments([]string{
+		"--provider", "kiro", "--model", "kiro-model", "exec", "review",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := launchSuperProfiles(t.Context(), runner, nil, profiles, options); err != nil {
+		t.Fatal(err)
+	}
+	if process.home == home || !strings.HasPrefix(filepath.Base(process.home), ".godex-overlay-") {
+		t.Fatalf("Kiro Super child home = %q base=%q", process.home, home)
+	}
+	if process.provider != "kiro" {
+		t.Fatalf("Kiro Super provider = %q", process.provider)
+	}
+	if !captured.SmartContextEnabled || !captured.SkipQuotaPreflight {
+		t.Fatalf("Kiro Super proxy config = %#v", captured)
+	}
+	accounts, err := captured.Accounts(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(accounts) != 1 || accounts[0].Home != home || accounts[0].Provider.Kind != "kiro" {
+		t.Fatalf("Kiro Super routing accounts = %#v", accounts)
+	}
+	if len(profiles.acquired) != 1 || profiles.acquired[0] != "kiro-main" || profiles.released != 1 {
+		t.Fatalf("Kiro Super lease = acquired:%#v released:%d", profiles.acquired, profiles.released)
+	}
+	if _, err := os.Stat(process.home); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("Kiro Super overlay survived exit: %v", err)
+	}
+}
+
+type superProviderProfiles struct {
+	home string
+}
+
+func (profiles *superProviderProfiles) ResolveLaunch(context.Context, string) (profilemodel.LaunchTarget, error) {
+	return profilemodel.LaunchTarget{}, errors.New("unexpected ResolveLaunch")
+}
+func (profiles *superProviderProfiles) ActiveLaunch(context.Context) (profilemodel.LaunchTarget, bool, error) {
+	return profilemodel.LaunchTarget{}, false, nil
+}
+func (profiles *superProviderProfiles) AcquireLaunch(context.Context, string) (func() error, error) {
+	return func() error { return nil }, nil
+}
+func (profiles *superProviderProfiles) ProviderLaunchPool(context.Context, string, string, bool) ([]profilemodel.LaunchTarget, error) {
+	return nil, errors.New("unexpected ProviderLaunchPool")
+}
+func (profiles *superProviderProfiles) ResolveProviderLaunch(_ context.Context, provider, requested string) (profilemodel.LaunchTarget, bool, error) {
+	if provider != "deepseek" || requested != "" {
+		return profilemodel.LaunchTarget{}, false, errors.New("unexpected provider resolution")
+	}
+	return profilemodel.LaunchTarget{Name: "deepseek-home", CodexHome: profiles.home, Provider: "deepseek"}, true, nil
+}
+func (profiles *superProviderProfiles) AcquireLaunchPool(context.Context, []string) (func() error, error) {
+	return nil, errors.New("unexpected AcquireLaunchPool")
+}
+func (profiles *superProviderProfiles) OpenAICompatibleBaseURL(context.Context, string) (string, bool, error) {
+	return "", false, nil
+}
+
+func TestProdex04356SuperLaunchDeepSeekAPIKeyFixedPoolUsesOverlay(t *testing.T) {
+	home := t.TempDir()
+	if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte("model = \"deepseek\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	profiles := &superProviderProfiles{home: home}
+	process := &kiroShortcutProcess{}
+	var captured proxyconfig.Config
+	runner := runtimeusecase.NewRunner(nil, process, func(config proxyconfig.Config) (runtimeusecase.Proxy, error) {
+		captured = config
+		return &kiroShortcutProxy{}, nil
+	})
+	runner.SetManagedProfilesRoot(filepath.Join(t.TempDir(), "profiles"))
+	runner.SetProviderCredentialResolver(superCredentialResolver{
+		keys: map[string][]string{"deepseek": {"key-a", "key-b"}},
+	})
+
+	options, err := parseSuperArguments([]string{
+		"--provider", "deepseek", "--no-auto-rotate", "--model", "deepseek-chat",
+		"exec", "review",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := launchSuperProfiles(t.Context(), runner, nil, profiles, options); err != nil {
+		t.Fatal(err)
+	}
+	if process.home == home || !strings.HasPrefix(filepath.Base(process.home), ".godex-overlay-") {
+		t.Fatalf("DeepSeek Super child home = %q base=%q", process.home, home)
+	}
+	if process.provider != "deepseek" {
+		t.Fatalf("DeepSeek Super provider = %q", process.provider)
+	}
+	if captured.Provider.Kind != "deepseek" || captured.Provider.DefaultModel != "deepseek-chat" ||
+		!captured.SmartContextEnabled || !captured.SkipQuotaPreflight {
+		t.Fatalf("DeepSeek Super config = %#v", captured)
+	}
+	routed, err := captured.Accounts(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(routed) != 1 || routed[0].ID != captured.PreferredAccount || routed[0].Home != home {
+		t.Fatalf("DeepSeek fixed routing pool = preferred:%q accounts:%#v", captured.PreferredAccount, routed)
+	}
+	if len(captured.ProviderCredentials) != 2 {
+		t.Fatalf("DeepSeek credential snapshot = %#v", captured.ProviderCredentials)
+	}
+}
+
+func TestProdex04356SuperLaunchFailsClosedForUnimplementedLocalRewriteAndNoProxy(t *testing.T) {
+	runner := runtimeusecase.NewRunner(nil, &kiroShortcutProcess{}, nil)
+	for _, args := range [][]string{
+		{"--url", "http://127.0.0.1:11434/v1"},
+		{"--no-proxy"},
+	} {
+		options, err := parseSuperArguments(args)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = launchSuperProfiles(t.Context(), runner, nil, nil, options)
+		if err == nil || !strings.Contains(err.Error(), "not implemented yet") {
+			t.Fatalf("Super launch %v = %v", args, err)
+		}
+	}
+}
+
+type superSessionAccounts struct {
+	homes map[string]string
+}
+
+func (accounts superSessionAccounts) List(context.Context) ([]accountentity.Account, error) {
+	return []accountentity.Account{
+		{ID: "home", Name: "home", Enabled: true},
+		{ID: "owner", Name: "owner", Enabled: true},
+	}, nil
+}
+func (accounts superSessionAccounts) CodexHome(id string) string { return accounts.homes[id] }
+func (accounts superSessionAccounts) LaunchCandidates(context.Context, string) ([]accountentity.Account, error) {
+	return nil, errors.New("fresh launch selection unexpectedly used")
+}
+func (accounts superSessionAccounts) SelectForLaunch(context.Context, string) (accountentity.Account, error) {
+	return accountentity.Account{}, errors.New("fresh launch selection unexpectedly used")
+}
+
+type superSessionReader struct {
+	home string
+	id   string
+}
+
+func (reader superSessionReader) List(_ context.Context, home string) ([]sessionentity.Session, error) {
+	if home != reader.home {
+		return nil, nil
+	}
+	return []sessionentity.Session{{
+		ID: reader.id, ThreadName: "Super Resume", Source: "cli",
+		Path: filepath.Join(home, "sessions", reader.id+".jsonl"), UpdatedUnix: 10,
+	}}, nil
+}
+
+func TestProdex04356SuperLaunchBareSessionPreservesOwnerAndInjectsFullAccessAfterResolution(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "home")
+	owner := filepath.Join(root, "owner")
+	for _, path := range []string{home, owner} {
+		if err := os.MkdirAll(path, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(path, "config.toml"), []byte("model = \"gpt-5.4\"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	accounts := superSessionAccounts{homes: map[string]string{"home": home, "owner": owner}}
+	process := &kiroShortcutProcess{}
+	var captured proxyconfig.Config
+	runner := runtimeusecase.NewRunner(accounts, process, func(config proxyconfig.Config) (runtimeusecase.Proxy, error) {
+		captured = config
+		return &kiroShortcutProxy{}, nil
+	})
+	runner.SetManagedProfilesRoot(filepath.Join(root, "profiles"))
+	const sessionID = "00000000-0000-4000-8000-000000000123"
+	catalog := sessionusecase.NewCatalog(accounts, superSessionReader{home: home, id: sessionID}, runner)
+	catalog.SetOwnerLookup(func(context.Context, string) (string, error) { return "owner", nil })
+
+	options, err := parseSuperArguments([]string{sessionID, "continue"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := launchSuperProfiles(t.Context(), runner, catalog, nil, options); err != nil {
+		t.Fatal(err)
+	}
+	if captured.PreferredAccount != "owner" {
+		t.Fatalf("Super session preferred owner = %q", captured.PreferredAccount)
+	}
+	routed, err := captured.Accounts(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(routed) != 1 || routed[0].ID != "owner" || routed[0].Home != owner {
+		t.Fatalf("Super session routed accounts = %#v", routed)
+	}
+	if process.home == home || !strings.HasPrefix(filepath.Base(process.home), ".godex-overlay-") {
+		t.Fatalf("Super session child home = %q base=%q", process.home, home)
+	}
+	joined := strings.Join(process.arguments, "\n")
+	for _, expected := range []string{
+		"--dangerously-bypass-approvals-and-sandbox",
+		"resume",
+		sessionID,
+		"continue",
+		"features.apps=false",
+	} {
+		if !strings.Contains(joined, expected) {
+			t.Fatalf("Super session args missing %q: %#v", expected, process.arguments)
+		}
+	}
+	if !captured.SmartContextEnabled {
+		t.Fatal("Super session lost Smart Context")
+	}
+}

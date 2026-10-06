@@ -20,9 +20,13 @@ func TestProdex04356SuperDefaultsMatchTaggedBehavior(t *testing.T) {
 	if options.noAutoRotate || options.skipQuota || options.presidio || options.subAgent.enabled {
 		t.Fatalf("unexpected super defaults = %#v", options)
 	}
-	wantPrefix := []string{"--dangerously-bypass-approvals-and-sandbox", "-c", "features.apps=false"}
+	wantPrefix := []string{"-c", "features.apps=false"}
 	if len(options.codexArgs) < len(wantPrefix) || !reflect.DeepEqual(options.codexArgs[:len(wantPrefix)], wantPrefix) {
-		t.Fatalf("super codex args = %#v, want prefix %#v", options.codexArgs, wantPrefix)
+		t.Fatalf("parsed super codex args = %#v, want prefix %#v", options.codexArgs, wantPrefix)
+	}
+	prepared := superPreparedCodexArgs(options)
+	if len(prepared) == 0 || prepared[0] != "--dangerously-bypass-approvals-and-sandbox" {
+		t.Fatalf("prepared super codex args = %#v", prepared)
 	}
 	if !reflect.DeepEqual(superDefaultTools, []string{
 		"caveman", "rtk", "codebase-memory-mcp", "playwright-mcp", "ponytail",

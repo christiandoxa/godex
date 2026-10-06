@@ -468,3 +468,15 @@ func TestNativeSessionDeliveryRoutesNameAndLastAcrossProfileHomes(t *testing.T) 
 		}
 	}
 }
+
+func TestProdex04356BareSessionSelectorSurvivesRootConfigOptions(t *testing.T) {
+	const id = "00000000-0000-4000-8000-000000000001"
+	index, args := sessionArgument([]string{"-c", "features.apps=false", id, "continue"})
+	if index != 3 {
+		t.Fatalf("session index = %d, args = %#v", index, args)
+	}
+	want := []string{"-c", "features.apps=false", "resume", id, "continue"}
+	if !reflect.DeepEqual(args, want) {
+		t.Fatalf("session rewrite = %#v, want %#v", args, want)
+	}
+}
