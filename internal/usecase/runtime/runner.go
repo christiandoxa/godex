@@ -128,9 +128,16 @@ func (runner *Runner) RunWithOptions(
 	if err != nil {
 		return err
 	}
-	profiles, err := runner.proxyAccounts(ctx, exhausted, selector, selected.ID)
-	if err != nil {
-		return err
+	var profiles []proxyconfig.Account
+	if options.AllowAutoRotate != nil && !*options.AllowAutoRotate {
+		profiles = []proxyconfig.Account{{
+			ID: selected.ID, Home: runner.accounts.CodexHome(selected.ID), Enabled: selected.Enabled,
+		}}
+	} else {
+		profiles, err = runner.proxyAccounts(ctx, exhausted, selector, selected.ID)
+		if err != nil {
+			return err
+		}
 	}
 	ids := make([]string, 0, len(profiles))
 	for _, profile := range profiles {
@@ -169,6 +176,7 @@ type RuntimeLaunchOptions struct {
 	SmartContextEnabled bool
 	SkipQuotaPreflight  bool
 	AutoRedeem          *bool
+	AllowAutoRotate     *bool
 	SuperOverlay        bool
 }
 

@@ -249,3 +249,42 @@ func TestProdex04356RuntimeSuperProviderAPIKeysKeepsCredentialPool(t *testing.T)
 		t.Fatalf("provider child did not use overlay: %q", process.home)
 	}
 }
+
+func TestProdex04356RuntimeLaunchOptionsCanDisableAccountRotation(t *testing.T) {
+	root := t.TempDir()
+	homeOne := filepath.Join(root, "one")
+	homeTwo := filepath.Join(root, "two")
+	for _, home := range []string{homeOne, homeTwo} {
+		if err := os.MkdirAll(home, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	accounts := &fakeLaunchAccounts{
+		accounts: []accountentity.Account{
+			{ID: "one", Name: "one", Enabled: true},
+			{ID: "two", Name: "two", Enabled: true},
+		},
+		homes: map[string]string{"one": homeOne, "two": homeTwo},
+	}
+	process := &fakeProxyProcess{}
+	proxy := &fakeProxy{}
+	var config proxyconfig.Config
+	runner := NewRunner(accounts, process, func(got proxyconfig.Config) (Proxy, error) {
+		config = got
+		return proxy, nil
+	})
+	rotate := false
+	if err := runner.RunWithOptions(
+		context.Background(), "one", nil,
+		RuntimeLaunchOptions{AllowAutoRotate: &rotate},
+	); err != nil {
+		t.Fatal(err)
+	}
+	routed, err := config.Accounts(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(routed) != 1 || routed[0].ID != "one" {
+		t.Fatalf("fixed launch pool = %#v", routed)
+	}
+}
