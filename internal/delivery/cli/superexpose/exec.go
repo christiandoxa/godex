@@ -7,26 +7,29 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/christiandoxa/godex/internal/helper/redact"
 )
 
 const (
-	execDefaultTimeoutMS  = 30_000
-	execMaxTimeoutMS      = 120_000
-	execMaxProgramBytes   = 4 * 1024
-	execMaxArguments      = 256
-	execMaxArgumentBytes  = 16 * 1024
-	execMaxArgumentsBytes = 256 * 1024
-	execMaxCWDBytes       = 4 * 1024
-	execMaxEnvEntries     = 128
-	execMaxEnvKeyBytes    = 256
-	execMaxEnvValueBytes  = 16 * 1024
-	execMaxStdinBytes     = 256 * 1024
-	execMaxOutputBytes    = 128 * 1024
+	execDefaultTimeoutMS   = 30_000
+	execMaxTimeoutMS       = 120_000
+	execMaxProgramBytes    = 4 * 1024
+	execMaxArguments       = 256
+	execMaxArgumentBytes   = 16 * 1024
+	execMaxArgumentsBytes  = 256 * 1024
+	execMaxCWDBytes        = 4 * 1024
+	execMaxEnvEntries      = 128
+	execMaxEnvKeyBytes     = 256
+	execMaxEnvValueBytes   = 16 * 1024
+	execMaxStdinBytes      = 256 * 1024
+	execMaxOutputBytes     = 128 * 1024
+	execLogCommandMaxBytes = 2 * 1024
 )
 
 type execRequest struct {
@@ -46,11 +49,128 @@ type capturedOutput struct {
 }
 
 func executeDirect(ctx context.Context, arguments map[string]any, defaultCWD string, tools optionalToolSnapshot) (map[string]any, error) {
+	return executeDirectAudited(ctx, arguments, defaultCWD, tools, nil)
+}
+
+func executeDirectAudited(ctx context.Context, arguments map[string]any, defaultCWD string, tools optionalToolSnapshot, audit *exposeAuditLog) (map[string]any, error) {
 	request, err := parseExecRequest(arguments, defaultCWD, tools)
 	if err != nil {
+		if audit != nil {
+			audit.tryEvent("super_expose_exec_rejected", map[string]string{
+				"program": safeExecProgramLabel(arguments["program"]),
+				"reason":  redact.Secrets(err.Error()),
+			})
+		}
 		return nil, err
 	}
-	return runExec(ctx, request, tools)
+	program := safeExecProgramLabel(request.requestedProgram)
+	commandPreview := execLogCommandPreview(request)
+	if audit != nil {
+		audit.tryEvent("super_expose_exec_started", map[string]string{
+			"program":     program,
+			"command":     commandPreview,
+			"cwd":         boundUTF8(redact.Secrets(request.cwd), execMaxCWDBytes),
+			"arg_count":   fmt.Sprint(len(request.args)),
+			"env_count":   fmt.Sprint(len(request.env)),
+			"stdin_bytes": fmt.Sprint(len(request.stdin)),
+			"timeout_ms":  fmt.Sprint(request.timeout.Milliseconds()),
+		})
+	}
+
+	result, err := runExec(ctx, request, tools)
+	if audit != nil {
+		fields := map[string]string{
+			"program": program,
+			"command": commandPreview,
+		}
+		if err != nil {
+			fields["success"] = "false"
+			fields["reason"] = redact.Secrets(err.Error())
+		} else {
+			fields["success"] = fmt.Sprint(result["success"])
+			fields["status"] = fmt.Sprint(result["status"])
+			fields["exit_status"] = fmt.Sprint(result["exit_status"])
+			fields["duration_ms"] = fmt.Sprint(result["duration_ms"])
+			fields["stdout_truncated"] = fmt.Sprint(result["stdout_truncated"])
+			fields["stderr_truncated"] = fmt.Sprint(result["stderr_truncated"])
+		}
+		audit.tryEvent("super_expose_exec_completed", fields)
+	}
+	return result, err
+}
+
+func safeExecProgramLabel(value any) string {
+	program, _ := value.(string)
+	return safeExecProgramLabelString(program)
+}
+
+func safeExecProgramLabelString(program string) string {
+	if base := filepath.Base(program); base != "" && base != "." && base != string(filepath.Separator) {
+		return redact.Secrets(base)
+	}
+	return "program"
+}
+
+func execLogCommandPreview(request execRequest) string {
+	rendered := make([]string, 0, len(request.args)+1)
+	rendered = append(rendered, execLogArgument(request.requestedProgram, false))
+	redactNext := false
+	for _, argument := range request.args {
+		if redactNext {
+			rendered = append(rendered, "<redacted>")
+			redactNext = false
+			continue
+		}
+		if execLogSecretFlag(argument) {
+			if key, _, found := strings.Cut(argument, "="); found {
+				rendered = append(rendered, key+"=<redacted>")
+			} else {
+				rendered = append(rendered, argument)
+				redactNext = true
+			}
+			continue
+		}
+		rendered = append(rendered, execLogArgument(argument, true))
+	}
+	return boundUTF8(redact.Secrets(strings.Join(rendered, " ")), execLogCommandMaxBytes)
+}
+
+func execLogSecretFlag(value string) bool {
+	key := value
+	if before, _, found := strings.Cut(value, "="); found {
+		key = before
+	}
+	var compact strings.Builder
+	for _, character := range key {
+		if character >= 'A' && character <= 'Z' {
+			character += 'a' - 'A'
+		}
+		if character >= 'a' && character <= 'z' || character >= '0' && character <= '9' {
+			compact.WriteRune(character)
+		}
+	}
+	value = compact.String()
+	switch value {
+	case "apikey", "authtoken", "authorization", "clientsecret", "password", "secret",
+		"token", "header", "cookie", "proxyuser", "h", "b", "u", "p":
+		return true
+	}
+	return strings.HasSuffix(value, "token") ||
+		strings.HasSuffix(value, "secret") ||
+		strings.HasSuffix(value, "password") ||
+		strings.HasSuffix(value, "apikey")
+}
+
+func execLogArgument(value string, quote bool) string {
+	value = redact.Secrets(value)
+	if quote && strings.IndexFunc(value, unicode.IsSpace) >= 0 {
+		encoded, err := json.Marshal(value)
+		if err != nil {
+			return "\"<redacted>\""
+		}
+		return string(encoded)
+	}
+	return value
 }
 
 func parseExecRequest(arguments map[string]any, defaultCWD string, tools optionalToolSnapshot) (execRequest, error) {

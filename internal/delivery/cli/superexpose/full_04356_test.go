@@ -97,6 +97,57 @@ func TestProdex04356SuperExposeFullStartEventsResultAndLegacyIngress(t *testing.
 	}
 }
 
+func TestProdex04356SuperExposeFullRunLifecycleIsAudited(t *testing.T) {
+	t.Setenv(exposeHelperEnv, "run-success")
+	manager, err := newRunManager(t.TempDir(), nil, "gdxi_audit", "repo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager.executable = os.Args[0]
+	defer manager.shutdown()
+	capture := &exposeAuditCapture{}
+	handler := testExecHandler(t, optionalToolSnapshot{})
+	handler.mode = "full"
+	handler.runs = manager
+	handler.audit = newExposeAuditLogWithSink(t.Context(), capture)
+
+	started := performMCP(t, handler, "tools/call", map[string]any{
+		"name": godexStartToolName,
+		"arguments": map[string]any{
+			"task": "audit-run",
+		},
+		"_meta": map[string]any{"io.modelcontextprotocol/protocolVersion": mcpCurrentProtocolVersion},
+	}, godexStartToolName, true)
+	if started.Code != 200 {
+		t.Fatalf("start = %d %s", started.Code, started.Body.String())
+	}
+	var rpc map[string]any
+	if err := json.Unmarshal(started.Body.Bytes(), &rpc); err != nil {
+		t.Fatal(err)
+	}
+	structured := rpc["result"].(map[string]any)["structuredContent"].(map[string]any)
+	runID := structured["run_id"].(string)
+	waitRunTerminal(t, manager, runID)
+
+	for _, kind := range []string{
+		"super_expose_run_created",
+		"super_expose_run_started",
+		"super_expose_run_completed",
+	} {
+		event := capture.event(kind)
+		if event == nil {
+			t.Fatalf("missing %s in %#v", kind, capture.events)
+		}
+		if event.Fields["run_id"] != runID {
+			t.Fatalf("%s run_id = %#v", kind, event.Fields)
+		}
+	}
+	completed := capture.event("super_expose_run_completed")
+	if completed.Fields["state"] != "succeeded" || completed.Fields["exit_code"] != "0" {
+		t.Fatalf("run completion audit = %#v", completed.Fields)
+	}
+}
+
 func TestProdex04356SuperExposeFullQueueBoundsAndCancellation(t *testing.T) {
 	t.Setenv(exposeHelperEnv, "run-sleep")
 	manager, err := newRunManager(t.TempDir(), nil, "gdxi_queue", "repo")

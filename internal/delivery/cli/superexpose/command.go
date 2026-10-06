@@ -215,6 +215,18 @@ func runExecServer(ctx context.Context, options Options, out, errOut io.Writer) 
 	if err != nil {
 		return fmt.Errorf("failed to canonicalize expose workspace: %w", err)
 	}
+	audit, err := newExposeAuditLog(ctx)
+	if err != nil {
+		return err
+	}
+	tools := discoverOptionalTools()
+	if err := audit.event("super_expose_starting", map[string]string{
+		"mode":                     options.Mode,
+		"bind":                     "loopback",
+		"optional_tools_available": fmt.Sprint(len(tools.availableIDs())),
+	}); err != nil {
+		return fmt.Errorf("failed to create expose audit log: %w", err)
+	}
 	token, err := capabilityToken()
 	if err != nil {
 		return err
@@ -241,11 +253,10 @@ func runExecServer(ctx context.Context, options Options, out, errOut io.Writer) 
 	}
 	expectedPath := "/mcp/" + token
 	endpoint := "http://" + listener.Addr().String() + expectedPath
-	tools := discoverOptionalTools()
 	var runs *runManager
 	var sessions *existingSessionService
 	if options.Mode == "full" {
-		runs, err = newRunManager(workspace, options.SuperArgs, instanceID, displayName)
+		runs, err = newRunManagerWithAudit(workspace, options.SuperArgs, instanceID, displayName, audit)
 		if err != nil {
 			return err
 		}
@@ -262,11 +273,17 @@ func runExecServer(ctx context.Context, options Options, out, errOut io.Writer) 
 		runs:          runs,
 		sessions:      sessions,
 		optionalTools: tools,
+		audit:         audit,
 	}
 	server := &http.Server{
 		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       90 * time.Second,
+	}
+	if options.OpenAITunnelID != "" {
+		audit.tryEvent("super_expose_openai_tunnel_starting", map[string]string{
+			"mode": options.Mode, "provider": "openai",
+		})
 	}
 	fmt.Fprintf(out, "Godex Super expose %s\n", options.Mode)
 	fmt.Fprintf(out, "Workspace: %s\n", displayName)
@@ -276,6 +293,17 @@ func runExecServer(ctx context.Context, options Options, out, errOut io.Writer) 
 	fmt.Fprintln(out, "Stop: Ctrl-C")
 	if errOut != nil {
 		fmt.Fprintln(errOut, "Godex Super Expose: capability URL is secret; Ctrl-C stops the endpoint.")
+	}
+	port := ""
+	if tcpAddress, ok := listener.Addr().(*net.TCPAddr); ok {
+		port = fmt.Sprint(tcpAddress.Port)
+	}
+	if err := audit.event("super_expose_started", map[string]string{
+		"mode": options.Mode,
+		"bind": "loopback",
+		"port": port,
+	}); err != nil {
+		return fmt.Errorf("failed to flush expose audit log: %w", err)
 	}
 
 	serveErr := make(chan error, 1)
@@ -317,6 +345,10 @@ func runExecServer(ctx context.Context, options Options, out, errOut io.Writer) 
 			return err
 		case err := <-tunnelReady:
 			if err != nil {
+				audit.tryEvent("super_expose_openai_tunnel_failed", map[string]string{
+					"provider": "openai",
+					"reason":   "startup_failed",
+				})
 				closeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				_ = server.Shutdown(closeCtx)
 				cancel()
@@ -326,11 +358,25 @@ func runExecServer(ctx context.Context, options Options, out, errOut io.Writer) 
 			tunnelReady = nil
 			if tunnel != nil {
 				tunnelExit = tunnel.exit
+				if err := audit.event("super_expose_openai_tunnel_ready", map[string]string{
+					"provider":       "openai",
+					"client_version": tunnel.version,
+				}); err != nil {
+					closeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+					_ = server.Shutdown(closeCtx)
+					cancel()
+					<-serveErr
+					return fmt.Errorf("failed to flush expose tunnel audit log: %w", err)
+				}
 				if errOut != nil {
 					fmt.Fprintf(errOut, "Godex Super Expose: OpenAI Secure MCP Tunnel %s ready (client %s).\n", tunnel.id, tunnel.version)
 				}
 			}
-		case <-tunnelExit:
+		case exitErr := <-tunnelExit:
+			audit.tryEvent("super_expose_openai_tunnel_exited", map[string]string{
+				"provider":  "openai",
+				"exit_code": tunnelExitCodeLabel(exitErr),
+			})
 			closeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			_ = server.Shutdown(closeCtx)
 			cancel()

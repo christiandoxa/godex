@@ -62,19 +62,23 @@ type execMCPHandler struct {
 	runs          *runManager
 	sessions      *existingSessionService
 	optionalTools optionalToolSnapshot
+	audit         *exposeAuditLog
 	rate          rateLimiter
 }
 
 func (handler *execMCPHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	if request.URL.Path != handler.expectedPath {
+		handler.audit.tryEvent("super_expose_http_rejected", map[string]string{"reason": "not_found"})
 		writeJSON(writer, http.StatusNotFound, map[string]any{"error": "not_found"})
 		return
 	}
 	if request.Method != http.MethodPost {
+		handler.audit.tryEvent("super_expose_http_rejected", map[string]string{"reason": "method_not_allowed"})
 		writeJSON(writer, http.StatusMethodNotAllowed, map[string]any{"error": "method_not_allowed"})
 		return
 	}
 	if !handler.rate.admit(time.Now()) {
+		handler.audit.tryEvent("super_expose_http_rejected", map[string]string{"reason": "rate_limit"})
 		writeRPCError(writer, http.StatusTooManyRequests, nil, -32029, "request rate limit exceeded", nil)
 		return
 	}
@@ -94,6 +98,10 @@ func (handler *execMCPHandler) ServeHTTP(writer http.ResponseWriter, request *ht
 
 	body, err := io.ReadAll(io.LimitReader(request.Body, bodyMaxBytes+1))
 	if err != nil || len(body) > bodyMaxBytes {
+		handler.audit.tryEvent("super_expose_http_rejected", map[string]string{
+			"reason":     "invalid_body",
+			"body_bytes": fmt.Sprint(len(body)),
+		})
 		writeRPCError(writer, http.StatusBadRequest, nil, -32600, "request body is invalid or too large", nil)
 		return
 	}
@@ -106,15 +114,24 @@ func (handler *execMCPHandler) ServeHTTP(writer http.ResponseWriter, request *ht
 	decoder.UseNumber()
 	var raw any
 	if err := decoder.Decode(&raw); err != nil {
+		handler.audit.tryEvent("super_expose_rpc_rejected", map[string]string{
+			"mode": handler.mode, "reason": "parse_error",
+		})
 		writeRPCError(writer, http.StatusBadRequest, nil, -32700, "parse error", nil)
 		return
 	}
 	if decoder.Decode(&struct{}{}) != io.EOF {
+		handler.audit.tryEvent("super_expose_rpc_rejected", map[string]string{
+			"mode": handler.mode, "reason": "parse_error",
+		})
 		writeRPCError(writer, http.StatusBadRequest, nil, -32700, "parse error", nil)
 		return
 	}
 	message, ok := raw.(map[string]any)
 	if !ok {
+		handler.audit.tryEvent("super_expose_rpc_rejected", map[string]string{
+			"mode": handler.mode, "reason": "invalid_request",
+		})
 		detail := "parse error"
 		if _, isArray := raw.([]any); isArray {
 			detail = "batch requests are unsupported"
@@ -155,8 +172,19 @@ func (handler *execMCPHandler) ServeHTTP(writer http.ResponseWriter, request *ht
 		return
 	}
 
+	toolName := ""
+	if paramsObject != nil {
+		toolName, _ = paramsObject["name"].(string)
+	}
+	methodAudit, toolAudit := exposeAuditRoute(method, toolName)
+	handler.audit.tryEvent("super_expose_rpc", map[string]string{
+		"mode": handler.mode, "method": methodAudit, "tool": toolAudit,
+		"body_bytes": fmt.Sprint(len(body)),
+	})
+
 	switch method {
 	case "server/discover":
+		handler.auditRPCCompletion(methodAudit, toolAudit, true)
 		writeRPCResult(writer, id, handler.serverDiscover())
 	case "initialize":
 		if !paramsPresent || !paramsIsObject {
@@ -169,13 +197,17 @@ func (handler *execMCPHandler) ServeHTTP(writer http.ResponseWriter, request *ht
 			return
 		}
 		if !mcpProtocolVersionSupported(protocolVersion) {
+			handler.auditRPCCompletion(methodAudit, toolAudit, false)
 			writeRPCResult(writer, id, toolErrorResult("unsupported protocol version"))
 			return
 		}
+		handler.auditRPCCompletion(methodAudit, toolAudit, true)
 		writeRPCResult(writer, id, handler.initialize(protocolVersion))
 	case "ping":
+		handler.auditRPCCompletion(methodAudit, toolAudit, true)
 		writeRPCResult(writer, id, map[string]any{})
 	case "tools/list":
+		handler.auditRPCCompletion(methodAudit, toolAudit, true)
 		writeRPCResult(writer, id, handler.toolsList())
 	case "tools/call":
 		if !paramsPresent || !paramsIsObject {
@@ -202,13 +234,68 @@ func (handler *execMCPHandler) ServeHTTP(writer http.ResponseWriter, request *ht
 		}
 		result, err := handler.callTool(request.Context(), name, arguments)
 		if err != nil {
+			handler.auditRPCCompletion(methodAudit, toolAudit, false)
 			writeRPCResult(writer, id, toolErrorResult(err.Error()))
 			return
 		}
+		handler.auditRPCCompletion(methodAudit, toolAudit, true)
 		writeRPCResult(writer, id, toolSuccessResult(result))
 	default:
+		handler.audit.tryEvent("super_expose_rpc_rejected", map[string]string{
+			"mode": handler.mode, "reason": "method_not_found",
+		})
 		writeRPCError(writer, http.StatusNotFound, id, -32601, "method not found", nil)
 	}
+}
+
+func (handler *execMCPHandler) auditRPCCompletion(method, tool string, success bool) {
+	handler.audit.tryEvent("super_expose_rpc_completed", map[string]string{
+		"mode": handler.mode, "method": method, "tool": tool, "success": fmt.Sprint(success),
+	})
+}
+
+func exposeAuditRoute(method, tool string) (string, string) {
+	methodLabel := "unknown"
+	switch method {
+	case "server/discover":
+		methodLabel = "server_discover"
+	case "initialize":
+		methodLabel = "initialize"
+	case "ping":
+		methodLabel = "ping"
+	case "tools/list":
+		methodLabel = "tools_list"
+	case "tools/call":
+		methodLabel = "tools_call"
+	case "notifications/initialized", "notifications/cancelled":
+		methodLabel = "notification"
+	}
+	toolLabel := "unknown"
+	if method == "tools/call" {
+		switch canonicalExposeTool(tool) {
+		case godexStartToolName:
+			toolLabel = "start"
+		case godexStatusToolName:
+			toolLabel = "status"
+		case godexEventsToolName:
+			toolLabel = "events"
+		case godexResultToolName:
+			toolLabel = "result"
+		case godexCancelToolName:
+			toolLabel = "cancel"
+		case godexListToolName:
+			toolLabel = "list"
+		case godexExecToolName:
+			toolLabel = "exec"
+		case godexSessionPromptWriteToolName:
+			toolLabel = "session_prompt_write"
+		case godexSessionPreemptToolName:
+			toolLabel = "session_preempt"
+		case godexSessionOutputReadToolName:
+			toolLabel = "session_output_read"
+		}
+	}
+	return methodLabel, toolLabel
 }
 
 func (handler *execMCPHandler) serverName() string {

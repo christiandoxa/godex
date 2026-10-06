@@ -14,8 +14,11 @@ import (
 	"path/filepath"
 	goruntime "runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	runtimemodel "github.com/christiandoxa/godex/internal/model/runtime"
 )
 
 const (
@@ -159,6 +162,45 @@ func TestProdex04356SuperExposeExecArgumentAndBindPolicy(t *testing.T) {
 	}
 	if text := out.String(); !strings.Contains(text, "Godex Super expose dry run") || !strings.Contains(text, "Mode: exec") {
 		t.Fatalf("dry-run output = %q", text)
+	}
+}
+
+func TestProdex04356SuperExposeRecordsLifecycleInGodexRuntimeLog(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("GODEX_HOME", home)
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan error, 1)
+	go func() {
+		done <- Run(ctx, []string{"exec", "--listen", "127.0.0.1:0"}, io.Discard, io.Discard)
+	}()
+	time.Sleep(150 * time.Millisecond)
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("super expose did not stop after cancellation")
+	}
+
+	content, err := os.ReadFile(filepath.Join(home, "logs", "runtime.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(content)
+	for _, want := range []string{
+		`"kind":"super_expose_starting"`,
+		`"kind":"super_expose_started"`,
+		`"mode":"exec"`,
+		`"bind":"loopback"`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("runtime expose log missing %q: %s", want, text)
+		}
+	}
+	if strings.Contains(text, "/mcp/") {
+		t.Fatalf("capability path leaked into runtime expose log: %s", text)
 	}
 }
 
@@ -441,6 +483,133 @@ func TestProdex04356SuperExposeDirectExecBoundsTimeoutRedactionAndEnvironment(t 
 	}
 }
 
+type exposeAuditCapture struct {
+	mu     sync.Mutex
+	events []runtimemodel.Event
+}
+
+func (capture *exposeAuditCapture) Append(_ context.Context, event runtimemodel.Event) error {
+	capture.mu.Lock()
+	defer capture.mu.Unlock()
+	capture.events = append(capture.events, event)
+	return nil
+}
+
+func (capture *exposeAuditCapture) event(kind string) *runtimemodel.Event {
+	capture.mu.Lock()
+	defer capture.mu.Unlock()
+	for index := range capture.events {
+		if capture.events[index].Kind != kind {
+			continue
+		}
+		event := capture.events[index]
+		if event.Fields != nil {
+			fields := make(map[string]string, len(event.Fields))
+			for key, value := range event.Fields {
+				fields[key] = value
+			}
+			event.Fields = fields
+		}
+		return &event
+	}
+	return nil
+}
+
+func (capture *exposeAuditCapture) snapshot() []runtimemodel.Event {
+	capture.mu.Lock()
+	defer capture.mu.Unlock()
+	return append([]runtimemodel.Event(nil), capture.events...)
+}
+
+func TestProdex04356SuperExposeExecAuditRedactsCommandSecrets(t *testing.T) {
+	capture := &exposeAuditCapture{}
+	handler := testExecHandler(t, optionalToolSnapshot{})
+	handler.audit = newExposeAuditLogWithSink(t.Context(), capture)
+	secret := "synthetic-super-secret-value"
+	otherSecret := "synthetic-token-secret-value"
+	response := performMCP(t, handler, "tools/call", map[string]any{
+		"name": godexExecToolName,
+		"arguments": map[string]any{
+			"program": os.Args[0],
+			"args":    []any{"--api-key", secret, "--token=" + otherSecret, "visible argument"},
+			"env":     map[string]any{exposeHelperEnv: "success"},
+		},
+		"_meta": map[string]any{"io.modelcontextprotocol/protocolVersion": mcpCurrentProtocolVersion},
+	}, godexExecToolName, true)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "hello-expose") {
+		t.Fatalf("audited exec call = %d %s", response.Code, response.Body.String())
+	}
+
+	started := capture.event("super_expose_exec_started")
+	completed := capture.event("super_expose_exec_completed")
+	if started == nil || completed == nil {
+		t.Fatalf("exec audit events = %#v", capture.snapshot())
+	}
+	preview := started.Fields["command"]
+	if !strings.Contains(preview, "--api-key <redacted>") ||
+		!strings.Contains(preview, "--token=<redacted>") ||
+		!strings.Contains(preview, "\"visible argument\"") {
+		t.Fatalf("redacted command preview = %q", preview)
+	}
+	if strings.Contains(preview, secret) || strings.Contains(preview, otherSecret) {
+		t.Fatalf("secret leaked in command preview: %q", preview)
+	}
+	if len(preview) > 2*1024 {
+		t.Fatalf("command preview exceeded bound: %d", len(preview))
+	}
+	if completed.Fields["success"] != "true" || completed.Fields["status"] != "completed" {
+		t.Fatalf("completion audit = %#v", completed.Fields)
+	}
+	rpc := capture.event("super_expose_rpc")
+	rpcCompleted := capture.event("super_expose_rpc_completed")
+	if rpc == nil || rpcCompleted == nil {
+		t.Fatalf("RPC audit events = %#v", capture.snapshot())
+	}
+	if rpc.Fields["mode"] != "exec" || rpc.Fields["method"] != "tools_call" || rpc.Fields["tool"] != "exec" {
+		t.Fatalf("RPC audit = %#v", rpc.Fields)
+	}
+	if rpcCompleted.Fields["success"] != "true" {
+		t.Fatalf("RPC completion audit = %#v", rpcCompleted.Fields)
+	}
+}
+
+func TestProdex04356SuperExposeTrailingJSONIsAuditedAsParseError(t *testing.T) {
+	capture := &exposeAuditCapture{}
+	handler := testExecHandler(t, optionalToolSnapshot{})
+	handler.audit = newExposeAuditLogWithSink(t.Context(), capture)
+	request := httptest.NewRequest(http.MethodPost, "http://"+handler.expectedHost+handler.expectedPath,
+		strings.NewReader("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\"} {\"extra\":true}"))
+	request.Host = handler.expectedHost
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Accept", "application/json")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("trailing JSON status = %d body=%s", response.Code, response.Body.String())
+	}
+	rejected := capture.event("super_expose_rpc_rejected")
+	if rejected == nil || rejected.Fields["reason"] != "parse_error" || rejected.Fields["mode"] != "exec" {
+		t.Fatalf("trailing JSON audit = %#v", capture.snapshot())
+	}
+}
+
+func TestProdex04356SuperExposeHTTPRejectionIsAudited(t *testing.T) {
+	capture := &exposeAuditCapture{}
+	handler := testExecHandler(t, optionalToolSnapshot{})
+	handler.audit = newExposeAuditLogWithSink(t.Context(), capture)
+	request := httptest.NewRequest(http.MethodPost, "http://127.0.0.1/mcp/wrong-capability", strings.NewReader("{}"))
+	request.Host = handler.expectedHost
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("wrong capability status = %d", response.Code)
+	}
+	rejected := capture.event("super_expose_http_rejected")
+	if rejected == nil || rejected.Fields["reason"] != "not_found" {
+		t.Fatalf("HTTP rejection audit = %#v", capture.snapshot())
+	}
+}
+
 func TestProdex04356SuperExposeRateLimitIs120PerSecond(t *testing.T) {
 	var limiter rateLimiter
 	now := time.Unix(1_700_000_000, 0)
@@ -465,6 +634,7 @@ func testExecHandler(t *testing.T, tools optionalToolSnapshot) *execMCPHandler {
 		displayName:   "repo",
 		instanceID:    "gdxi_test",
 		workspace:     t.TempDir(),
+		mode:          "exec",
 		optionalTools: tools,
 	}
 }
@@ -511,6 +681,65 @@ func TestProdex04356SuperExposeInstanceAndCapabilityShapesAreGodexNative(t *test
 	}
 	if filepath.Separator == 0 {
 		t.Fatal("unreachable")
+	}
+}
+
+func TestProdex04356SuperExposeTunnelLifecycleIsAudited(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("GODEX_HOME", home)
+	t.Setenv(tunnelHelperEnv, "1")
+	t.Setenv("GODEX_TUNNEL_CLIENT_BIN", os.Args[0])
+	t.Setenv("CONTROL_PLANE_API_KEY", "synthetic-control-key")
+	validID := "tunnel_" + strings.Repeat("f", 32)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan error, 1)
+	go func() {
+		done <- Run(ctx, []string{
+			"exec", "--listen", "127.0.0.1:0", "--openai-tunnel-id", validID,
+		}, io.Discard, io.Discard)
+	}()
+
+	logPath := filepath.Join(home, "logs", "runtime.jsonl")
+	deadline := time.Now().Add(5 * time.Second)
+	var text string
+	for time.Now().Before(deadline) {
+		content, err := os.ReadFile(logPath)
+		if err == nil {
+			text = string(content)
+			if strings.Contains(text, `"kind":"super_expose_openai_tunnel_ready"`) {
+				break
+			}
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("tunneled expose did not stop")
+	}
+
+	content, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text = string(content)
+	for _, want := range []string{
+		`"kind":"super_expose_openai_tunnel_starting"`,
+		`"kind":"super_expose_openai_tunnel_ready"`,
+		`"provider":"openai"`,
+		`"client_version":"0.0.15"`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("tunnel audit missing %q: %s", want, text)
+		}
+	}
+	if strings.Contains(text, validID) || strings.Contains(text, "synthetic-control-key") || strings.Contains(text, "/mcp/") {
+		t.Fatalf("tunnel audit leaked sensitive endpoint material: %s", text)
 	}
 }
 

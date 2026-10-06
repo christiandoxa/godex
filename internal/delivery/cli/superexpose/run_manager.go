@@ -84,6 +84,7 @@ type runManager struct {
 	instanceID    string
 	workspaceName string
 	executable    string
+	audit         *exposeAuditLog
 
 	mu           sync.Mutex
 	runs         map[string]*runRecord
@@ -94,6 +95,10 @@ type runManager struct {
 }
 
 func newRunManager(workspace string, baseArgs []string, instanceID, workspaceName string) (*runManager, error) {
+	return newRunManagerWithAudit(workspace, baseArgs, instanceID, workspaceName, nil)
+}
+
+func newRunManagerWithAudit(workspace string, baseArgs []string, instanceID, workspaceName string, audit *exposeAuditLog) (*runManager, error) {
 	executable, err := os.Executable()
 	if err != nil {
 		return nil, fmt.Errorf("resolve current Godex executable: %w", err)
@@ -101,8 +106,15 @@ func newRunManager(workspace string, baseArgs []string, instanceID, workspaceNam
 	return &runManager{
 		workspace: workspace, baseArgs: append([]string(nil), baseArgs...),
 		instanceID: instanceID, workspaceName: workspaceName, executable: executable,
-		runs: make(map[string]*runRecord),
+		audit: audit, runs: make(map[string]*runRecord),
 	}, nil
+}
+
+func (manager *runManager) setAuditIfNil(audit *exposeAuditLog) {
+	if manager == nil || manager.audit != nil {
+		return
+	}
+	manager.audit = audit
 }
 
 func (manager *runManager) start(arguments map[string]any) (map[string]any, error) {
@@ -130,6 +142,7 @@ func (manager *runManager) start(arguments map[string]any) (map[string]any, erro
 		return nil, errors.New("run manager is stopping")
 	}
 	if len(manager.queue) >= maxQueuedRuns && manager.active >= maxActiveRuns {
+		manager.audit.tryEvent("super_expose_run_rejected", map[string]string{"reason": "queue_full"})
 		manager.mu.Unlock()
 		return nil, errors.New("run queue is full")
 	}
@@ -138,6 +151,7 @@ func (manager *runManager) start(arguments map[string]any) (map[string]any, erro
 	manager.dispatchLocked()
 	result := manager.summaryLocked(runID, record)
 	manager.mu.Unlock()
+	manager.audit.tryEvent("super_expose_run_created", map[string]string{"run_id": runID})
 	return result, nil
 }
 
@@ -226,6 +240,7 @@ func (manager *runManager) cancel(runID string) map[string]any {
 		return result
 	}
 	record.cancelRequested = true
+	manager.audit.tryEvent("super_expose_run_cancel_requested", map[string]string{"run_id": runID})
 	if record.state == runQueued {
 		filtered := manager.queue[:0]
 		for _, job := range manager.queue {
@@ -318,13 +333,13 @@ func (manager *runManager) execute(job queuedRun) {
 	command.Env = childRunEnvironment(job.apiEnv, manager.instanceID, manager.workspaceName)
 	stdin, err := command.StdinPipe()
 	if err != nil {
-		manager.finishStartFailed(job.id, "capture stdin")
+		manager.recordStartFailure(job.id, "spawn", "capture stdin")
 		return
 	}
 	command.Stdout = runOutputWriter{manager: manager, runID: job.id, eventType: "stdout"}
 	command.Stderr = runOutputWriter{manager: manager, runID: job.id, eventType: "stderr"}
 	if err := command.Start(); err != nil {
-		manager.finishStartFailed(job.id, "spawn")
+		manager.recordStartFailure(job.id, "spawn", "spawn")
 		return
 	}
 
@@ -338,6 +353,9 @@ func (manager *runManager) execute(job queuedRun) {
 		}
 	}
 	manager.mu.Unlock()
+	if !cancelled {
+		manager.audit.tryEvent("super_expose_run_started", map[string]string{"run_id": job.id})
+	}
 	if cancelled {
 		stopExecProcessTree(command)
 	}
@@ -360,6 +378,7 @@ func (manager *runManager) execute(job queuedRun) {
 
 	manager.mu.Lock()
 	record = manager.runs[job.id]
+	var completion map[string]string
 	if record != nil {
 		record.child = nil
 		finished := nowMillis()
@@ -378,6 +397,17 @@ func (manager *runManager) execute(job queuedRun) {
 			record.state = runFailed
 			pushRunEvent(record, "run_failed", "")
 		}
+		exitCode := "none"
+		if record.exitStatus != nil {
+			exitCode = strconv.Itoa(*record.exitStatus)
+		}
+		completion = map[string]string{
+			"run_id":           job.id,
+			"state":            string(record.state),
+			"exit_code":        exitCode,
+			"output_bytes":     strconv.Itoa(len(record.output)),
+			"output_truncated": strconv.FormatBool(record.outputTruncated),
+		}
 	}
 	if manager.active > 0 {
 		manager.active--
@@ -385,6 +415,9 @@ func (manager *runManager) execute(job queuedRun) {
 	manager.pruneTerminalLocked()
 	manager.dispatchLocked()
 	manager.mu.Unlock()
+	if completion != nil {
+		manager.audit.tryEvent("super_expose_run_completed", completion)
+	}
 }
 
 type runOutputWriter struct {
@@ -427,6 +460,14 @@ func (manager *runManager) appendRunOutput(runID, eventType string, content []by
 	if record.outputTruncated && !hasRunEvent(record, "output_truncated") {
 		pushRunEvent(record, "output_truncated", "output limit reached")
 	}
+}
+
+func (manager *runManager) recordStartFailure(runID, stage, message string) {
+	manager.audit.tryEvent("super_expose_run_start_failed", map[string]string{
+		"run_id": runID,
+		"stage":  stage,
+	})
+	manager.finishStartFailed(runID, message)
 }
 
 func (manager *runManager) finishStartFailed(runID, message string) {

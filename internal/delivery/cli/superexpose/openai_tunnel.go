@@ -507,6 +507,20 @@ func (tunnel *openAITunnelProcess) shutdown() {
 	}
 }
 
+func tunnelExitCodeLabel(err error) string {
+	if err == nil {
+		return "0"
+	}
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) && exitErr.ProcessState != nil {
+		if code := exitErr.ProcessState.ExitCode(); code >= 0 {
+			return fmt.Sprint(code)
+		}
+		return "signal"
+	}
+	return "unknown"
+}
+
 func tunnelHasControl(value string) bool {
 	for _, current := range value {
 		if unicode.IsControl(current) {

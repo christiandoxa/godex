@@ -44,11 +44,12 @@ func (handler *execMCPHandler) callTool(ctx context.Context, name string, argume
 	}
 	switch tool {
 	case godexExecToolName:
-		return executeDirect(ctx, arguments, handler.workspace, handler.optionalTools)
+		return executeDirectAudited(ctx, arguments, handler.workspace, handler.optionalTools, handler.audit)
 	case godexStartToolName:
 		if handler.runs == nil {
 			return nil, errors.New("run manager is unavailable")
 		}
+		handler.runs.setAuditIfNil(handler.audit)
 		started, err := handler.runs.start(arguments)
 		if err != nil {
 			return nil, err
