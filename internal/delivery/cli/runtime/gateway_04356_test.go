@@ -113,3 +113,56 @@ func TestProdex04356GatewayArgumentsMatchTaggedSurface(t *testing.T) {
 		t.Fatal("conflicting Presidio flags unexpectedly accepted")
 	}
 }
+
+func TestProdex04356GatewaySmartContextAndPresidioReachRuntimeProxy(t *testing.T) {
+	proxy := &gatewayTestProxy{}
+	var captured proxymodel.Config
+	var requiredValues []bool
+	runner := runtimeusecase.NewRunner(
+		gatewayTestAccounts{
+			account: accountentity.Account{ID: "account-a", Name: "account-a", Enabled: true},
+			home:    "/profiles/account-a",
+		},
+		gatewayTestProcess{},
+		func(got proxymodel.Config) (runtimeusecase.Proxy, error) {
+			captured = got
+			return proxy, nil
+		},
+	)
+	runner.SetUpstreamURL("https://chatgpt.com/backend-api")
+	runner.SetPresidioConfigResolver(func(_ context.Context, required bool) (*proxymodel.PresidioConfig, error) {
+		requiredValues = append(requiredValues, required)
+		return &proxymodel.PresidioConfig{
+			AnalyzerURL:   "http://127.0.0.1:5002",
+			AnonymizerURL: "http://127.0.0.1:5001",
+		}, nil
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	var out bytes.Buffer
+	if err := Gateway(ctx, runner, nil, &out, []string{
+		"--smart-context", "--presidio",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !captured.SmartContextEnabled || captured.Presidio == nil {
+		t.Fatalf("gateway feature config = %#v", captured)
+	}
+	if len(requiredValues) != 1 || requiredValues[0] {
+		t.Fatalf("gateway Presidio required calls = %#v", requiredValues)
+	}
+
+	captured = proxymodel.Config{}
+	proxy.started, proxy.closed = false, false
+	ctx, cancel = context.WithCancel(context.Background())
+	cancel()
+	out.Reset()
+	if err := Gateway(ctx, runner, nil, &out, []string{
+		"--smart-context", "--no-presidio",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !captured.SmartContextEnabled || captured.Presidio != nil {
+		t.Fatalf("gateway no-presidio config = %#v", captured)
+	}
+}

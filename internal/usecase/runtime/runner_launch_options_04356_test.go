@@ -370,3 +370,52 @@ func TestProdex04356NoProxyPolicyReachesQuotaAndRuntimeProxy(t *testing.T) {
 		t.Fatalf("runtime proxy config lost upstream no-proxy: %#v", config)
 	}
 }
+
+func TestProdex04356PresidioLaunchResolverReachesProxyAndRequiredPolicy(t *testing.T) {
+	process := &fakeProxyProcess{}
+	proxy := &fakeProxy{}
+	var captured proxyconfig.Config
+	var requiredValues []bool
+	runner := NewRunner(nil, process, func(got proxyconfig.Config) (Proxy, error) {
+		captured = got
+		return proxy, nil
+	})
+	runner.SetPresidioConfigResolver(func(_ context.Context, required bool) (*proxyconfig.PresidioConfig, error) {
+		requiredValues = append(requiredValues, required)
+		return &proxyconfig.PresidioConfig{
+			AnalyzerURL:   "http://127.0.0.1:5002",
+			AnonymizerURL: "http://127.0.0.1:5001",
+			FailClosed:    required,
+		}, nil
+	})
+
+	err := runner.launchHomeWithOptions(
+		t.Context(), "/profiles/presidio", "profile-presidio",
+		proxyconfig.Provider{}, nil,
+		[]proxyconfig.Account{{ID: "profile-presidio", Home: "/profiles/presidio", Enabled: true}},
+		nil,
+		RuntimeLaunchOptions{PresidioEnabled: true, PresidioRequired: true},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(requiredValues) != 1 || !requiredValues[0] {
+		t.Fatalf("required resolver calls = %#v", requiredValues)
+	}
+	if captured.Presidio == nil || !captured.Presidio.FailClosed ||
+		captured.Presidio.AnalyzerURL != "http://127.0.0.1:5002" {
+		t.Fatalf("presidio proxy config = %#v", captured.Presidio)
+	}
+
+	runner.SetPresidioConfigResolver(nil)
+	err = runner.launchHomeWithOptions(
+		t.Context(), "/profiles/presidio", "profile-presidio",
+		proxyconfig.Provider{}, nil,
+		[]proxyconfig.Account{{ID: "profile-presidio", Home: "/profiles/presidio", Enabled: true}},
+		nil,
+		RuntimeLaunchOptions{PresidioEnabled: true},
+	)
+	if err == nil || !strings.Contains(err.Error(), "resolver is not configured") {
+		t.Fatalf("missing resolver = %v", err)
+	}
+}

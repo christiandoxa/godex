@@ -69,6 +69,18 @@ func (proxy *Proxy) forwardResponsesWebSocket(
 			continue
 		}
 
+		if proxy.redactor != nil && len(payload) > 0 {
+			redacted, err := proxy.redactor.Redact(sessionContext, payload)
+			if err != nil {
+				if writeErr := tunnel.toClient.writeText(
+					responsesWebSocketErrorPayload(http.StatusBadGateway, "presidio_redaction_failed", "gateway PII redaction failed"),
+				); writeErr != nil {
+					return writeErr
+				}
+				continue
+			}
+			payload = redacted
+		}
 		smart := prepareSmartContextWebSocketBody(
 			proxy.smartContextEnabled, request.URL.Path, request.Header, payload,
 		)

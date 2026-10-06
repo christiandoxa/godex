@@ -38,6 +38,8 @@ type providerCredentialResolver interface {
 	APIKeys(string, string) ([]string, error)
 }
 
+type presidioConfigResolver func(context.Context, bool) (*proxyconfig.PresidioConfig, error)
+
 type Runner struct {
 	accounts            launchAccounts
 	process             codexProcess
@@ -52,6 +54,7 @@ type Runner struct {
 	sharedCodexHome     string
 	managedProfilesRoot string
 	sessionLocker       codexSessionLocker
+	presidioResolver    presidioConfigResolver
 	autoRedeem          bool
 }
 
@@ -92,6 +95,12 @@ func (runner *Runner) SetSharedCodexHome(home string) {
 
 func (runner *Runner) SetProviderCredentialResolver(resolver providerCredentialResolver) {
 	runner.credentials = resolver
+}
+
+func (runner *Runner) SetPresidioConfigResolver(resolver func(context.Context, bool) (*proxyconfig.PresidioConfig, error)) {
+	if runner != nil {
+		runner.presidioResolver = resolver
+	}
 }
 
 func (runner *Runner) SetAutoRedeem(enabled bool) {
@@ -179,6 +188,8 @@ type RuntimeLaunchOptions struct {
 	AllowAutoRotate     *bool
 	SuperOverlay        bool
 	UpstreamNoProxy     bool
+	PresidioEnabled     bool
+	PresidioRequired    bool
 	OverlayPrepare      func(string) error
 }
 
@@ -255,6 +266,16 @@ func (runner *Runner) launchHomeWithOptions(
 	config.SmartContextEnabled = options.SmartContextEnabled
 	config.SkipQuotaPreflight = options.SkipQuotaPreflight
 	config.UpstreamNoProxy = options.UpstreamNoProxy
+	if options.PresidioEnabled {
+		if runner.presidioResolver == nil {
+			return errors.New("Presidio runtime resolver is not configured")
+		}
+		presidioConfig, err := runner.presidioResolver(ctx, options.PresidioRequired)
+		if err != nil {
+			return err
+		}
+		config.Presidio = presidioConfig
+	}
 	proxy, err := runner.newProxy(config)
 	if err != nil {
 		return err

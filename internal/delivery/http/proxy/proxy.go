@@ -16,12 +16,17 @@ import (
 	routingusecase "github.com/christiandoxa/godex/internal/usecase/routing"
 )
 
+type BodyRedactor interface {
+	Redact(context.Context, []byte) ([]byte, error)
+}
+
 type Config struct {
 	Router                           *routingusecase.Router
 	Activity                         activityRecorder
 	Broker                           *proxymodel.BrokerConfig
 	ListenAddr                       string
 	SmartContextEnabled              bool
+	Redactor                         BodyRedactor
 	ActiveRequestLimit               int
 	MaxRequestBytes, MaxInspectBytes int64
 }
@@ -37,6 +42,7 @@ type Proxy struct {
 	broker                    *proxymodel.BrokerConfig
 	brokerLog                 *brokerLiveLog
 	smartContextEnabled       bool
+	redactor                  BodyRedactor
 	admission                 *activeRequestHandler
 	listener                  net.Listener
 	done                      chan struct{}
@@ -67,6 +73,7 @@ func NewProxy(config Config) (*Proxy, error) {
 		router: config.Router, activity: config.Activity, broker: config.Broker, listenAddr: config.ListenAddr,
 		maxRequest: config.MaxRequestBytes, maxInspect: config.MaxInspectBytes,
 		smartContextEnabled:       config.SmartContextEnabled,
+		redactor:                  config.Redactor,
 		tunnels:                   make(map[*websocketTunnel]struct{}),
 		responsesWebSocketTunnels: make(map[*responsesWebSocketTunnel]struct{}),
 	}
@@ -225,6 +232,15 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 				activity.fail(0, "request canceled")
 			}
 			return
+		}
+		if proxy.redactor != nil && len(body) > 0 {
+			redacted, err := proxy.redactor.Redact(request.Context(), body)
+			if err != nil {
+				activity.fail(http.StatusBadGateway, "presidio_redaction_failed")
+				http.Error(writer, "gateway PII redaction failed", http.StatusBadGateway)
+				return
+			}
+			body = redacted
 		}
 		smart := prepareSmartContextHTTPBody(
 			proxy.smartContextEnabled, request.URL.Path, request.Header, body,

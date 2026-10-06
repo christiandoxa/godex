@@ -325,6 +325,9 @@ func TestProdex04356SuperLaunchWritesInheritedSubAgentOverlayBeforeChild(t *test
 		return &kiroShortcutProxy{}, nil
 	})
 	runner.SetManagedProfilesRoot(filepath.Join(t.TempDir(), "profiles"))
+	runner.SetPresidioConfigResolver(func(context.Context, bool) (*proxyconfig.PresidioConfig, error) {
+		return &proxyconfig.PresidioConfig{}, nil
+	})
 
 	options, err := parseSuperArguments([]string{
 		"--provider", "kiro",

@@ -132,9 +132,6 @@ func superProfilesWithToolLookup(
 	if options.dryRun {
 		return renderSuperDryRunResolved(out, options, tools)
 	}
-	if superPresidioEnabled(options) {
-		return errors.New("Godex Super Presidio runtime activation is not implemented yet")
-	}
 	return launchSuperProfiles(ctx, runner, sessions, profiles, options)
 }
 
@@ -733,6 +730,10 @@ func superPresidioEnabled(options superOptions) bool {
 	return slices.Contains(options.requiredTools, "presidio") ||
 		(options.presidio && !options.noPresidio) ||
 		(slices.Contains(options.tools, "presidio") && !options.noPresidio)
+}
+
+func superPresidioRequired(options superOptions) bool {
+	return slices.Contains(options.requiredTools, "presidio")
 }
 
 func superPreparedCodexArgs(options superOptions) []string {

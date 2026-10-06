@@ -37,15 +37,10 @@ func Gateway(
 	if runner == nil {
 		return errors.New("runtime support is not configured")
 	}
-	if options.smartContext {
-		return errors.New("godex gateway --smart-context is not implemented yet")
-	}
-	if options.presidio || options.noPresidio {
-		return errors.New("godex gateway Presidio options are not implemented yet")
-	}
-
 	start := runtimeusecase.GatewayStartOptions{
-		ListenAddr: options.listen,
+		ListenAddr:          options.listen,
+		SmartContextEnabled: options.smartContext,
+		PresidioEnabled:     options.presidio && !options.noPresidio,
 	}
 	var gateway *runtimeusecase.Gateway
 	var release func() error

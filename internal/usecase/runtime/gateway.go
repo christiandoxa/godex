@@ -15,6 +15,8 @@ type GatewayStartOptions struct {
 	ListenAddr          string
 	UpstreamURL         string
 	SmartContextEnabled bool
+	PresidioEnabled     bool
+	PresidioRequired    bool
 	Broker              *proxymodel.BrokerConfig
 }
 
@@ -224,6 +226,16 @@ func (runner *Runner) startGateway(
 	config.ListenAddr = strings.TrimSpace(options.ListenAddr)
 	config.SkipQuotaPreflight = skipQuotaPreflight
 	config.SmartContextEnabled = options.SmartContextEnabled
+	if options.PresidioEnabled {
+		if runner.presidioResolver == nil {
+			return nil, errors.New("Presidio runtime resolver is not configured")
+		}
+		presidioConfig, err := runner.presidioResolver(ctx, options.PresidioRequired)
+		if err != nil {
+			return nil, err
+		}
+		config.Presidio = presidioConfig
+	}
 	config.Broker = options.Broker
 	proxy, err := runner.newProxy(config)
 	if err != nil {

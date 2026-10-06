@@ -23,6 +23,8 @@ func superRuntimeLaunchOptions(options superOptions) runtimeusecase.RuntimeLaunc
 		AllowAutoRotate:     &allowRotate,
 		SuperOverlay:        true,
 		UpstreamNoProxy:     options.noProxy,
+		PresidioEnabled:     superPresidioEnabled(options),
+		PresidioRequired:    superPresidioRequired(options),
 	}
 	prepares := make([]func(string) error, 0, 2)
 	if options.toolResolutionDone {

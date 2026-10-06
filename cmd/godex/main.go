@@ -25,6 +25,7 @@ import (
 	kirogateway "github.com/christiandoxa/godex/internal/gateway/kiro"
 	localrewritegateway "github.com/christiandoxa/godex/internal/gateway/localrewrite"
 	"github.com/christiandoxa/godex/internal/gateway/openai"
+	presidiogateway "github.com/christiandoxa/godex/internal/gateway/presidio"
 	providerkeygateway "github.com/christiandoxa/godex/internal/gateway/providerkey"
 	quotagateway "github.com/christiandoxa/godex/internal/gateway/quota"
 	updategateway "github.com/christiandoxa/godex/internal/gateway/update"
@@ -108,9 +109,16 @@ func run() int {
 		if err != nil {
 			return nil, err
 		}
+		var redactor proxyhttp.BodyRedactor
+		if config.Presidio != nil {
+			redactor, err = presidiogateway.NewRedactor(*config.Presidio)
+			if err != nil {
+				return nil, err
+			}
+		}
 		return proxyhttp.NewProxy(proxyhttp.Config{
 			Router: router, Activity: activity, Broker: config.Broker, ListenAddr: config.ListenAddr,
-			SmartContextEnabled: config.SmartContextEnabled,
+			SmartContextEnabled: config.SmartContextEnabled, Redactor: redactor,
 		})
 	})
 	runner := runtimeusecase.NewRunner(store, process, factory)
@@ -120,6 +128,9 @@ func run() int {
 	runner.SetCurrentCodexHome(settings.CurrentCodexHome)
 	runner.SetSharedCodexHome(settings.SharedCodexHome)
 	runner.SetManagedProfilesRoot(filepath.Join(settings.Home, "profiles"))
+	runner.SetPresidioConfigResolver(func(ctx context.Context, required bool) (*proxyconfig.PresidioConfig, error) {
+		return presidiogateway.ResolveForLaunch(ctx, settings.Home, required)
+	})
 	runner.SetProviderCredentialResolver(providerkeygateway.NewSource())
 	runner.SetAntigravityProcess(antigravityProcess)
 	runner.SetAntigravitySessionLocker(codex.SessionLocker{})

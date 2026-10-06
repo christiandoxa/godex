@@ -46,6 +46,7 @@ type Config struct {
 	SkipQuotaPreflight  bool
 	UpstreamNoProxy     bool
 	SmartContextEnabled bool
+	Presidio            *PresidioConfig
 	Broker              *BrokerConfig
 	Accounts            func(context.Context) ([]Account, error)
 }
