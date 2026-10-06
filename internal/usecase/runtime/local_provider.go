@@ -174,7 +174,7 @@ func (runner *Runner) RunLocalProviderHome(
 	if err != nil {
 		return err
 	}
-	return runner.process.Run(ctx, home, prepared)
+	return runner.runRuntimeChild(ctx, home, prepared)
 }
 
 func localProviderArguments(config LocalProviderConfig, arguments []string) ([]string, error) {

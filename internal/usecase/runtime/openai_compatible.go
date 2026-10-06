@@ -28,7 +28,7 @@ func (runner *Runner) RunOpenAICompatibleProfile(
 	if err != nil {
 		return err
 	}
-	return runner.process.Run(ctx, home, prepared)
+	return runner.runRuntimeChild(ctx, home, prepared)
 }
 
 func OpenAICompatibleRewriteProvider(baseURL string) (proxymodel.Provider, error) {

@@ -233,7 +233,7 @@ func (runner *Runner) launchHomeWithOptions(
 	}
 	proxyRunner, ok := runner.process.(proxyCodex)
 	if !ok {
-		return runner.process.Run(ctx, home, arguments)
+		return runner.runRuntimeChild(ctx, home, arguments)
 	}
 	if runner.newProxy == nil {
 		return errors.New("runtime proxy factory is not configured")

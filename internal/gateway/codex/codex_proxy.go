@@ -78,6 +78,7 @@ func (process *CodexProcess) runThroughProxy(
 	if err := secureCodexHomeWithShared(codexHome, process.sharedCodexHome); err != nil {
 		return err
 	}
+	commandServer := codexCommandServerSubcommand(arguments)
 	switch provider {
 	case "local":
 		arguments, err = localProxyArguments(endpoint, arguments)
@@ -88,6 +89,10 @@ func (process *CodexProcess) runThroughProxy(
 	}
 	if err != nil {
 		return err
+	}
+	if !commandServer {
+		arguments = codexTUIArguments(arguments)
+		resetTerminalKeyboardEnhancementBestEffort(process.terminal.Stdout)
 	}
 	release, err := (SessionLocker{}).LockCodexSessionsForChild(ctx, codexHome)
 	if err != nil {

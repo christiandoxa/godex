@@ -41,7 +41,7 @@ func (runner *Runner) RunLocal(ctx context.Context, selector string, args []stri
 		}
 		defer func() { err = errors.Join(err, release()) }()
 	}
-	return runner.process.Run(ctx, runner.accounts.CodexHome(account.ID), args)
+	return runner.runRuntimeChild(ctx, runner.accounts.CodexHome(account.ID), args)
 }
 
 func (runner *Runner) RunCurrent(ctx context.Context, selector string, args []string) (err error) {
@@ -76,5 +76,5 @@ func (runner *Runner) RunHome(ctx context.Context, codexHome string, args []stri
 	if err != nil {
 		return err
 	}
-	return runner.process.Run(ctx, home, args)
+	return runner.runRuntimeChild(ctx, home, args)
 }

@@ -311,5 +311,6 @@ func environmentWith(key, value string) []string {
 		}
 		environment = append(environment, entry)
 	}
-	return append(environment, key+"="+value)
+	environment = append(environment, key+"="+value)
+	return hardenCodexChildEnvironment(environment)
 }

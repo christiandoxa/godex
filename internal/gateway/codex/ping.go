@@ -38,11 +38,6 @@ var upstreamProxyEnvKeys = map[string]bool{
 	"PROXY": true, "proxy": true,
 }
 
-var dangerousChildEnvKeys = map[string]bool{
-	"LD_PRELOAD": true, "LD_AUDIT": true, "LD_LIBRARY_PATH": true, "LD_ORIGIN_PATH": true,
-	"DYLD_INSERT_LIBRARIES": true, "DYLD_LIBRARY_PATH": true, "DYLD_FRAMEWORK_PATH": true,
-}
-
 func (process *CodexProcess) PingOpenAI(ctx context.Context, target pingmodel.Target, options pingmodel.Options) (pingmodel.ProcessResult, error) {
 	binary, err := process.resolveBinary()
 	if err != nil {
@@ -130,11 +125,8 @@ func pingArguments(options pingmodel.Options) []string {
 }
 
 func pingEnvironment(codexHome string, noProxy bool) []string {
-	removed := make(map[string]bool, len(providerSecretEnvKeys)+len(dangerousChildEnvKeys)+len(upstreamProxyEnvKeys))
+	removed := make(map[string]bool, len(providerSecretEnvKeys)+len(upstreamProxyEnvKeys))
 	for key := range providerSecretEnvKeys {
-		removed[key] = true
-	}
-	for key := range dangerousChildEnvKeys {
 		removed[key] = true
 	}
 	if noProxy {
@@ -150,7 +142,8 @@ func pingEnvironment(codexHome string, noProxy bool) []string {
 		}
 		environment = append(environment, entry)
 	}
-	return append(environment, "CODEX_HOME="+filepath.Clean(codexHome))
+	environment = append(environment, "CODEX_HOME="+filepath.Clean(codexHome))
+	return hardenCodexChildEnvironment(environment)
 }
 
 type pingCapture struct {

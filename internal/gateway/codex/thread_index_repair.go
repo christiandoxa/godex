@@ -97,7 +97,7 @@ func codexThreadIndexEnvironment(codexHome, sharedCodexHome string) []string {
 	if sharedSessions {
 		environment = append(environment, "CODEX_SQLITE_HOME="+sharedCodexHome)
 	}
-	return environment
+	return hardenCodexChildEnvironment(environment)
 }
 
 func codexSessionsShareDirectory(codexHome, sharedCodexHome string) bool {

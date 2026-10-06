@@ -9,14 +9,23 @@ import (
 // by the runtime proxy without starting Codex or the proxy.
 func PreviewRuntimeProxyArguments(provider string, arguments []string) ([]string, error) {
 	const endpoint = "http://127.0.0.1:0"
+	commandServer := codexCommandServerSubcommand(arguments)
+	var (
+		projected []string
+		err       error
+	)
 	switch strings.TrimSpace(provider) {
 	case "local":
-		return localProxyArguments(endpoint, arguments)
+		projected, err = localProxyArguments(endpoint, arguments)
 	case "openai-compatible":
-		return openAICompatibleProxyArguments(endpoint, arguments)
+		projected, err = openAICompatibleProxyArguments(endpoint, arguments)
 	default:
-		return proxyArguments(endpoint, arguments)
+		projected, err = proxyArguments(endpoint, arguments)
 	}
+	if err != nil || commandServer {
+		return projected, err
+	}
+	return codexTUIArguments(projected), nil
 }
 
 // RuntimeDryRunBinaryLabel reports the configured child binary without probing
