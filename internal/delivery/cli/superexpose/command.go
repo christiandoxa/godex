@@ -80,9 +80,6 @@ func Run(ctx context.Context, arguments []string, out, errOut io.Writer) error {
 		fmt.Fprintln(out, "Status: dry run")
 		return nil
 	}
-	if options.Mode != "exec" {
-		return errors.New("Godex Super expose full mode is not implemented yet; use exec mode")
-	}
 	return runExecServer(ctx, options, out, errOut)
 }
 
@@ -200,12 +197,22 @@ func runExecServer(ctx context.Context, options Options, out, errOut io.Writer) 
 	expectedPath := "/mcp/" + token
 	endpoint := "http://" + listener.Addr().String() + expectedPath
 	tools := discoverOptionalTools()
+	var runs *runManager
+	if options.Mode == "full" {
+		runs, err = newRunManager(workspace, options.SuperArgs, instanceID, displayName)
+		if err != nil {
+			return err
+		}
+		defer runs.shutdown()
+	}
 	handler := &execMCPHandler{
 		expectedPath:  expectedPath,
 		expectedHost:  listener.Addr().String(),
 		displayName:   displayName,
 		instanceID:    instanceID,
 		workspace:     workspace,
+		mode:          options.Mode,
+		runs:          runs,
 		optionalTools: tools,
 	}
 	server := &http.Server{
@@ -213,9 +220,9 @@ func runExecServer(ctx context.Context, options Options, out, errOut io.Writer) 
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       90 * time.Second,
 	}
-	fmt.Fprintln(out, "Godex Super expose exec")
+	fmt.Fprintf(out, "Godex Super expose %s\n", options.Mode)
 	fmt.Fprintf(out, "Workspace: %s\n", displayName)
-	fmt.Fprintln(out, "Mode: exec")
+	fmt.Fprintf(out, "Mode: %s\n", options.Mode)
 	fmt.Fprintf(out, "Endpoint: %s\n", endpoint)
 	fmt.Fprintln(out, "Safety: capability URL is secret; local loopback only.")
 	fmt.Fprintln(out, "Stop: Ctrl-C")

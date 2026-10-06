@@ -29,8 +29,21 @@ var mcpProtocolVersions = []string{
 }
 
 const (
-	godexExecToolName  = "godex_super_exec"
-	legacyExecToolName = "prodex_super_exec"
+	godexStartToolName  = "godex_super_start"
+	godexStatusToolName = "godex_super_status"
+	godexEventsToolName = "godex_super_events"
+	godexResultToolName = "godex_super_result"
+	godexCancelToolName = "godex_super_cancel"
+	godexListToolName   = "godex_super_list"
+	godexExecToolName   = "godex_super_exec"
+
+	legacyStartToolName  = "prodex_super_start"
+	legacyStatusToolName = "prodex_super_status"
+	legacyEventsToolName = "prodex_super_events"
+	legacyResultToolName = "prodex_super_result"
+	legacyCancelToolName = "prodex_super_cancel"
+	legacyListToolName   = "prodex_super_list"
+	legacyExecToolName   = "prodex_super_exec"
 )
 
 type execMCPHandler struct {
@@ -39,6 +52,8 @@ type execMCPHandler struct {
 	displayName   string
 	instanceID    string
 	workspace     string
+	mode          string
+	runs          *runManager
 	optionalTools optionalToolSnapshot
 	rate          rateLimiter
 }
@@ -174,15 +189,11 @@ func (handler *execMCPHandler) ServeHTTP(writer http.ResponseWriter, request *ht
 				return
 			}
 		}
-		if err := validateExecToolArguments(name, arguments); err != nil {
+		if err := validateToolArguments(name, arguments); err != nil {
 			writeRPCError(writer, http.StatusBadRequest, id, -32602, err.Error(), nil)
 			return
 		}
-		if !isExecToolName(name) {
-			writeRPCResult(writer, id, toolErrorResult("tool is not exposed by this endpoint"))
-			return
-		}
-		result, err := executeDirect(request.Context(), arguments, handler.workspace, handler.optionalTools)
+		result, err := handler.callTool(request.Context(), name, arguments)
 		if err != nil {
 			writeRPCResult(writer, id, toolErrorResult(err.Error()))
 			return
@@ -198,6 +209,9 @@ func (handler *execMCPHandler) serverName() string {
 }
 
 func (handler *execMCPHandler) instructions() string {
+	if handler.mode == "full" {
+		return "Full Godex Super endpoint. Run lifecycle tools and godex_super_exec are exposed for this local capability instance.\n" + handler.optionalTools.instructions()
+	}
 	return "Exec-only Godex Super endpoint. Only godex_super_exec is exposed.\n" + handler.optionalTools.instructions()
 }
 
@@ -231,9 +245,13 @@ func (handler *execMCPHandler) initialize(protocolVersion string) map[string]any
 }
 
 func (handler *execMCPHandler) toolsList() map[string]any {
+	tools := []any{handler.execToolDefinition()}
+	if handler.mode == "full" {
+		tools = append(handler.lifecycleToolDefinitions(), tools...)
+	}
 	return map[string]any{
 		"resultType": "complete",
-		"tools":      []any{handler.execToolDefinition()},
+		"tools":      tools,
 		"ttlMs":      300_000,
 		"cacheScope": "private",
 		"_meta": map[string]any{

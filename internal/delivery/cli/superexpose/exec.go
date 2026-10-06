@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -250,14 +249,10 @@ func runExec(ctx context.Context, request execRequest, tools optionalToolSnapsho
 	if err != nil {
 		return nil, errors.New("failed to capture executable stdin")
 	}
-	stdout, err := command.StdoutPipe()
-	if err != nil {
-		return nil, errors.New("failed to capture executable stdout")
-	}
-	stderr, err := command.StderrPipe()
-	if err != nil {
-		return nil, errors.New("failed to capture executable stderr")
-	}
+	stdoutCapture := newBoundedExecWriter()
+	stderrCapture := newBoundedExecWriter()
+	command.Stdout = stdoutCapture
+	command.Stderr = stderrCapture
 	started := time.Now()
 	if err := command.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start executable: %s", redact.Secrets(err.Error()))
@@ -270,11 +265,6 @@ func runExec(ctx context.Context, request execRequest, tools optionalToolSnapsho
 		_, _ = stdin.Write(request.stdin)
 		_ = stdin.Close()
 	}()
-	stdoutResult := make(chan capturedOutputResult, 1)
-	stderrResult := make(chan capturedOutputResult, 1)
-	go captureExecOutput(stdout, stdoutResult)
-	go captureExecOutput(stderr, stderrResult)
-
 	wait := make(chan error, 1)
 	go func() { wait <- command.Wait() }()
 
@@ -311,22 +301,8 @@ func runExec(ctx context.Context, request execRequest, tools optionalToolSnapsho
 	case <-time.After(2 * time.Second):
 		return nil, errors.New("exec stdin writer did not stop")
 	}
-	stdoutCaptured, err := awaitCapturedOutput(stdoutResult, "exec stdout reader")
-	if err != nil {
-		return nil, err
-	}
-	stderrCaptured, err := awaitCapturedOutput(stderrResult, "exec stderr reader")
-	if err != nil {
-		return nil, err
-	}
-	if stdoutCaptured.err != nil {
-		return nil, fmt.Errorf("exec stdout reader failed: %s", redact.Secrets(stdoutCaptured.err.Error()))
-	}
-	if stderrCaptured.err != nil {
-		return nil, fmt.Errorf("exec stderr reader failed: %s", redact.Secrets(stderrCaptured.err.Error()))
-	}
-	stdoutText, stdoutClipped := renderExecOutput(stdoutCaptured.output)
-	stderrText, stderrClipped := renderExecOutput(stderrCaptured.output)
+	stdoutText, stdoutClipped := renderExecOutput(stdoutCapture.snapshot())
+	stderrText, stderrClipped := renderExecOutput(stderrCapture.snapshot())
 
 	exitCode, exitStatus, signal := execExitDetails(waitErr)
 	status := "completed"
@@ -363,45 +339,35 @@ func runExec(ctx context.Context, request execRequest, tools optionalToolSnapsho
 	return result, nil
 }
 
-type capturedOutputResult struct {
+type boundedExecWriter struct {
+	mu     sync.Mutex
 	output capturedOutput
-	err    error
 }
 
-func awaitCapturedOutput(result <-chan capturedOutputResult, label string) (capturedOutputResult, error) {
-	select {
-	case captured := <-result:
-		return captured, nil
-	case <-time.After(2 * time.Second):
-		return capturedOutputResult{}, fmt.Errorf("%s did not stop", label)
-	}
+func newBoundedExecWriter() *boundedExecWriter {
+	return &boundedExecWriter{output: capturedOutput{bytes: make([]byte, 0, 8192)}}
 }
 
-func captureExecOutput(reader io.Reader, result chan<- capturedOutputResult) {
-	buffer := make([]byte, 8192)
-	output := capturedOutput{bytes: make([]byte, 0, 8192)}
-	for {
-		count, err := reader.Read(buffer)
-		if count > 0 {
-			if len(output.bytes) < execMaxOutputBytes {
-				remaining := execMaxOutputBytes - len(output.bytes)
-				kept := min(remaining, count)
-				output.bytes = append(output.bytes, buffer[:kept]...)
-				if kept < count {
-					output.truncated = true
-				}
-			} else {
-				output.truncated = true
-			}
+func (writer *boundedExecWriter) Write(content []byte) (int, error) {
+	writer.mu.Lock()
+	defer writer.mu.Unlock()
+	if len(writer.output.bytes) < execMaxOutputBytes {
+		remaining := execMaxOutputBytes - len(writer.output.bytes)
+		kept := min(remaining, len(content))
+		writer.output.bytes = append(writer.output.bytes, content[:kept]...)
+		if kept < len(content) {
+			writer.output.truncated = true
 		}
-		if err != nil {
-			if errors.Is(err, io.EOF) || errors.Is(err, os.ErrClosed) {
-				err = nil
-			}
-			result <- capturedOutputResult{output: output, err: err}
-			return
-		}
+	} else if len(content) > 0 {
+		writer.output.truncated = true
 	}
+	return len(content), nil
+}
+
+func (writer *boundedExecWriter) snapshot() capturedOutput {
+	writer.mu.Lock()
+	defer writer.mu.Unlock()
+	return capturedOutput{bytes: append([]byte(nil), writer.output.bytes...), truncated: writer.output.truncated}
 }
 
 func renderExecOutput(output capturedOutput) (string, bool) {

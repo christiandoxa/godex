@@ -32,6 +32,21 @@ func TestMain(m *testing.M) {
 	case "control-plane":
 		_, _ = os.Stdout.WriteString(os.Getenv("CONTROL_PLANE_API_KEY"))
 		os.Exit(0)
+	case "run-success":
+		task, _ := io.ReadAll(os.Stdin)
+		_, _ = os.Stdout.WriteString("task=" + string(task) + "\n")
+		_, _ = os.Stderr.WriteString("run-stderr\n")
+		os.Exit(0)
+	case "run-fail":
+		_, _ = os.Stderr.WriteString("run-failed\n")
+		os.Exit(23)
+	case "run-large":
+		_, _ = io.Copy(os.Stdout, strings.NewReader(strings.Repeat("y", runOutputMaxBytes+16*1024)))
+		os.Exit(0)
+	case "run-sleep":
+		_, _ = io.ReadAll(os.Stdin)
+		time.Sleep(30 * time.Second)
+		os.Exit(0)
 	}
 	os.Exit(m.Run())
 }
