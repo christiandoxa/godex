@@ -11,23 +11,45 @@ import (
 )
 
 const (
+	superCavemanMinimumVersion    = "2.3.1"
+	superRTKMinimumVersion        = "0.46.0"
+	superCodebaseMinimumVersion   = "0.9.1-rc.1"
 	superPlaywrightPackageCLI     = "@playwright/mcp"
 	superPlaywrightMinimumVersion = "0.0.79"
+	superPonytailMinimumVersion   = "4.9.0"
 	superToolProbeTimeout         = 5 * time.Second
 )
 
 func defaultSuperToolLookup(tool string) (string, bool) {
 	switch tool {
 	case "caveman", "ponytail":
-		return superManagedPluginDirectory(tool)
+		path, ok := superManagedPluginDirectory(tool)
+		if !ok {
+			return "", false
+		}
+		minimum := superCavemanMinimumVersion
+		if tool == "ponytail" {
+			minimum = superPonytailMinimumVersion
+		}
+		if compareSuperVersion(filepath.Base(path), minimum) < 0 {
+			return "", false
+		}
+		return path, true
 	case "playwright-mcp":
 		return superPlaywrightCommand()
 	case "rtk", "codebase-memory-mcp":
-		if path, ok := superManagedCommand(tool); ok {
-			return path, true
+		path, ok := superManagedCommand(tool)
+		if !ok {
+			var err error
+			path, err = exec.LookPath(tool)
+			if err != nil {
+				return "", false
+			}
 		}
-		path, err := exec.LookPath(tool)
-		return path, err == nil
+		if !superCommandVersionCompatible(tool, path) {
+			return "", false
+		}
+		return path, true
 	default:
 		return "", false
 	}
@@ -177,6 +199,131 @@ func compareSuperVersion(left, right string) int {
 	return 0
 }
 
+type superSemver struct {
+	major, minor, patch uint64
+	pre                 []string
+}
+
+func parseSuperSemver(value string) (superSemver, bool) {
+	value = strings.TrimSpace(strings.TrimPrefix(value, "v"))
+	core, pre, _ := strings.Cut(value, "-")
+	parts := strings.Split(core, ".")
+	if len(parts) != 3 {
+		return superSemver{}, false
+	}
+	numbers := [3]uint64{}
+	for index, part := range parts {
+		number, err := strconv.ParseUint(part, 10, 64)
+		if err != nil {
+			return superSemver{}, false
+		}
+		numbers[index] = number
+	}
+	result := superSemver{major: numbers[0], minor: numbers[1], patch: numbers[2]}
+	if pre != "" {
+		result.pre = strings.Split(pre, ".")
+	}
+	return result, true
+}
+
+func compareSuperSemver(left, right string) int {
+	a, aok := parseSuperSemver(left)
+	b, bok := parseSuperSemver(right)
+	if !aok || !bok {
+		return strings.Compare(left, right)
+	}
+	for _, pair := range [][2]uint64{{a.major, b.major}, {a.minor, b.minor}, {a.patch, b.patch}} {
+		if pair[0] < pair[1] {
+			return -1
+		}
+		if pair[0] > pair[1] {
+			return 1
+		}
+	}
+	if len(a.pre) == 0 && len(b.pre) == 0 {
+		return 0
+	}
+	if len(a.pre) == 0 {
+		return 1
+	}
+	if len(b.pre) == 0 {
+		return -1
+	}
+	limit := min(len(a.pre), len(b.pre))
+	for index := 0; index < limit; index++ {
+		leftID, rightID := a.pre[index], b.pre[index]
+		leftNum, leftErr := strconv.ParseUint(leftID, 10, 64)
+		rightNum, rightErr := strconv.ParseUint(rightID, 10, 64)
+		switch {
+		case leftErr == nil && rightErr == nil:
+			if leftNum < rightNum {
+				return -1
+			}
+			if leftNum > rightNum {
+				return 1
+			}
+		case leftErr == nil:
+			return -1
+		case rightErr == nil:
+			return 1
+		default:
+			if leftID < rightID {
+				return -1
+			}
+			if leftID > rightID {
+				return 1
+			}
+		}
+	}
+	if len(a.pre) < len(b.pre) {
+		return -1
+	}
+	if len(a.pre) > len(b.pre) {
+		return 1
+	}
+	return 0
+}
+
+func superProbeSemver(value string) (string, bool) {
+	for _, token := range strings.Fields(value) {
+		token = strings.TrimFunc(token, func(r rune) bool {
+			return !((r >= '0' && r <= '9') || (r >= 'A' && r <= 'Z') ||
+				(r >= 'a' && r <= 'z') || r == '.' || r == '-' || r == '+')
+		})
+		token = strings.TrimPrefix(token, "v")
+		if _, ok := parseSuperSemver(token); ok {
+			return token, true
+		}
+	}
+	return "", false
+}
+
+func superCommandVersionCompatible(tool, path string) bool {
+	output, ok := superProbeCommand(path, "--version")
+	if !ok {
+		return false
+	}
+	line := firstSuperLine(output)
+	switch tool {
+	case "rtk":
+		version, ok := superProbeSemver(line)
+		return ok && compareSuperSemver(version, superRTKMinimumVersion) >= 0
+	case "codebase-memory-mcp":
+		const prefix = "codebase-memory-mcp "
+		if !strings.HasPrefix(line, prefix) {
+			return false
+		}
+		version := strings.TrimSpace(strings.TrimPrefix(line, prefix))
+		if version == "dev" {
+			return true
+		}
+		_, ok := parseSuperSemver(version)
+		return ok && compareSuperSemver(version, superCodebaseMinimumVersion) >= 0
+	default:
+		return false
+	}
+}
+
 func superPlaywrightCommand() (string, bool) {
 	node, err := exec.LookPath("node")
 	if err != nil {
@@ -201,7 +348,7 @@ func superPlaywrightCommand() (string, bool) {
 		return "", false
 	}
 	playwrightVersion := strings.TrimPrefix(strings.TrimSpace(firstSuperLine(output)), "v")
-	if compareSuperVersion(playwrightVersion, superPlaywrightMinimumVersion) < 0 {
+	if compareSuperSemver(playwrightVersion, superPlaywrightMinimumVersion) < 0 {
 		return "", false
 	}
 	return npx, true
@@ -223,4 +370,10 @@ func firstSuperLine(value string) string {
 		return strings.TrimSpace(line)
 	}
 	return strings.TrimSpace(value)
+}
+
+// ResolveSuperOptionalTool exposes the same validated optional-tool resolution used by Godex Super.
+// The returned path is either an executable path or a managed plugin directory depending on the tool kind.
+func ResolveSuperOptionalTool(tool string) (string, bool) {
+	return defaultSuperToolLookup(tool)
 }
