@@ -18,6 +18,7 @@ const (
 	deepSeekProviderKind                 = "deepseek"
 	copilotProviderKind                  = "copilot"
 	geminiProviderKind                   = "gemini"
+	kiroProviderKind                     = "kiro"
 )
 
 func runProfilelessProviderSelection(
@@ -26,6 +27,9 @@ func runProfilelessProviderSelection(
 	selection runtimemodel.Selection,
 	arguments []string,
 ) error {
+	if selection.Provider == kiroProviderKind {
+		return providerCredentialRequired(kiroProviderKind)
+	}
 	keys, err := runner.ProviderAPIKeys(selection.Provider, selection.APIKey)
 	if err != nil {
 		return err
@@ -52,14 +56,18 @@ func runProviderSelection(
 	arguments []string,
 ) error {
 	if selection.Provider != anthropicProviderKind && selection.Provider != copilotProviderKind &&
-		selection.Provider != deepSeekProviderKind && selection.Provider != geminiProviderKind {
+		selection.Provider != deepSeekProviderKind && selection.Provider != geminiProviderKind &&
+		selection.Provider != kiroProviderKind {
 		return fmt.Errorf(providerShortcutNotImplementedFormat, selection.Provider)
 	}
-	keys, err := runner.ProviderAPIKeys(selection.Provider, selection.APIKey)
+	target, found, err := profiles.ResolveProviderLaunch(ctx, selection.Provider, selection.Profile)
 	if err != nil {
 		return err
 	}
-	target, found, err := profiles.ResolveProviderLaunch(ctx, selection.Provider, selection.Profile)
+	if selection.Provider == kiroProviderKind {
+		return runKiroProviderSelection(ctx, runner, profiles, selection, target, found, arguments)
+	}
+	keys, err := runner.ProviderAPIKeys(selection.Provider, selection.APIKey)
 	if err != nil {
 		return err
 	}
@@ -117,6 +125,33 @@ func runProviderAPIKeySelection(
 		)
 	}
 	return runner.RunProviderAPIKeys(ctx, home, provider, request.keys, request.arguments)
+}
+
+func runKiroProviderSelection(
+	ctx context.Context,
+	runner *runtimeusecase.Runner,
+	profiles launchProfiles,
+	selection runtimemodel.Selection,
+	target profilemodel.LaunchTarget,
+	found bool,
+	arguments []string,
+) (runErr error) {
+	if !found || target.Provider != kiroProviderKind {
+		return providerCredentialRequired(kiroProviderKind)
+	}
+	release, err := profiles.AcquireLaunch(ctx, target.Name)
+	if err != nil {
+		return err
+	}
+	defer func() { runErr = errors.Join(runErr, release()) }()
+	provider := runtimeusecase.KiroProvider(target.Name)
+	applyProviderSelectionModel(&provider, selection.Model)
+	if err := runtimeusecase.ApplyProviderSelectionLimits(
+		&provider, selection.ContextWindow, selection.AutoCompactTokenLimit,
+	); err != nil {
+		return err
+	}
+	return runner.RunProviderProfile(ctx, target.CodexHome, provider, arguments)
 }
 
 func runProviderOAuthSelection(
@@ -186,6 +221,8 @@ func providerCredentialRequired(kind string) error {
 		return errors.New("godex run --provider copilot requires an imported Copilot profile, --api-key, or GITHUB_COPILOT_API_KEY(S)")
 	case geminiProviderKind:
 		return errors.New("godex run --provider gemini requires --api-key, GEMINI_API_KEY(S), or GOOGLE_API_KEY(S)")
+	case kiroProviderKind:
+		return errors.New("godex run --provider kiro requires an imported Kiro profile from `godex profile import kiro`")
 	default:
 		return fmt.Errorf(providerShortcutNotImplementedFormat, kind)
 	}
