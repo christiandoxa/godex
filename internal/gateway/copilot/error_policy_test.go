@@ -14,7 +14,7 @@ func TestCopilotProviderErrorClassificationMatchesRetryPolicy(t *testing.T) {
 		{500, `{"error":{"code":"model_not_supported"}}`, copilotErrorNotFound, true},
 		{503, `{"error":{"message":"backend overloaded"}}`, copilotErrorTransient, true},
 		{429, `{"error":{"code":"rate_limit_exceeded"}}`, copilotErrorRateLimit, true},
-		{429, `{"error":{"message":"too many requests"}}`, copilotErrorRateLimit, true},
+		{429, `{"error":{"message":"too many requests"}}`, copilotErrorOther, false},
 		{429, `{"error":{"code":"model_not_supported"}}`, copilotErrorNotFound, true},
 		{429, `{"error":{"type":"invalid_request_error"}}`, copilotErrorOther, false},
 	}
@@ -55,4 +55,20 @@ func sameCopilotCodes(got, want []string) bool {
 		}
 	}
 	return true
+}
+
+func TestProdex04356CopilotGeneric429GateIsPrecommitRetryable(t *testing.T) {
+	if !copilotProviderRetryPrecommit(copilotErrorRateLimit, 429, []byte("too many requests")) {
+		t.Fatal("tagged Copilot generic-429 gate rejected a precommit rate-limit retry")
+	}
+	if copilotProviderRetryPrecommit(copilotErrorOther, 429, []byte("too many requests")) {
+		t.Fatal("bare generic 429 was promoted from provider class Other")
+	}
+	if !copilotProviderRetryPrecommit(
+		copilotErrorQuota,
+		429,
+		[]byte(`{"error":{"code":"insufficient_quota","detail":"invalid_request"}}`),
+	) {
+		t.Fatal("structured quota signal lost precedence to generic nonretryable text")
+	}
 }

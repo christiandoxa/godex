@@ -318,7 +318,7 @@ func TestProdex04356RuntimeTransportGeneric429FallsBackBeforeCommit(t *testing.T
 		attempts int
 	}{
 		{"structured", `{"error":{"code":"rate_limit_exceeded"}}`, 2},
-		{"bare", `{"error":{"message":"too many requests"}}`, 2},
+		{"bare", `{"error":{"message":"too many requests"}}`, 1},
 		{"model not supported", `{"error":{"code":"model_not_supported"}}`, 2},
 		{"invalid request", `{"error":{"type":"invalid_request_error"}}`, 1},
 	} {

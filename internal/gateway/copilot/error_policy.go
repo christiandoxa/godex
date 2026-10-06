@@ -19,10 +19,17 @@ const (
 
 func copilotModelRetryAllowed(status int, body []byte) bool {
 	class := classifyCopilotProviderError(status, body)
+	return copilotProviderRetryPrecommit(class, status, body)
+}
+
+func copilotProviderRetryPrecommit(class copilotProviderErrorClass, status int, body []byte) bool {
 	if status == 429 && !copilotRetryable429Body(body) {
 		return false
 	}
-	return class == copilotErrorQuota || class == copilotErrorRateLimit || class == copilotErrorTransient || class == copilotErrorNotFound
+	return class == copilotErrorQuota ||
+		class == copilotErrorRateLimit ||
+		class == copilotErrorTransient ||
+		class == copilotErrorNotFound
 }
 
 func classifyCopilotProviderError(status int, body []byte) copilotProviderErrorClass {
@@ -33,9 +40,6 @@ func classifyCopilotProviderError(status int, body []byte) copilotProviderErrorC
 			class = candidate
 		}
 	}
-	if class == copilotErrorOther && status == 429 && copilotRetryable429Body(body) {
-		return copilotErrorRateLimit
-	}
 	if class == copilotErrorOther && status >= 500 {
 		return copilotErrorTransient
 	}
@@ -43,6 +47,10 @@ func classifyCopilotProviderError(status int, body []byte) copilotProviderErrorC
 }
 
 func copilotRetryable429Body(body []byte) bool {
+	structured := classifyCopilotProviderError(429, body)
+	if structured == copilotErrorQuota || structured == copilotErrorRateLimit {
+		return true
+	}
 	text := strings.ToLower(string(body))
 	for _, marker := range []string{
 		"invalid_prompt",

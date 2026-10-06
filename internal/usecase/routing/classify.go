@@ -145,7 +145,7 @@ func (proxy *Router) classifySpecialResponse(
 		}
 		return outcome, pending, err, true
 	case externalProviderKind(providerKind) && response.StatusCode >= http.StatusBadRequest:
-		outcome, pending, err := proxy.classifyExternalProvider(response, pending, providerKind)
+		outcome, pending, err := proxy.classifyExternalProvider(response, pending)
 		return outcome, pending, err, true
 	default:
 		return responseOutcome{}, pending, nil, false
@@ -245,7 +245,6 @@ func inspectResponse(body io.Reader, limit int64) ([]byte, bool, error) {
 func (proxy *Router) classifyExternalProvider(
 	response *proxymodel.Response,
 	pending *pendingResponse,
-	providerKind string,
 ) (responseOutcome, *pendingResponse, error) {
 	prefix, complete, err := inspectResponse(response.Body, proxy.maxInspect)
 	pending.prefix = prefix
@@ -257,14 +256,6 @@ func (proxy *Router) classifyExternalProvider(
 		classificationBody = nil
 	}
 	classification := providerentity.ClassifyError(response.StatusCode, classificationBody)
-	if response.StatusCode == http.StatusTooManyRequests &&
-		strings.EqualFold(strings.TrimSpace(providerKind), "copilot") &&
-		classification.Class == providerentity.ErrorOther &&
-		!generic429NonRetryable(classificationBody) {
-		classification = providerentity.ErrorClassification{
-			Class: providerentity.ErrorRateLimit, Cooldown: time.Minute,
-		}
-	}
 	switch classification.Class {
 	case providerentity.ErrorAuth:
 		return responseOutcome{kind: responseAuthFailure}, pending, nil
