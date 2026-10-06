@@ -63,7 +63,11 @@ func Run(ctx context.Context, arguments []string, out, errOut io.Writer) error {
 		return errors.New("legacy --tunnel mode is not supported; use --openai-tunnel-id or omit tunnel flags for local-only access")
 	}
 	if options.OpenAITunnelID != "" {
-		return errors.New("OpenAI Secure MCP Tunnel is not implemented yet in Godex Super expose")
+		resolved, err := validateOpenAITunnelID(options.OpenAITunnelID)
+		if err != nil {
+			return err
+		}
+		options.OpenAITunnelID = resolved
 	}
 	address, err := net.ResolveTCPAddr("tcp", options.Listen)
 	if err != nil {
@@ -76,7 +80,11 @@ func Run(ctx context.Context, arguments []string, out, errOut io.Writer) error {
 		fmt.Fprintln(out, "Godex Super expose dry run")
 		fmt.Fprintf(out, "Mode: %s\n", options.Mode)
 		fmt.Fprintf(out, "Listen: %s\n", options.Listen)
-		fmt.Fprintln(out, "Tunnel: disabled (local only)")
+		if options.OpenAITunnelID != "" {
+			fmt.Fprintf(out, "Tunnel: OpenAI Secure MCP Tunnel %s\n", options.OpenAITunnelID)
+		} else {
+			fmt.Fprintln(out, "Tunnel: disabled (local only)")
+		}
 		fmt.Fprintln(out, "Status: dry run")
 		return nil
 	}
@@ -278,15 +286,63 @@ func runExecServer(ctx context.Context, options Options, out, errOut io.Writer) 
 		}
 		serveErr <- err
 	}()
-	select {
-	case err := <-serveErr:
-		return err
-	case <-ctx.Done():
-		closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-		defer cancel()
-		_ = server.Shutdown(closeCtx)
-		<-serveErr
-		return nil
+
+	var tunnel *openAITunnelProcess
+	var tunnelReady <-chan error
+	var tunnelExit <-chan error
+	if options.OpenAITunnelID != "" {
+		tunnel, err = startOpenAITunnel(endpoint, options.OpenAITunnelID)
+		if err != nil {
+			closeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			_ = server.Shutdown(closeCtx)
+			cancel()
+			<-serveErr
+			return err
+		}
+		defer tunnel.shutdown()
+		ready := make(chan error, 1)
+		go func() {
+			ready <- tunnel.waitReady(ctx)
+			close(ready)
+		}()
+		tunnelReady = ready
+		if errOut != nil {
+			fmt.Fprintf(errOut, "Godex Super Expose: OpenAI Secure MCP Tunnel %s starting.\n", options.OpenAITunnelID)
+		}
+	}
+
+	for {
+		select {
+		case err := <-serveErr:
+			return err
+		case err := <-tunnelReady:
+			if err != nil {
+				closeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				_ = server.Shutdown(closeCtx)
+				cancel()
+				<-serveErr
+				return err
+			}
+			tunnelReady = nil
+			if tunnel != nil {
+				tunnelExit = tunnel.exit
+				if errOut != nil {
+					fmt.Fprintf(errOut, "Godex Super Expose: OpenAI Secure MCP Tunnel %s ready (client %s).\n", tunnel.id, tunnel.version)
+				}
+			}
+		case <-tunnelExit:
+			closeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			_ = server.Shutdown(closeCtx)
+			cancel()
+			<-serveErr
+			return errors.New("OpenAI tunnel-client exited unexpectedly")
+		case <-ctx.Done():
+			closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+			_ = server.Shutdown(closeCtx)
+			cancel()
+			<-serveErr
+			return nil
+		}
 	}
 }
 

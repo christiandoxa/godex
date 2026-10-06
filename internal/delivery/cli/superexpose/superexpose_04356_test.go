@@ -2,20 +2,35 @@ package superexpose
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 	"testing"
 	"time"
 )
 
-const exposeHelperEnv = "GODEX_SUPER_EXPOSE_HELPER"
+const (
+	exposeHelperEnv          = "GODEX_SUPER_EXPOSE_HELPER"
+	tunnelHelperEnv          = "GODEX_TUNNEL_CLIENT_HELPER"
+	tunnelCaptureEnv         = "GODEX_TUNNEL_CLIENT_CAPTURE"
+	tunnelExternalHealthEnv  = "GODEX_TUNNEL_CLIENT_HEALTH_BASE"
+	tunnelOversizeVersionEnv = "GODEX_TUNNEL_CLIENT_OVERSIZE_VERSION"
+)
 
 func TestMain(m *testing.M) {
+	if os.Getenv(tunnelHelperEnv) != "" {
+		runTunnelClientTestHelper()
+		os.Exit(0)
+	}
 	switch os.Getenv(exposeHelperEnv) {
 	case "success":
 		_, _ = os.Stdout.WriteString("hello-expose")
@@ -49,6 +64,77 @@ func TestMain(m *testing.M) {
 		os.Exit(0)
 	}
 	os.Exit(m.Run())
+}
+
+func runTunnelClientTestHelper() {
+	if len(os.Args) < 2 {
+		os.Exit(64)
+	}
+	if os.Args[1] == "--version" {
+		sha := strings.Repeat("a", 40)
+		_, _ = fmt.Fprintf(os.Stdout, "0.0.15+%s (git sha: %s)\n", sha, sha)
+		if os.Getenv(tunnelOversizeVersionEnv) != "" {
+			_, _ = io.Copy(os.Stdout, strings.NewReader(strings.Repeat("x", 1024*1024+1)))
+		}
+		return
+	}
+	if len(os.Args) >= 3 && os.Args[1] == "run" && os.Args[2] == "--help" {
+		_, _ = fmt.Fprintln(os.Stdout, "Usage: tunnel-client run --config <path>")
+		return
+	}
+	if os.Args[1] != "run" {
+		os.Exit(65)
+	}
+	valueFor := func(name string) string {
+		for index := 1; index+1 < len(os.Args); index++ {
+			if os.Args[index] == name {
+				return os.Args[index+1]
+			}
+		}
+		return ""
+	}
+	healthFile := valueFor("--health.url-file")
+	if healthFile == "" {
+		os.Exit(66)
+	}
+	if capture := os.Getenv(tunnelCaptureEnv); capture != "" {
+		keyPresent := os.Getenv("CONTROL_PLANE_API_KEY") != ""
+		_, openAIKeyPresent := os.LookupEnv("OPENAI_API_KEY")
+		_, tunnelConfigPresent := os.LookupEnv("TUNNEL_CLIENT_CONFIG")
+		_, inheritedTunnelIDPresent := os.LookupEnv("CONTROL_PLANE_TUNNEL_ID")
+		content := "args=" + strings.Join(os.Args[1:], "\n") +
+			"\nkey_present=" + fmt.Sprint(keyPresent) +
+			"\nopenai_api_key_present=" + fmt.Sprint(openAIKeyPresent) +
+			"\ntunnel_config_present=" + fmt.Sprint(tunnelConfigPresent) +
+			"\ninherited_tunnel_id_present=" + fmt.Sprint(inheritedTunnelIDPresent) + "\n"
+		_ = os.WriteFile(capture, []byte(content), 0o600)
+	}
+	if externalHealth := strings.TrimSpace(os.Getenv(tunnelExternalHealthEnv)); externalHealth != "" {
+		if err := os.WriteFile(healthFile, []byte(externalHealth), 0o600); err != nil {
+			os.Exit(68)
+		}
+		for {
+			time.Sleep(time.Second)
+		}
+	}
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		os.Exit(67)
+	}
+	defer listener.Close()
+	baseURL := "http://" + listener.Addr().String()
+	if err := os.WriteFile(healthFile, []byte(baseURL), 0o600); err != nil {
+		os.Exit(68)
+	}
+	server := &http.Server{Handler: http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		switch request.URL.Path {
+		case "/healthz", "/readyz":
+			writer.WriteHeader(http.StatusOK)
+		default:
+			writer.WriteHeader(http.StatusNotFound)
+		}
+	})}
+	_ = server.Serve(listener)
 }
 
 func TestProdex04356SuperExposeExecArgumentAndBindPolicy(t *testing.T) {
@@ -425,5 +511,294 @@ func TestProdex04356SuperExposeInstanceAndCapabilityShapesAreGodexNative(t *test
 	}
 	if filepath.Separator == 0 {
 		t.Fatal("unreachable")
+	}
+}
+
+func TestProdex04356OpenAITunnelIDAndClientVersionPolicy(t *testing.T) {
+	validID := "tunnel_" + strings.Repeat("a", 32)
+	if got, err := validateOpenAITunnelID(validID); err != nil || got != validID {
+		t.Fatalf("valid tunnel id = %q, %v", got, err)
+	}
+	if got, err := validateOpenAITunnelID("  " + validID + "  "); err != nil || got != validID {
+		t.Fatalf("trimmed tunnel id = %q, %v", got, err)
+	}
+	for _, value := range []string{
+		"tunnel_short",
+		"tunnel_" + strings.Repeat("A", 32),
+		"other_" + strings.Repeat("a", 32),
+	} {
+		if _, err := validateOpenAITunnelID(value); err == nil {
+			t.Fatalf("invalid tunnel id accepted: %q", value)
+		}
+	}
+	sha := strings.Repeat("1", 40)
+	for _, value := range []struct {
+		text string
+		want string
+		ok   bool
+	}{
+		{"0.0.13+" + sha + " (git sha: " + sha + ")", "0.0.13", true},
+		{"0.0.15+" + sha + " (git sha: " + sha + ")", "0.0.15", true},
+		{"0.0.16+" + sha + " (git sha: " + sha + ")", "0.0.16", true},
+		{"0.0.12+" + sha + " (git sha: " + sha + ")", "", false},
+		{"0.0.15-rc.1+" + sha + " (git sha: " + sha + ")", "", false},
+		{"0..15+" + sha + " (git sha: " + sha + ")", "", false},
+		{"00.0.15+" + sha + " (git sha: " + sha + ")", "", false},
+		{"0.00.15+" + sha + " (git sha: " + sha + ")", "", false},
+		{"0.0.015+" + sha + " (git sha: " + sha + ")", "", false},
+		{"0.0.15", "", false},
+	} {
+		got, ok := supportedTunnelClientVersion(value.text)
+		if ok != value.ok || got != value.want {
+			t.Fatalf("version %q = %q,%t; want %q,%t", value.text, got, ok, value.want, value.ok)
+		}
+	}
+}
+
+func TestProdex04356OpenAITunnelCredentialsDistinguishMissingAndInvalid(t *testing.T) {
+	t.Setenv(tunnelHelperEnv, "1")
+	t.Setenv("GODEX_TUNNEL_CLIENT_BIN", os.Args[0])
+	validID := "tunnel_" + strings.Repeat("d", 32)
+
+	if err := os.Unsetenv("CONTROL_PLANE_API_KEY"); err != nil {
+		t.Fatal(err)
+	}
+	tunnel, err := startOpenAITunnel("http://127.0.0.1:4567/mcp/capability", validID)
+	if tunnel != nil {
+		tunnel.shutdown()
+	}
+	if err == nil || !strings.Contains(err.Error(), "requires CONTROL_PLANE_API_KEY in noninteractive mode") {
+		t.Fatalf("missing API key error = %v", err)
+	}
+
+	for _, invalid := range []string{"", "bad\nkey", "bad\u0085key"} {
+		t.Setenv("CONTROL_PLANE_API_KEY", invalid)
+		tunnel, err := startOpenAITunnel("http://127.0.0.1:4567/mcp/capability", validID)
+		if tunnel != nil {
+			tunnel.shutdown()
+		}
+		if err == nil || !strings.Contains(err.Error(), "OpenAI Secure MCP Tunnel API key is invalid") {
+			t.Fatalf("invalid API key %q error = %v", invalid, err)
+		}
+	}
+
+	t.Setenv("CONTROL_PLANE_API_KEY", string([]byte{0xff}))
+	tunnel, err = startOpenAITunnel("http://127.0.0.1:4567/mcp/capability", validID)
+	if tunnel != nil {
+		tunnel.shutdown()
+	}
+	if err == nil || !strings.Contains(err.Error(), "requires CONTROL_PLANE_API_KEY in noninteractive mode") {
+		t.Fatalf("non-UTF8 API key error = %v", err)
+	}
+}
+
+func TestProdex04356OpenAITunnelURLsRejectUnicodeWhitespaceAndInvalidUTF8(t *testing.T) {
+	for _, value := range []string{
+		"http://127.0.0.1:4567/mcp/ capability",
+		"http://127.0.0.1:4567/mcp/capability",
+	} {
+		if _, err := validateLocalTunnelMCPURL(value); err == nil {
+			t.Fatalf("local MCP URL accepted Unicode whitespace/control: %q", value)
+		}
+	}
+
+	for _, value := range []string{
+		"http://127.0.0.1: 4567",
+		"http://127.0.0.1:4567",
+	} {
+		if _, err := validateTunnelHealthBase(value); err == nil {
+			t.Fatalf("health URL accepted Unicode whitespace/control: %q", value)
+		}
+	}
+
+	healthFile := filepath.Join(t.TempDir(), "health-url")
+	if err := os.WriteFile(healthFile, []byte{0xff, 0xfe}, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := readTunnelHealthBase(healthFile); err == nil ||
+		!strings.Contains(err.Error(), "not valid UTF-8") {
+		t.Fatalf("invalid UTF-8 health URL error = %v", err)
+	}
+}
+
+func TestProdex04356OpenAITunnelHealthBaseTrimsAllTrailingSlashes(t *testing.T) {
+	got, err := validateTunnelHealthBase("  http://127.0.0.1:4567///  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "http://127.0.0.1:4567" {
+		t.Fatalf("health base = %q", got)
+	}
+}
+
+func TestProdex04356OpenAITunnelProbeRejectsOversizeVersionOutput(t *testing.T) {
+	t.Setenv(tunnelHelperEnv, "1")
+	t.Setenv(tunnelOversizeVersionEnv, "1")
+	t.Setenv("GODEX_TUNNEL_CLIENT_BIN", os.Args[0])
+	if _, _, err := ensureOpenAITunnelAvailable(); err == nil {
+		t.Fatal("oversize tunnel-client version output was accepted")
+	}
+}
+
+func TestProdex04356OpenAITunnelPrivateFilesRetryCollision(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("TMPDIR", root)
+	nextTunnelConfigID.Store(700)
+	collision := filepath.Join(root, fmt.Sprintf("godex-openai-tunnel-%d-701-0", os.Getpid()))
+	if err := os.Mkdir(collision, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	directory, err := createOpenAITunnelFiles("http://127.0.0.1:4567/mcp/capability")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(directory)
+	if directory == collision {
+		t.Fatalf("private tunnel directory reused colliding path %q", directory)
+	}
+	if !strings.HasSuffix(directory, "-701-1") {
+		t.Fatalf("collision retry directory = %q", directory)
+	}
+}
+
+func TestProdex04356OpenAITunnelReadinessRejectsChildExitAfterHealth(t *testing.T) {
+	validID := "tunnel_" + strings.Repeat("e", 32)
+	t.Setenv(tunnelHelperEnv, "1")
+	t.Setenv("GODEX_TUNNEL_CLIENT_BIN", os.Args[0])
+	t.Setenv("CONTROL_PLANE_API_KEY", "synthetic-control-key")
+
+	var tunnel *openAITunnelProcess
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		switch request.URL.Path {
+		case "/healthz":
+			writer.WriteHeader(http.StatusOK)
+		case "/readyz":
+			if tunnel == nil || tunnel.command == nil || tunnel.command.Process == nil {
+				writer.WriteHeader(http.StatusServiceUnavailable)
+				return
+			}
+			_ = tunnel.command.Process.Kill()
+			time.Sleep(50 * time.Millisecond)
+			writer.WriteHeader(http.StatusOK)
+		default:
+			writer.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+	t.Setenv(tunnelExternalHealthEnv, server.URL)
+
+	var err error
+	tunnel, err = startOpenAITunnel("http://127.0.0.1:4567/mcp/capability", validID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tunnel.shutdown()
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+	if err := tunnel.waitReady(ctx); err == nil || !strings.Contains(err.Error(), "exited before local readiness") {
+		t.Fatalf("readiness after child exit = %v", err)
+	}
+}
+
+func TestProdex04356OpenAITunnelDryRunValidatesWithoutClientProbe(t *testing.T) {
+	validID := "tunnel_" + strings.Repeat("b", 32)
+	t.Setenv("GODEX_TUNNEL_CLIENT_BIN", filepath.Join(t.TempDir(), "missing-tunnel-client"))
+	var out bytes.Buffer
+	if err := Run(t.Context(), []string{
+		"exec", "--openai-tunnel-id", validID, "--dry-run",
+	}, &out, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "Tunnel: OpenAI Secure MCP Tunnel "+validID) {
+		t.Fatalf("dry-run tunnel output = %q", out.String())
+	}
+	if err := Run(t.Context(), []string{
+		"exec", "--openai-tunnel-id", "tunnel_short", "--dry-run",
+	}, io.Discard, io.Discard); err == nil || !strings.Contains(err.Error(), "OpenAI tunnel id") {
+		t.Fatalf("invalid tunnel dry-run = %v", err)
+	}
+	if err := Run(t.Context(), []string{
+		"exec", "--tunnel", "--dry-run",
+	}, io.Discard, io.Discard); err == nil || !strings.Contains(err.Error(), "legacy --tunnel mode") {
+		t.Fatalf("legacy tunnel = %v", err)
+	}
+}
+
+func TestProdex04356OpenAITunnelStartsOfficialClientWithPrivateConfigAndHealth(t *testing.T) {
+	validID := "tunnel_" + strings.Repeat("c", 32)
+	capture := filepath.Join(t.TempDir(), "capture.txt")
+	t.Setenv(tunnelHelperEnv, "1")
+	t.Setenv(tunnelCaptureEnv, capture)
+	t.Setenv("GODEX_TUNNEL_CLIENT_BIN", os.Args[0])
+	t.Setenv("PRODEX_TUNNEL_CLIENT_BIN", filepath.Join(t.TempDir(), "must-not-win"))
+	t.Setenv("CONTROL_PLANE_API_KEY", "synthetic-control-key")
+	t.Setenv("OPENAI_API_KEY", "must-not-inherit")
+	t.Setenv("TUNNEL_CLIENT_CONFIG", "must-not-inherit")
+
+	tunnel, err := startOpenAITunnel("http://127.0.0.1:4567/mcp/capability", validID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	directory := tunnel.directory
+	defer tunnel.shutdown()
+
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	if err := tunnel.waitReady(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if tunnel.version != "0.0.15" || tunnel.id != validID {
+		t.Fatalf("tunnel status = id:%q version:%q", tunnel.id, tunnel.version)
+	}
+	info, err := os.Stat(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o700 && goruntime.GOOS != "windows" {
+		t.Fatalf("tunnel directory mode = %o", info.Mode().Perm())
+	}
+	for _, name := range []string{"config.yaml", "mcp-url", "health-url"} {
+		info, err := os.Stat(filepath.Join(directory, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm() != 0o600 && goruntime.GOOS != "windows" {
+			t.Fatalf("%s mode = %o", name, info.Mode().Perm())
+		}
+	}
+	config, err := os.ReadFile(filepath.Join(directory, "config.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(config), "config_version: 1") ||
+		!strings.Contains(string(config), "file:"+filepath.Join(directory, "mcp-url")) {
+		t.Fatalf("tunnel config = %q", config)
+	}
+	captured, err := os.ReadFile(capture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(captured)
+	for _, want := range []string{
+		"run", "--control-plane.base-url", "https://api.openai.com",
+		"--control-plane.tunnel-id", validID,
+		"--control-plane.api-key", "env:CONTROL_PLANE_API_KEY",
+		"--health.listen-addr", "127.0.0.1:0",
+		"key_present=true",
+		"openai_api_key_present=false",
+		"tunnel_config_present=false",
+		"inherited_tunnel_id_present=false",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("tunnel argv capture missing %q: %s", want, text)
+		}
+	}
+	if strings.Contains(text, "synthetic-control-key") || strings.Contains(text, "must-not-inherit") {
+		t.Fatalf("tunnel capture leaked secret/inherited config: %s", text)
+	}
+
+	tunnel.shutdown()
+	if _, err := os.Stat(directory); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("tunnel private directory survived cleanup: %v", err)
 	}
 }
