@@ -25,13 +25,16 @@ func (transport *Transport) ExecuteWebSocketMessage(
 	state := &websocketMessageState{turnState: session.turnState}
 	reusedSession := connection != nil
 	reuseIdle := time.Duration(0)
+	connectDuration := time.Duration(0)
 	if reusedSession {
 		reuseIdle = time.Since(session.completed)
 	}
 	if connection == nil {
 		handshake := input
 		handshake.Body = nil
+		connectStarted := time.Now()
 		response, err := transport.ExecuteWebSocket(ctx, handshake, account)
+		connectDuration = time.Since(connectStarted)
 		if err != nil {
 			return nil, err
 		}
@@ -53,9 +56,11 @@ func (transport *Transport) ExecuteWebSocketMessage(
 			_ = connection.Close()
 			return nil, fmt.Errorf("send upstream realtime websocket message: %w", err)
 		}
-		return websocketRealtimeCommittedResponse(
+		response := websocketRealtimeCommittedResponse(
 			connection, state.turnState, input.FirstEventRetryUsed, reusedSession, reuseIdle,
-		), nil
+		)
+		response.UpstreamConnectDuration = connectDuration
+		return response, nil
 	}
 	watchdog := newWebSocketReadWatchdog(connection, websocketPrecommitProgressTimeout)
 	connection = watchdog
@@ -64,9 +69,13 @@ func (transport *Transport) ExecuteWebSocketMessage(
 		return nil, fmt.Errorf("send upstream websocket message: %w", err)
 	}
 	plan := websocketResponsePlanFor(input, reusedSession)
-	return transport.readWebSocketMessage(
+	response, err := transport.readWebSocketMessage(
 		ctx, input, account, connection, state, reusedSession, reuseIdle, plan,
 	)
+	if response != nil && response.UpstreamConnectDuration == 0 {
+		response.UpstreamConnectDuration = connectDuration
+	}
+	return response, err
 }
 
 func websocketRealtimeCommittedResponse(

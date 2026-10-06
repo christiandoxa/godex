@@ -46,7 +46,9 @@ func (router *Router) executeWebSocket(
 	websocket websocketGateway,
 ) (*proxymodel.Response, error) {
 	for reload := 0; reload < 2; reload++ {
-		response, err := websocket.ExecuteWebSocket(ctx, request, account)
+		response, err := router.observedWebSocketConnectAttempt(ctx, request, account, func() (*proxymodel.Response, error) {
+			return websocket.ExecuteWebSocket(ctx, request, account)
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -68,7 +70,9 @@ func (router *Router) executeWebSocketMessage(
 	turnStateRetryDelays := [...]time.Duration{75 * time.Millisecond, 200 * time.Millisecond, 500 * time.Millisecond}
 	turnStateRetryIndex := 0
 	for {
-		response, err := websocket.ExecuteWebSocketMessage(ctx, request, account)
+		response, err := router.observedWebSocketMessageAttempt(ctx, request, account, func() (*proxymodel.Response, error) {
+			return websocket.ExecuteWebSocketMessage(ctx, request, account)
+		})
 		if err != nil {
 			return nil, err
 		}

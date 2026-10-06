@@ -38,6 +38,7 @@ type Response struct {
 	WebSocketFrames         bool
 	WebSocketReusedSession  bool
 	WebSocketReuseIdle      time.Duration
+	UpstreamConnectDuration time.Duration
 	WebSocketRealtimeDuplex bool
 	FirstEventRetryUsed     bool
 	FirstEventCommitted     bool

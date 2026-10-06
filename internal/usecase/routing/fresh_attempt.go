@@ -173,9 +173,10 @@ func (router *Router) freshAttempt(
 		if ctx.Err() != nil {
 			return nil, nil, false, ctx.Err()
 		}
-		router.recordRouteFailure(ctx, account.ID, request.QuotaSelection)
 		if isTransportFailure(err) {
-			router.persistTransportBackoff(ctx, account.ID, request.QuotaSelection)
+			router.recordTransportExecutionFailure(ctx, account.ID, request.QuotaSelection, err)
+		} else {
+			router.recordRouteFailure(ctx, account.ID, request.QuotaSelection)
 		}
 		return nil, &pendingResponse{accountID: account.ID, transient: true}, false, nil
 	}
@@ -188,9 +189,10 @@ func (router *Router) freshAttempt(
 			return nil, nil, false, ctx.Err()
 		}
 		if pending != nil && pending.transient {
-			router.recordRouteFailure(ctx, account.ID, request.QuotaSelection)
 			if isTransportFailure(err) {
-				router.persistTransportBackoff(ctx, account.ID, request.QuotaSelection)
+				router.recordTransportExecutionFailure(ctx, account.ID, request.QuotaSelection, err)
+			} else {
+				router.recordRouteFailure(ctx, account.ID, request.QuotaSelection)
 			}
 			pending.close()
 			return nil, &pendingResponse{accountID: account.ID, transient: true}, false, nil

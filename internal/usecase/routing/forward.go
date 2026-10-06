@@ -36,9 +36,10 @@ func (router *Router) forwardBound(
 		if ctx.Err() != nil {
 			return proxymodel.Forwarded{}, ctx.Err()
 		}
-		router.recordRouteFailure(ctx, account.ID, request.QuotaSelection)
 		if isTransportFailure(err) {
-			router.persistTransportBackoff(ctx, account.ID, request.QuotaSelection)
+			router.recordTransportExecutionFailure(ctx, account.ID, request.QuotaSelection, err)
+		} else {
+			router.recordRouteFailure(ctx, account.ID, request.QuotaSelection)
 		}
 		return proxymodel.Forwarded{}, &proxymodel.Error{
 			StatusCode: http.StatusBadGateway,
@@ -141,7 +142,11 @@ func (router *Router) handleBoundResponse(
 	outcome, pending, err := router.classify(response, account.Provider.Kind)
 	if err != nil {
 		if pending != nil && pending.transient {
-			router.recordRouteFailure(ctx, account.ID, request.QuotaSelection)
+			if isTransportFailure(err) {
+				router.recordTransportExecutionFailure(ctx, account.ID, request.QuotaSelection, err)
+			} else {
+				router.recordRouteFailure(ctx, account.ID, request.QuotaSelection)
+			}
 		}
 		closePendingResponse(pending)
 		return proxymodel.Forwarded{}, &proxymodel.Error{

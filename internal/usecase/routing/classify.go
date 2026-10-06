@@ -153,7 +153,7 @@ func (proxy *Router) classifyPrecommitFailure(response *proxymodel.Response, pen
 		quota:           classification.Class == providerentity.ErrorQuota,
 		transient:       classification.Class == providerentity.ErrorRateLimit || classification.Class == providerentity.ErrorTransient,
 		transport:       transport,
-		healthPenalty:   precommitHealthPenalty(classification.Class, transport),
+		healthPenalty:   precommitHealthPenalty(classification.Class, transport, failure.Code),
 		firstEventRetry: true,
 	}, pending, nil
 }
@@ -165,9 +165,9 @@ func transientHealthPenalty(class providerentity.ErrorClass) uint8 {
 	return 0
 }
 
-func precommitHealthPenalty(class providerentity.ErrorClass, transport bool) uint8 {
+func precommitHealthPenalty(class providerentity.ErrorClass, transport bool, transportCode string) uint8 {
 	if transport {
-		return 0
+		return transportHealthPenalty(transportCode)
 	}
 	return transientHealthPenalty(class)
 }

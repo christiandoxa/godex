@@ -55,6 +55,52 @@ func (store *Store) LoadRouteHealth(ctx context.Context, now time.Time) ([]routi
 	return active, nil
 }
 
+func (store *Store) SetRouteHealth(ctx context.Context, accountID, route string, value uint8, now time.Time) (routingentity.RouteHealthScore, error) {
+	if value > routingentity.MaxRouteHealthScore {
+		return routingentity.RouteHealthScore{}, errors.New("invalid routing health score")
+	}
+	if err := ctx.Err(); err != nil {
+		return routingentity.RouteHealthScore{}, err
+	}
+	if err := store.prepare(); err != nil {
+		return routingentity.RouteHealthScore{}, err
+	}
+	release, err := lockfile.Acquire(ctx, filepath.Join(store.root, "routing-health.guard"))
+	if err != nil {
+		return routingentity.RouteHealthScore{}, err
+	}
+	defer release()
+	scores, err := store.readRouteHealth()
+	if err != nil {
+		return routingentity.RouteHealthScore{}, err
+	}
+	updated := routingentity.RouteHealthScore{AccountID: accountID, Route: route, Score: value, UpdatedUnix: now.Unix()}
+	if err := updated.Validate(); err != nil {
+		return routingentity.RouteHealthScore{}, err
+	}
+	index := -1
+	for candidate, score := range scores {
+		if score.AccountID == accountID && score.Route == route {
+			index = candidate
+			break
+		}
+	}
+	if value == 0 {
+		if index >= 0 {
+			scores = append(scores[:index], scores[index+1:]...)
+		}
+	} else if index >= 0 {
+		scores[index] = updated
+	} else {
+		scores = append(scores, updated)
+	}
+	scores = retainRouteHealth(scores, now)
+	if err := store.writeRouteHealth(scores); err != nil {
+		return routingentity.RouteHealthScore{}, err
+	}
+	return updated, nil
+}
+
 func (store *Store) AdjustRouteHealth(
 	ctx context.Context,
 	accountID, route string,

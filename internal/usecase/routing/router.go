@@ -39,6 +39,9 @@ type cachedQuotaPreflight interface {
 type routingStateRepository interface {
 	LoadRouteHealth(context.Context, time.Time) ([]routingentity.RouteHealthScore, error)
 	AdjustRouteHealth(context.Context, string, string, int, time.Time) (routingentity.RouteHealthScore, error)
+	SetRouteHealth(context.Context, string, string, uint8, time.Time) (routingentity.RouteHealthScore, error)
+	LoadRouteMemory(context.Context, time.Time) ([]routingentity.RouteMemoryScore, error)
+	MutateRouteMemory(context.Context, string, string, string, time.Time, func(routingentity.RouteMemoryScore) routingentity.RouteMemoryScore) (routingentity.RouteMemoryScore, error)
 	LoadRetryBackoffs(context.Context, time.Time) ([]routingentity.RetryBackoff, error)
 	SetRetryBackoff(context.Context, routingentity.RetryBackoff, time.Time) error
 	ClearRetryBackoff(context.Context, string, time.Time) error
@@ -83,6 +86,7 @@ type Router struct {
 	retryBackoffMu            sync.Mutex
 	transportMu               sync.Mutex
 	routeHealthMu             sync.Mutex
+	routeMemoryMu             sync.Mutex
 	routeCircuitMu            sync.Mutex
 	previousResponseFailureMu sync.Mutex
 	cursor                    int
@@ -95,6 +99,7 @@ type Router struct {
 	quotaBlocked              map[string]bool
 	quotaChecks               map[quotaCheckKey]quotaCheck
 	routeHealth               map[routeHealthKey]routingentity.RouteHealthScore
+	routeMemory               map[routeMemoryKey]routingentity.RouteMemoryScore
 	routeCircuits             map[routeHealthKey]routingentity.RouteCircuit
 	transportBackoffs         map[routeHealthKey]routingentity.TransportBackoff
 	previousResponseFailures  map[previousResponseFailureKey]routingentity.PreviousResponseFailure
@@ -134,6 +139,7 @@ func NewRouter(config Config) (*Router, error) {
 		profileInflightHardLimit: config.ProfileInflightHardLimit, profileInflightWait: config.ProfileInflightWait,
 		quotaBlocked: make(map[string]bool), quotaChecks: make(map[quotaCheckKey]quotaCheck),
 		routeHealth:              make(map[routeHealthKey]routingentity.RouteHealthScore),
+		routeMemory:              make(map[routeMemoryKey]routingentity.RouteMemoryScore),
 		routeCircuits:            make(map[routeHealthKey]routingentity.RouteCircuit),
 		transportBackoffs:        make(map[routeHealthKey]routingentity.TransportBackoff),
 		previousResponseFailures: make(map[previousResponseFailureKey]routingentity.PreviousResponseFailure),
@@ -150,6 +156,13 @@ func NewRouter(config Config) (*Router, error) {
 		}
 		for _, score := range scores {
 			router.routeHealth[routeHealthKey{accountID: score.AccountID, route: score.Route}] = score
+		}
+		memory, err := config.RoutingState.LoadRouteMemory(ctx, now)
+		if err != nil {
+			return nil, err
+		}
+		for _, score := range memory {
+			router.routeMemory[routeMemoryKey{accountID: score.AccountID, route: score.Route, kind: score.Kind}] = score
 		}
 		circuits, err := config.RoutingState.LoadRouteCircuits(ctx, now, scores)
 		if err != nil {
@@ -221,7 +234,9 @@ func (router *Router) Forward(ctx context.Context, request proxymodel.Request) (
 	if err != nil {
 		return nil, err
 	}
-	if err := router.bindSuccessfulResponse(ctx, &result, accounts, keys, request.WebSocketMessage); err != nil {
+	if err := router.bindSuccessfulResponse(
+		ctx, &result, accounts, keys, request.WebSocketMessage, request.QuotaSelection,
+	); err != nil {
 		return nil, err
 	}
 	transferred = true
@@ -288,6 +303,7 @@ func (router *Router) bindSuccessfulResponse(
 	accounts []proxymodel.Account,
 	keys affinityKeys,
 	websocketMessage bool,
+	selection quotamodel.Selection,
 ) error {
 	if result.Response.PrecommitFailure != nil && result.Response.PrecommitFailure.StaleContinuation {
 		result.Failed = true
@@ -344,6 +360,9 @@ func (router *Router) bindSuccessfulResponse(
 		result.Response.Body.Close()
 		return err
 	}
+	if stream {
+		router.wrapResponsesStreamLatency(result.AccountID, selection, result.Response, len(result.Prefix) > 0)
+	}
 	return nil
 }
 
@@ -391,10 +410,14 @@ func (router *Router) executeAccount(ctx context.Context, request proxymodel.Req
 		if strings.EqualFold(strings.TrimSpace(account.Provider.Kind), "gemini") {
 			return router.executeGeminiModelFallback(ctx, request, account)
 		}
-		return router.gateway.Execute(ctx, request, account)
+		return router.observedGatewayAttempt(ctx, request, account, func() (*proxymodel.Response, error) {
+			return router.gateway.Execute(ctx, request, account)
+		})
 	}
 	for reload := 0; reload < 2; reload++ {
-		response, err := router.gateway.Execute(ctx, request, account)
+		response, err := router.observedGatewayAttempt(ctx, request, account, func() (*proxymodel.Response, error) {
+			return router.gateway.Execute(ctx, request, account)
+		})
 		if err != nil {
 			return nil, err
 		}

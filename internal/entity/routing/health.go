@@ -34,7 +34,7 @@ func (score RouteHealthScore) Validate() error {
 
 func validRoute(route string) bool {
 	switch route {
-	case "standard", "responses", "compact", "websocket":
+	case "global", "standard", "responses", "compact", "websocket":
 		return true
 	default:
 		return false

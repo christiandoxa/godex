@@ -22,7 +22,9 @@ func (router *Router) executeGeminiModelFallback(
 ) (*proxymodel.Response, error) {
 	models, fields, compact, ok := geminiModelFallbacks(request)
 	if !ok {
-		response, err := router.gateway.Execute(ctx, request, account)
+		response, err := router.observedGatewayAttempt(ctx, request, account, func() (*proxymodel.Response, error) {
+			return router.gateway.Execute(ctx, request, account)
+		})
 		if err != nil {
 			closeResponse(response)
 			return nil, err
@@ -43,7 +45,9 @@ func (router *Router) executeGeminiModelFallback(
 			return nil, errors.New("failed to encode Gemini model fallback request")
 		}
 		attempt.Body = body
-		response, err := router.gateway.Execute(ctx, attempt, account)
+		response, err := router.observedGatewayAttempt(ctx, attempt, account, func() (*proxymodel.Response, error) {
+			return router.gateway.Execute(ctx, attempt, account)
+		})
 		if err != nil {
 			closeResponse(response)
 			return nil, err

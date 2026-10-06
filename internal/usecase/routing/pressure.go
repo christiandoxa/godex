@@ -21,7 +21,7 @@ type candidateLoad struct {
 	backoff          time.Duration
 	providerPriority uint8
 	inflight         int
-	health           uint8
+	health           uint32
 	pressure         quotamodel.Pressure
 	soft             bool
 }
@@ -73,7 +73,7 @@ func (router *Router) orderCandidatesMode(accounts []proxymodel.Account, selecti
 			backoff:          backoff,
 			providerPriority: runtimeProviderPriority(account),
 			inflight:         router.inflight[account.ID],
-			health:           router.routeHealth[routeHealthKey{accountID: account.ID, route: routeHealthRoute(selection.RouteKind)}].Effective(now),
+			health:           router.routeCompositeHealthScoreLocked(account.ID, routeHealthRoute(selection.RouteKind), now),
 			pressure:         pressure,
 			soft:             router.inflight[account.ID] >= softLimit,
 		}

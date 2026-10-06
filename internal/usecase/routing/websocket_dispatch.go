@@ -79,7 +79,9 @@ func (router *Router) executeRouted(
 	previousRetryIndex := 0
 	current := request
 	for {
-		response, err := websocket.ExecuteWebSocketMessage(ctx, current, account)
+		response, err := router.observedWebSocketMessageAttempt(ctx, current, account, func() (*proxymodel.Response, error) {
+			return websocket.ExecuteWebSocketMessage(ctx, current, account)
+		})
 		if err != nil {
 			return nil, err
 		}
