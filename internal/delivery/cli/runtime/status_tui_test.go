@@ -12,7 +12,7 @@ import (
 
 func TestStatusTUIViewAndKeys(t *testing.T) {
 	model := newStatusTUIModel(context.Background(), newCLIActivity(), time.Second)
-	updated, command := model.Update(statusSnapshotMsg{overview: mustOverview(t)})
+	updated, command := model.Update(statusSnapshotMsg{overview: mustOverview(t), resources: statusResourceSnapshot{available: true, processCount: 2, runtimeProcessCount: 1}})
 	model = updated.(statusTUIModel)
 	if command != nil {
 		t.Fatal("snapshot unexpectedly returned command")

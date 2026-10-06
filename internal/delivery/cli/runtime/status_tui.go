@@ -17,21 +17,27 @@ import (
 type statusTickMsg time.Time
 
 type statusSnapshotMsg struct {
-	overview runtimemodel.Overview
-	err      error
+	overview  runtimemodel.Overview
+	resources statusResourceSnapshot
+	err       error
 }
 
 type statusTUIModel struct {
-	ctx      context.Context
-	activity *runtimeusecase.Activity
-	interval time.Duration
-	overview *runtimemodel.Overview
-	err      error
-	loading  bool
+	ctx       context.Context
+	activity  *runtimeusecase.Activity
+	resources *statusResourceTracker
+	interval  time.Duration
+	overview  *runtimemodel.Overview
+	resource  statusResourceSnapshot
+	err       error
+	loading   bool
 }
 
 func newStatusTUIModel(ctx context.Context, activity *runtimeusecase.Activity, interval time.Duration) statusTUIModel {
-	return statusTUIModel{ctx: ctx, activity: activity, interval: interval, loading: true}
+	return statusTUIModel{
+		ctx: ctx, activity: activity, resources: newStatusResourceTracker(),
+		interval: interval, loading: true,
+	}
 }
 
 func (model statusTUIModel) Init() tea.Cmd {
@@ -57,6 +63,7 @@ func (model statusTUIModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		if message.err == nil {
 			overview := message.overview
 			model.overview = &overview
+			model.resource = message.resources
 		}
 	case statusTickMsg:
 		if model.loading {
@@ -75,7 +82,7 @@ func (model statusTUIModel) View() string {
 		output.WriteString("Updated: ")
 		output.WriteString(time.Now().Format("2006-01-02 15:04:05"))
 		output.WriteByte('\n')
-		for _, field := range statusFields(*model.overview) {
+		for _, field := range statusFields(*model.overview, model.resource) {
 			_, _ = fmt.Fprintf(&output, "%s: %s\n", field[0], field[1])
 		}
 	} else if model.loading {
@@ -93,7 +100,8 @@ func (model statusTUIModel) View() string {
 func (model statusTUIModel) fetch() tea.Cmd {
 	return func() tea.Msg {
 		overview, err := model.activity.Overview(model.ctx)
-		return statusSnapshotMsg{overview: overview, err: err}
+		resources := model.resources.sample()
+		return statusSnapshotMsg{overview: overview, resources: resources, err: err}
 	}
 }
 

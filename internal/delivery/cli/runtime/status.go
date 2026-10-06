@@ -78,10 +78,20 @@ func writeStatusSnapshot(ctx context.Context, activity *runtimeusecase.Activity,
 	if err != nil {
 		return err
 	}
+	resources := newStatusResourceTracker()
+	_ = resources.sample()
+	timer := time.NewTimer(200 * time.Millisecond)
+	select {
+	case <-timer.C:
+	case <-ctx.Done():
+		timer.Stop()
+		return ctx.Err()
+	}
+	resourceSnapshot := resources.sample()
 	if _, err := fmt.Fprintf(out, "Updated: %s\n", time.Now().Format("2006-01-02 15:04:05")); err != nil {
 		return err
 	}
-	for _, field := range statusFields(overview) {
+	for _, field := range statusFields(overview, resourceSnapshot) {
 		if _, err := fmt.Fprintf(out, "%s: %s\n", field[0], field[1]); err != nil {
 			return err
 		}
@@ -89,13 +99,17 @@ func writeStatusSnapshot(ctx context.Context, activity *runtimeusecase.Activity,
 	return nil
 }
 
-func statusFields(overview runtimemodel.Overview) [][2]string {
+func statusFields(overview runtimemodel.Overview, resources statusResourceSnapshot) [][2]string {
 	fields := [][2]string{
 		{"Active profile", valueOrDash(overview.ActiveProfile)},
 		{"Profiles", fmt.Sprint(overview.ProfileCount)},
 		{"Enabled", fmt.Sprint(overview.EnabledCount)},
 		{"Inflight", fmt.Sprint(overview.Inflight)},
 		{"Recent events", fmt.Sprint(overview.RecentEvents)},
+		{"Processes", statusProcessField(resources)},
+		{"Memory", statusMemoryField(resources)},
+		{"Network", statusNetworkField(resources)},
+		{"Disk I/O", statusDiskField(resources)},
 	}
 	if overview.LastEvent != nil {
 		last := overview.LastEvent
@@ -115,4 +129,45 @@ func writerIsTerminal(out io.Writer) bool {
 	}
 	info, err := file.Stat()
 	return err == nil && info.Mode()&os.ModeCharDevice != 0
+}
+
+func statusProcessField(resources statusResourceSnapshot) string {
+	if !resources.available {
+		return "unavailable"
+	}
+	cpu := "warming up"
+	if resources.cpuPercent != nil {
+		cpu = fmt.Sprintf("%.1f%%", *resources.cpuPercent)
+	}
+	return fmt.Sprintf("%d total, %d runtime; CPU %s",
+		resources.processCount, resources.runtimeProcessCount, cpu)
+}
+
+func statusMemoryField(resources statusResourceSnapshot) string {
+	if !resources.available {
+		return "unavailable"
+	}
+	return fmt.Sprintf("%s (%.1f%% host)",
+		statusHumanBytes(resources.residentBytes), statusMemoryPercent(resources))
+}
+
+func statusNetworkField(resources statusResourceSnapshot) string {
+	if !resources.available {
+		return "unavailable"
+	}
+	return fmt.Sprintf("%d sockets; RX queue %s, TX queue %s",
+		resources.socketCount,
+		statusHumanBytes(resources.networkRXQueueBytes),
+		statusHumanBytes(resources.networkTXQueueBytes))
+}
+
+func statusDiskField(resources statusResourceSnapshot) string {
+	if !resources.available {
+		return "unavailable"
+	}
+	return fmt.Sprintf("read %s total (%s/s), write %s total (%s/s)",
+		statusHumanBytes(resources.diskReadBytes),
+		statusHumanBytes(resources.diskReadBytesPerSecond),
+		statusHumanBytes(resources.diskWriteBytes),
+		statusHumanBytes(resources.diskWriteBytesPerSecond))
 }
