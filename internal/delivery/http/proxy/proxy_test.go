@@ -99,32 +99,55 @@ func TestProxyContinuationAffinity(t *testing.T) {
 	}
 }
 
-func TestProxyBoundAffinityPreservesUnauthorizedResponse(t *testing.T) {
+func TestProdex04356ProxyBoundAffinityUnauthorizedSignalsFullContextReplay(t *testing.T) {
 	accounts := testRuntimeAccounts(t, "A", "token-a", "B", "token-b")
-	var calls int
-	upstream := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
-		calls++
-		if calls == 1 {
-			writer.Header().Set("Content-Type", "application/json")
+	var seen []string
+	upstream := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		accountID := request.Header.Get("ChatGPT-Account-Id")
+		seen = append(seen, accountID)
+		writer.Header().Set("Content-Type", "application/json")
+		if accountID == "workspace-B" {
+			_, _ = io.WriteString(writer, `{"id":"response-b"}`)
+			return
+		}
+		if len(seen) == 1 {
 			_, _ = io.WriteString(writer, `{"id":"response-a"}`)
 			return
 		}
-		writer.Header().Set("X-Upstream", "bound-unauthorized")
 		writer.WriteHeader(http.StatusUnauthorized)
-		_, _ = io.WriteString(writer, "bound unauthorized")
+		_, _ = io.WriteString(writer, `{"error":{"code":"authentication_error"}}`)
 	}))
 	defer upstream.Close()
+
 	proxy := newTestProxy(t, upstream.URL, accounts)
-	first := doProxyJSON(t, proxy.URL+"/backend-api/prodex/responses", `{}`, nil)
+	first := doProxyJSON(t, proxy.URL+"/backend-api/prodex/responses", "{}", nil)
 	_ = first.Body.Close()
-	second := doProxyJSON(t, proxy.URL+"/backend-api/prodex/responses", `{"previous_response_id":"response-a"}`, nil)
-	body, err := io.ReadAll(second.Body)
-	_ = second.Body.Close()
+
+	signal := doProxyJSON(t, proxy.URL+"/backend-api/prodex/responses",
+		`{"previous_response_id":"response-a","input":[{"type":"function_call_output","call_id":"call-1","output":"done"}]}`, nil)
+	body, err := io.ReadAll(signal.Body)
+	_ = signal.Body.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if second.StatusCode != http.StatusUnauthorized || string(body) != "bound unauthorized" || second.Header.Get("X-Upstream") != "bound-unauthorized" {
-		t.Fatalf("bound response = status %d, body %q, header %q", second.StatusCode, body, second.Header.Get("X-Upstream"))
+	if signal.StatusCode != http.StatusBadRequest ||
+		!strings.Contains(string(body), "previous_response_not_found") ||
+		!strings.Contains(string(body), "Previous response was not found. Retrying the full request.") {
+		t.Fatalf("full-context signal = status %d body %q", signal.StatusCode, body)
+	}
+
+	replay := doProxyJSON(t, proxy.URL+"/backend-api/prodex/responses",
+		`{"input":[{"role":"user","content":"original"},{"role":"assistant","content":"answer"},{"role":"user","content":"continue"}]}`, nil)
+	replayBody, err := io.ReadAll(replay.Body)
+	_ = replay.Body.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replay.StatusCode != http.StatusOK || !strings.Contains(string(replayBody), "response-b") {
+		t.Fatalf("full-context replay = status %d body %q", replay.StatusCode, replayBody)
+	}
+	if strings.Join(seen, ",") != "workspace-A,workspace-A,workspace-B" {
+		t.Fatalf("auth recovery owner trace = %#v", seen)
 	}
 }
 
@@ -312,8 +335,8 @@ func TestProxyReturnsLastUnauthorizedAfterRotation(t *testing.T) {
 	if response.StatusCode != http.StatusUnauthorized || string(body) != "unauthorized" || response.Header.Get("X-Upstream") != "unauthorized" {
 		t.Fatalf("response = status %d, body %q, header %q", response.StatusCode, body, response.Header.Get("X-Upstream"))
 	}
-	if calls != len(accounts)*2 {
-		t.Fatalf("upstream attempts = %d, want %d", calls, len(accounts)*2)
+	if calls != len(accounts) {
+		t.Fatalf("upstream attempts = %d, want %d", calls, len(accounts))
 	}
 }
 

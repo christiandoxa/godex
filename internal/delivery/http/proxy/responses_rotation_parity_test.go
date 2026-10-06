@@ -12,28 +12,34 @@ import (
 	"time"
 )
 
-func TestProxyResponsesPassesGeneric429WithoutRotation(t *testing.T) {
+func TestProdex04356ProxyResponsesGeneric429RotatesBeforeCommit(t *testing.T) {
 	accounts := testRuntimeAccounts(t, "A", "token-a", "B", "token-b")
 	var seen []string
 	upstream := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		seen = append(seen, request.Header.Get("Authorization"))
-		writer.WriteHeader(http.StatusTooManyRequests)
-		_, _ = io.WriteString(writer, "Too Many Requests")
+		token := request.Header.Get("Authorization")
+		seen = append(seen, token)
+		if len(seen) == 1 {
+			writer.WriteHeader(http.StatusTooManyRequests)
+			_, _ = io.WriteString(writer, "Too Many Requests")
+			return
+		}
+		writer.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(writer, "recovered")
 	}))
 	defer upstream.Close()
 
 	proxy := newTestProxy(t, upstream.URL, accounts)
-	response := doProxyJSON(t, proxy.URL+"/responses", `{}`, nil)
+	response := doProxyJSON(t, proxy.URL+"/responses", "{}", nil)
 	body, err := io.ReadAll(response.Body)
 	_ = response.Body.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if response.StatusCode != http.StatusTooManyRequests || string(body) != "Too Many Requests" {
-		t.Fatalf("generic 429 = %d %q", response.StatusCode, body)
+	if response.StatusCode != http.StatusOK || string(body) != "recovered" {
+		t.Fatalf("generic 429 recovery = %d %q", response.StatusCode, body)
 	}
-	if !reflect.DeepEqual(seen, []string{"Bearer token-a"}) {
-		t.Fatalf("generic 429 dispatches = %#v", seen)
+	if len(seen) != 2 {
+		t.Fatalf("generic 429 dispatches = %#v, want 2 profiles", seen)
 	}
 }
 

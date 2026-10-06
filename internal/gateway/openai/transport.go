@@ -63,6 +63,29 @@ func (transport *Transport) execute(ctx context.Context, input proxymodel.Reques
 	if err != nil {
 		return nil, err
 	}
+	response, err := transport.executeWithAuth(ctx, input, account, websocket, auth)
+	if err != nil || response.StatusCode != http.StatusUnauthorized {
+		return response, err
+	}
+	reloaded, reloadErr := transport.auth.ReadAuth(ctx, account.Home)
+	if reloadErr != nil || !runtimeAuthChanged(auth, reloaded) {
+		return response, nil
+	}
+	_ = response.Body.Close()
+	return transport.executeWithAuth(ctx, input, account, websocket, reloaded)
+}
+
+func runtimeAuthChanged(previous, current proxymodel.Auth) bool {
+	return previous.AccessToken != current.AccessToken || previous.AccountID != current.AccountID
+}
+
+func (transport *Transport) executeWithAuth(
+	ctx context.Context,
+	input proxymodel.Request,
+	account proxymodel.Account,
+	websocket bool,
+	auth proxymodel.Auth,
+) (*proxymodel.Response, error) {
 	target := *transport.upstream
 	target.Path = upstreamPath(target.Path, input.Path)
 	target.RawPath = upstreamPath(transport.upstream.EscapedPath(), input.RawPath)
