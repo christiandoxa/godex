@@ -18,17 +18,49 @@ import (
 
 	"github.com/christiandoxa/godex/internal/helper/websocketframe"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
+	runtimemodel "github.com/christiandoxa/godex/internal/model/runtime"
 	routingusecase "github.com/christiandoxa/godex/internal/usecase/routing"
 )
 
 const responsesWebSocketTestKey = "dGhlIHNhbXBsZSBub25jZQ=="
 
+type responsesProcessedActivityRecorder struct {
+	mu     sync.Mutex
+	events []runtimemodel.Event
+}
+
+func (recorder *responsesProcessedActivityRecorder) Record(_ context.Context, event runtimemodel.Event) error {
+	recorder.mu.Lock()
+	defer recorder.mu.Unlock()
+	recorder.events = append(recorder.events, event)
+	return nil
+}
+
+func (recorder *responsesProcessedActivityRecorder) event(kind string) *runtimemodel.Event {
+	recorder.mu.Lock()
+	defer recorder.mu.Unlock()
+	for _, current := range recorder.events {
+		if current.Kind == kind {
+			copy := current
+			if current.Fields != nil {
+				copy.Fields = make(map[string]string, len(current.Fields))
+				for key, value := range current.Fields {
+					copy.Fields[key] = value
+				}
+			}
+			return &copy
+		}
+	}
+	return nil
+}
+
 type responsesPublicGateway struct {
-	mu       sync.Mutex
-	accounts []string
-	bodies   []string
-	sessions []uint64
-	closed   chan uint64
+	mu         sync.Mutex
+	accounts   []string
+	bodies     []string
+	sessions   []uint64
+	requestIDs []uint64
+	closed     chan uint64
 }
 
 func (gateway *responsesPublicGateway) Execute(
@@ -47,6 +79,7 @@ func (gateway *responsesPublicGateway) ExecuteWebSocketMessage(
 	gateway.accounts = append(gateway.accounts, account.ID)
 	gateway.bodies = append(gateway.bodies, string(request.Body))
 	gateway.sessions = append(gateway.sessions, request.WebSocketSessionID)
+	gateway.requestIDs = append(gateway.requestIDs, request.RequestID)
 	gateway.mu.Unlock()
 
 	responseID := fmt.Sprintf("resp-%d", index)
@@ -161,7 +194,9 @@ func TestPublicResponsesWebSocketRoutesMessagesThroughCommittedOwners(t *testing
 
 func TestPublicResponsesWebSocketAbsorbsResponseProcessedMessages(t *testing.T) {
 	gateway := &responsesPublicGateway{closed: make(chan uint64, 1)}
+	recorder := &responsesProcessedActivityRecorder{}
 	proxy := newResponsesPublicProxy(t, gateway)
+	proxy.activity = recorder
 	server := httptest.NewServer(proxy.server.Handler)
 	defer server.Close()
 
@@ -172,23 +207,43 @@ func TestPublicResponsesWebSocketAbsorbsResponseProcessedMessages(t *testing.T) 
 		t.Fatalf("handshake status = %d", status)
 	}
 
-	processed := []byte(`{"type":"response.processed","response_id":"resp-processed"}`)
 	create := []byte(`{"type":"response.create","response":{}}`)
-	frames := append(protocolClientFrame(1, true, processed, true), protocolClientFrame(1, true, create, true)...)
-	if _, err := connection.Write(frames); err != nil {
+	if _, err := connection.Write(protocolClientFrame(1, true, create, true)); err != nil {
 		t.Fatal(err)
 	}
 	_ = connection.SetReadDeadline(time.Now().Add(time.Second))
 	if got := readResponsesPublicTextFrame(t, reader); !strings.Contains(got, `"id":"resp-1"`) {
-		t.Fatalf("create response = %q", got)
+		t.Fatalf("first create response = %q", got)
+	}
+
+	processed := []byte(`{"type":"response.processed","response_id":"resp-processed"}`)
+	second := []byte(`{"type":"response.create","response":{}}`)
+	frames := append(protocolClientFrame(1, true, processed, true), protocolClientFrame(1, true, second, true)...)
+	if _, err := connection.Write(frames); err != nil {
+		t.Fatal(err)
+	}
+	if got := readResponsesPublicTextFrame(t, reader); !strings.Contains(got, `"id":"resp-2"`) {
+		t.Fatalf("second create response = %q", got)
 	}
 
 	gateway.mu.Lock()
-	calls := len(gateway.bodies)
 	bodies := append([]string(nil), gateway.bodies...)
+	sessions := append([]uint64(nil), gateway.sessions...)
+	requestIDs := append([]uint64(nil), gateway.requestIDs...)
 	gateway.mu.Unlock()
-	if calls != 1 || len(bodies) != 1 || bodies[0] != string(create) {
-		t.Fatalf("processed message reached gateway: calls=%d bodies=%q", calls, bodies)
+	if len(bodies) != 2 || bodies[0] != string(create) || bodies[1] != string(second) ||
+		len(sessions) != 2 || sessions[0] == 0 || sessions[0] != sessions[1] ||
+		len(requestIDs) != 2 || requestIDs[0] == 0 || requestIDs[1] != requestIDs[0]+2 {
+		t.Fatalf("processed message changed upstream flow: bodies=%q sessions=%v requestIDs=%v",
+			bodies, sessions, requestIDs)
+	}
+	event := recorder.event("response_processed_absorbed")
+	if event == nil || event.AccountID != "account-a" ||
+		event.Fields["response_id"] != "resp-processed" ||
+		event.Fields["message_request_id"] == "" ||
+		event.Fields["websocket_session"] == "" ||
+		event.Fields["reason"] != "removed_upstream_codex_0_138" {
+		t.Fatalf("response.processed runtime event = %#v", event)
 	}
 }
 

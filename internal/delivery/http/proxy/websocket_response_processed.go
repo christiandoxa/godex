@@ -1,10 +1,21 @@
 package proxy
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+)
 
-func isResponseProcessedMessage(payload []byte) bool {
+func responseProcessedMessage(payload []byte) (string, bool) {
 	var message struct {
-		Type string `json:"type"`
+		Type       string `json:"type"`
+		ResponseID string `json:"response_id"`
 	}
-	return json.Unmarshal(payload, &message) == nil && message.Type == "response.processed"
+	if json.Unmarshal(payload, &message) != nil || message.Type != "response.processed" {
+		return "", false
+	}
+	responseID := strings.TrimSpace(message.ResponseID)
+	if responseID == "" {
+		responseID = "-"
+	}
+	return responseID, true
 }

@@ -5,8 +5,10 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strconv"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
+	runtimemodel "github.com/christiandoxa/godex/internal/model/runtime"
 )
 
 func (proxy *Proxy) forwardResponsesWebSocket(
@@ -68,7 +70,19 @@ func (proxy *Proxy) forwardResponsesWebSocket(
 			}
 			continue
 		}
-		if isResponseProcessedMessage(payload) {
+		messageRequestID := proxy.sequence.Add(1)
+		if responseID, processed := responseProcessedMessage(payload); processed {
+			proxy.recordActivity(context.WithoutCancel(sessionContext), runtimemodel.Event{
+				Kind:      "response_processed_absorbed",
+				Path:      request.URL.Path,
+				AccountID: activity.accountID,
+				Fields: map[string]string{
+					"message_request_id": strconv.FormatUint(messageRequestID, 10),
+					"websocket_session":  strconv.FormatUint(sessionID, 10),
+					"response_id":        responseID,
+					"reason":             "removed_upstream_codex_0_138",
+				},
+			})
 			continue
 		}
 
@@ -90,7 +104,7 @@ func (proxy *Proxy) forwardResponsesWebSocket(
 		payload = smart.Body
 
 		forwarded, err := proxy.router.Forward(sessionContext, proxymodel.Request{
-			RequestID:          proxy.sequence.Add(1),
+			RequestID:          messageRequestID,
 			Method:             request.Method,
 			Path:               request.URL.Path,
 			RawPath:            request.URL.EscapedPath(),
