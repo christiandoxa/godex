@@ -51,6 +51,9 @@ func NewRuntimeTransportWithOptions(apiURL, apiKey string, options RequestOption
 	if options.SSELookaheadTimeout <= 0 {
 		options.SSELookaheadTimeout = defaultSSELookaheadTimeout
 	}
+	if options.StreamIdleTimeout <= 0 {
+		options.StreamIdleTimeout = defaultSSEStreamIdleTimeout
+	}
 	betaUpstream, err := validateRuntimeURL(options.BetaBaseURL)
 	if err != nil {
 		return nil, err
@@ -227,7 +230,7 @@ func (transport *RuntimeTransport) inspectNativePrecommit(
 	}
 	state.committed = true
 	upstreamBody := response.Body
-	replayed, firstEvent, err := peekAnthropicFirstEvent(ctx, upstreamBody, transport.options.SSELookaheadTimeout)
+	replayed, firstEvent, err := peekAnthropicFirstEvent(ctx, upstreamBody, transport.options.SSELookaheadTimeout, transport.options.StreamIdleTimeout)
 	response.Body = replayed
 	if ctx.Err() != nil {
 		_ = upstreamBody.Close()

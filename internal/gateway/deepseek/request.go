@@ -17,6 +17,7 @@ type RequestOptions struct {
 	WebSearchMode       string
 	BetaBaseURL         string
 	SSELookaheadTimeout time.Duration
+	StreamIdleTimeout   time.Duration
 }
 
 type translatedRequestParts struct {

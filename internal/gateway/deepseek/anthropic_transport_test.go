@@ -271,7 +271,7 @@ func TestDeepSeekNativeMessagesRetriesOnlyBeforeFirstStreamEvent(t *testing.T) {
 			}
 		}))
 		defer server.Close()
-		transport, err := NewRuntimeTransportWithOptions(server.URL, "fixture-key", RequestOptions{WebSearchMode: "auto"}, server.Client())
+		transport, err := NewRuntimeTransportWithOptions(server.URL, "fixture-key", RequestOptions{WebSearchMode: "auto", StreamIdleTimeout: 250 * time.Millisecond}, server.Client())
 		if err != nil {
 			t.Fatal(err)
 		}

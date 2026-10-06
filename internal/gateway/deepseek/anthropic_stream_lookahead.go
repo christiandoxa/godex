@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	defaultSSELookaheadTimeout = time.Second
-	sseLookaheadMaxBytes       = 8 << 10
+	defaultSSELookaheadTimeout  = time.Second
+	defaultSSEStreamIdleTimeout = 5 * time.Minute
+	sseLookaheadMaxBytes        = 8 << 10
 )
 
 type anthropicReadResult struct {
@@ -22,11 +23,12 @@ type anthropicReadResult struct {
 
 // One reader carries inspected bytes and its live read into the committed stream.
 type anthropicReadAhead struct {
-	source    io.ReadCloser
-	results   chan anthropicReadResult
-	stop      chan struct{}
-	closeOnce sync.Once
-	closeErr  error
+	source      io.ReadCloser
+	results     chan anthropicReadResult
+	stop        chan struct{}
+	closeOnce   sync.Once
+	closeErr    error
+	idleTimeout time.Duration
 }
 
 type anthropicLookaheadBody struct {
@@ -37,11 +39,14 @@ type anthropicLookaheadBody struct {
 	terminal   bool
 }
 
-func peekAnthropicFirstEvent(ctx context.Context, body io.ReadCloser, timeout time.Duration) (io.ReadCloser, []byte, error) {
+func peekAnthropicFirstEvent(ctx context.Context, body io.ReadCloser, timeout, idleTimeout time.Duration) (io.ReadCloser, []byte, error) {
 	if timeout <= 0 {
 		timeout = defaultSSELookaheadTimeout
 	}
-	ahead := newAnthropicReadAhead(body)
+	if idleTimeout <= 0 {
+		idleTimeout = defaultSSEStreamIdleTimeout
+	}
+	ahead := newAnthropicReadAhead(body, idleTimeout)
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 	decoder := sse.NewDecoder(nativeMessagesMaxBytes)
@@ -92,9 +97,12 @@ func peekAnthropicFirstEvent(ctx context.Context, body io.ReadCloser, timeout ti
 	return &anthropicLookaheadBody{ahead: ahead, prefix: prefix}, nil, nil
 }
 
-func newAnthropicReadAhead(source io.ReadCloser) *anthropicReadAhead {
+func newAnthropicReadAhead(source io.ReadCloser, idleTimeout time.Duration) *anthropicReadAhead {
+	if idleTimeout <= 0 {
+		idleTimeout = defaultSSEStreamIdleTimeout
+	}
 	ahead := &anthropicReadAhead{
-		source: source, results: make(chan anthropicReadResult), stop: make(chan struct{}),
+		source: source, results: make(chan anthropicReadResult), stop: make(chan struct{}), idleTimeout: idleTimeout,
 	}
 	go func() {
 		defer close(ahead.results)
@@ -143,13 +151,33 @@ func (body *anthropicLookaheadBody) Read(buffer []byte) (int, error) {
 			body.terminal = true
 			return 0, body.pendingErr
 		}
-		result, ok := <-body.ahead.results
-		if !ok {
-			return 0, io.EOF
+		timer := time.NewTimer(body.ahead.idleTimeout)
+		select {
+		case result, ok := <-body.ahead.results:
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+			if !ok {
+				return 0, io.EOF
+			}
+			body.buffered, body.pendingErr = result.data, result.err
+		case <-timer.C:
+			_ = body.ahead.Close()
+			body.terminal = true
+			body.pendingErr = &streamIdleTimeoutError{}
+			return 0, body.pendingErr
 		}
-		body.buffered, body.pendingErr = result.data, result.err
 	}
 }
+
+type streamIdleTimeoutError struct{}
+
+func (*streamIdleTimeoutError) Error() string   { return "runtime upstream stream idle timed out" }
+func (*streamIdleTimeoutError) Timeout() bool   { return true }
+func (*streamIdleTimeoutError) Temporary() bool { return true }
 
 func (ahead *anthropicReadAhead) Close() error {
 	ahead.closeOnce.Do(func() {
