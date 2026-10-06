@@ -81,6 +81,9 @@ func New(
 }
 
 func (app *App) Run(ctx context.Context, arguments []string) error {
+	if handled, err := printPublicCommandHelp(app.out, arguments); handled {
+		return err
+	}
 	app.showUpdateNotice(ctx, arguments)
 	if len(arguments) == 0 {
 		return app.runRuntime(ctx, nil)
@@ -321,6 +324,9 @@ func (app *App) showUpdateNotice(ctx context.Context, arguments []string) {
 }
 
 func shouldShowUpdateNotice(arguments []string) bool {
+	if publicHelpRequested(arguments) {
+		return false
+	}
 	runtimeArguments := arguments
 	if len(runtimeArguments) > 0 && runtimeArguments[0] == "run" {
 		runtimeArguments = runtimeArguments[1:]

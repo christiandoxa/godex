@@ -42,6 +42,96 @@ func TestDispatcherVersion(t *testing.T) {
 	}
 }
 
+func TestProdex04356PublicCommandHelpIsSuccessfulAndDependencyFree(t *testing.T) {
+	tests := []struct {
+		arguments []string
+		usage     string
+	}{
+		{[]string{"profile", "--help"}, "Usage: godex profile"},
+		{[]string{"profile", "add", "--help"}, "Usage: godex profile add"},
+		{[]string{"profile", "export", "--help"}, "Usage: godex profile export"},
+		{[]string{"profile", "import", "--help"}, "Usage: godex profile import"},
+		{[]string{"profile", "import-current", "--help"}, "Usage: godex profile import-current"},
+		{[]string{"profile", "list", "--help"}, "Usage: godex profile list"},
+		{[]string{"profile", "remove", "--help"}, "Usage: godex profile remove"},
+		{[]string{"profile", "use", "--help"}, "Usage: godex profile use"},
+		{[]string{"session", "--help"}, "Usage: godex session"},
+		{[]string{"session", "list", "--help"}, "Usage: godex session list"},
+		{[]string{"session", "current", "--help"}, "Usage: godex session current"},
+		{[]string{"session", "resume", "--help"}, "Usage: godex session resume"},
+		{[]string{"ping", "--help"}, "Usage: godex ping"},
+		{[]string{"ping", "openai", "--help"}, "Usage: godex ping openai"},
+		{[]string{"login", "--help"}, "Usage: godex login"},
+		{[]string{"logout", "--help"}, "Usage: godex logout"},
+		{[]string{"quota", "--help"}, "Usage: godex quota"},
+		{[]string{"redeem", "--help"}, "Usage: godex redeem"},
+		{[]string{"status", "--help"}, "Usage: godex status"},
+		{[]string{"info", "--help"}, "Usage: godex info"},
+		{[]string{"log", "--help"}, "Usage: godex log"},
+		{[]string{"doctor", "--help"}, "Usage: godex doctor"},
+		{[]string{"gateway", "--help"}, "Usage: godex gateway"},
+		{[]string{"update", "--help"}, "Usage: godex update"},
+		{[]string{"current", "--help"}, "Usage: godex current"},
+		{[]string{"use", "--help"}, "Usage: godex use"},
+		{[]string{"run", "--help"}, "Usage: godex run"},
+		{[]string{"super", "--help"}, "Usage: godex super"},
+	}
+
+	for _, test := range tests {
+		t.Run(strings.Join(test.arguments, "_"), func(t *testing.T) {
+			var output bytes.Buffer
+			app := New(nil, nil, nil, nil, nil, nil, &output)
+			if err := app.Run(t.Context(), test.arguments); err != nil {
+				t.Fatalf("help error = %v", err)
+			}
+			if !strings.Contains(output.String(), test.usage) {
+				t.Fatalf("help missing %q: %q", test.usage, output.String())
+			}
+		})
+	}
+}
+
+func TestProdex04356ClapStyleHelpPathsResolveWithoutDependencies(t *testing.T) {
+	for _, test := range []struct {
+		arguments []string
+		usage     string
+	}{
+		{[]string{"help", "profile", "add"}, "Usage: godex profile add"},
+		{[]string{"profile", "help", "export"}, "Usage: godex profile export"},
+		{[]string{"session", "help", "list"}, "Usage: godex session list"},
+		{[]string{"ping", "help", "openai"}, "Usage: godex ping openai"},
+	} {
+		var output bytes.Buffer
+		app := New(nil, nil, nil, nil, nil, nil, &output)
+		if err := app.Run(t.Context(), test.arguments); err != nil {
+			t.Fatalf("%#v: %v", test.arguments, err)
+		}
+		if !strings.Contains(output.String(), test.usage) {
+			t.Fatalf("%#v missing %q: %q", test.arguments, test.usage, output.String())
+		}
+	}
+}
+
+func TestProdex04356PublicHelpNeverChecksForUpdates(t *testing.T) {
+	for _, arguments := range [][]string{
+		{"profile", "--help"},
+		{"session", "list", "--help"},
+		{"quota", "--help"},
+		{"redeem", "--help"},
+		{"status", "--help"},
+		{"doctor", "--help"},
+		{"gateway", "--help"},
+		{"login", "--help"},
+		{"logout", "--help"},
+		{"run", "--help"},
+		{"super", "--help"},
+	} {
+		if shouldShowUpdateNotice(arguments) {
+			t.Fatalf("help %#v unexpectedly checks for updates", arguments)
+		}
+	}
+}
+
 func TestDispatcherPassesUnknownCommandToCodex(t *testing.T) {
 	accounts := dispatcherAccounts{}
 	process := &dispatcherProcess{}

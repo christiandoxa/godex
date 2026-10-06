@@ -104,7 +104,7 @@ Notes:
   Child flags after the Codex command boundary are forwarded to Codex.
 `
 
-func printRunHelp(out io.Writer) error {
+func PrintRunHelp(out io.Writer) error {
 	if out == nil {
 		return fmt.Errorf("run help output is not configured")
 	}
@@ -112,7 +112,7 @@ func printRunHelp(out io.Writer) error {
 	return err
 }
 
-func printSuperHelp(out io.Writer) error {
+func PrintSuperHelp(out io.Writer) error {
 	if out == nil {
 		return fmt.Errorf("Super help output is not configured")
 	}
@@ -120,7 +120,7 @@ func printSuperHelp(out io.Writer) error {
 	return err
 }
 
-func runHelpRequested(arguments []string) bool {
+func RunHelpRequested(arguments []string) bool {
 	selection := runtimemodel.Selection{}
 	features := runtimeFeatures{}
 	for index := 0; index < len(arguments); {
@@ -140,7 +140,7 @@ func runHelpRequested(arguments []string) bool {
 	return false
 }
 
-func superHelpRequested(arguments []string) bool {
+func SuperHelpRequested(arguments []string) bool {
 	options := superOptions{}
 	arguments = rewriteSuperProviderAlias(arguments)
 	tailMode := false

@@ -81,8 +81,8 @@ func Super(ctx context.Context, out io.Writer, arguments []string) error {
 }
 
 func superWithToolLookup(_ context.Context, out io.Writer, arguments []string, lookup superToolLookup) error {
-	if superHelpRequested(arguments) {
-		return printSuperHelp(out)
+	if SuperHelpRequested(arguments) {
+		return PrintSuperHelp(out)
 	}
 	options, err := parseSuperArguments(arguments)
 	if err != nil {
@@ -122,8 +122,8 @@ func superProfilesWithToolLookup(
 	arguments []string,
 	lookup superToolLookup,
 ) error {
-	if superHelpRequested(arguments) {
-		return printSuperHelp(out)
+	if SuperHelpRequested(arguments) {
+		return PrintSuperHelp(out)
 	}
 	options, err := parseSuperArguments(arguments)
 	if err != nil {
