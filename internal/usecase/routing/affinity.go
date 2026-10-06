@@ -63,6 +63,10 @@ type bindingRepository interface {
 	AcquireConversation(context.Context) (func() error, error)
 }
 
+type verifiedBindingRepository interface {
+	MergeVerified(context.Context, []routingentity.Binding) ([]routingentity.Binding, error)
+}
+
 type affinityStore struct {
 	repository bindingRepository
 	mu         sync.Mutex
@@ -115,6 +119,9 @@ func (store *affinityStore) ownerLocked(keys affinityKeys) (string, error) {
 		if !ok {
 			continue
 		}
+		if binding.accountID == routingentity.ConflictAccountID {
+			return "", errors.New("request contains conflicting account affinity")
+		}
 		if owner != "" && owner != binding.accountID {
 			return "", errors.New("request contains conflicting account affinity")
 		}
@@ -141,6 +148,50 @@ func (store *affinityStore) remember(ctx context.Context, accountID string, keys
 		return err
 	}
 	store.refreshLocked(accountID, keyValues, now)
+	store.pruneLocked(now)
+	return nil
+}
+
+func (store *affinityStore) rememberVerified(ctx context.Context, accountID string, keys affinityKeys, now time.Time) error {
+	if strings.TrimSpace(accountID) == "" {
+		return errors.New("cannot bind verified affinity without an account")
+	}
+	keyValues := keys.values()
+	if len(keyValues) == 0 {
+		return nil
+	}
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	store.pruneLocked(now)
+	if err := store.loadMissingLocked(ctx, keys, now); err != nil {
+		return err
+	}
+	if repository, ok := store.repository.(verifiedBindingRepository); ok {
+		updates := make([]routingentity.Binding, 0, len(keys.entries()))
+		for _, entry := range keys.entries() {
+			updates = append(updates, routingentity.Binding{
+				Key: entry.Key, Kind: entry.Kind, AccountID: accountID, UpdatedUnix: now.Unix(),
+			})
+		}
+		bindings, err := repository.MergeVerified(ctx, updates)
+		if err != nil {
+			return err
+		}
+		store.loadLocked(bindings, keyValues, now)
+		return nil
+	}
+	for _, key := range keyValues {
+		current, exists := store.values[key]
+		owner := accountID
+		if exists && current.accountID != accountID {
+			owner = routingentity.ConflictAccountID
+		}
+		if current.accountID == routingentity.ConflictAccountID {
+			owner = routingentity.ConflictAccountID
+		}
+		store.sequence++
+		store.values[key] = affinityValue{accountID: owner, expires: now.Add(affinityTTL), sequence: store.sequence}
+	}
 	store.pruneLocked(now)
 	return nil
 }

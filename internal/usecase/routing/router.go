@@ -336,7 +336,7 @@ func (router *Router) bindSuccessfulResponse(
 			}
 		}
 		now := router.now()
-		if err := router.affinity.remember(ctx, result.AccountID, keys, now); err != nil {
+		if err := router.affinity.rememberVerified(ctx, result.AccountID, keys, now); err != nil {
 			return err
 		}
 		router.affinity.rememberResponseTurnStateForHome(
@@ -350,7 +350,7 @@ func (router *Router) bindSuccessfulResponse(
 			keys.turn = turnState
 		}
 		now := router.now()
-		if err := router.affinity.remember(ctx, result.AccountID, keys, now); err != nil {
+		if err := router.affinity.rememberVerified(ctx, result.AccountID, keys, now); err != nil {
 			return err
 		}
 		router.affinity.rememberResponseTurnStateForHome(
@@ -367,7 +367,7 @@ func (router *Router) bindSuccessfulResponse(
 		}
 		result.Prefix = prefix
 	}
-	if err := router.affinity.remember(ctx, result.AccountID, keys, router.now()); err != nil {
+	if err := router.affinity.rememberVerified(ctx, result.AccountID, keys, router.now()); err != nil {
 		result.Response.Body.Close()
 		return err
 	}
@@ -399,7 +399,7 @@ func (router *Router) bindSuccessfulResponse(
 func (router *Router) Observe(ctx context.Context, accountID string, headers http.Header, body []byte, stream bool) error {
 	keys := responseAffinity(headers, body, stream)
 	now := router.now()
-	if err := router.affinity.remember(ctx, accountID, keys, now); err != nil {
+	if err := router.affinity.rememberVerified(ctx, accountID, keys, now); err != nil {
 		return err
 	}
 	router.affinity.rememberResponseTurnState(keys.previous, accountID, keys.turn, now)

@@ -72,6 +72,64 @@ func (store *Store) Merge(ctx context.Context, updates []routingentity.Binding) 
 	return values, nil
 }
 
+func (store *Store) MergeVerified(ctx context.Context, updates []routingentity.Binding) ([]routingentity.Binding, error) {
+	if err := store.prepare(); err != nil {
+		return nil, err
+	}
+	release, err := lockfile.Acquire(ctx, filepath.Join(store.root, "routing.guard"))
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	current, err := store.read()
+	if err != nil {
+		return nil, err
+	}
+	values, err := mergeVerifiedBindingValues(current, updates)
+	if err != nil {
+		return nil, err
+	}
+	values, err = normalizeBindingValues(values)
+	if err != nil {
+		return nil, err
+	}
+	if err := store.write(values); err != nil {
+		return nil, err
+	}
+	return values, nil
+}
+
+func mergeVerifiedBindingValues(current, updates []routingentity.Binding) ([]routingentity.Binding, error) {
+	byKey := make(map[string]routingentity.Binding, len(current)+len(updates))
+	for _, binding := range current {
+		byKey[binding.Key] = binding
+	}
+	for _, binding := range updates {
+		if err := binding.Validate(); err != nil {
+			return nil, err
+		}
+		if old, ok := byKey[binding.Key]; ok && old.AccountID != binding.AccountID {
+			if old.AccountID == routingentity.ConflictAccountID {
+				if binding.UpdatedUnix > old.UpdatedUnix {
+					old.UpdatedUnix = binding.UpdatedUnix
+				}
+				byKey[binding.Key] = old
+				continue
+			}
+			binding.AccountID = routingentity.ConflictAccountID
+			if old.UpdatedUnix > binding.UpdatedUnix {
+				binding.UpdatedUnix = old.UpdatedUnix
+			}
+		}
+		byKey[binding.Key] = binding
+	}
+	values := make([]routingentity.Binding, 0, len(byKey))
+	for _, binding := range byKey {
+		values = append(values, binding)
+	}
+	return values, nil
+}
+
 func mergeBindingValues(current, updates []routingentity.Binding) ([]routingentity.Binding, error) {
 	byKey := make(map[string]routingentity.Binding, len(current)+len(updates))
 	for _, binding := range current {

@@ -19,46 +19,56 @@ func (router *Router) recoverInvalidPreviousResponse(
 	account proxymodel.Account,
 	response *proxymodel.Response,
 	keys *affinityKeys,
-) (*proxymodel.Response, bool, error) {
+) (*proxymodel.Response, bool, bool, error) {
 	if response == nil || request.WebSocketMessage || externalProviderKind(account.Provider.Kind) ||
 		!inspectablePreviousResponse(response) {
-		return response, false, nil
+		return response, false, false, nil
 	}
 	previous := requestPreviousResponseID(request.Body)
 	if previous == "" {
-		return response, false, nil
+		return response, false, false, nil
 	}
 	outcome, pending, err := router.classify(response, account.Provider.Kind)
 	if err != nil {
 		restoreResponsePrefix(response, pending)
-		return response, false, nil
+		return response, false, false, nil
 	}
 	if outcome.previousResponseNotFound {
-		if err := router.notePreviousResponseNotFound(ctx, account, previous, request.QuotaSelection, keys); err != nil {
-			pending.close()
-			return nil, false, err
+		response, outcome, pending, rotate, err := router.handleResponsesPreviousResponseNotFound(
+			ctx, request, account, response, outcome, pending, keys,
+		)
+		if err != nil {
+			return nil, false, false, err
+		}
+		if rotate {
+			restoreResponsePrefix(response, pending)
+			return response, true, true, nil
+		}
+		if !outcome.invalidPreviousResponseID {
+			restoreResponsePrefix(response, pending)
+			return response, outcome.failed, false, nil
 		}
 	}
 	if !outcome.invalidPreviousResponseID {
 		restoreResponsePrefix(response, pending)
-		return response, outcome.failed, nil
+		return response, outcome.failed, false, nil
 	}
 	if request.QuotaSelection.RouteKind != quotamodel.RouteKindResponses {
 		restoreResponsePrefix(response, pending)
-		return response, true, nil
+		return response, true, false, nil
 	}
 	owner, err := router.affinity.owner(ctx, affinityKeys{previous: previous}, router.now())
 	if err != nil {
 		pending.close()
-		return nil, false, fmt.Errorf("check previous response owner: %w", err)
+		return nil, false, false, fmt.Errorf("check previous response owner: %w", err)
 	}
 	if owner != account.ID {
 		restoreResponsePrefix(response, pending)
-		return response, true, nil
+		return response, true, false, nil
 	}
 	if err := router.affinity.forgetDeadResponse(ctx, previous, owner, account.Home); err != nil {
 		pending.close()
-		return nil, false, err
+		return nil, false, false, err
 	}
 	if keys != nil {
 		keys.previous = ""
@@ -67,29 +77,29 @@ func (router *Router) recoverInvalidPreviousResponse(
 	retry, ok := fullHistoryRecoveryRequest(request)
 	if !ok {
 		restoreResponsePrefix(response, pending)
-		return response, true, nil
+		return response, true, false, nil
 	}
 	pending.close()
 	retried, err := router.execute(ctx, retry, account)
 	if err != nil {
-		return nil, false, err
+		return nil, false, false, err
 	}
 	if !inspectablePreviousResponse(retried) {
-		return retried, false, nil
+		return retried, false, false, nil
 	}
 	retryOutcome, retryPending, err := router.classify(retried, account.Provider.Kind)
 	if err != nil {
 		restoreResponsePrefix(retried, retryPending)
-		return retried, false, nil
+		return retried, false, false, nil
 	}
 	if retryOutcome.previousResponseNotFound {
 		if err := router.notePreviousResponseNotFound(ctx, account, previous, request.QuotaSelection, keys); err != nil {
 			retryPending.close()
-			return nil, false, err
+			return nil, false, false, err
 		}
 	}
 	restoreResponsePrefix(retried, retryPending)
-	return retried, retryOutcome.failed, nil
+	return retried, retryOutcome.failed, false, nil
 }
 
 func inspectablePreviousResponse(response *proxymodel.Response) bool {

@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	websocketStaleContinuationMessage = "Upstream no longer recognizes this conversation chain before output started. Retry from the last user message or restart the Codex turn; Prodex will not send a fresh request without the missing context."
+	staleContinuationMessage          = "Upstream no longer recognizes this conversation chain before output started. Retry from the last user message or restart the Codex turn; Prodex will not send a fresh request without the missing context."
+	websocketStaleContinuationMessage = staleContinuationMessage
 	websocketFailureMessageMaxBytes   = 64 << 20
 )
 

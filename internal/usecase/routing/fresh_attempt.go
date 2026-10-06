@@ -41,7 +41,7 @@ func (router *Router) tryFreshCandidates(
 			if pending.firstEventRetry {
 				*firstEventRetryUsed = true
 			}
-			if pending.authFailure || pending.quota {
+			if pending.authFailure || pending.quota || pending.previousResponseNotFound {
 				retryable[account.ID] = false
 			}
 			sawTransient = sawTransient || pending.transient
@@ -202,6 +202,22 @@ func (router *Router) freshAttempt(
 		}
 		return nil, nil, false, &proxymodel.Error{StatusCode: 502, Message: "upstream response failed before commitment"}
 	}
+	if outcome.previousResponseNotFound && request.QuotaSelection.RouteKind == quotamodel.RouteKindResponses {
+		keys := requestRoutingAffinity(request)
+		var rotate bool
+		var recoveryErr error
+		response, outcome, pending, rotate, recoveryErr = router.handleResponsesPreviousResponseNotFound(
+			ctx, request, account, response, outcome, pending, &keys,
+		)
+		if recoveryErr != nil {
+			return nil, nil, false, recoveryErr
+		}
+		if rotate {
+			pending.accountID = account.ID
+			pending.previousResponseNotFound = true
+			return nil, pending, false, nil
+		}
+	}
 	if outcome.kind == responsePass {
 		router.clearQuotaBlocked(account.ID)
 		router.recordRouteOutcome(ctx, account.ID, request.QuotaSelection, response, outcome)
@@ -258,6 +274,10 @@ func finishFresh(last **pendingResponse) (proxymodel.Forwarded, error) {
 	*last = nil
 	if pending.response == nil {
 		return proxymodel.Forwarded{}, &proxymodel.Error{StatusCode: 502, Message: "all eligible accounts failed before upstream response commitment"}
+	}
+	if pending.previousResponseNotFound {
+		pending.close()
+		return proxymodel.Forwarded{Response: staleResponsesContinuationResponse(), AccountID: pending.accountID, Failed: true}, nil
 	}
 	return proxymodel.Forwarded{Response: pending.response, Prefix: pending.prefix, AccountID: pending.accountID, Failed: true}, nil
 }

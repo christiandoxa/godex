@@ -28,9 +28,9 @@ func (router *Router) forwardBound(
 		return proxymodel.Forwarded{}, err
 	}
 	response, err := router.executeWithProfileInflightWait(ctx, request, account, true)
-	failed := false
+	failed, rotatePrevious := false, false
 	if err == nil && !request.WebSocketMessage {
-		response, failed, err = router.recoverInvalidPreviousResponse(ctx, request, account, response, keys)
+		response, failed, rotatePrevious, err = router.recoverInvalidPreviousResponse(ctx, request, account, response, keys)
 	}
 	if err != nil {
 		if ctx.Err() != nil {
@@ -45,6 +45,23 @@ func (router *Router) forwardBound(
 			StatusCode: http.StatusBadGateway,
 			Message:    "conversation owner could not be reached; continuity was preserved",
 		}
+	}
+	if rotatePrevious {
+		if response != nil && response.Body != nil {
+			_ = response.Body.Close()
+		}
+		fallback := previousResponseFallbackAccounts(accounts, account.ID)
+		if len(fallback) == 0 {
+			return proxymodel.Forwarded{Response: staleResponsesContinuationResponse(), AccountID: account.ID, Failed: true}, nil
+		}
+		result, fallbackErr := router.forwardFresh(ctx, request, fallback)
+		if fallbackErr != nil {
+			if ctx.Err() != nil {
+				return proxymodel.Forwarded{}, ctx.Err()
+			}
+			return proxymodel.Forwarded{Response: staleResponsesContinuationResponse(), AccountID: account.ID, Failed: true}, nil
+		}
+		return result, nil
 	}
 	if request.WebSocketMessage {
 		return router.handleBoundWebSocketResponse(ctx, request, accounts, account, response)

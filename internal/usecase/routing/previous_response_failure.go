@@ -65,10 +65,12 @@ func (router *Router) hasPreviousResponseFailure(responseID string, selection qu
 		return false
 	}
 	responseKey := affinityDigest("previous", responseID)
+	now := router.now()
 	router.previousResponseFailureMu.Lock()
 	defer router.previousResponseFailureMu.Unlock()
-	for key := range router.previousResponseFailures {
-		if key.responseKey == responseKey && key.route == route {
+	for key, failure := range router.previousResponseFailures {
+		if key.responseKey == responseKey && key.route == route &&
+			failure.Effective(now) >= routingentity.PreviousResponseFailureThreshold {
 			return true
 		}
 	}
@@ -117,10 +119,11 @@ func (router *Router) notePreviousResponseNotFound(
 	keys *affinityKeys,
 ) error {
 	now := router.now()
-	if router.recordPreviousResponseFailure(ctx, account.ID, responseID, selection, now) <
-		routingentity.PreviousResponseFailureThreshold {
+	failures := router.recordPreviousResponseFailure(ctx, account.ID, responseID, selection, now)
+	if failures < routingentity.PreviousResponseFailureThreshold {
 		return nil
 	}
+	router.bumpRouteBadPairing(ctx, account.ID, selection, 1)
 	releaseKeys := affinityKeys{previous: responseID}
 	if keys != nil {
 		releaseKeys.turn = keys.turn
@@ -218,7 +221,8 @@ func (router *Router) previousResponseFailureAccounts(
 	}
 	eligible := make([]proxymodel.Account, 0, len(accounts))
 	for _, account := range accounts {
-		if router.previousResponseFailureScore(account.ID, responseID, request.QuotaSelection, now) == 0 {
+		if router.previousResponseFailureScore(account.ID, responseID, request.QuotaSelection, now) <
+			routingentity.PreviousResponseFailureThreshold {
 			eligible = append(eligible, account)
 		}
 	}

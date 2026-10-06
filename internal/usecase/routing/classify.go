@@ -32,13 +32,14 @@ type responseOutcome struct {
 }
 
 type pendingResponse struct {
-	response        *proxymodel.Response
-	prefix          []byte
-	accountID       string
-	firstEventRetry bool
-	authFailure     bool
-	quota           bool
-	transient       bool
+	response                 *proxymodel.Response
+	prefix                   []byte
+	accountID                string
+	firstEventRetry          bool
+	authFailure              bool
+	quota                    bool
+	transient                bool
+	previousResponseNotFound bool
 }
 
 func (pending *pendingResponse) close() {

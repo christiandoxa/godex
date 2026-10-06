@@ -7,6 +7,7 @@ import (
 
 const MaxBindings = 8192
 const RetentionSeconds = 30 * 24 * 60 * 60
+const ConflictAccountID = "__prodex_hard_binding_conflict__"
 
 type Binding struct {
 	Kind        string `json:"kind"`
@@ -21,14 +22,19 @@ func (b Binding) Validate() error {
 	default:
 		return errors.New("invalid routing binding kind")
 	}
-	if len(b.Key) != 64 || len(b.AccountID) != 32 {
+	if len(b.Key) != 64 {
 		return errors.New("invalid routing binding")
 	}
 	if _, err := hex.DecodeString(b.Key); err != nil {
 		return errors.New("invalid routing key")
 	}
-	if _, err := hex.DecodeString(b.AccountID); err != nil {
-		return errors.New("invalid routing owner")
+	if b.AccountID != ConflictAccountID {
+		if len(b.AccountID) != 32 {
+			return errors.New("invalid routing binding")
+		}
+		if _, err := hex.DecodeString(b.AccountID); err != nil {
+			return errors.New("invalid routing owner")
+		}
 	}
 	return nil
 }

@@ -17,8 +17,6 @@ import (
 func TestPreviousResponseFailureReleasesAffinityAtThresholdAndExcludesProfile(t *testing.T) {
 	const accountA = "0123456789abcdef0123456789abcdef"
 	const accountB = "fedcba9876543210fedcba9876543210"
-	const body = `{"previous_response_id":"resp-dead","input":[{"role":"user"},{"role":"assistant"},{"role":"user"}],"client_metadata":{"session_id":"session-a"}}`
-	const notFound = `{"error":{"type":"invalid_request_error","code":"previous_response_not_found","message":"previous response not found"}}`
 	now := time.Unix(1_000_000, 0)
 	homeA, homeB := t.TempDir(), t.TempDir()
 	for _, home := range []string{homeA, homeB} {
@@ -27,66 +25,60 @@ func TestPreviousResponseFailureReleasesAffinityAtThresholdAndExcludesProfile(t 
 		}
 	}
 	store := routingrepo.NewStore(t.TempDir())
-	gateway := &responseRecoveryGateway{replies: []responseRecoveryReply{
-		{status: 400, contentType: "application/json", body: notFound},
-		{status: 400, contentType: "application/json", body: notFound},
-		{status: 200, contentType: "application/json", body: `{"id":"resp-new"}`},
-	}}
+	accounts := []proxymodel.Account{
+		{ID: accountA, Home: homeA, Enabled: true},
+		{ID: accountB, Home: homeB, Enabled: true},
+	}
 	router, err := NewRouter(Config{
-		Gateway: gateway, Bindings: store, RoutingState: store, Now: func() time.Time { return now },
+		Bindings: store, RoutingState: store, Now: func() time.Time { return now },
 		Accounts: func(context.Context) ([]proxymodel.Account, error) {
-			return []proxymodel.Account{
-				{ID: accountA, Home: homeA, Enabled: true},
-				{ID: accountB, Home: homeB, Enabled: true},
-			}, nil
+			return append([]proxymodel.Account(nil), accounts...), nil
 		},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	request := responsesRecoveryRequest(body)
-	keys := requestAffinity(request, request.Body)
-	if err := router.affinity.remember(context.Background(), accountA, keys, now); err != nil {
+	keys := affinityKeys{previous: "resp-dead", session: "session-a"}
+	queryKeys := keys
+	if err := router.affinity.remember(t.Context(), accountA, keys, now); err != nil {
 		t.Fatal(err)
 	}
-	router.affinity.rememberResponseTurnStateForHome(context.Background(), keys.previous, accountA, homeA, "turn-a", now)
+	router.affinity.rememberResponseTurnStateForHome(t.Context(), keys.previous, accountA, homeA, "turn-a", now)
+	selection := quotamodel.Selection{RouteKind: quotamodel.RouteKindResponses}
+	account := accounts[0]
 
-	first, err := router.Forward(context.Background(), request)
-	if err != nil {
+	if err := router.notePreviousResponseNotFound(t.Context(), account, "resp-dead", selection, &keys); err != nil {
 		t.Fatal(err)
 	}
-	if err := first.Close(); err != nil {
-		t.Fatal(err)
+	if owner, err := router.affinity.owner(t.Context(), queryKeys, now); err != nil || owner != accountA {
+		t.Fatalf("owner after first miss = %q, %v", owner, err)
 	}
-	if owner, err := router.affinity.owner(context.Background(), keys, now); err != nil || owner != accountA {
-		t.Fatalf("owner after first failure = %q, %v", owner, err)
+	if score := router.previousResponseFailureScore(accountA, "resp-dead", selection, now); score != 1 {
+		t.Fatalf("score after first miss = %d, want 1", score)
 	}
 
-	second, err := router.Forward(context.Background(), request)
-	if err != nil {
+	if err := router.notePreviousResponseNotFound(t.Context(), account, "resp-dead", selection, &keys); err != nil {
 		t.Fatal(err)
 	}
-	if err := second.Close(); err != nil {
-		t.Fatal(err)
+	if owner, err := router.affinity.owner(t.Context(), queryKeys, now); err != nil || owner != "" {
+		t.Fatalf("owner after threshold miss = %q, %v", owner, err)
 	}
-	if owner, err := router.affinity.owner(context.Background(), keys, now); err != nil || owner != "" {
-		t.Fatalf("owner after threshold failure = %q, %v", owner, err)
+	if score := router.previousResponseFailureScore(accountA, "resp-dead", selection, now); score != 2 {
+		t.Fatalf("score after threshold miss = %d, want 2", score)
 	}
-	turnKey := affinityDigest("previous", keys.previous)
+	bad := router.routeMemory[routeMemoryKey{accountID: accountA, route: "responses", kind: routingentity.RouteMemoryBadPairing}].Effective(now)
+	if bad != 1 {
+		t.Fatalf("bad-pairing after threshold miss = %d, want 1", bad)
+	}
+	turnKey := affinityDigest("previous", "resp-dead")
 	if _, err := os.Lstat(filepath.Join(homeA, ".godex-turn-state", turnKey+".json")); !os.IsNotExist(err) {
 		t.Fatalf("stale turn-state sidecar remains: %v", err)
 	}
 
-	third, err := router.Forward(context.Background(), request)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer third.Close()
-	if got := third.Result.AccountID; got != accountB {
-		t.Fatalf("reselected account = %s, want %s", got, accountB)
-	}
-	if len(gateway.accounts) != 3 || gateway.accounts[0] != accountA || gateway.accounts[1] != accountA || gateway.accounts[2] != accountB {
-		t.Fatalf("attempt accounts = %v", gateway.accounts)
+	request := proxymodel.Request{Body: []byte(`{"previous_response_id":"resp-dead"}`), QuotaSelection: selection}
+	ordered := router.requestCandidatesForRequest(accounts, request, now)
+	if len(ordered) != 1 || ordered[0].ID != accountB {
+		t.Fatalf("threshold candidates = %#v", ordered)
 	}
 }
 
@@ -103,6 +95,9 @@ func TestPreviousResponseFailureCandidateExclusionIsRouteScoped(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Unix(1_000_000, 0)
+	router.recordPreviousResponseFailure(context.Background(), "account-a", "resp-route", quotamodel.Selection{
+		RouteKind: quotamodel.RouteKindResponses,
+	}, now)
 	router.recordPreviousResponseFailure(context.Background(), "account-a", "resp-route", quotamodel.Selection{
 		RouteKind: quotamodel.RouteKindResponses,
 	}, now)
