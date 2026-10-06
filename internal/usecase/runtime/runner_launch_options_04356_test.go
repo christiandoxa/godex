@@ -288,3 +288,36 @@ func TestProdex04356RuntimeLaunchOptionsCanDisableAccountRotation(t *testing.T) 
 		t.Fatalf("fixed launch pool = %#v", routed)
 	}
 }
+
+func TestProdex04356RuntimeLaunchOptionsFixProviderCredentialPool(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "home")
+	if err := os.MkdirAll(home, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	process := &fakeProxyProcess{}
+	proxy := &fakeProxy{}
+	var config proxyconfig.Config
+	runner := NewRunner(nil, process, func(got proxyconfig.Config) (Proxy, error) {
+		config = got
+		return proxy, nil
+	})
+	provider := DeepSeekProvider("deepseek-api-key", "")
+	rotate := false
+	if err := runner.RunProviderAPIKeysWithOptions(
+		context.Background(), home, provider, []string{"key-a", "key-b"}, nil,
+		RuntimeLaunchOptions{AllowAutoRotate: &rotate},
+	); err != nil {
+		t.Fatal(err)
+	}
+	routed, err := config.Accounts(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(routed) != 1 || routed[0].ID != config.PreferredAccount {
+		t.Fatalf("fixed provider pool = preferred:%q accounts:%#v", config.PreferredAccount, routed)
+	}
+	if len(config.ProviderCredentials) != 2 {
+		t.Fatalf("credential snapshot should stay complete for gateway setup: %#v", config.ProviderCredentials)
+	}
+}

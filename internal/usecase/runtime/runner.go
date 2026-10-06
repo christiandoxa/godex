@@ -227,6 +227,19 @@ func (runner *Runner) launchHomeWithOptions(
 	if err != nil {
 		return err
 	}
+	if options.AllowAutoRotate != nil && !*options.AllowAutoRotate {
+		fixed := profiles[:0]
+		for _, profile := range profiles {
+			if profile.ID == preferredID {
+				fixed = append(fixed, profile)
+				break
+			}
+		}
+		if len(fixed) == 0 {
+			return errors.New("selected runtime profile is missing from the fixed launch pool")
+		}
+		profiles = fixed
+	}
 	autoRedeem := runner.autoRedeem
 	if options.AutoRedeem != nil {
 		autoRedeem = *options.AutoRedeem
