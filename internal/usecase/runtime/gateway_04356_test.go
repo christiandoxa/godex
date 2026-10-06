@@ -21,7 +21,7 @@ func TestProdex04356GatewayAccountUsesFixedProfileWithoutQuotaPreflight(t *testi
 	})
 	runner.SetUpstreamURL("https://chatgpt.com/backend-api")
 
-	gateway, err := runner.StartGatewayAccount(t.Context(), "one", GatewayStartOptions{ListenAddr: "127.0.0.1:4567"})
+	gateway, err := runner.StartGatewayAccount(t.Context(), "one", GatewayStartOptions{ListenAddr: "127.0.0.1:4567", SmartContextEnabled: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,7 +29,7 @@ func TestProdex04356GatewayAccountUsesFixedProfileWithoutQuotaPreflight(t *testi
 		t.Fatal("gateway proxy was not started")
 	}
 	if config.ListenAddr != "127.0.0.1:4567" || !config.SkipQuotaPreflight || config.AutoRedeem ||
-		config.PreferredAccount != "one" || config.Provider.Kind != "" {
+		config.PreferredAccount != "one" || config.Provider.Kind != "" || !config.SmartContextEnabled {
 		t.Fatalf("gateway config = %#v", config)
 	}
 	got, err := config.Accounts(t.Context())

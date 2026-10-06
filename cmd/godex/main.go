@@ -108,6 +108,7 @@ func run() int {
 		}
 		return proxyhttp.NewProxy(proxyhttp.Config{
 			Router: router, Activity: activity, Broker: config.Broker, ListenAddr: config.ListenAddr,
+			SmartContextEnabled: config.SmartContextEnabled,
 		})
 	})
 	runner := runtimeusecase.NewRunner(store, process, factory)

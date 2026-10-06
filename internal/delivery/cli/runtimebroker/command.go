@@ -113,7 +113,8 @@ func (command *Command) Run(ctx context.Context, input io.Reader) (runErr error)
 	}
 
 	gateway, err := command.runner.StartBrokerGateway(ctx, target.AccountID, runtimeusecase.GatewayStartOptions{
-		ListenAddr: bootstrap.ListenAddr, UpstreamURL: bootstrap.UpstreamBaseURL, Broker: brokerConfig,
+		ListenAddr: bootstrap.ListenAddr, UpstreamURL: bootstrap.UpstreamBaseURL,
+		SmartContextEnabled: bootstrap.SmartContextEnabled, Broker: brokerConfig,
 	})
 	if err != nil {
 		return err

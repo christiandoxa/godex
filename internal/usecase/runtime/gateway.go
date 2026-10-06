@@ -12,9 +12,10 @@ import (
 const gatewayOpenAIMountPath = "/backend-api/godex"
 
 type GatewayStartOptions struct {
-	ListenAddr  string
-	UpstreamURL string
-	Broker      *proxymodel.BrokerConfig
+	ListenAddr          string
+	UpstreamURL         string
+	SmartContextEnabled bool
+	Broker              *proxymodel.BrokerConfig
 }
 
 type Gateway struct {
@@ -222,6 +223,7 @@ func (runner *Runner) startGateway(
 	config := runtimeProxyConfig(ctx, upstream, preferredID, provider, credentials, accounts, false)
 	config.ListenAddr = strings.TrimSpace(options.ListenAddr)
 	config.SkipQuotaPreflight = skipQuotaPreflight
+	config.SmartContextEnabled = options.SmartContextEnabled
 	config.Broker = options.Broker
 	proxy, err := runner.newProxy(config)
 	if err != nil {

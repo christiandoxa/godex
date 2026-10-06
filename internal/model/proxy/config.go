@@ -44,6 +44,7 @@ type Config struct {
 	ProviderCredentials []ProviderCredential
 	AutoRedeem          bool
 	SkipQuotaPreflight  bool
+	SmartContextEnabled bool
 	Broker              *BrokerConfig
 	Accounts            func(context.Context) ([]Account, error)
 }

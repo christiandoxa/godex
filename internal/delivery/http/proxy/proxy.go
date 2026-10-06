@@ -21,6 +21,7 @@ type Config struct {
 	Activity                         activityRecorder
 	Broker                           *proxymodel.BrokerConfig
 	ListenAddr                       string
+	SmartContextEnabled              bool
 	ActiveRequestLimit               int
 	MaxRequestBytes, MaxInspectBytes int64
 }
@@ -35,6 +36,7 @@ type Proxy struct {
 	activity                  activityRecorder
 	broker                    *proxymodel.BrokerConfig
 	brokerLog                 *brokerLiveLog
+	smartContextEnabled       bool
 	admission                 *activeRequestHandler
 	listener                  net.Listener
 	done                      chan struct{}
@@ -64,6 +66,7 @@ func NewProxy(config Config) (*Proxy, error) {
 	proxy := &Proxy{
 		router: config.Router, activity: config.Activity, broker: config.Broker, listenAddr: config.ListenAddr,
 		maxRequest: config.MaxRequestBytes, maxInspect: config.MaxInspectBytes,
+		smartContextEnabled:       config.SmartContextEnabled,
 		tunnels:                   make(map[*websocketTunnel]struct{}),
 		responsesWebSocketTunnels: make(map[*responsesWebSocketTunnel]struct{}),
 	}
@@ -223,6 +226,10 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 			}
 			return
 		}
+		smart := prepareSmartContextHTTPBody(
+			proxy.smartContextEnabled, request.URL.Path, request.Header, body,
+		)
+		body = smart.Body
 	}
 	exchange, err := proxy.router.Forward(request.Context(), proxymodel.Request{
 		RequestID: activity.sequence, Method: request.Method, Path: request.URL.Path,
