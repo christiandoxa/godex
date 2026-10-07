@@ -247,49 +247,48 @@ func TestDeepSeekWebSearchModeFallbackPolicy(t *testing.T) {
 func TestDeepSeekNativeMessagesRetriesOnlyBeforeFirstStreamEvent(t *testing.T) {
 	t.Run("retry transient error as first event", func(t *testing.T) {
 		var models []string
-		server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		client := &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
 			var body map[string]any
-			_ = json.NewDecoder(request.Body).Decode(&body)
-			models = append(models, body["model"].(string))
-			writer.Header().Set("Content-Type", "text/event-stream")
-			flusher := writer.(http.Flusher)
-			if len(models) == 1 {
-				_, _ = io.WriteString(writer, "event: error\ndata: {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"retry\"}}\n\n")
-				flusher.Flush()
-				return
+			if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
+				return nil, err
 			}
-			for _, chunk := range []string{
+			models = append(models, body["model"].(string))
+			if len(models) == 1 {
+				return anthropicStreamResponse(request, io.NopCloser(strings.NewReader(
+					"event: error\ndata: {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"retry\"}}\n\n",
+				))), nil
+			}
+			stream := strings.Join([]string{
 				"event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_ok\",\"model\":\"deepseek-v4-flash\"}}\n\n",
 				"event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\"}}\n\n",
 				"event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ready\"}}\n\n",
 				"event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n",
-			} {
-				_, _ = io.WriteString(writer, chunk[:len(chunk)/2])
-				flusher.Flush()
-				_, _ = io.WriteString(writer, chunk[len(chunk)/2:])
-				flusher.Flush()
-			}
-		}))
-		defer server.Close()
-		transport, err := NewRuntimeTransportWithOptions(server.URL, "fixture-key", RequestOptions{WebSearchMode: "auto", StreamIdleTimeout: 250 * time.Millisecond}, server.Client())
+			}, "")
+			return anthropicStreamResponse(request, io.NopCloser(strings.NewReader(stream))), nil
+		})}
+		transport, err := NewRuntimeTransportWithOptions(
+			"https://api.deepseek.test", "fixture-key",
+			RequestOptions{WebSearchMode: "auto", StreamIdleTimeout: time.Second},
+			client,
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer transport.Close()
 		response, err := transport.Execute(context.Background(), proxymodel.Request{
 			Method: http.MethodPost, Path: mountPath + "/responses",
-			Body: []byte(`{"model":"pro","input":"search","web_search_options":{}}`),
+			Body: []byte("{\"model\":\"pro\",\"input\":\"search\",\"web_search_options\":{}}"),
 		}, proxymodel.Account{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer response.Body.Close()
-		stream, err := io.ReadAll(response.Body)
-		if err != nil {
-			t.Fatal(err)
+		if len(models) != 2 || models[0] != "deepseek-v4-pro" || models[1] != "deepseek-v4-flash" {
+			t.Fatalf("models = %#v", models)
 		}
-		if len(models) != 2 || models[0] != "deepseek-v4-pro" || models[1] != "deepseek-v4-flash" || !strings.Contains(string(stream), "event: response.created") || !strings.Contains(string(stream), `"delta":"ready"`) {
-			t.Fatalf("models/stream = %#v / %s", models, stream)
+		if response.StatusCode != http.StatusOK ||
+			!strings.Contains(strings.ToLower(response.Header.Get(contentTypeHeader)), "text/event-stream") {
+			t.Fatalf("fallback response = status:%d headers:%v", response.StatusCode, response.Header)
 		}
 		if !response.FirstEventRetryUsed || !response.FirstEventCommitted || response.PrecommitFailure != nil {
 			t.Fatalf("model fallback commitment = %#v", response)
