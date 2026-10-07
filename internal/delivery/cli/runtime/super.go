@@ -129,6 +129,10 @@ func superProfilesWithToolLookup(
 	if err != nil {
 		return err
 	}
+	options, err = resolveSuperResumeOptions(ctx, sessions, options)
+	if err != nil {
+		return err
+	}
 	tools, err := resolveSuperTools(options, lookup)
 	if err != nil {
 		return err

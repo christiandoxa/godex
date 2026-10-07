@@ -101,6 +101,21 @@ func TestCollectorRejectsFilesWhenBudgetIsAlreadyUsed(t *testing.T) {
 	}
 }
 
+func TestProdex04356ReaderRemembersLatestTurnModelAndReasoningEffort(t *testing.T) {
+	var report sessionentity.Session
+	for _, line := range []string{
+		`{"timestamp":"2026-04-29T11:59:00Z","type":"session_meta","payload":{"id":"` + threadID + `"}}`,
+		`{"timestamp":"2026-04-29T12:00:00Z","type":"turn_context","payload":{"model":"gpt-5.2-codex","effort":"medium"}}`,
+		`{"timestamp":"2026-04-29T12:02:00Z","type":"turn_context","payload":{"model":"gpt-5.6-luna","effort":"max"}}`,
+		`{"timestamp":"2026-04-29T12:03:00Z","type":"response_item","payload":{"model":"should-not-win","effort":"low"}}`,
+	} {
+		applySessionMetadata(&report, []byte(line))
+	}
+	if report.LastModel != "gpt-5.6-luna" || report.LastReasoningEffort != "max" {
+		t.Fatalf("latest session settings = model:%q effort:%q", report.LastModel, report.LastReasoningEffort)
+	}
+}
+
 func TestReaderExtractsCodexSessionSource(t *testing.T) {
 	home := t.TempDir()
 	directory := filepath.Join(home, "sessions")

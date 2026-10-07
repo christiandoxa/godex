@@ -23,8 +23,10 @@ func runRuntimeLaunchOptions(selection runtimemodel.Selection) runtimeusecase.Ru
 }
 
 type runSessionLauncher struct {
-	runner  *runtimeusecase.Runner
-	options runtimeusecase.RuntimeLaunchOptions
+	runner    *runtimeusecase.Runner
+	profiles  launchProfiles
+	selection runtimemodel.Selection
+	options   runtimeusecase.RuntimeLaunchOptions
 }
 
 func (launcher runSessionLauncher) Run(ctx context.Context, selector string, args []string) error {

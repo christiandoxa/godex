@@ -13,6 +13,7 @@ import (
 
 	"github.com/christiandoxa/godex/internal/config"
 	"github.com/christiandoxa/godex/internal/delivery/cli"
+	runtimecli "github.com/christiandoxa/godex/internal/delivery/cli/runtime"
 	runtimebrokercli "github.com/christiandoxa/godex/internal/delivery/cli/runtimebroker"
 	proxyhttp "github.com/christiandoxa/godex/internal/delivery/http/proxy"
 	antigravitygateway "github.com/christiandoxa/godex/internal/gateway/antigravity"
@@ -173,9 +174,14 @@ func run() int {
 	nativeAuth.SetAntigravitySessionLocker(codex.SessionLocker{})
 	application.SetNativeAuth(nativeAuth)
 	application.SetActivity(activity)
-	sessions := sessionusecase.NewCatalog(store, sessionrepo.NewReader(), runner)
+	sessions := sessionusecase.NewCatalog(store, sessionrepo.NewReader(), runtimecli.NewSessionLauncher(runner, profiles))
+	sessions.SetProfiles(profiles)
+	sessions.SetSharedCodexHome(settings.SharedCodexHome)
 	sessions.SetOwnerLookup(func(ctx context.Context, id string) (string, error) {
 		return routingusecase.SessionOwner(ctx, bindings, id)
+	})
+	sessions.SetBindingForget(func(ctx context.Context, id string) error {
+		return routingusecase.ForgetSession(ctx, bindings, id)
 	})
 	application.SetSessions(sessions)
 	if err := application.Run(ctx, os.Args[1:]); err != nil {

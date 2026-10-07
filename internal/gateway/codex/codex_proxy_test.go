@@ -112,6 +112,35 @@ func writeProxyHelper(t *testing.T, body string) string {
 	return path
 }
 
+func TestProdex04356ExternalProviderProxyExposesGodexProviderIdentityToCodex(t *testing.T) {
+	home := t.TempDir()
+	record := filepath.Join(t.TempDir(), "args")
+	t.Setenv("GODEX_PROXY_RECORD", record)
+	script := writeProxyHelper(t, `printf '%s\n' "$@" > "$GODEX_PROXY_RECORD"`)
+	process := NewCodexProcess(script, Terminal{})
+	if err := process.RunThroughProxyProvider(
+		t.Context(), home, "http://127.0.0.1:4455", []string{"exec", "hello"}, "anthropic",
+	); err != nil {
+		t.Fatal(err)
+	}
+	content, err := os.ReadFile(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rendered := string(content)
+	for _, want := range []string{
+		`model_provider="godex-anthropic"`,
+		`model_providers.godex-anthropic.name="Anthropic"`,
+	} {
+		if !strings.Contains(rendered, want) {
+			t.Fatalf("external provider args missing %q: %s", want, rendered)
+		}
+	}
+	if strings.Contains(rendered, `model_provider="godex-openai"`) {
+		t.Fatalf("external provider session lost provider identity: %s", rendered)
+	}
+}
+
 func TestManagedTransportCannotBeOverridden(t *testing.T) {
 	for _, key := range []string{"model_provider", "model_providers.evil.base_url", "model_providers.godex-openai.supports_websockets", "cli_auth_credentials_store"} {
 		if _, err := proxyArguments("http://127.0.0.1:1234", []string{"-c", key + "=true"}); err == nil {

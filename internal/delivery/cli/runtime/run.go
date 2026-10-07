@@ -124,6 +124,12 @@ func runProfileSelection(
 	codexArguments []string,
 	launchOptions runtimeusecase.RuntimeLaunchOptions,
 ) error {
+	if index, args := sessionArgument(codexArguments); index >= 0 {
+		return runSessionArgumentWithLauncher(
+			ctx, sessions, selection.Account, args, index,
+			runSessionLauncher{runner: runner, profiles: profiles, selection: selection, options: launchOptions},
+		)
+	}
 	if selection.URL != "" {
 		return runLocalProviderSelection(ctx, runner, profiles, selection, codexArguments)
 	}
@@ -411,6 +417,7 @@ func runSessionArgumentWithLauncher(
 		IDPrefix:        prefix,
 		Arguments:       args,
 		Local:           local,
+		Delete:          command >= 0 && args[command] == "delete",
 	}
 	if launcher != nil {
 		return sessions.ResumeArgumentsWithLauncher(ctx, launch, launcher)

@@ -135,6 +135,11 @@ func launchSuperProfiles(
 	profiles launchProfiles,
 	options superOptions,
 ) error {
+	var err error
+	options, err = resolveSuperResumeOptions(ctx, sessions, options)
+	if err != nil {
+		return err
+	}
 	if runner == nil {
 		return errors.New("runtime support is not configured")
 	}

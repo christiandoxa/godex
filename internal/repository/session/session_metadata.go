@@ -24,6 +24,17 @@ func applySessionMetadata(report *sessionentity.Session, line []byte) {
 	if typeName != "" && typeName != "session_meta" && typeName != "turn_context" {
 		return
 	}
+	if typeName == "turn_context" {
+		if model := firstString(payload["model"], payloadMetadata["model"], value["model"], metadata["model"]); model != "" {
+			report.LastModel = model
+		}
+		if effort := firstString(
+			payload["effort"], payload["reasoning_effort"], payloadMetadata["effort"], payloadMetadata["reasoning_effort"],
+			value["effort"], value["reasoning_effort"], metadata["effort"], metadata["reasoning_effort"],
+		); effort != "" {
+			report.LastReasoningEffort = effort
+		}
+	}
 	if report.ID == "" && (typeName == "" || typeName == "session_meta") {
 		report.ID = firstString(payload["id"], payload["session_id"], value["id"], value["session_id"])
 	}

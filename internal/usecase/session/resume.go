@@ -63,14 +63,10 @@ func (catalog *Catalog) ResumeArguments(ctx context.Context, input sessionmodel.
 	return catalog.ResumeArgumentsWithLauncher(ctx, input, catalog.launcher)
 }
 
-func (catalog *Catalog) ResumeArgumentsWithLauncher(
+func (catalog *Catalog) ResolveArguments(
 	ctx context.Context,
 	input sessionmodel.Launch,
-	launcher Launcher,
-) error {
-	if launcher == nil {
-		return fmt.Errorf("session resume launcher is not configured")
-	}
+) (sessionmodel.Report, []string, error) {
 	var report sessionmodel.Report
 	var err error
 	if input.SessionSelector == "--last" {
@@ -79,19 +75,45 @@ func (catalog *Catalog) ResumeArgumentsWithLauncher(
 		report, err = catalog.Resolve(ctx, input.SessionSelector)
 	}
 	if err != nil {
-		return err
+		return sessionmodel.Report{}, nil, err
 	}
 	if err := catalog.validateAccountOwner(ctx, input.AccountSelector, report); err != nil {
-		return err
+		return sessionmodel.Report{}, nil, err
 	}
 	args, err := resolvedSessionArguments(input, report.ID)
 	if err != nil {
+		return sessionmodel.Report{}, nil, err
+	}
+	return report, args, nil
+}
+
+func (catalog *Catalog) ResumeArgumentsWithLauncher(
+	ctx context.Context,
+	input sessionmodel.Launch,
+	launcher Launcher,
+) error {
+	if launcher == nil {
+		return fmt.Errorf("session resume launcher is not configured")
+	}
+	report, args, err := catalog.ResolveArguments(ctx, input)
+	if err != nil {
 		return err
 	}
-	if input.Local {
-		return launcher.RunLocal(ctx, report.AccountID, args)
+	var launchErr error
+	if aware, ok := launcher.(ReportLauncher); ok {
+		launchErr = aware.RunSessionReport(ctx, report, args, input.Local)
+	} else if input.Local {
+		launchErr = launcher.RunLocal(ctx, report.AccountID, args)
+	} else {
+		launchErr = launcher.RunSession(ctx, report.AccountID, report.UpstreamAccountID, args)
 	}
-	return launcher.RunSession(ctx, report.AccountID, report.UpstreamAccountID, args)
+	if launchErr != nil {
+		return launchErr
+	}
+	if input.Delete && catalog.bindingForget != nil {
+		return catalog.bindingForget(ctx, report.ID)
+	}
+	return nil
 }
 
 func (catalog *Catalog) resolveLast(ctx context.Context, args []string) (sessionmodel.Report, error) {

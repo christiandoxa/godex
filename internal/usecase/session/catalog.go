@@ -5,6 +5,7 @@ import (
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
 	sessionentity "github.com/christiandoxa/godex/internal/entity/session"
+	sessionmodel "github.com/christiandoxa/godex/internal/model/session"
 )
 
 type accountStore interface {
@@ -16,6 +17,14 @@ type reader interface {
 	List(context.Context, string) ([]sessionentity.Session, error)
 }
 
+type profileSource interface {
+	SessionProfiles(context.Context) ([]sessionmodel.ProfileHome, error)
+}
+
+type ReportLauncher interface {
+	RunSessionReport(context.Context, sessionmodel.Report, []string, bool) error
+}
+
 type Launcher interface {
 	Run(context.Context, string, []string) error
 	RunLocal(context.Context, string, []string) error
@@ -23,10 +32,13 @@ type Launcher interface {
 }
 
 type Catalog struct {
-	accounts    accountStore
-	reader      reader
-	launcher    Launcher
-	ownerLookup func(context.Context, string) (string, error)
+	accounts        accountStore
+	reader          reader
+	launcher        Launcher
+	ownerLookup     func(context.Context, string) (string, error)
+	bindingForget   func(context.Context, string) error
+	profiles        profileSource
+	sharedCodexHome string
 }
 
 func NewCatalog(accounts accountStore, reader reader, launcher Launcher) *Catalog {
@@ -36,3 +48,11 @@ func NewCatalog(accounts accountStore, reader reader, launcher Launcher) *Catalo
 func (catalog *Catalog) SetOwnerLookup(lookup func(context.Context, string) (string, error)) {
 	catalog.ownerLookup = lookup
 }
+
+func (catalog *Catalog) SetBindingForget(forget func(context.Context, string) error) {
+	catalog.bindingForget = forget
+}
+
+func (catalog *Catalog) SetProfiles(profiles profileSource) { catalog.profiles = profiles }
+
+func (catalog *Catalog) SetSharedCodexHome(home string) { catalog.sharedCodexHome = home }

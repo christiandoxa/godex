@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
@@ -247,6 +248,5 @@ func validateRuntimeHome(codexHome string) (string, error) {
 }
 
 func profileRoutingID(home string) string {
-	digest := sha256.Sum256([]byte("profile:" + home))
-	return hex.EncodeToString(digest[:16])
+	return profilemodel.RoutingID(home)
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
@@ -267,5 +268,143 @@ func TestProdex04356ResumeArgumentsWithLauncherPreservesResolutionAndOverridesDi
 	if override.account != "two" ||
 		!reflect.DeepEqual(override.args, []string{"exec", "resume", "b111", "continue", "--json"}) {
 		t.Fatalf("override launcher lost session resolution: %#v", override)
+	}
+}
+
+type sessionProfilesFake struct {
+	homes []sessionmodel.ProfileHome
+}
+
+func (fake sessionProfilesFake) SessionProfiles(context.Context) ([]sessionmodel.ProfileHome, error) {
+	return append([]sessionmodel.ProfileHome(nil), fake.homes...), nil
+}
+
+type reportLauncherFake struct {
+	launcherFake
+	report sessionmodel.Report
+}
+
+func (fake *reportLauncherFake) RunSessionReport(_ context.Context, report sessionmodel.Report, args []string, _ bool) error {
+	fake.report = report
+	fake.account = report.AccountID
+	fake.args = append([]string(nil), args...)
+	return nil
+}
+
+func TestProdex04356SessionCatalogIncludesStandaloneProfiles(t *testing.T) {
+	launcher := &launcherFake{}
+	catalog := NewCatalog(accountsFake{}, readerFake{map[string][]sessionentity.Session{
+		"/standalone": {{ID: "standalone-id", ModelProvider: "godex-kiro", UpdatedUnix: 9, Path: "/standalone/sessions/rollout.jsonl"}},
+	}}, launcher)
+	catalog.SetProfiles(sessionProfilesFake{homes: []sessionmodel.ProfileHome{{
+		Name: "kiro-work", CodexHome: "/standalone", Provider: "kiro", Enabled: true,
+	}}})
+	reports, err := catalog.List(t.Context(), sessionmodel.Query{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reports) != 1 || reports[0].Profile != "kiro-work" || reports[0].AccountID != "" || reports[0].ModelProvider != "godex-kiro" {
+		t.Fatalf("standalone session reports = %#v", reports)
+	}
+}
+
+func TestProdex04356ResumePassesProviderAndSettingsMetadataToAwareLauncher(t *testing.T) {
+	launcher := &reportLauncherFake{}
+	catalog := NewCatalog(accountsFake{}, readerFake{map[string][]sessionentity.Session{
+		"one": {{
+			ID: "provider-session", ModelProvider: "godex-anthropic", LastModel: "claude-sonnet-5-5",
+			LastReasoningEffort: "high", UpdatedUnix: 10, Path: "/one/sessions/provider.jsonl",
+		}},
+	}}, launcher)
+	if err := catalog.ResumeArguments(t.Context(), sessionmodel.Launch{
+		SessionSelector: "provider-session", IDIndex: 1, Arguments: []string{"resume", "provider-session"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if launcher.report.ModelProvider != "godex-anthropic" || launcher.report.LastModel != "claude-sonnet-5-5" ||
+		launcher.report.LastReasoningEffort != "high" {
+		t.Fatalf("resume report metadata = %#v", launcher.report)
+	}
+}
+
+func TestProdex04356SharedSessionStoreUsesDurableOwnerForProfileBinding(t *testing.T) {
+	reader := readerFake{map[string][]sessionentity.Session{
+		"/shared": {{ID: "shared-session", ModelProvider: "godex-kiro", UpdatedUnix: 11, Path: "/shared/sessions/rollout.jsonl"}},
+	}}
+	catalog := NewCatalog(accountsFake{}, reader, &launcherFake{})
+	catalog.SetSharedCodexHome("/shared")
+	catalog.SetProfiles(sessionProfilesFake{homes: []sessionmodel.ProfileHome{{
+		Name: "kiro-work", CodexHome: "/profile-home", Provider: "kiro", Enabled: true, RoutingIDs: []string{"route-kiro"},
+	}}})
+	catalog.SetOwnerLookup(func(context.Context, string) (string, error) { return "route-kiro", nil })
+	reports, err := catalog.List(t.Context(), sessionmodel.Query{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reports) != 1 || reports[0].Profile != "kiro-work" || reports[0].CodexHome != "/profile-home" ||
+		reports[0].UpstreamAccountID != "route-kiro" {
+		t.Fatalf("shared bound report = %#v", reports)
+	}
+}
+
+func TestProdex04356SharedUnboundSessionRemainsProfileless(t *testing.T) {
+	catalog := NewCatalog(accountsFake{}, readerFake{map[string][]sessionentity.Session{
+		"/shared": {{ID: "unbound", ModelProvider: "godex-deepseek", UpdatedUnix: 12, Path: "/shared/sessions/unbound.jsonl"}},
+	}}, &launcherFake{})
+	catalog.SetSharedCodexHome("/shared")
+	catalog.SetProfiles(sessionProfilesFake{})
+	catalog.SetOwnerLookup(func(context.Context, string) (string, error) { return "", nil })
+	reports, err := catalog.List(t.Context(), sessionmodel.Query{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reports) != 1 || reports[0].Profile != "" || reports[0].CodexHome != "/shared" {
+		t.Fatalf("shared unbound report = %#v", reports)
+	}
+}
+
+type deleteAwareLauncher struct {
+	reportLauncherFake
+	err error
+}
+
+func (launcher *deleteAwareLauncher) RunSessionReport(_ context.Context, report sessionmodel.Report, args []string, _ bool) error {
+	launcher.report = report
+	launcher.args = append([]string(nil), args...)
+	return launcher.err
+}
+
+func TestProdex04356SuccessfulDeletePrunesDurableSessionBinding(t *testing.T) {
+	launcher := &deleteAwareLauncher{}
+	catalog := NewCatalog(accountsFake{}, readerFake{map[string][]sessionentity.Session{
+		"one": {{ID: "delete-session", UpdatedUnix: 10, Path: "/one/sessions/delete.jsonl"}},
+	}}, launcher)
+	forgot := ""
+	catalog.SetBindingForget(func(_ context.Context, id string) error { forgot = id; return nil })
+	if err := catalog.ResumeArguments(t.Context(), sessionmodel.Launch{
+		SessionSelector: "delete-session", IDIndex: 1, Arguments: []string{"delete", "delete-session"}, Local: true, Delete: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if forgot != "delete-session" {
+		t.Fatalf("forgot binding = %q", forgot)
+	}
+}
+
+func TestProdex04356FailedDeleteRetainsDurableSessionBinding(t *testing.T) {
+	launcher := &deleteAwareLauncher{err: errors.New("synthetic delete failure")}
+	catalog := NewCatalog(accountsFake{}, readerFake{map[string][]sessionentity.Session{
+		"one": {{ID: "delete-session", UpdatedUnix: 10, Path: "/one/sessions/delete.jsonl"}},
+	}}, launcher)
+	forgot := false
+	catalog.SetBindingForget(func(context.Context, string) error { forgot = true; return nil })
+	err := catalog.ResumeArguments(t.Context(), sessionmodel.Launch{
+		SessionSelector: "delete-session", IDIndex: 1, Arguments: []string{"delete", "delete-session"}, Local: true, Delete: true,
+	})
+	if err == nil || !strings.Contains(err.Error(), "synthetic delete failure") {
+		t.Fatalf("delete failure = %v", err)
+	}
+	if forgot {
+		t.Fatal("failed delete pruned durable binding")
 	}
 }

@@ -1,19 +1,22 @@
 package session
 
 type Report struct {
-	ID                string `json:"id"`
-	ThreadName        string `json:"thread_name,omitempty"`
-	Preview           string `json:"-"`
-	UpdatedAt         string `json:"updated_at,omitempty"`
-	CWD               string `json:"cwd,omitempty"`
-	Profile           string `json:"profile"`
-	UpstreamAccountID string `json:"-"`
-	AccountID         string `json:"-"`
-	ModelProvider     string `json:"model_provider,omitempty"`
-	Source            string `json:"-"`
-	Path              string `json:"path"`
-	ParentThreadID    string `json:"parent_thread_id,omitempty"`
-	UpdatedUnix       int64  `json:"-"`
+	ID                  string `json:"id"`
+	ThreadName          string `json:"thread_name,omitempty"`
+	Preview             string `json:"-"`
+	UpdatedAt           string `json:"updated_at,omitempty"`
+	CWD                 string `json:"cwd,omitempty"`
+	Profile             string `json:"profile"`
+	UpstreamAccountID   string `json:"-"`
+	AccountID           string `json:"-"`
+	CodexHome           string `json:"-"`
+	ModelProvider       string `json:"model_provider,omitempty"`
+	LastModel           string `json:"-"`
+	LastReasoningEffort string `json:"-"`
+	Source              string `json:"-"`
+	Path                string `json:"path"`
+	ParentThreadID      string `json:"parent_thread_id,omitempty"`
+	UpdatedUnix         int64  `json:"-"`
 }
 
 type Query struct {
@@ -33,4 +36,15 @@ type Launch struct {
 	IDPrefix        string
 	Arguments       []string
 	Local           bool
+	Delete          bool
+}
+
+type ProfileHome struct {
+	Name       string
+	AccountID  string
+	Email      string
+	CodexHome  string
+	Provider   string
+	Enabled    bool
+	RoutingIDs []string
 }

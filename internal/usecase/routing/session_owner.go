@@ -3,6 +3,7 @@ package routing
 import (
 	"context"
 	"errors"
+	"strings"
 
 	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
 )
@@ -29,4 +30,26 @@ func SessionOwner(ctx context.Context, repository interface {
 		}
 	}
 	return owner, nil
+}
+
+// ForgetSession removes durable session affinity after a successful native
+// session deletion, including the compact-session alias.
+func ForgetSession(ctx context.Context, repository interface {
+	Remove(context.Context, []string) error
+}, id string) error {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil
+	}
+	keys := affinityKeys{thread: id, session: id}.values()
+	keys = append(keys, affinityKeys{session: "__compact_session__:" + id}.values()...)
+	unique := make(map[string]bool, len(keys))
+	result := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if !unique[key] {
+			unique[key] = true
+			result = append(result, key)
+		}
+	}
+	return repository.Remove(ctx, result)
 }

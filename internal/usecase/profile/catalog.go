@@ -9,6 +9,7 @@ import (
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
 	profileentity "github.com/christiandoxa/godex/internal/entity/profile"
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
+	sessionmodel "github.com/christiandoxa/godex/internal/model/session"
 )
 
 const profileNotFoundFormat = "profile %q does not exist"
@@ -123,6 +124,50 @@ func (catalog *Catalog) SetKiroInspector(inspector kiroInspector) { catalog.kiro
 func (catalog *Catalog) SetKiroSource(source kiroSource) { catalog.kiroImport = source }
 
 func (catalog *Catalog) SetCopilotSource(source copilotSource) { catalog.copilot = source }
+
+func (catalog *Catalog) SessionProfiles(ctx context.Context) ([]sessionmodel.ProfileHome, error) {
+	reports, err := catalog.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	homes := make([]sessionmodel.ProfileHome, 0, len(reports))
+	for _, report := range reports {
+		homes = append(homes, sessionmodel.ProfileHome{
+			Name: report.Profile.Name, AccountID: report.AccountID, Email: report.Profile.Email,
+			CodexHome: report.Profile.CodexHome, Provider: string(report.Profile.Provider.Kind), Enabled: report.Enabled,
+			RoutingIDs: catalog.sessionRoutingIDs(ctx, report),
+		})
+	}
+	return homes, nil
+}
+
+func (catalog *Catalog) sessionRoutingIDs(ctx context.Context, report Report) []string {
+	home := report.Profile.CodexHome
+	kind := string(report.Profile.Provider.Kind)
+	if kind == "openai" {
+		_, compatible, _ := catalog.profiles.ReadOpenAICompatibleBaseURL(home)
+		authLabel := ""
+		if catalog.quotaAuth != nil {
+			if auth, err := catalog.quotaAuth.InspectQuotaAuth(ctx, home); err == nil {
+				authLabel = auth.Label
+			}
+		}
+		if compatible {
+			return []string{profilemodel.RoutingID("openai-compatible:" + home)}
+		}
+		if authLabel == "api-key" {
+			return nil
+		}
+		if report.AccountID != "" {
+			return []string{report.AccountID}
+		}
+		return []string{profilemodel.RoutingID(home)}
+	}
+	if kind == "" {
+		return nil
+	}
+	return []string{profilemodel.RoutingID(kind + ":" + home)}
+}
 
 func (catalog *Catalog) SetAuthInspector(inspector authInspector) {
 	catalog.auth = inspector

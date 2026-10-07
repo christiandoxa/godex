@@ -84,6 +84,8 @@ func (process *CodexProcess) runThroughProxy(
 		arguments, err = localProxyArguments(endpoint, arguments)
 	case "openai-compatible":
 		arguments, err = openAICompatibleProxyArguments(endpoint, arguments)
+	case "anthropic", "copilot", "deepseek", "gemini", "kiro":
+		arguments, err = externalProviderProxyArguments(endpoint, arguments, provider)
 	default:
 		arguments, err = proxyArguments(endpoint, arguments)
 	}
@@ -190,6 +192,47 @@ func openAICompatibleProxyArguments(endpoint string, arguments []string) ([]stri
 		"model_providers.godex-openai-compatible.wire_api=\"responses\"",
 		"model_providers.godex-openai-compatible.requires_openai_auth=true",
 		"model_providers.godex-openai-compatible.supports_websockets=false",
+	}
+	managed := make([]string, 0, len(values)*2)
+	for _, value := range values {
+		managed = append(managed, "-c", value)
+	}
+	return scopeModelArguments(arguments, managed), nil
+}
+
+func externalProviderProxyArguments(endpoint string, arguments []string, provider string) ([]string, error) {
+	endpoint = strings.TrimRight(strings.TrimSpace(endpoint), "/")
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	if endpoint == "" {
+		return nil, errors.New("proxy endpoint is required")
+	}
+	if containsProxyOverride(arguments) {
+		return nil, errors.New("codex arguments cannot override Godex routing or credential storage")
+	}
+	if err := validateRuntimeURL(endpoint); err != nil {
+		return nil, err
+	}
+	names := map[string]string{
+		"anthropic": "Anthropic",
+		"copilot":   "OpenAI",
+		"deepseek":  "DeepSeek",
+		"gemini":    "Azure",
+		"kiro":      "Azure",
+	}
+	name, ok := names[provider]
+	if !ok {
+		return nil, errors.New("runtime provider identity is unsupported")
+	}
+	id := "godex-" + provider
+	baseURL := endpoint + "/backend-api/godex"
+	values := []string{
+		"cli_auth_credentials_store=<redacted>",
+		"model_provider=" + strconv.Quote(id),
+		"model_providers." + id + ".name=" + strconv.Quote(name),
+		"model_providers." + id + ".base_url=" + strconv.Quote(baseURL),
+		"model_providers." + id + ".wire_api=\"responses\"",
+		"model_providers." + id + ".requires_openai_auth=true",
+		"model_providers." + id + ".supports_websockets=false",
 	}
 	managed := make([]string, 0, len(values)*2)
 	for _, value := range values {
