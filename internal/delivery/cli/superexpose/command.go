@@ -206,7 +206,7 @@ func optionValue(arguments []string, index int, name string) (string, int, bool,
 	return "", 0, false, nil
 }
 
-func runExecServer(ctx context.Context, options Options, out, errOut io.Writer) error {
+func runExecServerWithTunnelStarter(ctx context.Context, options Options, out, errOut io.Writer, startTunnel openAITunnelStarter) error {
 	workspace, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("failed to resolve expose workspace: %w", err)
@@ -319,7 +319,7 @@ func runExecServer(ctx context.Context, options Options, out, errOut io.Writer) 
 	var tunnelReady <-chan error
 	var tunnelExit <-chan error
 	if options.OpenAITunnelID != "" {
-		tunnel, err = startOpenAITunnel(endpoint, options.OpenAITunnelID)
+		tunnel, err = startTunnel(endpoint, options.OpenAITunnelID)
 		if err != nil {
 			closeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			_ = server.Shutdown(closeCtx)

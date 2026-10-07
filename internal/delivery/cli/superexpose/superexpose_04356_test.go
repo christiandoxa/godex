@@ -752,16 +752,23 @@ func TestProdex04356SuperExposeTunnelLifecycleIsAudited(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("GODEX_HOME", home)
 	t.Setenv(tunnelHelperEnv, "1")
-	t.Setenv("GODEX_TUNNEL_CLIENT_BIN", tunnelClientHelperBinary(t))
+	helper := tunnelClientHelperBinary(t)
 	t.Setenv("CONTROL_PLANE_API_KEY", "synthetic-control-key")
 	validID := "tunnel_" + strings.Repeat("f", 32)
+	options, err := parseArguments([]string{
+		"exec", "--listen", "127.0.0.1:0", "--openai-tunnel-id", validID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	starter := func(endpoint, tunnelID string) (*openAITunnelProcess, error) {
+		return spawnOpenAITunnel(endpoint, tunnelID, helper, "0.0.15")
+	}
 
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan error, 1)
 	go func() {
-		done <- Run(ctx, []string{
-			"exec", "--listen", "127.0.0.1:0", "--openai-tunnel-id", validID,
-		}, io.Discard, io.Discard)
+		done <- runExecServerWithTunnelStarter(ctx, options, io.Discard, io.Discard, starter)
 	}()
 
 	logPath := filepath.Join(home, "logs", "runtime.jsonl")
