@@ -200,7 +200,7 @@ func writeAuthForTest(t *testing.T, auth map[string]any) string {
 		t.Fatal(err)
 	}
 	path := filepath.Join(t.TempDir(), "auth.json")
-	if err := os.WriteFile(path, content, 0o600); err != nil {
+	if err := writePrivateFile(path, content); err != nil {
 		t.Fatal(err)
 	}
 	return path

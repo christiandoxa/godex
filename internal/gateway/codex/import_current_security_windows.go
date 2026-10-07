@@ -57,7 +57,7 @@ func importCurrentWindowsACLTrusted(path string, privateFile bool) bool {
 			return false
 		}
 		control, _, err := descriptor.Control()
-		if err != nil || control&windows.SE_DACL_PRESENT == 0 {
+		if err != nil || control&windows.SE_DACL_PRESENT == 0 || control&windows.SE_DACL_PROTECTED == 0 {
 			return false
 		}
 	} else if !importCurrentWindowsPrincipalTrusted(owner, user.User.Sid) {
