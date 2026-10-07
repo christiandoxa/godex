@@ -161,18 +161,31 @@ Options:
       --json          Emit stable JSON output
   -h, --help          Print help
 `,
-	"login": `Run provider login flows using Godex profiles where supported.
+	"login": `Run provider login flows, using Godex profiles where supported.
 
-Usage: godex login [OPTIONS]
+Usage: godex login [OPTIONS] [PROFILE_OR_LOGIN_ARG]...
+
+Arguments:
+  [PROFILE_OR_LOGIN_ARG]...  Optional profile name first, followed by login-method flags or provider arguments
 
 Options:
-      --name NAME              Friendly profile/account name
-      --device-auth            Use Codex device authentication
-      --with-api-key           Use OpenAI/OpenAI-compatible API-key login
-      --with-antigravity       Run native Antigravity sign-in
-      --base-url URL           Store an OpenAI-compatible API-key base URL
-      --openai-base-url URL    Alias for --base-url
-  -h, --help                   Print help
+  -p, --profile NAME  Existing profile to log into. If omitted, Godex creates or reuses a profile by workspace identity
+  -h, --help          Print help
+
+Examples:
+  godex login
+  godex login main
+  godex login --profile main
+  godex login --device-auth
+  godex login --with-claude
+  godex login --with-antigravity
+
+Notes:
+  A leading non-option argument selects the profile; status remains Codex login status.
+  Use --profile when selecting a profile literally named status.
+  OpenAI/Codex, Claude, and API-key login paths create or update Godex profiles.
+  Google Gemini OAuth profiles are unsupported; native Gemini CLI / Vertex AI compatibility is retired. Use a Gemini API key with godex s gemini; native Antigravity remains available through godex s gemini --cli agy.
+  Antigravity login delegates to agy auth login and does not create a Godex profile.
 `,
 	"logout": `Run Codex logout for the selected or active Godex profile.
 

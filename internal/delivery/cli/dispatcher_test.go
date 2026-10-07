@@ -44,6 +44,31 @@ func TestDispatcherVersion(t *testing.T) {
 	}
 }
 
+func TestProdex04356LoginHelpMatchesProfilePassthroughSurface(t *testing.T) {
+	var output bytes.Buffer
+	app := New(nil, nil, nil, nil, nil, nil, &output)
+	if err := app.Run(t.Context(), []string{"login", "--help"}); err != nil {
+		t.Fatal(err)
+	}
+	text := output.String()
+	for _, want := range []string{
+		"Usage: godex login [OPTIONS] [PROFILE_OR_LOGIN_ARG]...",
+		"-p, --profile NAME",
+		"godex login --with-claude",
+		"A leading non-option argument selects the profile",
+		"Antigravity login delegates to agy auth login",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("login help missing %q: %q", want, text)
+		}
+	}
+	for _, stale := range []string{"--name NAME", "--base-url URL", "--openai-base-url URL"} {
+		if strings.Contains(text, stale) {
+			t.Fatalf("login help exposed compatibility-only option %q: %q", stale, text)
+		}
+	}
+}
+
 func TestProdex04356PublicCommandHelpIsSuccessfulAndDependencyFree(t *testing.T) {
 	tests := []struct {
 		arguments []string
