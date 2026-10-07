@@ -83,8 +83,9 @@ func responseID(object map[string]any) string {
 	if id := objectString(object, "response_id"); id != "" {
 		return id
 	}
-	if id := objectString(object, "id"); id != "" {
-		return id
+	objectKind := objectString(object, "object")
+	if objectKind == "response" || strings.HasSuffix(objectKind, ".response") {
+		return objectString(object, "id")
 	}
 	return ""
 }

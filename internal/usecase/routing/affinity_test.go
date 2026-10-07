@@ -58,6 +58,12 @@ func TestResponseAffinityMatchesProdexResponseMetadataPrecedence(t *testing.T) {
 		t.Fatalf("root response metadata = %#v, want %#v", got, want)
 	}
 
+	got = responseAffinity(http.Header{}, []byte(`{"object":"event","id":"event-id"}`), false)
+	want = affinityKeys{}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("non-response root id = %#v, want %#v", got, want)
+	}
+
 	got = responseAffinity(http.Header{}, []byte("data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp-sse\",\"turnState\":\" camel-state \"}}\n\n"), true)
 	want = affinityKeys{previous: "resp-sse", turn: "camel-state"}
 	if !reflect.DeepEqual(got, want) {

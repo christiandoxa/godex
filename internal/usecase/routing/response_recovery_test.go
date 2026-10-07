@@ -52,7 +52,7 @@ func TestResponsesInvalidPreviousIDRetriesOwnedFullHistoryOnce(t *testing.T) {
 	const invalid = `{"type":"error","status":400,"error":{"type":"invalid_request_error","message":"Invalid ` + "`previous_response_id`" + `.","param":"previous_response_id"}}`
 	gateway := &responseRecoveryGateway{replies: []responseRecoveryReply{
 		{http.StatusBadRequest, "application/json", invalid},
-		{http.StatusOK, "application/json", `{"id":"resp-new"}`},
+		{http.StatusOK, "application/json", `{"object":"response","id":"resp-new"}`},
 	}}
 	router := newResponseRecoveryRouter(t, gateway, true)
 	exchange, err := router.Forward(context.Background(), responsesRecoveryRequest(original))
@@ -88,7 +88,7 @@ func TestResponsesInvalidPreviousIDClearsDurableBindingAndTurnState(t *testing.T
 	const invalid = `{"type":"error","status":400,"error":{"type":"invalid_request_error","message":"Invalid ` + "`previous_response_id`" + `."}}`
 	gateway := &responseRecoveryGateway{replies: []responseRecoveryReply{
 		{http.StatusBadRequest, "application/json", invalid},
-		{http.StatusOK, "application/json", `{"id":"resp-new"}`},
+		{http.StatusOK, "application/json", `{"object":"response","id":"resp-new"}`},
 	}}
 	now := time.Unix(100, 0)
 	home := t.TempDir()
