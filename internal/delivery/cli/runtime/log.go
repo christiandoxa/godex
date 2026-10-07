@@ -160,13 +160,10 @@ func writeLogEvent(out io.Writer, event runtimemodel.Event, jsonOutput bool) err
 	if jsonOutput {
 		return json.NewEncoder(out).Encode(event)
 	}
-	_, err := fmt.Fprintln(out, formatLogEvent(event))
+	_, err := fmt.Fprintln(out, formatLogEventWidth(event, logWriterWidth(out)))
 	return err
 }
 
 func formatLogEvent(event runtimemodel.Event) string {
-	when := time.UnixMilli(event.TimestampUnixMilli).Format(time.RFC3339Nano)
-	return fmt.Sprintf("%s\t%s\tstatus=%d\taccount=%s\t%s %s\tduration_ms=%d\t%s",
-		when, event.Kind, event.StatusCode, valueOrDash(event.AccountID),
-		event.Method, event.Path, event.DurationMillis, event.Message)
+	return formatLogEventWidth(event, defaultLogRenderWidth)
 }

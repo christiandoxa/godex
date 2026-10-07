@@ -156,7 +156,9 @@ func TestLogLastAndJSON(t *testing.T) {
 	if err := Log(context.Background(), activity, &output, []string{"last"}); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output.String(), "request_completed") || !strings.Contains(output.String(), "status=200") {
+	if !strings.Contains(output.String(), "] REQUEST") ||
+		!strings.Contains(output.String(), "| request completed") ||
+		!strings.Contains(output.String(), "status=200") {
 		t.Fatalf("last log = %q", output.String())
 	}
 	output.Reset()
