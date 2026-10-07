@@ -45,11 +45,17 @@ func TestGeminiSemanticCompactUsesSelectedModelAndSummary(t *testing.T) {
 		response.Header.Get("X-Godex-Compact-Provider") != "gemini" || !strings.Contains(string(body), "Keep the current worktree") {
 		t.Fatalf("compact response = status:%d headers:%v body:%s", response.StatusCode, response.Header, body)
 	}
-	if len(paths) != 1 || paths[0] != "/models/gemini-3.8-flash:generateContent" {
+	if len(paths) != 1 || paths[0] != "/models/chat-compression-default:generateContent" {
 		t.Fatalf("compact upstream paths = %#v", paths)
 	}
 	if len(nativeBodies) != 1 || len(nativeBodies[0]["contents"].([]any)) == 0 {
 		t.Fatalf("compact native body = %#v", nativeBodies)
+	}
+	system, _ := nativeBodies[0]["systemInstruction"].(map[string]any)
+	parts, _ := system["parts"].([]any)
+	encoded, _ := json.Marshal(parts)
+	if !strings.Contains(string(encoded), "current worktree state") {
+		t.Fatalf("compact instruction lost current-worktree requirement: %#v", nativeBodies[0])
 	}
 }
 
