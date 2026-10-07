@@ -15,13 +15,14 @@ import (
 )
 
 const (
-	contentTypeHeader      = "Content-Type"
-	defaultAPIURL          = "https://api.deepseek.com"
-	defaultBetaBaseURL     = "https://api.deepseek.com/beta"
-	anthropicVersion       = "2023-06-01"
-	bodyMaxBytes           = 8 << 20
-	streamEventMaxBytes    = 1 << 20
-	nativeMessagesMaxBytes = 4 << 20
+	contentTypeHeader              = "Content-Type"
+	defaultAPIURL                  = "https://api.deepseek.com"
+	defaultBetaBaseURL             = "https://api.deepseek.com/beta"
+	anthropicVersion               = "2023-06-01"
+	bodyMaxBytes                   = 8 << 20
+	translatedResponseBodyMaxBytes = deepSeekResponseArgumentsMaxBytes + (4 << 20)
+	streamEventMaxBytes            = 1 << 20
+	nativeMessagesMaxBytes         = 4 << 20
 )
 
 type RuntimeTransport struct {

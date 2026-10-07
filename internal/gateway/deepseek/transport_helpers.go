@@ -35,11 +35,11 @@ func translateResponseWithConversation(
 		}, nil
 	}
 	defer response.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(response.Body, bodyMaxBytes+1))
+	body, err := io.ReadAll(io.LimitReader(response.Body, translatedResponseBodyMaxBytes+1))
 	if err != nil {
 		return nil, errors.New("failed to read DeepSeek translated response")
 	}
-	if len(body) > bodyMaxBytes {
+	if len(body) > translatedResponseBodyMaxBytes {
 		return nil, errors.New("DeepSeek translated response exceeded the safe read limit")
 	}
 	translated, err := deepSeekChatResponse(body, time.Now())
