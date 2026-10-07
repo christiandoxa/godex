@@ -166,10 +166,14 @@ func repairSelectionAfterRemove(state *stateFile, removedID, nextID string) {
 	state.RotationCursor %= uint64(enabledCount)
 }
 
+func accountQuotaCompatible(account entity.Account) bool {
+	return strings.TrimSpace(account.Email) != "" || strings.TrimSpace(account.ChatGPTAccountID) != ""
+}
+
 func orderedEnabledIndexes(accounts []entity.Account) []int {
 	ordered := make([]int, 0, len(accounts))
 	for index, account := range accounts {
-		if account.Enabled {
+		if account.Enabled && accountQuotaCompatible(account) {
 			ordered = append(ordered, index)
 		}
 	}

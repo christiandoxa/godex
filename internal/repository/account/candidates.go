@@ -28,6 +28,9 @@ func (store *FileStore) LaunchCandidates(ctx context.Context, selector string) (
 		if !account.Enabled {
 			return nil, fmt.Errorf("account %q is disabled", account.Name)
 		}
+		if !accountQuotaCompatible(account) {
+			return nil, fmt.Errorf("profile %q is not ChatGPT quota-compatible", account.Name)
+		}
 		return []entity.Account{account}, nil
 	}
 
