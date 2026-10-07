@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -315,7 +316,11 @@ func TestDispatcherImportCurrentCopiesNativeHomeAndActivates(t *testing.T) {
 	var output bytes.Buffer
 	app := New(nil, importer, accounts, nil, nil, nil, &output)
 
-	if err := app.Run(context.Background(), []string{"profile", "import-current", "main"}); err != nil {
+	arguments := []string{"profile", "import-current", "main"}
+	if runtime.GOOS == "windows" {
+		arguments = append(arguments, "--insecure")
+	}
+	if err := app.Run(context.Background(), arguments); err != nil {
 		t.Fatal(err)
 	}
 	current, err := accounts.Current(context.Background())

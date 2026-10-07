@@ -291,7 +291,7 @@ func writePrivateFile(path string, content []byte) error {
 	if err != nil {
 		return err
 	}
-	if err := securePrivateFile(file); err != nil {
+	if err := securePrivateFile(file, path); err != nil {
 		_ = file.Close()
 		return err
 	}

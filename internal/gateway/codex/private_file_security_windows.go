@@ -9,7 +9,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-func securePrivateFile(file *os.File) error {
+func securePrivateFile(file *os.File, path string) error {
 	user, err := windows.GetCurrentProcessToken().GetTokenUser()
 	if err != nil || user == nil || user.User.Sid == nil {
 		if err != nil {
@@ -31,8 +31,8 @@ func securePrivateFile(file *os.File) error {
 	if err != nil {
 		return err
 	}
-	err = windows.SetSecurityInfo(
-		windows.Handle(file.Fd()),
+	err = windows.SetNamedSecurityInfo(
+		path,
 		windows.SE_FILE_OBJECT,
 		windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION,
 		nil,
@@ -40,6 +40,7 @@ func securePrivateFile(file *os.File) error {
 		acl,
 		nil,
 	)
+	runtime.KeepAlive(file)
 	runtime.KeepAlive(sid)
 	return err
 }
