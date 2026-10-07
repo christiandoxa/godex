@@ -39,13 +39,20 @@ func prepareProviderRuntimeArguments(
 		return arguments, nil
 	}
 	defaults := providerDefaultArguments(provider)
-	if provider.Kind == "local" {
+	if provider.Kind != "" {
+		webSearch := "live"
+		imageGeneration := false
+		if provider.Kind == "local" {
+			webSearch = "disabled"
+		} else if provider.Kind == "gemini" {
+			imageGeneration = true
+		}
 		defaults = append(defaults,
 			"-c", "model_reasoning_summary=\"none\"",
-			"-c", "web_search=\"disabled\"",
+			"-c", "web_search="+strconv.Quote(webSearch),
 			"-c", "features.apps=false",
 			"-c", "features.js_repl=false",
-			"-c", "features.image_generation=false",
+			"-c", "features.image_generation="+strconv.FormatBool(imageGeneration),
 		)
 	}
 	if store == nil || func() bool { _, found := providerConfigValue(arguments, "model_catalog_json"); return found }() {
