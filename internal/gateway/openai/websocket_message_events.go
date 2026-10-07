@@ -110,31 +110,89 @@ func websocketEventMetadata(payload []byte) (string, string, string) {
 	}
 	kind := jsonStringValue(value["type"])
 	responseID := ""
-	turnState := jsonStringValue(value["turn_state"])
-	if response, ok := value["response"].(map[string]any); ok {
+	response, _ := value["response"].(map[string]any)
+	if response != nil {
 		responseID = jsonStringValue(response["id"])
-		if turnState == "" {
-			turnState = jsonStringValue(response["turn_state"])
-		}
-		if turnState == "" {
-			if headers, ok := response["headers"].(map[string]any); ok {
-				turnState = websocketJSONHeader(headers, "x-codex-turn-state")
-			}
-		}
 	}
 	if responseID == "" {
 		responseID = jsonStringValue(value["response_id"])
 	}
+	if responseID == "" {
+		object := jsonStringValue(value["object"])
+		if object == "response" || strings.HasSuffix(object, ".response") {
+			responseID = jsonStringValue(value["id"])
+		}
+	}
 	if responseID == "" && strings.HasPrefix(kind, "response.") {
 		responseID = jsonStringValue(value["id"])
+	}
+	turnState := ""
+	if response != nil {
+		turnState = websocketJSONHeader(response["headers"], "x-codex-turn-state")
+	}
+	if turnState == "" {
+		turnState = websocketJSONHeader(value["headers"], "x-codex-turn-state")
+	}
+	if turnState == "" && response != nil {
+		turnState = jsonStringValue(response["turn_state"])
+	}
+	if turnState == "" && response != nil {
+		turnState = jsonStringValue(response["turnState"])
+	}
+	if turnState == "" {
+		turnState = jsonStringValue(value["turn_state"])
+	}
+	if turnState == "" {
+		turnState = jsonStringValue(value["turnState"])
 	}
 	return kind, strings.TrimSpace(responseID), strings.TrimSpace(turnState)
 }
 
-func websocketJSONHeader(headers map[string]any, wanted string) string {
-	for name, raw := range headers {
-		if strings.EqualFold(strings.TrimSpace(name), wanted) {
-			return jsonStringValue(raw)
+func websocketJSONHeader(headers any, wanted string) string {
+	switch typed := headers.(type) {
+	case map[string]any:
+		for name, raw := range typed {
+			if strings.EqualFold(strings.TrimSpace(name), wanted) {
+				return websocketJSONHeaderValue(raw)
+			}
+		}
+	case []any:
+		for _, item := range typed {
+			var name, value any
+			switch entry := item.(type) {
+			case []any:
+				if len(entry) >= 2 {
+					name, value = entry[0], entry[1]
+				}
+			case map[string]any:
+				name = entry["name"]
+				if name == nil {
+					name = entry["key"]
+				}
+				value = entry["value"]
+				if value == nil {
+					value = entry["values"]
+				}
+			}
+			if strings.EqualFold(strings.TrimSpace(jsonStringValue(name)), wanted) {
+				if result := websocketJSONHeaderValue(value); result != "" {
+					return result
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func websocketJSONHeaderValue(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return strings.TrimSpace(typed)
+	case []any:
+		for _, item := range typed {
+			if result := websocketJSONHeaderValue(item); result != "" {
+				return result
+			}
 		}
 	}
 	return ""
