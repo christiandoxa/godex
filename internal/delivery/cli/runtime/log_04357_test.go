@@ -15,6 +15,7 @@ import (
 
 func TestProdex04357LogHumanEventNamesMatchTaggedRenderer(t *testing.T) {
 	for input, want := range map[string]string{
+		"route_decision":            "route decided",
 		"stream_read_error":         "stream read failed",
 		"custom_event_name":         "custom event name",
 		"super_expose_exec_started": "MCP",
