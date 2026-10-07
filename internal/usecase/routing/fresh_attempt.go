@@ -28,7 +28,6 @@ func (router *Router) tryFreshCandidates(
 			continue
 		}
 		request.FirstEventRetryUsed = *firstEventRetryUsed
-		router.recordSelectionMarker(ctx, "selection_pick", account, request.QuotaSelection)
 		router.recordRouteDecisionSelected(ctx, request, account)
 		result, found, pending, saturated, err := router.tryFreshCandidate(ctx, request, candidates, account)
 		if err != nil || found {

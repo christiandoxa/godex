@@ -317,7 +317,6 @@ func (router *Router) forwardWebSocketQuotaLastChance(
 	request proxymodel.Request,
 	account proxymodel.Account,
 ) (proxymodel.Forwarded, error) {
-	router.recordSelectionMarker(ctx, "selection_pick", account, request.QuotaSelection)
 	router.recordRouteDecisionSelected(ctx, request, account)
 	response, acquired, err := router.tryExecuteWithProfileInflight(ctx, request, account, false)
 	if err != nil {
