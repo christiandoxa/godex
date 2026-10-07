@@ -2,6 +2,7 @@ package routing
 
 import (
 	"context"
+	"net/http"
 	"reflect"
 	"strings"
 	"testing"
@@ -41,6 +42,26 @@ func TestResponseAffinityReadsNestedResponseIdentifiers(t *testing.T) {
 	want := affinityKeys{previous: "response-nested", session: "session-nested", turn: "turn-nested"}
 	if !reflect.DeepEqual(keys, want) {
 		t.Fatalf("nested affinity = %#v, want %#v", keys, want)
+	}
+}
+
+func TestResponseAffinityMatchesProdexResponseMetadataPrecedence(t *testing.T) {
+	got := responseAffinity(http.Header{}, []byte(`{"id":"event-id","response_id":"resp-root","object":"response","headers":{"x-codex-turn-state":"root-state"},"response":{"id":"resp-nested","headers":[["X-CODEX-TURN-STATE",[" nested-state ","later"]]],"turn_state":"response-state","turnState":"camel-state"}}`), false)
+	want := affinityKeys{previous: "resp-nested", turn: "nested-state"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("nested response metadata = %#v, want %#v", got, want)
+	}
+
+	got = responseAffinity(http.Header{}, []byte(`{"object":"model.response","id":"resp-object","headers":[{"key":"x-codex-turn-state","values":[" root-state "]}]}`), false)
+	want = affinityKeys{previous: "resp-object", turn: "root-state"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("root response metadata = %#v, want %#v", got, want)
+	}
+
+	got = responseAffinity(http.Header{}, []byte("data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp-sse\",\"turnState\":\" camel-state \"}}\n\n"), true)
+	want = affinityKeys{previous: "resp-sse", turn: "camel-state"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("SSE response metadata = %#v, want %#v", got, want)
 	}
 }
 

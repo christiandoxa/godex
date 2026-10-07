@@ -66,12 +66,98 @@ func responseAffinity(headers http.Header, body []byte, stream bool) affinityKey
 
 func responseObjectAffinity(object map[string]any) affinityKeys {
 	keys := affinityKeys{
-		previous: objectString(object, "id", "response_id"),
+		previous: responseID(object),
 		session:  objectString(object, "session_id", "conversation_id", "thread_id"),
-		turn:     objectString(object, "turn_state"),
+		turn:     responseObjectTurnState(object),
 	}
 	collectNestedAffinity(object, &keys, 0)
 	return keys
+}
+
+func responseID(object map[string]any) string {
+	if response, ok := object["response"].(map[string]any); ok {
+		if id := objectString(response, "id"); id != "" {
+			return id
+		}
+	}
+	if id := objectString(object, "response_id"); id != "" {
+		return id
+	}
+	if id := objectString(object, "id"); id != "" {
+		return id
+	}
+	return ""
+}
+
+func responseObjectTurnState(object map[string]any) string {
+	response, _ := object["response"].(map[string]any)
+	if response != nil {
+		if state := responseHeaderTurnState(response["headers"]); state != "" {
+			return state
+		}
+	}
+	if state := responseHeaderTurnState(object["headers"]); state != "" {
+		return state
+	}
+	if response != nil {
+		if state := objectString(response, "turn_state", "turnState"); state != "" {
+			return state
+		}
+	}
+	return objectString(object, "turn_state", "turnState")
+}
+
+func responseHeaderTurnState(headers any) string {
+	switch value := headers.(type) {
+	case map[string]any:
+		for name, raw := range value {
+			if strings.EqualFold(strings.TrimSpace(name), "x-codex-turn-state") {
+				if state := responseHeaderValue(raw); state != "" {
+					return state
+				}
+			}
+		}
+	case []any:
+		for _, raw := range value {
+			var name, value any
+			switch entry := raw.(type) {
+			case []any:
+				if len(entry) >= 2 {
+					name, value = entry[0], entry[1]
+				}
+			case map[string]any:
+				name = entry["name"]
+				if name == nil {
+					name = entry["key"]
+				}
+				value = entry["value"]
+				if value == nil {
+					value = entry["values"]
+				}
+			}
+			nameText, _ := name.(string)
+			if strings.EqualFold(strings.TrimSpace(nameText), "x-codex-turn-state") {
+				if state := responseHeaderValue(value); state != "" {
+					return state
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func responseHeaderValue(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return strings.TrimSpace(typed)
+	case []any:
+		for _, item := range typed {
+			if text := responseHeaderValue(item); text != "" {
+				return text
+			}
+		}
+	}
+	return ""
 }
 
 func collectNestedAffinity(object map[string]any, keys *affinityKeys, depth int) {
