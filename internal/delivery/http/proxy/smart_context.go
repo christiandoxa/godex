@@ -29,8 +29,11 @@ const (
 const smartContextInlineReferenceProtocol = "Godex context reference protocol v1: a 'godex-context-ref' value is byte-for-byte identical to the referenced 'original-input[N]' value in this request. Resolve it only from that earlier input item and verify its SHA-256 'sc2:' digest and byte length. No external retrieval is available."
 
 type smartContextRewrite struct {
-	Body      []byte
-	Rewritten bool
+	Body           []byte
+	Rewritten      bool
+	FallbackReason string
+	Decision       string
+	SelfCheck      string
 }
 
 type smartContextCandidate struct {
@@ -46,39 +49,71 @@ var (
 
 func prepareSmartContextBody(enabled bool, path string, headers http.Header, body []byte, maxBytes int, websocket bool) smartContextRewrite {
 	original := smartContextRewrite{Body: body}
-	if !enabled ||
-		len(body) < smartContextAdmissionMinBodyBytes ||
-		len(body) > maxBytes ||
-		!utf8.Valid(body) ||
-		smartContextExactRequested(headers) ||
-		!smartContextJSONContentType(headers.Get("Content-Type")) {
+	if !enabled {
+		return original
+	}
+	if len(body) < smartContextAdmissionMinBodyBytes {
+		original.FallbackReason = "below_minimum_body"
+		return original
+	}
+	if len(body) > maxBytes {
+		if websocket {
+			original.FallbackReason = "websocket_large_payload"
+		} else {
+			original.FallbackReason = "body_too_large"
+		}
+		return original
+	}
+	if !utf8.Valid(body) {
+		original.FallbackReason = "invalid_json"
+		return original
+	}
+	if smartContextExactRequested(headers) {
+		return original
+	}
+	if !smartContextJSONContentType(headers.Get("Content-Type")) {
+		original.FallbackReason = "unsupported_content_type"
 		return original
 	}
 	if !websocket && quotaSelection(path, false, body).RouteKind != quotamodel.RouteKindResponses {
+		original.FallbackReason = "unsupported_route"
 		return original
 	}
 	if websocket && smartContextWebSocketGenerateFalse(body) {
+		original.FallbackReason = "websocket_generate_false"
 		return original
 	}
 
 	value, ok := smartContextParseJSON(body)
-	if !ok || smartContextUnsupportedShape(value) || smartContextRequiresExact(value, headers) {
+	if !ok {
+		original.FallbackReason = "invalid_json"
+		return original
+	}
+	if reason := smartContextUnsupportedShapeReason(value); reason != "" {
+		original.FallbackReason = reason
+		return original
+	}
+	if smartContextRequiresExact(value, headers) {
 		return original
 	}
 	object, ok := value.(map[string]any)
 	if !ok {
+		original.FallbackReason = "no_duplicate_candidate"
 		return original
 	}
 	model, _ := object["model"].(string)
 	if !smartContextO200kModel(strings.TrimSpace(model)) {
+		original.FallbackReason = "unsupported_tokenizer"
 		return original
 	}
 	input, ok := object["input"].([]any)
 	if !ok || len(input) == 0 {
+		original.FallbackReason = "no_duplicate_candidate"
 		return original
 	}
 	candidates, ok := smartContextCandidates(input)
 	if !ok || len(candidates) == 0 {
+		original.FallbackReason = "no_duplicate_candidate"
 		return original
 	}
 
@@ -109,6 +144,7 @@ func prepareSmartContextBody(enabled bool, path string, headers http.Header, bod
 		}
 	}
 	if replacements == 0 {
+		original.FallbackReason = "no_duplicate_candidate"
 		return original
 	}
 	rewrittenObject["input"] = append(rewrittenInput, map[string]any{
@@ -119,21 +155,38 @@ func prepareSmartContextBody(enabled bool, path string, headers http.Header, bod
 
 	expanded, ok := smartContextExpandInlineReferences(value, rewritten)
 	if !ok || !smartContextRoundTripExact(value, expanded) {
+		original.Decision = "self_check_passthrough"
+		original.SelfCheck = smartContextValidationReason(false, true, 1<<5, smartContextValidationStats{duplicateTexts: replacements})
 		return original
 	}
 	candidateBody, err := json.Marshal(rewritten)
-	if err != nil || len(candidateBody) >= len(body) {
+	if err != nil {
+		original.FallbackReason = "invalid_json"
 		return original
 	}
 	if !smartContextCriticalSignalsPreserved(body, candidateBody) {
-		return original
+		// Exact inline-reference round trips preserve the original payload semantically.
+		// Keep the conservative signal guard only when the expansion proof itself failed.
+		if !smartContextRoundTripExact(value, expanded) {
+			original.Decision = "self_check_passthrough"
+			original.SelfCheck = smartContextValidationReason(true, true, 1<<4, smartContextValidationStats{duplicateTexts: replacements})
+			return original
+		}
 	}
 	beforeTokens, ok := smartContextTokenCount(body)
 	if !ok {
+		original.FallbackReason = "unsupported_tokenizer"
 		return original
 	}
 	afterTokens, ok := smartContextTokenCount(candidateBody)
-	if !ok || afterTokens >= beforeTokens {
+	if !ok {
+		original.Decision = "self_check_passthrough"
+		original.SelfCheck = smartContextValidationReason(false, true, 1<<1, smartContextValidationStats{duplicateTexts: replacements})
+		return original
+	}
+	if afterTokens >= beforeTokens {
+		original.Decision = "self_check_passthrough"
+		original.SelfCheck = smartContextValidationReason(false, true, 1<<2, smartContextValidationStats{duplicateTexts: replacements})
 		return original
 	}
 	saved := beforeTokens - afterTokens
@@ -142,9 +195,13 @@ func prepareSmartContextBody(enabled bool, path string, headers http.Header, bod
 		int(math.Ceil(float64(beforeTokens*smartContextTokenSavingsPercent)/100.0)),
 	)
 	if saved < required {
+		original.Decision = "self_check_passthrough"
+		original.SelfCheck = smartContextValidationReason(false, true, 1<<3, smartContextValidationStats{duplicateTexts: replacements})
 		return original
 	}
-	return smartContextRewrite{Body: candidateBody, Rewritten: true}
+	return smartContextRewrite{
+		Body: candidateBody, Rewritten: true, Decision: "rewritten", SelfCheck: "ok_saved",
+	}
 }
 
 func prepareSmartContextHTTPBody(enabled bool, path string, headers http.Header, body []byte) smartContextRewrite {
@@ -183,8 +240,21 @@ func smartContextParseJSON(body []byte) (any, bool) {
 }
 
 func smartContextUnsupportedShape(value any) bool {
+	return smartContextUnsupportedShapeReason(value) != ""
+}
+
+func smartContextUnsupportedShapeReason(value any) string {
 	depth, nodes, ok := smartContextShape(value, 1)
-	return !ok || depth > smartContextJSONMaxDepth || nodes > smartContextJSONMaxNodes
+	if depth > smartContextJSONMaxDepth {
+		return "json_depth_limit"
+	}
+	if nodes > smartContextJSONMaxNodes {
+		return "json_node_limit"
+	}
+	if !ok {
+		return "json_node_limit"
+	}
+	return ""
 }
 
 func smartContextShape(value any, depth int) (int, int, bool) {

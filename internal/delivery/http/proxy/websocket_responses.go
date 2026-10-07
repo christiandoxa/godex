@@ -98,8 +98,17 @@ func (proxy *Proxy) forwardResponsesWebSocket(
 			}
 			payload = redacted
 		}
+		bodyBytesBeforeSmartContext := len(payload)
 		smart := prepareSmartContextWebSocketBody(
 			proxy.smartContextEnabled, request.URL.Path, request.Header, payload,
+		)
+		proxy.recordSmartContextResult(
+			context.WithoutCancel(sessionContext),
+			messageRequestID,
+			request.URL.Path,
+			true,
+			bodyBytesBeforeSmartContext,
+			smart,
 		)
 		payload = smart.Body
 

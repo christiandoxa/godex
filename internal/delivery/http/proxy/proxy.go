@@ -242,8 +242,17 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 			}
 			body = redacted
 		}
+		bodyBytesBeforeSmartContext := len(body)
 		smart := prepareSmartContextHTTPBody(
 			proxy.smartContextEnabled, request.URL.Path, request.Header, body,
+		)
+		proxy.recordSmartContextResult(
+			context.WithoutCancel(request.Context()),
+			activity.sequence,
+			request.URL.Path,
+			false,
+			bodyBytesBeforeSmartContext,
+			smart,
 		)
 		body = smart.Body
 	}
