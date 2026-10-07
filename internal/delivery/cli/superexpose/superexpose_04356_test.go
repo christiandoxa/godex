@@ -742,7 +742,7 @@ func TestProdex04356SuperExposeTunnelLifecycleIsAudited(t *testing.T) {
 	}()
 
 	logPath := filepath.Join(home, "logs", "runtime.jsonl")
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(openAITunnelReadyTimeout)
 	var text string
 	for time.Now().Before(deadline) {
 		content, err := os.ReadFile(logPath)

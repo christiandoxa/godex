@@ -414,7 +414,7 @@ func relayChildOutput(reader io.Reader, writer io.Writer, result chan<- relayRes
 			}
 		}
 		if err != nil {
-			if err != io.EOF && writeErr == nil {
+			if !errors.Is(err, io.EOF) && !errors.Is(err, os.ErrClosed) && writeErr == nil {
 				writeErr = err
 			}
 			result <- relayResult{bytes: total, err: writeErr}

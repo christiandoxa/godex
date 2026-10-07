@@ -236,9 +236,9 @@ func (command *Command) waitUntilIdle(
 					gateway.RecordBrokerLog("runtime_broker_persistence_promotion_error error=owner_lock")
 				case owner:
 					*ownerRelease = release
+					gateway.RecordBrokerLog("runtime_broker_persistence_promoted role=owner")
 					gateway.SetPersistenceEnabled(true)
 					gateway.SetPersistenceRole("owner")
-					gateway.RecordBrokerLog("runtime_broker_persistence_promoted role=owner")
 				}
 			}
 			if active == 0 && time.Since(lastLeaseScan) >= leaseScan {

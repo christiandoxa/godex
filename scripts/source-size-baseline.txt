@@ -9,7 +9,7 @@
 502	internal/delivery/cli/runtime/super_launch.go
 423	internal/delivery/cli/runtimebroker/store.go
 469	internal/delivery/cli/subagent/subagent.go
-409	internal/delivery/cli/superexpose/command.go
+407	internal/delivery/cli/superexpose/command.go
 546	internal/delivery/cli/superexpose/exec.go
 531	internal/delivery/cli/superexpose/openai_tunnel.go
 675	internal/delivery/cli/superexpose/protocol.go

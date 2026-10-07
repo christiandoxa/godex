@@ -383,9 +383,7 @@ func runExecServer(ctx context.Context, options Options, out, errOut io.Writer) 
 			<-serveErr
 			return errors.New("OpenAI tunnel-client exited unexpectedly")
 		case <-ctx.Done():
-			closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-			_ = server.Shutdown(closeCtx)
-			cancel()
+			_ = server.Close()
 			<-serveErr
 			return nil
 		}
