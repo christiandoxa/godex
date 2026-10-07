@@ -252,12 +252,9 @@ func startOpenAITunnel(localMCPURL, tunnelID string) (*openAITunnelProcess, erro
 	if err != nil {
 		return nil, err
 	}
-	apiKey, present := os.LookupEnv("CONTROL_PLANE_API_KEY")
-	if !present || !utf8.ValidString(apiKey) {
-		return nil, errors.New("OpenAI Secure MCP Tunnel requires CONTROL_PLANE_API_KEY in noninteractive mode")
-	}
-	if apiKey == "" || len(apiKey) > openAITunnelAPIKeyMax || tunnelHasControl(apiKey) {
-		return nil, errors.New("OpenAI Secure MCP Tunnel API key is invalid")
+	apiKey, err := openAITunnelAPIKeyFromEnv()
+	if err != nil {
+		return nil, err
 	}
 	localMCPURL, err = validateLocalTunnelMCPURL(localMCPURL)
 	if err != nil {

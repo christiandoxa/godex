@@ -826,39 +826,26 @@ func TestProdex04356OpenAITunnelIDAndClientVersionPolicy(t *testing.T) {
 }
 
 func TestProdex04356OpenAITunnelCredentialsDistinguishMissingAndInvalid(t *testing.T) {
-	t.Setenv(tunnelHelperEnv, "1")
-	t.Setenv("GODEX_TUNNEL_CLIENT_BIN", tunnelClientHelperBinary(t))
-	validID := "tunnel_" + strings.Repeat("d", 32)
-
 	if err := os.Unsetenv("CONTROL_PLANE_API_KEY"); err != nil {
 		t.Fatal(err)
 	}
-	tunnel, err := startOpenAITunnel("http://127.0.0.1:4567/mcp/capability", validID)
-	if tunnel != nil {
-		tunnel.shutdown()
-	}
-	if err == nil || !strings.Contains(err.Error(), "requires CONTROL_PLANE_API_KEY in noninteractive mode") {
+	if _, err := openAITunnelAPIKeyFromEnv(); err == nil ||
+		!strings.Contains(err.Error(), "requires CONTROL_PLANE_API_KEY in noninteractive mode") {
 		t.Fatalf("missing API key error = %v", err)
 	}
 
 	for _, invalid := range []string{"", "bad\nkey", "bad\u0085key"} {
 		t.Setenv("CONTROL_PLANE_API_KEY", invalid)
-		tunnel, err := startOpenAITunnel("http://127.0.0.1:4567/mcp/capability", validID)
-		if tunnel != nil {
-			tunnel.shutdown()
-		}
-		if err == nil || !strings.Contains(err.Error(), "OpenAI Secure MCP Tunnel API key is invalid") {
+		if _, err := openAITunnelAPIKeyFromEnv(); err == nil ||
+			!strings.Contains(err.Error(), "OpenAI Secure MCP Tunnel API key is invalid") {
 			t.Fatalf("invalid API key %q error = %v", invalid, err)
 		}
 	}
 
 	if goruntime.GOOS != "windows" {
 		t.Setenv("CONTROL_PLANE_API_KEY", string([]byte{0xff}))
-		tunnel, err = startOpenAITunnel("http://127.0.0.1:4567/mcp/capability", validID)
-		if tunnel != nil {
-			tunnel.shutdown()
-		}
-		if err == nil || !strings.Contains(err.Error(), "requires CONTROL_PLANE_API_KEY in noninteractive mode") {
+		if _, err := openAITunnelAPIKeyFromEnv(); err == nil ||
+			!strings.Contains(err.Error(), "requires CONTROL_PLANE_API_KEY in noninteractive mode") {
 			t.Fatalf("non-UTF8 API key error = %v", err)
 		}
 	}

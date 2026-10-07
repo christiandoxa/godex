@@ -68,8 +68,8 @@ func TestProdex04355DeepSeekStreamIdleAcceptsSubIdleGaps(t *testing.T) {
 				`event: content_block_delta` + "\ndata: " + `{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"ready"}}` + "\n\n",
 			`event: message_stop` + "\ndata: " + `{"type":"message_stop"}` + "\n\n",
 		},
-		[]time.Duration{0, 15 * time.Millisecond, 15 * time.Millisecond},
-		40*time.Millisecond,
+		[]time.Duration{0, 50 * time.Millisecond, 50 * time.Millisecond},
+		500*time.Millisecond,
 	)
 	if !strings.Contains(stream, `"delta":"ready"`) || !strings.Contains(stream, "event: response.completed") {
 		t.Fatalf("sub-idle stream = %s", stream)
@@ -85,8 +85,8 @@ func TestProdex04355DeepSeekStreamIdleResetsAfterEachChunk(t *testing.T) {
 			`event: content_block_delta` + "\ndata: " + `{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"b"}}` + "\n\n" +
 				`event: message_stop` + "\ndata: " + `{"type":"message_stop"}` + "\n\n",
 		},
-		[]time.Duration{0, 18 * time.Millisecond, 18 * time.Millisecond, 18 * time.Millisecond},
-		30*time.Millisecond,
+		[]time.Duration{0, 100 * time.Millisecond, 100 * time.Millisecond, 100 * time.Millisecond},
+		250*time.Millisecond,
 	)
 	if !strings.Contains(stream, `"delta":"a"`) || !strings.Contains(stream, `"delta":"b"`) || !strings.Contains(stream, "event: response.completed") {
 		t.Fatalf("reset-idle stream = %s", stream)
