@@ -165,12 +165,27 @@ func kiroMessagesStopReason(response map[string]any) string {
 	if kiroResponseHasToolCalls(response) {
 		return "tool_use"
 	}
+	var reason any
+	var found bool
 	if details, ok := response["incomplete_details"].(map[string]any); ok {
-		if responseString(details["reason"], "") == "max_output_tokens" {
-			return "max_tokens"
+		reason, found = details["reason"]
+	}
+	if !found {
+		if metadata, ok := response[kiroFieldMetadata].(map[string]any); ok {
+			if kiro, ok := metadata["kiro"].(map[string]any); ok {
+				reason, found = kiro["stop_reason"]
+			}
 		}
 	}
-	return "end_turn"
+	value, _ := reason.(string)
+	switch value {
+	case "max_output_tokens", "max_tokens":
+		return "max_tokens"
+	case "tool_use":
+		return "tool_use"
+	default:
+		return "end_turn"
+	}
 }
 
 func kiroResponseHasToolCalls(response map[string]any) bool {

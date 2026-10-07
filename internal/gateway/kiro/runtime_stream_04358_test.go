@@ -99,3 +99,34 @@ func TestProdex04358MessagesResponsePreservesToolUseShape(t *testing.T) {
 		t.Fatalf("usage = %#v", usage)
 	}
 }
+
+func TestProdex04358MessagesStopReasonPrecedence(t *testing.T) {
+	tests := []struct {
+		name     string
+		response map[string]any
+		want     string
+	}{
+		{name: "metadata max output", response: map[string]any{"metadata": map[string]any{"kiro": map[string]any{"stop_reason": "max_output_tokens"}}}, want: "max_tokens"},
+		{name: "metadata max tokens", response: map[string]any{"metadata": map[string]any{"kiro": map[string]any{"stop_reason": "max_tokens"}}}, want: "max_tokens"},
+		{name: "metadata tool use", response: map[string]any{"metadata": map[string]any{"kiro": map[string]any{"stop_reason": "tool_use"}}}, want: "tool_use"},
+		{name: "incomplete wins metadata", response: map[string]any{
+			"incomplete_details": map[string]any{"reason": "max_tokens"},
+			"metadata":           map[string]any{"kiro": map[string]any{"stop_reason": "tool_use"}},
+		}, want: "max_tokens"},
+		{name: "present unknown incomplete blocks metadata fallback", response: map[string]any{
+			"incomplete_details": map[string]any{"reason": "unknown"},
+			"metadata":           map[string]any{"kiro": map[string]any{"stop_reason": "tool_use"}},
+		}, want: "end_turn"},
+		{name: "wrong typed incomplete blocks metadata fallback", response: map[string]any{
+			"incomplete_details": map[string]any{"reason": 7},
+			"metadata":           map[string]any{"kiro": map[string]any{"stop_reason": "tool_use"}},
+		}, want: "end_turn"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := kiroMessagesStopReason(test.response); got != test.want {
+				t.Fatalf("stop reason = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
