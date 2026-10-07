@@ -15,6 +15,8 @@ const requestMaxBytes = 16 << 20
 type translatedRequest struct {
 	body     []byte
 	metadata map[string]any
+	model    string
+	stream   bool
 }
 
 func translateResponsesRequest(body []byte, model string) (translatedRequest, error) {
@@ -31,11 +33,23 @@ func translateResponsesRequest(body []byte, model string) (translatedRequest, er
 		return translatedRequest{}, err
 	}
 	applyThoughtSignatures(chat["messages"], request["input"])
-	encoded, err := json.Marshal(chat)
+	native, err := geminiGenerateContentRequest(chat, request)
 	if err != nil {
-		return translatedRequest{}, errors.New("failed to serialize translated Gemini chat request")
+		return translatedRequest{}, err
 	}
-	return translatedRequest{body: encoded, metadata: metadata}, nil
+	encoded, err := json.Marshal(native)
+	if err != nil {
+		return translatedRequest{}, errors.New("failed to serialize translated Gemini generateContent request")
+	}
+	selectedModel := strings.TrimSpace(model)
+	if requested, _ := request["model"].(string); strings.TrimSpace(requested) != "" {
+		selectedModel = strings.TrimSpace(requested)
+	}
+	if selectedModel == "" {
+		selectedModel = "auto"
+	}
+	stream, _ := request["stream"].(bool)
+	return translatedRequest{body: encoded, metadata: metadata, model: selectedModel, stream: stream}, nil
 }
 
 func parseResponsesRequest(body []byte) (map[string]any, error) {
@@ -147,11 +161,8 @@ func applyGeminiFormat(chat, request, metadata map[string]any) error {
 		chat["response_format"] = format
 	}
 	if degraded {
-		metadata["degraded_response_format"] = map[string]any{
-			"from": responseFormatType(request), "to": "json_object",
-			"reason": "Gemini OpenAI-compatible response_format supports json_object but not native JSON Schema enforcement",
-		}
-		ensureJSONInstruction(chat)
+		// Native Gemini GenerateContent supports JSON-schema constraints directly.
+		// The schema is projected into generationConfig.responseJsonSchema later.
 	}
 	return nil
 }

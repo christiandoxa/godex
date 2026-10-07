@@ -61,6 +61,48 @@ func (transport *RuntimeTransport) Execute(ctx context.Context, input proxymodel
 	}
 }
 
+func (transport *RuntimeTransport) sendResponses(
+	ctx context.Context,
+	input proxymodel.Request,
+	translated translatedRequest,
+) (*http.Response, error) {
+	target, err := transport.responsesTarget(translated.model, translated.stream)
+	if err != nil {
+		return nil, err
+	}
+	request, err := http.NewRequestWithContext(ctx, input.Method, target, bytes.NewReader(translated.body))
+	if err != nil {
+		return nil, errors.New("create Gemini upstream request")
+	}
+	applyNativeHeaders(request.Header, input.Header, transport.apiKey)
+	if translated.stream {
+		request.Header.Set("Accept", "text/event-stream")
+	}
+	return transport.client.Do(request)
+}
+
+func (transport *RuntimeTransport) responsesTarget(model string, stream bool) (string, error) {
+	target := *transport.upstream
+	base := strings.TrimRight(target.Path, "/")
+	base = strings.TrimSuffix(base, "/openai")
+	model = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(model), "models/"))
+	if model == "" || strings.Contains(model, "/") || model == "." || model == ".." {
+		return "", errors.New("Gemini Responses model is invalid")
+	}
+	method := "generateContent"
+	if stream {
+		method = "streamGenerateContent"
+	}
+	target.Path = base + "/models/" + model + ":" + method
+	target.RawPath = ""
+	if stream {
+		target.RawQuery = "alt=sse"
+	} else {
+		target.RawQuery = ""
+	}
+	return target.String(), nil
+}
+
 func (transport *RuntimeTransport) send(ctx context.Context, input proxymodel.Request, current route, body []byte) (*http.Response, error) {
 	target, err := transport.target(current, input.RawQuery)
 	if err != nil {

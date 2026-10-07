@@ -17,20 +17,19 @@ func TestGeminiTargetNormalizesOpenAIPathAndEscapesModelID(t *testing.T) {
 		base string
 		want string
 	}{
-		{"https://gemini.example.test/v1beta/", "https://gemini.example.test/v1beta/openai/chat/completions?key=value"},
-		{"https://gemini.example.test/v1beta/openai/", "https://gemini.example.test/v1beta/openai/chat/completions?key=value"},
+		{"https://gemini.example.test/v1beta/", "https://gemini.example.test/v1beta/models/gemini%20model:generateContent"},
+		{"https://gemini.example.test/v1beta/openai/", "https://gemini.example.test/v1beta/models/gemini%20model:generateContent"},
 	} {
 		transport, err := NewRuntimeTransport(test.base, "fixture-key", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		got, err := transport.target(route{kind: routeResponses}, "key=value")
+		got, err := transport.responsesTarget("gemini model", false)
 		transport.Close()
 		if err != nil || got != test.want {
-			t.Fatalf("target for %q = %q, err=%v; want %q", test.base, got, err, test.want)
+			t.Fatalf("responses target for %q = %q, err=%v; want %q", test.base, got, err, test.want)
 		}
 	}
-
 	transport, err := NewRuntimeTransport("https://gemini.example.test/v1beta", "fixture-key", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -195,35 +194,22 @@ func TestGeminiNonGetModelsRequestPassesThrough(t *testing.T) {
 }
 
 func TestGeminiResponsesUsesRequestedModelAndBearerAuth(t *testing.T) {
-	type captured struct {
-		path  string
-		auth  string
-		model string
-	}
+	type captured struct{ path, auth, apiKey string }
 	var requests []captured
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		body, _ := io.ReadAll(request.Body)
-		var value struct {
-			Model string `json:"model"`
-		}
-		_ = json.Unmarshal(body, &value)
-		requests = append(requests, captured{
-			path: request.URL.Path, auth: request.Header.Get("Authorization"), model: value.Model,
-		})
+		requests = append(requests, captured{path: request.URL.Path, auth: request.Header.Get("Authorization"), apiKey: request.Header.Get("x-goog-api-key")})
 		writer.Header().Set("Content-Type", "application/json")
-		_, _ = writer.Write([]byte(`{"id":"chat_ok","model":"gemini-3.7-flash","choices":[{"message":{"role":"assistant","content":"ok"}}]}`))
+		_, _ = writer.Write([]byte("{\"responseId\":\"resp_ok\",\"modelVersion\":\"gemini-3.8-flash\",\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"ok\"}]},\"finishReason\":\"STOP\"}]}"))
 	}))
 	defer server.Close()
-
 	transport, err := NewRuntimeTransport(server.URL+"/v1beta/openai", "fixture-key", server.Client())
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer transport.Close()
 	response, err := transport.Execute(context.Background(), proxymodel.Request{
-		Method: http.MethodPost,
-		Path:   mountPath + "/responses",
-		Body:   []byte(`{"model":"gemini-3.8-flash","input":"hello"}`),
+		Method: http.MethodPost, Path: mountPath + "/responses",
+		Body: []byte("{\"model\":\"gemini-3.8-flash\",\"input\":\"hello\"}"),
 	}, proxymodel.Account{})
 	if err != nil {
 		t.Fatal(err)
@@ -233,16 +219,11 @@ func TestGeminiResponsesUsesRequestedModelAndBearerAuth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if response.StatusCode != http.StatusOK || !strings.Contains(string(body), `"object":"response"`) {
+	if response.StatusCode != http.StatusOK || !strings.Contains(string(body), "\"object\":\"response\"") {
 		t.Fatalf("translated response = status:%d body:%s", response.StatusCode, body)
 	}
-	if len(requests) != 1 || requests[0].model != "gemini-3.8-flash" {
+	if len(requests) != 1 || requests[0].path != "/v1beta/models/gemini-3.8-flash:generateContent" || requests[0].apiKey != "fixture-key" || requests[0].auth != "" {
 		t.Fatalf("upstream requests = %#v", requests)
-	}
-	for _, request := range requests {
-		if request.path != "/v1beta/openai/chat/completions" || request.auth != "Bearer fixture-key" {
-			t.Fatalf("upstream request = %#v", request)
-		}
 	}
 }
 

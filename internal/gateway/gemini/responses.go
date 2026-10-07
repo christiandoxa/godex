@@ -10,9 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
-	"github.com/google/uuid"
 )
 
 func (transport *RuntimeTransport) executeResponses(ctx context.Context, input proxymodel.Request, current route) (*proxymodel.Response, error) {
@@ -20,7 +18,7 @@ func (transport *RuntimeTransport) executeResponses(ctx context.Context, input p
 	if err != nil {
 		return nil, &proxymodel.Error{StatusCode: http.StatusBadRequest, Message: err.Error()}
 	}
-	response, err := transport.send(ctx, input, current, translated.body)
+	response, err := transport.sendResponses(ctx, input, translated)
 	if err != nil {
 		return nil, err
 	}
@@ -33,12 +31,7 @@ func (transport *RuntimeTransport) executeResponses(ctx context.Context, input p
 func translateResponse(response *http.Response, requestMetadata map[string]any) (*proxymodel.Response, error) {
 	contentType := strings.ToLower(response.Header.Get("Content-Type"))
 	if strings.Contains(contentType, "text/event-stream") {
-		return &proxymodel.Response{
-			StatusCode: response.StatusCode,
-			Header:     translatedHeaders(response.Header, "text/event-stream"),
-			Body:       chatcompat.ChatSSEWithMetadata(response.Body, "gemini", requestMetadata),
-			Trailer:    response.Trailer,
-		}, nil
+		return translateGeminiNativeStream(response, requestMetadata), nil
 	}
 	defer response.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(response.Body, bodyMaxBytes+1))
@@ -48,18 +41,15 @@ func translateResponse(response *http.Response, requestMetadata map[string]any) 
 	if len(body) > bodyMaxBytes {
 		return nil, errors.New("Gemini translated response exceeded the safe read limit")
 	}
-	translated, err := chatcompat.ChatResponseWithOptions(body, time.Now(), chatcompat.ResponseOptions{
-		ProviderKey: "gemini", AdapterLabel: "Gemini OpenAI-compatible",
-		DefaultModel:       "auto",
-		FallbackResponseID: func() string { return "resp_gemini_" + uuid.NewString() },
-		FallbackCallID:     func(int) string { return "call_gemini_" + uuid.NewString() },
-	})
-	if err != nil {
-		return nil, err
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.UseNumber()
+	var native map[string]any
+	if err := decoder.Decode(&native); err != nil {
+		return nil, errors.New("failed to parse Gemini response JSON")
 	}
-	translated, err = mergeResponseMetadata(translated, requestMetadata)
+	translated, err := json.Marshal(geminiNativeResponsesValue(native, requestMetadata, time.Now().Unix()))
 	if err != nil {
-		return nil, err
+		return nil, errors.New("failed to serialize Gemini Responses JSON")
 	}
 	return &proxymodel.Response{
 		StatusCode: response.StatusCode,

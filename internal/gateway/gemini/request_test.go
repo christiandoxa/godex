@@ -15,26 +15,28 @@ func TestGeminiResponsesRequestPreservesMetadataAndMapsTopLevelReasoning(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
-	var chat map[string]any
-	if err := json.Unmarshal(translated.body, &chat); err != nil {
+	var native map[string]any
+	if err := json.Unmarshal(translated.body, &native); err != nil {
 		t.Fatal(err)
 	}
-	if chat["reasoning_effort"] != "high" {
-		t.Fatalf("reasoning_effort = %#v", chat["reasoning_effort"])
+	generation := native["generationConfig"].(map[string]any)
+	thinking := generation["thinkingConfig"].(map[string]any)
+	if thinking["thinkingLevel"] != "HIGH" || thinking["includeThoughts"] != true {
+		t.Fatalf("thinking config = %#v", thinking)
 	}
-	if _, exists := chat["tool_choice"]; exists {
-		t.Fatalf("tool_choice was not omitted for thinking mode: %#v", chat)
+	if _, exists := native["toolConfig"]; exists {
+		t.Fatalf("toolConfig was not omitted for thinking mode: %#v", native)
 	}
 	metadata := translated.metadata
 	if metadata["request_id"] != "r1" || metadata["client_metadata"].(map[string]any)["client"] != "codex" {
 		t.Fatalf("response metadata = %#v", metadata)
 	}
-	gemini := metadata["gemini"].(map[string]any)
-	if gemini["trace"] != "g1" || gemini["prompt_cache_key"] != " cache " || gemini["prompt_cache_retention"] != "24h" {
-		t.Fatalf("Gemini metadata = %#v", gemini)
+	provider := metadata["gemini"].(map[string]any)
+	if provider["trace"] != "g1" || provider["prompt_cache_key"] != " cache " || provider["prompt_cache_retention"] != "24h" {
+		t.Fatalf("Gemini metadata = %#v", provider)
 	}
-	if gemini["omitted_tool_choice"].(map[string]any)["from"] != "required" {
-		t.Fatalf("omitted choice metadata = %#v", gemini["omitted_tool_choice"])
+	if provider["omitted_tool_choice"].(map[string]any)["from"] != "required" {
+		t.Fatalf("omitted choice metadata = %#v", provider["omitted_tool_choice"])
 	}
 }
 
@@ -51,24 +53,33 @@ func TestGeminiResponsesRequestTranslatesNestedToolsAndFormats(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var chat map[string]any
-	if err := json.Unmarshal(translated.body, &chat); err != nil {
+	var native map[string]any
+	if err := json.Unmarshal(translated.body, &native); err != nil {
 		t.Fatal(err)
 	}
-	tools := chat["tools"].([]any)
-	if len(tools) != 4 || tools[0].(map[string]any)["function"].(map[string]any)["name"] != "files__read" ||
-		tools[1].(map[string]any)["function"].(map[string]any)["name"] != "shell" ||
-		tools[2].(map[string]any)["function"].(map[string]any)["name"] != "mcp__fs__list_files" ||
-		tools[3].(map[string]any)["function"].(map[string]any)["name"] != "mcp__fs__read_file" {
-		t.Fatalf("translated tools = %#v", tools)
+	tools := native["tools"].([]any)
+	declarations := tools[0].(map[string]any)["functionDeclarations"].([]any)
+	if len(declarations) != 4 ||
+		declarations[0].(map[string]any)["name"] != "files__read" ||
+		declarations[1].(map[string]any)["name"] != "shell" ||
+		declarations[2].(map[string]any)["name"] != "mcp__fs__list_files" ||
+		declarations[3].(map[string]any)["name"] != "mcp__fs__read_file" {
+		t.Fatalf("translated declarations = %#v", declarations)
 	}
-	if chat["tool_choice"].(map[string]any)["function"].(map[string]any)["name"] != "files__read" ||
-		chat["web_search_options"].(map[string]any)["search_context_size"] != "high" ||
-		chat["response_format"].(map[string]any)["type"] != "json_object" {
-		t.Fatalf("translated controls = %#v", chat)
+	if _, ok := tools[1].(map[string]any)["googleSearch"]; !ok {
+		t.Fatalf("Gemini web-search tool = %#v", tools)
 	}
-	if translated.metadata["gemini"].(map[string]any)["degraded_response_format"].(map[string]any)["from"] != "structured_output" {
-		t.Fatalf("response metadata = %#v", translated.metadata)
+	choice := native["toolConfig"].(map[string]any)["functionCallingConfig"].(map[string]any)
+	if choice["mode"] != "ANY" || choice["allowedFunctionNames"].([]any)[0] != "files__read" {
+		t.Fatalf("translated toolConfig = %#v", native["toolConfig"])
+	}
+	generation := native["generationConfig"].(map[string]any)
+	if generation["responseMimeType"] != "application/json" ||
+		generation["responseJsonSchema"].(map[string]any)["type"] != "object" {
+		t.Fatalf("translated generation config = %#v", generation)
+	}
+	if provider, _ := translated.metadata["gemini"].(map[string]any); provider["degraded_response_format"] != nil {
+		t.Fatalf("native structured output was incorrectly marked degraded: %#v", translated.metadata)
 	}
 }
 
@@ -93,11 +104,12 @@ func TestGeminiResponsesRequestMapsMCPNamedToolChoice(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var chat map[string]any
-	if err := json.Unmarshal(translated.body, &chat); err != nil {
+	var native map[string]any
+	if err := json.Unmarshal(translated.body, &native); err != nil {
 		t.Fatal(err)
 	}
-	if chat["tool_choice"].(map[string]any)["function"].(map[string]any)["name"] != "mcp__files__read" {
-		t.Fatalf("tool_choice = %#v", chat["tool_choice"])
+	choice := native["toolConfig"].(map[string]any)["functionCallingConfig"].(map[string]any)
+	if choice["allowedFunctionNames"].([]any)[0] != "mcp__files__read" {
+		t.Fatalf("toolConfig = %#v", native["toolConfig"])
 	}
 }
