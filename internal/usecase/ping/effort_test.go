@@ -34,3 +34,16 @@ func TestPingDynamicModelsRejectsExplicitUnsupportedOrHidden(t *testing.T) {
 		t.Fatalf("dynamic models = %#v, want only visible", models)
 	}
 }
+
+func TestNormalizePingEffortFallsBackToProviderDefaultForUnknownModel(t *testing.T) {
+	got, err := normalizePingEffort("gpt-dynamic-only", "MAX")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "max" {
+		t.Fatalf("normalized effort = %q, want max", got)
+	}
+	if _, err := normalizePingEffort("gpt-dynamic-only", "ultra"); err == nil {
+		t.Fatal("provider-default unsupported effort unexpectedly accepted")
+	}
+}

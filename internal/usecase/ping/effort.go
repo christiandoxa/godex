@@ -36,6 +36,9 @@ func normalizePingEffort(model, effort string) (string, error) {
 		selected = entries[0].ID
 	}
 	entry := proxymodel.ResolveProviderCatalogEntry(entries, selected)
+	if entry == nil && len(entries) > 0 {
+		entry = &entries[0]
+	}
 	if entry == nil {
 		return "", errors.New("reasoning effort is unsupported for the selected model")
 	}

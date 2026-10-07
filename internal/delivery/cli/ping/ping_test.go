@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
+
 	pingmodel "github.com/christiandoxa/godex/internal/model/ping"
 )
 
@@ -174,5 +176,17 @@ func TestPingRejectsControlValuesBeforeRunner(t *testing.T) {
 		if err := Run(context.Background(), runner, &strings.Builder{}, arguments); err == nil {
 			t.Fatalf("arguments %q unexpectedly accepted", arguments)
 		}
+	}
+}
+
+func TestPingChoiceNavigationMatchesProdexLowercaseKeys(t *testing.T) {
+	model := pingChoiceModel{title: "test", choices: []string{"a", "b"}, selected: 0}
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'K'}})
+	if got := updated.(pingChoiceModel).selected; got != 0 {
+		t.Fatalf("uppercase K moved selection to %d", got)
+	}
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	if got := updated.(pingChoiceModel).selected; got != 1 {
+		t.Fatalf("lowercase j selection = %d, want 1", got)
 	}
 }

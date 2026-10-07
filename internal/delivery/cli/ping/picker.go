@@ -31,7 +31,7 @@ func (model pingChoiceModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	if !ok {
 		return model, nil
 	}
-	switch strings.ToLower(key.String()) {
+	switch key.String() {
 	case "up", "k":
 		if model.selected == 0 {
 			model.selected = len(model.choices) - 1
