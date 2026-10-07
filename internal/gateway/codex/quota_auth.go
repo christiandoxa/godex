@@ -54,23 +54,43 @@ func (process *CodexProcess) InspectQuotaAuth(ctx context.Context, codexHome str
 	return summarizeQuotaAuth(content), nil
 }
 
+type quotaStoredAuth struct {
+	AuthMode *string `json:"auth_mode"`
+	Tokens   *struct {
+		AccessToken *string `json:"access_token"`
+	} `json:"tokens"`
+	OpenAIAPIKey  *string `json:"OPENAI_API_KEY"`
+	BedrockAPIKey *struct {
+		APIKey *string `json:"api_key"`
+	} `json:"bedrock_api_key"`
+}
+
 func summarizeQuotaAuth(content []byte) profilemodel.QuotaAuthSummary {
-	var auth codexAuthFile
+	var auth quotaStoredAuth
 	if err := json.Unmarshal(content, &auth); err != nil {
 		return quotaAuthSummary("invalid-auth", false)
 	}
-	defer clearAuthTokens(&auth)
-	if strings.TrimSpace(auth.Tokens.AccessToken) != "" {
+	hasChatGPTToken := auth.Tokens != nil && auth.Tokens.AccessToken != nil &&
+		strings.TrimSpace(*auth.Tokens.AccessToken) != ""
+	hasAPIKey := auth.OpenAIAPIKey != nil && strings.TrimSpace(*auth.OpenAIAPIKey) != ""
+	hasBedrockAPIKey := auth.BedrockAPIKey != nil && auth.BedrockAPIKey.APIKey != nil &&
+		strings.TrimSpace(*auth.BedrockAPIKey.APIKey) != ""
+
+	modeMatches := func(want string) bool {
+		return auth.AuthMode != nil && normalizeQuotaAuthMode(*auth.AuthMode) == want
+	}
+	switch {
+	case hasChatGPTToken || modeMatches("chatgpt"):
 		return quotaAuthSummary("chatgpt", true)
-	}
-	mode := normalizeQuotaAuthMode(auth.AuthMode)
-	if mode == "apikey" || strings.TrimSpace(auth.OpenAIAPIKey) != "" {
+	case hasBedrockAPIKey || modeMatches("bedrockapikey"):
+		return quotaAuthSummary("bedrock-api-key", false)
+	case hasAPIKey || modeMatches("apikey"):
 		return quotaAuthSummary("api-key", false)
-	}
-	if mode == "" {
+	case auth.AuthMode == nil:
 		return quotaAuthSummary("auth-present", false)
+	default:
+		return quotaAuthSummary(*auth.AuthMode, false)
 	}
-	return quotaAuthSummary(strings.ToLower(strings.TrimSpace(auth.AuthMode)), false)
 }
 
 func normalizeQuotaAuthMode(value string) string {

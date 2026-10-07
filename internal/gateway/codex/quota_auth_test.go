@@ -104,3 +104,29 @@ func TestInspectQuotaAuthKeepsOpenAIProviderAuthSummary(t *testing.T) {
 		t.Fatalf("summary = %+v", got)
 	}
 }
+
+func TestProdex04358QuotaAuthSummaryLabelPolicy(t *testing.T) {
+	tests := []struct {
+		name       string
+		content    string
+		wantLabel  string
+		compatible bool
+	}{
+		{name: "mode-only chatgpt", content: `{"auth_mode":" chat-gpt "}`, wantLabel: "chatgpt", compatible: true},
+		{name: "bedrock mode", content: `{"auth_mode":" Bedrock_API-Key "}`, wantLabel: "bedrock-api-key"},
+		{name: "bedrock credential", content: `{"auth_mode":"custom","bedrock_api_key":{"api_key":" key "}}`, wantLabel: "bedrock-api-key"},
+		{name: "chatgpt token wins", content: `{"auth_mode":"api-key","OPENAI_API_KEY":"key","tokens":{"access_token":" token "}}`, wantLabel: "chatgpt", compatible: true},
+		{name: "bedrock wins api key", content: `{"auth_mode":"api-key","OPENAI_API_KEY":"key","bedrock_api_key":{"api_key":"bedrock"}}`, wantLabel: "bedrock-api-key"},
+		{name: "missing mode with auth object", content: `{}`, wantLabel: "auth-present"},
+		{name: "custom preserves spelling", content: `{"auth_mode":" Custom_Mode "}`, wantLabel: " Custom_Mode "},
+		{name: "empty mode is present", content: `{"auth_mode":""}`, wantLabel: ""},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := summarizeQuotaAuth([]byte(test.content))
+			if got.Label != test.wantLabel || got.Compatible != test.compatible {
+				t.Fatalf("summary = %+v, want label=%q compatible=%t", got, test.wantLabel, test.compatible)
+			}
+		})
+	}
+}
