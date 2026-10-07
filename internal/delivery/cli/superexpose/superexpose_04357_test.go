@@ -1,23 +1,35 @@
 package superexpose
 
-import (
-	"strings"
-	"testing"
-)
+import "testing"
 
-func TestProdex04357OpenAITunnelQualificationReferenceIs0016(t *testing.T) {
-	if openAITunnelMinimumVersion != "0.0.13" {
-		t.Fatalf("minimum tunnel-client version = %q", openAITunnelMinimumVersion)
-	}
-	if openAITunnelLatestReference != "0.0.16" {
-		t.Fatalf("latest qualified tunnel-client reference = %q, want 0.0.16", openAITunnelLatestReference)
-	}
-	if text := openAITunnelInstallError().Error(); !strings.Contains(text, "0.0.16") || !strings.Contains(text, "0.0.13") {
-		t.Fatalf("tunnel install guidance = %q", text)
-	}
-	const sha = "5f99daabd4aa4a77049e6d81d54a0d8c18335397"
-	version, ok := supportedTunnelClientVersion("0.0.16+" + sha + " (git sha: " + sha + ")")
-	if !ok || version != "0.0.16" {
-		t.Fatalf("official 0.0.16 qualification = %q / %t", version, ok)
+func TestProdex04357ExposeAuditRouteLabelsMatchCanonicalSurface(t *testing.T) {
+	for _, testCase := range []struct {
+		method, tool string
+		wantMethod   string
+		wantTool     string
+	}{
+		{"server/discover", "", "server_discover", "unknown"},
+		{"initialize", "", "initialize", "unknown"},
+		{"ping", "", "ping", "unknown"},
+		{"tools/list", "", "tools_list", "unknown"},
+		{"notifications/initialized", "", "notification", "unknown"},
+		{"notifications/cancelled", "", "notification", "unknown"},
+		{"tools/call", godexStartToolName, "tools_call", "start"},
+		{"tools/call", godexStatusToolName, "tools_call", "status"},
+		{"tools/call", godexEventsToolName, "tools_call", "events"},
+		{"tools/call", godexResultToolName, "tools_call", "result"},
+		{"tools/call", godexCancelToolName, "tools_call", "cancel"},
+		{"tools/call", godexListToolName, "tools_call", "list"},
+		{"tools/call", godexExecToolName, "tools_call", "exec"},
+		{"tools/call", godexSessionPromptWriteToolName, "tools_call", "session_prompt_write"},
+		{"tools/call", godexSessionPreemptToolName, "tools_call", "session_preempt"},
+		{"tools/call", godexSessionOutputReadToolName, "tools_call", "session_output_read"},
+		{"other", "", "unknown", "unknown"},
+	} {
+		gotMethod, gotTool := exposeAuditRoute(testCase.method, testCase.tool)
+		if gotMethod != testCase.wantMethod || gotTool != testCase.wantTool {
+			t.Fatalf("route %q/%q = %q/%q, want %q/%q",
+				testCase.method, testCase.tool, gotMethod, gotTool, testCase.wantMethod, testCase.wantTool)
+		}
 	}
 }
