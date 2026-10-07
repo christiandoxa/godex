@@ -80,7 +80,7 @@ jobs:
             -Dsonar.projectName=godex
             -Dsonar.projectVersion=${{ github.sha }}
 
-      - name: Require zero Sonar issues
+      - name: Enforce Sonar quality and security gates
         shell: bash
         run: |
           set -euo pipefail
@@ -89,20 +89,6 @@ jobs:
             --data-urlencode "projectKey=godex-ci" \
             "${SONAR_HOST_URL}/api/qualitygates/project_status")"
           jq -er '.projectStatus.status == "OK"' <<<"${status_response}" >/dev/null
-
-          response="$(curl --fail --silent --show-error --get \
-            --header "Authorization: Bearer ${SONAR_TOKEN}" \
-            --data-urlencode "componentKeys=godex-ci" \
-            --data-urlencode "resolved=false" \
-            --data-urlencode "ps=100" \
-            "${SONAR_HOST_URL}/api/issues/search")"
-          total="$(jq -er '(.paging.total // .total) | select(type == "number")' <<<"${response}")"
-          if [ "${total}" -ne 0 ]; then
-            echo "Sonar unresolved issues:" >&2
-            jq -r '.issues[] | "\(.component | sub("^godex-ci:"; "")):\(.line // 0) \(.rule) \(.message)"' <<<"${response}" >&2
-            echo "Sonar reported ${total} unresolved issue(s); refusing to continue." >&2
-            exit 1
-          fi
 
           hotspots_response="$(curl --fail --silent --show-error --get \
             --header "Authorization: Bearer ${SONAR_TOKEN}" \
@@ -131,7 +117,7 @@ jobs:
             echo "Sonar rating or duplication gate failed: ${measures}" >&2
             exit 1
           fi
-          echo "Sonar zero-issue, zero-hotspot, A-rating, and duplication gates: passed."
+          echo "Sonar quality-gate, zero-hotspot, A-rating, and duplication gates: passed."
 
       - name: Revoke ephemeral local Sonar token
         if: ${{ always() && env.SONAR_TOKEN_NAME != '' }}

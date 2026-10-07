@@ -1,0 +1,34 @@
+# Maximum committed line counts for legacy Go source files above the default limit.
+# Lower this value whenever a file shrinks; new files are always capped by GODEX_MAX_GO_FILE_LINES.
+448	cmd/godex/main.go
+608	internal/delivery/cli/dispatcher.go
+448	internal/delivery/cli/public_help.go
+477	internal/delivery/cli/runtime/run.go
+487	internal/delivery/cli/runtime/status_resource.go
+901	internal/delivery/cli/runtime/super.go
+502	internal/delivery/cli/runtime/super_launch.go
+423	internal/delivery/cli/runtimebroker/store.go
+469	internal/delivery/cli/subagent/subagent.go
+409	internal/delivery/cli/superexpose/command.go
+546	internal/delivery/cli/superexpose/exec.go
+531	internal/delivery/cli/superexpose/openai_tunnel.go
+675	internal/delivery/cli/superexpose/protocol.go
+1037	internal/delivery/cli/superexpose/run_manager.go
+621	internal/delivery/cli/superexpose/session_appserver_unix.go
+837	internal/delivery/cli/superexpose/session_control.go
+432	internal/delivery/cli/superexpose/session_operations.go
+728	internal/delivery/cli/superexpose/session_output_read.go
+470	internal/delivery/http/proxy/broker_admin.go
+471	internal/delivery/http/proxy/smart_context.go
+407	internal/gateway/deepseek/anthropic_stream_response.go
+515	internal/gateway/deepseek/stream_state.go
+521	internal/gateway/gemini/native_response.go
+558	internal/gateway/presidio/engine.go
+417	internal/usecase/quota/usage_cache.go
+421	internal/usecase/routing/broker_metrics.go
+518	internal/usecase/routing/router.go
+403	internal/usecase/routing/websocket_quota_full_context.go
+460	internal/usecase/runtime/activity.go
+472	internal/usecase/runtime/super_overlay.go
+423	internal/usecase/runtime/super_subagent.go
+470	internal/usecase/runtime/super_tools.go
