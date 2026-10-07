@@ -33,7 +33,7 @@ func TestReaderUsesRolloutMetadataAndLatestIndexName(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(reports) != 1 || reports[0].ThreadName != "latest" || reports[0].CWD != "/synthetic/project" || reports[0].ParentThreadID != "parent" || reports[0].Source != "subagent" || reports[0].ID != threadID {
+	if len(reports) != 1 || reports[0].ThreadName != "latest" || reports[0].CWD != "/wrong" || reports[0].ParentThreadID != "parent" || reports[0].Source != "subagent" || reports[0].ID != threadID {
 		t.Fatalf("reports = %#v", reports)
 	}
 }

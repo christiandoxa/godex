@@ -1,7 +1,10 @@
 package session
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
+	"strconv"
 	"strings"
 	"time"
 
@@ -10,50 +13,70 @@ import (
 
 func applySessionMetadata(report *sessionentity.Session, line []byte) {
 	var value map[string]any
-	if json.Unmarshal(line, &value) != nil {
+	decoder := json.NewDecoder(bytes.NewReader(line))
+	decoder.UseNumber()
+	if decoder.Decode(&value) != nil {
 		return
 	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		return
+	}
+
 	payload := objectValue(value["payload"])
 	metadata := objectValue(value["metadata"])
 	payloadMetadata := objectValue(payload["metadata"])
-	typeName := stringValue(value["type"])
+	typeRaw, typePresent := sessionRawStringToken(value["type"])
+	typeName := strings.TrimSpace(typeRaw)
+	typeClass := 0
+	if typePresent {
+		switch typeRaw {
+		case "session_meta":
+			typeClass = 1
+		case "turn_context":
+			typeClass = 2
+		default:
+			typeClass = 3
+		}
+	}
 	if report.Preview == "" {
 		report.Preview = sessionPreview(typeName, payload)
 	}
 
-	if typeName != "" && typeName != "session_meta" && typeName != "turn_context" {
-		return
-	}
-	if typeName == "turn_context" {
-		if model := firstString(payload["model"], payloadMetadata["model"], value["model"], metadata["model"]); model != "" {
+	if typeClass == 2 {
+		if model, present := firstSessionString(payload["model"], value["model"]); present {
 			report.LastModel = model
 		}
-		if effort := firstString(
-			payload["effort"], payload["reasoning_effort"], payloadMetadata["effort"], payloadMetadata["reasoning_effort"],
-			value["effort"], value["reasoning_effort"], metadata["effort"], metadata["reasoning_effort"],
-		); effort != "" {
+		if effort, present := firstSessionString(
+			payload["effort"], payload["reasoning_effort"],
+			value["effort"], value["reasoning_effort"],
+		); present {
 			report.LastReasoningEffort = effort
 		}
 	}
-	if report.ID == "" && (typeName == "" || typeName == "session_meta") {
-		report.ID = firstString(payload["id"], payload["session_id"], value["id"], value["session_id"])
+
+	if typeClass == 0 || typeClass == 1 {
+		if id, present := firstSessionString(payload["id"], payload["session_id"], value["id"], value["session_id"]); present {
+			report.ID = id
+		}
 	}
-	if threadName := firstString(
+
+	if threadName, present := firstSessionString(
 		payload["thread_name"], payload["title"], payloadMetadata["thread_name"],
 		value["thread_name"], value["title"], metadata["thread_name"],
-	); threadName != "" {
+	); present {
 		report.ThreadName = threadName
 	}
-	if cwd := firstString(
+	if cwd, present := firstSessionString(
 		payload["cwd"], payloadMetadata["cwd"], payload["workdir"],
 		value["cwd"], metadata["cwd"], value["workdir"],
-	); cwd != "" {
+	); present {
 		report.CWD = cwd
 	}
-	if provider := firstString(
+	if provider, present := firstSessionString(
 		payload["model_provider"], payloadMetadata["model_provider"],
 		value["model_provider"], metadata["model_provider"],
-	); provider != "" {
+	); present {
 		report.ModelProvider = provider
 	}
 	if source := sessionSourceKind(payload["source"]); source != "" {
@@ -61,30 +84,86 @@ func applySessionMetadata(report *sessionentity.Session, line []byte) {
 	} else if source := sessionSourceKind(value["source"]); source != "" {
 		report.Source = source
 	}
-	if parent := sessionParentThreadID(value, payload); parent != "" {
+	if parent, present := sessionParentThreadID(value, payload); present {
 		report.ParentThreadID = parent
 	}
-	if timestamp := firstString(value["updated_at"], value["timestamp"], payload["updated_at"], payload["timestamp"]); timestamp != "" {
-		if parsed, err := time.Parse(time.RFC3339Nano, timestamp); err == nil && parsed.Unix() >= report.UpdatedUnix {
-			report.UpdatedAt = timestamp
-			report.UpdatedUnix = parsed.Unix()
+
+	if timestamp, present := firstSessionString(
+		value["updated_at"], value["timestamp"], payload["updated_at"], payload["timestamp"],
+	); present {
+		report.UpdatedAt = timestamp
+		if sortKey, ok := sessionTimestampSortKey(timestamp); ok {
+			report.UpdatedUnix = sortKey
 		}
+	} else if epoch, present := firstSessionInt64(
+		value["updated_at"], value["ts"], value["timestamp"],
+		payload["updated_at"], payload["ts"], payload["timestamp"],
+	); present {
+		report.UpdatedUnix = epoch
+		report.UpdatedAt = sessionFormatEpoch(epoch)
 	}
 }
 
-func sessionParentThreadID(value, payload map[string]any) string {
-	if parent := firstString(payload["parent_thread_id"], value["parent_thread_id"]); parent != "" {
-		return parent
-	}
+func sessionParentThreadID(value, payload map[string]any) (string, bool) {
 	for _, root := range []map[string]any{payload, value} {
 		source := objectValue(root["source"])
 		subagent := objectValue(source["subagent"])
 		spawn := objectValue(subagent["thread_spawn"])
-		if parent := stringValue(spawn["parent_thread_id"]); parent != "" {
-			return parent
+		if parent, present := sessionStringToken(spawn["parent_thread_id"]); present {
+			return parent, true
 		}
 	}
-	return ""
+	return firstSessionString(payload["parent_thread_id"], value["parent_thread_id"])
+}
+
+func sessionRawStringToken(value any) (string, bool) {
+	text, ok := value.(string)
+	return text, ok
+}
+
+func sessionStringToken(value any) (string, bool) {
+	text, ok := sessionRawStringToken(value)
+	if !ok {
+		return "", false
+	}
+	text = strings.TrimSpace(text)
+	return text, text != ""
+}
+
+func firstSessionString(values ...any) (string, bool) {
+	for _, value := range values {
+		if text, present := sessionStringToken(value); present {
+			return text, true
+		}
+	}
+	return "", false
+}
+
+func firstSessionInt64(values ...any) (int64, bool) {
+	for _, value := range values {
+		number, ok := value.(json.Number)
+		if !ok {
+			continue
+		}
+		parsed, err := strconv.ParseInt(string(number), 10, 64)
+		if err == nil {
+			return parsed, true
+		}
+	}
+	return 0, false
+}
+
+func sessionTimestampSortKey(value string) (int64, bool) {
+	value = strings.TrimSpace(value)
+	if parsed, err := time.Parse(time.RFC3339Nano, value); err == nil {
+		return parsed.Unix(), true
+	}
+	parsed, err := strconv.ParseInt(value, 10, 64)
+	return parsed, err == nil
+}
+
+func sessionFormatEpoch(epoch int64) string {
+	return time.Unix(epoch, 0).In(time.Local).Format("2006-01-02 15:04:05 MST")
 }
 
 func objectValue(value any) map[string]any {
