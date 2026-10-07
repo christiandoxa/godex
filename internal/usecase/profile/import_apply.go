@@ -90,6 +90,18 @@ func (catalog *Catalog) applyImportAction(ctx context.Context, action importActi
 		if err != nil {
 			return err
 		}
+		if action.after != nil && action.target.AccountID != "" {
+			selected, ok := catalog.accounts.(interface {
+				ApplySelectedProvider(context.Context, string, string, profilemodel.ProviderSnapshot, []profilemodel.ExportedSecretFile) (accountentity.Account, error)
+			})
+			if !ok {
+				return errors.New("selected account provider login support is not configured")
+			}
+			_, err := selected.ApplySelectedProvider(
+				ctx, action.target.AccountID, importedProfileEmail(action.source, action.identity), action.source.Provider, action.source.SecretFiles,
+			)
+			return err
+		}
 		if action.create {
 			files := make(map[string][]byte, len(secrets))
 			defer func() {

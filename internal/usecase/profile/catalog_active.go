@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
 	profileentity "github.com/christiandoxa/godex/internal/entity/profile"
@@ -131,8 +132,14 @@ func (catalog *Catalog) activeName(ctx context.Context) string {
 }
 
 func accountProfile(account accountentity.Account, home string) profileentity.Profile {
+	kind := profileentity.ProviderOpenAI
+	if configured := strings.TrimSpace(account.ProviderKind); configured != "" {
+		kind = profileentity.ProviderKind(configured)
+	}
 	return profileentity.Profile{
 		Name: account.Name, CodexHome: home, Managed: true, Email: account.Email,
-		Provider: profileentity.Provider{Kind: profileentity.ProviderOpenAI},
+		Provider: profileentity.Provider{
+			Kind: kind, Account: account.ProviderAccount, AuthMethod: account.ProviderAuthMethod,
+		},
 	}
 }

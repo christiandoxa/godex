@@ -167,6 +167,10 @@ func repairSelectionAfterRemove(state *stateFile, removedID, nextID string) {
 }
 
 func accountQuotaCompatible(account entity.Account) bool {
+	provider := strings.TrimSpace(account.ProviderKind)
+	if provider != "" && provider != "openai" {
+		return false
+	}
 	return strings.TrimSpace(account.Email) != "" || strings.TrimSpace(account.ChatGPTAccountID) != ""
 }
 

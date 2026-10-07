@@ -197,7 +197,7 @@ func (catalog *Catalog) ActiveLaunch(ctx context.Context) (profilemodel.LaunchTa
 	if err != nil {
 		return profilemodel.LaunchTarget{}, false, err
 	}
-	if !found || report.AccountID != "" && target.Auth != "api-key" {
+	if !found || report.AccountID != "" && target.Provider == string(profileentity.ProviderOpenAI) && target.Auth != "api-key" {
 		return profilemodel.LaunchTarget{}, false, nil
 	}
 	return target, true, nil
@@ -223,8 +223,10 @@ func (catalog *Catalog) ResolveProviderLaunch(
 		return profilemodel.LaunchTarget{}, false, err
 	}
 	for _, report := range listed {
-		if report.AccountID == "" && report.Enabled && string(report.Profile.Provider.Kind) == provider {
-			return launchTarget(report), true, nil
+		if report.Enabled && string(report.Profile.Provider.Kind) == provider &&
+			(report.AccountID == "" || provider != string(profileentity.ProviderOpenAI)) {
+			target, err := catalog.launchTargetWithAuth(ctx, report)
+			return target, err == nil, err
 		}
 	}
 	if activeFound {
@@ -259,11 +261,15 @@ func (catalog *Catalog) ProviderLaunchPool(
 	}
 	result := []profilemodel.LaunchTarget{selected}
 	for _, report := range listed {
-		if report.Profile.Name == selectedName || report.AccountID != "" ||
+		if report.Profile.Name == selectedName || !report.Enabled ||
 			string(report.Profile.Provider.Kind) != provider {
 			continue
 		}
-		result = append(result, launchTarget(report))
+		target, err := catalog.launchTargetWithAuth(ctx, report)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, target)
 	}
 	sort.Slice(result[1:], func(i, j int) bool {
 		return result[i+1].Name < result[j+1].Name
@@ -279,7 +285,7 @@ func (catalog *Catalog) AcquireLaunchPool(
 	sort.Strings(names)
 	releases := make([]func() error, 0, len(names))
 	for _, name := range names {
-		release, err := catalog.profiles.Acquire(ctx, name)
+		release, err := catalog.AcquireLaunch(ctx, name)
 		if err != nil {
 			for index := len(releases) - 1; index >= 0; index-- {
 				_ = releases[index]()

@@ -165,7 +165,7 @@ func runLaunchTarget(
 	allowRotate bool,
 	launchOptions runtimeusecase.RuntimeLaunchOptions,
 ) (runErr error) {
-	if target.AccountID != "" && target.Auth != "api-key" {
+	if target.AccountID != "" && target.Provider == "openai" && target.Auth != "api-key" {
 		return runParsedWithOptions(ctx, runner, sessions, target.AccountID, arguments, launchOptions)
 	}
 	if profiles == nil || target.Name == "" {

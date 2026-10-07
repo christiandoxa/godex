@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
 	sessionentity "github.com/christiandoxa/godex/internal/entity/session"
@@ -17,6 +18,10 @@ import (
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
+	accountrepo "github.com/christiandoxa/godex/internal/repository/account"
+	profilerepo "github.com/christiandoxa/godex/internal/repository/profile"
+	runtimerepo "github.com/christiandoxa/godex/internal/repository/runtime"
+	profileusecase "github.com/christiandoxa/godex/internal/usecase/profile"
 	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
 	sessionusecase "github.com/christiandoxa/godex/internal/usecase/session"
 )
@@ -661,6 +666,61 @@ func TestRunHomeLocalProviderKeepsResolvedHome(t *testing.T) {
 		if !strings.Contains(joined, expected) {
 			t.Fatalf("local provider args missing %q: %#v", expected, process.arguments)
 		}
+	}
+}
+
+func TestProdex04356ConvertedManagedClaudeProfileLaunchesAsAnthropicProvider(t *testing.T) {
+	root := t.TempDir()
+	accounts := accountrepo.NewFileStore(root)
+	staged, err := accounts.CreateStagedHome()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(staged, "auth.json"), []byte("{\"fixture\":true}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	candidate, err := accountentity.NewAccount(
+		accountentity.Identity{Email: "<redacted>", ChatGPTAccountID: "chatgpt-work"},
+		"work", time.Unix(1, 0),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	account, err := accounts.CommitLogin(t.Context(), candidate, staged, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	providerAccount, method := "claude@example.test", "claude-ai-oauth:pro"
+	provider := profilemodel.ProviderSnapshot{Kind: "anthropic", Account: &providerAccount, AuthMethod: &method}
+	if _, err := accounts.ApplySelectedProvider(
+		t.Context(), account.ID, providerAccount, provider,
+		[]profilemodel.ExportedSecretFile{{Path: ".credentials.json", Text: "{\"accessToken\":\"fixture\"}"}},
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	profiles := profilerepo.NewStore(root)
+	catalog := profileusecase.NewCatalog(profiles, accounts, filepath.Join(root, "current"))
+	process := &runPolicyProcess{}
+	proxy := &gatewayTestProxy{}
+	var captured proxymodel.Config
+	runner := runtimeusecase.NewRunner(accounts, process, func(config proxymodel.Config) (runtimeusecase.Proxy, error) {
+		captured = config
+		return proxy, nil
+	})
+	runner.SetProviderCatalogStore(runtimerepo.NewProviderCatalogStore())
+	if err := RunProfiles(t.Context(), runner, nil, catalog, []string{
+		"--profile", "work", "exec", "hello",
+	}, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	home := accounts.CodexHome(account.ID)
+	if process.home != home || !proxy.started || !proxy.closed {
+		t.Fatalf("Claude provider launch lifecycle = home:%q process:%#v proxy:%#v", home, process, proxy)
+	}
+	routed, err := captured.Accounts(t.Context())
+	if err != nil || len(routed) != 1 || routed[0].Home != home || routed[0].Provider.Kind != "anthropic" {
+		t.Fatalf("Claude provider routed accounts = %#v err=%v", routed, err)
 	}
 }
 

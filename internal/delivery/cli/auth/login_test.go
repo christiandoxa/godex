@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -75,8 +76,9 @@ func TestLoginParsesFlagsAndRendersIdentity(t *testing.T) {
 
 func TestLoginRejectsUnexpectedArgumentsAndOutputErrors(t *testing.T) {
 	login := authusecase.NewLogin(&fakeLoginAccounts{}, fakeLoginCodex{})
-	if err := Login(context.Background(), login, nil, io.Discard, []string{"one", "two"}); err == nil {
-		t.Fatal("multiple positional profiles unexpectedly accepted")
+	options, err := ParseLoginOptions([]string{"one", "two"})
+	if err != nil || options.Profile != "one" || !reflect.DeepEqual(options.CodexArgs, []string{"two"}) {
+		t.Fatalf("second positional passthrough = %#v, err=%v", options, err)
 	}
 	if err := Login(context.Background(), login, nil, failingWriter{}, nil); err == nil {
 		t.Fatal("output failure unexpectedly ignored")
@@ -110,6 +112,64 @@ func TestParseLoginOptionsIsSharedByMenuAndDirectLogin(t *testing.T) {
 	}
 }
 
+func TestProdex04356LoginMethodPlannerMatchesTaggedPrecedence(t *testing.T) {
+	api, err := ParseLoginOptions([]string{"--device-auth", "--with-claude", "--with-api-key"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !api.WithAPIKey || api.DeviceAuth || api.WithClaude || api.WithAntigravity || api.WithAccessToken {
+		t.Fatalf("API-key precedence = %#v", api)
+	}
+	claude, err := ParseLoginOptions([]string{"--device-auth", "--with-claude", "--with-access-token"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !claude.WithClaude || claude.DeviceAuth || claude.WithAccessToken {
+		t.Fatalf("Claude precedence = %#v", claude)
+	}
+	access, err := ParseLoginOptions([]string{"--with-access-token", "--device-auth"})
+	if err != nil || !access.WithAccessToken || access.DeviceAuth {
+		t.Fatalf("access-token precedence = %#v, err=%v", access, err)
+	}
+	status, err := ParseLoginOptions([]string{"status", "--with-api-key"})
+	if err != nil || !status.Status || status.WithAPIKey {
+		t.Fatalf("leading status precedence = %#v, err=%v", status, err)
+	}
+	device, err := ParseLoginOptions([]string{"--device-auth", "status"})
+	if err != nil || device.Status || !device.DeviceAuth {
+		t.Fatalf("non-leading status precedence = %#v, err=%v", device, err)
+	}
+}
+
+func TestProdex04356LoginClaudeAliasesAndGeminiMigration(t *testing.T) {
+	for _, flag := range []string{"--with-claude", "--claude"} {
+		options, err := ParseLoginOptions([]string{flag})
+		if err != nil || !options.WithClaude {
+			t.Fatalf("Claude flag %q => %#v, err=%v", flag, options, err)
+		}
+	}
+	for _, flag := range []string{"--with-google", "--google"} {
+		_, err := ParseLoginOptions([]string{flag})
+		if err == nil || !strings.Contains(err.Error(), "Gemini OAuth profiles are unsupported and disabled") {
+			t.Fatalf("Gemini migration flag %q error = %v", flag, err)
+		}
+	}
+	status, err := ParseLoginOptions([]string{"status", "--with-google"})
+	if err != nil || !status.Status {
+		t.Fatalf("leading status should suppress retired Gemini migration: %#v err=%v", status, err)
+	}
+}
+
+func TestProdex04356LoginPreservesCodexPassthroughArguments(t *testing.T) {
+	options, err := ParseLoginOptions([]string{"work", "--with-access-token", "--opaque", "value"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if options.Profile != "work" || !options.WithAccessToken || !reflect.DeepEqual(options.CodexArgs, []string{"--with-access-token", "--opaque", "value"}) {
+		t.Fatalf("passthrough options = %#v", options)
+	}
+}
+
 func TestProdex04356LoginProfileSelectorsAndStatusMatchTaggedCLI(t *testing.T) {
 	tests := []struct {
 		arguments []string
@@ -134,8 +194,9 @@ func TestProdex04356LoginProfileSelectorsAndStatusMatchTaggedCLI(t *testing.T) {
 	if _, err := ParseLoginOptions([]string{"--profile", "work", "--name", "other"}); err == nil {
 		t.Fatal("--profile with --name unexpectedly accepted")
 	}
-	if _, err := ParseLoginOptions([]string{"work", "--profile", "other"}); err == nil {
-		t.Fatal("positional profile with --profile unexpectedly accepted")
+	trailingProfile, err := ParseLoginOptions([]string{"work", "--profile", "other"})
+	if err != nil || trailingProfile.Profile != "work" || !reflect.DeepEqual(trailingProfile.CodexArgs, []string{"--profile", "other"}) {
+		t.Fatalf("trailing --profile passthrough = %#v, err=%v", trailingProfile, err)
 	}
 	if !ShouldPromptLoginMenu([]string{"--profile", "work"}) {
 		t.Fatal("selected profile without explicit method should retain interactive provider chooser")

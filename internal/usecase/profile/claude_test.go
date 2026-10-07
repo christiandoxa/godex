@@ -5,8 +5,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
+	accountrepo "github.com/christiandoxa/godex/internal/repository/account"
 	profilerepo "github.com/christiandoxa/godex/internal/repository/profile"
 )
 
@@ -20,6 +22,10 @@ func (fake fakeClaudeSource) Load(context.Context) (profilemodel.BuiltinCredenti
 }
 
 func (fake fakeClaudeSource) InspectCredential(context.Context, string) (profilemodel.BuiltinCredential, error) {
+	return fake.credential, fake.err
+}
+
+func (fake fakeClaudeSource) LoginOAuth(context.Context, string, string) (profilemodel.BuiltinCredential, error) {
 	return fake.credential, fake.err
 }
 
@@ -105,5 +111,67 @@ func TestSanitizeProfileSlugMatchesProdexRules(t *testing.T) {
 		if got := sanitizeProfileSlug(input); got != want {
 			t.Fatalf("sanitize(%q) = %q, want %q", input, got, want)
 		}
+	}
+}
+
+type blockingClaudeLoginSource struct {
+	credential profilemodel.BuiltinCredential
+	entered    chan struct{}
+	release    chan struct{}
+}
+
+func (source blockingClaudeLoginSource) Load(context.Context) (profilemodel.BuiltinCredential, error) {
+	return source.credential, nil
+}
+func (source blockingClaudeLoginSource) InspectCredential(context.Context, string) (profilemodel.BuiltinCredential, error) {
+	return source.credential, nil
+}
+func (source blockingClaudeLoginSource) LoginOAuth(context.Context, string, string) (profilemodel.BuiltinCredential, error) {
+	close(source.entered)
+	<-source.release
+	return source.credential, nil
+}
+
+func TestProdex04356SelectedClaudeLoginHoldsLifecycleLockAcrossOAuth(t *testing.T) {
+	root := t.TempDir()
+	profiles := profilerepo.NewStore(root)
+	accounts := accountrepo.NewFileStore(root)
+	catalog := NewCatalog(profiles, accounts, filepath.Join(root, "current"))
+	if _, err := catalog.Add(t.Context(), profilemodel.AddRequest{Name: "work"}); err != nil {
+		t.Fatal(err)
+	}
+	account, method := "person@example.test", "claude-ai-oauth:pro"
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	catalog.SetClaudeSource(blockingClaudeLoginSource{
+		entered: entered, release: release,
+		credential: profilemodel.BuiltinCredential{
+			Provider: profilemodel.ProviderSnapshot{Kind: "anthropic", Account: &account, AuthMethod: &method},
+			Email:    account, SecretFiles: []profilemodel.ExportedSecretFile{{Path: ".credentials.json", Text: "{\"accessToken\":\"fixture\"}"}},
+		},
+	})
+
+	loginDone := make(chan error, 1)
+	go func() {
+		_, err := catalog.LoginClaude(t.Context(), "work", "")
+		loginDone <- err
+	}()
+	<-entered
+	removeDone := make(chan error, 1)
+	go func() {
+		_, err := catalog.Remove(t.Context(), profilemodel.RemoveRequest{Name: "work", DeleteHome: true})
+		removeDone <- err
+	}()
+	select {
+	case err := <-removeDone:
+		t.Fatalf("profile mutation escaped selected Claude lifecycle lock: %v", err)
+	case <-time.After(100 * time.Millisecond):
+	}
+	close(release)
+	if err := <-loginDone; err != nil {
+		t.Fatal(err)
+	}
+	if err := <-removeDone; err != nil {
+		t.Fatal(err)
 	}
 }

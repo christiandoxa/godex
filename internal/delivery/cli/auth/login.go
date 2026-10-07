@@ -17,46 +17,22 @@ type LoginOptions struct {
 	Status           bool
 	DeviceAuth       bool
 	WithAPIKey       bool
+	WithClaude       bool
 	WithAntigravity  bool
+	WithAccessToken  bool
 	BaseURL          string
 	BaseURLSpecified bool
+	CodexArgs        []string
 }
+
+const geminiOAuthDisabledGuidance = "Google Gemini OAuth profiles are unsupported and disabled. For Codex-fronted Gemini, migrate to a Gemini API key (`--api-key`, `GEMINI_API_KEY`, or `GOOGLE_API_KEY`). Native Gemini CLI / Vertex AI compatibility was retired; use the Gemini provider bridge with API-key authentication."
 
 func ParseLoginOptions(arguments []string) (LoginOptions, error) {
 	options := LoginOptions{}
-	positionalProfile := ""
-	requestedAntigravity := false
-	for index := 0; index < len(arguments); index++ {
+	index := 0
+	for index < len(arguments) {
 		argument := arguments[index]
 		switch {
-		case argument == "--device-auth":
-			options.DeviceAuth = true
-		case argument == "--with-api-key":
-			options.WithAPIKey = true
-		case argument == "--with-antigravity" || argument == "--antigravity" ||
-			argument == "--with-agy" || argument == "--agy":
-			requestedAntigravity = true
-		case argument == "status":
-			options.Status = true
-		case argument == "--":
-			for _, value := range arguments[index+1:] {
-				if value == "status" && !options.Status {
-					options.Status = true
-					continue
-				}
-				if positionalProfile == "" && !strings.HasPrefix(value, "-") {
-					positionalProfile = value
-					continue
-				}
-				return LoginOptions{}, errors.New("login accepts at most one profile and optional status")
-			}
-			index = len(arguments)
-		case argument == "--name" || strings.HasPrefix(argument, "--name="):
-			value, next, err := loginOptionValue(arguments, index, "--name")
-			if err != nil {
-				return LoginOptions{}, err
-			}
-			options.Name, index = value, next
 		case argument == "--profile" || strings.HasPrefix(argument, "--profile=") ||
 			argument == "-p" || strings.HasPrefix(argument, "-p=") ||
 			argument == "--account" || strings.HasPrefix(argument, "--account="):
@@ -64,40 +40,99 @@ func ParseLoginOptions(arguments []string) (LoginOptions, error) {
 			if err != nil {
 				return LoginOptions{}, err
 			}
-			if options.Profile != "" {
+			if options.Profile != "" && options.Profile != value {
 				return LoginOptions{}, errors.New("login accepts at most one --profile")
 			}
-			options.Profile, index = value, next
-		case argument == "--base-url" || strings.HasPrefix(argument, "--base-url=") ||
-			argument == "--openai-base-url" || strings.HasPrefix(argument, "--openai-base-url="):
-			value, next, err := loginOptionValueAllowEmpty(arguments, index, "--base-url", "--openai-base-url")
-			if err != nil {
-				return LoginOptions{}, err
-			}
-			options.BaseURL, options.BaseURLSpecified, index = value, true, next
-		case strings.HasPrefix(argument, "-"):
-			return LoginOptions{}, fmt.Errorf("unknown login option %q", argument)
+			options.Profile, index = value, next+1
 		default:
-			if positionalProfile != "" {
-				return LoginOptions{}, errors.New("login accepts at most one positional profile")
-			}
-			positionalProfile = argument
+			index = len(arguments)
 		}
 	}
-	if positionalProfile != "" {
-		if options.Profile != "" && options.Profile != positionalProfile {
-			return LoginOptions{}, errors.New("positional profile conflicts with --profile")
+
+	consumed := 0
+	for consumed < len(arguments) {
+		argument := arguments[consumed]
+		if argument == "--profile" || argument == "-p" || argument == "--account" {
+			consumed += 2
+			continue
 		}
-		options.Profile = positionalProfile
+		if strings.HasPrefix(argument, "--profile=") || strings.HasPrefix(argument, "-p=") ||
+			strings.HasPrefix(argument, "--account=") {
+			consumed++
+			continue
+		}
+		break
+	}
+	methodArgs := append([]string(nil), arguments[consumed:]...)
+	var err error
+	methodArgs, options.Name, err = extractLoginCompatName(methodArgs, options.Name)
+	if err != nil {
+		return LoginOptions{}, err
+	}
+	if options.Profile == "" && len(methodArgs) > 0 &&
+		!strings.HasPrefix(methodArgs[0], "-") && methodArgs[0] != "status" {
+		options.Profile = methodArgs[0]
+		methodArgs = methodArgs[1:]
 	}
 	if options.Profile != "" && options.Name != "" {
 		return LoginOptions{}, errors.New("--profile cannot be combined with --name")
 	}
-	options.WithAntigravity = requestedAntigravity && !options.WithAPIKey
-	if options.WithAntigravity {
+
+	filtered, baseURL, baseURLSpecified, err := extractLoginBaseURL(methodArgs)
+	if err != nil {
+		return LoginOptions{}, err
+	}
+	options.CodexArgs = filtered
+	options.BaseURL, options.BaseURLSpecified = baseURL, baseURLSpecified
+
+	if len(filtered) > 0 && filtered[0] == "status" {
+		options.Status = true
 		if options.BaseURLSpecified {
+			return LoginOptions{}, errors.New("--base-url is only supported for API key login")
+		}
+		return options, nil
+	}
+
+	hasAPIKey, hasClaude, hasAntigravity := false, false, false
+	hasAccessToken, hasDevice, removedGemini := false, false, false
+	for _, argument := range filtered {
+		switch argument {
+		case "--with-api-key":
+			hasAPIKey = true
+		case "--with-claude", "--claude":
+			hasClaude = true
+		case "--with-antigravity", "--antigravity", "--with-agy", "--agy":
+			hasAntigravity = true
+		case "--with-access-token":
+			hasAccessToken = true
+		case "--device-auth":
+			hasDevice = true
+		case "--with-google", "--google":
+			removedGemini = true
+		}
+	}
+	if removedGemini {
+		return LoginOptions{}, errors.New(geminiOAuthDisabledGuidance)
+	}
+	switch {
+	case hasAPIKey:
+		options.WithAPIKey = true
+	case hasClaude:
+		options.WithClaude = true
+	case hasAntigravity:
+		options.WithAntigravity = true
+	case hasAccessToken:
+		options.WithAccessToken = true
+	case hasDevice:
+		options.DeviceAuth = true
+	}
+	if options.BaseURLSpecified && (options.WithClaude || options.WithAntigravity || options.WithAccessToken || options.DeviceAuth) {
+		if options.WithAntigravity {
 			return LoginOptions{}, errors.New("--base-url is not supported for Antigravity login")
 		}
+		return LoginOptions{}, errors.New("--base-url is only supported for API key login")
+	}
+	if options.WithAntigravity {
 		if options.Name != "" {
 			return LoginOptions{}, errors.New("--name is not supported for Antigravity login")
 		}
@@ -106,6 +141,55 @@ func ParseLoginOptions(arguments []string) (LoginOptions, error) {
 		}
 	}
 	return options, nil
+}
+
+func extractLoginCompatName(arguments []string, initial string) ([]string, string, error) {
+	filtered := make([]string, 0, len(arguments))
+	name := initial
+	for index := 0; index < len(arguments); index++ {
+		argument := arguments[index]
+		switch {
+		case argument == "--name":
+			if index+1 >= len(arguments) || strings.TrimSpace(arguments[index+1]) == "" {
+				return nil, "", errors.New("--name requires a value")
+			}
+			name = arguments[index+1]
+			index++
+		case strings.HasPrefix(argument, "--name="):
+			value := strings.TrimSpace(strings.TrimPrefix(argument, "--name="))
+			if value == "" {
+				return nil, "", errors.New("--name requires a value")
+			}
+			name = value
+		default:
+			filtered = append(filtered, argument)
+		}
+	}
+	return filtered, name, nil
+}
+
+func extractLoginBaseURL(arguments []string) ([]string, string, bool, error) {
+	filtered := make([]string, 0, len(arguments))
+	baseURL := ""
+	specified := false
+	for index := 0; index < len(arguments); index++ {
+		argument := arguments[index]
+		switch {
+		case argument == "--base-url" || argument == "--openai-base-url":
+			if index+1 >= len(arguments) {
+				return nil, "", false, errors.New("--base-url requires a URL value")
+			}
+			baseURL, specified = arguments[index+1], true
+			index++
+		case strings.HasPrefix(argument, "--base-url="):
+			baseURL, specified = strings.TrimPrefix(argument, "--base-url="), true
+		case strings.HasPrefix(argument, "--openai-base-url="):
+			baseURL, specified = strings.TrimPrefix(argument, "--openai-base-url="), true
+		default:
+			filtered = append(filtered, argument)
+		}
+	}
+	return filtered, baseURL, specified, nil
 }
 
 func loginOptionValueAllowEmpty(arguments []string, index int, names ...string) (string, int, error) {
@@ -148,7 +232,8 @@ func loginOptionValue(arguments []string, index int, names ...string) (string, i
 
 func ShouldPromptLoginMenu(arguments []string) bool {
 	options, err := ParseLoginOptions(arguments)
-	return err == nil && !options.DeviceAuth && !options.WithAPIKey && !options.WithAntigravity
+	return err == nil && !options.Status && !options.DeviceAuth && !options.WithAPIKey &&
+		!options.WithClaude && !options.WithAntigravity && !options.WithAccessToken && len(options.CodexArgs) == 0
 }
 
 func Login(ctx context.Context, login *authusecase.Login, native *authusecase.Native, out io.Writer, arguments []string) error {
@@ -159,6 +244,9 @@ func Login(ctx context.Context, login *authusecase.Login, native *authusecase.Na
 	if options.WithAPIKey {
 		return errors.New("API-key login requires profile support")
 	}
+	if options.WithClaude {
+		return errors.New("Claude login requires profile support")
+	}
 	if options.WithAntigravity {
 		if native == nil {
 			return errors.New("native authentication commands are not configured")
@@ -168,7 +256,11 @@ func Login(ctx context.Context, login *authusecase.Login, native *authusecase.Na
 	if options.BaseURLSpecified {
 		return errors.New("--base-url is only supported for API key login")
 	}
-	account, err := login.Run(ctx, accountmodel.LoginInput{Name: options.Name, DeviceAuth: options.DeviceAuth})
+	account, err := login.RunArguments(
+		ctx,
+		accountmodel.LoginInput{Name: options.Name, DeviceAuth: options.DeviceAuth},
+		options.CodexArgs,
+	)
 	if err != nil {
 		return err
 	}

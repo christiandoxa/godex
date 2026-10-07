@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -438,6 +439,10 @@ func (source dispatcherClaudeSource) InspectCredential(context.Context, string) 
 	return source.credential, nil
 }
 
+func (source dispatcherClaudeSource) LoginOAuth(context.Context, string, string) (profilemodel.BuiltinCredential, error) {
+	return source.credential, nil
+}
+
 type dispatcherCopilotSource struct {
 	credential profilemodel.BuiltinCredential
 }
@@ -568,6 +573,7 @@ func TestDispatcherLoginMenuUnsupportedMethodFailsExplicitly(t *testing.T) {
 type selectedLoginCodex struct {
 	loginHome string
 	device    bool
+	arguments []string
 	email     string
 	accountID string
 	token     string
@@ -594,9 +600,7 @@ func (process *selectedLoginCodex) authToken() string {
 
 func (process *selectedLoginCodex) Run(_ context.Context, home string, arguments []string) error {
 	process.loginHome = home
-	if strings.Join(arguments, " ") != "login status" {
-		return errors.New("unexpected selected login command")
-	}
+	process.arguments = append([]string(nil), arguments...)
 	return nil
 }
 
@@ -615,6 +619,21 @@ func (process *selectedLoginCodex) InspectAuthJSON(_ context.Context, content []
 func (process *selectedLoginCodex) Login(_ context.Context, home string, device bool) (accountentity.Identity, error) {
 	process.loginHome = home
 	process.device = device
+	if err := os.MkdirAll(home, 0o700); err != nil {
+		return accountentity.Identity{}, err
+	}
+	identity := process.identity()
+	content := []byte("{\"auth_mode\":\"chatgpt\",\"tokens\":{\"access_token\":\"" + process.authToken() + "\",\"account_id\":\"" + identity.ChatGPTAccountID + "\"}}")
+	if err := os.WriteFile(filepath.Join(home, "auth.json"), content, 0o600); err != nil {
+		return accountentity.Identity{}, err
+	}
+	return identity, nil
+}
+
+func (process *selectedLoginCodex) LoginArguments(_ context.Context, home string, arguments []string) (accountentity.Identity, error) {
+	process.arguments = append([]string(nil), arguments...)
+	process.device = slices.Contains(arguments, "--device-auth")
+	process.loginHome = home
 	if err := os.MkdirAll(home, 0o700); err != nil {
 		return accountentity.Identity{}, err
 	}
@@ -695,8 +714,12 @@ func TestProdex04356LoginStatusOptionOrderAndTemporaryHome(t *testing.T) {
 	if err := app.runLogin(t.Context(), []string{"status", "--profile", "work"}); err != nil {
 		t.Fatal(err)
 	}
-	if process.loginHome != work.Profile.CodexHome {
-		t.Fatalf("reordered selected status home = %q, want %q", process.loginHome, work.Profile.CodexHome)
+	trailingSelectorHome := process.loginHome
+	if trailingSelectorHome == work.Profile.CodexHome || strings.Join(process.arguments, " ") != "login status --profile work" {
+		t.Fatalf("trailing selector status home/args = %q / %#v", trailingSelectorHome, process.arguments)
+	}
+	if _, err := os.Stat(trailingSelectorHome); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("trailing selector temporary home remains: %q err=%v", trailingSelectorHome, err)
 	}
 	if err := app.runLogin(t.Context(), []string{"status"}); err != nil {
 		t.Fatal(err)
@@ -976,6 +999,94 @@ func TestProdex04356SelectedManagedAccountAPIKeyLoginClearsChatGPTIdentity(t *te
 	if err != nil || current.Profile.Name != "work" || current.Profile.Email != "" ||
 		current.AccountID != initial.ID {
 		t.Fatalf("selected managed API-key current = %#v err=%v", current, err)
+	}
+}
+
+func TestProdex04356DirectAccessTokenLoginPreservesCodexArguments(t *testing.T) {
+	root := t.TempDir()
+	accounts := accountrepo.NewFileStore(root)
+	process := &selectedLoginCodex{email: "<redacted>", accountID: "access-account", token: "access-token"}
+	login := authusecase.NewLogin(accounts, process)
+	app := New(login, nil, accounts, nil, nil, nil, &bytes.Buffer{})
+	if err := app.runLogin(t.Context(), []string{"--with-access-token", "--opaque", "value"}); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(process.arguments, []string{"--with-access-token", "--opaque", "value"}) {
+		t.Fatalf("access-token passthrough = %#v", process.arguments)
+	}
+	listed, err := accounts.List(t.Context())
+	if err != nil || len(listed) != 1 || listed[0].ChatGPTAccountID != "access-account" {
+		t.Fatalf("access-token login accounts = %#v err=%v", listed, err)
+	}
+}
+
+func TestProdex04356DirectClaudeLoginCreatesAnthropicProfile(t *testing.T) {
+	root := t.TempDir()
+	accounts := accountrepo.NewFileStore(root)
+	profiles := profilerepo.NewStore(root)
+	catalog := profileusecase.NewCatalog(profiles, accounts, filepath.Join(root, "current"))
+	account, method := "claude@example.test", "claude-ai-oauth:pro"
+	catalog.SetClaudeSource(dispatcherClaudeSource{credential: profilemodel.BuiltinCredential{
+		Provider:    profilemodel.ProviderSnapshot{Kind: "anthropic", Account: &account, AuthMethod: &method},
+		Email:       account,
+		SecretFiles: []profilemodel.ExportedSecretFile{{Path: ".credentials.json", Text: `{"accessToken":"<redacted>"}`}},
+	}})
+	var output bytes.Buffer
+	app := New(nil, nil, accounts, nil, nil, nil, &output)
+	app.SetProfiles(catalog)
+	if err := app.runLogin(t.Context(), []string{"--with-claude"}); err != nil {
+		t.Fatal(err)
+	}
+	current, err := catalog.Current(t.Context())
+	if err != nil || current.Profile.Provider.Kind != profileentity.ProviderAnthropic ||
+		current.Profile.Provider.Account != account || current.Profile.Email != account {
+		t.Fatalf("Claude current profile = %#v err=%v", current, err)
+	}
+	secret, err := profiles.ReadProviderSecret(current.Profile.CodexHome, ".credentials.json")
+	if err != nil || !strings.Contains(secret, "accessToken") {
+		t.Fatalf("Claude credential = <redacted> err=%v", err)
+	}
+}
+
+func TestProdex04356SelectedManagedOpenAIClaudeLoginConvertsProviderInPlace(t *testing.T) {
+	root := t.TempDir()
+	accounts := accountrepo.NewFileStore(root)
+	profiles := profilerepo.NewStore(root)
+	process := &selectedLoginCodex{email: "<redacted>", accountID: "chatgpt-account", token: "chatgpt-token"}
+	login := authusecase.NewLogin(accounts, process)
+	initial, err := login.Run(t.Context(), accountmodel.LoginInput{Name: "work"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	home := accounts.CodexHome(initial.ID)
+	catalog := profileusecase.NewCatalog(profiles, accounts, filepath.Join(root, "current"))
+	claudeAccount, method := "claude@example.test", "claude-ai-oauth:max"
+	catalog.SetClaudeSource(dispatcherClaudeSource{credential: profilemodel.BuiltinCredential{
+		Provider:    profilemodel.ProviderSnapshot{Kind: "anthropic", Account: &claudeAccount, AuthMethod: &method},
+		Email:       claudeAccount,
+		SecretFiles: []profilemodel.ExportedSecretFile{{Path: ".credentials.json", Text: `{"accessToken":"<redacted>"}`}},
+	}})
+	app := New(login, nil, accounts, nil, nil, nil, &bytes.Buffer{})
+	app.SetProfiles(catalog)
+	if err := app.runLogin(t.Context(), []string{"--profile", "work", "--with-claude"}); err != nil {
+		t.Fatal(err)
+	}
+	current, err := catalog.Current(t.Context())
+	if err != nil || current.Profile.Name != "work" || current.Profile.CodexHome != home ||
+		current.Profile.Provider.Kind != profileentity.ProviderAnthropic || current.Profile.Provider.Account != claudeAccount {
+		t.Fatalf("converted Claude profile = %#v err=%v", current, err)
+	}
+	listed, err := accounts.List(t.Context())
+	if err != nil || len(listed) != 1 || listed[0].ID != initial.ID || listed[0].ProviderKind != "anthropic" ||
+		listed[0].ChatGPTAccountID != "" {
+		t.Fatalf("converted account metadata = %#v err=%v", listed, err)
+	}
+	if _, err := accounts.LaunchCandidates(t.Context(), ""); err == nil || !strings.Contains(err.Error(), "no enabled accounts") {
+		t.Fatalf("converted Claude profile remained in ChatGPT rotation: %v", err)
+	}
+	secret, err := os.ReadFile(filepath.Join(home, ".credentials.json"))
+	if err != nil || !bytes.Contains(secret, []byte("accessToken")) {
+		t.Fatalf("converted Claude secret = <redacted> err=%v", err)
 	}
 }
 

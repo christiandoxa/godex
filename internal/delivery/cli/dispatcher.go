@@ -237,20 +237,26 @@ func (app *App) runLogin(ctx context.Context, arguments []string) error {
 		if app.login == nil {
 			return fmt.Errorf("login status support is not configured")
 		}
-		return app.login.RunStatus(ctx)
+		return app.login.RunStatusArguments(ctx, options.CodexArgs)
 	}
 	if options.Profile != "" {
 		switch {
 		case options.Status:
-			return app.runSelectedLoginStatus(ctx, options.Profile)
+			return app.runSelectedLoginStatus(ctx, options)
 		case options.WithAPIKey:
 			return app.runSelectedAPIKeyLogin(ctx, options)
-		case options.DeviceAuth || !authcli.ShouldPromptLoginMenu(arguments) || !authcli.LoginMenuInteractive(app.in, app.errOut):
+		case options.WithClaude:
+			return app.runSelectedClaudeLogin(ctx, options)
+		case options.DeviceAuth || options.WithAccessToken ||
+			!authcli.ShouldPromptLoginMenu(arguments) || !authcli.LoginMenuInteractive(app.in, app.errOut):
 			return app.runSelectedOpenAILogin(ctx, options)
 		}
 	}
 	if options.WithAPIKey {
 		return app.runAPIKeyLogin(ctx, options)
+	}
+	if options.WithClaude {
+		return app.runClaudeLogin(ctx, options)
 	}
 	if options.WithAntigravity {
 		return authcli.Login(ctx, app.login, app.nativeAuth, app.out, arguments)
@@ -292,6 +298,7 @@ func (app *App) runLoginMenuAction(ctx context.Context, action authcli.LoginMenu
 	case authcli.LoginDeviceCode:
 		if options.Profile != "" {
 			options.DeviceAuth = true
+			options.CodexArgs = append(options.CodexArgs, "--device-auth")
 			return app.runSelectedOpenAILogin(ctx, options)
 		}
 		deviceArguments := append([]string(nil), arguments...)
@@ -307,7 +314,10 @@ func (app *App) runLoginMenuAction(ctx context.Context, action authcli.LoginMenu
 		antigravityArguments = append(antigravityArguments, "--with-antigravity")
 		return authcli.Login(ctx, app.login, app.nativeAuth, app.out, antigravityArguments)
 	case authcli.LoginClaude:
-		return app.runBuiltinLoginImport(ctx, "claude", options.Name)
+		if options.Profile != "" {
+			return app.runSelectedClaudeLogin(ctx, options)
+		}
+		return app.runClaudeLogin(ctx, options)
 	case authcli.LoginCopilotImport:
 		return app.runBuiltinLoginImport(ctx, "copilot", options.Name)
 	default:
@@ -315,12 +325,12 @@ func (app *App) runLoginMenuAction(ctx context.Context, action authcli.LoginMenu
 	}
 }
 
-func (app *App) runSelectedLoginStatus(ctx context.Context, profile string) error {
+func (app *App) runSelectedLoginStatus(ctx context.Context, options authcli.LoginOptions) error {
 	if app.profiles == nil || app.login == nil {
 		return fmt.Errorf("selected profile login support is not configured")
 	}
-	return app.profiles.SelectedLoginStatus(ctx, profile, func(home string) error {
-		return app.login.RunSelectedStatus(ctx, home)
+	return app.profiles.SelectedLoginStatus(ctx, options.Profile, func(home string) error {
+		return app.login.RunSelectedStatusArguments(ctx, home, options.CodexArgs)
 	})
 }
 
@@ -332,12 +342,40 @@ func (app *App) runSelectedOpenAILogin(ctx context.Context, options authcli.Logi
 		return fmt.Errorf("--base-url is only supported for API key login")
 	}
 	report, err := app.profiles.SelectedOpenAILogin(ctx, options.Profile, func() ([]byte, error) {
-		return app.login.RunSelected(ctx, options.DeviceAuth)
+		return app.login.RunSelectedArguments(ctx, options.CodexArgs)
 	})
 	if err != nil {
 		return err
 	}
 	_, err = fmt.Fprintf(app.out, "Logged in successfully for profile %q.\n", report.Profile.Name)
+	return err
+}
+
+func (app *App) runClaudeLogin(ctx context.Context, options authcli.LoginOptions) error {
+	if app.profiles == nil {
+		return fmt.Errorf("Claude profile login support is not configured")
+	}
+	result, err := app.profiles.LoginClaude(ctx, "", options.Name)
+	if err != nil {
+		return err
+	}
+	verb := "Created"
+	if result.Updated {
+		verb = "Updated"
+	}
+	_, err = fmt.Fprintf(app.out, "%s Anthropic profile %q from Claude OAuth login.\n", verb, result.Profile)
+	return err
+}
+
+func (app *App) runSelectedClaudeLogin(ctx context.Context, options authcli.LoginOptions) error {
+	if app.profiles == nil {
+		return fmt.Errorf("Claude profile login support is not configured")
+	}
+	result, err := app.profiles.LoginClaude(ctx, options.Profile, "")
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(app.out, "Signed in with Claude for profile %q.\n", result.Profile)
 	return err
 }
 

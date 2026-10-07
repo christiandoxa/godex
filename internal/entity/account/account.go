@@ -18,14 +18,17 @@ var (
 const maxAccountNameLength = 48
 
 type Account struct {
-	ID               string    `json:"id"`
-	Name             string    `json:"name"`
-	Email            string    `json:"email,omitempty"`
-	ChatGPTAccountID string    `json:"chatgpt_account_id,omitempty"`
-	Enabled          bool      `json:"enabled"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
-	LastUsedAt       time.Time `json:"last_used_at"`
+	ID                 string    `json:"id"`
+	Name               string    `json:"name"`
+	Email              string    `json:"email,omitempty"`
+	ChatGPTAccountID   string    `json:"chatgpt_account_id,omitempty"`
+	ProviderKind       string    `json:"provider_kind,omitempty"`
+	ProviderAccount    string    `json:"provider_account,omitempty"`
+	ProviderAuthMethod string    `json:"provider_auth_method,omitempty"`
+	Enabled            bool      `json:"enabled"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
+	LastUsedAt         time.Time `json:"last_used_at"`
 }
 
 type Identity struct {
@@ -91,6 +94,15 @@ func ValidateStoredAccount(account Account) error {
 	normalizedName, err := NormalizeAccountName(account.Name)
 	if err != nil || normalizedName != account.Name {
 		return fmt.Errorf("invalid account name %q", account.Name)
+	}
+	switch strings.TrimSpace(account.ProviderKind) {
+	case "", "openai", "anthropic":
+	default:
+		return fmt.Errorf("invalid stored account provider %q", account.ProviderKind)
+	}
+	if strings.TrimSpace(account.ProviderKind) != "anthropic" &&
+		(strings.TrimSpace(account.ProviderAccount) != "" || strings.TrimSpace(account.ProviderAuthMethod) != "") {
+		return errors.New("stored account provider metadata requires anthropic provider")
 	}
 	return nil
 }

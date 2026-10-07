@@ -57,6 +57,9 @@ func (store *FileStore) ApplySelectedLogin(
 		current := state.Accounts[index]
 		current.Email = mail
 		current.ChatGPTAccountID = accountKey
+		current.ProviderKind = ""
+		current.ProviderAccount = ""
+		current.ProviderAuthMethod = ""
 		current.UpdatedAt = maxTime(current.UpdatedAt, store.now().UTC())
 		if err := accountentity.ValidateAccount(current); err != nil {
 			return err
@@ -175,6 +178,9 @@ func (store *FileStore) ApplySelectedAPIKey(
 		current := state.Accounts[index]
 		current.Email = ""
 		current.ChatGPTAccountID = ""
+		current.ProviderKind = ""
+		current.ProviderAccount = ""
+		current.ProviderAuthMethod = ""
 		current.UpdatedAt = maxTime(current.UpdatedAt, store.now().UTC())
 		if err := accountentity.ValidateStoredAccount(current); err != nil {
 			rollbackFiles()
@@ -218,6 +224,19 @@ func (store *FileStore) SelectedLoginActionCommitted(
 		if action.IdentityCleared && (strings.TrimSpace(account.Email) != "" || strings.TrimSpace(account.ChatGPTAccountID) != "") {
 			return nil
 		}
+		wantProvider := strings.TrimSpace(action.After.Provider.Kind)
+		gotProvider := strings.TrimSpace(account.ProviderKind)
+		if wantProvider == "openai" && gotProvider == "" {
+			gotProvider = "openai"
+		}
+		if wantProvider != gotProvider ||
+			optionalProviderSnapshotValue(action.After.Provider.Account) != strings.TrimSpace(account.ProviderAccount) ||
+			optionalProviderSnapshotValue(action.After.Provider.AuthMethod) != strings.TrimSpace(account.ProviderAuthMethod) {
+			return nil
+		}
+		if wantProvider == "anthropic" && strings.TrimSpace(account.ChatGPTAccountID) != "" {
+			return nil
+		}
 		for _, file := range action.Files {
 			matches, err := selectedLoginFileMatches(store.CodexHome(account.ID), file)
 			if err != nil || !matches {
@@ -231,7 +250,7 @@ func (store *FileStore) SelectedLoginActionCommitted(
 }
 
 func selectedLoginFileMatches(home string, file profilemodel.ImportLifecycleFile) (bool, error) {
-	if file.Path != authFileName && file.Path != importedAuthLocalConfigFile {
+	if file.Path != authFileName && file.Path != importedAuthLocalConfigFile && file.Path != importedAuthClaudeFile {
 		return false, errors.New("invalid selected login lifecycle file")
 	}
 	path := filepath.Join(home, file.Path)
@@ -270,4 +289,91 @@ func selectedLoginFileMatches(home string, file profilemodel.ImportLifecycleFile
 	}
 	digest := sha256.Sum256(content)
 	return hex.EncodeToString(digest[:]) == file.SHA256, nil
+}
+
+func (store *FileStore) ApplySelectedProvider(
+	ctx context.Context,
+	accountID string,
+	email string,
+	provider profilemodel.ProviderSnapshot,
+	files []profilemodel.ExportedSecretFile,
+) (accountentity.Account, error) {
+	if provider.Kind != "anthropic" || len(files) != 1 || files[0].Path != importedAuthClaudeFile ||
+		len(files[0].Text) == 0 || len(files[0].Text) > 2<<20 {
+		return accountentity.Account{}, errors.New("selected provider login payload is invalid")
+	}
+	providerAccount := ""
+	if provider.Account != nil {
+		providerAccount = strings.TrimSpace(*provider.Account)
+	}
+	providerAuthMethod := ""
+	if provider.AuthMethod != nil {
+		providerAuthMethod = strings.TrimSpace(*provider.AuthMethod)
+	}
+
+	var result accountentity.Account
+	err := store.withLock(ctx, func() error {
+		state, err := store.readState()
+		if err != nil {
+			return err
+		}
+		index, err := resolveIndex(state.Accounts, accountID)
+		if err != nil || state.Accounts[index].ID != accountID {
+			return errors.New("selected login account is unavailable")
+		}
+		release, err := store.acquireProfile(accountID)
+		if err != nil {
+			return err
+		}
+		defer release()
+		home := store.CodexHome(accountID)
+		if err := ownerOnlyDirectory(home); err != nil {
+			return err
+		}
+		secretPath := filepath.Join(home, importedAuthClaudeFile)
+		previous, existed, err := readExistingImportedProviderSecret(secretPath)
+		if err != nil {
+			return err
+		}
+		defer clearImportedAuth(previous)
+		rollbackSecret := func() {
+			if existed {
+				_, _ = fileutil.AtomicWrite(secretPath, previous)
+			} else {
+				_ = os.Remove(secretPath)
+			}
+		}
+		if _, err := fileutil.AtomicWrite(secretPath, []byte(files[0].Text)); err != nil {
+			return err
+		}
+		current := state.Accounts[index]
+		current.Email = strings.TrimSpace(email)
+		current.ChatGPTAccountID = ""
+		current.ProviderKind = "anthropic"
+		current.ProviderAccount = providerAccount
+		current.ProviderAuthMethod = providerAuthMethod
+		current.UpdatedAt = maxTime(current.UpdatedAt, store.now().UTC())
+		if err := accountentity.ValidateStoredAccount(current); err != nil {
+			rollbackSecret()
+			return err
+		}
+		state.Accounts[index] = current
+		committed, err := store.writeState(state)
+		if err != nil {
+			if !committed {
+				rollbackSecret()
+			}
+			return err
+		}
+		result = current
+		return nil
+	})
+	return result, err
+}
+
+func optionalProviderSnapshotValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return strings.TrimSpace(*value)
 }

@@ -21,6 +21,8 @@ const (
 	importedAuthRollbackMetaFile = "metadata.json"
 	importedAuthLocalConfigFile  = ".prodex-profile.toml"
 	importedAuthLocalConfigMax   = 64 << 10
+	importedAuthClaudeFile       = ".credentials.json"
+	importedAuthClaudeBackupFile = "claude-credentials.json"
 )
 
 type importedAuthRollbackMetadata struct {
@@ -29,6 +31,7 @@ type importedAuthRollbackMetadata struct {
 	Account          accountentity.Account
 	LocalConfigFound bool
 	LocalConfig      []byte
+	ClaudeFound      bool
 }
 
 func (store *FileStore) ReplaceImportedAuth(ctx context.Context, selector string, authJSON []byte) error {
@@ -88,10 +91,16 @@ func (store *FileStore) PrepareImportedAuthRollback(ctx context.Context, account
 		if err != nil {
 			return err
 		}
-		return writeImportedAuthRollback(home, id, content, importedAuthRollbackMetadata{
+		claude, claudeFound, err := readExistingImportedProviderSecret(filepath.Join(home, importedAuthClaudeFile))
+		if err != nil {
+			return err
+		}
+		defer clearImportedAuth(claude)
+		metadata := importedAuthRollbackMetadata{
 			Version: 1, HadAuth: hadAuth, Account: state.Accounts[index],
-			LocalConfigFound: localConfigFound, LocalConfig: localConfig,
-		})
+			LocalConfigFound: localConfigFound, LocalConfig: localConfig, ClaudeFound: claudeFound,
+		}
+		return writeImportedAuthRollbackWithClaude(home, id, content, claude, metadata)
 	})
 }
 
@@ -135,6 +144,40 @@ func readExistingImportedLocalConfig(path string) ([]byte, bool, error) {
 		return nil, false, errors.New("existing account local config is unavailable")
 	}
 	return content, true, nil
+}
+
+func readExistingImportedProviderSecret(path string) ([]byte, bool, error) {
+	info, err := os.Lstat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, false, nil
+	}
+	if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || info.Size() > 2<<20 {
+		return nil, false, errors.New("existing account provider secret is unavailable")
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0 {
+		return nil, false, errors.New("existing account provider secret is not private")
+	}
+	content, err := os.ReadFile(path)
+	if err != nil || len(content) == 0 || len(content) > 2<<20 {
+		clearImportedAuth(content)
+		return nil, false, errors.New("existing account provider secret is unavailable")
+	}
+	return content, true, nil
+}
+
+func writeImportedAuthRollbackWithClaude(home, id string, auth, claude []byte, metadata importedAuthRollbackMetadata) error {
+	if err := writeImportedAuthRollback(home, id, auth, metadata); err != nil {
+		return err
+	}
+	if !metadata.ClaudeFound {
+		return nil
+	}
+	backupRoot := filepath.Join(home, importedAuthRollbackDir+id)
+	if _, err := fileutil.AtomicWrite(filepath.Join(backupRoot, importedAuthClaudeBackupFile), claude); err != nil {
+		_ = os.RemoveAll(backupRoot)
+		return fmt.Errorf("save imported provider rollback backup: %w", err)
+	}
+	return fileutil.SyncDirectory(backupRoot)
 }
 
 func writeImportedAuthRollback(home, id string, content []byte, metadata importedAuthRollbackMetadata) error {
@@ -199,6 +242,19 @@ func (store *FileStore) RestoreImportedAuthRollback(ctx context.Context, account
 			}
 		} else if err := os.Remove(configPath); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("remove imported account local config: %w", err)
+		}
+		claudePath := filepath.Join(home, importedAuthClaudeFile)
+		if metadata.ClaudeFound {
+			backup, err := readImportedAuthRollback(filepath.Join(backupRoot, importedAuthClaudeBackupFile))
+			if err != nil {
+				return err
+			}
+			defer clearImportedAuth(backup)
+			if _, err := fileutil.AtomicWrite(claudePath, backup); err != nil {
+				return fmt.Errorf("restore imported account provider secret: %w", err)
+			}
+		} else if err := os.Remove(claudePath); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("remove imported account provider secret: %w", err)
 		}
 		state, err := store.readState()
 		if err != nil {

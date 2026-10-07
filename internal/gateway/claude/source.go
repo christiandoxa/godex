@@ -19,8 +19,9 @@ const (
 )
 
 type Source struct {
-	homeDir func() (string, error)
-	getenv  func(string) string
+	homeDir    func() (string, error)
+	getenv     func(string) string
+	oauthLogin oauthLoginRunner
 }
 
 type credentialsFile struct {

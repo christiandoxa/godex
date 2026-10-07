@@ -107,6 +107,9 @@ func validateBundleImportAccountAction(journalID string, action profilemodel.Imp
 			return nil
 		}
 	}
+	if action.After.Provider.Kind == "anthropic" && len(action.Files) == 1 && action.Files[0].Path == ".credentials.json" {
+		return nil
+	}
 	return errors.New("invalid account import auth journal")
 }
 
