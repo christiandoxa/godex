@@ -77,7 +77,14 @@ func isolateExposeOptionalToolDiscovery(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", "")
 	t.Setenv("HOME", empty)
 	t.Setenv("USERPROFILE", empty)
-	t.Setenv("PATH", empty)
+	if goruntime.GOOS == "windows" {
+		systemRoot := strings.TrimSpace(os.Getenv("SystemRoot"))
+		if systemRoot != "" {
+			t.Setenv("PATH", filepath.Join(systemRoot, "System32"))
+		}
+	} else {
+		t.Setenv("PATH", "/usr/bin:/bin")
+	}
 }
 
 func tunnelClientHelperBinary(t *testing.T) string {
@@ -85,6 +92,9 @@ func tunnelClientHelperBinary(t *testing.T) string {
 	sourcePath, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
+	}
+	if goruntime.GOOS != "windows" {
+		return sourcePath
 	}
 	source, err := os.Open(sourcePath)
 	if err != nil {
