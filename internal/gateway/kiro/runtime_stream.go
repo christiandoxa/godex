@@ -71,25 +71,74 @@ func kiroChatSSE(response map[string]any) []byte {
 
 func kiroMessagesSSE(message map[string]any) []byte {
 	var output bytes.Buffer
-	writeSSE(&output, "message_start", map[string]any{"type": "message_start", kiroFieldMessage: map[string]any{
-		"id": message["id"], "type": kiroFieldMessage, "role": "assistant", kiroFieldModel: message[kiroFieldModel], kiroFieldContent: []any{}, kiroFieldStopReason: nil, "stop_sequence": nil,
-	}})
+	startMessage := make(map[string]any, len(message)+2)
+	for key, value := range message {
+		startMessage[key] = value
+	}
+	startMessage[kiroFieldContent] = []any{}
+	startMessage[kiroFieldStopReason] = nil
+	writeSSE(&output, "message_start", map[string]any{"type": "message_start", kiroFieldMessage: startMessage})
+
 	content, _ := message[kiroFieldContent].([]any)
-	index := 0
-	for _, raw := range content {
+	for index, raw := range content {
 		part, ok := raw.(map[string]any)
-		if !ok || responseString(part["type"], "") != "text" {
+		if !ok {
 			continue
 		}
-		text := responseString(part["text"], "")
-		writeSSE(&output, "content_block_start", map[string]any{"type": "content_block_start", kiroFieldIndex: index, "content_block": map[string]any{"type": "text", "text": ""}})
-		if text != "" {
-			writeSSE(&output, "content_block_delta", map[string]any{"type": "content_block_delta", kiroFieldIndex: index, kiroFieldDelta: map[string]any{"type": "text_delta", "text": text}})
+		switch responseString(part["type"], "") {
+		case "text":
+			writeSSE(&output, "content_block_start", map[string]any{
+				"type": "content_block_start", kiroFieldIndex: index,
+				"content_block": map[string]any{"type": "text", "text": ""},
+			})
+			text, _ := part["text"].(string)
+			if text != "" {
+				writeSSE(&output, "content_block_delta", map[string]any{
+					"type": "content_block_delta", kiroFieldIndex: index,
+					kiroFieldDelta: map[string]any{"type": "text_delta", "text": text},
+				})
+			}
+			writeSSE(&output, "content_block_stop", map[string]any{"type": "content_block_stop", kiroFieldIndex: index})
+		case "tool_use":
+			id, found := part["id"]
+			if !found {
+				id = "call_kiro"
+			}
+			name, found := part["name"]
+			if !found {
+				name = "tool_call"
+			}
+			writeSSE(&output, "content_block_start", map[string]any{
+				"type": "content_block_start", kiroFieldIndex: index,
+				"content_block": map[string]any{"type": "tool_use", "id": id, "name": name, "input": map[string]any{}},
+			})
+			input := any(map[string]any{})
+			if value, found := part["input"]; found {
+				input = value
+			}
+			encoded, _ := json.Marshal(input)
+			writeSSE(&output, "content_block_delta", map[string]any{
+				"type": "content_block_delta", kiroFieldIndex: index,
+				kiroFieldDelta: map[string]any{"type": "input_json_delta", "partial_json": string(encoded)},
+			})
+			writeSSE(&output, "content_block_stop", map[string]any{"type": "content_block_stop", kiroFieldIndex: index})
 		}
-		writeSSE(&output, "content_block_stop", map[string]any{"type": "content_block_stop", kiroFieldIndex: index})
-		index++
 	}
-	writeSSE(&output, "message_delta", map[string]any{"type": "message_delta", kiroFieldDelta: map[string]any{kiroFieldStopReason: message[kiroFieldStopReason], "stop_sequence": nil}, "usage": message["usage"]})
+	stopReason, found := message[kiroFieldStopReason]
+	if !found {
+		stopReason = "end_turn"
+	}
+	outputTokens := any(0)
+	if usage, ok := message[kiroFieldUsage].(map[string]any); ok {
+		if value, found := usage[kiroFieldOutputTokens]; found {
+			outputTokens = value
+		}
+	}
+	writeSSE(&output, "message_delta", map[string]any{
+		"type":         "message_delta",
+		kiroFieldDelta: map[string]any{kiroFieldStopReason: stopReason, "stop_sequence": nil},
+		"usage":        map[string]any{kiroFieldOutputTokens: outputTokens},
+	})
 	writeSSE(&output, "message_stop", map[string]any{"type": "message_stop"})
 	return output.Bytes()
 }

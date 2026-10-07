@@ -51,7 +51,35 @@ func kiroChatResponse(response map[string]any, requestID uint64) map[string]any 
 }
 
 func kiroMessagesResponse(response map[string]any, requestedModel string) map[string]any {
-	content := make([]any, 0, 1)
+	content := make([]any, 0, 2)
+	output, _ := response["output"].([]any)
+	for _, raw := range output {
+		item, ok := raw.(map[string]any)
+		if !ok || responseString(item["type"], "") != "function_call" {
+			continue
+		}
+		id, found := item["call_id"]
+		if !found {
+			id = "call_kiro"
+		}
+		name, found := item["name"]
+		if !found {
+			name = "tool_call"
+		}
+		input := any(map[string]any{})
+		if arguments, ok := item["arguments"].(string); ok {
+			var decoded any
+			if json.Unmarshal([]byte(arguments), &decoded) == nil {
+				input = decoded
+			}
+		}
+		content = append(content, map[string]any{
+			"type":  "tool_use",
+			"id":    id,
+			"name":  name,
+			"input": input,
+		})
+	}
 	if text := kiroResponseText(response); text != "" {
 		content = append(content, map[string]any{"type": "text", "text": text})
 	}
@@ -64,8 +92,12 @@ func kiroMessagesResponse(response map[string]any, requestedModel string) map[st
 			usage[kiroFieldOutputTokens] = value
 		}
 	}
+	id, found := response["id"]
+	if !found {
+		id = "msg_kiro"
+	}
 	return map[string]any{
-		"id":             response["id"],
+		"id":             id,
 		"type":           kiroFieldMessage,
 		"role":           kiroRoleAssistant,
 		kiroFieldModel:   requestedModel,
