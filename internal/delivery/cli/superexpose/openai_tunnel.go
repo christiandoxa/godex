@@ -22,7 +22,7 @@ import (
 
 const (
 	openAITunnelMinimumVersion  = "0.0.13"
-	openAITunnelLatestReference = "0.0.15"
+	openAITunnelLatestReference = "0.0.16"
 	openAITunnelProbeTimeout    = 15 * time.Second
 	openAITunnelProbeOutputMax  = 1024 * 1024
 	openAITunnelReadyTimeout    = 20 * time.Second
