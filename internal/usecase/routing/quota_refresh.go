@@ -91,8 +91,8 @@ func (router *Router) cacheQuotaFailure(accountID string, selection quotamodel.S
 	if accountID == "" {
 		return
 	}
-	if delay < quotaCheckFreshness {
-		delay = quotaCheckFreshness
+	if delay <= 0 {
+		delay = prodex04357QuotaQuarantineFallback
 	}
 	now := router.now()
 	router.storeQuotaCheck(quotaCheckKey{accountID: accountID, selection: selection}, quotaCheck{

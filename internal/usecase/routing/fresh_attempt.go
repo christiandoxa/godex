@@ -236,9 +236,11 @@ func (router *Router) freshAttempt(
 }
 
 func (router *Router) applyRetryOutcome(ctx context.Context, accountID string, selection quotamodel.Selection, outcome responseOutcome) {
+	duration := outcome.quarantine
 	if outcome.quota {
+		duration = router.quotaQuarantineDuration(accountID, selection, outcome.quotaResetAt)
 		router.markQuotaBlocked(accountID)
-		router.cacheQuotaFailure(accountID, selection, outcome.quarantine)
+		router.cacheQuotaFailure(accountID, selection, duration)
 	} else {
 		router.clearQuotaBlocked(accountID)
 	}
@@ -247,7 +249,6 @@ func (router *Router) applyRetryOutcome(ctx context.Context, accountID string, s
 		return
 	}
 	if outcome.kind == responseRetry && !outcome.transport {
-		duration := outcome.quarantine
 		if duration <= 0 {
 			duration = defaultProfileRetryBackoff
 		}

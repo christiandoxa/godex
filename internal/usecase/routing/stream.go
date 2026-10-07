@@ -98,7 +98,7 @@ func streamOutcome(data []byte, headers http.Header, now time.Time, providerKind
 		case providerentity.ErrorQuota:
 			return responseOutcome{
 				kind: responseRetry, quarantine: maxDuration(retryAfter(headers, now), classification.Cooldown),
-				failed: true, quota: true, firstEventRetry: true,
+				failed: true, quota: true, quotaResetAt: quotaResetAtFromMessage(data, now), firstEventRetry: true,
 			}, false
 		case providerentity.ErrorRateLimit:
 			cooldown := maxDuration(retryAfter(headers, now), classification.Cooldown)
@@ -115,7 +115,10 @@ func streamOutcome(data []byte, headers http.Header, now time.Time, providerKind
 			}, false
 		}
 		if isQuotaResponse(data) {
-			return responseOutcome{kind: responseRetry, quarantine: retryAfter(headers, now), failed: true, quota: true, firstEventRetry: true}, false
+			return responseOutcome{
+				kind: responseRetry, quarantine: retryAfter(headers, now), failed: true, quota: true,
+				quotaResetAt: quotaResetAtFromMessage(data, now), firstEventRetry: true,
+			}, false
 		}
 		return responseOutcome{kind: responsePass, failed: true}, false
 	default:

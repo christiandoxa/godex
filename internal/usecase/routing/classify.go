@@ -26,6 +26,7 @@ type responseOutcome struct {
 	quarantine                time.Duration
 	failed                    bool
 	quota                     bool
+	quotaResetAt              int64
 	profileUnavailable        bool
 	transient                 bool
 	transport                 bool
@@ -84,9 +85,15 @@ func (proxy *Router) classify(response *proxymodel.Response, providerKind string
 		if classification.Class == providerentity.ErrorRateLimit {
 			cooldown = rateLimitCooldown(response.Header, classificationBody)
 		}
+		quota := classification.Class == providerentity.ErrorQuota
+		resetAt := int64(0)
+		if quota {
+			resetAt = quotaResetAtFromMessage(classificationBody, proxy.now())
+		}
 		return responseOutcome{
 			kind: responseRetry, quarantine: cooldown,
-			quota:         classification.Class == providerentity.ErrorQuota,
+			quota:         quota,
+			quotaResetAt:  resetAt,
 			transient:     classification.Class == providerentity.ErrorRateLimit || classification.Class == providerentity.ErrorTransient,
 			healthPenalty: transientHealthPenalty(classification.Class),
 		}, pending, nil
@@ -119,7 +126,10 @@ func (proxy *Router) classify(response *proxymodel.Response, providerKind string
 			(!externalProviderKind(providerKind) &&
 				(response.StatusCode == http.StatusPaymentRequired || response.StatusCode == http.StatusForbidden) &&
 				openAIWorkspaceQuotaResponse(prefix))) {
-			return responseOutcome{kind: responseRetry, quarantine: 30 * time.Second, quota: true}, pending, nil
+			return responseOutcome{
+				kind: responseRetry, quarantine: 30 * time.Second, quota: true,
+				quotaResetAt: quotaResetAtFromMessage(prefix, proxy.now()),
+			}, pending, nil
 		}
 	}
 	return responseOutcome{kind: responsePass}, pending, nil
@@ -260,7 +270,10 @@ func (proxy *Router) classifyExternalProvider(
 	case providerentity.ErrorAuth:
 		return responseOutcome{kind: responseAuthFailure}, pending, nil
 	case providerentity.ErrorQuota:
-		return responseOutcome{kind: responseRetry, quarantine: classification.Cooldown, quota: true}, pending, nil
+		return responseOutcome{
+			kind: responseRetry, quarantine: classification.Cooldown, quota: true,
+			quotaResetAt: quotaResetAtFromMessage(classificationBody, proxy.now()),
+		}, pending, nil
 	case providerentity.ErrorRateLimit:
 		return responseOutcome{
 			kind: responseRetry, quarantine: maxDuration(retryAfter(response.Header, proxy.now()), classification.Cooldown), transient: true,
