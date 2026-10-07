@@ -3,9 +3,11 @@
 package superexpose
 
 import (
+	"context"
 	"os/exec"
 	"strconv"
 	"syscall"
+	"time"
 )
 
 const execCreateNewProcessGroup = 0x00000200
@@ -21,7 +23,9 @@ func stopExecProcessTree(command *exec.Cmd) {
 	if command == nil || command.Process == nil {
 		return
 	}
-	killer := exec.Command("taskkill", "/PID", strconv.Itoa(command.Process.Pid), "/T", "/F")
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	killer := exec.CommandContext(ctx, "taskkill", "/PID", strconv.Itoa(command.Process.Pid), "/T", "/F")
 	if killer.Run() == nil {
 		return
 	}

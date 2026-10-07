@@ -48,9 +48,11 @@ func TestExecuteWebSocketMessageStreamsThroughTerminalEvent(t *testing.T) {
 				return
 			}
 		}
-		if err := writeWebSocketEvent(connection, []byte(`{"type":"response.created","response":{"id":"must_not_forward"}}`)); err != nil {
-			t.Errorf("write event after terminal response: %v", err)
-		}
+		// The client is allowed to close the upstream socket immediately after the
+		// terminal event. If this write succeeds, the assertion below still proves
+		// the post-terminal event was not forwarded; if it fails, closure is the
+		// expected equivalent outcome.
+		_ = writeWebSocketEvent(connection, []byte(`{"type":"response.created","response":{"id":"must_not_forward"}}`))
 	})
 	defer server.Close()
 	transport, err := NewTransport(server.URL, nil, websocketAuth{})

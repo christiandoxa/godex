@@ -69,6 +69,39 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func tunnelClientHelperBinary(t *testing.T) string {
+	t.Helper()
+	sourcePath, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	source, err := os.Open(sourcePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer source.Close()
+	name := "tunnel-client"
+	if goruntime.GOOS == "windows" {
+		name += ".exe"
+	}
+	destinationPath := filepath.Join(t.TempDir(), name)
+	destination, err := os.OpenFile(destinationPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.Copy(destination, source); err != nil {
+		_ = destination.Close()
+		t.Fatal(err)
+	}
+	if err := destination.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(destinationPath, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	return destinationPath
+}
+
 func runTunnelClientTestHelper() {
 	if len(os.Args) < 2 {
 		os.Exit(64)
@@ -173,7 +206,15 @@ func TestProdex04356SuperExposeRecordsLifecycleInGodexRuntimeLog(t *testing.T) {
 	go func() {
 		done <- Run(ctx, []string{"exec", "--listen", "127.0.0.1:0"}, io.Discard, io.Discard)
 	}()
-	time.Sleep(150 * time.Millisecond)
+	logPath := filepath.Join(home, "logs", "runtime.jsonl")
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		content, err := os.ReadFile(logPath)
+		if err == nil && strings.Contains(string(content), "\"kind\":\"super_expose_started\"") {
+			break
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
 	cancel()
 	select {
 	case err := <-done:
@@ -184,7 +225,7 @@ func TestProdex04356SuperExposeRecordsLifecycleInGodexRuntimeLog(t *testing.T) {
 		t.Fatal("super expose did not stop after cancellation")
 	}
 
-	content, err := os.ReadFile(filepath.Join(home, "logs", "runtime.jsonl"))
+	content, err := os.ReadFile(logPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -688,7 +729,7 @@ func TestProdex04356SuperExposeTunnelLifecycleIsAudited(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("GODEX_HOME", home)
 	t.Setenv(tunnelHelperEnv, "1")
-	t.Setenv("GODEX_TUNNEL_CLIENT_BIN", os.Args[0])
+	t.Setenv("GODEX_TUNNEL_CLIENT_BIN", tunnelClientHelperBinary(t))
 	t.Setenv("CONTROL_PLANE_API_KEY", "synthetic-control-key")
 	validID := "tunnel_" + strings.Repeat("f", 32)
 
@@ -786,7 +827,7 @@ func TestProdex04356OpenAITunnelIDAndClientVersionPolicy(t *testing.T) {
 
 func TestProdex04356OpenAITunnelCredentialsDistinguishMissingAndInvalid(t *testing.T) {
 	t.Setenv(tunnelHelperEnv, "1")
-	t.Setenv("GODEX_TUNNEL_CLIENT_BIN", os.Args[0])
+	t.Setenv("GODEX_TUNNEL_CLIENT_BIN", tunnelClientHelperBinary(t))
 	validID := "tunnel_" + strings.Repeat("d", 32)
 
 	if err := os.Unsetenv("CONTROL_PLANE_API_KEY"); err != nil {
@@ -865,7 +906,7 @@ func TestProdex04356OpenAITunnelHealthBaseTrimsAllTrailingSlashes(t *testing.T) 
 func TestProdex04356OpenAITunnelProbeRejectsOversizeVersionOutput(t *testing.T) {
 	t.Setenv(tunnelHelperEnv, "1")
 	t.Setenv(tunnelOversizeVersionEnv, "1")
-	t.Setenv("GODEX_TUNNEL_CLIENT_BIN", os.Args[0])
+	t.Setenv("GODEX_TUNNEL_CLIENT_BIN", tunnelClientHelperBinary(t))
 	if _, _, err := ensureOpenAITunnelAvailable(); err == nil {
 		t.Fatal("oversize tunnel-client version output was accepted")
 	}
@@ -897,7 +938,7 @@ func TestProdex04356OpenAITunnelPrivateFilesRetryCollision(t *testing.T) {
 func TestProdex04356OpenAITunnelReadinessRejectsChildExitAfterHealth(t *testing.T) {
 	validID := "tunnel_" + strings.Repeat("e", 32)
 	t.Setenv(tunnelHelperEnv, "1")
-	t.Setenv("GODEX_TUNNEL_CLIENT_BIN", os.Args[0])
+	t.Setenv("GODEX_TUNNEL_CLIENT_BIN", tunnelClientHelperBinary(t))
 	t.Setenv("CONTROL_PLANE_API_KEY", "synthetic-control-key")
 
 	var tunnel *openAITunnelProcess
@@ -962,7 +1003,7 @@ func TestProdex04356OpenAITunnelStartsOfficialClientWithPrivateConfigAndHealth(t
 	capture := filepath.Join(t.TempDir(), "capture.txt")
 	t.Setenv(tunnelHelperEnv, "1")
 	t.Setenv(tunnelCaptureEnv, capture)
-	t.Setenv("GODEX_TUNNEL_CLIENT_BIN", os.Args[0])
+	t.Setenv("GODEX_TUNNEL_CLIENT_BIN", tunnelClientHelperBinary(t))
 	t.Setenv("PRODEX_TUNNEL_CLIENT_BIN", filepath.Join(t.TempDir(), "must-not-win"))
 	t.Setenv("CONTROL_PLANE_API_KEY", "synthetic-control-key")
 	t.Setenv("OPENAI_API_KEY", "must-not-inherit")

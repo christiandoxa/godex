@@ -79,7 +79,13 @@ func TestMaintainManagedSessionsMatchesProdexFullSequence(t *testing.T) {
 		t.Fatalf("session metadata prefix = %#v", lines)
 	}
 	stable := filepath.Join(shared, "attachments", "thread-1", "pasted-text-1.txt")
-	if !strings.Contains(string(rewritten), stable) || strings.Contains(string(rewritten), oldRoot) {
+	var rewrittenEvent map[string]any
+	if err := json.Unmarshal([]byte(lines[1]), &rewrittenEvent); err != nil {
+		t.Fatal(err)
+	}
+	payload, _ := rewrittenEvent["payload"].(map[string]any)
+	message, _ := payload["message"].(string)
+	if message != "read "+stable || strings.Contains(message, oldRoot) {
 		t.Fatalf("session attachment path not stabilized: %s", rewritten)
 	}
 	if got, err := os.ReadFile(stable); err != nil || string(got) != "attachment body" {
