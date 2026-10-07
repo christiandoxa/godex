@@ -73,7 +73,7 @@ func geminiResponseFormat(request map[string]any) (map[string]any, bool, error) 
 	case "json_schema", "structured_output":
 		return map[string]any{"type": "json_object"}, true, nil
 	default:
-		return nil, false, fmt.Errorf("Gemini OpenAI-compatible response_format type %q is not supported", kind)
+		return nil, false, fmt.Errorf("Gemini response_format type `%s` is not supported", kind)
 	}
 }
 

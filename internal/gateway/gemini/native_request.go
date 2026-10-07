@@ -3,7 +3,6 @@ package gemini
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strings"
 )
 
@@ -272,34 +271,53 @@ func geminiNativeGenerationConfig(original, chat map[string]any) (map[string]any
 }
 
 func geminiCandidateCount(request map[string]any) (int64, bool, error) {
-	var value any
-	var found bool
-	if current, ok := request["candidate_count"]; ok {
-		value, found = current, true
+	snake, snakeFound := request["candidate_count"]
+	camel, camelFound := request["candidateCount"]
+	snakeActive := snakeFound && snake != nil
+	camelActive := camelFound && camel != nil
+
+	if snakeActive && camelActive && !geminiCandidateValuesEqual(snake, camel) {
+		return 0, false, errors.New("invalid_candidate_count: Gemini request fields `candidate_count` and `candidateCount` conflict")
 	}
-	if current, ok := request["candidateCount"]; ok {
-		if found && current != nil && value != nil && fmt.Sprint(current) != fmt.Sprint(value) {
-			return 0, false, errors.New("Gemini invalid_candidate_count: candidate_count and candidateCount conflict")
-		}
-		value, found = current, true
+	if snakeActive && !geminiCandidateCountIsOne(snake) {
+		return 0, false, errors.New("invalid_candidate_count: Gemini request field `candidate_count` must be omitted, null, or 1")
 	}
-	if !found || value == nil {
-		return 0, false, nil
+	if camelActive && !geminiCandidateCountIsOne(camel) {
+		return 0, false, errors.New("invalid_candidate_count: Gemini request field `candidateCount` must be omitted, null, or 1")
 	}
-	number, ok := value.(json.Number)
-	if ok {
-		parsed, err := number.Int64()
-		if err == nil && parsed == 1 {
-			return 1, true, nil
-		}
-	}
-	if number, ok := value.(float64); ok && number == 1 && number == float64(int64(number)) {
+	if snakeActive || camelActive {
 		return 1, true, nil
 	}
-	if integer, ok := value.(int); ok && integer == 1 {
-		return 1, true, nil
+	return 0, false, nil
+}
+
+func geminiCandidateValuesEqual(left, right any) bool {
+	switch left := left.(type) {
+	case json.Number:
+		right, ok := right.(json.Number)
+		return ok && left.String() == right.String()
+	case int:
+		right, ok := right.(int)
+		return ok && left == right
+	case int64:
+		right, ok := right.(int64)
+		return ok && left == right
+	default:
+		return false
 	}
-	return 0, false, errors.New("Gemini invalid_candidate_count: candidate_count must be omitted, null, or 1")
+}
+
+func geminiCandidateCountIsOne(value any) bool {
+	switch value := value.(type) {
+	case json.Number:
+		return value.String() == "1"
+	case int:
+		return value == 1
+	case int64:
+		return value == 1
+	default:
+		return false
+	}
 }
 
 func geminiResponseSchema(request map[string]any) any {

@@ -12,11 +12,14 @@ func geminiTools(value any) ([]any, map[string]bool, error) {
 	}
 	items, ok := value.([]any)
 	if !ok {
-		return nil, nil, errors.New("Gemini OpenAI-compatible tools must be an array")
+		return nil, nil, errors.New("invalid_tool_declaration: Gemini request field `tools` must be an array")
 	}
 	tools := make([]any, 0, len(items))
 	names := make(map[string]bool, len(items))
-	for _, raw := range items {
+	for index, raw := range items {
+		if err := validateGeminiToolDeclaration(raw, index); err != nil {
+			return nil, nil, err
+		}
 		if err := appendGeminiTool(&tools, names, raw, ""); err != nil {
 			return nil, nil, err
 		}
@@ -25,6 +28,46 @@ func geminiTools(value any) ([]any, map[string]bool, error) {
 		}
 	}
 	return tools, names, nil
+}
+
+func validateGeminiToolDeclaration(raw any, index int) error {
+	item, ok := raw.(map[string]any)
+	if !ok {
+		return fmt.Errorf("invalid_tool_declaration: Gemini request field `tools[%d]` must be an object", index)
+	}
+	kind, _ := item["type"].(string)
+	_, hasFunction := item["function"]
+	if kind != "function" && !hasFunction {
+		return nil
+	}
+
+	function := item
+	field := fmt.Sprintf("tools[%d]", index)
+	if hasFunction {
+		nested, ok := item["function"].(map[string]any)
+		if !ok {
+			return fmt.Errorf("invalid_tool_declaration: Gemini request field `tools[%d].function` must be an object", index)
+		}
+		function = nested
+		field += ".function"
+	}
+	name, ok := function["name"].(string)
+	if !ok || strings.TrimSpace(name) == "" {
+		return fmt.Errorf("invalid_tool_declaration: Gemini request field `%s.name` must be a non-empty string", field)
+	}
+	parameters, exists := function["parameters"]
+	if !exists {
+		return fmt.Errorf("invalid_tool_declaration: Gemini request field `%s.parameters` is required", field)
+	}
+	if _, ok := parameters.(map[string]any); !ok {
+		return fmt.Errorf("invalid_tool_declaration: Gemini request field `%s.parameters` must be an object", field)
+	}
+	if description, exists := function["description"]; exists && description != nil {
+		if _, ok := description.(string); !ok {
+			return fmt.Errorf("invalid_tool_declaration: Gemini request field `%s.description` must be a string", field)
+		}
+	}
+	return nil
 }
 
 func appendGeminiTool(tools *[]any, names map[string]bool, raw any, namespace string) error {
