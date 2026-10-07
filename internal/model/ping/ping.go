@@ -3,6 +3,7 @@ package ping
 type Options struct {
 	Profile string
 	Model   string
+	Effort  string
 	BaseURL string
 	NoProxy bool
 	JSON    bool
@@ -49,6 +50,8 @@ type Result struct {
 	Status                 Status `json:"status"`
 	Model                  string `json:"model,omitempty"`
 	RequestedModel         string `json:"requested_model,omitempty"`
+	Effort                 string `json:"effort"`
+	RequestedEffort        string `json:"requested_effort"`
 	EffectiveModel         string `json:"effective_model,omitempty"`
 	CredentialValidation   string `json:"credential_validation"`
 	FirstResponseLatencyMS *int64 `json:"first_response_latency_ms,omitempty"`
@@ -70,13 +73,15 @@ type Summary struct {
 }
 
 type Report struct {
-	Provider       string   `json:"provider"`
-	Status         string   `json:"status"`
-	Model          string   `json:"model,omitempty"`
-	RequestedModel string   `json:"requested_model,omitempty"`
-	EffectiveModel string   `json:"effective_model,omitempty"`
-	LatencyMS      int64    `json:"latency_ms"`
-	Detail         string   `json:"detail"`
-	Profiles       []Result `json:"profiles"`
-	Summary        Summary  `json:"summary"`
+	Provider        string   `json:"provider"`
+	Status          string   `json:"status"`
+	Model           string   `json:"model,omitempty"`
+	RequestedModel  string   `json:"requested_model,omitempty"`
+	Effort          string   `json:"effort"`
+	RequestedEffort string   `json:"requested_effort"`
+	EffectiveModel  string   `json:"effective_model,omitempty"`
+	LatencyMS       int64    `json:"latency_ms"`
+	Detail          string   `json:"detail"`
+	Profiles        []Result `json:"profiles"`
+	Summary         Summary  `json:"summary"`
 }

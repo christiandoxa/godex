@@ -11,12 +11,12 @@ import (
 )
 
 func TestPingArgumentsMatchCanonicalProdexPath(t *testing.T) {
-	got := pingArguments(pingmodel.Options{Model: "gpt-test", BaseURL: "https://example.test/backend-api", NoProxy: true})
+	got := pingArguments(pingmodel.Options{Model: "gpt-test", Effort: "max", BaseURL: "https://example.test/backend-api", NoProxy: true})
 	want := []string{
 		"exec", "--sandbox", "read-only", "--ephemeral", "--ignore-user-config",
 		"--ignore-rules", "--skip-git-repo-check", "-c", `model_provider="openai"`,
 		"-c", `chatgpt_base_url="https://example.test/backend-api"`,
-		"--model", "gpt-test", "--json", "--color", "never", "hello",
+		"--model", "gpt-test", "-c", "model_reasoning_effort=max", "--json", "--color", "never", "hello",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("arguments = %#v\nwant %#v", got, want)

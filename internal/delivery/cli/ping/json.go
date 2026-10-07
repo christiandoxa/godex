@@ -12,6 +12,8 @@ type jsonResult struct {
 	Status                 pingmodel.Status `json:"status"`
 	Model                  *string          `json:"model"`
 	RequestedModel         *string          `json:"requested_model"`
+	Effort                 *string          `json:"effort"`
+	RequestedEffort        *string          `json:"requested_effort"`
 	EffectiveModel         *string          `json:"effective_model"`
 	CredentialValidation   string           `json:"credential_validation"`
 	FirstResponseLatencyMS *int64           `json:"first_response_latency_ms"`
@@ -21,21 +23,24 @@ type jsonResult struct {
 }
 
 type jsonReport struct {
-	Provider       string            `json:"provider"`
-	Status         string            `json:"status"`
-	Model          *string           `json:"model"`
-	RequestedModel *string           `json:"requested_model"`
-	EffectiveModel *string           `json:"effective_model"`
-	LatencyMS      int64             `json:"latency_ms"`
-	Detail         string            `json:"detail"`
-	Profiles       []jsonResult      `json:"profiles"`
-	Summary        pingmodel.Summary `json:"summary"`
+	Provider        string            `json:"provider"`
+	Status          string            `json:"status"`
+	Model           *string           `json:"model"`
+	RequestedModel  *string           `json:"requested_model"`
+	Effort          *string           `json:"effort"`
+	RequestedEffort *string           `json:"requested_effort"`
+	EffectiveModel  *string           `json:"effective_model"`
+	LatencyMS       int64             `json:"latency_ms"`
+	Detail          string            `json:"detail"`
+	Profiles        []jsonResult      `json:"profiles"`
+	Summary         pingmodel.Summary `json:"summary"`
 }
 
 func writeJSON(out io.Writer, report pingmodel.Report) error {
 	value := jsonReport{
 		Provider: report.Provider, Status: report.Status,
 		Model: optionalString(report.Model), RequestedModel: optionalString(report.RequestedModel),
+		Effort: optionalString(report.Effort), RequestedEffort: optionalString(report.RequestedEffort),
 		EffectiveModel: optionalString(report.EffectiveModel), LatencyMS: report.LatencyMS,
 		Detail: report.Detail, Summary: report.Summary,
 		Profiles: make([]jsonResult, 0, len(report.Profiles)),
@@ -44,6 +49,7 @@ func writeJSON(out io.Writer, report pingmodel.Report) error {
 		value.Profiles = append(value.Profiles, jsonResult{
 			Profile: result.Profile, Status: result.Status,
 			Model: optionalString(result.Model), RequestedModel: optionalString(result.RequestedModel),
+			Effort: optionalString(result.Effort), RequestedEffort: optionalString(result.RequestedEffort),
 			EffectiveModel: optionalString(result.EffectiveModel), CredentialValidation: result.CredentialValidation,
 			FirstResponseLatencyMS: result.FirstResponseLatencyMS, CompletionLatencyMS: result.CompletionLatencyMS,
 			LatencyMS: result.LatencyMS, Detail: result.Detail,

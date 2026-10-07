@@ -27,6 +27,15 @@ func Run(ctx context.Context, probe runner, out io.Writer, arguments []string) e
 	if err != nil {
 		return err
 	}
+	if err := pingusecase.ValidateOptions(options); err != nil {
+		return err
+	}
+	if pingShouldPromptSelection(options.JSON, pingInteractiveTerminal()) {
+		options, err = promptPingOptions(ctx, options)
+		if err != nil {
+			return err
+		}
+	}
 	report, err := runProbe(ctx, probe, out, options)
 	if err != nil {
 		return err
@@ -46,7 +55,7 @@ func Run(ctx context.Context, probe runner, out io.Writer, arguments []string) e
 
 func parseArguments(arguments []string) (pingmodel.Options, error) {
 	if len(arguments) == 0 || arguments[0] != "openai" {
-		return pingmodel.Options{}, errors.New("usage: godex ping openai [-p|--profile NAME] [--model MODEL] [--base-url URL] [--no-proxy] [--json]")
+		return pingmodel.Options{}, errors.New("usage: godex ping openai [-p|--profile NAME] [--model MODEL] [--effort LEVEL] [--base-url URL] [--no-proxy] [--json]")
 	}
 	options := pingmodel.Options{}
 	for index := 1; index < len(arguments); index++ {
@@ -69,12 +78,12 @@ func consumeArgument(arguments []string, index int, options *pingmodel.Options) 
 		options.JSON = true
 		return index, nil
 	case "--help", "-h":
-		return index, errors.New("usage: godex ping openai [-p|--profile NAME] [--model MODEL] [--base-url URL] [--no-proxy] [--json]")
+		return index, errors.New("usage: godex ping openai [-p|--profile NAME] [--model MODEL] [--effort LEVEL] [--base-url URL] [--no-proxy] [--json]")
 	}
 	for _, option := range []struct {
 		name string
 		set  func(string)
-	}{{"--profile", func(value string) { options.Profile = value }}, {"-p", func(value string) { options.Profile = value }}, {"--model", func(value string) { options.Model = value }}, {"--base-url", func(value string) { options.BaseURL = value }}} {
+	}{{"--profile", func(value string) { options.Profile = value }}, {"-p", func(value string) { options.Profile = value }}, {"--model", func(value string) { options.Model = value }}, {"--effort", func(value string) { options.Effort = value }}, {"--base-url", func(value string) { options.BaseURL = value }}} {
 		value, next, handled, err := optionValue(arguments, index, option.name)
 		if !handled {
 			continue
@@ -135,10 +144,11 @@ func writeProfileResult(out io.Writer, result pingmodel.Result) error {
 	first := latencyLabel(result.FirstResponseLatencyMS, "unavailable")
 	completion := latencyValue(result.CompletionLatencyMS)
 	requested := valueOrDefault(result.RequestedModel, "configured/default")
+	effort := valueOrDefault(result.RequestedEffort, "configured/default")
 	effective := valueOrDefault(result.EffectiveModel, "unavailable")
 	if _, err := fmt.Fprintf(
-		out, "%s  %-20s first=%s completion=%dms  requested=%s effective=%s\n",
-		result.Profile, pingusecase.HumanStatus(result.Status), first, completion, requested, effective,
+		out, "%s  %-20s first=%s completion=%dms  requested=%s effort=%s effective=%s\n",
+		result.Profile, pingusecase.HumanStatus(result.Status), first, completion, requested, effort, effective,
 	); err != nil {
 		return err
 	}

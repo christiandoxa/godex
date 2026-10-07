@@ -37,22 +37,22 @@ func TestPingParsesOpenAIOptionsAndRendersHumanOutput(t *testing.T) {
 	runner := &fakeRunner{report: pingmodel.Report{
 		Provider: "openai", Status: "ok", Detail: "1/1 profiles healthy",
 		Profiles: []pingmodel.Result{{
-			Profile: "work", Status: pingmodel.Pass, RequestedModel: "gpt-test", EffectiveModel: "gpt-effective",
+			Profile: "work", Status: pingmodel.Pass, RequestedModel: "gpt-test", RequestedEffort: "max", Effort: "max", EffectiveModel: "gpt-effective",
 			CredentialValidation: "valid", FirstResponseLatencyMS: &first, CompletionLatencyMS: &completion, LatencyMS: &completion,
 			Detail: "valid model response received",
 		}},
 		Summary: pingmodel.Summary{ProfilesDiscovered: 1, ProfilesTested: 1, Healthy: 1, DurationMS: 40, PoolUsable: true},
 	}}
 	var output strings.Builder
-	arguments := []string{"openai", "--profile", "work", "--model", "gpt-test", "--base-url", "https://example.test/backend-api", "--no-proxy"}
+	arguments := []string{"openai", "--profile", "work", "--model", "gpt-test", "--effort", "MAX", "--base-url", "https://example.test/backend-api", "--no-proxy"}
 	if err := Run(context.Background(), runner, &output, arguments); err != nil {
 		t.Fatal(err)
 	}
-	want := pingmodel.Options{Profile: "work", Model: "gpt-test", BaseURL: "https://example.test/backend-api", NoProxy: true}
+	want := pingmodel.Options{Profile: "work", Model: "gpt-test", Effort: "MAX", BaseURL: "https://example.test/backend-api", NoProxy: true}
 	if runner.options != want {
 		t.Fatalf("options = %+v, want %+v", runner.options, want)
 	}
-	for _, text := range []string{"OpenAI application ping", "work", "OK", "first=12ms", "completion=34ms", "Pool usable: yes"} {
+	for _, text := range []string{"OpenAI application ping", "work", "OK", "first=12ms", "completion=34ms", "effort=max", "Pool usable: yes"} {
 		if !strings.Contains(output.String(), text) {
 			t.Fatalf("output missing %q: %q", text, output.String())
 		}
@@ -145,9 +145,34 @@ func TestPingJSONKeepsNullableReferenceFields(t *testing.T) {
 	if err := Run(context.Background(), runner, &output, []string{"openai", "--json"}); err != nil {
 		t.Fatal(err)
 	}
-	for _, field := range []string{`"model":null`, `"requested_model":null`, `"effective_model":null`, `"first_response_latency_ms":null`} {
+	for _, field := range []string{`"model":null`, `"requested_model":null`, `"effort":null`, `"requested_effort":null`, `"effective_model":null`, `"first_response_latency_ms":null`} {
 		if !strings.Contains(output.String(), field) {
 			t.Fatalf("JSON output missing %s: %s", field, output.String())
+		}
+	}
+}
+
+func TestPingSelectionPromptIsHumanInteractiveOnly(t *testing.T) {
+	if !pingShouldPromptSelection(false, true) {
+		t.Fatal("human interactive ping should prompt")
+	}
+	if pingShouldPromptSelection(true, true) {
+		t.Fatal("JSON ping must not prompt")
+	}
+	if pingShouldPromptSelection(false, false) {
+		t.Fatal("non-interactive ping must not prompt")
+	}
+}
+
+func TestPingRejectsControlValuesBeforeRunner(t *testing.T) {
+	runner := &fakeRunner{}
+	for _, arguments := range [][]string{
+		{"openai", "--effort", "max\n"},
+		{"openai", "--model", "gpt-test\r"},
+		{"openai", "--profile", "work\x00"},
+	} {
+		if err := Run(context.Background(), runner, &strings.Builder{}, arguments); err == nil {
+			t.Fatalf("arguments %q unexpectedly accepted", arguments)
 		}
 	}
 }

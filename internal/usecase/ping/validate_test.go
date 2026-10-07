@@ -74,13 +74,42 @@ func (fake fakePingProfiles) QuotaTargets(context.Context) ([]profilemodel.Quota
 type fakePingProcess struct {
 	results map[string]pingmodel.ProcessResult
 	errs    map[string]error
+	options map[string]pingmodel.Options
 }
 
-func (fake fakePingProcess) PingOpenAI(_ context.Context, target pingmodel.Target, _ pingmodel.Options) (pingmodel.ProcessResult, error) {
+func (fake fakePingProcess) PingOpenAI(_ context.Context, target pingmodel.Target, options pingmodel.Options) (pingmodel.ProcessResult, error) {
+	if fake.options != nil {
+		fake.options[target.Name] = options
+	}
 	if err := fake.errs[target.Name]; err != nil {
 		return pingmodel.ProcessResult{}, err
 	}
 	return fake.results[target.Name], nil
+}
+
+func TestOpenAIPingPropagatesReasoningEffort(t *testing.T) {
+	pass := []byte("{\"type\":\"thread.started\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"Hello\"}}\n{\"type\":\"turn.completed\"}\n")
+	options := map[string]pingmodel.Options{}
+	process := fakePingProcess{results: map[string]pingmodel.ProcessResult{"work": {Stdout: pass, ExitCode: 0, LatencyMS: 10}}, options: options}
+	probe := NewOpenAI(fakePingProfiles{targets: []profilemodel.QuotaTarget{{Name: "work", CodexHome: "/work", Provider: "openai"}}}, process)
+	report, err := probe.Run(context.Background(), pingmodel.Options{Model: "gpt-6-astra", Effort: "MAX"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if options["work"].Effort != "max" {
+		t.Fatalf("child options = %+v, want normalized effort max", options["work"])
+	}
+	if report.Profiles[0].Effort != "max" || report.Profiles[0].RequestedEffort != "max" {
+		t.Fatalf("report profile = %+v, want effort fields", report.Profiles[0])
+	}
+}
+
+func TestOpenAIPingRejectsUnsupportedReasoningEffort(t *testing.T) {
+	process := fakePingProcess{options: map[string]pingmodel.Options{}}
+	probe := NewOpenAI(fakePingProfiles{targets: []profilemodel.QuotaTarget{{Name: "work", CodexHome: "/work", Provider: "openai"}}}, process)
+	if _, err := probe.Run(context.Background(), pingmodel.Options{Model: "gpt-5.6-luna", Effort: "ultra"}); err == nil || !strings.Contains(err.Error(), "unsupported") {
+		t.Fatalf("unsupported effort error = %v", err)
+	}
 }
 
 func TestOpenAIPingSelectsProfilesAndSummarizes(t *testing.T) {

@@ -23,13 +23,13 @@ var pingSecretPatterns = []struct {
 	{regexp.MustCompile(`\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}`), `<redacted>`},
 }
 
-func processErrorResult(profile, model string, err error, latency int64) pingmodel.Result {
+func processErrorResult(profile, model, effort string, err error, latency int64) pingmodel.Result {
 	status := classifyFailure(err.Error())
 	if status == pingmodel.ProcessFailed && strings.Contains(strings.ToLower(err.Error()), "failed to start") {
 		status = pingmodel.SpawnFailed
 	}
 	detail := appendPingDetail(statusDetail(status), boundedPingDetail(err.Error()))
-	return newResult(profile, model, status, detail, nil, latency, "")
+	return newResult(profile, model, effort, status, detail, nil, latency, "")
 }
 
 func decorateProcessFailure(status pingmodel.Status, detail string, result pingmodel.ProcessResult) string {

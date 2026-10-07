@@ -50,6 +50,11 @@ func (ping *OpenAI) RunObserved(
 	if err := validateOptions(options); err != nil {
 		return pingmodel.Report{}, err
 	}
+	normalizedEffort, err := normalizePingEffort(options.Model, options.Effort)
+	if err != nil {
+		return pingmodel.Report{}, err
+	}
+	options.Effort = normalizedEffort
 	targets, err := ping.targets(ctx, options.Profile)
 	if err != nil {
 		return pingmodel.Report{}, err
@@ -150,10 +155,10 @@ func (ping *OpenAI) probeTarget(ctx context.Context, target pingmodel.Target, op
 	started := time.Now()
 	processResult, err := ping.process.PingOpenAI(ctx, target, options)
 	if err != nil {
-		return processErrorResult(target.Name, options.Model, err, time.Since(started).Milliseconds())
+		return processErrorResult(target.Name, options.Model, options.Effort, err, time.Since(started).Milliseconds())
 	}
 	status, detail, effectiveModel := classifyProcessResult(processResult)
-	return newResult(target.Name, options.Model, status, detail, processResult.FirstResponseMS, processResult.LatencyMS, effectiveModel)
+	return newResult(target.Name, options.Model, options.Effort, status, detail, processResult.FirstResponseMS, processResult.LatencyMS, effectiveModel)
 }
 
 func classifyProcessResult(result pingmodel.ProcessResult) (pingmodel.Status, string, string) {
@@ -193,10 +198,10 @@ func classifyEmptyProtocolFailure(status pingmodel.Status, detail string, result
 	return status, detail
 }
 
-func newResult(profile, model string, status pingmodel.Status, detail string, first *int64, latency int64, effective string) pingmodel.Result {
+func newResult(profile, model, effort string, status pingmodel.Status, detail string, first *int64, latency int64, effective string) pingmodel.Result {
 	completion := latency
 	return pingmodel.Result{
-		Profile: profile, Status: status, Model: model, RequestedModel: model, EffectiveModel: effective,
+		Profile: profile, Status: status, Model: model, RequestedModel: model, Effort: effort, RequestedEffort: effort, EffectiveModel: effective,
 		CredentialValidation: credentialValidation(status), FirstResponseLatencyMS: first,
 		CompletionLatencyMS: &completion, LatencyMS: &completion, Detail: detail,
 	}
@@ -218,7 +223,7 @@ func buildReport(results []pingmodel.Result, discovered int, options pingmodel.O
 	}
 	return pingmodel.Report{
 		Provider: "openai", Status: status, Model: options.Model, RequestedModel: options.Model,
-		EffectiveModel: effective, LatencyMS: elapsed.Milliseconds(),
+		Effort: options.Effort, RequestedEffort: options.Effort, EffectiveModel: effective, LatencyMS: elapsed.Milliseconds(),
 		Detail:   fmt.Sprintf("%d/%d profiles healthy", summary.Healthy, len(results)),
 		Profiles: results, Summary: summary,
 	}
@@ -241,8 +246,10 @@ func accumulateSummary(summary *pingmodel.Summary, status pingmodel.Status) {
 	}
 }
 
+func ValidateOptions(options pingmodel.Options) error { return validateOptions(options) }
+
 func validateOptions(options pingmodel.Options) error {
-	for name, value := range map[string]string{"--profile": options.Profile, "--model": options.Model} {
+	for name, value := range map[string]string{"--profile": options.Profile, "--model": options.Model, "--effort": options.Effort} {
 		if value != "" && (strings.TrimSpace(value) == "" || strings.ContainsAny(value, "\r\n\x00")) {
 			return fmt.Errorf("%s must be nonempty and contain no control characters", name)
 		}

@@ -121,6 +121,9 @@ func pingArguments(options pingmodel.Options) []string {
 	if options.Model != "" {
 		arguments = append(arguments, "--model", options.Model)
 	}
+	if options.Effort != "" {
+		arguments = append(arguments, "-c", "model_reasoning_effort="+options.Effort)
+	}
 	return append(arguments, "--json", "--color", "never", "hello")
 }
 
