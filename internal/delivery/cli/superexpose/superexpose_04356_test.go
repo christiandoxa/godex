@@ -807,6 +807,22 @@ func TestProdex04356SuperExposeTunnelLifecycleIsAudited(t *testing.T) {
 	}
 }
 
+func TestProdex04356OpenAITunnelBinaryPrefersGodexOverride(t *testing.T) {
+	binary, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GODEX_TUNNEL_CLIENT_BIN", binary)
+	t.Setenv("PRODEX_TUNNEL_CLIENT_BIN", filepath.Join(t.TempDir(), "must-not-win"))
+	got, err := openAITunnelBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Clean(got) != filepath.Clean(binary) {
+		t.Fatalf("tunnel binary = %q, want %q", got, binary)
+	}
+}
+
 func TestProdex04356OpenAITunnelIDAndClientVersionPolicy(t *testing.T) {
 	validID := "tunnel_" + strings.Repeat("a", 32)
 	if got, err := validateOpenAITunnelID(validID); err != nil || got != validID {
@@ -948,7 +964,7 @@ func TestProdex04356OpenAITunnelPrivateFilesRetryCollision(t *testing.T) {
 func TestProdex04356OpenAITunnelReadinessRejectsChildExitAfterHealth(t *testing.T) {
 	validID := "tunnel_" + strings.Repeat("e", 32)
 	t.Setenv(tunnelHelperEnv, "1")
-	t.Setenv("GODEX_TUNNEL_CLIENT_BIN", tunnelClientHelperBinary(t))
+	helper := tunnelClientHelperBinary(t)
 	t.Setenv("CONTROL_PLANE_API_KEY", "synthetic-control-key")
 
 	var tunnel *openAITunnelProcess
@@ -972,7 +988,7 @@ func TestProdex04356OpenAITunnelReadinessRejectsChildExitAfterHealth(t *testing.
 	t.Setenv(tunnelExternalHealthEnv, server.URL)
 
 	var err error
-	tunnel, err = startOpenAITunnel("http://127.0.0.1:4567/mcp/capability", validID)
+	tunnel, err = spawnOpenAITunnel("http://127.0.0.1:4567/mcp/capability", validID, helper, "0.0.15")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1013,13 +1029,12 @@ func TestProdex04356OpenAITunnelStartsOfficialClientWithPrivateConfigAndHealth(t
 	capture := filepath.Join(t.TempDir(), "capture.txt")
 	t.Setenv(tunnelHelperEnv, "1")
 	t.Setenv(tunnelCaptureEnv, capture)
-	t.Setenv("GODEX_TUNNEL_CLIENT_BIN", tunnelClientHelperBinary(t))
-	t.Setenv("PRODEX_TUNNEL_CLIENT_BIN", filepath.Join(t.TempDir(), "must-not-win"))
+	helper := tunnelClientHelperBinary(t)
 	t.Setenv("CONTROL_PLANE_API_KEY", "synthetic-control-key")
 	t.Setenv("OPENAI_API_KEY", "must-not-inherit")
 	t.Setenv("TUNNEL_CLIENT_CONFIG", "must-not-inherit")
 
-	tunnel, err := startOpenAITunnel("http://127.0.0.1:4567/mcp/capability", validID)
+	tunnel, err := spawnOpenAITunnel("http://127.0.0.1:4567/mcp/capability", validID, helper, "0.0.15")
 	if err != nil {
 		t.Fatal(err)
 	}
