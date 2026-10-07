@@ -79,13 +79,16 @@ func (router *Router) tryAcquireProfileInflight(
 	}
 	router.inflight[accountID] = current + weight
 	router.profileInflightAdmissionsTotal++
+	active := current + weight
 	router.mu.Unlock()
+	router.recordProfileInflightMarker(accountID, active)
 
 	var once sync.Once
 	return func() {
 		once.Do(func() {
 			router.mu.Lock()
 			current := router.inflight[accountID]
+			active := 0
 			if current <= 0 {
 				router.profileInflightReleaseUnderflowsTotal++
 			} else {
@@ -93,12 +96,14 @@ func (router *Router) tryAcquireProfileInflight(
 				if current <= weight {
 					delete(router.inflight, accountID)
 				} else {
-					router.inflight[accountID] = current - weight
+					active = current - weight
+					router.inflight[accountID] = active
 				}
 			}
 			close(router.inflightChanged)
 			router.inflightChanged = make(chan struct{})
 			router.mu.Unlock()
+			router.recordProfileInflightMarker(accountID, active)
 		})
 	}, true
 }

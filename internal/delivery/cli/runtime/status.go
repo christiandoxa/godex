@@ -88,9 +88,6 @@ func writeStatusSnapshot(ctx context.Context, activity *runtimeusecase.Activity,
 		return ctx.Err()
 	}
 	resourceSnapshot := resources.sample()
-	if _, err := fmt.Fprintf(out, "Updated: %s\n", time.Now().Format("2006-01-02 15:04:05")); err != nil {
-		return err
-	}
 	for _, field := range statusFields(overview, resourceSnapshot) {
 		if _, err := fmt.Fprintf(out, "%s: %s\n", field[0], field[1]); err != nil {
 			return err
@@ -100,26 +97,26 @@ func writeStatusSnapshot(ctx context.Context, activity *runtimeusecase.Activity,
 }
 
 func statusFields(overview runtimemodel.Overview, resources statusResourceSnapshot) [][2]string {
-	fields := [][2]string{
-		{"Active profile", valueOrDash(overview.ActiveProfile)},
-		{"Profiles", fmt.Sprint(overview.ProfileCount)},
-		{"Enabled", fmt.Sprint(overview.EnabledCount)},
-		{"Inflight", fmt.Sprint(overview.Inflight)},
-		{"Recent events", fmt.Sprint(overview.RecentEvents)},
+	updated := overview.UpdatedAt
+	if strings.TrimSpace(updated) == "" {
+		updated = time.Now().In(time.Local).Format("2006-01-02 15:04:05")
+	}
+	return [][2]string{
+		{"Profile", statusProfileField(overview)},
+		{"5h quota", statusPoolRemaining(overview.Quota.FiveHour)},
+		{"5h runway", statusRunway(overview.Quota.FiveHour, overview.FiveHourRunway, overview.UpdatedUnix)},
+		{"Weekly quota", statusPoolRemaining(overview.Quota.Weekly)},
+		{"Weekly runway", statusRunway(overview.Quota.Weekly, overview.WeeklyRunway, overview.UpdatedUnix)},
+		{"Token usage", statusTokenUsage(overview.TokenSummary)},
+		{"Token efficiency", statusTokenEfficiency(overview.TokenSummary.Total)},
+		{"Token history", statusTokenHistory(overview)},
 		{"Processes", statusProcessField(resources)},
 		{"Memory", statusMemoryField(resources)},
 		{"Network", statusNetworkField(resources)},
 		{"Disk I/O", statusDiskField(resources)},
+		{"Recent load", statusLoadSummary(overview.RuntimeLoad, statusRuntimeProcessCount(resources))},
+		{"Updated", updated},
 	}
-	if overview.LastEvent != nil {
-		last := overview.LastEvent
-		fields = append(fields,
-			[2]string{"Last event", last.Kind},
-			[2]string{"Last status", fmt.Sprint(last.StatusCode)},
-			[2]string{"Last event at", time.UnixMilli(last.TimestampUnixMilli).Format(time.RFC3339)},
-		)
-	}
-	return fields
 }
 
 func writerIsTerminal(out io.Writer) bool {

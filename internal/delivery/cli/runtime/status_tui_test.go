@@ -18,7 +18,7 @@ func TestStatusTUIViewAndKeys(t *testing.T) {
 		t.Fatal("snapshot unexpectedly returned command")
 	}
 	view := model.View()
-	for _, expected := range []string{"Godex Status", "Active profile: work", "q/esc quit", "r refresh"} {
+	for _, expected := range []string{"Godex Status", "Profile: runtime=work, configured=work", "5h quota: Unavailable", "Token usage: No token_usage events found", "q/esc quit", "r refresh"} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("view missing %q: %q", expected, view)
 		}

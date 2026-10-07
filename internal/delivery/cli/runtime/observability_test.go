@@ -145,7 +145,10 @@ func TestStatusNonTerminalUsesOneSnapshot(t *testing.T) {
 	if err := Status(context.Background(), newCLIActivity(), &output, []string{"--interval", "2"}); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output.String(), "Active profile: work") || !strings.Contains(output.String(), "Inflight: 0") {
+	if !strings.Contains(output.String(), "Profile: runtime=work, configured=work") ||
+		!strings.Contains(output.String(), "5h quota: Unavailable") ||
+		!strings.Contains(output.String(), "Token usage: No token_usage events found") ||
+		!strings.Contains(output.String(), "Updated: ") {
 		t.Fatalf("status = %q", output.String())
 	}
 }

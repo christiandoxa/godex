@@ -446,6 +446,7 @@ func (router *Router) bindSuccessfulResponse(
 }
 
 func (router *Router) Observe(ctx context.Context, accountID string, headers http.Header, body []byte, stream bool) error {
+	router.observeTokenUsage(ctx, accountID, body)
 	keys := responseAffinity(headers, body, stream)
 	now := router.now()
 	if err := router.affinity.rememberVerified(ctx, accountID, keys, now); err != nil {

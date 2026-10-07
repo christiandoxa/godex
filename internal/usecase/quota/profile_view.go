@@ -96,6 +96,13 @@ func (status *Status) populateOpenAIProfileQuota(ctx context.Context, report *qu
 		return
 	}
 	report.Usage, report.Err = status.fetchHomeUsage(ctx, target.CodexHome, baseURL)
+	if report.Err == nil && strings.TrimSpace(baseURL) == "" {
+		now := status.now()
+		status.storeUsage(target.CodexHome, report.Usage, now)
+		for _, key := range statusSnapshotKeys(target.Name, target.AccountID) {
+			status.storeUsageSnapshot(ctx, key, report.Usage, now)
+		}
+	}
 	report.State = quotaState(*report, status.now())
 }
 

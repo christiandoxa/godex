@@ -37,13 +37,19 @@ func TestProdex04355ProfileInflightSaturationRecordsRuntimeMarker(t *testing.T) 
 	if _, ok := router.tryAcquireProfileInflight("main", request, false); ok {
 		t.Fatal("saturated permit acquired")
 	}
-	if len(recorder.events) != 1 {
-		t.Fatalf("events = %#v", recorder.events)
+	var event *runtimemodel.Event
+	for index := range recorder.events {
+		if recorder.events[index].Kind == "profile_inflight_saturated" {
+			event = &recorder.events[index]
+			break
+		}
 	}
-	event := recorder.events[0]
-	if event.Kind != "profile_inflight_saturated" || event.RequestID != "44" || event.Fields["profile"] != "main" ||
+	if event == nil {
+		t.Fatalf("profile_inflight_saturated missing: %#v", recorder.events)
+	}
+	if event.RequestID != "44" || event.Fields["profile"] != "main" ||
 		event.Fields["hard_limit"] != "2" || event.Fields["route"] != "responses" || event.Fields["transport"] != "http" {
-		t.Fatalf("profile marker = %#v", event)
+		t.Fatalf("profile marker = %#v", *event)
 	}
 }
 

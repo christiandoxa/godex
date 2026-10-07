@@ -161,6 +161,7 @@ func run() int {
 	application.SetRuntimeBroker(runtimebrokercli.NewCommand(runner, profiles, brokerStore, activity, version.Version))
 	activity.SetProfiles(profiles)
 	quotaStatus.SetProfiles(profiles)
+	activity.SetQuotaStatus(quotaStatus)
 	application.SetRedeemer(quotausecase.NewRedeemer(profiles, quotaClient))
 	application.SetPing(pingusecase.NewOpenAI(profiles, process))
 	releaseClient := githubgateway.NewEnvironmentReleaseClient("godex/"+version.Version, nil)
