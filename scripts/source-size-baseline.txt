@@ -8,7 +8,7 @@
 901	internal/delivery/cli/runtime/super.go
 502	internal/delivery/cli/runtime/super_launch.go
 423	internal/delivery/cli/runtimebroker/store.go
-469	internal/delivery/cli/subagent/subagent.go
+413	internal/delivery/cli/subagent/subagent.go
 407	internal/delivery/cli/superexpose/command.go
 546	internal/delivery/cli/superexpose/exec.go
 528	internal/delivery/cli/superexpose/openai_tunnel.go

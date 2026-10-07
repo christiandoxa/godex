@@ -320,11 +320,6 @@ func childArgv(spec childLaunchSpec, task string) []string {
 	return append(args, "exec", task)
 }
 
-type relayResult struct {
-	bytes uint64
-	err   error
-}
-
 func runChild(
 	ctx context.Context,
 	spec childLaunchSpec,
@@ -334,27 +329,22 @@ func runChild(
 	command := exec.Command(spec.Executable, childArgv(spec, task)...)
 	command.Env = subAgentChildEnvironment()
 	configureProcessGroup(command)
-	stdoutPipe, err := command.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	stderrPipe, err := command.StderrPipe()
+	relay, err := newChildOutputRelay(command, stdout, stderr)
 	if err != nil {
 		return err
 	}
 	if err := command.Start(); err != nil {
+		relay.close()
 		return fmt.Errorf("failed to spawn sub-agent child: %w", err)
 	}
+	relay.childStarted()
+	defer relay.close()
 	if err := os.Remove(taskPath); err != nil {
 		stopProcessTree(command)
 		_ = command.Wait()
+		_, _ = relay.drain()
 		return fmt.Errorf("failed to remove consumed task file: %w", err)
 	}
-
-	stdoutResult := make(chan relayResult, 1)
-	stderrResult := make(chan relayResult, 1)
-	go relayChildOutput(stdoutPipe, stdout, stdoutResult)
-	go relayChildOutput(stderrPipe, stderr, stderrResult)
 
 	wait := make(chan error, 1)
 	go func() { wait <- command.Wait() }()
@@ -374,7 +364,7 @@ func runChild(
 	}
 	stopProcessTree(command)
 
-	outputBytes, outputIncomplete := drainRelayResults(stdoutResult, stderrResult)
+	outputBytes, outputIncomplete := relay.drain()
 	if cancelled {
 		message := "sub-agent launcher cancelled"
 		if outputIncomplete {
@@ -397,52 +387,6 @@ func runChild(
 		return errors.New("sub-agent child completed without output")
 	}
 	return nil
-}
-
-func relayChildOutput(reader io.Reader, writer io.Writer, result chan<- relayResult) {
-	var total uint64
-	var writeErr error
-	buffer := make([]byte, 8192)
-	for {
-		count, err := reader.Read(buffer)
-		if count > 0 {
-			total += uint64(count)
-			if writeErr == nil {
-				if _, currentErr := writer.Write(buffer[:count]); currentErr != nil {
-					writeErr = currentErr
-				}
-			}
-		}
-		if err != nil {
-			if !errors.Is(err, io.EOF) && !errors.Is(err, os.ErrClosed) && writeErr == nil {
-				writeErr = err
-			}
-			result <- relayResult{bytes: total, err: writeErr}
-			return
-		}
-	}
-}
-
-func drainRelayResults(stdout, stderr <-chan relayResult) (uint64, bool) {
-	timer := time.NewTimer(outputDrainTimeout)
-	defer timer.Stop()
-	var total uint64
-	incomplete := false
-	for count := 0; count < 2; count++ {
-		select {
-		case result := <-stdout:
-			total += result.bytes
-			incomplete = incomplete || result.err != nil
-			stdout = nil
-		case result := <-stderr:
-			total += result.bytes
-			incomplete = incomplete || result.err != nil
-			stderr = nil
-		case <-timer.C:
-			return total, true
-		}
-	}
-	return total, incomplete
 }
 
 func subAgentChildEnvironment() []string {
