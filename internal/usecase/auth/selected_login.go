@@ -36,6 +36,26 @@ func (login *Login) RunSelected(ctx context.Context, deviceAuth bool) (authJSON 
 	return reader.ReadAuthSnapshot(ctx, stagedHome)
 }
 
+func (login *Login) RunStatus(ctx context.Context) (err error) {
+	if login == nil || login.accounts == nil || login.codex == nil {
+		return errors.New("login status is not configured")
+	}
+	runner, ok := login.codex.(selectedLoginRunner)
+	if !ok {
+		return errors.New("login status support is not configured")
+	}
+	stagedHome, err := login.accounts.CreateStagedHome()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if cleanupErr := login.removeAll(stagedHome); cleanupErr != nil {
+			err = errors.Join(err, cleanupErr)
+		}
+	}()
+	return runner.Run(ctx, stagedHome, []string{"login", "status"})
+}
+
 func (login *Login) RunSelectedStatus(ctx context.Context, home string) error {
 	if login == nil || login.codex == nil {
 		return errors.New("selected profile login is not configured")

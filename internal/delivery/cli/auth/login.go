@@ -58,8 +58,9 @@ func ParseLoginOptions(arguments []string) (LoginOptions, error) {
 			}
 			options.Name, index = value, next
 		case argument == "--profile" || strings.HasPrefix(argument, "--profile=") ||
-			argument == "-p" || strings.HasPrefix(argument, "-p="):
-			value, next, err := loginOptionValue(arguments, index, "--profile", "-p")
+			argument == "-p" || strings.HasPrefix(argument, "-p=") ||
+			argument == "--account" || strings.HasPrefix(argument, "--account="):
+			value, next, err := loginOptionValue(arguments, index, "--profile", "-p", "--account")
 			if err != nil {
 				return LoginOptions{}, err
 			}

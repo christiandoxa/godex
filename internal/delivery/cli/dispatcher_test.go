@@ -626,6 +626,90 @@ func (process *selectedLoginCodex) Login(_ context.Context, home string, device 
 	return identity, nil
 }
 
+type selectedLogoutProcess struct {
+	home string
+	args []string
+}
+
+func (process *selectedLogoutProcess) Run(_ context.Context, home string, args []string) error {
+	process.home = home
+	process.args = append([]string(nil), args...)
+	return nil
+}
+
+func TestProdex04356LogoutUsesSelectedOrActiveProfileHome(t *testing.T) {
+	root := t.TempDir()
+	accounts := accountrepo.NewFileStore(root)
+	profiles := profilerepo.NewStore(root)
+	catalog := profileusecase.NewCatalog(profiles, accounts, filepath.Join(root, "current"))
+	work, err := catalog.Add(t.Context(), profilemodel.AddRequest{Name: "work"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := catalog.Add(t.Context(), profilemodel.AddRequest{Name: "other"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	process := &selectedLogoutProcess{}
+	native := authusecase.NewNative(accounts, process, nil)
+	app := New(nil, nil, accounts, nil, nil, nil, &bytes.Buffer{})
+	app.SetProfiles(catalog)
+	app.SetNativeAuth(native)
+
+	if err := app.runLogout(t.Context(), []string{"other"}); err != nil {
+		t.Fatal(err)
+	}
+	if process.home != other.Profile.CodexHome || strings.Join(process.args, " ") != "logout" {
+		t.Fatalf("explicit logout home/args = %q / %#v", process.home, process.args)
+	}
+	current, err := catalog.Current(t.Context())
+	if err != nil || current.Profile.Name != "work" {
+		t.Fatalf("explicit logout changed active profile = %#v err=%v", current, err)
+	}
+	if err := app.runLogout(t.Context(), nil); err != nil {
+		t.Fatal(err)
+	}
+	if process.home != work.Profile.CodexHome || strings.Join(process.args, " ") != "logout" {
+		t.Fatalf("active logout home/args = %q / %#v", process.home, process.args)
+	}
+	listed, err := catalog.List(t.Context())
+	if err != nil || len(listed) != 2 {
+		t.Fatalf("logout changed profile metadata = %#v err=%v", listed, err)
+	}
+}
+
+func TestProdex04356LoginStatusOptionOrderAndTemporaryHome(t *testing.T) {
+	root := t.TempDir()
+	accounts := accountrepo.NewFileStore(root)
+	profiles := profilerepo.NewStore(root)
+	catalog := profileusecase.NewCatalog(profiles, accounts, filepath.Join(root, "current"))
+	work, err := catalog.Add(t.Context(), profilemodel.AddRequest{Name: "work"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	process := &selectedLoginCodex{}
+	login := authusecase.NewLogin(accounts, process)
+	app := New(login, nil, accounts, nil, nil, nil, &bytes.Buffer{})
+	app.SetProfiles(catalog)
+
+	if err := app.runLogin(t.Context(), []string{"status", "--profile", "work"}); err != nil {
+		t.Fatal(err)
+	}
+	if process.loginHome != work.Profile.CodexHome {
+		t.Fatalf("reordered selected status home = %q, want %q", process.loginHome, work.Profile.CodexHome)
+	}
+	if err := app.runLogin(t.Context(), []string{"status"}); err != nil {
+		t.Fatal(err)
+	}
+	temporary := process.loginHome
+	if temporary == work.Profile.CodexHome {
+		t.Fatalf("unselected status reused active profile home %q", temporary)
+	}
+	if _, err := os.Stat(temporary); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("temporary login status home remains: %q err=%v", temporary, err)
+	}
+}
+
 func TestProdex04356SelectedProfileLoginStatusUsesTargetHome(t *testing.T) {
 	root := t.TempDir()
 	accounts := accountrepo.NewFileStore(root)

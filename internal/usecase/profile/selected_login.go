@@ -11,6 +11,35 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
+func (catalog *Catalog) SelectedOpenAILogout(
+	ctx context.Context,
+	name string,
+	run func(string) error,
+) error {
+	if run == nil {
+		return errors.New("selected logout runner is not configured")
+	}
+	return catalog.withBundleImportLock(ctx, func() error {
+		var target Report
+		var err error
+		if strings.TrimSpace(name) == "" {
+			target, err = catalog.current(ctx)
+		} else {
+			target, err = catalog.selectedOpenAITargetLocked(ctx, name)
+		}
+		if err != nil {
+			return err
+		}
+		if target.Profile.Provider.Kind != profileentity.ProviderOpenAI {
+			return fmt.Errorf(
+				"profile %q uses %s; godex logout currently supports OpenAI/Codex profiles only",
+				target.Profile.Name, target.Profile.Provider.Kind,
+			)
+		}
+		return run(target.Profile.CodexHome)
+	})
+}
+
 func (catalog *Catalog) SelectedLoginStatus(
 	ctx context.Context,
 	name string,

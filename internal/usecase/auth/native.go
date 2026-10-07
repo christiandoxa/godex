@@ -65,6 +65,16 @@ func (native *Native) RunAntigravityLogin(ctx context.Context) (runErr error) {
 	return native.antigravity.RunWithCodexHome(ctx, native.antigravityHome, []string{"auth", "login"})
 }
 
+func (native *Native) RunHome(ctx context.Context, home string, arguments []string) error {
+	if native == nil || native.process == nil {
+		return errors.New("native authentication commands are not configured")
+	}
+	if home == "" {
+		return errors.New("selected profile CODEX_HOME is unavailable")
+	}
+	return native.process.Run(ctx, home, arguments)
+}
+
 func (native *Native) Run(ctx context.Context, input authmodel.Command) (err error) {
 	var account accountentity.Account
 	if input.Selector == "" {

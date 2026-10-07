@@ -226,3 +226,30 @@ func TestAntigravityLoginDispatchAndOptionValidation(t *testing.T) {
 		t.Fatalf("Antigravity login home/args = %q / %#v", process.home, process.arguments)
 	}
 }
+
+func TestProdex04356LogoutSelectorsMatchProfileCLI(t *testing.T) {
+	for _, test := range []struct {
+		args []string
+		want string
+	}{
+		{nil, ""},
+		{[]string{"work"}, "work"},
+		{[]string{"-p", "work"}, "work"},
+		{[]string{"--profile", "work"}, "work"},
+		{[]string{"--account", "work"}, "work"},
+	} {
+		got, err := ParseLogoutSelector(test.args)
+		if err != nil || got != test.want {
+			t.Fatalf("%#v => %q, err=%v", test.args, got, err)
+		}
+	}
+	for _, args := range [][]string{
+		{"one", "two"},
+		{"-p", "one", "--profile", "two"},
+		{"--unknown"},
+	} {
+		if _, err := ParseLogoutSelector(args); err == nil {
+			t.Fatalf("logout selector %#v unexpectedly accepted", args)
+		}
+	}
+}

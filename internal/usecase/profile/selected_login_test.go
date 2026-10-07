@@ -44,6 +44,64 @@ func selectedLoginFixture() []byte {
 	return []byte("{\"auth_mode\":\"chatgpt\",\"tokens\":{\"access_token\":\"fixture-token\",\"account_id\":\"selected-account\"}}")
 }
 
+func TestProdex04356SelectedLogoutHoldsLifecycleLockAcrossChild(t *testing.T) {
+	root := t.TempDir()
+	repo := profilerepo.NewStore(root)
+	catalog := NewCatalog(repo, &fakeAccounts{}, filepath.Join(root, "current"))
+	if _, err := catalog.Add(t.Context(), profilemodel.AddRequest{Name: "work"}); err != nil {
+		t.Fatal(err)
+	}
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	logoutDone := make(chan error, 1)
+	go func() {
+		logoutDone <- catalog.SelectedOpenAILogout(t.Context(), "work", func(string) error {
+			close(entered)
+			<-release
+			return nil
+		})
+	}()
+	<-entered
+
+	removeDone := make(chan error, 1)
+	go func() {
+		_, err := catalog.Remove(t.Context(), profilemodel.RemoveRequest{Name: "work", DeleteHome: true})
+		removeDone <- err
+	}()
+	select {
+	case err := <-removeDone:
+		t.Fatalf("profile mutation escaped selected-logout lifecycle lock: %v", err)
+	case <-time.After(100 * time.Millisecond):
+	}
+	close(release)
+	if err := <-logoutDone; err != nil {
+		t.Fatal(err)
+	}
+	if err := <-removeDone; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestProdex04356SelectedLogoutRejectsNonOpenAIProfile(t *testing.T) {
+	root := t.TempDir()
+	repo := profilerepo.NewStore(root)
+	profile := profileentity.Profile{
+		Name: "gemini", CodexHome: repo.ManagedHome("gemini"), Managed: true,
+		Provider: profileentity.Provider{Kind: profileentity.ProviderGemini},
+	}
+	if err := repo.ImportProvider(t.Context(), profile, map[string]string{}, true); err != nil {
+		t.Fatal(err)
+	}
+	catalog := NewCatalog(repo, &fakeAccounts{}, filepath.Join(root, "current"))
+	err := catalog.SelectedOpenAILogout(t.Context(), "gemini", func(string) error {
+		t.Fatal("non-OpenAI logout child unexpectedly ran")
+		return nil
+	})
+	if err == nil || !strings.Contains(err.Error(), "supports OpenAI/Codex profiles only") {
+		t.Fatalf("non-OpenAI logout error = %v", err)
+	}
+}
+
 func TestProdex04356SelectedLoginHoldsLifecycleLockAcrossExternalLogin(t *testing.T) {
 	root := t.TempDir()
 	repo := profilerepo.NewStore(root)

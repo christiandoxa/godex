@@ -174,13 +174,16 @@ Options:
       --openai-base-url URL    Alias for --base-url
   -h, --help                   Print help
 `,
-	"logout": `Run Codex logout for the selected or active Godex account/profile.
+	"logout": `Run Codex logout for the selected or active Godex profile.
 
-Usage: godex logout [OPTIONS]
+Usage: godex logout [OPTIONS] [NAME]
+
+Arguments:
+  [NAME]  Profile name. If omitted, Godex uses the active profile
 
 Options:
-      --account SELECTOR  Select the managed account to log out
-  -h, --help              Print help
+  -p, --profile NAME  Profile name. If omitted, Godex uses the active profile
+  -h, --help          Print help
 `,
 	"quota": `Inspect live quota for one profile or the whole profile pool.
 

@@ -96,7 +96,7 @@ func (app *App) Run(ctx context.Context, arguments []string) error {
 	case "login":
 		return app.runLogin(ctx, arguments[1:])
 	case "logout":
-		return authcli.Native(ctx, app.nativeAuth, true, arguments[1:])
+		return app.runLogout(ctx, arguments[1:])
 	case "accounts":
 		return accountcli.List(ctx, app.accounts, app.out, arguments[1:])
 	case "current":
@@ -229,12 +229,15 @@ func superExposeOptionTakesValue(argument string) bool {
 }
 
 func (app *App) runLogin(ctx context.Context, arguments []string) error {
-	if len(arguments) > 0 && arguments[0] == "status" {
-		return authcli.Native(ctx, app.nativeAuth, false, arguments[1:])
-	}
 	options, err := authcli.ParseLoginOptions(arguments)
 	if err != nil {
 		return err
+	}
+	if options.Status && options.Profile == "" {
+		if app.login == nil {
+			return fmt.Errorf("login status support is not configured")
+		}
+		return app.login.RunStatus(ctx)
 	}
 	if options.Profile != "" {
 		switch {
@@ -260,6 +263,19 @@ func (app *App) runLogin(ctx context.Context, arguments []string) error {
 		return err
 	}
 	return app.runLoginMenuAction(ctx, action, arguments)
+}
+
+func (app *App) runLogout(ctx context.Context, arguments []string) error {
+	selector, err := authcli.ParseLogoutSelector(arguments)
+	if err != nil {
+		return err
+	}
+	if app.profiles == nil || app.nativeAuth == nil {
+		return fmt.Errorf("selected profile logout support is not configured")
+	}
+	return app.profiles.SelectedOpenAILogout(ctx, selector, func(home string) error {
+		return app.nativeAuth.RunHome(ctx, home, []string{"logout"})
+	})
 }
 
 func (app *App) runLoginMenuAction(ctx context.Context, action authcli.LoginMenuAction, arguments []string) error {
