@@ -15,6 +15,16 @@ import (
 const routeDecisionTraceSchemaVersion = 1
 const routeDecisionMaxIdentifierBytes = 96
 
+type routeDecisionTraceWire struct {
+	SchemaVersion     int    `json:"schema_version"`
+	Route             string `json:"route"`
+	RequestedModel    string `json:"requested_model,omitempty"`
+	ResolvedModel     string `json:"resolved_model,omitempty"`
+	SelectedCandidate string `json:"selected_candidate,omitempty"`
+	TerminalOutcome   string `json:"terminal_outcome"`
+	TerminalReason    string `json:"terminal_reason,omitempty"`
+}
+
 type routeDecisionTrace struct {
 	schemaVersion     int
 	route             string
@@ -61,24 +71,16 @@ func (router *Router) recordRouteDecision(
 	if router == nil || router.activity == nil {
 		return
 	}
-	payload := map[string]any{
-		"schema_version":   trace.schemaVersion,
-		"route":            trace.route,
-		"terminal_outcome": trace.terminalOutcome,
+	wire := routeDecisionTraceWire{
+		SchemaVersion:     trace.schemaVersion,
+		Route:             trace.route,
+		RequestedModel:    trace.requestedModel,
+		ResolvedModel:     trace.resolvedModel,
+		SelectedCandidate: trace.selectedCandidate,
+		TerminalOutcome:   trace.terminalOutcome,
+		TerminalReason:    trace.terminalReason,
 	}
-	if trace.requestedModel != "" {
-		payload["requested_model"] = trace.requestedModel
-	}
-	if trace.resolvedModel != "" {
-		payload["resolved_model"] = trace.resolvedModel
-	}
-	if trace.selectedCandidate != "" {
-		payload["selected_candidate"] = trace.selectedCandidate
-	}
-	if trace.terminalReason != "" {
-		payload["terminal_reason"] = trace.terminalReason
-	}
-	encoded, err := json.Marshal(payload)
+	encoded, err := json.Marshal(wire)
 	if err != nil {
 		return
 	}

@@ -84,6 +84,9 @@ func TestProdex04357RouteDecisionTraceFreshSelectionMatchesTaggedCompactSchema(t
 	if _, exists := trace["candidates"]; exists {
 		t.Fatalf("compact tagged trace unexpectedly contains candidates: %#v", trace)
 	}
+	if got := event.Fields["trace"]; got != "{\"schema_version\":1,\"route\":\"responses\",\"requested_model\":\"gpt-5.6\",\"resolved_model\":\"gpt-5.6\",\"selected_candidate\":\"alpha\",\"terminal_outcome\":\"selected\"}" {
+		t.Fatalf("trace serialization = %q", got)
+	}
 }
 
 func TestProdex04357RouteDecisionTraceBoundSelectionAndNoCandidate(t *testing.T) {
