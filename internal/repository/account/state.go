@@ -119,7 +119,7 @@ func validateState(state stateFile) error {
 	names := make(map[string]struct{}, len(state.Accounts))
 	activeFound := state.ActiveAccountID == ""
 
-	for index, account := range state.Accounts {
+	for _, account := range state.Accounts {
 		if err := entity.ValidateAccount(account); err != nil {
 			return fmt.Errorf("Godex state contains invalid account metadata: %w", err)
 		}
@@ -133,15 +133,6 @@ func validateState(state stateFile) error {
 			return fmt.Errorf("Godex state contains duplicate account name %q", account.Name)
 		}
 		names[name] = struct{}{}
-		// ponytail: O(n²) identity scan; state is a small local account list.
-		for _, previous := range state.Accounts[:index] {
-			if previous.SameIdentity(entity.Identity{
-				Email:            account.Email,
-				ChatGPTAccountID: account.ChatGPTAccountID,
-			}) {
-				return fmt.Errorf("Godex state contains duplicate account identity %q", account.ID)
-			}
-		}
 		if account.ID == state.ActiveAccountID {
 			activeFound = true
 		}

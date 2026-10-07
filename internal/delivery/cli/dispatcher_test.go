@@ -16,6 +16,7 @@ import (
 	profileentity "github.com/christiandoxa/godex/internal/entity/profile"
 	"github.com/christiandoxa/godex/internal/gateway/codex"
 	updategateway "github.com/christiandoxa/godex/internal/gateway/update"
+	accountmodel "github.com/christiandoxa/godex/internal/model/account"
 	authmodel "github.com/christiandoxa/godex/internal/model/auth"
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 	proxyconfig "github.com/christiandoxa/godex/internal/model/proxy"
@@ -561,6 +562,222 @@ func TestDispatcherLoginMenuUnsupportedMethodFailsExplicitly(t *testing.T) {
 	app := New(nil, nil, nil, nil, nil, nil, &bytes.Buffer{})
 	if err := app.runLoginMenuAction(context.Background(), authcli.LoginGeminiAPIKeyGuidance, nil); err == nil || !strings.Contains(err.Error(), "guidance-only") {
 		t.Fatalf("unsupported login action error = %v", err)
+	}
+}
+
+type selectedLoginCodex struct {
+	loginHome string
+	device    bool
+	email     string
+	accountID string
+	token     string
+}
+
+func (process *selectedLoginCodex) identity() accountentity.Identity {
+	email := process.email
+	if email == "" {
+		email = "selected@example.com"
+	}
+	accountID := process.accountID
+	if accountID == "" {
+		accountID = "selected-account"
+	}
+	return accountentity.Identity{Email: email, ChatGPTAccountID: accountID}
+}
+
+func (process *selectedLoginCodex) authToken() string {
+	if process.token != "" {
+		return process.token
+	}
+	return "selected-login-token"
+}
+
+func (process *selectedLoginCodex) Run(_ context.Context, home string, arguments []string) error {
+	process.loginHome = home
+	if strings.Join(arguments, " ") != "login status" {
+		return errors.New("unexpected selected login command")
+	}
+	return nil
+}
+
+func (process *selectedLoginCodex) ReadAuthSnapshot(_ context.Context, home string) ([]byte, error) {
+	return os.ReadFile(filepath.Join(home, "auth.json"))
+}
+
+func (process *selectedLoginCodex) InspectAuthJSON(_ context.Context, content []byte) (accountentity.Identity, error) {
+	identity := process.identity()
+	if !bytes.Contains(content, []byte(identity.ChatGPTAccountID)) {
+		return accountentity.Identity{}, errors.New("unexpected selected auth snapshot")
+	}
+	return identity, nil
+}
+
+func (process *selectedLoginCodex) Login(_ context.Context, home string, device bool) (accountentity.Identity, error) {
+	process.loginHome = home
+	process.device = device
+	if err := os.MkdirAll(home, 0o700); err != nil {
+		return accountentity.Identity{}, err
+	}
+	identity := process.identity()
+	content := []byte("{\"auth_mode\":\"chatgpt\",\"tokens\":{\"access_token\":\"" + process.authToken() + "\",\"account_id\":\"" + identity.ChatGPTAccountID + "\"}}")
+	if err := os.WriteFile(filepath.Join(home, "auth.json"), content, 0o600); err != nil {
+		return accountentity.Identity{}, err
+	}
+	return identity, nil
+}
+
+func TestProdex04356SelectedProfileLoginStatusUsesTargetHome(t *testing.T) {
+	root := t.TempDir()
+	accounts := accountrepo.NewFileStore(root)
+	profiles := profilerepo.NewStore(root)
+	catalog := profileusecase.NewCatalog(profiles, accounts, filepath.Join(root, "current"))
+	report, err := catalog.Add(t.Context(), profilemodel.AddRequest{Name: "work"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	process := &selectedLoginCodex{}
+	login := authusecase.NewLogin(accounts, process)
+	app := New(login, nil, accounts, nil, nil, nil, &bytes.Buffer{})
+	app.SetProfiles(catalog)
+
+	if err := app.runLogin(t.Context(), []string{"--profile", "work", "status"}); err != nil {
+		t.Fatal(err)
+	}
+	if process.loginHome != report.Profile.CodexHome {
+		t.Fatalf("selected login status home = %q, want %q", process.loginHome, report.Profile.CodexHome)
+	}
+	listed, err := accounts.List(t.Context())
+	if err != nil || len(listed) != 0 {
+		t.Fatalf("selected status mutated managed accounts: %#v err=%v", listed, err)
+	}
+}
+
+func TestProdex04356SelectedProfileDeviceLoginUpdatesTargetInsteadOfAutoCreating(t *testing.T) {
+	root := t.TempDir()
+	accounts := accountrepo.NewFileStore(root)
+	profiles := profilerepo.NewStore(root)
+	catalog := profileusecase.NewCatalog(profiles, accounts, filepath.Join(root, "current"))
+	report, err := catalog.Add(t.Context(), profilemodel.AddRequest{Name: "work"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	process := &selectedLoginCodex{}
+	catalog.SetAuthInspector(process)
+	login := authusecase.NewLogin(accounts, process)
+	var output bytes.Buffer
+	app := New(login, nil, accounts, nil, nil, nil, &output)
+	app.SetProfiles(catalog)
+
+	if err := app.runLogin(t.Context(), []string{"--profile", "work", "--device-auth"}); err != nil {
+		t.Fatal(err)
+	}
+	content, err := profiles.ReadAuthJSON(report.Profile.CodexHome)
+	if err != nil {
+		t.Fatalf("selected profile auth was not updated: %v", err)
+	}
+	if !bytes.Contains(content, []byte("selected-login-token")) {
+		t.Fatalf("selected profile auth = %s", content)
+	}
+	listedAccounts, err := accounts.List(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(listedAccounts) != 0 {
+		t.Fatalf("selected profile login auto-created managed account: %#v", listedAccounts)
+	}
+	current, err := catalog.Current(t.Context())
+	if err != nil || current.Profile.Name != "work" {
+		t.Fatalf("current profile = %#v err=%v", current, err)
+	}
+	if !process.device {
+		t.Fatal("selected profile device login lost --device-auth")
+	}
+}
+
+func TestProdex04356SelectedManagedAccountLoginKeepsTargetAndUpdatesIdentity(t *testing.T) {
+	root := t.TempDir()
+	accounts := accountrepo.NewFileStore(root)
+	profiles := profilerepo.NewStore(root)
+	process := &selectedLoginCodex{email: "first@example.com", accountID: "first-account", token: "first-token"}
+	login := authusecase.NewLogin(accounts, process)
+	initial, err := login.Run(t.Context(), accountmodel.LoginInput{Name: "work"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalog := profileusecase.NewCatalog(profiles, accounts, filepath.Join(root, "current"))
+	catalog.SetAuthInspector(process)
+	process.email = "second@example.com"
+	process.accountID = "second-account"
+	process.token = "second-token"
+	app := New(login, nil, accounts, nil, nil, nil, &bytes.Buffer{})
+	app.SetProfiles(catalog)
+
+	if err := app.runLogin(t.Context(), []string{"--profile", "work", "--device-auth"}); err != nil {
+		t.Fatal(err)
+	}
+	listed, err := accounts.List(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(listed) != 1 || listed[0].ID != initial.ID || listed[0].Name != "work" ||
+		listed[0].Email != "second@example.com" || listed[0].ChatGPTAccountID != "second-account" {
+		t.Fatalf("selected account metadata = %#v, initial=%#v", listed, initial)
+	}
+	authJSON, err := os.ReadFile(filepath.Join(accounts.CodexHome(initial.ID), "auth.json"))
+	if err != nil || !bytes.Contains(authJSON, []byte("second-token")) {
+		t.Fatalf("selected account auth = %s err=%v", authJSON, err)
+	}
+	current, err := catalog.Current(t.Context())
+	if err != nil || current.Profile.Name != "work" || current.AccountID != initial.ID {
+		t.Fatalf("selected account current profile = %#v err=%v", current, err)
+	}
+}
+
+func TestProdex04356SelectedLoginMayAdoptIdentityUsedByAnotherProfile(t *testing.T) {
+	root := t.TempDir()
+	accounts := accountrepo.NewFileStore(root)
+	profiles := profilerepo.NewStore(root)
+	process := &selectedLoginCodex{email: "one@example.com", accountID: "account-one", token: "token-one"}
+	login := authusecase.NewLogin(accounts, process)
+	one, err := login.Run(t.Context(), accountmodel.LoginInput{Name: "one"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	process.email = "two@example.com"
+	process.accountID = "account-two"
+	process.token = "token-two"
+	two, err := login.Run(t.Context(), accountmodel.LoginInput{Name: "two"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalog := profileusecase.NewCatalog(profiles, accounts, filepath.Join(root, "current"))
+	catalog.SetAuthInspector(process)
+	app := New(login, nil, accounts, nil, nil, nil, &bytes.Buffer{})
+	app.SetProfiles(catalog)
+
+	if err := app.runLogin(t.Context(), []string{"--profile", "one", "--device-auth"}); err != nil {
+		t.Fatal(err)
+	}
+	listed, err := accounts.List(t.Context())
+	if err != nil || len(listed) != 2 {
+		t.Fatalf("selected duplicate identity accounts = %#v err=%v", listed, err)
+	}
+	var first, second accountentity.Account
+	for _, account := range listed {
+		switch account.ID {
+		case one.ID:
+			first = account
+		case two.ID:
+			second = account
+		}
+	}
+	if first.Name != "one" || first.ChatGPTAccountID != "account-two" ||
+		second.Name != "two" || second.ChatGPTAccountID != "account-two" {
+		t.Fatalf("duplicate selected-login identities = first:%#v second:%#v", first, second)
+	}
+	current, err := catalog.Current(t.Context())
+	if err != nil || current.AccountID != one.ID || current.Profile.Name != "one" {
+		t.Fatalf("selected duplicate identity active profile = %#v err=%v", current, err)
 	}
 }
 

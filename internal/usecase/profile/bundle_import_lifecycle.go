@@ -275,6 +275,9 @@ func (catalog *Catalog) newBundleImportJournal(ctx context.Context, plan importP
 }
 
 func actionAfterProfile(action importAction) profileentity.Profile {
+	if action.after != nil {
+		return *action.after
+	}
 	profile := action.target.Profile
 	if !action.create && sourceProviderKind(action.source) != profileentity.ProviderOpenAI {
 		profile.Email = importedProfileEmail(action.source, action.identity)

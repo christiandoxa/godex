@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	accountentity "github.com/christiandoxa/godex/internal/entity/account"
 	profileentity "github.com/christiandoxa/godex/internal/entity/profile"
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 )
@@ -46,7 +47,29 @@ func (catalog *Catalog) applyImportAction(ctx context.Context, action importActi
 		if action.create {
 			return catalog.profiles.ImportBundleProfile(ctx, action.target.Profile, map[string][]byte{"auth.json": authBytes}, journalID)
 		}
-		return catalog.replaceImportedAuth(ctx, action.target, authBytes)
+		if action.after != nil && action.target.AccountID != "" {
+			selected, ok := catalog.accounts.(interface {
+				ApplySelectedLogin(context.Context, string, accountentity.Identity, []byte) (accountentity.Account, error)
+			})
+			if !ok {
+				return errors.New("selected account login support is not configured")
+			}
+			_, err := selected.ApplySelectedLogin(ctx, action.target.AccountID, action.identity, authBytes)
+			return err
+		}
+		if err := catalog.replaceImportedAuth(ctx, action.target, authBytes); err != nil {
+			return err
+		}
+		if action.after != nil {
+			selected, ok := catalog.profiles.(interface {
+				ApplySelectedLoginMetadata(context.Context, string, profileentity.Profile) error
+			})
+			if !ok {
+				return errors.New("selected profile login metadata support is not configured")
+			}
+			return selected.ApplySelectedLoginMetadata(ctx, action.target.Profile.Name, *action.after)
+		}
+		return nil
 	case profileentity.ProviderAnthropic, profileentity.ProviderGemini, profileentity.ProviderKiro, profileentity.ProviderCopilot, profileentity.ProviderAgy:
 		secrets, err := providerSecrets(action.source)
 		if err != nil {

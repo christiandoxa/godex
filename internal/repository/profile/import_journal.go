@@ -24,11 +24,12 @@ const (
 )
 
 type profileImportAuthJournal struct {
-	Version    int    `json:"version"`
-	Profile    string `json:"profile"`
-	CodexHome  string `json:"codex_home"`
-	BackupName string `json:"backup_name"`
-	Phase      string `json:"phase"`
+	Version     int    `json:"version"`
+	Profile     string `json:"profile"`
+	CodexHome   string `json:"codex_home"`
+	BackupName  string `json:"backup_name"`
+	Phase       string `json:"phase"`
+	AuthMissing bool   `json:"auth_missing,omitempty"`
 }
 
 func (store *Store) CountImportAuthJournals(ctx context.Context) (int, error) {
@@ -157,17 +158,23 @@ func (store *Store) recoverProfileImportAuthJournal(
 			return err
 		}
 	case "backed_up":
-		backup, err := readProfileImportAuthBackup(backupPath)
-		if err != nil {
-			return err
-		}
-		defer clearBytes(backup)
 		authPath := filepath.Join(profile.CodexHome, profileAuthFileName)
 		if err := validateProfileAuthTarget(authPath); err != nil {
 			return err
 		}
-		if _, err := fileutil.AtomicWrite(authPath, backup); err != nil {
-			return fmt.Errorf("restore imported profile authentication: %w", err)
+		if journal.AuthMissing {
+			if err := os.Remove(authPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return fmt.Errorf("remove newly imported profile authentication: %w", err)
+			}
+		} else {
+			backup, err := readProfileImportAuthBackup(backupPath)
+			if err != nil {
+				return err
+			}
+			defer clearBytes(backup)
+			if _, err := fileutil.AtomicWrite(authPath, backup); err != nil {
+				return fmt.Errorf("restore imported profile authentication: %w", err)
+			}
 		}
 		journal.Phase = "rolled_back"
 		if _, err := store.writeProfileImportAuthJournal(journal); err != nil {

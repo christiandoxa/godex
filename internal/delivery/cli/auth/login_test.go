@@ -75,8 +75,8 @@ func TestLoginParsesFlagsAndRendersIdentity(t *testing.T) {
 
 func TestLoginRejectsUnexpectedArgumentsAndOutputErrors(t *testing.T) {
 	login := authusecase.NewLogin(&fakeLoginAccounts{}, fakeLoginCodex{})
-	if err := Login(context.Background(), login, nil, io.Discard, []string{"positional"}); err == nil {
-		t.Fatal("positional argument unexpectedly accepted")
+	if err := Login(context.Background(), login, nil, io.Discard, []string{"one", "two"}); err == nil {
+		t.Fatal("multiple positional profiles unexpectedly accepted")
 	}
 	if err := Login(context.Background(), login, nil, failingWriter{}, nil); err == nil {
 		t.Fatal("output failure unexpectedly ignored")
@@ -93,7 +93,7 @@ func TestLoginMenuPromptEligibilityPreservesExplicitAndInvalidCLI(t *testing.T) 
 			t.Fatalf("arguments %#v should allow interactive menu", arguments)
 		}
 	}
-	for _, arguments := range [][]string{{"--device-auth"}, {"positional"}, {"--unknown"}, {"--name"}} {
+	for _, arguments := range [][]string{{"--device-auth"}, {"one", "two"}, {"--unknown"}, {"--name"}} {
 		if ShouldPromptLoginMenu(arguments) {
 			t.Fatalf("arguments %#v unexpectedly allow interactive menu", arguments)
 		}
@@ -107,6 +107,38 @@ func TestParseLoginOptionsIsSharedByMenuAndDirectLogin(t *testing.T) {
 	}
 	if options.Name != "work" || !options.DeviceAuth {
 		t.Fatalf("options = %#v", options)
+	}
+}
+
+func TestProdex04356LoginProfileSelectorsAndStatusMatchTaggedCLI(t *testing.T) {
+	tests := []struct {
+		arguments []string
+		profile   string
+		status    bool
+		device    bool
+	}{
+		{[]string{"--profile", "work", "--device-auth"}, "work", false, true},
+		{[]string{"-p", "work", "status"}, "work", true, false},
+		{[]string{"work", "status"}, "work", true, false},
+		{[]string{"work", "--device-auth"}, "work", false, true},
+	}
+	for _, test := range tests {
+		options, err := ParseLoginOptions(test.arguments)
+		if err != nil {
+			t.Fatalf("%#v: %v", test.arguments, err)
+		}
+		if options.Profile != test.profile || options.Status != test.status || options.DeviceAuth != test.device {
+			t.Fatalf("%#v => %#v", test.arguments, options)
+		}
+	}
+	if _, err := ParseLoginOptions([]string{"--profile", "work", "--name", "other"}); err == nil {
+		t.Fatal("--profile with --name unexpectedly accepted")
+	}
+	if _, err := ParseLoginOptions([]string{"work", "--profile", "other"}); err == nil {
+		t.Fatal("positional profile with --profile unexpectedly accepted")
+	}
+	if !ShouldPromptLoginMenu([]string{"--profile", "work"}) {
+		t.Fatal("selected profile without explicit method should retain interactive provider chooser")
 	}
 }
 

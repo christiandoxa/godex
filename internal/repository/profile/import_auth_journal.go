@@ -24,11 +24,20 @@ func (store *Store) replaceImportedAuthLocked(profile profileentity.Profile, aut
 	if err != nil || homeInfo.Mode()&os.ModeSymlink != 0 || !homeInfo.IsDir() {
 		return errors.New("profile CODEX_HOME must be a real directory")
 	}
-	previous, err := store.ReadAuthJSON(profile.CodexHome)
-	if err != nil {
+	authPath := filepath.Join(profile.CodexHome, profileAuthFileName)
+	authMissing := false
+	var previous []byte
+	if _, err := os.Lstat(authPath); errors.Is(err, os.ErrNotExist) {
+		authMissing = true
+	} else if err != nil {
 		return err
+	} else {
+		previous, err = store.ReadAuthJSON(profile.CodexHome)
+		if err != nil {
+			return err
+		}
+		defer clearBytes(previous)
 	}
-	defer clearBytes(previous)
 
 	backupPath := filepath.Join(profile.CodexHome, profileImportAuthBackupName)
 	if _, err := os.Lstat(backupPath); !errors.Is(err, os.ErrNotExist) {
@@ -41,6 +50,7 @@ func (store *Store) replaceImportedAuthLocked(profile profileentity.Profile, aut
 	journal := profileImportAuthJournal{
 		Version: profileImportAuthJournalV1, Profile: profile.Name,
 		CodexHome: profile.CodexHome, BackupName: profileImportAuthBackupName, Phase: "prepared",
+		AuthMissing: authMissing,
 	}
 	if committed, err := store.writeProfileImportAuthJournal(journal); err != nil {
 		if !committed {
@@ -48,8 +58,10 @@ func (store *Store) replaceImportedAuthLocked(profile profileentity.Profile, aut
 		}
 		return fmt.Errorf("create profile import auth journal: %w", err)
 	}
-	if _, err := fileutil.AtomicWrite(backupPath, previous); err != nil {
-		return fmt.Errorf("back up imported profile authentication: %w", err)
+	if !authMissing {
+		if _, err := fileutil.AtomicWrite(backupPath, previous); err != nil {
+			return fmt.Errorf("back up imported profile authentication: %w", err)
+		}
 	}
 	journal.Phase = "backed_up"
 	if _, err := store.writeProfileImportAuthJournal(journal); err != nil {

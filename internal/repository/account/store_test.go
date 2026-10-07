@@ -728,13 +728,12 @@ func TestConcurrentDistinctLoginsAreSerialized(t *testing.T) {
 	}
 }
 
-func TestStateRejectsDuplicateIdentityMetadata(t *testing.T) {
+func TestProdex04356StateAllowsDuplicateIdentityMetadataForSelectedLogin(t *testing.T) {
 	store := newTestStore(t)
 	first := newTestAccount(t, "one", "person@example.com", "account-1", time.Unix(1, 0))
-	second, err := entity.NewAccount(entity.Identity{Email: "person@example.com"}, "two", time.Unix(2, 0))
-	if err != nil {
-		t.Fatal(err)
-	}
+	second := newTestAccount(t, "two", "other@example.com", "account-2", time.Unix(2, 0))
+	second.Email = first.Email
+	second.ChatGPTAccountID = first.ChatGPTAccountID
 	state := stateFile{Version: stateVersion, Accounts: []entity.Account{first, second}}
 	content, err := json.Marshal(state)
 	if err != nil {
@@ -743,8 +742,9 @@ func TestStateRejectsDuplicateIdentityMetadata(t *testing.T) {
 	if err := os.WriteFile(store.statePath(), content, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.List(context.Background()); err == nil || !strings.Contains(err.Error(), "duplicate account identity") {
-		t.Fatalf("duplicate identity error = %v", err)
+	listed, err := store.List(context.Background())
+	if err != nil || len(listed) != 2 {
+		t.Fatalf("duplicate selected-login identity state = %#v err=%v", listed, err)
 	}
 }
 

@@ -24,6 +24,7 @@ type importAction struct {
 	identity    accountentity.Identity
 	identityKey string
 	create      bool
+	after       *profileentity.Profile
 }
 
 func (catalog *Catalog) Import(ctx context.Context, request profilemodel.ImportRequest) (profilemodel.ImportResult, error) {

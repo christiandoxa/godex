@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"strings"
@@ -14,6 +13,8 @@ import (
 
 type LoginOptions struct {
 	Name             string
+	Profile          string
+	Status           bool
 	DeviceAuth       bool
 	WithAPIKey       bool
 	WithAntigravity  bool
@@ -22,43 +23,109 @@ type LoginOptions struct {
 }
 
 func ParseLoginOptions(arguments []string) (LoginOptions, error) {
-	flags := flag.NewFlagSet("login", flag.ContinueOnError)
-	flags.SetOutput(io.Discard)
-	name := flags.String("name", "", "friendly account name")
-	deviceAuth := flags.Bool("device-auth", false, "use Codex device authentication")
-	withAPIKey := flags.Bool("with-api-key", false, "use an OpenAI/OpenAI-compatible API key")
-	withAntigravity := flags.Bool("with-antigravity", false, "authenticate the native Antigravity CLI")
-	antigravity := flags.Bool("antigravity", false, "alias for --with-antigravity")
-	withAgy := flags.Bool("with-agy", false, "alias for --with-antigravity")
-	agy := flags.Bool("agy", false, "alias for --with-antigravity")
-	baseURL := ""
-	baseURLSpecified := false
-	setBaseURL := func(value string) error {
-		baseURL, baseURLSpecified = value, true
-		return nil
+	options := LoginOptions{}
+	positionalProfile := ""
+	requestedAntigravity := false
+	for index := 0; index < len(arguments); index++ {
+		argument := arguments[index]
+		switch {
+		case argument == "--device-auth":
+			options.DeviceAuth = true
+		case argument == "--with-api-key":
+			options.WithAPIKey = true
+		case argument == "--with-antigravity" || argument == "--antigravity" ||
+			argument == "--with-agy" || argument == "--agy":
+			requestedAntigravity = true
+		case argument == "status":
+			options.Status = true
+		case argument == "--":
+			for _, value := range arguments[index+1:] {
+				if value == "status" && !options.Status {
+					options.Status = true
+					continue
+				}
+				if positionalProfile == "" && !strings.HasPrefix(value, "-") {
+					positionalProfile = value
+					continue
+				}
+				return LoginOptions{}, errors.New("login accepts at most one profile and optional status")
+			}
+			index = len(arguments)
+		case argument == "--name" || strings.HasPrefix(argument, "--name="):
+			value, next, err := loginOptionValue(arguments, index, "--name")
+			if err != nil {
+				return LoginOptions{}, err
+			}
+			options.Name, index = value, next
+		case argument == "--profile" || strings.HasPrefix(argument, "--profile=") ||
+			argument == "-p" || strings.HasPrefix(argument, "-p="):
+			value, next, err := loginOptionValue(arguments, index, "--profile", "-p")
+			if err != nil {
+				return LoginOptions{}, err
+			}
+			if options.Profile != "" {
+				return LoginOptions{}, errors.New("login accepts at most one --profile")
+			}
+			options.Profile, index = value, next
+		case argument == "--base-url" || strings.HasPrefix(argument, "--base-url=") ||
+			argument == "--openai-base-url" || strings.HasPrefix(argument, "--openai-base-url="):
+			value, next, err := loginOptionValue(arguments, index, "--base-url", "--openai-base-url")
+			if err != nil {
+				return LoginOptions{}, err
+			}
+			options.BaseURL, options.BaseURLSpecified, index = value, true, next
+		case strings.HasPrefix(argument, "-"):
+			return LoginOptions{}, fmt.Errorf("unknown login option %q", argument)
+		default:
+			if positionalProfile != "" {
+				return LoginOptions{}, errors.New("login accepts at most one positional profile")
+			}
+			positionalProfile = argument
+		}
 	}
-	flags.Func("base-url", "OpenAI-compatible base URL", setBaseURL)
-	flags.Func("openai-base-url", "OpenAI-compatible base URL", setBaseURL)
-	if err := flags.Parse(arguments); err != nil {
-		return LoginOptions{}, fmt.Errorf("parse login arguments: %w", err)
+	if positionalProfile != "" {
+		if options.Profile != "" && options.Profile != positionalProfile {
+			return LoginOptions{}, errors.New("positional profile conflicts with --profile")
+		}
+		options.Profile = positionalProfile
 	}
-	if flags.NArg() != 0 {
-		return LoginOptions{}, errors.New("login does not accept positional arguments")
+	if options.Profile != "" && options.Name != "" {
+		return LoginOptions{}, errors.New("--profile cannot be combined with --name")
 	}
-	requestedAntigravity := *withAntigravity || *antigravity || *withAgy || *agy
-	useAntigravity := requestedAntigravity && !*withAPIKey
-	if useAntigravity {
-		if baseURLSpecified {
+	options.WithAntigravity = requestedAntigravity && !options.WithAPIKey
+	if options.WithAntigravity {
+		if options.BaseURLSpecified {
 			return LoginOptions{}, errors.New("--base-url is not supported for Antigravity login")
 		}
-		if *name != "" {
+		if options.Name != "" {
 			return LoginOptions{}, errors.New("--name is not supported for Antigravity login")
 		}
+		if options.Profile != "" {
+			return LoginOptions{}, errors.New("Antigravity login is global and does not use Godex profiles")
+		}
 	}
-	return LoginOptions{
-		Name: *name, DeviceAuth: *deviceAuth, WithAPIKey: *withAPIKey, WithAntigravity: useAntigravity,
-		BaseURL: baseURL, BaseURLSpecified: baseURLSpecified,
-	}, nil
+	return options, nil
+}
+
+func loginOptionValue(arguments []string, index int, names ...string) (string, int, error) {
+	argument := arguments[index]
+	for _, name := range names {
+		if argument == name {
+			if index+1 >= len(arguments) || strings.TrimSpace(arguments[index+1]) == "" {
+				return "", index, fmt.Errorf("%s requires a value", name)
+			}
+			return arguments[index+1], index + 1, nil
+		}
+		prefix := name + "="
+		if strings.HasPrefix(argument, prefix) {
+			value := strings.TrimSpace(strings.TrimPrefix(argument, prefix))
+			if value == "" {
+				return "", index, fmt.Errorf("%s requires a value", name)
+			}
+			return value, index, nil
+		}
+	}
+	return "", index, errors.New("login option requires a value")
 }
 
 func ShouldPromptLoginMenu(arguments []string) bool {

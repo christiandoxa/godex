@@ -236,6 +236,16 @@ func (app *App) runLogin(ctx context.Context, arguments []string) error {
 	if err != nil {
 		return err
 	}
+	if options.Profile != "" {
+		switch {
+		case options.Status:
+			return app.runSelectedLoginStatus(ctx, options.Profile)
+		case options.WithAPIKey:
+			return app.runSelectedAPIKeyLogin(ctx, options)
+		case options.DeviceAuth || !authcli.ShouldPromptLoginMenu(arguments) || !authcli.LoginMenuInteractive(app.in, app.errOut):
+			return app.runSelectedOpenAILogin(ctx, options)
+		}
+	}
 	if options.WithAPIKey {
 		return app.runAPIKeyLogin(ctx, options)
 	}
@@ -259,12 +269,22 @@ func (app *App) runLoginMenuAction(ctx context.Context, action authcli.LoginMenu
 	}
 	switch action {
 	case authcli.LoginChatGPT:
+		if options.Profile != "" {
+			return app.runSelectedOpenAILogin(ctx, options)
+		}
 		return authcli.Login(ctx, app.login, app.nativeAuth, app.out, arguments)
 	case authcli.LoginDeviceCode:
+		if options.Profile != "" {
+			options.DeviceAuth = true
+			return app.runSelectedOpenAILogin(ctx, options)
+		}
 		deviceArguments := append([]string(nil), arguments...)
 		deviceArguments = append(deviceArguments, "--device-auth")
 		return authcli.Login(ctx, app.login, app.nativeAuth, app.out, deviceArguments)
 	case authcli.LoginOpenAIAPIKey:
+		if options.Profile != "" {
+			return app.runSelectedAPIKeyLogin(ctx, options)
+		}
 		return app.runAPIKeyLogin(ctx, options)
 	case authcli.LoginAntigravity:
 		antigravityArguments := append([]string(nil), arguments...)
@@ -277,6 +297,36 @@ func (app *App) runLoginMenuAction(ctx context.Context, action authcli.LoginMenu
 	default:
 		return fmt.Errorf("selected login method is guidance-only in this Godex build")
 	}
+}
+
+func (app *App) runSelectedLoginStatus(ctx context.Context, profile string) error {
+	if app.profiles == nil || app.login == nil {
+		return fmt.Errorf("selected profile login support is not configured")
+	}
+	return app.profiles.SelectedLoginStatus(ctx, profile, func(home string) error {
+		return app.login.RunSelectedStatus(ctx, home)
+	})
+}
+
+func (app *App) runSelectedOpenAILogin(ctx context.Context, options authcli.LoginOptions) error {
+	if app.profiles == nil || app.login == nil {
+		return fmt.Errorf("selected profile login support is not configured")
+	}
+	if options.BaseURLSpecified {
+		return fmt.Errorf("--base-url is only supported for API key login")
+	}
+	report, err := app.profiles.SelectedOpenAILogin(ctx, options.Profile, func() ([]byte, error) {
+		return app.login.RunSelected(ctx, options.DeviceAuth)
+	})
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(app.out, "Logged in successfully for profile %q.\n", report.Profile.Name)
+	return err
+}
+
+func (app *App) runSelectedAPIKeyLogin(ctx context.Context, options authcli.LoginOptions) error {
+	return fmt.Errorf("selected profile API-key login is not configured")
 }
 
 func (app *App) runAPIKeyLogin(ctx context.Context, options authcli.LoginOptions) error {
