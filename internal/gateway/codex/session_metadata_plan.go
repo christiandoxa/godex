@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-const sessionRepairProdexVersion = "0.435.1"
+const sessionRepairProdexVersion = "0.435.8"
 
 func planSessionMetadataRepair(path, contents string) (string, bool, error) {
 	selector, ok := sessionIDFromPath(path)

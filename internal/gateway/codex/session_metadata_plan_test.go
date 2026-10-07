@@ -70,7 +70,7 @@ func TestSessionMetadataRepairPlanSynthesizesTaggedMetadata(t *testing.T) {
 	if meta["timestamp"] != "2026-06-14T23:32:19Z" || meta["type"] != "session_meta" ||
 		payload["id"] != sessionID || payload["session_id"] != sessionID ||
 		payload["timestamp"] != "2026-06-14T23:32:19Z" || payload["cwd"] != "/tmp/workspace" ||
-		payload["originator"] != "prodex-repair" || payload["cli_version"] != "0.435.1" ||
+		payload["originator"] != "prodex-repair" || payload["cli_version"] != "0.435.8" ||
 		payload["source"] != "cli" || payload["model_provider"] != "prodex-deepseek" {
 		t.Fatalf("synthetic metadata = %#v", meta)
 	}
@@ -116,5 +116,29 @@ func TestSessionIDFromPathMatchesTaggedUUIDExtraction(t *testing.T) {
 		if got, ok := sessionIDFromPath(filepath.Join(t.TempDir(), name)); ok {
 			t.Fatalf("invalid session path %q produced %q", name, got)
 		}
+	}
+}
+
+func TestProdex04358SessionRepairStructuralAndFieldPrecedence(t *testing.T) {
+	structural := `{"timestamp":"","type":"\u0073ession_meta","payload":{"id":"","timestamp":"","cwd":"","originator":"","cli_version":""}}`
+	if !sessionLineStartsCodexRolloutMetadata(structural) {
+		t.Fatal("escaped structural session metadata was not recognized")
+	}
+
+	sessionID := "019ec6c3-28a4-79f0-91f9-74a2f34b0928"
+	path := filepath.Join(t.TempDir(), "rollout-"+sessionID+".jsonl")
+	repair := `{"timestamp":" root ","cwd":"root-cwd","model_provider":"root-provider","payload":{"timestamp":"payload-ts","cwd":" payload-cwd ","model_provider":" payload-provider "}}`
+	line := syntheticSessionMetadataLine(path, sessionID, []string{repair})
+	if line == "" {
+		t.Fatal("synthetic repair metadata was not produced")
+	}
+	var value map[string]any
+	if err := json.Unmarshal([]byte(line), &value); err != nil {
+		t.Fatal(err)
+	}
+	payload := value["payload"].(map[string]any)
+	if value["timestamp"] != "root" || payload["timestamp"] != "root" ||
+		payload["cwd"] != "payload-cwd" || payload["model_provider"] != "payload-provider" {
+		t.Fatalf("repair precedence = %#v", value)
 	}
 }
