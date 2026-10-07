@@ -19,12 +19,16 @@ type importPlan struct {
 }
 
 type importAction struct {
-	source      profilemodel.ExportedProfile
-	target      Report
-	identity    accountentity.Identity
-	identityKey string
-	create      bool
-	after       *profileentity.Profile
+	source          profilemodel.ExportedProfile
+	target          Report
+	identity        accountentity.Identity
+	identityKey     string
+	create          bool
+	after           *profileentity.Profile
+	extraFiles      []profilemodel.ExportedSecretFile
+	removeFiles     []string
+	identityCleared bool
+	selectedAPIKey  bool
 }
 
 func (catalog *Catalog) Import(ctx context.Context, request profilemodel.ImportRequest) (profilemodel.ImportResult, error) {

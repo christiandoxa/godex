@@ -19,12 +19,16 @@ import (
 const (
 	importedAuthRollbackDir      = ".godex-import-backup-"
 	importedAuthRollbackMetaFile = "metadata.json"
+	importedAuthLocalConfigFile  = ".prodex-profile.toml"
+	importedAuthLocalConfigMax   = 64 << 10
 )
 
 type importedAuthRollbackMetadata struct {
-	Version int
-	HadAuth bool
-	Account accountentity.Account
+	Version          int
+	HadAuth          bool
+	Account          accountentity.Account
+	LocalConfigFound bool
+	LocalConfig      []byte
 }
 
 func (store *FileStore) ReplaceImportedAuth(ctx context.Context, selector string, authJSON []byte) error {
@@ -80,8 +84,13 @@ func (store *FileStore) PrepareImportedAuthRollback(ctx context.Context, account
 			return err
 		}
 		defer clearImportedAuth(content)
+		localConfig, localConfigFound, err := readExistingImportedLocalConfig(filepath.Join(home, importedAuthLocalConfigFile))
+		if err != nil {
+			return err
+		}
 		return writeImportedAuthRollback(home, id, content, importedAuthRollbackMetadata{
 			Version: 1, HadAuth: hadAuth, Account: state.Accounts[index],
+			LocalConfigFound: localConfigFound, LocalConfig: localConfig,
 		})
 	})
 }
@@ -106,6 +115,24 @@ func readExistingImportedAuth(path string) ([]byte, bool, error) {
 	if err != nil || len(content) == 0 || len(content) > 2<<20 {
 		clearImportedAuth(content)
 		return nil, false, errors.New("existing account authentication is unavailable")
+	}
+	return content, true, nil
+}
+
+func readExistingImportedLocalConfig(path string) ([]byte, bool, error) {
+	info, err := os.Lstat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, false, nil
+	}
+	if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || info.Size() > importedAuthLocalConfigMax {
+		return nil, false, errors.New("existing account local config is unavailable")
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0 {
+		return nil, false, errors.New("existing account local config is not private")
+	}
+	content, err := os.ReadFile(path)
+	if err != nil || len(content) > importedAuthLocalConfigMax {
+		return nil, false, errors.New("existing account local config is unavailable")
 	}
 	return content, true, nil
 }
@@ -165,6 +192,14 @@ func (store *FileStore) RestoreImportedAuthRollback(ctx context.Context, account
 		} else if err := os.Remove(authPath); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("remove imported account authentication: %w", err)
 		}
+		configPath := filepath.Join(home, importedAuthLocalConfigFile)
+		if metadata.LocalConfigFound {
+			if _, err := fileutil.AtomicWrite(configPath, metadata.LocalConfig); err != nil {
+				return fmt.Errorf("restore imported account local config: %w", err)
+			}
+		} else if err := os.Remove(configPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("remove imported account local config: %w", err)
+		}
 		state, err := store.readState()
 		if err != nil {
 			return err
@@ -181,21 +216,21 @@ func (store *FileStore) RestoreImportedAuthRollback(ctx context.Context, account
 
 func readImportedAuthRollbackMetadata(path string) (importedAuthRollbackMetadata, error) {
 	info, err := os.Lstat(path)
-	if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || info.Size() > 64<<10 {
+	if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || info.Size() > 128<<10 {
 		return importedAuthRollbackMetadata{}, errors.New("imported authentication rollback metadata is unavailable")
 	}
 	if runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0 {
 		return importedAuthRollbackMetadata{}, errors.New("imported authentication rollback metadata is not private")
 	}
 	content, err := os.ReadFile(path)
-	if err != nil || len(content) > 64<<10 {
+	if err != nil || len(content) > 128<<10 {
 		return importedAuthRollbackMetadata{}, errors.New("imported authentication rollback metadata is unavailable")
 	}
 	decoder := json.NewDecoder(bytes.NewReader(content))
 	decoder.DisallowUnknownFields()
 	var metadata importedAuthRollbackMetadata
 	if err := decoder.Decode(&metadata); err != nil || requireJSONEOF(decoder) != nil ||
-		metadata.Version != 1 || accountentity.ValidateAccount(metadata.Account) != nil {
+		metadata.Version != 1 || accountentity.ValidateStoredAccount(metadata.Account) != nil {
 		return importedAuthRollbackMetadata{}, errors.New("invalid imported authentication rollback metadata")
 	}
 	return metadata, nil

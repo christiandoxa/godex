@@ -8,6 +8,7 @@ import (
 
 	profileentity "github.com/christiandoxa/godex/internal/entity/profile"
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
+	"github.com/pelletier/go-toml/v2"
 )
 
 func (catalog *Catalog) SelectedLoginStatus(
@@ -78,6 +79,72 @@ func (catalog *Catalog) SelectedOpenAILogin(
 		return nil
 	})
 	return result, err
+}
+
+func (catalog *Catalog) SelectedOpenAIAPIKey(
+	ctx context.Context,
+	name string,
+	input profilemodel.APIKeyLoginInput,
+) (Report, error) {
+	apiKey := strings.TrimSpace(input.APIKey)
+	if apiKey == "" {
+		return Report{}, errors.New("API key cannot be empty")
+	}
+	_, baseURLPointer, err := normalizeAPIKeyBaseURL(input.BaseURL, input.BaseURLSpecified)
+	if err != nil {
+		return Report{}, err
+	}
+	authJSON, err := apiKeyAuthJSON(apiKey)
+	if err != nil {
+		return Report{}, err
+	}
+	defer clearBundleBytes(authJSON)
+	extraFiles, removeFiles, err := selectedAPIKeyConfigFiles(baseURLPointer, input.BaseURLSpecified)
+	if err != nil {
+		return Report{}, err
+	}
+
+	var result Report
+	err = catalog.withBundleImportLock(ctx, func() error {
+		target, err := catalog.selectedOpenAITargetLocked(ctx, name)
+		if err != nil {
+			return err
+		}
+		desired := target.Profile
+		desired.Email = ""
+		source := profilemodel.ExportedProfile{
+			Name: target.Profile.Name, SourceManaged: target.Profile.Managed,
+			Provider: providerSnapshotFromEntity(target.Profile.Provider), AuthJSON: string(authJSON),
+		}
+		action := importAction{
+			source: source, target: target, after: &desired, extraFiles: extraFiles, removeFiles: removeFiles,
+			identityCleared: target.AccountID != "", selectedAPIKey: true,
+		}
+		plan := importPlan{
+			actions: []importAction{action}, resolvedNames: map[string]string{name: name},
+			activeTarget: name,
+		}
+		if _, err := catalog.applyImport(ctx, plan); err != nil {
+			return err
+		}
+		result = Report{Profile: desired, Active: true, Enabled: target.Enabled, AccountID: target.AccountID}
+		return nil
+	})
+	return result, err
+}
+
+func selectedAPIKeyConfigFiles(baseURL *string, specified bool) ([]profilemodel.ExportedSecretFile, []string, error) {
+	if !specified {
+		return nil, nil, nil
+	}
+	if baseURL == nil {
+		return nil, []string{".prodex-profile.toml"}, nil
+	}
+	content, err := toml.Marshal(map[string]string{"openai_compatible_base_url": *baseURL})
+	if err != nil {
+		return nil, nil, errors.New("failed to serialize profile local config")
+	}
+	return []profilemodel.ExportedSecretFile{{Path: ".prodex-profile.toml", Text: string(content)}}, nil, nil
 }
 
 func (catalog *Catalog) selectedOpenAITargetLocked(ctx context.Context, name string) (Report, error) {

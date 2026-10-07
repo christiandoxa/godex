@@ -64,7 +64,6 @@ func normalizeAPIKeyBaseURL(value string, specified bool) (string, *string, erro
 	if !specified {
 		return "", nil, nil
 	}
-	value = strings.TrimSpace(value)
 	if value == "" {
 		return "", nil, nil
 	}

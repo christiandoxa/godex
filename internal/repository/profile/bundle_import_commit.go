@@ -76,14 +76,26 @@ func bundleImportFilesMatch(home string, files []profilemodel.ImportLifecycleFil
 }
 
 func bundleImportFileMatches(home string, file profilemodel.ImportLifecycleFile) (bool, error) {
-	if err := validateImportRollbackFile(file.Path); err != nil || len(file.SHA256) != sha256.Size*2 {
+	if err := validateImportRollbackFile(file.Path); err != nil {
+		return false, errors.New("invalid profile import lifecycle file entry")
+	}
+	path := filepath.Join(home, file.Path)
+	info, err := os.Lstat(path)
+	if file.Missing {
+		if errors.Is(err, os.ErrNotExist) {
+			return true, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		return false, nil
+	}
+	if len(file.SHA256) != sha256.Size*2 {
 		return false, errors.New("invalid profile import lifecycle file entry")
 	}
 	if _, err := hex.DecodeString(file.SHA256); err != nil {
 		return false, errors.New("invalid profile import lifecycle file digest")
 	}
-	path := filepath.Join(home, file.Path)
-	info, err := os.Lstat(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return false, nil
 	}

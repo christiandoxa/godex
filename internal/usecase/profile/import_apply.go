@@ -48,6 +48,16 @@ func (catalog *Catalog) applyImportAction(ctx context.Context, action importActi
 			return catalog.profiles.ImportBundleProfile(ctx, action.target.Profile, map[string][]byte{"auth.json": authBytes}, journalID)
 		}
 		if action.after != nil && action.target.AccountID != "" {
+			if action.selectedAPIKey {
+				selected, ok := catalog.accounts.(interface {
+					ApplySelectedAPIKey(context.Context, string, []byte, []profilemodel.ExportedSecretFile, []string) (accountentity.Account, error)
+				})
+				if !ok {
+					return errors.New("selected account API-key login support is not configured")
+				}
+				_, err := selected.ApplySelectedAPIKey(ctx, action.target.AccountID, authBytes, action.extraFiles, action.removeFiles)
+				return err
+			}
 			selected, ok := catalog.accounts.(interface {
 				ApplySelectedLogin(context.Context, string, accountentity.Identity, []byte) (accountentity.Account, error)
 			})
@@ -67,7 +77,12 @@ func (catalog *Catalog) applyImportAction(ctx context.Context, action importActi
 			if !ok {
 				return errors.New("selected profile login metadata support is not configured")
 			}
-			return selected.ApplySelectedLoginMetadata(ctx, action.target.Profile.Name, *action.after)
+			if err := selected.ApplySelectedLoginMetadata(ctx, action.target.Profile.Name, *action.after); err != nil {
+				return err
+			}
+			if len(action.extraFiles) != 0 || len(action.removeFiles) != 0 {
+				return catalog.profiles.ApplySelectedLoginFiles(ctx, action.target.Profile.Name, action.extraFiles, action.removeFiles)
+			}
 		}
 		return nil
 	case profileentity.ProviderAnthropic, profileentity.ProviderGemini, profileentity.ProviderKiro, profileentity.ProviderCopilot, profileentity.ProviderAgy:

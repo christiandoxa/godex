@@ -120,7 +120,7 @@ func validateState(state stateFile) error {
 	activeFound := state.ActiveAccountID == ""
 
 	for _, account := range state.Accounts {
-		if err := entity.ValidateAccount(account); err != nil {
+		if err := entity.ValidateStoredAccount(account); err != nil {
 			return fmt.Errorf("Godex state contains invalid account metadata: %w", err)
 		}
 		if _, exists := ids[account.ID]; exists {

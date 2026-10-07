@@ -13,13 +13,14 @@ type ImportLifecycleJournal struct {
 }
 
 type ImportLifecycleAction struct {
-	Name      string                  `json:"name"`
-	AccountID string                  `json:"account_id,omitempty"`
-	Create    bool                    `json:"create"`
-	Before    *ImportLifecycleProfile `json:"before,omitempty"`
-	After     ImportLifecycleProfile  `json:"after"`
-	BackupID  string                  `json:"backup_id,omitempty"`
-	Files     []ImportLifecycleFile   `json:"files"`
+	Name            string                  `json:"name"`
+	AccountID       string                  `json:"account_id,omitempty"`
+	Create          bool                    `json:"create"`
+	Before          *ImportLifecycleProfile `json:"before,omitempty"`
+	After           ImportLifecycleProfile  `json:"after"`
+	BackupID        string                  `json:"backup_id,omitempty"`
+	IdentityCleared bool                    `json:"identity_cleared,omitempty"`
+	Files           []ImportLifecycleFile   `json:"files"`
 }
 
 type ImportLifecycleProfile struct {
@@ -30,6 +31,7 @@ type ImportLifecycleProfile struct {
 }
 
 type ImportLifecycleFile struct {
-	Path   string `json:"path"`
-	SHA256 string `json:"sha256"`
+	Path    string `json:"path"`
+	SHA256  string `json:"sha256"`
+	Missing bool   `json:"missing,omitempty"`
 }

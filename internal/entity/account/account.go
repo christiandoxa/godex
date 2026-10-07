@@ -73,15 +73,24 @@ func StableAccountID(identity Identity) string {
 }
 
 func ValidateAccount(account Account) error {
+	if err := ValidateStoredAccount(account); err != nil {
+		return err
+	}
+	if strings.TrimSpace(account.Email) == "" && strings.TrimSpace(account.ChatGPTAccountID) == "" {
+		return errors.New("account has no ChatGPT identity")
+	}
+	return nil
+}
+
+// ValidateStoredAccount permits identityless OpenAI API-key profiles while
+// keeping interactive ChatGPT login candidates identity-bearing.
+func ValidateStoredAccount(account Account) error {
 	if !accountIDPattern.MatchString(account.ID) {
 		return fmt.Errorf("invalid account ID %q", account.ID)
 	}
 	normalizedName, err := NormalizeAccountName(account.Name)
 	if err != nil || normalizedName != account.Name {
 		return fmt.Errorf("invalid account name %q", account.Name)
-	}
-	if strings.TrimSpace(account.Email) == "" && strings.TrimSpace(account.ChatGPTAccountID) == "" {
-		return errors.New("account has no ChatGPT identity")
 	}
 	return nil
 }

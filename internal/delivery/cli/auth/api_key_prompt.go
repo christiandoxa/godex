@@ -190,7 +190,11 @@ func promptAPIKeyLoginPlain(in io.Reader, out io.Writer, options LoginOptions) (
 			name = defaultName
 		}
 	}
-	return profilemodel.APIKeyLoginInput{Name: name, APIKey: strings.TrimSpace(apiKey), BaseURL: strings.TrimSpace(baseURL), BaseURLSpecified: specified}, nil
+	resolvedBaseURL := baseURL
+	if !options.BaseURLSpecified {
+		resolvedBaseURL = strings.TrimSpace(baseURL)
+	}
+	return profilemodel.APIKeyLoginInput{Name: name, APIKey: strings.TrimSpace(apiKey), BaseURL: resolvedBaseURL, BaseURLSpecified: specified}, nil
 }
 
 func readSecretPrompt(reader *bufio.Reader, in io.Reader, out io.Writer, prompt string) (string, error) {

@@ -90,10 +90,24 @@ func validateBundleImportAccountAction(journalID string, action profilemodel.Imp
 	if _, err := hex.DecodeString(action.AccountID); err != nil {
 		return errors.New("invalid account import update journal")
 	}
-	if len(action.Files) != 1 || action.Files[0].Path != profileAuthFileName {
-		return errors.New("invalid account import auth journal")
+	if len(action.Files) == 1 && action.Files[0].Path == profileAuthFileName {
+		return nil
 	}
-	return nil
+	if action.IdentityCleared && len(action.Files) == 2 {
+		seenAuth, seenConfig := false, false
+		for _, file := range action.Files {
+			switch file.Path {
+			case profileAuthFileName:
+				seenAuth = true
+			case profileLocalConfigFileName:
+				seenConfig = true
+			}
+		}
+		if seenAuth && seenConfig {
+			return nil
+		}
+	}
+	return errors.New("invalid account import auth journal")
 }
 
 func validateBundleImportActionFiles(action profilemodel.ImportLifecycleAction) error {
@@ -110,13 +124,22 @@ func validateBundleImportActionFiles(action profilemodel.ImportLifecycleAction) 
 }
 
 func validateBundleImportLifecycleFile(file profilemodel.ImportLifecycleFile, seen map[string]bool) error {
-	if err := validateImportRollbackFile(file.Path); err != nil || len(file.SHA256) != sha256.Size*2 {
+	if err := validateImportRollbackFile(file.Path); err != nil {
 		return errors.New("invalid profile import lifecycle file entry")
 	}
 	if seen[file.Path] {
 		return errors.New("duplicate profile import lifecycle file entry")
 	}
 	seen[file.Path] = true
+	if file.Missing {
+		if file.SHA256 != "" {
+			return errors.New("missing profile import lifecycle file has a digest")
+		}
+		return nil
+	}
+	if len(file.SHA256) != sha256.Size*2 {
+		return errors.New("invalid profile import lifecycle file entry")
+	}
 	if _, err := hex.DecodeString(file.SHA256); err != nil {
 		return errors.New("invalid profile import lifecycle file digest")
 	}

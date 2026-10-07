@@ -2,6 +2,8 @@ package profile
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"os"
 	"path/filepath"
@@ -208,6 +210,60 @@ func TestBundleImportApplyingInferenceKeepsCommittedExistingProfileAuth(t *testi
 	}
 	if _, err := os.Lstat(filepath.Join(work.CodexHome, ".godex-import-backup-"+id)); !os.IsNotExist(err) {
 		t.Fatalf("committed profile backup remains: %v", err)
+	}
+}
+
+func TestProdex04356SelectedAPIKeyClearBaseURLRecoveryRollsBackPartialRemoval(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	profiles := profilerepo.NewStore(root)
+	accounts := accountrepo.NewFileStore(t.TempDir())
+	work := profileentity.Profile{
+		Name: "work", CodexHome: profiles.ManagedHome("work"), Managed: true,
+		Provider: profileentity.Provider{Kind: profileentity.ProviderOpenAI},
+	}
+	if err := profiles.ImportOpenAI(ctx, work, []byte("before-auth"), true); err != nil {
+		t.Fatal(err)
+	}
+	const oldBase = "https://old.example.test/v1"
+	if _, _, err := profiles.LoginOpenAIAPIKey(ctx, work, []byte("before-auth"), func() *string { value := oldBase; return &value }(), true, true); err != nil {
+		t.Fatal(err)
+	}
+	const id = "abababababababababababababababab"
+	if err := profiles.PrepareBundleImportRollback(ctx, work.Name, id, []string{"auth.json", ".prodex-profile.toml"}); err != nil {
+		t.Fatal(err)
+	}
+	before := importLifecycleProfile(work)
+	afterAuth := []byte("after-auth")
+	digest := sha256.Sum256(afterAuth)
+	journal := profilemodel.ImportLifecycleJournal{
+		Version: 1, ID: id, Phase: "applying", PreviousProfileActive: work.Name, NextProfileActive: work.Name,
+		Actions: []profilemodel.ImportLifecycleAction{{
+			Name: work.Name, Before: &before, After: before, BackupID: id,
+			Files: []profilemodel.ImportLifecycleFile{
+				{Path: "auth.json", SHA256: hex.EncodeToString(digest[:])},
+				{Path: ".prodex-profile.toml", Missing: true},
+			},
+		}},
+	}
+	if err := profiles.WriteBundleImportJournal(journal); err != nil {
+		t.Fatal(err)
+	}
+	if err := profiles.ReplaceAuth(ctx, work.Name, afterAuth); err != nil {
+		t.Fatal(err)
+	}
+	// Crash here: auth changed, but the old base-URL file was not removed yet.
+	catalog := NewCatalog(profiles, accounts, "")
+	if _, err := catalog.List(ctx); err != nil {
+		t.Fatal(err)
+	}
+	assertProfileAuth(t, profiles, work.CodexHome, "before-auth")
+	base, found, err := profiles.ReadOpenAICompatibleBaseURL(work.CodexHome)
+	if err != nil || !found || base != oldBase {
+		t.Fatalf("recovered base URL = %q found=%t err=%v", base, found, err)
+	}
+	if journals, err := profiles.BundleImportJournals(); err != nil || len(journals) != 0 {
+		t.Fatalf("remaining clear-base-url journals = %#v err=%v", journals, err)
 	}
 }
 

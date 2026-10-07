@@ -781,6 +781,120 @@ func TestProdex04356SelectedLoginMayAdoptIdentityUsedByAnotherProfile(t *testing
 	}
 }
 
+func TestProdex04356SelectedStandaloneAPIKeyLoginUpdatesExistingProfile(t *testing.T) {
+	root := t.TempDir()
+	accounts := accountrepo.NewFileStore(root)
+	profiles := profilerepo.NewStore(root)
+	catalog := profileusecase.NewCatalog(profiles, accounts, filepath.Join(root, "current"))
+	report, err := catalog.Add(t.Context(), profilemodel.AddRequest{Name: "work"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	app := New(nil, nil, accounts, nil, nil, nil, &output)
+	app.SetProfiles(catalog)
+	app.SetInput(strings.NewReader("sk-selected-standalone\n"))
+
+	const baseURL = "https://api.example.test/v1"
+	if err := app.runLogin(t.Context(), []string{
+		"--profile", "work", "--with-api-key", "--base-url", baseURL,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	authJSON, err := profiles.ReadAuthJSON(report.Profile.CodexHome)
+	if err != nil || !bytes.Contains(authJSON, []byte("sk-selected-standalone")) {
+		t.Fatalf("selected standalone auth = %s err=%v", authJSON, err)
+	}
+	base, found, err := profiles.ReadOpenAICompatibleBaseURL(report.Profile.CodexHome)
+	if err != nil || !found || base != baseURL {
+		t.Fatalf("selected standalone base URL = %q found=%t err=%v", base, found, err)
+	}
+	current, err := catalog.Current(t.Context())
+	if err != nil || current.Profile.Name != "work" || current.Profile.Email != "" {
+		t.Fatalf("selected standalone current = %#v err=%v", current, err)
+	}
+	listed, err := accounts.List(t.Context())
+	if err != nil || len(listed) != 0 {
+		t.Fatalf("selected standalone API key created account = %#v err=%v", listed, err)
+	}
+}
+
+func TestProdex04356SelectedAPIKeyExplicitEmptyBaseURLClearsOverride(t *testing.T) {
+	root := t.TempDir()
+	accounts := accountrepo.NewFileStore(root)
+	profiles := profilerepo.NewStore(root)
+	catalog := profileusecase.NewCatalog(profiles, accounts, filepath.Join(root, "current"))
+	report, err := catalog.Add(t.Context(), profilemodel.AddRequest{Name: "work"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := catalog.SelectedOpenAIAPIKey(t.Context(), "work", profilemodel.APIKeyLoginInput{
+		APIKey: "sk-first", BaseURL: "https://api.example.test/v1", BaseURLSpecified: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	configPath := filepath.Join(report.Profile.CodexHome, ".prodex-profile.toml")
+	if _, err := os.Stat(configPath); err != nil {
+		t.Fatalf("initial base URL config missing: %v", err)
+	}
+	if _, err := catalog.SelectedOpenAIAPIKey(t.Context(), "work", profilemodel.APIKeyLoginInput{
+		APIKey: "sk-second", BaseURL: "", BaseURLSpecified: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(configPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("explicit empty base URL left local config behind: %v", err)
+	}
+	if _, found, err := profiles.ReadOpenAICompatibleBaseURL(report.Profile.CodexHome); err != nil || found {
+		t.Fatalf("cleared selected base URL found=%t err=%v", found, err)
+	}
+}
+
+func TestProdex04356SelectedManagedAccountAPIKeyLoginClearsChatGPTIdentity(t *testing.T) {
+	root := t.TempDir()
+	accounts := accountrepo.NewFileStore(root)
+	profiles := profilerepo.NewStore(root)
+	process := &selectedLoginCodex{email: "<redacted>", accountID: "account-one", token: "first-token"}
+	login := authusecase.NewLogin(accounts, process)
+	initial, err := login.Run(t.Context(), accountmodel.LoginInput{Name: "work"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalog := profileusecase.NewCatalog(profiles, accounts, filepath.Join(root, "current"))
+	var output bytes.Buffer
+	app := New(login, nil, accounts, nil, nil, nil, &output)
+	app.SetProfiles(catalog)
+	app.SetInput(strings.NewReader("sk-selected-account\n"))
+
+	const baseURL = "https://api.example.test/v1"
+	if err := app.runLogin(t.Context(), []string{
+		"--profile", "work", "--with-api-key", "--base-url", baseURL,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	listed, err := accounts.List(t.Context())
+	if err != nil || len(listed) != 1 {
+		t.Fatalf("selected managed API-key accounts = %#v err=%v", listed, err)
+	}
+	if listed[0].ID != initial.ID || listed[0].Name != "work" ||
+		listed[0].Email != "" || listed[0].ChatGPTAccountID != "" {
+		t.Fatalf("selected managed API-key metadata = %#v initial=%#v", listed[0], initial)
+	}
+	authJSON, err := os.ReadFile(filepath.Join(accounts.CodexHome(initial.ID), "auth.json"))
+	if err != nil || !bytes.Contains(authJSON, []byte("sk-selected-account")) {
+		t.Fatalf("selected managed API-key auth = %s err=%v", authJSON, err)
+	}
+	base, found, err := profiles.ReadOpenAICompatibleBaseURL(accounts.CodexHome(initial.ID))
+	if err != nil || !found || base != baseURL {
+		t.Fatalf("selected managed API-key base URL = %q found=%t err=%v", base, found, err)
+	}
+	current, err := catalog.Current(t.Context())
+	if err != nil || current.Profile.Name != "work" || current.Profile.Email != "" ||
+		current.AccountID != initial.ID {
+		t.Fatalf("selected managed API-key current = %#v err=%v", current, err)
+	}
+}
+
 func TestDispatcherDirectAPIKeyLoginCreatesOpenAICompatibleProfile(t *testing.T) {
 	root := t.TempDir()
 	accounts := accountrepo.NewFileStore(root)

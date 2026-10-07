@@ -142,6 +142,22 @@ func TestProdex04356LoginProfileSelectorsAndStatusMatchTaggedCLI(t *testing.T) {
 	}
 }
 
+func TestProdex04356LoginBaseURLEmptyIsExplicitClear(t *testing.T) {
+	for _, arguments := range [][]string{
+		{"--with-api-key", "--base-url="},
+		{"--with-api-key", "--base-url", ""},
+		{"--with-api-key", "--openai-base-url="},
+	} {
+		options, err := ParseLoginOptions(arguments)
+		if err != nil {
+			t.Fatalf("%#v: %v", arguments, err)
+		}
+		if !options.WithAPIKey || !options.BaseURLSpecified || options.BaseURL != "" {
+			t.Fatalf("%#v => %#v", arguments, options)
+		}
+	}
+}
+
 func TestParseLoginOptionsSupportsAPIKeyAndBaseURLAliases(t *testing.T) {
 	options, err := ParseLoginOptions([]string{"--with-api-key", "--name", "work", "--base-url", "https://example.test/v1"})
 	if err != nil {

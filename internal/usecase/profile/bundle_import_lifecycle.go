@@ -20,6 +20,10 @@ type importedAuthCommitVerifier interface {
 	ImportedAuthMatches(context.Context, string, string) (bool, error)
 }
 
+type selectedLoginCommitVerifier interface {
+	SelectedLoginActionCommitted(context.Context, profilemodel.ImportLifecycleAction) (bool, error)
+}
+
 func (catalog *Catalog) withBundleImportLock(ctx context.Context, operation func() error) (err error) {
 	release, err := catalog.profiles.AcquireBundleImportLock(ctx)
 	if err != nil {
@@ -86,6 +90,9 @@ func (catalog *Catalog) bundleImportActionCommitted(
 	journalID string,
 ) (bool, error) {
 	if action.AccountID != "" {
+		if verifier, ok := catalog.accounts.(selectedLoginCommitVerifier); ok {
+			return verifier.SelectedLoginActionCommitted(ctx, action)
+		}
 		verifier, ok := catalog.accounts.(importedAuthCommitVerifier)
 		if !ok || len(action.Files) != 1 {
 			return false, nil
@@ -250,7 +257,8 @@ func (catalog *Catalog) newBundleImportJournal(ctx context.Context, plan importP
 	for _, action := range plan.actions {
 		lifecycleAction := profilemodel.ImportLifecycleAction{
 			Name: action.target.Profile.Name, Create: action.create,
-			After: importLifecycleProfile(actionAfterProfile(action)), Files: importLifecycleFiles(action.source),
+			After: importLifecycleProfile(actionAfterProfile(action)),
+			Files: importActionLifecycleFiles(action), IdentityCleared: action.identityCleared,
 		}
 		if action.create {
 			lifecycleAction.After = importLifecycleProfile(action.target.Profile)
@@ -292,6 +300,20 @@ func importLifecycleProfile(profile profileentity.Profile) profilemodel.ImportLi
 		CodexHome: profile.CodexHome, Managed: profile.Managed, Email: profile.Email,
 		Provider: providerSnapshotFromEntity(profile.Provider),
 	}
+}
+
+func importActionLifecycleFiles(action importAction) []profilemodel.ImportLifecycleFile {
+	result := importLifecycleFiles(action.source)
+	for _, file := range action.extraFiles {
+		content := []byte(file.Text)
+		digest := sha256.Sum256(content)
+		clearBundleBytes(content)
+		result = append(result, profilemodel.ImportLifecycleFile{Path: file.Path, SHA256: hex.EncodeToString(digest[:])})
+	}
+	for _, path := range action.removeFiles {
+		result = append(result, profilemodel.ImportLifecycleFile{Path: path, Missing: true})
+	}
+	return result
 }
 
 func importLifecycleFiles(source profilemodel.ExportedProfile) []profilemodel.ImportLifecycleFile {

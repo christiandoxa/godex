@@ -29,6 +29,7 @@ type repository interface {
 	ImportBundleProfile(context.Context, profileentity.Profile, map[string][]byte, string) error
 	ReplaceAuth(context.Context, string, []byte) error
 	LoginOpenAIAPIKey(context.Context, profileentity.Profile, []byte, *string, bool, bool) (profileentity.Profile, bool, error)
+	ApplySelectedLoginFiles(context.Context, string, []profilemodel.ExportedSecretFile, []string) error
 	ReadOpenAICompatibleBaseURL(string) (string, bool, error)
 	EncodeBundle(profilemodel.BundlePayload, string) ([]byte, error)
 	DecodeBundle([]byte, string) (profilemodel.BundlePayload, bool, error)

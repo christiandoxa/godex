@@ -326,7 +326,28 @@ func (app *App) runSelectedOpenAILogin(ctx context.Context, options authcli.Logi
 }
 
 func (app *App) runSelectedAPIKeyLogin(ctx context.Context, options authcli.LoginOptions) error {
-	return fmt.Errorf("selected profile API-key login is not configured")
+	if app.profiles == nil {
+		return fmt.Errorf("selected profile login support is not configured")
+	}
+	selected := options
+	selected.Name = selected.Profile
+	input, err := authcli.PromptAPIKeyLogin(ctx, app.in, app.errOut, selected)
+	if err != nil {
+		return err
+	}
+	input.Name = selected.Profile
+	result, err := app.profiles.SelectedOpenAIAPIKey(ctx, selected.Profile, input)
+	input.APIKey = ""
+	if err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(app.out, "Logged in with API key for profile %q.\n", result.Profile.Name); err != nil {
+		return err
+	}
+	if input.BaseURLSpecified && strings.TrimSpace(input.BaseURL) != "" {
+		_, err = fmt.Fprintf(app.out, "Base URL: %s\n", strings.TrimSpace(input.BaseURL))
+	}
+	return err
 }
 
 func (app *App) runAPIKeyLogin(ctx context.Context, options authcli.LoginOptions) error {

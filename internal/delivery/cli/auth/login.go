@@ -69,7 +69,7 @@ func ParseLoginOptions(arguments []string) (LoginOptions, error) {
 			options.Profile, index = value, next
 		case argument == "--base-url" || strings.HasPrefix(argument, "--base-url=") ||
 			argument == "--openai-base-url" || strings.HasPrefix(argument, "--openai-base-url="):
-			value, next, err := loginOptionValue(arguments, index, "--base-url", "--openai-base-url")
+			value, next, err := loginOptionValueAllowEmpty(arguments, index, "--base-url", "--openai-base-url")
 			if err != nil {
 				return LoginOptions{}, err
 			}
@@ -105,6 +105,23 @@ func ParseLoginOptions(arguments []string) (LoginOptions, error) {
 		}
 	}
 	return options, nil
+}
+
+func loginOptionValueAllowEmpty(arguments []string, index int, names ...string) (string, int, error) {
+	argument := arguments[index]
+	for _, name := range names {
+		if argument == name {
+			if index+1 >= len(arguments) {
+				return "", index, fmt.Errorf("%s requires a value", name)
+			}
+			return arguments[index+1], index + 1, nil
+		}
+		prefix := name + "="
+		if strings.HasPrefix(argument, prefix) {
+			return strings.TrimPrefix(argument, prefix), index, nil
+		}
+	}
+	return "", index, errors.New("login option requires a value")
 }
 
 func loginOptionValue(arguments []string, index int, names ...string) (string, int, error) {
