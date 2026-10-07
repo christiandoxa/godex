@@ -309,7 +309,7 @@ func (router *Router) profileInflightHardLimitedForRequest(
 	current := router.inflight[accountID]
 	limit := effectiveProfileInflightHardLimit(router.profileInflightHardLimit, weight)
 	router.mu.Unlock()
-	return current+weight > limit
+	return current > limit-weight
 }
 
 func (router *Router) forwardWebSocketQuotaLastChance(

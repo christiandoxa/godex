@@ -59,7 +59,7 @@ func (router *Router) tryAcquireProfileInflight(
 	router.mu.Lock()
 	current := router.inflight[accountID]
 	hardLimit := effectiveProfileInflightHardLimit(router.profileInflightHardLimit, weight)
-	if !hardAffinity && current+weight > hardLimit {
+	if !hardAffinity && current > hardLimit-weight {
 		router.mu.Unlock()
 		transport := "http"
 		if strings.EqualFold(strings.TrimSpace(request.Header.Get("Upgrade")), "websocket") || request.WebSocketMessage {
@@ -77,11 +77,15 @@ func (router *Router) tryAcquireProfileInflight(
 		router.recordRuntimeMarker(context.Background(), event)
 		return nil, false
 	}
-	router.inflight[accountID] = current + weight
+	maxInt := int(^uint(0) >> 1)
+	next := maxInt
+	if current <= maxInt-weight {
+		next = current + weight
+	}
+	router.inflight[accountID] = next
 	router.profileInflightAdmissionsTotal++
-	active := current + weight
 	router.mu.Unlock()
-	router.recordProfileInflightMarker(accountID, active)
+	router.recordProfileInflightMarker(accountID, next)
 
 	var once sync.Once
 	return func() {

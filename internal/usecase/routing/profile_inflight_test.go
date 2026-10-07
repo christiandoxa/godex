@@ -204,6 +204,74 @@ func TestProfileInflightHardAffinityBypassesHardLimitButRemainsCounted(t *testin
 	bypass()
 }
 
+func TestProfileInflightAdmissionSaturatesCounterAtIntMax(t *testing.T) {
+	maxInt := int(^uint(0) >> 1)
+	router := &Router{
+		inflight:                 map[string]int{"a": maxInt},
+		inflightChanged:          make(chan struct{}),
+		profileInflightHardLimit: 8,
+	}
+	request := profileInflightRequest("/v1/chat/completions")
+
+	if release, ok := router.tryAcquireProfileInflight("a", request, false); ok || release != nil {
+		t.Fatal("overflowing non-affinity admission bypassed the hard limit")
+	}
+	if got := router.inflight["a"]; got != maxInt {
+		t.Fatalf("rejected admission changed counter to %d", got)
+	}
+	if !router.profileInflightHardLimitedForRequest("a", request) {
+		t.Fatal("overflowing profile was reported below its hard limit")
+	}
+	release, ok := router.tryAcquireProfileInflight("a", request, true)
+	if !ok {
+		t.Fatal("hard-affinity admission should bypass the hard limit")
+	}
+	if got := router.inflight["a"]; got != maxInt {
+		t.Fatalf("hard-affinity admission wrapped counter to %d", got)
+	}
+	release()
+}
+
+func TestProfileInflightHardLimitIsAtomicUnderConcurrentAdmission(t *testing.T) {
+	const callers, hardLimit = 64, 16
+	router := &Router{
+		inflight:                 make(map[string]int),
+		inflightChanged:          make(chan struct{}),
+		profileInflightHardLimit: hardLimit,
+	}
+	request := profileInflightRequest("/v1/chat/completions")
+	start := make(chan struct{})
+	results := make(chan func(), callers)
+	for i := 0; i < callers; i++ {
+		go func() {
+			<-start
+			release, ok := router.tryAcquireProfileInflight("a", request, false)
+			if ok {
+				results <- release
+				return
+			}
+			results <- nil
+		}()
+	}
+	close(start)
+
+	var releases []func()
+	for i := 0; i < callers; i++ {
+		if release := <-results; release != nil {
+			releases = append(releases, release)
+		}
+	}
+	if len(releases) != hardLimit || router.inflight["a"] != hardLimit {
+		t.Fatalf("concurrent admissions = %d with active count %d, want %d", len(releases), router.inflight["a"], hardLimit)
+	}
+	for _, release := range releases {
+		release()
+	}
+	if router.inflight["a"] != 0 {
+		t.Fatalf("inflight after releasing admitted calls = %d, want 0", router.inflight["a"])
+	}
+}
+
 func TestProfileInflightWaitHonorsCancellation(t *testing.T) {
 	waiting := make(chan struct{}, 1)
 	gateway := &profileInflightGateway{}
