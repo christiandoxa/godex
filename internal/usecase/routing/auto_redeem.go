@@ -70,6 +70,8 @@ func (router *Router) redeemedAttempt(
 	request proxymodel.Request,
 	account proxymodel.Account,
 ) (proxymodel.Forwarded, error) {
+	router.recordSelectionMarker(ctx, "selection_pick", account, request.QuotaSelection)
+	router.recordRouteDecisionSelected(ctx, request, account)
 	response, err := router.execute(ctx, request, account)
 	if err != nil {
 		if ctx.Err() != nil {

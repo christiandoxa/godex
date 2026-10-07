@@ -27,6 +27,8 @@ func (router *Router) forwardBound(
 	if err != nil {
 		return proxymodel.Forwarded{}, err
 	}
+	router.recordSelectionMarker(ctx, "selection_keep_current", account, request.QuotaSelection)
+	router.recordRouteDecisionSelected(ctx, request, account)
 	response, err := router.executeWithProfileInflightWait(ctx, request, account, true)
 	failed, rotatePrevious := false, false
 	if err == nil && !request.WebSocketMessage {

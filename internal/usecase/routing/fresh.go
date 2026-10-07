@@ -227,6 +227,7 @@ func (router *Router) forwardFreshWithoutCandidates(
 	} else if ok {
 		return redeemed, nil
 	}
+	router.recordRouteDecisionNoCandidate(ctx, request)
 	return proxymodel.Forwarded{}, &proxymodel.Error{
 		StatusCode: http.StatusServiceUnavailable,
 		Message:    "no enabled account is available",
