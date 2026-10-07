@@ -36,7 +36,7 @@ func TestProxyRoundRobinAndPreCommitRotation(t *testing.T) {
 			return
 		}
 		writer.Header().Set("Content-Type", "application/json")
-		_, _ = fmt.Fprintf(writer, `{"id":"response-%s"}`, strings.TrimPrefix(token, "Bearer token-"))
+		_, _ = fmt.Fprintf(writer, `{"object":"response","id":"response-%s"}`, strings.TrimPrefix(token, "Bearer token-"))
 	}))
 	defer upstream.Close()
 
@@ -79,7 +79,7 @@ func TestProxyContinuationAffinity(t *testing.T) {
 		seen = append(seen, request.Header.Get("Authorization"))
 		writer.Header().Set("x-codex-turn-state", "turn-a")
 		writer.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(writer, `{"id":"response-a"}`)
+		_, _ = io.WriteString(writer, `{"object":"response","id":"response-a"}`)
 	}))
 	defer upstream.Close()
 
@@ -107,11 +107,11 @@ func TestProdex04356ProxyBoundAffinityUnauthorizedSignalsFullContextReplay(t *te
 		seen = append(seen, accountID)
 		writer.Header().Set("Content-Type", "application/json")
 		if accountID == "workspace-B" {
-			_, _ = io.WriteString(writer, `{"id":"response-b"}`)
+			_, _ = io.WriteString(writer, `{"object":"response","id":"response-b"}`)
 			return
 		}
 		if len(seen) == 1 {
-			_, _ = io.WriteString(writer, `{"id":"response-a"}`)
+			_, _ = io.WriteString(writer, `{"object":"response","id":"response-a"}`)
 			return
 		}
 		writer.WriteHeader(http.StatusUnauthorized)
@@ -153,7 +153,7 @@ func TestProdex04356ProxyBoundAffinityUnauthorizedSignalsFullContextReplay(t *te
 
 func TestProxyAffinityKeysEachStayWithTheirOwner(t *testing.T) {
 	cases := []proxyAffinityCase{
-		{name: "previous response", secondBody: `{"previous_response_id":"response-a"}`, firstReply: `{"id":"response-a"}`},
+		{name: "previous response", secondBody: `{"previous_response_id":"response-a"}`, firstReply: `{"object":"response","id":"response-a"}`},
 		{name: "turn state", firstHeaders: map[string]string{"x-codex-turn-state": ""}, firstResponseHeaders: map[string]string{"x-codex-turn-state": "turn-a"}, secondHeaders: map[string]string{"x-codex-turn-state": "turn-a"}},
 		{name: "session", firstBody: `{"session_id":"session-a"}`, secondBody: `{"session_id":"session-a"}`},
 	}
@@ -807,7 +807,7 @@ func TestProxyRemembersEveryNonstreamResponseInChain(t *testing.T) {
 		}
 		calls++
 		writer.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(writer, `{"id":"response-%d"}`, calls)
+		fmt.Fprintf(writer, `{"object":"response","id":"response-%d"}`, calls)
 	}))
 	defer upstream.Close()
 	proxy := newTestProxy(t, upstream.URL, accounts)
