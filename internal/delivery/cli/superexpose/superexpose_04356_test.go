@@ -69,6 +69,17 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func isolateExposeOptionalToolDiscovery(t *testing.T) {
+	t.Helper()
+	empty := t.TempDir()
+	t.Setenv("GODEX_OPTIMIZERS_HOME", empty)
+	t.Setenv("PRODEX_OPTIMIZERS_HOME", "")
+	t.Setenv("XDG_DATA_HOME", "")
+	t.Setenv("HOME", empty)
+	t.Setenv("USERPROFILE", empty)
+	t.Setenv("PATH", empty)
+}
+
 func tunnelClientHelperBinary(t *testing.T) string {
 	t.Helper()
 	sourcePath, err := os.Executable()
@@ -199,6 +210,7 @@ func TestProdex04356SuperExposeExecArgumentAndBindPolicy(t *testing.T) {
 }
 
 func TestProdex04356SuperExposeRecordsLifecycleInGodexRuntimeLog(t *testing.T) {
+	isolateExposeOptionalToolDiscovery(t)
 	home := t.TempDir()
 	t.Setenv("GODEX_HOME", home)
 	ctx, cancel := context.WithCancel(t.Context())
@@ -726,6 +738,7 @@ func TestProdex04356SuperExposeInstanceAndCapabilityShapesAreGodexNative(t *test
 }
 
 func TestProdex04356SuperExposeTunnelLifecycleIsAudited(t *testing.T) {
+	isolateExposeOptionalToolDiscovery(t)
 	home := t.TempDir()
 	t.Setenv("GODEX_HOME", home)
 	t.Setenv(tunnelHelperEnv, "1")
