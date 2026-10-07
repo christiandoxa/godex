@@ -20,6 +20,7 @@ type LaunchTarget struct {
 	CodexHome      string
 	AccountID      string
 	Provider       string
+	Auth           string
 	ProviderConfig ProviderSnapshot
 }
 

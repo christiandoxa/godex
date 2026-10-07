@@ -165,7 +165,7 @@ func runLaunchTarget(
 	allowRotate bool,
 	launchOptions runtimeusecase.RuntimeLaunchOptions,
 ) (runErr error) {
-	if target.AccountID != "" {
+	if target.AccountID != "" && target.Auth != "api-key" {
 		return runParsedWithOptions(ctx, runner, sessions, target.AccountID, arguments, launchOptions)
 	}
 	if profiles == nil || target.Name == "" {
@@ -174,6 +174,31 @@ func runLaunchTarget(
 	provider, err := launchRuntimeProvider(target)
 	if err != nil {
 		return err
+	}
+	if target.Provider == "openai" {
+		if acquirer, ok := profiles.(interface {
+			AcquireOpenAILaunch(context.Context, string) (func() error, string, bool, string, error)
+		}); ok {
+			release, baseURL, compatible, authLabel, err := acquirer.AcquireOpenAILaunch(ctx, target.Name)
+			if err != nil {
+				return err
+			}
+			defer func() { runErr = errors.Join(runErr, release()) }()
+			effectiveAuth := target.Auth
+			if authLabel != "" {
+				effectiveAuth = authLabel
+			}
+			if target.Auth == "api-key" && effectiveAuth != "api-key" {
+				return errors.New("profile authentication changed while launch was starting")
+			}
+			if compatible {
+				return runner.RunOpenAICompatibleProfileWithOptions(ctx, target.CodexHome, baseURL, arguments, launchOptions)
+			}
+			if effectiveAuth == "api-key" {
+				return runner.RunDirectProfileWithOptions(ctx, target.CodexHome, arguments, launchOptions)
+			}
+			return runStandaloneProfileWithOptions(ctx, runner, target.CodexHome, provider, arguments, launchOptions)
+		}
 	}
 	if provider.Kind == "copilot" || provider.Kind == "anthropic" || provider.Kind == "kiro" {
 		if launchOptions.AllowAutoRotate != nil && !*launchOptions.AllowAutoRotate {
@@ -200,6 +225,9 @@ func runLaunchTarget(
 		}
 		if compatible {
 			return runner.RunOpenAICompatibleProfileWithOptions(ctx, target.CodexHome, baseURL, arguments, launchOptions)
+		}
+		if target.Auth == "api-key" {
+			return runner.RunDirectProfileWithOptions(ctx, target.CodexHome, arguments, launchOptions)
 		}
 	}
 	return runStandaloneProfileWithOptions(ctx, runner, target.CodexHome, provider, arguments, launchOptions)

@@ -616,6 +616,30 @@ func (fake *fakeLocalLaunchProfiles) OpenAICompatibleBaseURL(context.Context, st
 	return "", false, nil
 }
 
+func TestProdex04356SelectedAPIKeyAccountRunsFromTargetHomeWithoutChatGPTSelection(t *testing.T) {
+	home := t.TempDir()
+	accounts := &fakeRunnerAccounts{}
+	process := &fakeRunnerProcess{}
+	runner := runtimeusecase.NewRunner(accounts, process, nil)
+	profiles := &fakeLocalLaunchProfiles{target: profilemodel.LaunchTarget{
+		Name: "api-key-work", CodexHome: home, AccountID: "legacy-account", Provider: "openai", Auth: "api-key",
+	}}
+	if err := RunProfiles(t.Context(), runner, nil, profiles, []string{
+		"--profile", "api-key-work", "--", "exec", "hello",
+	}, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if accounts.selected != "" {
+		t.Fatalf("API-key profile re-entered ChatGPT account selection: %q", accounts.selected)
+	}
+	if process.home != home || strings.Join(process.arguments, " ") != "exec hello" {
+		t.Fatalf("API-key direct launch = home:%q args:%#v", process.home, process.arguments)
+	}
+	if strings.Join(profiles.acquired, ",") != "api-key-work" || profiles.released != 1 {
+		t.Fatalf("API-key profile lease = %v/%d", profiles.acquired, profiles.released)
+	}
+}
+
 func TestRunHomeLocalProviderKeepsResolvedHome(t *testing.T) {
 	process := &fakeRunnerProcess{}
 	runner := runtimeusecase.NewRunner(&fakeRunnerAccounts{}, process, nil)

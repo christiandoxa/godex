@@ -32,10 +32,22 @@ func (catalog *Catalog) ResolveLaunch(ctx context.Context, name string) (profile
 	}
 	for _, report := range listed {
 		if report.Profile.Name == name {
-			return launchTarget(report), nil
+			return catalog.launchTargetWithAuth(ctx, report)
 		}
 	}
 	return profilemodel.LaunchTarget{}, fmt.Errorf(profileNotFoundFormat, name)
+}
+
+func (catalog *Catalog) launchTargetWithAuth(ctx context.Context, report Report) (profilemodel.LaunchTarget, error) {
+	target := launchTarget(report)
+	if report.Profile.Provider.Kind == profileentity.ProviderOpenAI && catalog.quotaAuth != nil {
+		auth, err := catalog.quotaAuthSummary(ctx, report.Profile)
+		if err != nil {
+			return profilemodel.LaunchTarget{}, err
+		}
+		target.Auth = auth.Label
+	}
+	return target, nil
 }
 
 func launchTarget(report Report) profilemodel.LaunchTarget {
@@ -47,7 +59,86 @@ func launchTarget(report Report) profilemodel.LaunchTarget {
 }
 
 func (catalog *Catalog) AcquireLaunch(ctx context.Context, name string) (func() error, error) {
-	return catalog.profiles.Acquire(ctx, name)
+	listed, err := catalog.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, report := range listed {
+		if report.Profile.Name != name {
+			continue
+		}
+		if report.AccountID != "" {
+			leases, ok := catalog.accounts.(interface {
+				AcquireProfiles(context.Context, []string) (func() error, error)
+			})
+			if !ok {
+				return nil, errors.New("account profile lease support is not configured")
+			}
+			return leases.AcquireProfiles(ctx, []string{report.AccountID})
+		}
+		return catalog.profiles.Acquire(ctx, name)
+	}
+	return nil, fmt.Errorf(profileNotFoundFormat, name)
+}
+
+func (catalog *Catalog) AcquireOpenAILaunch(ctx context.Context, name string) (func() error, string, bool, string, error) {
+	var release func() error
+	var baseURL, authLabel string
+	var compatible bool
+	err := catalog.withBundleImportLock(ctx, func() error {
+		listed, err := catalog.list(ctx)
+		if err != nil {
+			return err
+		}
+		var target Report
+		found := false
+		for _, report := range listed {
+			if report.Profile.Name == name {
+				target, found = report, true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf(profileNotFoundFormat, name)
+		}
+		if target.Profile.Provider.Kind != profileentity.ProviderOpenAI {
+			return fmt.Errorf("profile %q does not use provider %q", name, profileentity.ProviderOpenAI)
+		}
+		if target.AccountID != "" {
+			leases, ok := catalog.accounts.(interface {
+				AcquireProfiles(context.Context, []string) (func() error, error)
+			})
+			if !ok {
+				return errors.New("account profile lease support is not configured")
+			}
+			release, err = leases.AcquireProfiles(ctx, []string{target.AccountID})
+		} else {
+			release, err = catalog.profiles.Acquire(ctx, target.Profile.Name)
+		}
+		if err != nil {
+			return err
+		}
+		baseURL, compatible, err = catalog.profiles.ReadOpenAICompatibleBaseURL(target.Profile.CodexHome)
+		if err != nil {
+			_ = release()
+			release = nil
+			return err
+		}
+		if catalog.quotaAuth != nil {
+			auth, authErr := catalog.quotaAuthSummary(ctx, target.Profile)
+			if authErr != nil {
+				_ = release()
+				release = nil
+				return authErr
+			}
+			authLabel = auth.Label
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, "", false, "", err
+	}
+	return release, baseURL, compatible, authLabel, nil
 }
 
 func (catalog *Catalog) CurrentLaunch(ctx context.Context) (profilemodel.LaunchTarget, error) {
@@ -55,18 +146,61 @@ func (catalog *Catalog) CurrentLaunch(ctx context.Context) (profilemodel.LaunchT
 	if err != nil {
 		return profilemodel.LaunchTarget{}, err
 	}
-	return launchTarget(report), nil
+	return catalog.launchTargetWithAuth(ctx, report)
 }
 
 func (catalog *Catalog) ActiveLaunch(ctx context.Context) (profilemodel.LaunchTarget, bool, error) {
-	profile, active, err := catalog.ActiveStandalone(ctx)
-	if err != nil || !active {
-		return profilemodel.LaunchTarget{}, active, err
+	var report Report
+	var target profilemodel.LaunchTarget
+	found := false
+	err := catalog.withBundleImportLock(ctx, func() error {
+		hasProfile, err := catalog.profiles.HasActive(ctx)
+		if err != nil {
+			return err
+		}
+		if hasProfile {
+			profile, err := catalog.profiles.Current(ctx)
+			if err != nil {
+				return err
+			}
+			report = Report{Profile: profile, Active: true, Enabled: true}
+			found = true
+		} else {
+			activeID, err := catalog.accounts.ActiveID(ctx)
+			if err != nil {
+				return err
+			}
+			if activeID == "" {
+				return nil
+			}
+			accounts, err := catalog.accounts.List(ctx)
+			if err != nil {
+				return err
+			}
+			for _, account := range accounts {
+				if account.ID == activeID {
+					report = Report{
+						Profile: accountProfile(account, catalog.accounts.CodexHome(account.ID)),
+						Active:  true, Enabled: account.Enabled, AccountID: account.ID,
+					}
+					found = true
+					break
+				}
+			}
+			if !found {
+				return errors.New("active account metadata is inconsistent")
+			}
+		}
+		target, err = catalog.launchTargetWithAuth(ctx, report)
+		return err
+	})
+	if err != nil {
+		return profilemodel.LaunchTarget{}, false, err
 	}
-	return profilemodel.LaunchTarget{
-		Name: profile.Name, CodexHome: profile.CodexHome, Provider: string(profile.Provider.Kind),
-		ProviderConfig: providerSnapshotFromEntity(profile.Provider),
-	}, true, nil
+	if !found || report.AccountID != "" && target.Auth != "api-key" {
+		return profilemodel.LaunchTarget{}, false, nil
+	}
+	return target, true, nil
 }
 
 func (catalog *Catalog) ResolveProviderLaunch(
@@ -164,12 +298,12 @@ func (catalog *Catalog) AcquireLaunchPool(
 }
 
 func (catalog *Catalog) OpenAICompatibleBaseURL(ctx context.Context, profileName string) (string, bool, error) {
-	profile, err := catalog.profiles.Resolve(ctx, profileName)
+	target, err := catalog.ResolveLaunch(ctx, profileName)
 	if err != nil {
 		return "", false, err
 	}
-	if profile.Provider.Kind != profileentity.ProviderOpenAI {
+	if target.Provider != string(profileentity.ProviderOpenAI) {
 		return "", false, nil
 	}
-	return catalog.profiles.ReadOpenAICompatibleBaseURL(profile.CodexHome)
+	return catalog.profiles.ReadOpenAICompatibleBaseURL(target.CodexHome)
 }
