@@ -75,11 +75,14 @@ func TestProdex04357SuperResumeDryRunRestoresProviderModelAndEffort(t *testing.T
 		"Provider: kiro",
 		"model=\"gpt-5.6-luna\"",
 		"model_reasoning_effort=\"max\"",
-		sessionID,
+		"<SESSION_UUID>",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("super resume dry-run missing %q: %s", want, text)
 		}
+	}
+	if strings.Contains(text, sessionID) {
+		t.Fatalf("super resume dry-run leaked raw parent session UUID: %s", text)
 	}
 }
 

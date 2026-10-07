@@ -99,8 +99,7 @@ func TestProdex04356SuperSubAgentOverlayWritesLauncherSlotsAndAgentsBlock(t *tes
 	text := string(instructions)
 	for _, want := range []string{
 		"Maximum active sub-agents: 3 (custom)",
-		"Inherited Presidio: enabled",
-		"Inherited required tools: rtk, presidio",
+		"- Presidio: enabled (inherited)",
 		"__sub-agent-exec",
 		"GODEX_SUB_AGENT=1",
 	} {

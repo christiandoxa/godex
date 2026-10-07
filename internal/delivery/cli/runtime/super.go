@@ -10,8 +10,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/christiandoxa/godex/internal/helper/redact"
 	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
 	sessionusecase "github.com/christiandoxa/godex/internal/usecase/session"
+	"github.com/google/uuid"
 )
 
 var superDefaultTools = []string{
@@ -451,6 +453,8 @@ func consumeSuperSubAgentArgument(arguments []string, index int, options *superO
 		options.subAgent.maxConcurrency = parsed
 		if strings.EqualFold(strings.TrimSpace(value), "default") {
 			options.subAgent.maxConcurrencySource = "default"
+		} else if slices.Contains([]uint16{4, 8, 16, 32}, parsed) {
+			options.subAgent.maxConcurrencySource = "preset"
 		} else {
 			options.subAgent.maxConcurrencySource = "custom"
 		}
@@ -632,24 +636,102 @@ func renderSuperDryRunResolved(out io.Writer, options superOptions, tools []supe
 		}
 		fmt.Fprintf(out, "  %s%s: %s\n", status.name, required, state)
 	}
-	if options.subAgent.enabled {
-		fmt.Fprintf(out, "Sub-agent: enabled provider=%s max_concurrency=%d", options.subAgent.provider, options.subAgent.maxConcurrency)
-		if options.subAgent.model != "" {
-			fmt.Fprintf(out, " model=%s", options.subAgent.model)
-		}
-		if options.subAgent.effort != "" {
-			fmt.Fprintf(out, " effort=%s", options.subAgent.effort)
-		}
-		if options.subAgent.url != "" {
-			fmt.Fprintf(out, " url=%s", options.subAgent.url)
-		}
-		fmt.Fprintln(out)
-	} else {
-		fmt.Fprintln(out, "Sub-agent: disabled")
-	}
+	renderSuperSubAgentDryRun(out, options)
 	fmt.Fprintf(out, "Codex args: %s\n", renderRedactedArgs(superPreparedCodexArgs(options)))
 	fmt.Fprintln(out, "Dry run: overlays and services are not started.")
 	return nil
+}
+
+func renderSuperSubAgentDryRun(out io.Writer, options superOptions) {
+	if !options.subAgent.enabled {
+		fmt.Fprintln(out, "Sub-agent: disabled")
+		fmt.Fprintf(out, "Sub-agent inherited Presidio: %s\n", enabledLabel(superPresidioEnabled(options)))
+		fmt.Fprintln(out, "Sub-agent local URL: absent")
+		fmt.Fprintln(out, "Sub-agent recursion disabled: yes")
+		fmt.Fprintln(out, "Sub-agent overlay: absent")
+		return
+	}
+
+	model := "provider default"
+	if options.subAgent.model != "" {
+		model = redact.Secrets(options.subAgent.model)
+	}
+	effort := "provider/model default"
+	if options.subAgent.effort != "" {
+		effort = options.subAgent.effort
+	}
+	required := "none"
+	if len(options.requiredTools) > 0 {
+		required = strings.Join(options.requiredTools, ", ")
+	}
+	localURL := "absent"
+	if options.subAgent.url != "" {
+		localURL = "configured"
+	}
+	fmt.Fprintln(out, "Sub-agent: enabled")
+	fmt.Fprintf(out, "Sub-agent provider: %s\n", superSubAgentDryRunProviderLabel(options.subAgent.provider))
+	fmt.Fprintf(out, "Sub-agent model: %s\n", model)
+	fmt.Fprintf(out, "Sub-agent reasoning effort: %s\n", effort)
+	fmt.Fprintf(out, "Maximum active sub-agents: %d (%s)\n",
+		options.subAgent.maxConcurrency,
+		superSubAgentDryRunConcurrencySource(options.subAgent.maxConcurrencySource),
+	)
+	fmt.Fprintln(out, "Sub-agent concurrency hard maximum: 64")
+	fmt.Fprintln(out, "Sub-agent concurrency enforcement: cross-process exclusive slot leases")
+	fmt.Fprintf(out, "Sub-agent inherited Presidio: %s\n", enabledLabel(superPresidioEnabled(options)))
+	fmt.Fprintf(out, "Sub-agent inherited required tools: %s\n", required)
+	fmt.Fprintf(out, "Sub-agent local URL: %s\n", localURL)
+	fmt.Fprintf(out, "Sub-agent launch target: %s (parent resume id is not inherited by children)\n",
+		superSubAgentDryRunTarget(options.codexArgs),
+	)
+	fmt.Fprintln(out, "Sub-agent recursion disabled: yes")
+	fmt.Fprintln(out, "Sub-agent recursion marker: GODEX_SUB_AGENT=1")
+	fmt.Fprintln(out, "Sub-agent child launcher: shell-free internal command")
+	fmt.Fprintln(out, "Sub-agent overlay: SUB_AGENTS.md (temporary; full instructions injected into the effective AGENTS file)")
+}
+
+func superSubAgentDryRunProviderLabel(provider string) string {
+	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case "openai":
+		return "OpenAI"
+	case "anthropic":
+		return "Anthropic"
+	case "copilot":
+		return "GitHub Copilot"
+	case "deepseek":
+		return "DeepSeek"
+	case "gemini":
+		return "Google Gemini"
+	case "kiro":
+		return "Kiro"
+	case "local":
+		return "Local"
+	default:
+		return redact.Secrets(strings.TrimSpace(provider))
+	}
+}
+
+func superSubAgentDryRunConcurrencySource(source string) string {
+	switch strings.ToLower(strings.TrimSpace(source)) {
+	case "default":
+		return "Godex default"
+	case "preset":
+		return "explicit preset"
+	case "custom":
+		return "custom"
+	default:
+		return strings.TrimSpace(source)
+	}
+}
+
+func superSubAgentDryRunTarget(arguments []string) string {
+	if index, _ := sessionArgument(arguments); index >= 0 {
+		return "resume <SESSION_UUID>"
+	}
+	if index := nativeCommandIndex(arguments); index >= 0 && arguments[index] == "exec" {
+		return "exec"
+	}
+	return "fresh"
 }
 
 func resolveSuperTools(options superOptions, lookup superToolLookup) ([]superToolStatus, error) {
@@ -784,5 +866,36 @@ func renderRedactedArgs(arguments []string) string {
 	if len(arguments) == 0 {
 		return "(none)"
 	}
-	return strings.Join(arguments, " ")
+	redacted := make([]string, 0, len(arguments))
+	for _, argument := range arguments {
+		redacted = append(redacted, redactSuperSessionArgument(redact.Secrets(argument)))
+	}
+	return strings.Join(redacted, " ")
+}
+
+func redactSuperSessionArgument(value string) string {
+	if value == "" {
+		return value
+	}
+	var builder strings.Builder
+	last := 0
+	changed := false
+	for index := range value {
+		if index < last || index+36 > len(value) {
+			continue
+		}
+		candidate := value[index : index+36]
+		if _, err := uuid.Parse(candidate); err != nil {
+			continue
+		}
+		builder.WriteString(value[last:index])
+		builder.WriteString("<SESSION_UUID>")
+		last = index + 36
+		changed = true
+	}
+	if !changed {
+		return value
+	}
+	builder.WriteString(value[last:])
+	return builder.String()
 }

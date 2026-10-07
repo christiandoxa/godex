@@ -362,8 +362,7 @@ func TestProdex04356SuperLaunchWritesInheritedSubAgentOverlayBeforeChild(t *test
 		t.Fatalf("sub-agent required tools = %#v", process.spec["required-tools"])
 	}
 	for _, want := range []string{
-		"Inherited Presidio: enabled",
-		"Inherited required tools: rtk",
+		"- Presidio: enabled (inherited)",
 		"Maximum active sub-agents: 7 (custom)",
 	} {
 		if !strings.Contains(process.agents, want) {
