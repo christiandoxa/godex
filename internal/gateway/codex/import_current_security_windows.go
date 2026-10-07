@@ -15,6 +15,8 @@ func importCurrentEntryIsSafe(info os.FileInfo) bool {
 	return !ok || attributes.FileAttributes&syscall.FILE_ATTRIBUTE_REPARSE_POINT == 0
 }
 
+func importCurrentSymlinkTrusted(os.FileInfo) bool { return false }
+
 func importCurrentDirectoryTrusted(path string, _ os.FileInfo) bool {
 	return importCurrentWindowsACLTrusted(path, false)
 }

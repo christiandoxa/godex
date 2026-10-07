@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -728,7 +729,15 @@ func sameCanonicalPath(left, right string) bool {
 	}
 	a, errA = filepath.Abs(a)
 	b, errB = filepath.Abs(b)
-	return errA == nil && errB == nil && filepath.Clean(a) == filepath.Clean(b)
+	if errA != nil || errB != nil {
+		return false
+	}
+	a = filepath.Clean(a)
+	b = filepath.Clean(b)
+	if runtime.GOOS == "windows" {
+		return strings.EqualFold(a, b)
+	}
+	return a == b
 }
 
 func normalizedThreadID(value string) (string, error) {

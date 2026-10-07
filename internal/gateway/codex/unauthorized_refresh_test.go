@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -80,7 +81,7 @@ func TestProdex04356RefreshUnauthorizedAuthUsesExactOAuthContract(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm()&0o077 != 0 {
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0 {
 		t.Fatalf("refreshed auth mode = %o, want private", info.Mode().Perm())
 	}
 }

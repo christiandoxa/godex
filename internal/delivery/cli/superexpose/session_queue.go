@@ -130,6 +130,9 @@ func openSessionReadOnlyDatabase(path string) (*sql.DB, error) {
 		return nil, err
 	}
 	uri := url.URL{Scheme: "file", Path: filepath.ToSlash(absolute)}
+	if filepath.VolumeName(absolute) != "" {
+		uri = url.URL{Scheme: "file", Opaque: filepath.ToSlash(absolute)}
+	}
 	query := uri.Query()
 	query.Set("mode", "ro")
 	query.Add("_pragma", "query_only(1)")

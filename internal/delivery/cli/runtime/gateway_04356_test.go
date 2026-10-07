@@ -64,12 +64,13 @@ func TestProdex04356GatewayHelpShowsVisibleURLAlias(t *testing.T) {
 }
 
 func TestProdex04356GatewayCLIUsesFixedOpenAIMountAndCloses(t *testing.T) {
+	home := t.TempDir()
 	proxy := &gatewayTestProxy{}
 	var config proxymodel.Config
 	runner := runtimeusecase.NewRunner(
 		gatewayTestAccounts{
 			account: accountentity.Account{ID: "account-a", Name: "account-a", Enabled: true},
-			home:    "/profiles/account-a",
+			home:    home,
 		},
 		gatewayTestProcess{},
 		func(got proxymodel.Config) (runtimeusecase.Proxy, error) {
@@ -126,13 +127,14 @@ func TestProdex04356GatewayArgumentsMatchTaggedSurface(t *testing.T) {
 }
 
 func TestProdex04356GatewaySmartContextAndPresidioReachRuntimeProxy(t *testing.T) {
+	home := t.TempDir()
 	proxy := &gatewayTestProxy{}
 	var captured proxymodel.Config
 	var requiredValues []bool
 	runner := runtimeusecase.NewRunner(
 		gatewayTestAccounts{
 			account: accountentity.Account{ID: "account-a", Name: "account-a", Enabled: true},
-			home:    "/profiles/account-a",
+			home:    home,
 		},
 		gatewayTestProcess{},
 		func(got proxymodel.Config) (runtimeusecase.Proxy, error) {

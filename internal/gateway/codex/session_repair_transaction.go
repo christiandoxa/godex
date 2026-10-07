@@ -341,8 +341,10 @@ func ensureSessionRepairBackup(path string, source []byte) (string, os.FileInfo,
 	if matchErr != nil || !matches {
 		return "", nil, false, fmt.Errorf("repair backup changed while in use: %s", backupPath)
 	}
-	if syncErr := existing.Sync(); syncErr != nil {
-		return "", nil, false, syncErr
+	if runtime.GOOS != "windows" {
+		if syncErr := existing.Sync(); syncErr != nil {
+			return "", nil, false, syncErr
+		}
 	}
 	return backupPath, info, false, nil
 }

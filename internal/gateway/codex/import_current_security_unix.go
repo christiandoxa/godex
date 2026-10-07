@@ -9,6 +9,11 @@ import (
 
 func importCurrentEntryIsSafe(os.FileInfo) bool { return true }
 
+func importCurrentSymlinkTrusted(info os.FileInfo) bool {
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	return ok && uint32(stat.Uid) == 0
+}
+
 func importCurrentDirectoryTrusted(_ string, info os.FileInfo) bool {
 	stat, ok := info.Sys().(*syscall.Stat_t)
 	if !ok {

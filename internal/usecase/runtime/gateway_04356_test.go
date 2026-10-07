@@ -9,9 +9,10 @@ import (
 )
 
 func TestProdex04356GatewayAccountUsesFixedProfileWithoutQuotaPreflight(t *testing.T) {
+	home := t.TempDir()
 	accounts := &fakeLaunchAccounts{
 		accounts: []accountentity.Account{{ID: "one", Name: "one", Enabled: true}},
-		homes:    map[string]string{"one": "/profiles/one"},
+		homes:    map[string]string{"one": home},
 	}
 	proxy := &fakeProxy{}
 	var config proxymodel.Config
@@ -36,7 +37,7 @@ func TestProdex04356GatewayAccountUsesFixedProfileWithoutQuotaPreflight(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 1 || got[0].ID != "one" || got[0].Home != "/profiles/one" || !got[0].Enabled {
+	if len(got) != 1 || got[0].ID != "one" || got[0].Home != home || !got[0].Enabled {
 		t.Fatalf("gateway fixed pool = %#v", got)
 	}
 	if gateway.Endpoint() != "http://127.0.0.1:1234/backend-api/godex" {
@@ -51,13 +52,14 @@ func TestProdex04356GatewayAccountUsesFixedProfileWithoutQuotaPreflight(t *testi
 }
 
 func TestProdex04356GatewayAPIKeysKeepsProviderCredentialPool(t *testing.T) {
+	currentHome := t.TempDir()
 	proxy := &fakeProxy{}
 	var config proxymodel.Config
 	runner := NewRunner(&fakeLaunchAccounts{}, &fakeProcess{}, func(got proxymodel.Config) (Proxy, error) {
 		config = got
 		return proxy, nil
 	})
-	runner.SetCurrentCodexHome("/profiles/current")
+	runner.SetCurrentCodexHome(currentHome)
 	provider := DeepSeekProvider("deepseek-api-key", "")
 
 	gateway, err := runner.StartGatewayAPIKeys(
@@ -76,7 +78,7 @@ func TestProdex04356GatewayAPIKeysKeepsProviderCredentialPool(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(got) != 2 || got[0].Provider.Kind != "deepseek" || got[1].Provider.Kind != "deepseek" ||
-		got[0].Home != "/profiles/current" || got[1].Home != "/profiles/current" {
+		got[0].Home != currentHome || got[1].Home != currentHome {
 		t.Fatalf("provider gateway pool = %#v", got)
 	}
 }

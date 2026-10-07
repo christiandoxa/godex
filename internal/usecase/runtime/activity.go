@@ -324,9 +324,9 @@ func runtimeQuotaObservation(event runtimemodel.Event) (runtimemodel.RuntimeQuot
 	}
 	return runtimemodel.RuntimeQuotaObservation{
 		TimestampUnixMilli: event.TimestampUnixMilli,
-		Profile: profile,
-		FiveHourRemaining: five,
-		WeeklyRemaining: weekly,
+		Profile:            profile,
+		FiveHourRemaining:  five,
+		WeeklyRemaining:    weekly,
 	}, true
 }
 
@@ -365,10 +365,10 @@ func estimateRuntimeRunway(
 	}
 	secondsUntilExhaustion := int64(math.Ceil(float64(currentRemaining) / burnPerHour * 3600))
 	return &runtimemodel.RunwayEstimate{
-		BurnPerHour: burnPerHour,
-		ObservedProfiles: observedProfiles,
+		BurnPerHour:         burnPerHour,
+		ObservedProfiles:    observedProfiles,
 		ObservedSpanSeconds: max(int64(0), latest-earliest),
-		ExhaustAt: now + max(secondsUntilExhaustion, int64(0)),
+		ExhaustAt:           now + max(secondsUntilExhaustion, int64(0)),
 	}
 }
 

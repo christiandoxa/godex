@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,10 +31,16 @@ func TestMaintainManagedSessionsMatchesProdexFullSequence(t *testing.T) {
 	if err := os.WriteFile(oldAttachment, []byte("attachment body"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	raw := strings.Join([]string{
-		"{\"timestamp\":\"2026-10-03T12:49:50Z\",\"type\":\"event\",\"payload\":{\"message\":\"read " + oldAttachment + "\"}}",
-		"{\"timestamp\":\"2026-10-03T12:50:00Z\",\"type\":\"session_meta\",\"payload\":{\"id\":\"" + sessionID + "\",\"thread_id\":\"thread-1\"}}",
-	}, "\n") + "\n"
+	event, err := json.Marshal(map[string]any{
+		"timestamp": "2026-10-03T12:49:50Z",
+		"type":      "event",
+		"payload":   map[string]any{"message": "read " + oldAttachment},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := string(event) + "\n" +
+		"{\"timestamp\":\"2026-10-03T12:50:00Z\",\"type\":\"session_meta\",\"payload\":{\"id\":\"" + sessionID + "\",\"thread_id\":\"thread-1\"}}\n"
 	if err := os.WriteFile(session, []byte(raw), 0o600); err != nil {
 		t.Fatal(err)
 	}

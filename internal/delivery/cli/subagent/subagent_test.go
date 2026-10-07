@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -322,8 +323,10 @@ func TestProdex04356SubAgentLimitSecuresAndPreservesTask(t *testing.T) {
 	if statErr != nil {
 		t.Fatalf("limit removed retryable task: %v", statErr)
 	}
-	if got := info.Mode().Perm(); got != 0o600 {
-		t.Fatalf("retryable task mode = %o, want 600", got)
+	if runtime.GOOS != "windows" {
+		if got := info.Mode().Perm(); got != 0o600 {
+			t.Fatalf("retryable task mode = %o, want 600", got)
+		}
 	}
 }
 

@@ -181,20 +181,34 @@ func uncompressedRolloutFile(name string) bool {
 }
 
 func pathWithinAnyRoot(path string, roots []string) bool {
-	path, err := filepath.Abs(path)
+	path, err := canonicalContainmentPath(path)
 	if err != nil {
 		return false
 	}
 	for _, root := range roots {
-		root, err := filepath.Abs(root)
+		root, err := canonicalContainmentPath(root)
 		if err != nil {
 			continue
 		}
-		if path == root || strings.HasPrefix(path, filepath.Clean(root)+string(filepath.Separator)) {
+		relative, err := filepath.Rel(root, path)
+		if err == nil && relative != ".." &&
+			!strings.HasPrefix(relative, ".."+string(filepath.Separator)) &&
+			!filepath.IsAbs(relative) {
 			return true
 		}
 	}
 	return false
+}
+
+func canonicalContainmentPath(path string) (string, error) {
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+	if resolved, resolveErr := filepath.EvalSymlinks(absolute); resolveErr == nil {
+		absolute = resolved
+	}
+	return filepath.Clean(absolute), nil
 }
 
 func containsParentTraversal(path string) bool {

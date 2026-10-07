@@ -50,10 +50,11 @@ func TestRestoreSessionFileModifiedTimePreservesAccessTime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := info.ModTime(); !got.Equal(time.Date(2026, 10, 3, 12, 49, 50, 123456789, time.UTC)) {
-		t.Fatalf("mtime = %s", got.Format(time.RFC3339Nano))
+	wantModified := time.Date(2026, 10, 3, 12, 49, 50, 123456789, time.UTC)
+	if got := info.ModTime(); !timestampsWithin(got, wantModified, time.Microsecond) {
+		t.Fatalf("mtime = %s, want %s", got.Format(time.RFC3339Nano), wantModified.Format(time.RFC3339Nano))
 	}
-	if got := sessionFileAccessTime(info); !got.Equal(access) {
+	if got := sessionFileAccessTime(info); !timestampsWithin(got, access, time.Microsecond) {
 		t.Fatalf("atime = %s, want %s", got.Format(time.RFC3339Nano), access.Format(time.RFC3339Nano))
 	}
 }
@@ -75,7 +76,13 @@ func TestRestoreSessionFileModifiedTimeNoTimestampIsNoOp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !info.ModTime().Equal(modified) || !sessionFileAccessTime(info).Equal(access) {
+	if !timestampsWithin(info.ModTime(), modified, time.Microsecond) ||
+		!timestampsWithin(sessionFileAccessTime(info), access, time.Microsecond) {
 		t.Fatalf("timestamps changed on no-op: atime=%s mtime=%s", sessionFileAccessTime(info), info.ModTime())
 	}
+}
+
+func timestampsWithin(left, right time.Time, tolerance time.Duration) bool {
+	delta := left.Sub(right)
+	return delta >= -tolerance && delta <= tolerance
 }

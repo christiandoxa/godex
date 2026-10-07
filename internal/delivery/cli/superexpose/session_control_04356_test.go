@@ -70,10 +70,11 @@ func TestProdex04356SessionResolverSelectsOnePlainGodexAndDescendantWriter(t *te
 	if target.godex.pid != 100 || target.writer.pid != 101 || target.threadID != fixture.threadID {
 		t.Fatalf("resolved target = %#v", target)
 	}
-	if target.queueDB != fixture.queueDB || target.stateDB != fixture.stateDB {
+	if !sameCanonicalPath(target.queueDB, fixture.queueDB) || !sameCanonicalPath(target.stateDB, fixture.stateDB) {
 		t.Fatalf("database target = queue:%q state:%q", target.queueDB, target.stateDB)
 	}
-	if target.environment.codexHome != fixture.codexHome || target.environment.pwd != fixture.workspace {
+	if !sameCanonicalPath(target.environment.codexHome, fixture.codexHome) ||
+		!sameCanonicalPath(target.environment.pwd, fixture.workspace) {
 		t.Fatalf("target environment = %#v", target.environment)
 	}
 }

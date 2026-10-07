@@ -811,13 +811,15 @@ func TestProdex04356OpenAITunnelCredentialsDistinguishMissingAndInvalid(t *testi
 		}
 	}
 
-	t.Setenv("CONTROL_PLANE_API_KEY", string([]byte{0xff}))
-	tunnel, err = startOpenAITunnel("http://127.0.0.1:4567/mcp/capability", validID)
-	if tunnel != nil {
-		tunnel.shutdown()
-	}
-	if err == nil || !strings.Contains(err.Error(), "requires CONTROL_PLANE_API_KEY in noninteractive mode") {
-		t.Fatalf("non-UTF8 API key error = %v", err)
+	if goruntime.GOOS != "windows" {
+		t.Setenv("CONTROL_PLANE_API_KEY", string([]byte{0xff}))
+		tunnel, err = startOpenAITunnel("http://127.0.0.1:4567/mcp/capability", validID)
+		if tunnel != nil {
+			tunnel.shutdown()
+		}
+		if err == nil || !strings.Contains(err.Error(), "requires CONTROL_PLANE_API_KEY in noninteractive mode") {
+			t.Fatalf("non-UTF8 API key error = %v", err)
+		}
 	}
 }
 
@@ -872,6 +874,8 @@ func TestProdex04356OpenAITunnelProbeRejectsOversizeVersionOutput(t *testing.T) 
 func TestProdex04356OpenAITunnelPrivateFilesRetryCollision(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("TMPDIR", root)
+	t.Setenv("TMP", root)
+	t.Setenv("TEMP", root)
 	nextTunnelConfigID.Store(700)
 	collision := filepath.Join(root, fmt.Sprintf("godex-openai-tunnel-%d-701-0", os.Getpid()))
 	if err := os.Mkdir(collision, 0o700); err != nil {

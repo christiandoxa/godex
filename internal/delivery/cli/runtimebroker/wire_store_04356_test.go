@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -110,8 +111,10 @@ func TestProdex04356RuntimeBrokerStoreSeparatesCapabilityAndRecoversBackup(t *te
 	if !bytes.Contains(capabilityBytes, []byte("broker-secret")) {
 		t.Fatal("capability did not contain expected secret")
 	}
-	if info, err := os.Stat(store.CapabilityPath("broker-1")); err != nil || info.Mode().Perm() != 0o600 {
-		t.Fatalf("capability mode = %v / %v", info, err)
+	if runtime.GOOS != "windows" {
+		if info, err := os.Stat(store.CapabilityPath("broker-1")); err != nil || info.Mode().Perm() != 0o600 {
+			t.Fatalf("capability mode = %v / %v", info, err)
+		}
 	}
 
 	registry.CurrentProfile = "secondary"
@@ -170,8 +173,10 @@ func TestProdex04356RuntimeBrokerLeasesArePrivateBoundedAndCleaned(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info, err := os.Stat(live.Path()); err != nil || info.Mode().Perm() != 0o600 {
-		t.Fatalf("lease mode = %v / %v", info, err)
+	if runtime.GOOS != "windows" {
+		if info, err := os.Stat(live.Path()); err != nil || info.Mode().Perm() != 0o600 {
+			t.Fatalf("lease mode = %v / %v", info, err)
+		}
 	}
 	if content, err := os.ReadFile(live.Path()); err != nil || string(content) != "pid="+itoa(os.Getpid())+"\n" {
 		t.Fatalf("lease content = %q / %v", content, err)

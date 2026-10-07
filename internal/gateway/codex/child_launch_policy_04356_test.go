@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -112,6 +113,9 @@ func TestProdex04356KeyboardEnhancementPopSequenceMatchesCrossterm(t *testing.T)
 }
 
 func TestProdex04356DirectCodexRunAppliesTUILaunchPolicy(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell fixture")
+	}
 	record := filepath.Join(t.TempDir(), "args.txt")
 	script := filepath.Join(t.TempDir(), "codex-helper.sh")
 	content := "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$GODEX_CHILD_POLICY_RECORD\"\n"

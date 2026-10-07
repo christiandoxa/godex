@@ -42,6 +42,9 @@ func TestProdex04356SuperToolResolverUsesNewestManagedPluginDirectories(t *testi
 }
 
 func TestProdex04356SuperToolResolverUsesManagedCommandsBeforePATH(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("shell fixture")
+	}
 	root := t.TempDir()
 	t.Setenv("GODEX_OPTIMIZERS_HOME", root)
 	pathDir := t.TempDir()

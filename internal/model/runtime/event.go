@@ -68,10 +68,10 @@ type Overview struct {
 	TokenHistory   []uint64                 `json:"token_history,omitempty"`
 	TokenFirstAt   string                   `json:"token_first_at,omitempty"`
 	TokenLastAt    string                   `json:"token_last_at,omitempty"`
-	RuntimeLoad      RuntimeLoadSummary       `json:"runtime_load"`
-	FiveHourRunway   *RunwayEstimate          `json:"five_hour_runway,omitempty"`
-	WeeklyRunway     *RunwayEstimate          `json:"weekly_runway,omitempty"`
-	UpdatedUnix      int64                    `json:"updated_unix,omitempty"`
+	RuntimeLoad    RuntimeLoadSummary       `json:"runtime_load"`
+	FiveHourRunway *RunwayEstimate          `json:"five_hour_runway,omitempty"`
+	WeeklyRunway   *RunwayEstimate          `json:"weekly_runway,omitempty"`
+	UpdatedUnix    int64                    `json:"updated_unix,omitempty"`
 	UpdatedAt      string                   `json:"updated_at,omitempty"`
 	LastEvent      *Event                   `json:"last_event,omitempty"`
 }

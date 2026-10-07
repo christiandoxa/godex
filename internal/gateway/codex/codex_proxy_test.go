@@ -113,6 +113,9 @@ func writeProxyHelper(t *testing.T, body string) string {
 }
 
 func TestProdex04356ExternalProviderProxyExposesGodexProviderIdentityToCodex(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("helper uses a POSIX executable")
+	}
 	home := t.TempDir()
 	record := filepath.Join(t.TempDir(), "args")
 	t.Setenv("GODEX_PROXY_RECORD", record)

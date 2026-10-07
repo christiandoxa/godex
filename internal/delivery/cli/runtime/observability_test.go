@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -88,6 +89,7 @@ func TestProdex04356InfoProcessSummaryMatchesTaggedShape(t *testing.T) {
 }
 
 func TestInfoTextAndJSON(t *testing.T) {
+	runtimeLogDir := filepath.Join(string(filepath.Separator), "managed", "logs")
 	activity := newCLIActivity()
 	var text bytes.Buffer
 	if err := Info(context.Background(), activity, &text, nil); err != nil {
@@ -100,7 +102,7 @@ func TestInfoTextAndJSON(t *testing.T) {
 		"Runtime preset: default",
 		"Runtime proxy contract: scoped gateway, policy-visible selection, bounded precommit retry",
 		"Secret backend: file",
-		"Runtime logs: /managed/logs (jsonl)",
+		"Runtime logs: " + runtimeLogDir + " (jsonl)",
 		"Codex version: codex-cli 0.159.2",
 	} {
 		if !strings.Contains(text.String(), expected) {
@@ -121,7 +123,7 @@ func TestInfoTextAndJSON(t *testing.T) {
 	if value["active_profile"] != "work" ||
 		value["token_usage"] != "unavailable" ||
 		value["runtime_policy"] != nil ||
-		runtimeLogs["directory"] != "/managed/logs" ||
+		runtimeLogs["directory"] != runtimeLogDir ||
 		runtimeLogs["format"] != "jsonl" ||
 		secretBackend["backend"] != "file" ||
 		fields["Runtime policy"] != "disabled" ||

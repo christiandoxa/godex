@@ -140,18 +140,22 @@ func validateImportSource(path string, insecure bool) error {
 		if err != nil {
 			return fmt.Errorf("inspect current Codex home path %s: %w", current, err)
 		}
-		if info.Mode()&os.ModeSymlink != 0 || !importCurrentEntryIsSafe(info) {
+		if info.Mode()&os.ModeSymlink != 0 {
+			if !importCurrentSymlinkTrusted(info) {
+				return fmt.Errorf("current Codex home path contains symbolic link or reparse point %s", current)
+			}
+		} else if !importCurrentEntryIsSafe(info) {
 			return fmt.Errorf("current Codex home path contains symbolic link or reparse point %s", current)
 		}
 		if current == clean && !info.IsDir() {
 			return errors.New("current Codex home must be a real directory")
 		}
-		if !insecure && info.IsDir() && !importCurrentDirectoryTrusted(current, info) {
-			return fmt.Errorf("CODEX_HOME path %s is not trusted by the current user; pass --insecure to bypass this check", current)
-		}
 		parent := filepath.Dir(current)
 		if parent == current {
 			break
+		}
+		if !insecure && info.IsDir() && !importCurrentDirectoryTrusted(current, info) {
+			return fmt.Errorf("CODEX_HOME path %s is not trusted by the current user; pass --insecure to bypass this check", current)
 		}
 	}
 	return nil
