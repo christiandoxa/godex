@@ -268,3 +268,57 @@ func TestRequestQuotaGateUsesFreshCachedFailureOnlyWhenPoolHasAlternative(t *tes
 		t.Fatalf("Responses quota cache filtered another route's candidates: %#v", got)
 	}
 }
+
+type delayedQuotaAvailabilityFake struct {
+	delay     time.Duration
+	completed bool
+}
+
+func (fake *delayedQuotaAvailabilityFake) AvailabilityForRoute(
+	ctx context.Context,
+	_ accountentity.Account,
+	_ quotamodel.Selection,
+) (quotamodel.Availability, error) {
+	timer := time.NewTimer(fake.delay)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		fake.completed = true
+		return quotamodel.Availability{Ready: true}, nil
+	case <-ctx.Done():
+		return quotamodel.Availability{}, ctx.Err()
+	}
+}
+
+func TestProdex04358ColdStartQuotaProbeWaitsForRealProgress(t *testing.T) {
+	now := time.Unix(100, 0)
+	accounts := []proxymodel.Account{{
+		ID: "account-delayed", Home: "/delayed", Enabled: true,
+		EligibleAfter: now.Add(time.Hour),
+	}}
+	gateway := &sequenceRoutingGateway{responses: map[string][]routingResponseFixture{
+		"account-delayed": {{status: http.StatusOK, body: `{"id":"ready-after-probe"}`}},
+	}}
+	quota := &delayedQuotaAvailabilityFake{delay: 30 * time.Millisecond}
+	router, err := NewRouter(Config{
+		Gateway: gateway, Now: func() time.Time { return now }, QuotaPreflight: quota,
+		Accounts: func(context.Context) ([]proxymodel.Account, error) { return accounts, nil },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	exchange, err := router.Forward(ctx, proxymodel.Request{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer exchange.Close()
+	if !quota.completed {
+		t.Fatal("route continued before the cold-start quota probe made real progress")
+	}
+	if exchange.Result.AccountID != "account-delayed" || exchange.Result.Response.StatusCode != http.StatusOK {
+		t.Fatalf("route result = %#v", exchange.Result)
+	}
+}
