@@ -35,6 +35,29 @@ func (router *Router) recoverBoundRetryableFailure(
 		return proxymodel.Forwarded{}, false, nil
 	}
 
+	if outcome.quota &&
+		request.QuotaSelection.RouteKind == quotamodel.RouteKindResponses &&
+		keys.previous == "" && keys.turn != "" &&
+		requestHasReconstructableFullHistory(request) {
+		owned, err := router.turnStateOwnedBy(ctx, keys.turn, failed.ID)
+		if err != nil {
+			closePendingResponse(pending)
+			return proxymodel.Forwarded{}, true, err
+		}
+		if owned {
+			if err := router.affinity.releaseOwnedDead(
+				ctx, failed.ID, affinityKeys{turn: keys.turn, session: keys.session}, router.now(),
+			); err != nil {
+				closePendingResponse(pending)
+				return proxymodel.Forwarded{}, true, err
+			}
+			closePendingResponse(pending)
+			replay := requestWithoutTurnState(request)
+			result, err := router.forwardFresh(ctx, replay, fallback)
+			return result, true, err
+		}
+	}
+
 	if (request.QuotaSelection.RouteKind == quotamodel.RouteKindResponses ||
 		request.QuotaSelection.RouteKind == quotamodel.RouteKindCompact) && keys.previous != "" {
 		if err := router.affinity.forgetOwned(ctx, failed.ID, *keys, router.now()); err != nil {

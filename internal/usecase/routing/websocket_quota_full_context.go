@@ -167,6 +167,26 @@ func (router *Router) handleBoundWebSocketRetryable(
 	}
 
 	decision := router.websocketQuotaFallbackDecision(request, accounts, account, metadata)
+	if outcome.quota && metadata.previousResponseID == "" && metadata.turnState != "" &&
+		decision.kind == websocketQuotaFallbackReady && requestHasReconstructableFullHistory(request) {
+		owned, err := router.turnStateOwnedBy(ctx, metadata.turnState, account.ID)
+		if err != nil {
+			closePendingResponse(pending)
+			return proxymodel.Forwarded{}, err
+		}
+		if owned {
+			if err := router.affinity.releaseOwnedDead(
+				ctx, account.ID,
+				affinityKeys{turn: metadata.turnState, session: metadata.sessionID},
+				router.now(),
+			); err != nil {
+				closePendingResponse(pending)
+				return proxymodel.Forwarded{}, err
+			}
+			closePendingResponse(pending)
+			return router.forwardFresh(ctx, requestWithoutTurnState(request), accounts)
+		}
+	}
 	if metadata.turnState != "" {
 		return pendingForwarded(account.ID, outcome, pending), nil
 	}

@@ -260,6 +260,7 @@ func (exchange *Exchange) Close() error {
 
 func (router *Router) Forward(ctx context.Context, request proxymodel.Request) (*Exchange, error) {
 	request.SelectionSequence = router.selectionSequence.Add(1)
+	request = router.scrubDeadTurnState(request)
 	promptCacheKey := requestPromptCacheKey(request)
 	keys := requestRoutingAffinity(request)
 	release, err := router.acquireConversation(ctx, keys)
@@ -370,6 +371,9 @@ func (router *Router) bindSuccessfulResponse(
 	}
 	if result.Failed || result.Response.StatusCode >= 400 {
 		return nil
+	}
+	if keys.turn != "" && router.affinity.deadTurnState(keys.turn, router.now()) {
+		keys.turn = ""
 	}
 	router.clearPreviousResponseFailures(ctx, result.AccountID, keys.previous)
 	router.rememberPromptCacheOwner(result.AccountID, promptCacheKey, router.now())
