@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"syscall"
@@ -58,6 +57,15 @@ func main() {
 func run() int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	// Hidden Codex SessionStart callback must be handled before config
+	// discovery, credentials or any runtime side effects.
+	if handled, err := runtimecli.HandleSessionStartNotify04360(os.Args[1:], os.Stdin); handled {
+		if err != nil {
+			_, _ = fmt.Fprintln(os.Stderr, errorPrefix, err)
+			return 1
+		}
+		return 0
+	}
 	if arguments, ok := nativeAntigravityArguments(os.Args[1:]); ok {
 		return runNativeAntigravity(ctx, arguments)
 	}
@@ -420,29 +428,4 @@ func runtimeProviderHome(config proxyconfig.Config) (string, error) {
 		return accounts[0].Home, nil
 	}
 	return "", errors.New("runtime provider profile home is unavailable")
-}
-
-func exitCode(ctx context.Context, err error) int {
-	var childError *exec.ExitError
-	if errors.As(err, &childError) {
-		if code := childError.ExitCode(); code >= 0 {
-			return code
-		}
-		if childError.ProcessState != nil {
-			if status, ok := childError.ProcessState.Sys().(syscall.WaitStatus); ok && status.Signaled() {
-				return 128 + int(status.Signal())
-			}
-		}
-	}
-	var coded interface{ ExitCode() int }
-	if errors.As(err, &coded) {
-		if code := coded.ExitCode(); code >= 0 {
-			return code
-		}
-	}
-	if errors.Is(ctx.Err(), context.Canceled) || errors.Is(err, context.Canceled) {
-		return 130
-	}
-	_, _ = fmt.Fprintln(os.Stderr, errorPrefix, err)
-	return 1
 }

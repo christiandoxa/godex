@@ -267,13 +267,59 @@ implements the corresponding **five-second, Ctrl+C-cancellable wait**:
   retry wait. The production interval and prompt abort are separately
   tested without sleeping five seconds in CI.
 
-**Still different/unproven:** Prodex's native `SessionStart`
-hook and online monitor can make decisions *while* a child is running;
-Godex currently checks the verified rollout/goal database **after
-child exit**. The asynchronous background persistence/probe queues
+**Still different/unproven at this checkpoint:** Prodex's
+native `SessionStart` and online monitor can make decisions *while* a
+child is running. Follow-up 7 adds the trusted native headless exec
+SessionStart hook; Godex still checks the verified rollout/goal
+database **after child exit**. The asynchronous background persistence/probe queues
 and full live differential provider/transport matrix also remain
 unverified. Therefore these additional recovery contracts do **not**
 constitute full 1:1 parity.
+
+## Follow-up 7: trusted native Codex SessionStart for managed headless exec
+
+Tagged source: `crates/prodex-app/src/app_commands/runtime_launch/goal_resume.rs`
+(`add_runtime_goal_session_tracking`, `runtime_goal_session_hook_hash`,
+`handle_runtime_goal_session_notify_if_requested`).
+
+- Godex now injects the source-matched `-c hooks.SessionStart=[...]`
+  command hook and `hooks.state` trusted SHA-256 identity into
+  eligible managed OpenAI `exec` starts. The canonical hash
+  is derived from the exact normalized session-start command identity,
+  with the tagged five-second hook timeout and platform-specific
+  POSIX/Windows command escaping. A user-provided
+  `hooks.SessionStart` override is never overwritten.
+- The hidden `__runtime-goal-session-notify` CLI command is handled
+  **before** ordinary Godex config/credential discovery. It accepts
+  bounded (64 KiB) Codex JSON payloads and validates the UUID from
+  `thread-id` or `session_id`, rejecting conflicts. The
+  callback writes **exactly one** newly created marker under a
+  user-private temporary directory; symlinks, unexpected file names,
+  repeated writes and invalid payloads fail closed.
+- After the child exits, the managed headless recovery path can use
+  this verified marker to select **one** new session even if
+  unrelated concurrent Codex rollout files were created. Historical,
+  unknown and duplicate IDs do not bypass the session-owner and
+  acceptance-evidence verification. Without a valid marker, the
+  existing requirement of exactly one newly discovered session remains.
+- Tests cover canonical hook-hash identity, Windows/Unix command
+  escaping, user hook preservation, callback-before-config dispatch,
+  payload bounds, symlink/replay protection, native process-marker
+  delivery and real `RunProfiles` disambiguation among two
+  concurrent rollouts. The official Codex CLI `0.161.0` also
+  accepts the injected hooks configuration under
+  `--strict-config exec-server --listen stdio` with no model
+  turn. Intentional production mutations of the trust hash,
+  marker validation, user override and consumer dispatch are
+  detected by the same regression fixtures.
+
+**Still open:** the exact Prodex monitor also maintains live goal
+state while the Codex child runs, injects an optional `notify`
+fallback where appropriate, and handles native TUI and other
+app-server transports. The hook added here covers **headless
+managed `exec` only**; it does not certify those other
+monitoring/lifecycle paths or the asynchronous background-queue
+sources as 1:1 equivalents.
 
 ## Still NOT closed; do not promote as full parity
 
@@ -287,10 +333,13 @@ constitute full 1:1 parity.
    discovery, bounded compressed rollout reads, read-only goal status
    transitions, structured transient error classes and per-generation
    distinct-profile rotation now have meaningful source-matched tests.
-   Prodex's native session-start hook, online in-process goal monitor,
-   and all native launch/continuation conditions are **not** fully
-   reproduced. The five-second transient-pool scheduler now has
-   cancellable tests, but real-world workflow parity remains unproven.
+   The headless managed-exec session-start hook is now implemented
+   with native Codex 0.161.0 config validation, but the online
+   in-process goal monitor, TUI/other app-server hook integration,
+   optional notify fallback and all native launch/continuation
+   conditions are **not** fully reproduced. The five-second
+   transient-pool scheduler has cancellable tests, but real-world
+   workflow parity remains unproven.
 3. **Full continuation/transport coverage:** HTTP Responses/Compact
    admission now bypasses the saturated lane for a verified owner and
    retains the global cap, with bounded request-body inspection.

@@ -2,6 +2,8 @@ package runtime
 
 import (
 	"context"
+	"os"
+	"runtime"
 	"strings"
 
 	sessionmodel "github.com/christiandoxa/godex/internal/model/session"
@@ -33,7 +35,19 @@ func runParsedWithOptionsWithRecovery(
 	if err != nil || ctx.Err() != nil {
 		return runParsedWithOptions(ctx, runner, sessions, selector, args, opts)
 	}
-	original := runParsedWithOptions(ctx, runner, sessions, selector, args, opts)
+	// Prodex 0.436.0 uses a native trusted SessionStart hook to
+	// disambiguate the child it launched. Keep a private, per-run marker
+	// and fall back to unique-session discovery if the hook is unavailable.
+	var marker *sessionStartMarker04360
+	execArgs := args
+	if monitor, monitorErr := newSessionStartMarker04360(); monitorErr == nil {
+		marker = monitor
+		defer marker.Close()
+		if exe, exeErr := os.Executable(); exeErr == nil {
+			execArgs = marker.codexHookArgumentsForOS04360(args, exe, runtime.GOOS)
+		}
+	}
+	original := runParsedWithOptions(ctx, runner, sessions, selector, execArgs, opts)
 	if original == nil || ctx.Err() != nil || recoveryExitCancelled04360(original) {
 		return original
 	}
@@ -41,7 +55,11 @@ func runParsedWithOptionsWithRecovery(
 	if err != nil {
 		return original
 	}
-	report, ok := newSessionAfter04360(before, after)
+	markerID := ""
+	if marker != nil {
+		markerID = marker.ID()
+	}
+	report, ok := newSessionAfterMarker04360(before, after, markerID)
 	if !ok || report.AccountID != "" && report.AccountID != selector ||
 		report.UpstreamAccountID != "" && report.UpstreamAccountID != selector ||
 		report.ModelProvider != "" && report.ModelProvider != "openai" ||
