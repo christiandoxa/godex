@@ -10,7 +10,7 @@ import (
 	routingrepo "github.com/christiandoxa/godex/internal/repository/routing"
 )
 
-func TestProdex04356ForgetSessionRemovesDurableSessionAliasesOnly(t *testing.T) {
+func TestProdex04356ForgetSessionRemovesDurableSessionAliasesIdempotently(t *testing.T) {
 	store := routingrepo.NewStore(t.TempDir())
 	const sessionID = "019c9e3d-45a0-7ad0-a6ee-b194ac2d44fc"
 	owner := strings.Repeat("1", 32)
@@ -25,8 +25,10 @@ func TestProdex04356ForgetSessionRemovesDurableSessionAliasesOnly(t *testing.T) 
 	if _, err := store.Merge(context.Background(), updates); err != nil {
 		t.Fatal(err)
 	}
-	if err := ForgetSession(context.Background(), store, sessionID); err != nil {
-		t.Fatal(err)
+	for range 2 {
+		if err := ForgetSession(context.Background(), store, sessionID); err != nil {
+			t.Fatal(err)
+		}
 	}
 	values, err := store.Load(context.Background())
 	if err != nil {

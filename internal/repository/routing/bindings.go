@@ -2,23 +2,15 @@ package routing
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
-	"github.com/christiandoxa/godex/internal/helper/fileutil"
-	"github.com/christiandoxa/godex/internal/helper/lockfile"
-	"io"
-	"os"
 	"path/filepath"
 	"sort"
-	"time"
+
+	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
+	"github.com/christiandoxa/godex/internal/helper/lockfile"
 )
 
 type Store struct{ root string }
-type snapshot struct {
-	Version  int                     `json:"version"`
-	Bindings []routingentity.Binding `json:"bindings"`
-}
 
 func NewStore(root string) *Store { return &Store{root: root} }
 
@@ -181,97 +173,4 @@ func bindingLess(left, right routingentity.Binding) bool {
 		return left.UpdatedUnix > right.UpdatedUnix
 	}
 	return left.Key < right.Key
-}
-
-func (store *Store) write(values []routingentity.Binding) error {
-	content, err := json.Marshal(snapshot{Version: 1, Bindings: values})
-	if err != nil {
-		return err
-	}
-	_, err = fileutil.AtomicWrite(filepath.Join(store.root, "routing.json"), content)
-	return err
-}
-
-func (store *Store) prepare() error {
-	if !filepath.IsAbs(store.root) || store.root == filepath.Dir(store.root) {
-		return errors.New("invalid routing home")
-	}
-	if err := os.MkdirAll(store.root, 0700); err != nil {
-		return err
-	}
-	info, err := os.Lstat(store.root)
-	if err != nil {
-		return err
-	}
-	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-		return errors.New("routing home must be a real directory")
-	}
-	return os.Chmod(store.root, 0700)
-}
-func (store *Store) read() ([]routingentity.Binding, error) {
-	file, found, err := store.openSnapshot()
-	if err != nil || !found {
-		return nil, err
-	}
-	defer file.Close()
-	value, err := decodeSnapshot(file)
-	if err != nil {
-		return nil, err
-	}
-	return filterSnapshotBindings(value.Bindings)
-}
-
-func (store *Store) openSnapshot() (*os.File, bool, error) {
-	path := filepath.Join(store.root, "routing.json")
-	info, err := os.Lstat(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, false, nil
-	}
-	if err != nil {
-		return nil, false, err
-	}
-	if !info.Mode().IsRegular() || info.Size() > 2<<20 {
-		return nil, false, errors.New("routing snapshot must be a bounded regular file")
-	}
-	file, err := os.Open(path)
-	return file, err == nil, err
-}
-
-func decodeSnapshot(file *os.File) (snapshot, error) {
-	decoder := json.NewDecoder(io.LimitReader(file, (2<<20)+1))
-	decoder.DisallowUnknownFields()
-	var value snapshot
-	if decoder.Decode(&value) != nil {
-		return snapshot{}, errors.New("decode routing snapshot")
-	}
-	var extra any
-	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
-		return snapshot{}, errors.New("routing snapshot has trailing data")
-	}
-	if value.Version != 1 {
-		return snapshot{}, errors.New("unsupported routing snapshot version")
-	}
-	if len(value.Bindings) > routingentity.MaxBindings {
-		return snapshot{}, errors.New("routing snapshot exceeds binding limit")
-	}
-	return value, nil
-}
-
-func filterSnapshotBindings(bindings []routingentity.Binding) ([]routingentity.Binding, error) {
-	values := make([]routingentity.Binding, 0, len(bindings))
-	seen := make(map[string]bool, len(bindings))
-	cutoff := time.Now().Unix() - routingentity.RetentionSeconds
-	for _, binding := range bindings {
-		if err := binding.Validate(); err != nil {
-			return nil, err
-		}
-		if seen[binding.Key] {
-			return nil, errors.New("routing snapshot has duplicate keys")
-		}
-		seen[binding.Key] = true
-		if durableBinding(binding) || binding.UpdatedUnix > cutoff {
-			values = append(values, binding)
-		}
-	}
-	return values, nil
 }
