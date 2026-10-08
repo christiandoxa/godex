@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"net/url"
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -47,7 +48,7 @@ func TestProdex04360GoalDatabaseConnectionCannotMutateState(t *testing.T) {
 	const session = "019c9e3d-45a0-7ad0-a6ee-b194ac2d44f9"
 	root := t.TempDir()
 	path := fixtureGoalDB04360(t, root, session, "active")
-	dsn := goalReadOnlyDSN04360(path, "linux")
+	dsn := goalReadOnlyDSN04360(path, runtime.GOOS)
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		t.Fatal(err)
