@@ -30,7 +30,7 @@ func copyResponseHeaders(destination, source http.Header) {
 func copyTrailers(destination, responseHeaders, source http.Header) {
 	connectionHeaders := httpheader.ConnectionTokens(responseHeaders)
 	for key, values := range source {
-		if httpheader.IsHop(key) || connectionHeaders[http.CanonicalHeaderKey(key)] {
+		if shouldSkipResponseHeader(key, connectionHeaders) {
 			continue
 		}
 		destination[key] = append([]string(nil), values...)
@@ -43,7 +43,7 @@ func declareResponseTrailers(destination, responseHeaders, trailers http.Header)
 	add := func(value string) {
 		for _, name := range strings.Split(value, ",") {
 			canonical := http.CanonicalHeaderKey(strings.TrimSpace(name))
-			if canonical == "" || httpheader.IsHop(canonical) || connectionHeaders[canonical] || declared[canonical] {
+			if canonical == "" || shouldSkipResponseHeader(canonical, connectionHeaders) || declared[canonical] {
 				continue
 			}
 			destination.Add("Trailer", canonical)
@@ -60,5 +60,5 @@ func declareResponseTrailers(destination, responseHeaders, trailers http.Header)
 
 func shouldSkipResponseHeader(key string, connectionHeaders map[string]bool) bool {
 	name := strings.ToLower(strings.TrimSpace(key))
-	return httpheader.IsHop(name) || connectionHeaders[http.CanonicalHeaderKey(key)]
+	return name == "content-length" || httpheader.IsHop(name) || connectionHeaders[http.CanonicalHeaderKey(key)]
 }

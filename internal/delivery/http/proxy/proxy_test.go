@@ -17,6 +17,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
 func TestProxyRoundRobinAndPreCommitRotation(t *testing.T) {
@@ -471,6 +473,43 @@ func TestProxyForwardsHeadersBodyAndTrailers(t *testing.T) {
 	}
 	if response.Trailer.Get("X-Upstream-Trailer") != "trailer-value" {
 		t.Fatalf("trailer = %q", response.Trailer.Get("X-Upstream-Trailer"))
+	}
+}
+
+func TestProxyDropsUpstreamContentLengthButKeepsMeaningfulHeaders(t *testing.T) {
+	proxy := &Proxy{maxInspect: 1024}
+	writer := httptest.NewRecorder()
+	lifecycle := &requestLifecycle{}
+	response := &proxymodel.Response{
+		StatusCode: http.StatusCreated,
+		Header: http.Header{
+			"Content-Length":      []string{"999"},
+			"Content-Encoding":    []string{"identity"},
+			"X-Codex-Turn-State":  []string{"synthetic-turn"},
+			"X-Upstream-Metadata": []string{"keep-me"},
+		},
+		Body: io.NopCloser(strings.NewReader("payload")),
+		Trailer: http.Header{
+			"Content-Length": []string{"trailer-framing-leak"},
+			"X-Upstream":     []string{"trailer-value"},
+		},
+	}
+
+	proxy.forwardResponse(context.Background(), writer, response, nil, "", lifecycle)
+
+	if writer.Code != http.StatusCreated || writer.Body.String() != "payload" {
+		t.Fatalf("forwarded response = status %d body %q", writer.Code, writer.Body.String())
+	}
+	if writer.Header().Get("Content-Length") != "" {
+		t.Fatalf("upstream framing header leaked: %q", writer.Header().Get("Content-Length"))
+	}
+	if writer.Header().Get("Content-Encoding") != "identity" ||
+		writer.Header().Get("X-Codex-Turn-State") != "synthetic-turn" ||
+		writer.Header().Get("X-Upstream-Metadata") != "keep-me" {
+		t.Fatalf("meaningful response headers changed: %#v", writer.Header())
+	}
+	if writer.Header().Get("X-Upstream") != "trailer-value" {
+		t.Fatalf("trailer forwarding changed: %#v", writer.Header())
 	}
 }
 
