@@ -84,6 +84,7 @@ type Status struct {
 	usageCache    map[string]usageSnapshot
 	snapshotCache map[string]quotamodel.UsageSnapshot
 	snapshots     usageSnapshotStore
+	probes        probeRefreshGate
 }
 
 func NewStatus(accounts accountStore, usage usageGateway) *Status {
@@ -222,14 +223,16 @@ func (status *Status) selectedAccount(ctx context.Context, selector string) (acc
 }
 
 func (status *Status) fetchHomeUsage(ctx context.Context, home, baseURL string) (quotamodel.Usage, error) {
-	if baseURL == "" {
-		return status.usage.Fetch(ctx, home)
-	}
-	override, ok := status.usage.(overrideUsageGateway)
-	if !ok {
-		return quotamodel.Usage{}, errors.New("quota base URL override is not supported")
-	}
-	return override.FetchAt(ctx, home, baseURL)
+	return status.fetchProbe(ctx, func() (quotamodel.Usage, error) {
+		if baseURL == "" {
+			return status.usage.Fetch(ctx, home)
+		}
+		override, ok := status.usage.(overrideUsageGateway)
+		if !ok {
+			return quotamodel.Usage{}, errors.New("quota base URL override is not supported")
+		}
+		return override.FetchAt(ctx, home, baseURL)
+	})
 }
 
 func (status *Status) fetchUsage(ctx context.Context, account accountentity.Account, baseURL string) (quotamodel.Usage, error) {

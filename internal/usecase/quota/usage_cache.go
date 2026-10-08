@@ -21,16 +21,7 @@ type usageSnapshot struct {
 }
 
 func (status *Status) cachedAvailabilityUsage(ctx context.Context, accountID, home string, selection *quotamodel.Selection) (quotamodel.Usage, quotamodel.Source, error) {
-	return status.cachedAvailabilityUsageWithPolicy(ctx, accountID, home, selection, false)
-}
-
-func (status *Status) cachedAvailabilityUsageWithPolicy(
-	ctx context.Context,
-	accountID, home string,
-	selection *quotamodel.Selection,
-	noProxy bool,
-) (quotamodel.Usage, quotamodel.Source, error) {
-	return status.cachedAvailabilityUsageAtPolicy(ctx, accountID, home, selection, "", noProxy)
+	return status.cachedAvailabilityUsageAtPolicy(ctx, accountID, home, selection, "", false)
 }
 
 func (status *Status) cachedAvailabilityUsageAtPolicy(
@@ -48,15 +39,22 @@ func (status *Status) cachedAvailabilityUsageAtPolicy(
 		}
 	}
 
+	// Cache hits stay local.
+	// Only misses consume the bounded probe gate.
+	// Provider errors still release it.
 	var usage quotamodel.Usage
 	var err error
 	switch {
 	case baseURL != "" || noProxy:
 		if policy, ok := status.usage.(policyUsageGateway); ok {
-			usage, err = policy.FetchAtPolicy(ctx, home, baseURL, noProxy)
+			usage, err = status.fetchProbe(ctx, func() (quotamodel.Usage, error) {
+				return policy.FetchAtPolicy(ctx, home, baseURL, noProxy)
+			})
 		} else if baseURL != "" && !noProxy {
 			if override, ok := status.usage.(overrideUsageGateway); ok {
-				usage, err = override.FetchAt(ctx, home, baseURL)
+				usage, err = status.fetchProbe(ctx, func() (quotamodel.Usage, error) {
+					return override.FetchAt(ctx, home, baseURL)
+				})
 			} else {
 				err = errors.New("quota base URL override is not supported")
 			}
@@ -64,7 +62,9 @@ func (status *Status) cachedAvailabilityUsageAtPolicy(
 			err = statusNoProxyUnsupported()
 		}
 	default:
-		usage, err = status.usage.Fetch(ctx, home)
+		usage, err = status.fetchProbe(ctx, func() (quotamodel.Usage, error) {
+			return status.usage.Fetch(ctx, home)
+		})
 	}
 	if err == nil {
 		if baseURL == "" {
