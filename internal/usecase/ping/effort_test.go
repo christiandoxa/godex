@@ -47,3 +47,23 @@ func TestNormalizePingEffortFallsBackToProviderDefaultForUnknownModel(t *testing
 		t.Fatal("provider-default unsupported effort unexpectedly accepted")
 	}
 }
+
+func TestProdex04358PingDynamicCatalogVisibilityIsExact(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("CODEX_HOME", home)
+	// Prodex only accepts an absent visibility or an ASCII-case-insensitive
+	// exact "list"; an empty or whitespace-padded value is not "list".
+	cache := `{"models":[
+        {"slug":"empty-visibility","visibility":""},
+        {"slug":"padded-visibility","visibility":" list "},
+        {"slug":"other-visibility","visibility":"hide"},
+        {"slug":"uppercase-listed","visibility":"LIST"},
+        {"slug":"missing-visibility"}]}`
+	if err := os.WriteFile(filepath.Join(home, "models_cache.json"), []byte(cache), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	models := pingDynamicModels()
+	if len(models) != 2 || models[0].id != "uppercase-listed" || models[1].id != "missing-visibility" {
+		t.Fatalf("visible model ids = %#v, want uppercase-listed and missing-visibility", models)
+	}
+}

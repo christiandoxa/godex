@@ -152,8 +152,9 @@ func pingDynamicModels() []pingModelCatalog {
 		if hidden, present := rawBool(raw, "hidden"); present && hidden {
 			continue
 		}
-		visibility := dynamicString(raw, "visibility")
-		if visibility != "" && !asciiEqualFold(visibility, "list") {
+		var visibility *string
+		if json.Unmarshal(raw["visibility"], &visibility) == nil && visibility != nil &&
+			!asciiEqualFold(*visibility, "list") {
 			continue
 		}
 		label := dynamicString(raw, "display_name", "displayName")
