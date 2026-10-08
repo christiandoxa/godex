@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -82,5 +83,36 @@ func TestProdex04356RunOpenAICompatibleProfileWithOptionsUsesRuntimeProxy(t *tes
 		process.endpoint != "http://127.0.0.1:1234" ||
 		!strings.Contains(strings.Join(process.arguments, "\n"), "exec") {
 		t.Fatalf("compatible child = home:%q endpoint:%q args:%#v", process.home, process.endpoint, process.arguments)
+	}
+}
+
+type compatibleOverrideProcess struct {
+	fakeProxyProcess
+	directHome string
+	directArgs []string
+}
+
+func (process *compatibleOverrideProcess) RunRuntimeDirect(_ context.Context, home string, args []string, _ bool) error {
+	process.directHome = home
+	process.directArgs = append([]string(nil), args...)
+	return nil
+}
+
+func TestOpenAICompatibleProfileUserProviderOverrideUsesDirectCodex(t *testing.T) {
+	home := t.TempDir()
+	process := &compatibleOverrideProcess{}
+	runner := NewRunner(nil, process, func(proxymodel.Config) (Proxy, error) {
+		t.Fatal("user provider override unexpectedly created a runtime proxy")
+		return nil, nil
+	})
+
+	arguments := []string{"-c", `model_provider="custom"`, "exec", "hello"}
+	if err := runner.RunOpenAICompatibleProfileWithOptions(
+		t.Context(), home, "https://example.test/v1", arguments, RuntimeLaunchOptions{},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if process.directHome != home || !reflect.DeepEqual(process.directArgs, arguments) {
+		t.Fatalf("direct launch = home:%q args:%#v", process.directHome, process.directArgs)
 	}
 }

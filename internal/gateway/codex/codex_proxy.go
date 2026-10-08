@@ -101,7 +101,7 @@ func (process *CodexProcess) runThroughProxy(
 		return err
 	}
 	defer release()
-	command := exec.CommandContext(ctx, binary, arguments...)
+	command := terminalCommand(ctx, binary, arguments)
 	command.Env = proxyChildEnvironment(codexHome, provider, process.sharedCodexHome)
 	command.Stdin = process.terminal.Stdin
 	command.Stdout = process.terminal.Stdout

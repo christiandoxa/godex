@@ -33,7 +33,7 @@ func quotaValue(value any) bool {
 
 func quotaFieldValue(key string, value any) bool {
 	switch key {
-	case "code", "type", "error_code", "status", "reason":
+	case "code", "type", "error", "error_code", "status", "reason":
 		text, ok := value.(string)
 		return ok && quotaCode(text)
 	default:

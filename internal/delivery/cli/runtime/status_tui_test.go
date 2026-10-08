@@ -33,6 +33,17 @@ func TestStatusTUIViewAndKeys(t *testing.T) {
 	}
 }
 
+func TestStatusTUIUsesSnapshotTimestampOnce(t *testing.T) {
+	model := newStatusTUIModel(context.Background(), newCLIActivity(), time.Second)
+	updated, _ := model.Update(statusSnapshotMsg{
+		overview: runtimemodel.Overview{UpdatedAt: "2026-10-01 12:34:56"},
+	})
+	view := updated.(statusTUIModel).View()
+	if strings.Count(view, "Updated:") != 1 || !strings.Contains(view, "Updated: 2026-10-01 12:34:56") {
+		t.Fatalf("status TUI timestamp = %q", view)
+	}
+}
+
 func mustOverview(t *testing.T) runtimemodel.Overview {
 	t.Helper()
 	overview, err := newCLIActivity().Overview(context.Background())

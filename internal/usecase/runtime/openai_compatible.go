@@ -51,6 +51,9 @@ func (runner *Runner) RunOpenAICompatibleProfileWithOptions(
 	if err != nil {
 		return err
 	}
+	if _, found := providerConfigValue(arguments, "model_provider"); found {
+		return runner.RunDirectProfileWithOptions(ctx, home, arguments, options)
+	}
 	provider, err := OpenAICompatibleRewriteProvider(baseURL)
 	if err != nil {
 		return err

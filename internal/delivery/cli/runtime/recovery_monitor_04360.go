@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/json"
 	"io"
 	"os"
@@ -15,11 +16,10 @@ import (
 
 const recoveryScanCap04360 int64 = 1 << 20
 const recoveryLineCap04360 = 64 << 10
+const recoveryCheckpointProbeBytes04360 int64 = 4096
 
-// A checkpoint starts at the current logical end. Historical errors
-// never authorize a new model turn. Compressed, symlinked, missing or
-// non-regular rollouts remain ineligible until their recovery contract is
-// independently implemented.
+// A checkpoint starts at the current logical end. Historical errors never
+// authorize a new model turn. Prefix hashes also reject same-file rewrites.
 type recoveryCheckpoint04360 struct {
 	path        string
 	origin      os.FileInfo
@@ -48,7 +48,22 @@ func captureRecoveryCheckpoint04360(path string) recoveryCheckpoint04360 {
 			compressed: true, baselineSHA: sha256.Sum256(baseline),
 		}
 	}
-	return recoveryCheckpoint04360{path: path, origin: info, offset: info.Size(), valid: true}
+	source, err := os.Open(path)
+	if err != nil {
+		return recoveryCheckpoint04360{}
+	}
+	defer source.Close()
+	opened, err := source.Stat()
+	if err != nil || !opened.Mode().IsRegular() || !os.SameFile(info, opened) {
+		return recoveryCheckpoint04360{}
+	}
+	baselineSHA, ok := recoveryPrefixHash04360(source, opened.Size())
+	if !ok {
+		return recoveryCheckpoint04360{}
+	}
+	return recoveryCheckpoint04360{
+		path: path, origin: info, offset: opened.Size(), valid: true, baselineSHA: baselineSHA,
+	}
 }
 
 func (checkpoint recoveryCheckpoint04360) newAcceptedUsageLimit04360(ctx context.Context, sessionID string) bool {
@@ -82,11 +97,52 @@ func (checkpoint recoveryCheckpoint04360) newAcceptedRecoveryClass04360(ctx cont
 	if size <= checkpoint.offset || size-checkpoint.offset > recoveryScanCap04360 {
 		return ""
 	}
+	baselineSHA, ok := recoveryPrefixHash04360(source, checkpoint.offset)
+	if !ok || baselineSHA != checkpoint.baselineSHA {
+		return ""
+	}
 	fragment, err := io.ReadAll(io.NewSectionReader(source, checkpoint.offset, size-checkpoint.offset))
 	if err != nil {
 		return ""
 	}
 	return scanRecoveryClassFragment04360(ctx, sessionID, fragment)
+}
+
+func recoveryPrefixHash04360(source *os.File, size int64) ([32]byte, bool) {
+	if size < 0 {
+		return [32]byte{}, false
+	}
+	hash := sha256.New()
+	var encodedSize [8]byte
+	binary.LittleEndian.PutUint64(encodedSize[:], uint64(size))
+	_, _ = hash.Write(encodedSize[:])
+	probe := size
+	if probe > recoveryCheckpointProbeBytes04360 {
+		probe = recoveryCheckpointProbeBytes04360
+	}
+	prefix := make([]byte, probe)
+	if probe > 0 {
+		read, err := source.ReadAt(prefix, 0)
+		if err != nil && (err != io.EOF || int64(read) != probe) || int64(read) != probe {
+			return [32]byte{}, false
+		}
+		_, _ = hash.Write(prefix)
+	}
+	if size > 0 {
+		start := size - recoveryCheckpointProbeBytes04360
+		if start < 0 {
+			start = 0
+		}
+		window := make([]byte, size-start)
+		read, err := source.ReadAt(window, start)
+		if err != nil && (err != io.EOF || int64(read) != int64(len(window))) || read != len(window) {
+			return [32]byte{}, false
+		}
+		_, _ = hash.Write(window)
+	}
+	var digest [32]byte
+	copy(digest[:], hash.Sum(nil))
+	return digest, true
 }
 
 func scanRecoveryFragment04360(ctx context.Context, sessionID string, fragment []byte) bool {

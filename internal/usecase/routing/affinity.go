@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
 
 const (
@@ -27,6 +29,16 @@ type affinityKeys struct {
 
 func (keys affinityKeys) hasAffinity() bool {
 	return keys.previous != "" || keys.turn != "" || keys.session != "" || keys.thread != ""
+}
+
+func (keys affinityKeys) hasHardAffinity(selection quotamodel.Selection) bool {
+	return keys.previous != "" || keys.turn != "" || keys.thread != "" ||
+		(selection.RouteKind == quotamodel.RouteKindCompact && keys.session != "")
+}
+
+func (keys affinityKeys) hasSoftSessionAffinity(selection quotamodel.Selection) bool {
+	return keys.session != "" && keys.previous == "" && keys.turn == "" && keys.thread == "" &&
+		selection.RouteKind != quotamodel.RouteKindCompact
 }
 
 func (keys affinityKeys) entries() []routingentity.Binding {
@@ -97,6 +109,35 @@ func (store *affinityStore) owner(ctx context.Context, keys affinityKeys, now ti
 	if err := store.loadMissingLocked(ctx, keys, now); err != nil {
 		return "", err
 	}
+	owner, err := store.ownerLocked(keys)
+	if err == nil && owner != "" {
+		entries := make([]bindingEntry, 0, len(keys.entries()))
+		for _, entry := range continuationEntries(keys) {
+			if _, ok := store.values[entry.Key]; ok {
+				entries = append(entries, entry)
+			}
+		}
+		store.touchContinuationEntriesLocked(entries, now, false)
+	}
+	return owner, err
+}
+
+func (store *affinityStore) refreshOwner(ctx context.Context, keys affinityKeys, now time.Time) (string, error) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	store.pruneLocked(now)
+	if store.repository == nil {
+		return store.ownerLocked(keys)
+	}
+	bindings, err := store.repository.Load(ctx)
+	if err != nil {
+		return "", err
+	}
+	keyValues := keys.values()
+	for _, key := range keyValues {
+		delete(store.values, key)
+	}
+	store.loadLocked(bindings, keyValues, now)
 	owner, err := store.ownerLocked(keys)
 	if err == nil && owner != "" {
 		entries := make([]bindingEntry, 0, len(keys.entries()))

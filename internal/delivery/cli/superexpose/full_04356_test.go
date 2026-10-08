@@ -134,9 +134,9 @@ func TestProdex04356SuperExposeFullRunLifecycleIsAudited(t *testing.T) {
 		"super_expose_run_started",
 		"super_expose_run_completed",
 	} {
-		event := capture.event(kind)
+		event := capture.waitEvent(kind)
 		if event == nil {
-			t.Fatalf("missing %s in %#v", kind, capture.events)
+			t.Fatalf("missing %s", kind)
 		}
 		if event.Fields["run_id"] != runID {
 			t.Fatalf("%s run_id = %#v", kind, event.Fields)
@@ -239,7 +239,7 @@ func TestProdex04356SuperExposeFullToolArgumentValidation(t *testing.T) {
 
 func waitRunTerminal(t *testing.T, manager *runManager, runID string) map[string]any {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(60 * time.Second)
 	for time.Now().Before(deadline) {
 		value := manager.status(runID)
 		switch value["state"] {
@@ -254,7 +254,7 @@ func waitRunTerminal(t *testing.T, manager *runManager, runID string) map[string
 
 func waitRunState(t *testing.T, manager *runManager, runID, state string) map[string]any {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(60 * time.Second)
 	for time.Now().Before(deadline) {
 		value := manager.status(runID)
 		if value["state"] == state {

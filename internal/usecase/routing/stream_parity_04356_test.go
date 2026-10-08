@@ -67,6 +67,16 @@ func TestProdex04356DeactivatedWorkspaceSSEIsRetryableBeforeCommit(t *testing.T)
 	}
 }
 
+func TestSSENestedErrorPayloadWithoutTypeIsRetryable(t *testing.T) {
+	outcome, wait := streamOutcome(
+		[]byte(`{"error":{"code":"rate_limit_exceeded"}}`),
+		make(http.Header), time.Unix(0, 0), "openai",
+	)
+	if wait || outcome.kind != responseRetry || !outcome.transient || !outcome.firstEventRetry {
+		t.Fatalf("nested error outcome = %#v, wait=%t", outcome, wait)
+	}
+}
+
 type deactivatedWorkspaceGateway struct {
 	mu      sync.Mutex
 	calls   []string
@@ -92,7 +102,7 @@ func (gateway *deactivatedWorkspaceGateway) Execute(
 func TestProdex04356DeactivatedWorkspaceSSERotatesBeforeCommit(t *testing.T) {
 	first := "data: {\"type\":\"response.queued\"}\n\n" +
 		"data: {\"type\":\"response.failed\",\"response\":{\"error\":{\"code\":\"deactivated_workspace\"}}}\n\n"
-	second := "data: {\"type\":\"response.created\",\"response\":{\"id\":\"response-b\"}}\n\n"
+	second := "data: {\"type\":\"response.output_text.delta\",\"delta\":\"ready\"}\n\n"
 	gateway := &deactivatedWorkspaceGateway{streams: map[string]string{"account-a": first, "account-b": second}}
 	router, err := NewRouter(Config{
 		Gateway:          gateway,

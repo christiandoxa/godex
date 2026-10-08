@@ -275,6 +275,39 @@ func TestTakeWebSocketMessageSessionMatchesAccountAndTurnStateOverride(t *testin
 	}
 }
 
+func TestExecuteWebSocketMessageTurnsReusedSendFailureIntoPrecommitTransport(t *testing.T) {
+	transport, err := NewTransport("http://127.0.0.1", nil, websocketAuth{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer transport.Close()
+
+	connection, peer := net.Pipe()
+	_ = peer.Close()
+	transport.websocketMessageMu.Lock()
+	transport.websocketMessageSessions[44] = websocketMessageSession{
+		connection: connection,
+		accountID:  "profile-a",
+		home:       "synthetic-home",
+		completed:  time.Now(),
+	}
+	transport.websocketMessageMu.Unlock()
+
+	request := websocketMessageRequest(`{"type":"response.create","response":{"previous_response_id":"resp-owner"}}`)
+	request.WebSocketSessionID = 44
+	response, err := transport.ExecuteWebSocketMessage(
+		context.Background(), request,
+		proxymodel.Account{ID: "profile-a", Home: "synthetic-home"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if !response.WebSocketReusedSession || response.FirstEventCommitted || response.PrecommitFailure == nil || !response.PrecommitFailure.Transport {
+		t.Fatalf("reused send failure = %#v", response)
+	}
+}
+
 func TestCloseWebSocketSessionOwnsSessionLifecycle(t *testing.T) {
 	transport, err := NewTransport("http://127.0.0.1", nil, websocketAuth{})
 	if err != nil {

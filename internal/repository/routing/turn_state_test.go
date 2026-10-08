@@ -2,6 +2,7 @@ package routing
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -51,6 +52,52 @@ func TestResponseTurnStatePersistsPrivatelyAndExpires(t *testing.T) {
 		if err != nil || info.Mode().Perm() != 0o700 {
 			t.Fatalf("turn-state directory permissions = %v, %v", info, err)
 		}
+	}
+}
+
+func TestResponseTurnStateSaveRecoversOrphanedAtomicWriteAtCapacity(t *testing.T) {
+	home := t.TempDir()
+	if err := os.Chmod(home, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	directory := filepath.Join(home, responseTurnStateDirectory)
+	if err := os.Mkdir(directory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for i := range responseTurnStateFiles {
+		name := fmt.Sprintf("%064x.json", i)
+		if err := os.WriteFile(filepath.Join(directory, name), []byte("{}"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	orphan := filepath.Join(directory, ".atomic-crash-leftover")
+	if err := os.WriteFile(orphan, []byte("partial"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	key := strings.Repeat("f", 64)
+	store := NewStore(t.TempDir())
+	if err := store.SaveResponseTurnState(context.Background(), home, key, "recovered-save", time.Unix(10_000, 0)); err != nil {
+		t.Fatalf("save after interrupted atomic write: %v", err)
+	}
+	if _, err := os.Lstat(orphan); !os.IsNotExist(err) {
+		t.Fatalf("orphaned atomic file remains: %v", err)
+	}
+	entries, err := os.ReadDir(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateFiles := 0
+	for _, entry := range entries {
+		if strings.HasSuffix(entry.Name(), ".json") {
+			stateFiles++
+		}
+	}
+	if stateFiles != responseTurnStateFiles {
+		t.Fatalf("turn-state file count = %d, want %d", stateFiles, responseTurnStateFiles)
+	}
+	if got, _, err := store.LoadResponseTurnState(context.Background(), home, key, time.Unix(9_999, 0)); err != nil || got != "recovered-save" {
+		t.Fatalf("saved state = %q, %v", got, err)
 	}
 }
 

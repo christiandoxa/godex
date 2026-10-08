@@ -116,3 +116,35 @@ func TestProdex04360ChildExitMonitorRejectsMissingSymlinkAndOversize(t *testing.
 		t.Fatal("cancelled launch scheduled recovery")
 	}
 }
+
+func TestProdex04361ChildExitMonitorRejectsInPlaceStaleRolloutRewrite(t *testing.T) {
+	const session = "019c9e3d-45a0-7ad0-a6ee-b194ac2d44f9"
+	path := filepath.Join(t.TempDir(), "rollout-"+session+".jsonl")
+	if err := os.WriteFile(path, []byte(`{"type":"session_meta","payload":{"id":"`+session+`"}}`+"\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	checkpoint := captureRecoveryCheckpoint04360(path)
+	if !checkpoint.valid {
+		t.Fatal("failed to capture regular rollout checkpoint")
+	}
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	padding := make([]byte, checkpoint.offset)
+	if _, err := file.Write(padding); err != nil {
+		_ = file.Close()
+		t.Fatal(err)
+	}
+	if _, err := file.WriteString(`{"type":"response_item","payload":{"role":"user"}}` + "\n" +
+		`{"type":"error","error":{"code":"usage_limit_reached"}}` + "\n"); err != nil {
+		_ = file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if checkpoint.newAcceptedUsageLimit04360(context.Background(), session) {
+		t.Fatal("in-place rewritten rollout reused stale checkpoint evidence")
+	}
+}

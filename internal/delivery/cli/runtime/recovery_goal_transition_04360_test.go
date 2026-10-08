@@ -18,7 +18,8 @@ func TestProdex04360ActiveGoalTransitionDetectsFreshUsageLimit(t *testing.T) {
 	}{
 		{"active", "usage_limited", 100, 101, true},
 		{"active", "usage_limited", 100, 100, false},
-		{"paused", "usage_limited", 100, 101, false},
+		{"paused", "usage_limited", 100, 101, true},
+		{"blocked", "usage_limited", 100, 101, true},
 		{"active", "completed", 100, 101, false},
 		{"usage_limited", "usage_limited", 100, 100, false},
 	} {

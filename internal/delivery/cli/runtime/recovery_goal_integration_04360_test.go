@@ -41,16 +41,18 @@ func (process *goalOnlyRecoveryProcess04360) Run(_ context.Context, _ string, _ 
 func TestProdex04360GoalTransitionRelauchesKnownSessionWithoutFalseTextMarker(t *testing.T) {
 	const id = "019c9e3d-45a0-7ad0-a6ee-b194ac2d44f9"
 	for _, tc := range []struct {
-		name   string
-		change bool
-		want   int
+		name, before string
+		change       bool
+		want         int
 	}{
-		{"actual goal transition", true, 2},
-		{"old active goal without new limit", false, 1},
+		{"active goal transition", "active", true, 2},
+		{"paused goal transition", "paused", true, 2},
+		{"blocked goal transition", "blocked", true, 2},
+		{"old active goal without new limit", "active", false, 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			home := t.TempDir()
-			dbPath := fixtureGoalDB04360(t, home, id, "active")
+			dbPath := fixtureGoalDB04360(t, home, id, tc.before)
 			db, err := sql.Open("sqlite", dbPath)
 			if err != nil {
 				t.Fatal(err)

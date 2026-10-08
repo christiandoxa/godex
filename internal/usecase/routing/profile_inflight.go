@@ -197,6 +197,14 @@ type profileInflightBody struct {
 	release func()
 }
 
+func (body *profileInflightBody) releaseAdmission() { body.release() }
+
+func releaseProfileInflight(body io.ReadCloser) {
+	if releasable, ok := body.(interface{ releaseAdmission() }); ok {
+		releasable.releaseAdmission()
+	}
+}
+
 type profileInflightDuplexBody struct {
 	*profileInflightBody
 	duplex io.ReadWriteCloser

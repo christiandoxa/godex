@@ -161,8 +161,8 @@ and `crates/prodex-app/src/runtime_tools/usage_limit_recovery.rs`.
   authorize relaunch.
 - Goal database status is checked read-only with parameterized SQLite
   queries. `active`, `paused`, `blocked` and `usage_limited` are
-  resumable; terminal goals cannot be relaunched. A genuine newer
-  `active → usage_limited` database transition can authorize the same
+  resumable; terminal goals cannot be relaunched. A newer transition from
+  `active`, `paused` or `blocked` to `usage_limited` can authorize the same
   guarded continuation even without a free-form error message.
   Missing goal databases still permit standard (non-goal) recovery.
   The SQLite file URI is normalized across Linux/macOS and Windows
@@ -213,8 +213,8 @@ discovered headless `exec` sessions:
 - Before **each** next child launch, Godex checkpoints the same persisted
   Codex rollout and goal database. If that child fails, a subsequent
   recovery requires a *new* accepted-turn structured error or a new
-  `active → usage_limited` goal transition relative to the latest
-  checkpoint. A stale error from an earlier generation never authorizes
+  transition from `active`, `paused` or `blocked` to `usage_limited` relative to
+  the latest checkpoint. A stale error from an earlier generation never authorizes
   another launch.
 - Failed/previously attempted profiles are excluded from the current pool
   pass. Durable session-owner affinity is released before each retarget,

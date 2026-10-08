@@ -121,6 +121,43 @@ func TestDeepSeekResponseToolItemRejectsArgumentsOverTaggedLimit(t *testing.T) {
 	}
 }
 
+func TestProdex04361DeepSeekRTKArgumentsRespectProviderBoundary(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		valueBytes int
+		failed     bool
+	}{
+		{name: "long environment assignment is wrapped", valueBytes: 15 << 20},
+		{name: "scanner-sized assignment exceeds DeepSeek response limit", valueBytes: 17 << 20, failed: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			command := "CACHE=" + strings.Repeat("x", test.valueBytes) + " cargo test"
+			arguments, err := json.Marshal(map[string]string{"cmd": command})
+			if err != nil {
+				t.Fatal(err)
+			}
+			response := executeDeepSeekBufferedResponse(t, map[string]any{
+				"choices": []any{map[string]any{"message": map[string]any{
+					"tool_calls": []any{map[string]any{"function": map[string]any{
+						"name": "shell", "arguments": string(arguments),
+					}}},
+				}}},
+			})
+			if test.failed {
+				if response["status"] != "failed" || !strings.Contains(response["error"].(map[string]any)["message"].(string), "arguments exceeding") {
+					t.Fatalf("oversized RTK response = %#v", response)
+				}
+				return
+			}
+			tool := deepSeekTestTool(t, response)
+			wrapped := strings.Replace(command, " cargo test", " rtk cargo test", 1)
+			if tool["arguments"] != `{"cmd":"`+wrapped+`"}` {
+				t.Fatalf("wrapped long RTK arguments = %#v", tool["arguments"])
+			}
+		})
+	}
+}
+
 func TestDeepSeekResponseDefaultsUseTaggedTimeAndToolID(t *testing.T) {
 	translated, err := deepSeekChatResponse([]byte(`{"choices":[{"message":{"tool_calls":[{"function":{"name":"lookup","arguments":"{}"}}]}}]}`), time.Unix(42, 0))
 	if err != nil {

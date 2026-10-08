@@ -79,6 +79,24 @@ conversion and validates finite nonnegative weights plus signed
 TOML integer bounds before launch; percentage defaults remain correct for large
 valid token limits. These flag conversions remain private to CLI runtime.
 
+### Routing quota refresh
+
+`delivery/http/proxy` extracts a bounded requested model and route kind into the
+quota selection carried by `model/proxy.Request`. `usecase/routing` passes that
+selection through its quota port and caches availability by account, model, and
+route for five minutes. `usecase/quota` owns request-time availability: Responses,
+Compact, and WebSocket routes use the active primary window; Standard retains the
+broad primary/secondary check. Luna uses only its identified reserve bucket, and
+retired Spark models remain unavailable. Runtime launch keeps the broad
+`Availability` operation. Probe errors fail open; cancellation propagates.
+`usecase/routing` ranks eligible accounts by weighted in-flight activity, keeps
+round-robin order among equally loaded accounts, and counts response bodies until
+EOF or close. Responses and WebSocket requests count as two units; Compact and
+Standard count as one. The default soft limit is four units. Fresh cached quota
+failures are skipped only when another eligible profile remains; an all-blocked
+pool fails open to the existing upstream path.
+Full Prodex route scoring and its model-aware pre-send quota gate remain gaps.
+
 
 
 Doctor diagnostics remain a runtime-owned orchestration surface.
@@ -88,13 +106,14 @@ diagnostics. CLI delivery owns flag relationships plus human/JSON/bundle
 formatting; terminal human panels use Bubble Tea. User-selected bundle files are
 persisted through `repository/runtime.DoctorBundleStore`, which enforces a 4 MiB
 ceiling, rejects non-regular targets, and writes atomically with owner-only mode.
-Doctor repair actions use narrow ports rather than embedding filesystem policy in
-delivery. Profile import-journal recovery stays repository-owned. Full Codex
-thread-index repair resolves the active/default home in the profile use case, runs
-shared-session maintenance in `gateway/codex` using the Godex root for its versioned
-cache, then launches Codex app-server reconciliation with the exact active/shared
-home environment. Delivery owns the stderr completion notice and option ordering.
-Policy-suggestion flags still fail closed until their runtime-doctor planner exists.
+`usecase/runtime.Doctor` also consumes a narrow profile-import recovery port.
+`repository/profile` keeps profile-store auth-update journals under its existing
+store lock; journals contain only profile/path/phase metadata, while the prior
+credential file stays inside the profile `CODEX_HOME`. Recovery runs before
+profile-store reads and writes, and doctor can report how many journals it
+recovered. Account-store imports do not use this journal. Full Codex thread-index
+repair and policy-suggestion flags still fail closed until their owning
+subsystems exist.
 
 ### Terminal UI ownership
 
@@ -131,10 +150,7 @@ deduplication, Prodex-compatible profile naming, activation, and create-vs-updat
 policy. `repository/profile` owns private provider-secret persistence and rollback
 of failed metadata updates. Bundle export/import consumes that same boundary:
 Anthropic exports carry `.credentials.json` as a validated provider secret with
-empty `auth_json`. Gemini migration bundles similarly carry one schema-validated
-`gemini_oauth.json`, empty `auth_json`, and the tagged provider email/project
-metadata; persistence still uses the generic private provider-secret boundary,
-not the disabled Gemini runtime. Kiro exports follow the same adapter boundary with required
+empty `auth_json`. Kiro exports follow the same adapter boundary with required
 `kiro_auth.json` plus optional `kiro_model_catalog.json`; `gateway/kiro` validates
 the nested auth JSON and accepted model-catalog shapes without owning profile
 persistence. The same gateway owns built-in Kiro source discovery: it opens the
@@ -148,7 +164,6 @@ whether each optional secret existed before replacement. Copilot bundle handling
 uses the same provider-metadata path with no provider secret files: host/login/API
 and plan metadata are persisted in Godex, while the actual Copilot token remains
 owned by the external Copilot config/keychain boundary. `gateway/copilot` owns
-
 built-in Copilot discovery and is the only layer allowed to touch `config.json`,
 keytar/libsecret/SDK credential fallbacks, or the authenticated user-info request;
 it returns only tokenless provider metadata to `usecase/profile`.
@@ -159,18 +174,6 @@ owns launch-model/config precedence and converts the exact 0.435.1 Copilot catal
 snapshots plus account `/models` metadata into Codex `model_catalog_json`. This
 keeps provider HTTP/auth mechanics out of delivery and keeps filesystem policy
 out of the gateway.
-
-Multi-profile bundle mutation coordination remains in `usecase/profile`, while
-`repository/profile` and `repository/account` own durable journal/backup bytes.
-The lifecycle journal contains only target metadata, before/after provider
-snapshots, active-selection identifiers, and SHA-256 credential digests; secret
-contents stay in private rollback files under the owning managed home. Before
-profile reads or mutations, the use case serializes recovery under the lifecycle
-lock. An `applying` journal is finalized only when every persisted profile/account
-action, expected credential digest, owned promoted home, and active selection
-matches the recorded after-state; otherwise actions roll back in reverse order.
-This mirrors Prodex's crash window around final state persistence without making
-delivery or doctor presentation responsible for transaction semantics.
 
 
 Copilot model fallback stays inside `gateway/copilot`, before a response returns
@@ -214,10 +217,13 @@ details into delivery/use cases. Live Responses/Chat streaming uses a bounded
 producer queue and cancels the ACP child when the consumer closes; activity
 metadata is normalized/redacted before it becomes text or response metadata.
 usecase/runtime owns only provider defaults/catalog launch precedence, while
-usecase/profile owns selected-first pool membership and profile leases. A bounded
-in-memory conversation store is scoped by profile and handles
-previous_response_id/tool-call continuation; it is runtime-only and never
-persists conversation content into profile state.
+usecase/profile owns selected-first pool membership and profile leases. Routing
+keeps bounded affinity caches in memory and writes hashed owner bindings to the
+global routing store. Bounded route-health penalties and route circuits use
+separate versioned snapshots there. Opaque Responses WebSocket turn state stays
+in a 30-minute, 2,048-entry sidecar under its owner's private `CODEX_HOME`; an
+insecure profile home uses only the in-memory cache. Godex does not persist
+request or response bodies.
 
 Anthropic raw API-key launches reuse the same routing/account abstraction without
 turning secrets into profiles. `gateway/claude` resolves request/environment key
@@ -246,14 +252,11 @@ are carried as provider metadata rather than rereading files in the HTTP gateway
 `gateway/deepseek` binds one transport to each key ID, owns URL/auth/local
 Models/Compact routes, and owns the advanced Responses request translator
 (reasoning, primitive controls, strict tools/schema, JSON mode, replay/tool
-history). Shared RTK argument shaping stays in `gateway/chatcompat`. The gateway
-also owns tagged buffered/SSE response translation and native Anthropic Messages
-translation for DeepSeek web search. Native mode switches URL/auth atomically to
-`/anthropic/v1/messages` plus `x-api-key`, performs bounded first-event
-lookahead, and exposes only transport-neutral precommit failure metadata.
-`usecase/routing` owns the resulting credential retry/quarantine decision and
-never replays after stream commitment. The HTTP boundary supplies a monotonic
-request sequence used only for stable provider-stream item identity.
+history). Shared RTK argument shaping stays in `gateway/chatcompat`.
+`gateway/deepseek` also owns Responses/SSE output shaping, web-search modes,
+beta-base routing, and the partial native Anthropic Messages bridge. Exact
+0.435.1 parity for that bridge remains open; delivery and generic routing do not
+own provider translation policy.
 
 Gemini raw-key runtime follows the same routing boundary. `gateway/gemini` owns
 the API-key pool, Gemini OpenAI-compatible URL/auth behavior, and Responses
@@ -268,10 +271,9 @@ fallback; transport errors and invalid summaries go directly to that fallback.
 and Chat response conversion, while Gemini-specific reasoning, metadata, tool
 shapes, and thought signatures stay in the Gemini gateway. Native Messages and
 Embeddings requests retain their paths and use `x-goog-api-key`; Responses and
-Chat use the OpenAI-compatible endpoint with Bearer <redacted> The canonical
-Gemini model catalog lives in `model/proxy`; `gateway/gemini` serves tagged GET
-Models list/single requests locally and leaves non-GET requests on the upstream
-route.
+Chat use the OpenAI-compatible endpoint with Bearer auth. Model catalog data
+lives in `model/proxy`; `gateway/gemini` serves tagged GET list/single requests
+locally and leaves other methods on the upstream route.
 
 ### Quota gateway and preflight
 
@@ -296,13 +298,6 @@ credential-free quota target catalog so aggregate `--auth`/`--provider`
 filtering can include standalone and non-OpenAI profiles without turning them
 into account identities.
 
-For profile-backed quota, `usecase/quota` consumes a narrow Codex
-model-provider inspector. `gateway/codex` reads bounded profile-local
-`config.toml` data and reports a configured non-OpenAI provider before any
-OpenAI usage request is attempted. `gateway/gemini` implements the tagged
-disabled-OAuth quota surface for legacy Gemini profiles; it returns migration
-guidance without credential or network access.
-
 `gateway/quota` owns virtual providers that do not correspond to managed
 profiles. DeepSeek resolves the plural/single API-key environment policy and
 queries bounded `/user/balance` JSON; local quota probes the command-scoped
@@ -326,8 +321,12 @@ provider path retains it. `gateway/copilot` implements the same profile quota
 boundary using the exact host/login account token resolver already used by runtime
 metadata; the token exists only for the bounded user-info request, while quota
 receives login, plan/access, chat/completions counters, reset date, and readiness.
-Managed profile adapters for Gemini/custom-provider quota remain separate outbound
-integrations.
+`usecase/quota` also consumes a narrow Codex model-provider inspector. The
+`gateway/codex` adapter reads bounded `config.toml` data and reports Prodex's
+configured-provider metadata before OpenAI quota probing. `gateway/gemini`
+returns the tagged disabled-OAuth guidance for legacy Gemini profiles; that path
+does not read credentials or make network requests because Gemini keys are
+launch-scoped, not persisted profiles.
 
 The CLI quota delivery package owns watch/once cadence, `--detail`, `--profile`,
 `--auth`, `--provider`, and `--base-url` parsing plus rendering of exact UTC
@@ -403,6 +402,9 @@ The affinity index maps opaque continuation keys to account IDs:
 - session/conversation ID.
 
 It is in-memory, bounded, expiring, and concurrency-safe. It stores no bearer token or request body.
+Returned response turn state is also retained in a separate bounded in-memory
+cache keyed by response ID and owner. The cache uses the affinity lifetime and
+does not write turn-state values to `routing.json`.
 
 ## Commit boundary
 
@@ -562,7 +564,7 @@ rollout/session ownership.
 ## 1:1 expansion boundary
 
 The verified OpenAI/Codex core remains the stability baseline while Godex expands
-toward feature-for-feature Prodex 0.435.1 parity. Remaining multi-provider
+toward the current Prodex 0.436.1 checkpoint (see `docs/PARITY-04361.md`). Remaining multi-provider
 bridges, Super, gateway, richer diagnostics, provider runtime bridges, and any
 still-missing provider-specific import/bundle surfaces remain implementation backlog
 rather than permanent exclusions.
@@ -588,12 +590,12 @@ domain-second layout. Session helpers remain private to their owning packages.
 The composition root injects the runtime launcher through a narrow consumed
 interface; session workflows do not import the runtime use-case implementation.
 
-Repeat login and auth-only import update only the existing profile's `auth.json`.
-The account repository backs up credentials privately, atomically replaces them,
-and restores the backup when the metadata write fails before commitment. Native
-configuration, sessions, history, and Codex-owned databases remain in place.
-New accounts still promote their complete staged home. No generic file-copy
-helper is needed for this account-specific credential transaction.
+Repeat login and duplicate `profile import-current` update only the existing
+account's `auth.json`. A new `profile import-current` stages a private copy of
+the current Codex home, then promotes that tree for the new account. The account
+repository backs up credentials privately, atomically replaces them, and
+restores the backup when the metadata write fails before commitment. Duplicate
+imports preserve the managed configuration, sessions, history, and databases.
 
 Profile mutations write a versioned, metadata-only transaction journal before
 changing a home or credentials. Reads and mutations recover an interrupted
@@ -644,8 +646,19 @@ propagate before commitment rather than becoming successful truncated bodies.
 
 Responses cannot re-enter routing after delivery commits headers. Truncated
 upstream streams abort downstream HTTP using `http.ErrAbortHandler`; they are
-not closed as successful chunked responses and are never replayed. Unexpected
-WebSocket upgrades are rejected explicitly; HTTP/SSE is Godex's model transport.
+not closed as successful chunked responses and are never replayed. The loopback
+proxy owns supported WebSocket handshakes and local frame handling. Responses
+text messages each enter `usecase/routing`; routing selects and retries an
+account, while `gateway/openai` handles the upstream exchange and its bounded
+precommit inspection. Delivery relays a committed exchange through its terminal
+event, then releases it before reading the next message. The delivery layer
+assigns one opaque session ID per client tunnel; the OpenAI gateway reuses the
+terminal upstream connection for that tunnel and account, and closes it when
+the tunnel ends. The gateway caps retained connections at 128 and reconnects
+connections idle for more than 60 seconds. An explicit connection-limit event
+on a reused session gets one fresh connection attempt on the same account.
+Response IDs bind continuations to the selected account. Realtime/live paths
+keep the raw frame tunnel. Managed Codex itself stays configured for HTTP/SSE.
 
 ## Durable upstream ownership
 
@@ -659,6 +672,26 @@ snapshot allows 8,192 total bindings; it evicts old opaque response/turn digests
 and refuses new conversations if protected bindings fill the store. Opaque
 entries expire after 30 days. Conflicting concurrent ownership updates fail.
 Per-conversation guards serialize first requests through downstream completion.
+
+Route-health penalties live in a separate versioned `route-health.json` file.
+Route circuits live in `route-circuits.json`. The repository bounds health
+scores to 1,024 entries and circuits to 4,096 entries, and uses an OS guard plus
+atomic replacement. Scores are route-scoped, decay by one point per minute, and
+are ignored after 14 days; later updates prune expired entries. Active circuits
+soften to a half-open probe at startup and reserve one probe atomically. Invalid
+snapshots fail before upstream work. The routing use case owns score changes and
+candidate-order policy; `repository/routing` owns persistence.
+
+HTTP Responses `previous_response_not_found` failures use a separate bounded
+`previous-response-failures.json` snapshot. It stores the account, route, score,
+timestamp, and SHA-256 response-ID digest. The routing use case applies the
+two-failure release threshold, a score cap of 16, one-point decay per 180
+seconds, and 14-day retention; a bound HTTP continuation stays with its owner
+until that threshold. It then releases response, turn, and session affinity and
+excludes that account from fresh candidates for the same response and route.
+The durable snapshot and in-memory cache both retain at most 4,096 newest
+records, with stable key ordering for timestamp ties. WebSocket message retries
+remain pinned to their bound owner.
 
 The routing repository also exposes a first-owner OS guard to the routing use
 case. Independent processes re-read ownership under that guard before an upstream
@@ -685,11 +718,12 @@ use cases remain the owners of registered login and exclusive logout workflows.
 Argument helpers stay private to CLI runtime delivery because they describe that
 transport's command grammar, not a generic technical concern.
 
-The stateless `helper/lockfile` and `helper/fileutil` packages now have two real
-persistence consumers, account and routing, and own only OS locks and durable
-private atomic writes. Running Codex children hold shared profile leases;
-credential mutation/removal requires an exclusive lease. Concurrent native
-children can share a profile without weakening mutation exclusion.
+The stateless `helper/lockfile` package serves account and routing persistence
+with OS locks. `helper/fileutil` owns private atomic writes and safe directory
+copying; profile persistence and the Codex gateway share its private home-copy
+operation. The copy rejects symlinks and special files and creates user-only
+entries. Running Codex children hold shared profile leases; credential
+mutation/removal requires an exclusive lease.
 
 Retained deactivation belongs to the account domain: CLI enable/disable commands
 invoke account use cases, and the account repository updates enablement and

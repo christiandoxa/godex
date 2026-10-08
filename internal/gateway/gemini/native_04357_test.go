@@ -177,6 +177,18 @@ func TestProdex04357GeminiGroundingCitationSourcesAliasIsPreserved(t *testing.T)
 	}
 }
 
+func TestProdex04361GeminiBufferedResponseOmitsEmptyMetadata(t *testing.T) {
+	value := geminiNativeResponsesValue(map[string]any{
+		"responseId": "resp_no_metadata",
+		"candidates": []any{map[string]any{
+			"content": map[string]any{"parts": []any{map[string]any{"text": "ok"}}},
+		}},
+	}, nil, 0)
+	if _, exists := value["metadata"]; exists {
+		t.Fatalf("empty Gemini response metadata = %#v, want omitted", value["metadata"])
+	}
+}
+
 func TestProdex04357GeminiBufferedSpecialToolItemsAndNamespaceMapping(t *testing.T) {
 	root := map[string]any{
 		"responseId": "resp_tools",

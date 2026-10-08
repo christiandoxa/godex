@@ -1,8 +1,12 @@
-# Prodex 0.435.5 parity audit
+# Historical Prodex 0.435.5 parity audit
+
+The current parity checkpoint targets Prodex `0.436.1`; see
+[`PARITY-04361.md`](PARITY-04361.md). This document preserves the earlier
+0.435.5 audit and its historical evidence.
 
 Reference: exact Prodex tag `0.435.5`, commit
 `24223c315e7a30f527328f62c632a481411552cb`. The tag's `Cargo.toml` declares
-`0.435.5`, and its compatibility audit names Codex `rust-v0.160.0` at commit
+`0.435.5`, and its compatibility audit retains Codex `rust-v0.160.0` at commit
 `a956835d020762cb2b570053af06f643a11c0ecc`. Comparison reads use tagged Prodex
 Git objects rather than the mutable Prodex checkout. The audited Codex commit is
 not present in this local checkout, so it is treated as release-audit evidence
@@ -11,9 +15,25 @@ evidence below that names `0.434.2`/`0.159.2` remains evidence for that earlier
 checkpoint, not the current parity target.
 
 
+## 0.435.4 runtime reliability delta
+
+Prodex `0.435.4` adds no user-facing command surface. Its runtime contract makes
+compatible retryable profile viability authoritative over transient-failure
+flags and precommit attempt bookkeeping. Fresh Responses, Standard HTTP, Compact,
+and fresh WebSocket work must wait and reselect while a compatible retryable
+profile remains. Selection must be reevaluated after every wait, including
+request-local exclusions and current profile state. Hard continuation affinity
+still fails closed, and an authoritative all-zero quota pool remains terminal.
+
+At that historical checkpoint, this contract was not yet closed in Godex. In particular,
+Godex's current fresh route still stops at its 64-attempt boundary, and its
+recovery loop retains the initial candidate snapshot after a wait. Compact's
+request-local quota fallback decision and WebSocket's fresh-message recovery
+also require independent parity checks.
+
 ## 1:1 parity expansion
 
-The project target is now feature-for-feature parity with Prodex `0.435.5`, not
+The historical project target was feature-for-feature parity with Prodex `0.435.5`, not
 only the historical OpenAI/Codex core boundary. The core closure below remains a
 verified baseline while additional surfaces are implemented. Current expansion
 checkpoints add standalone/external profile registration and copy workflows,
@@ -68,31 +88,41 @@ and closed these gaps:
 | Capability | Godex implementation and observable coverage |
 | --- | --- |
 | Isolated ChatGPT accounts | Official Codex interactive/device login, per-account homes, identity deduplication, deterministic and unambiguous selectors. Account/auth tests cover registration and selection. |
-| Safe profile lifecycle | Repeat login/import replaces credentials while retaining native state. Metadata-only single-auth and multi-profile lifecycle journals recover interrupted operations, infer a fully persisted commit before cleanup, or roll partial actions back in reverse while restoring profile/account selection. Owned OS locks and shared profile leases exclude concurrent credential mutation/removal. |
+| Safe profile lifecycle | Repeat login/import replaces credentials while retaining native state. Metadata-only journals recover interrupted operations; owned OS locks and shared profile leases exclude concurrent credential mutation/removal. Account repository tests cover recovery, leases, and unsafe paths. |
 | Account retention and native auth | Enable/disable retains the home. Managed status/logout bypass quota/rotation; logout uses an exclusive lease. Unsafe mutating auth passthrough is rejected with managed-command guidance. |
 | Session discovery and launch | Bounded metadata catalog, list/current filters, text/JSON/ID/resume-command output, unique prefixes, and bare UUID resume. Native name/`--last` lookup follows Codex 0.160.0 source/preview semantics across managed profiles. Bare native resume/fork keeps Codex's own picker UI while the tagged Prodex runtime-state manifest is projected onto one shared Codex root; `auth.json` and `.credentials.json` remain profile-local while config/history/session/index/tooling state is shared. Delivery/session/runtime plus exact Codex app-server tests cover the global view and argument preservation. |
-| Quota and fresh selection | One-shot compact/detailed usage windows, single-profile raw JSON, reset timestamps, fail-open probe uncertainty, deterministic bounded selection, and temporary exhaustion deadlines. Explicit selectors remain fixed. Quota/runtime tests cover exhaustion, uncertainty, and reset eligibility. |
+| Quota and fresh selection | One-shot compact/detailed usage windows, single-profile raw JSON, reset timestamps, fail-open probe uncertainty, deterministic bounded selection, and temporary exhaustion deadlines. If current candidates fail before commitment, routing refreshes launch-excluded profiles using the bounded request model and route; results stay fresh for five minutes per account/model/route. Responses, Compact, and WebSocket use the primary window, Standard uses both windows, and Luna reserve quota stays model-specific. Explicit selectors remain fixed. Launch preflight still uses broad primary/secondary windows. |
 | Managed Codex configuration | HTTP/SSE Responses provider keeps native account/bootstrap HTTPS. Managed config enters the innermost exec scope; user overrides retain precedence. Routing/auth-store overrides, quoted/equals forms, whole provider tables, OSS/local providers, and remote app-server routing cannot bypass it. The Codex delimiter preserves literal arguments. |
-| Durable conversation ownership | Hashed, bounded, versioned bindings survive restart/cache expiry. Requested owners beyond cache capacity resolve correctly. Independent routers serialize first-owner selection under an OS guard. Native picker/name/last resumes keep the rollout home and the enabled owner pool; explicit account scope remains fixed. |
-| Safe HTTP rotation and streaming | Selected bearer and ChatGPT routing ID replace caller credentials. Bounded retries occur only before commitment. Known continuations preserve their owner; unknown opaque continuations fail closed. Streams flush and preserve bytes/headers/trailers; committed failures abort downstream without replay. HTTP/routing tests cover chains, concurrency, restart, and real broken streams. |
+| Durable conversation ownership | Hashed, bounded, versioned owner bindings survive restart/cache expiry. Opaque Responses WebSocket turn state survives router restart in a 30-minute, 2,048-file sidecar under its owning private `CODEX_HOME`; insecure homes use only memory. Requested owners beyond cache capacity resolve correctly. Independent routers serialize first-owner selection under an OS guard. Native picker/name/last resumes keep the rollout home and enabled owner pool; explicit account scope remains fixed. |
+| Safe HTTP rotation and streaming | Selected bearer and ChatGPT routing ID replace caller credentials. Bounded retries occur only before commitment. Account-level response retry deadlines survive router restart and clear after success. Route-scoped transport cooldowns persist and rank candidates by remaining delay. Known continuations preserve their owner; unknown opaque continuations fail closed. Responses HTTP retries an exact invalid previous-response ID once on its bound owner only with session metadata and reconstructable full history; otherwise it preserves the original response. Streams flush and preserve bytes/headers/trailers; committed failures abort downstream without replay. HTTP/routing tests cover chains, recovery guards, concurrency, restart, and real broken streams. |
 | Native process and installation surfaces | Native Codex owns models, tools, sandbox/approval behavior, session replay, queue execution, agents, mcp-server, app-server, exec-server, and token refresh. Godex preserves safe foreground arguments and meaningful child exit status; routing escapes fail before launch. Existing checksum installers and release naming remain intact; no installation/release files changed in this audit. |
+| Current-home account import | New imports copy the native Codex home into an isolated managed account. Duplicate identities update authentication and preserve the existing managed home. `--insecure` bypasses the source-home permission check. Gateway and use-case tests cover full-state copy, private staging, identity updates, and cleanup. |
 
 ## Gaps closed by these checkpoints
 
 - `09d5cec` and `9fa089b` close the remaining native session-name/`--last`/picker gap against Codex `rust-v0.160.0`. Name lookup is case-sensitive, active-session only, uses the native `cli`/`vscode` source set, and falls back from thread name to the first user-message preview. The native picker itself is not reimplemented: Godex prepares one shared Codex state root before launch and leaves the exact native picker in control. `CODEX_SQLITE_HOME` points at that root only after sharing is established. An opt-in integration regression runs the exact local Codex 0.160.0 app-server and proves `thread/list` launched from one profile sees picker-visible rollouts imported from two managed profiles.
 - `44673d8` aligns that shared runtime state with the exact Prodex `0.435.5` manifest rather than sharing only picker-critical files. Sessions, archives, attachments, shell snapshots, memories, rules, skills, agents, plugins, tagged static files, dynamic SQLite families, and valid profile-v2 configs are linked through the shared root; `config.toml` is accepted only when its link targets the configured shared root, while `auth.json` and runtime-local `.credentials.json` remain profile-local. `history.jsonl` uses the tagged 64 MiB bounded first-occurrence dedup/timestamp merge. Non-history file authority follows profile creation order, and migration from a legacy directory symlink copies its target without deleting that legacy target. Independent regressions plus sensitivity mutations lock history merging, legacy-target preservation, creation-order authority, and shared-config target binding.
-- `2176248` closes full native-home `profile import-current` parity against
-  Prodex `0.435.5`: a new identity copies the current Codex home into its
-  isolated managed home while omitting only the installer-owned root `packages`
-  directory; a duplicate identity refreshes authentication without replacing
-  existing managed native state, and the resulting profile is activated in the
-  same repository transaction. Source files and permissions are never mutated.
-  Trusted readable source homes are accepted, group/other-writable parents and
-  non-private `auth.json` are rejected by default, and `--insecure` bypasses
-  those trust-permission checks without permitting symlink traversal. Copy
-  regressions cover metadata preservation, disappearing files, in-root regular
-  symlinks, escaping/broken links, special entries, destination cleanup, strict
-  name collisions, duplicate auth-only refresh, and the real CLI production path.
+- Retryable response cooldowns previously lived only in router memory. Godex
+  now persists account-level deadlines in a bounded, versioned
+  `retry-backoff.json` sidecar, restores active entries at startup, and clears
+  them after a successful response. Repository locks and atomic writes protect
+  updates; tests cover restart, expiry, concurrent writes, and success clearing.
+  Tagged reference: [health backoff](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-app/src/runtime_proxy/health_backoff.rs)
+  and [health commit](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-app/src/runtime_proxy/health_commit.rs).
+- Recognized transport failures now persist per account and route in a bounded,
+  versioned `transport-backoff.json` sidecar. Cooldowns start at 15 seconds,
+  double to 120 seconds, soften to 15 seconds after restart, and clear after
+  same-route success. Fresh recovery waits for the cooldown and candidate
+  ranking defers the backed-off account while retaining it as a fallback.
+  Tests cover transport classification, restart, route isolation, growth, and
+  expiry. Tagged reference: [transport failure classification](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-app/src/runtime_proxy/transport_failure.rs),
+  [backoff policy](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-app/src/runtime_proxy/health_backoff.rs),
+  and [runtime constants](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-app/src/core_constants.rs).
+- `profile import-current` previously copied only `auth.json`. It now follows
+  Prodex `0.435.2`'s `copy-current` flow: new accounts receive a private native
+  home copy, while a duplicate identity refreshes authentication and keeps its
+  managed state. `--insecure` bypasses the source directory permission check;
+  symlinks remain rejected. Tagged source: [CLI arguments](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-cli/src/profile.rs#L77-L87), [import-current dispatch](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-app/src/profile_commands/import_export/import.rs#L97-L105), [copy path](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-app/src/profile_commands/manage/add_profile.rs#L64-L73), and [duplicate auth update](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-app/src/profile_commands/manage.rs#L132-L230).
 - Strict capability checking previously used a command that rejected
   `--strict-config`. It now uses `exec-server --listen stdio`, closed stdin,
   a temporary home and working directory, and a ten-second deadline. Relative
@@ -102,6 +132,14 @@ and closed these gaps:
 - Root option values and generated config previously hid native commands from
   dispatch. Session intent now crosses delivery into the use case through
   `model/session.Launch`, without reparsing CLI placement in the use case.
+- Responses HTTP now recovers an exact invalid previous-response ID once on its
+  bound owner when session metadata and reconstructable full history are present.
+  It removes that stale response binding and its profile turn-state sidecar;
+  incomplete follow-ups keep the original response. Tests cover JSON and SSE
+  failures, ownership, near-match errors, and the one-retry limit. Tagged source:
+  [request shape](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/mojo/prodex_core/runtime_proxy_request.mojo),
+  [HTTP recovery](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-app/src/runtime_proxy/responses/attempt.rs),
+  and [recovery tests](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-app/tests/support/main_internal/runtime_proxy_continuations/http_followups/invalid_previous_response_id.rs).
 - Native picker resumes previously restricted the upstream pool to the rollout
   home and applied fresh-work quota selection. Home and pool are now independent.
 - Loading more durable bindings than the cache could evict the requested owner.
@@ -120,122 +158,133 @@ policy stays in `usecase/routing`, persistence/OS guards in
 `repository/routing`, and native launch in `gateway/codex`. The existing
 `helper/lockfile` supplies the shared technical primitive; no new shared helper,
 dependency, daemon, or background worker was introduced by those checkpoints.
-Final closure adds only `helper/sse`, a technical framing parser with real
-consumers in routing and HTTP delivery. Quota classification stays in the routing
-use case; HTTP delivery owns stream commitment and forwarding. Import decoding
-stays private to the Codex gateway, journal recovery stays in account persistence,
-and eligibility validation stays in the runtime use case.
+The earlier core closure added only `helper/sse`, a technical framing parser
+with real consumers in routing and HTTP delivery. Quota classification stays in
+the routing use case; HTTP delivery owns stream commitment and forwarding.
+Import decoding stays private to the Codex gateway, journal recovery stays in
+account persistence, and eligibility validation stays in the runtime use case.
 
 ## Remaining 1:1 parity gaps
 
 - Prodex `0.435.5` is the exact parity baseline. Its audited Codex target remains
   `rust-v0.160.0`; the accepted minimum remains 0.153.2. Prodex `0.435.5` adds no
   new user-facing surface; its WebSocket hard-affinity quota-replay delta is closed
-  below. The inherited 0.435.2
-  auto-rotation reliability behavior is now covered on Godex HTTP production
-  paths: 1% quota remains usable, authoritative all-zero pools do not dispatch,
-  structured rate limits, overloads, and precommit transport failures recover
-  across repeated sweeps, recovery sweeps are not a terminal attempt cap,
-  cancellation remains terminal, and committed streams are never replayed.
-  Individual recovery waits remain bounded while the overall retry epoch may
-  continue as long as a retryable profile remains. Prodex 0.435.3 additionally
-  removes user-visible local-capacity deadlines in favor of wait-and-resume
-  backpressure with eligibility re-evaluation. Godex now applies that contract to
-  global active-request admission: the host-derived Prodex default computes
-  worker/long-lived capacity from available parallelism and yields a 64-84 request
-  ceiling; excess callers queue instead of being rejected, cancellation stops
-  queued work without upstream dispatch, and a production-path 32-caller/limit-1
-  regression verifies
-  serialization with zero local saturation failures. Per-profile hard admission
-  now follows the tagged default hard limit of 8 with Responses/WebSocket weight 2
-  and Compact/Standard weight 1; permits live through response-body/duplex close,
-  hard affinity bypasses the cap while remaining counted, capacity release wakes
-  waiting work, and each wait epoch reloads profile eligibility so an unavailable
-  saturated profile can yield to another profile. Global and per-route lane
-  admission are acquired atomically, so a waiter on a saturated Responses lane
-  does not consume a free global slot; lane defaults follow the tagged
-  parallelism/global policy and saturated lanes wait for release or cancellation
-  instead of returning local overload. Prodex's separate bounded long-lived worker
-  queue has no Godex resource-equivalent: Godex's net/http request goroutine waits
-  directly at the global+lane admission boundary, so there is no independent
-  queue-full deadline that can surface to the caller. The local WebSocket
-  frame/message protocol layer now mirrors Prodex's tungstenite 0.30.0 server
-  defaults and validation for 16 MiB frames, 64 MiB messages, masking/reserved
-  bits/opcodes, fragmented UTF-8 text, control frames, and close payload/code
-  handling. The internal OpenAI upstream per-message transport now also matches
-  the tagged Responses-WebSocket mechanics for session reuse/turn-state override,
-  8 KiB fresh precommit promotion, 512 KiB hard-affinity fail-closed buffering,
-  8-second precommit and 300-second committed idle timing, non-leaking precommit
-  failures, retry-vs-terminal event separation, response-header turn state,
-  connection-limit reuse recovery, and reset-on-failed/incomplete terminal events.
-  Prodex 0.435.4 additionally makes profile viability authoritative across
-  precommit-budget boundaries. Godex fresh recovery now reloads the account source
-  and rebuilds its candidate/retryable set after each recovery wait, so a newly
-  selectable profile can replace a stale candidate even when no transient-failure
-  flag was recorded. The no-transient wait path has an explicit regression.
-  Compact now also respects request-local exclusions when deciding whether quota
-  fallback is exhausted: a profile already failed/excluded in the same request is
-  not counted again merely because it remains globally eligible. This is scoped
-  to Compact and leaves ordinary Responses recovery unchanged. Fresh WebSocket
-  messages inherit the same 0.435.4 viability rule through the generic fresh
-  recovery path: a retryable profile may wait/reselect without a transient flag,
-  while a known previous-response owner remains hard-affinity/fail-closed during
-  backoff. Dedicated regressions lock both behaviors.
-  The public Responses WebSocket entrypoint is now enabled for the tagged
-  Responses paths: Godex performs the local 101 handshake from the client key,
-  rejects binary messages without ending the session, routes each text message
-  through the existing owner-aware router under one stable local WebSocket
-  session id, releases the upstream message session on local close, and closes
-  active public tunnels during proxy shutdown. Known-owner
-  `previous_response_not_found` is now handled on the production message path:
-  semantic locked-affinity or upstream turn-state recovery retries the same owner
-  on the tagged 75/200/500 ms schedule, trusted-owner continuations without a
-  retry reason fail closed immediately, turn-state overrides are not truncated by
-  a Godex-only 4 KiB cap, and terminal stale failures are translated to the tagged
-  409 `stale_continuation` WebSocket shape without leaking the raw upstream code;
-  the local socket remains usable for the next message. Fresh upstream WebSocket
-  connect quota failures now also match the tagged auto-redeem policy: a context-free
-  fresh message may redeem the same profile once before retrying that profile,
-  while message-level quota failures and requests carrying previous/session/turn
-  context do not trigger auto-redeem and instead continue through quota fallback/
-  affinity policy. The tagged invalid-previous-response compatibility gate is now
-  closed too: exact `invalid_request_error` + "Invalid `previous_response_id`."
-  events are distinguished from ordinary missing-chain failures, the dead response
-  binding is removed without releasing session ownership, eligible previous+session
-  owner matches receive the 400 `previous_response_not_found` full-context replay
-  signal, and a subsequent full-context message remains on that session owner.
-  Non-eligible invalid-ID errors pass through unchanged. Realtime/live WebSocket
-  surfaces now use the same precommit selection path for their first text frame:
-  the local 101 handshake completes before any upstream profile is selected, the
-  first text establishes and commits the selected upstream WebSocket without
-  waiting for provider output, and the committed session then pumps text and
-  binary messages bidirectionally. Local client pings receive local pongs,
-  upstream pings receive upstream pongs, and close frames propagate across the
-  committed duplex session. This is covered by gateway and public E2E regressions
-  including multiple client frames while upstream is silent. Quota-triggered
-  WebSocket recovery is now closed as well: a quota-blocked owner with a ready
-  fallback emits the tagged 400 `previous_response_not_found` full-context signal
-  for previous+session continuations, releases only the failed owner's
-  previous/turn/session affinity, and lets the next full-context replay select the
-  ready profile without leaking the upstream quota event. Session-only affinity is
-  soft and rotates the same request when a fallback is ready. The tagged
-  `Ready` / `LastChance` / `Unavailable` quota-fallback policy is also enforced:
-  a context-free session may use one otherwise-healthy profile through transient
-  quarantine/backoff without waiting, ordinary context-constrained continuation
-  fallback does not use that last chance, and the profile hard in-flight cap remains
-  authoritative. Prodex `0.435.5` adds one deliberate exception for recovery: when
-  a hard-affinity previous+session continuation is quota-blocked before send, or its
-  owner returns a precommit quota failure, Godex evaluates fallback availability as
-  a future full-context request. A `Ready` or bounded `LastChance` fallback therefore
-  produces the tagged 400 `previous_response_not_found` signal, releases the failed
-  owner's previous/turn/session affinity, and lets the client's full-context replay
-  bind a healthy profile without waiting through soft quarantine. A hard in-flight
-  cap, fully exhausted pool, or otherwise unavailable fallback remains terminal and
-  retains ownership. Message-level quota never spends an auto-redeem credit. Public
-  E2E regressions cover both response-time A -> signal -> reconnect/full-context -> B
-  and the new pre-send blocked-owner path. With Responses, Realtime/live, stale/invalid
-  continuation handling, commitment, backpressure, and quota recovery all closed, the
-  Prodex 0.435.5 WebSocket surface is now considered parity-complete.
+  by the checkpoint below. The inherited reliability work continues to prove that
+  quota-aware rotation does not leak local admission failures. Godex now
+  proves through production paths that 1% remaining quota stays selectable,
+  all-zero quota stops before launch/dispatch, structured rate-limit 429 and
+  its cooldown recovers, overload 503 and precommit transport failures recover
+  across repeated sweeps, bare 429 passes through, cancellation stops recovery,
+  known affinity stays with its owner, and committed streams are not replayed.
+  Responses and standard HTTP tests capture attempt order; Compact captures the
+  full retry sequence; a fake-clock Responses test crosses more than 30 seconds
+  of simulated retry backoff. Godex continues recovery while a transiently
+  failing profile remains quota-usable, matching Prodex `0.435.4`; each wait is
+  capped at 30 seconds. Pool exhaustion and request cancellation remain terminal.
+  Godex has no request-time quota-probe worker, so the same-request cold-start
+  probe race does not apply. It ranks weighted in-flight work using Prodex's
+  default soft limit of four units: Responses and WebSocket requests count
+  twice, while Compact and Standard count once. Above-limit accounts rank
+  behind lower-load candidates. Godex still lacks Prodex's local-overload
+  pressure mode and capacity-admission wait. Responses WebSocket now routes
+  each client text message through the routing use case, binds response IDs to the selected
+  account, retries eligible precommit failures, and streams committed frames
+  through their terminal event. The OpenAI gateway holds at most 64 KiB or 64
+  precommit events; Realtime/live paths retain the raw tunnel. Responses
+  messages reuse terminal upstream sessions per client tunnel and selected
+  account, with a 128-session bound and 60-second idle reconnect. Godex retries
+  an explicit connection-limit event on a reused session once with a fresh
+  connection on the same account. WebSocket precommit quota failures use the
+  configured auto-redeem retry path. For a known-owner
+  `previous_response_not_found`, Godex retries the owner up to three times
+  with returned turn state at 75 ms, 200 ms, and 500 ms, then preserves the
+  upstream retryable event and retains that request's affinity. Prodex applies a stateful policy: it may retry the owner
+  and, when it classifies the WebSocket continuation as stale, fails closed
+  without releasing locked affinity; rotation releases affinity separately.
+  Godex now retains that owner for a later full-context replay. HTTP Responses
+  also persist route-scoped `previous_response_not_found` scores using a hashed
+  response ID, with Prodex's threshold of two failures, score cap of 16,
+  one-point decay per 180 seconds, and 14-day retention. A bound HTTP
+  continuation stays with its owner until the second failure reaches the
+  threshold; Godex then releases response, turn, and session affinity. Fresh
+  candidates exclude that account for the same response and route while its
+  score remains active. The bounded snapshot and in-memory cache retain the
+  4,096 newest records. This covers the HTTP
+  negative-cache threshold and release path; WebSocket retries remain pinned to
+  their owner, and same-request cross-owner retry remains open. Prodex's
+  [negative-cache recording](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-app/src/runtime_proxy/continuation.rs#L467-L568)
+  and [candidate exclusion](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-app/src/runtime_proxy/selection/previous_response/discovery.rs#L119-L140)
+  plus the [score and decay limits](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-app/src/core_constants.rs#L108-L151)
+  and [score retention](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-runtime-store/src/lib.rs#L36)
+  establish that policy.
+  Its [orchestration policy](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-app/src/runtime_proxy/previous_response_orchestration.rs)
+  and [Codex full-context recovery test](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-app/tests/support/main_internal/runtime_proxy_continuations/websocket_invalid_previous_response.rs)
+  establish the client replay workflow.
+  Hard-affinity continuations bypass launch-time `EligibleAfter` blocking and
+  auto-redeem, so Godex sends the message to its bound owner, matching Prodex's
+  [WebSocket gate](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-app/src/runtime_proxy/websocket/response_tracking/quota_gate.rs#L24-L98)
+  and [shared quota decision](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-app/src/runtime_proxy/quota/gate.rs#L188-L311).
+  Prodex `0.435.5` adds a recovery exception to that hard-affinity rule: a
+  quota-blocked previous+session owner with a legal future full-context fallback
+  returns 400 `previous_response_not_found`, releases only that exhausted owner's
+  previous/turn/session affinity, and lets the client's full-context replay bind
+  another profile. Fallback availability for this signal is evaluated without the
+  stale continuation constraint, so one bounded `LastChance` profile may bypass
+  soft quarantine/circuit pressure; the hard in-flight cap and a truly unavailable
+  pool remain terminal. Pre-send blocked-owner regressions and the public WebSocket
+  production path lock this `0.435.5` behavior.
+  Fresh work refreshes launch-excluded profiles after current candidates fail
+  before commitment; the bounded request model and route select availability,
+  and the five-minute cache follows the reference's quota-cache freshness
+  interval. Luna reserve capacity applies only to Luna; retired Spark remains
+  unavailable. This covers stale-exclusion refresh behavior from Prodex's
+  [model-specific quota pairing](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-quota/src/render/model_capacity.rs#L26-L106)
+  and [route quota gate](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-app/src/runtime_proxy/quota/gate.rs#L188-L311).
+  Godex now orders eligible accounts by weighted in-flight load and rotates
+  equally loaded accounts deterministically. Its default soft limit is four
+  units; Responses/WebSocket use two units per request, and Compact/Standard
+  use one, matching Prodex's [runtime defaults](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-app/src/core_constants.rs#L75-L80)
+  and [route weights](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-runtime-proxy/src/health/inflight.rs#L12-L39).
+  Prodex's candidate plan includes in-flight count plus route health, backoff,
+  quota pressure, and a soft limit
+  ([candidate inputs](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-runtime-proxy/src/selection_plan.rs#L44-L64),
+  [runtime plan construction](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-app/src/runtime_proxy/selection_plan.rs#L236-L313));
+  Launch preflight and routing share five-minute usage snapshots. Warm snapshots
+  provide model- and route-aware quota availability and pressure without another
+  usage fetch; routing skips a cached exhausted account when a ready alternative
+  remains, and fails open when every cached candidate is blocked. A cold cache
+  does not trigger a pre-send probe for otherwise eligible accounts. Candidate
+  order now uses transient backoff time, cached quota pressure, weighted
+  in-flight count,
+  a bounded route-specific health penalty, and deterministic rotation among
+  equal-ranked candidates.
+  Accounts above the in-flight soft limit are deferred while lower-load
+  candidates remain, but stay available as fallbacks. Godex persists route-health
+  penalties for fresh and bound-owner responses in `route-health.json`; scores
+  decay by one point per minute and are ignored after 14 days. Active transient
+  backoff defers a candidate while preserving it as a fallback. Account-level
+  response and route-scoped transport backoffs now persist. Route circuits now
+  persist in `route-circuits.json` per account and route, open at health score 4,
+  and grow from 20 seconds to a 10-minute cap under repeated failures. Restart
+  softens active circuits to a health-scaled half-open probe. The repository
+  reserves one probe atomically, and success clears the circuit. Prodex's
+  broader health and ranking inputs remain
+  open ([candidate inputs](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-runtime-proxy/src/selection_plan.rs#L44-L64),
+  [health updates](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-app/src/runtime_proxy/health_performance.rs),
+  [route-circuit policy](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-app/src/runtime_proxy/health_circuit.rs),
+  [health decay and retention](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-runtime-store/src/profile_backoff/score.rs)).
+  Known-owner WebSocket reused-session transport failures reconnect once on the
+  same account when session turn state is available. A fresh handshake that
+  then reports `previous_response_not_found` retries up to three times on that
+  owner with returned turn state. Response-ID-to-turn-state lookups survive router
+  restarts for 30 minutes in a bounded sidecar under the owning private
+  `CODEX_HOME`; filenames contain response-ID digests, and `routing.json` still
+  contains no raw response IDs or turn-state values. Same-request cross-owner
+  retry remains open.
+  Inbound binary messages receive the tagged error event and client pings
+  receive local pong frames. Full 0.435.5 parity remains open. The 0.435.1
+  provider-catalog and Codex-owned provider/history invariants remain historical
+  evidence and still apply.
 - The `0.435.1` hotfix adds no user-facing command surface; its material Godex
   delta is provider-model policy. Anthropic/Copilot embedded catalogs now come
   directly from the tagged canonical provider catalog, Anthropic defaults are
@@ -258,25 +307,27 @@ and eligibility validation stays in the runtime use case.
   quota/rate 429s advance the model chain; other 429 responses preserve their
   original status and body. Chat Completions uses the OpenAI-compatible
   endpoint; Messages and Embeddings pass through with Gemini API-key headers.
-  GET Models list/single requests serve the exact Prodex 0.435.1 Gemini catalog
-  locally, including tagged alias/case matching and model-not-found 404 behavior;
-  non-GET Models requests still pass upstream. Gemini OAuth runtime/login remains
-  disabled as in the tag. Legacy Gemini OAuth profile quota returns the exact
-  disabled-auth guidance without credential reads or network access. OpenAI
-  profiles with a non-OpenAI Codex `model_provider` expose the tagged configured
-  provider/auth metadata and skip OpenAI quota probing. Gemini OAuth bundle
-  migration is implemented independently of the disabled runtime: plain/encrypted
-  bundles preserve empty `auth_json`, tagged provider email/project metadata, and
-  one validated `gemini_oauth.json`; same-name updates replace metadata and the
-  private secret without creating `auth.json`. Native Antigravity launch and
-  global login now use
-  `PRODEX_AGY_BIN` (default `agy`) with the shared Codex home and tagged child
-  arguments/environment. Native launch skips profile startup and update lookup,
-  prepares the shared home during dry-run without spawning `agy`, rejects resume
-  and unsupported provider options, and preserves child exit status. Child
-  launches hold the shared Codex session lock through process exit. Godex accepts
-  the tagged `s`/`super` Gemini syntax plus its existing `run` spelling. The
-  dry-run TTY panel uses Bubble Tea with the tagged panel fields.
+  GET Models list/single requests serve the Prodex 0.435.1 Gemini catalog locally;
+  missing models return the tagged 404 response and non-GET requests pass upstream.
+  Login remains guidance-only for API keys, and OAuth profiles stay disabled as
+  in the tag. Legacy Gemini profile quota returns the tagged disabled-auth error
+  without a network request. Profile-backed custom model providers now report
+  the tagged configured-provider metadata from bounded Codex config inspection.
+  Gemini OAuth bundles now preserve Prodex `0.435.1`'s required Gemini provider
+  `email`, optional `project_id`, exact `secret_files[].path` value
+  `gemini_oauth.json`, and tagged `GeminiOAuthSecret` field types. New imports write only that credential file
+  under the managed profile home; same-provider imports update it in place.
+  Unencrypted bundle payloads contain the credential, password-protected
+  payloads encrypt it, and profile metadata plus CLI summaries omit it. OAuth
+  runtime use remains disabled as in the tag.
+  Native Antigravity launch and global login use `PRODEX_AGY_BIN` (default `agy`)
+  with the shared Codex home and the tagged child arguments/environment. Native
+  launch skips profile startup and update lookup, prepares the shared home during
+  dry-run without spawning `agy`, rejects resume and unsupported provider options,
+  and preserves the child exit status. Child launches hold the shared Codex
+  session lock through process exit. Godex accepts the tagged `s`/`super` Gemini
+  syntax plus its existing `run` spelling. Its dry-run TTY panel uses Bubble Tea
+  with the tagged panel fields and inline layout.
 - DeepSeek now has the 0.435.1 raw-key runtime
   plus its dedicated Codex model catalog and advanced request-side Responses
   adapter: exact key precedence/provider defaults/stable key rotation, launch-model
@@ -285,14 +336,17 @@ and eligibility validation stays in the runtime use case.
   arguments, strict-schema normalization with config.toml-over-env precedence,
   named tool choice, `pro/flash` model fallback, Chat/Messages passthrough,
   native DeepSeek Messages URL/auth, local Models emulation, and local Compact
-  fallback are implemented. Buffered Responses and live SSE match the tagged sparse
-  defaults, reasoning/tool shaping, raw function-argument deltas, empty-delta
-  events, and completion semantics. Search-option mapping, off-mode rejection,
-  config-over-environment `auto`/`openai_chat`/`anthropic` selection, strict-tools
-  beta-base routing, and native DeepSeek Anthropic Messages request/response/SSE
-  translation are implemented. Native streams inspect the first event before
-  commitment, preserving the tagged bounded model-fallback and credential-rotation
-  rules without replay after commitment. The Prodex local OpenAI-compatible
+  fallback are implemented. DeepSeek Responses now match the tagged sparse
+  response defaults, while SSE matches the tagged raw function-argument,
+  empty-delta, and `[DONE]` event shaping. Search-option mapping, off-mode
+  rejection, config-over-environment mode selection, and strict-tools beta-base
+  routing are implemented. The native Anthropic Messages bridge handles
+  supported request shapes and has bounded first-event inspection. Request
+  selection now matches the tagged mode policy: default/`auto` and `anthropic`
+  use native Messages only when web-search options are present, and only
+  default/`auto` may safely fall back to chat. An unset mode uses the `auto`
+  fallback policy. Tests cover default fallback and explicit `auto`,
+  `openai_chat`, and `anthropic` behavior ([selection and fallback](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-app/src/runtime_launch/proxy_startup/local_rewrite_deepseek_send.rs#L460-L490), [mode policy](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/mojo/prodex_core/deepseek.mojo#L2963-L3020)). Its SSE path drops empty text deltas and preserves whitespace, matching the tagged runtime; other response/SSE behavior remains a parity gap. The Prodex local OpenAI-compatible
   `--url` runtime surface is implemented: Godex validates credential-free
   HTTP(S) endpoints, normalizes root URLs to `/v1`, generates the exact
   `prodex-local` Responses provider config/default model/context/compact
@@ -354,14 +408,9 @@ and eligibility validation stays in the runtime use case.
 - The standalone gateway surface, remaining process/resource metrics,
   audit-log backend, and richer runtime-policy diagnostics. Doctor now supports
   install checks, bounded runtime tails, quota summaries, runtime JSON, and
-  redacted private bundles; `--repair-import-auth-journals` now recovers
-  profile-store auth-replacement journals and reports the tagged orphan/repaired
-  status shape. `--repair-session-index` now resolves the active/default Codex
-  home, runs full shared-session maintenance, then reconciles active and archived
-  threads through Codex app-server before reporting completion. Policy suggestions
-  remain. Existing
-  status/quota/log, doctor panels, redeem-confirmation, human session-list, profile
-  bundle password, and
+  redacted private bundles; full import-lifecycle journal recovery, session-index
+  repair, and policy suggestions remain. Existing status/quota/log, doctor panels,
+  redeem-confirmation, human session-list, profile bundle password, and
   login/provider-menu TUIs use Bubble Tea. The login menu now mirrors the 0.435.1
   nine-entry ordering/navigation and preserves the reference TTY-only trigger.
   Persisted OpenAI/API-compatible API-key login is implemented end-to-end:
@@ -392,17 +441,46 @@ and eligibility validation stays in the runtime use case.
   email. Built-in Copilot import is implemented with commented-config parsing,
   config/keytar/libsecret/SDK credential fallback, bounded user-info enrichment,
   trimmed host+config-login identity matching, Prodex-compatible naming, and
-  tokenless profile persistence. Multi-profile bundle imports now use a private,
-  credential-free lifecycle journal with crash recovery across create/update
-  actions, account-backed auth replacements, active-selection restoration, orphan
-  staging cleanup, and committed-state inference when the final phase marker was
-  not persisted. OpenAI plain/encrypted bundle wire formats, Bubble Tea
+  tokenless profile persistence. Process-crash lifecycle-journal recovery for
+  multi-profile imports also remains
+  to match Prodex exactly. OpenAI plain/encrypted bundle wire formats, Bubble Tea
   protection/password prompts, and identity-safe runtime rollback are implemented.
-- HTTP/SSE model transport is explicit. Godex now contains source-audited local
-  WebSocket protocol and OpenAI upstream per-message transport prerequisites, but
-  the public upgrade path is not yet wired to the complete Prodex routing/recovery
-  policy. Until that end-to-end path closes, unsupported upgrades continue to fail
-  before upstream work rather than exposing a half-complete forwarding surface.
+- OpenAI WebSocket upgrades use a local Responses session and retain a raw
+  Realtime/live tunnel. Responses messages reuse terminal upstream sessions per
+  client tunnel and account, with a 128-session bound and 60-second idle reconnect.
+  A reused session's explicit connection-limit event gets one fresh connection
+  attempt on the same account. The gateway buffers tagged precommit events within a 64 KiB
+  or 64-event bound, exposes retryable failures to routing, and streams committed
+  frames through the terminal response event. Response IDs bind nested
+  `previous_response_id` continuations to the selected account. Exchanges close
+  before the next client message. Handshakes hide upstream credentials and
+  cookies; binary input receives the tagged 400 error event, and client pings
+  receive local pong frames. WebSocket precommit quota failures use the
+  configured auto-redeem retry path. Known-owner `previous_response_not_found`
+  failures retry up to three times with returned turn state when available, then preserve
+  the upstream retryable event and retain the failed request's affinity. A later
+  full-context replay stays on that owner, matching Prodex's stale-continuation
+  policy.
+  Hard-affinity continuations proceed on their bound owner despite launch-time
+  quota deadlines and do not auto-redeem. Fresh and soft-affinity routes refresh
+  launch-excluded OpenAI profiles after current candidates fail before
+  commitment. Warm five-minute usage snapshots are shared by launch preflight
+  and routing; cached availability and pressure are model- and route-aware.
+  Fresh cached quota failures are skipped when another eligible account remains,
+  while a fully cached-blocked pool fails open. Cold caches do not cause
+  pre-send quota probes for otherwise eligible accounts. Candidate ranking uses
+  transient backoff time, quota pressure, weighted in-flight count, route-health
+  penalties, an in-flight soft limit with fallback retention, and deterministic
+  rotation for equal ranks.
+  Route health for fresh and bound-owner responses persists in versioned
+  `route-health.json`, decays by one point per minute, and is ignored after 14
+  days. Account-level response and route-scoped transport backoffs persist.
+  Prodex's broader health scoring, other ranking inputs, and same-request
+  cross-owner retry remain open. The turn-state
+  sidecar is bounded to 2,048 files per profile with a 30-minute expiry; values
+  stay in the owning private `CODEX_HOME`, while
+  the global routing snapshot stores only digests and account IDs.
+  Unsupported upgrades and paths fail before upstream work.
 - Remove keeps its existing destructive contract. Disable and logout provide
   retained deactivation; no second archive tree or changed removal default.
 - Profile bundle protection/password interaction now matches the Prodex terminal
@@ -419,21 +497,12 @@ and eligibility validation stays in the runtime use case.
 - Doctor expansion now covers the observable 0.435.1 diagnostics that have real
   Godex data sources: `--install`, `--runtime`, `--quota`, 128 KiB default bounded
   `--tail-bytes`, `--runtime --json`, and `--bundle [PATH] --redacted`.
-  `--repair-import-auth-journals` recovers profile-store auth replacements, counts
-  remaining orphan journals without mutating them, and exposes the tagged human,
-  runtime-JSON, and bundle status fields. Account-store imports remain outside this
-  journal path. External provider quota diagnostics now use the tagged `Quota`,
-  `Main`, and optional `Reset` human fields plus the nested `{profile, provider,
-  quota}` JSON shape. OpenAI diagnostics now derive ready/blocked state from tagged
-  admission + 5h/weekly window semantics, preserve missing-vs-empty rate-limit
-  shape, and emit the same nested success/error JSON without leaking raw errors.
-  Bundle runtime events omit account IDs, quota diagnostics omit identity/email and raw
-  gateway errors, and file output is private/atomic. Full session-index repair now
-  matches the tagged maintenance-before-reconciliation ordering, including stable
-  attachment paths, metadata-prefix repair, modified-time restoration, goal-DB path
-  persistence, versioned maintenance cache, app-server active/archived pagination,
-  and the optional runtime timing marker. Runtime-policy suggestions remain
-  unsupported.
+  `--repair-import-auth-journals` recovers profile-store auth replacements using
+  path/phase metadata and a private backup kept in that profile's `CODEX_HOME`;
+  account-store import updates remain outside this journal path. Bundle runtime
+  events omit account IDs, quota diagnostics omit identity/email and raw gateway
+  errors, and file output is private/atomic. Full session-index repair and
+  runtime-policy suggestions remain unsupported and fail explicitly.
 - `update` now matches the standalone Prodex self-update contract: five-minute
   latest-release cache, short GitHub redirect probe, semver/no-downgrade decision,
   exclusive install lock with actual-binary re-probe, embedded installer execution,
@@ -445,11 +514,9 @@ and eligibility validation stays in the runtime use case.
   profile/model/base-URL/no-proxy/JSON options, 45-second timeout, four-worker
   cap, completion-order human rows, stable nullable JSON fields, failure taxonomy,
   private diagnostic CWD, provider-secret environment stripping, and bounded
-  redacted failure detail. Large-context OpenAI models now use the tagged launch
-  precedence before spawn: explicit root config, configured/effective
-  `models_cache.json`, then the exact 0.435.1 OpenAI catalog, with max-context
-  preference for the tagged model families and the 90% auto-compact default only
-  when not explicitly configured. It is never invoked implicitly.
+  redacted failure detail. It is never invoked implicitly. Large-model context
+  enrichment remains part of the wider provider/runtime parity work rather than
+  a ping-specific duplicate implementation.
 - Quota now matches Prodex's default five-second watch cadence, `--once`, raw,
   detail, profile selection, command-scoped base-URL override, aggregate
   `--auth`/`--provider` filtering, and the 0.435.1 provider-filter aliases.
@@ -484,13 +551,7 @@ and eligibility validation stays in the runtime use case.
   policy: exact host/login token resolution, plan/access precedence,
   chat/completions remaining and monthly totals, blocked/readiness semantics,
   monthly reset summary, and minimum remaining percentage are implemented without
-  persisting the token. Profile-backed raw quota now follows the tagged provider
-  dispatch: Copilot returns the bounded original user-info JSON, Anthropic/Kiro/AGY
-  serialize their external snapshot, and legacy Gemini OAuth fails before network
-  access with the 0.435.1 migration guidance. OpenAI profiles whose `config.toml`
-  selects a non-OpenAI `model_provider` report `model-provider:<id>` as auth, are
-  non-quota-compatible, and expose the tagged configured-provider snapshot/raw JSON.
-  Manual `redeem PROFILE` now matches the usage
+  persisting the token. Manual `redeem PROFILE` now matches the usage
   preflight, one-hour
   reset confirmation guard, idempotent consume endpoint, base-URL override, and
   no-proxy controls. Runtime `--auto-redeem` now matches the managed OpenAI
@@ -500,8 +561,32 @@ and eligibility validation stays in the runtime use case.
   profile; the 0.435.1 plan/reset/order planner, Spark exclusion, five-minute
   natural-reset guard, UUIDv7 idempotency key, post-redeem quota refresh, and
   hard-affinity owner preservation are implemented. Failed/missing quota probes,
-  non-quota failures, and non-OpenAI providers never spend a credit. WebSocket
-  auto-redeem remains absent with the wider WebSocket/Realtime transport.
+  non-quota failures, and non-OpenAI providers never spend a credit. Responses
+  WebSocket precommit quota failures use the configured auto-redeem retry path.
+  Known-owner reused-session transport failures reconnect once on the same
+  account when session turn state is available. A fresh handshake that then
+  reports `previous_response_not_found` retries up to three times on that owner
+  with returned turn state; exhaustion preserves the upstream retryable event
+  and retains affinity, so a later full-context replay stays on that owner.
+  Durable WebSocket response-ID-to-turn-state lookup now survives
+  router restarts through a bounded sidecar in the owning private `CODEX_HOME`;
+  same-request cross-owner retry remains open. Routing refreshes
+  launch-excluded profiles with bounded request model/route context and a
+  five-minute freshness interval. Warm snapshots provide model- and route-aware
+  availability and quota pressure; routing reuses them without an additional
+  usage fetch. Fresh cached quota failures are skipped when another eligible
+  account remains, and a fully cached-blocked pool fails open. Candidate ranking
+  combines transient backoff time, quota pressure, weighted in-flight count,
+  route-health penalties, and an in-flight soft limit while retaining deferred
+  candidates as fallbacks.
+  Equal-ranked candidates rotate deterministically. Route health for fresh and
+  bound-owner responses persists in versioned `route-health.json`, decays by
+  one point per minute, and is ignored after 14 days. A cold usage cache fails
+  open for otherwise eligible accounts; account-level response and route-scoped
+  transport backoffs persist. Other Prodex ranking inputs remain open.
+  Profile-backed Gemini's disabled OAuth quota response and custom Codex
+  model-provider metadata now match the 0.435.1 behavior; neither path persists
+  API keys or claims provider usage data.
 - Godex reloads Codex-owned auth on an authentication retry; it does not implement
   OAuth/token refresh, aggressive history rewrites, or silent model relaunch.
 - Native tools, models, approval/sandbox behavior, foreground command servers,
@@ -529,11 +614,27 @@ Tagged Prodex sources inspected include:
   `buffered_response.rs`, and
   `crates/prodex-runtime-proxy/src/response_forwarding.rs` for precommit SSE
   inspection, body failures, and incremental SSE ownership tracking.
-- `crates/prodex-provider-core/src/translators/anthropic/messages.rs`,
-  `crates/prodex-provider-core/src/translators/anthropic/messages/stream.rs`, and
-  `crates/prodex-app/src/runtime_launch/proxy_startup/local_rewrite_deepseek_send.rs`
-  for DeepSeek native Anthropic Messages request, response, SSE, and precommit
-  fallback behavior.
+- `crates/prodex-app/src/runtime_proxy/precommit_loop.rs`,
+  `health_backoff.rs`, `responses.rs`, and
+  `standard/compact/recovery.rs` for Prodex 0.435.4 retry sweeps, recovery waits,
+  Responses attempts, and Compact recovery.
+- `crates/prodex-runtime-proxy/src/{attempt_outcome,previous_response_orchestration}.rs`
+  and `crates/prodex-runtime-proxy/tests/src/attempt_outcome.rs` for bounded
+  same-owner previous-response retries at 75 ms, 200 ms, and 500 ms.
+- `crates/prodex-app/src/runtime_proxy/websocket.rs`, `websocket_message.rs`,
+  `websocket_message/continuation_handling.rs`, `failure_response.rs`, and
+  `lineage/{remember,lookup,release}.rs`, `core_constants.rs`, and
+  `websocket/response_tracking/{precommit,quota_gate,previous_response,session}.rs`,
+  plus
+  `crates/prodex-app/tests/src/runtime_proxy/websocket/precommit_regressions.rs`
+  for event-level selection, quota checks, affinity, commitment, and stale
+  continuation behavior.
+- `crates/prodex-app/src/runtime_proxy/quota/{gate,summary,cache}.rs` and
+  `crates/prodex-runtime-quota/src/{summary,window}.rs` for pre-send quota
+  decisions, five-minute probe freshness, and requested-model window selection.
+- `crates/prodex-provider-core/src/translators/deepseek/{response,stream}.rs`
+  and `mojo/prodex_core/openai_chat_response.mojo` for DeepSeek response and SSE
+  translation behavior.
 
 Local Codex source at `a04940cb` supplied queue grammar and the native debug,
 app-server proxy, and daemon branches that discard CLI overrides or detach.
@@ -543,9 +644,9 @@ Historical local parser validation used an ephemeral official npm package
 It reported `codex-cli 0.159.3`; managed provider strict-config and runtime-feature
 smoke tests passed, and unknown strict-config fields stopped exec/resume/fork/review
 before model work. That remains useful regression evidence, but it is not presented
-as a 0.160.0 execution result. The current Prodex 0.435.1 audit identifies Codex
-0.160.0 as the compatibility target and reports no required Codex model-transport
-change; the release itself is a provider-catalog/default/fallback hotfix.
+as a 0.160.0 execution result. The Prodex 0.435.4 compatibility audit retains
+Codex 0.160.0 as the target. The prior 0.435.1 provider-catalog/default/fallback
+hotfix did not require a Codex model-transport change.
 No live login, quota endpoint, refresh exchange, or model request is used for this
 baseline migration.
 
@@ -557,7 +658,7 @@ before it. Windows amd64 and macOS arm64 are cross-built locally; native Windows
 and live OpenAI behavior are not established by that build. Prodex's Rust/Mojo
 suite and release snapshots are outside this source/test audit.
 
-Passed commands:
+Commands passed for the earlier core checkpoint:
 
 ```sh
 rtk go test ./internal/gateway/codex ./internal/delivery/cli/runtime
@@ -574,16 +675,25 @@ GOOS=darwin GOARCH=arm64 go build -trimpath -o /tmp/godex-closure-darwin-arm64 .
 git diff --check
 ```
 
+Commands passed for the historical 0.435.2 routing review; they do not verify
+the 0.435.4 recovery delta:
+
+```sh
+rtk go test -race ./internal/usecase/routing ./internal/delivery/http/proxy ./internal/gateway/codex -count=1
+rtk make verify
+```
+
 Stable bindings remain protected up to 8,192; opaque bindings expire after
 30 days, and the in-memory cache remains at 4,096. Unknown/removed owners fail
 closed. Affinity inspection remains bounded, including SSE metadata. The global
 first-owner guard can serialize unrelated new conversations; use bounded lock
-shards only if measured contention warrants it. No further small correctness
-gap was found in the reviewed declared core after final closure. Startup SSE
-inspection can wait for output and shares the global first-owner guard; there is
-no background polling or new reader goroutine. SSE metadata remains bounded to
-64 KiB per event, and compressed stream bytes are preserved without inspection.
-These limits fail conservatively and never permit replay after commitment.
+shards only if measured contention warrants it. The earlier core audit found no
+further small correctness gap within its declared scope; it did not close the
+0.435.2 gaps listed above. Startup SSE inspection can wait for output and shares
+the global first-owner guard; there is no background polling or new reader
+goroutine. SSE metadata remains bounded to 64 KiB per event, and compressed
+stream bytes are preserved without inspection. These limits fail conservatively
+and never permit replay after commitment.
 
 An initial closure test run failed because the new test composition passed a
 typed nil repository through an interface. The fixture was corrected, and focused

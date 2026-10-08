@@ -119,14 +119,23 @@ func (state *geminiStreamState) consume(writer io.Writer, data []byte, requestMe
 					args = map[string]any{}
 				}
 				encoded, _ := json.Marshal(args)
-				state.toolCalls = append(state.toolCalls, map[string]any{
+				signature := geminiNativeThoughtSignature(part, call)
+				tool := map[string]any{
 					"type": "function_call", "call_id": callID, "name": name, "arguments": string(encoded),
-				})
-				if err := writeGeminiSSEEvent(writer, "response.function_call_arguments.delta", map[string]any{
+				}
+				if signature != "" {
+					tool["gemini_thought_signature"] = signature
+				}
+				state.toolCalls = append(state.toolCalls, tool)
+				delta := map[string]any{
 					"type":    "response.function_call_arguments.delta",
 					"call_id": callID, "delta": string(encoded),
 					"sequence_number": state.nextSequence(),
-				}); err != nil {
+				}
+				if signature != "" {
+					delta["thought_signature"] = signature
+				}
+				if err := writeGeminiSSEEvent(writer, "response.function_call_arguments.delta", delta); err != nil {
 					return err
 				}
 			}

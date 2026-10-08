@@ -87,16 +87,9 @@ func geminiNativeResponsesValue(root map[string]any, requestMetadata map[string]
 		usage, _ := rawUsage.(map[string]any)
 		result["usage"] = geminiNativeUsage(usage)
 	}
-	metadata := make(map[string]any)
-	mergeMetadataFields(metadata, requestMetadata)
-	if provider := geminiNativeResponseMetadata(root, candidate); len(provider) > 0 {
-		existing, _ := metadata["gemini"].(map[string]any)
-		merged := make(map[string]any)
-		mergeMetadataFields(merged, existing)
-		mergeMetadataFields(merged, provider)
-		metadata["gemini"] = merged
+	if metadata := geminiNativeResponseMetadataValue(root, candidate, requestMetadata); len(metadata) > 0 {
+		result["metadata"] = metadata
 	}
-	result["metadata"] = metadata
 	geminiApplyNativeStatus(result, root, candidate, len(output) > 0)
 	return result
 }

@@ -78,12 +78,20 @@ type goalTransition04360 struct {
 
 func captureGoalTransition04360(ctx context.Context, home, id string) goalTransition04360 {
 	prior, ok := readGoalRecoveryState04360(ctx, home, id)
-	return goalTransition04360{home: home, id: id, before: prior, valid: ok && prior.present && prior.status == "active"}
+	valid := ok && prior.present
+	if valid {
+		switch prior.status {
+		case "active", "paused", "blocked":
+		default:
+			valid = false
+		}
+	}
+	return goalTransition04360{home: home, id: id, before: prior, valid: valid}
 }
 
-// The tagged monitor arms on a previously active goal, and observes a
-// fresh transition to usage_limited; a historical, unchanged terminal
-// state cannot trigger another child invocation.
+// The tagged monitor arms on a previously resumable non-terminal goal, and
+// observes a fresh transition to usage_limited; a historical, unchanged
+// terminal state cannot trigger another child invocation.
 func (checkpoint goalTransition04360) newUsageLimit04360(ctx context.Context) bool {
 	if !checkpoint.valid || ctx.Err() != nil {
 		return false

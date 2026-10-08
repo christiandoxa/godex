@@ -547,20 +547,51 @@ func TestProdex04356SuperExposeDirectExecBoundsTimeoutRedactionAndEnvironment(t 
 }
 
 type exposeAuditCapture struct {
-	mu     sync.Mutex
-	events []runtimemodel.Event
+	mu      sync.Mutex
+	events  []runtimemodel.Event
+	changed chan struct{}
 }
 
 func (capture *exposeAuditCapture) Append(_ context.Context, event runtimemodel.Event) error {
 	capture.mu.Lock()
 	defer capture.mu.Unlock()
 	capture.events = append(capture.events, event)
+	if capture.changed != nil {
+		close(capture.changed)
+	}
+	capture.changed = make(chan struct{})
 	return nil
 }
 
 func (capture *exposeAuditCapture) event(kind string) *runtimemodel.Event {
 	capture.mu.Lock()
 	defer capture.mu.Unlock()
+	return capture.eventLocked(kind)
+}
+
+func (capture *exposeAuditCapture) waitEvent(kind string) *runtimemodel.Event {
+	deadline := time.NewTimer(5 * time.Second)
+	defer deadline.Stop()
+	for {
+		capture.mu.Lock()
+		if event := capture.eventLocked(kind); event != nil {
+			capture.mu.Unlock()
+			return event
+		}
+		if capture.changed == nil {
+			capture.changed = make(chan struct{})
+		}
+		changed := capture.changed
+		capture.mu.Unlock()
+		select {
+		case <-changed:
+		case <-deadline.C:
+			return nil
+		}
+	}
+}
+
+func (capture *exposeAuditCapture) eventLocked(kind string) *runtimemodel.Event {
 	for index := range capture.events {
 		if capture.events[index].Kind != kind {
 			continue

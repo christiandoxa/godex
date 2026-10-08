@@ -7,7 +7,37 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
+
+func TestAffinityHardnessMatchesProdexSessionScope(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		keys     affinityKeys
+		route    quotamodel.RouteKind
+		wantHard bool
+		wantSoft bool
+	}{
+		{name: "responses session", keys: affinityKeys{session: "s"}, route: quotamodel.RouteKindResponses, wantSoft: true},
+		{name: "websocket session", keys: affinityKeys{session: "s"}, route: quotamodel.RouteKindWebSocket, wantSoft: true},
+		{name: "standard session", keys: affinityKeys{session: "s"}, route: quotamodel.RouteKindStandard, wantSoft: true},
+		{name: "compact session", keys: affinityKeys{session: "s"}, route: quotamodel.RouteKindCompact, wantHard: true},
+		{name: "previous response", keys: affinityKeys{previous: "r"}, route: quotamodel.RouteKindResponses, wantHard: true},
+		{name: "turn state", keys: affinityKeys{turn: "t"}, route: quotamodel.RouteKindResponses, wantHard: true},
+		{name: "thread", keys: affinityKeys{thread: "t"}, route: quotamodel.RouteKindResponses, wantHard: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			selection := quotamodel.Selection{RouteKind: test.route}
+			if got := test.keys.hasHardAffinity(selection); got != test.wantHard {
+				t.Fatalf("hard affinity = %t, want %t", got, test.wantHard)
+			}
+			if got := test.keys.hasSoftSessionAffinity(selection); got != test.wantSoft {
+				t.Fatalf("soft session affinity = %t, want %t", got, test.wantSoft)
+			}
+		})
+	}
+}
 
 func TestAffinityExpiresAndRejectsConflicts(t *testing.T) {
 	store := newAffinityStore()

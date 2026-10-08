@@ -66,6 +66,11 @@ func (transport *Transport) ExecuteWebSocketMessage(
 	connection = watchdog
 	if err := writeWebSocketTextFrame(connection, input.Body); err != nil {
 		_ = connection.Close()
+		if reusedSession {
+			return websocketTransportFailure(
+				"", state.turnState, input.FirstEventRetryUsed, true, reuseIdle,
+			), nil
+		}
 		return nil, fmt.Errorf("send upstream websocket message: %w", err)
 	}
 	plan := websocketResponsePlanFor(input, reusedSession)

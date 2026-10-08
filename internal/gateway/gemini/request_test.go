@@ -40,6 +40,75 @@ func TestGeminiResponsesRequestPreservesMetadataAndMapsTopLevelReasoning(t *test
 	}
 }
 
+func TestGeminiResponsesRequestHardensFirstUnsignedGemini3ToolCall(t *testing.T) {
+	translated, err := translateResponsesRequest([]byte(`{
+		"model":"gemini-3.1-pro-preview","input":[
+			{"type":"function_call","call_id":"unsigned","name":"shell","arguments":"{}"},
+			{"type":"function_call","call_id":"signed","name":"shell","arguments":"{}","gemini_thought_signature":"sig"},
+			{"type":"function_call_output","call_id":"unsigned","output":"ok"}
+		]
+	}`), "gemini-3.1-pro-preview")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var native map[string]any
+	if err := json.Unmarshal(translated.body, &native); err != nil {
+		t.Fatal(err)
+	}
+	contents := native["contents"].([]any)
+	first := contents[0].(map[string]any)["parts"].([]any)[0].(map[string]any)
+	second := contents[1].(map[string]any)["parts"].([]any)[0].(map[string]any)
+	if first["thoughtSignature"] != "skip_thought_signature_validator" {
+		t.Fatalf("unsigned Gemini 3 tool call = %#v", first)
+	}
+	call := second["functionCall"].(map[string]any)
+	if call["thoughtSignature"] != "sig" {
+		t.Fatalf("signed Gemini 3 tool call = %#v", second)
+	}
+	if _, exists := second["thoughtSignature"]; exists {
+		t.Fatalf("nested signature was duplicated on Gemini part = %#v", second)
+	}
+}
+
+func TestGeminiResponsesRequestDoesNotHardenGemini25ToolCalls(t *testing.T) {
+	translated, err := translateResponsesRequest([]byte(`{
+		"model":"gemini-2.5-pro","input":[
+			{"type":"function_call","call_id":"unsigned","name":"shell","arguments":"{}"}
+		]
+	}`), "gemini-2.5-pro")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var native map[string]any
+	if err := json.Unmarshal(translated.body, &native); err != nil {
+		t.Fatal(err)
+	}
+	part := native["contents"].([]any)[0].(map[string]any)["parts"].([]any)[0].(map[string]any)
+	if _, exists := part["thoughtSignature"]; exists {
+		t.Fatalf("Gemini 2.5 tool call was hardened = %#v", part)
+	}
+}
+
+func TestGeminiToolCallThoughtSignatureHardeningStopsAfterFirstCall(t *testing.T) {
+	body := map[string]any{"contents": []any{map[string]any{
+		"role": "model",
+		"parts": []any{
+			map[string]any{"functionCall": map[string]any{"name": "first"}},
+			map[string]any{"functionCall": map[string]any{"name": "second"}},
+		},
+	}}}
+	if injected := hardenGeminiToolCallThoughtSignatures(body, "gemini-3.1-pro-preview"); injected != 1 {
+		t.Fatalf("injected thought signatures = %d, want 1", injected)
+	}
+	parts := body["contents"].([]any)[0].(map[string]any)["parts"].([]any)
+	if parts[0].(map[string]any)["thoughtSignature"] != "skip_thought_signature_validator" {
+		t.Fatalf("first tool call = %#v", parts[0])
+	}
+	if _, exists := parts[1].(map[string]any)["thoughtSignature"]; exists {
+		t.Fatalf("second tool call was hardened = %#v", parts[1])
+	}
+}
+
 func TestGeminiResponsesRequestTranslatesNestedToolsAndFormats(t *testing.T) {
 	translated, err := translateResponsesRequest([]byte(`{
 		"input":"hello","tools":[

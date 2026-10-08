@@ -93,7 +93,7 @@ func (router *Router) executeRouted(
 			authReloadUsed = true
 			continue
 		}
-		if !ownerTransportRetryUsed && hardAffinity &&
+		if !ownerTransportRetryUsed && (hardAffinity || response.WebSocketReusedSession) &&
 			websocketOwnerTransportRecovery(response, metadata.previousResponseID) {
 			closeWebSocketRoutingResponse(response)
 			ownerTransportRetryUsed = true
@@ -169,11 +169,11 @@ func websocketPreviousResponseNotFound(
 
 func websocketOwnerTransportRecovery(response *proxymodel.Response, previousResponseID string) bool {
 	return response != nil &&
-		strings.TrimSpace(previousResponseID) != "" &&
+		(strings.TrimSpace(previousResponseID) != "" || response.WebSocketReusedSession) &&
 		!response.FirstEventCommitted &&
 		response.PrecommitFailure != nil &&
 		response.PrecommitFailure.Transport &&
-		strings.TrimSpace(response.WebSocketTurnState) != ""
+		(strings.TrimSpace(response.WebSocketTurnState) != "" || response.WebSocketReusedSession)
 }
 
 func websocketTurnStateOverride(

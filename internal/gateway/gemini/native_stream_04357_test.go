@@ -32,6 +32,29 @@ func TestProdex04357GeminiStreamRuntimeProcessesThoughtFunctionAndLaterText(t *t
 	}
 }
 
+func TestProdex04361GeminiStreamPreservesThoughtSignature(t *testing.T) {
+	state := &geminiStreamState{responseID: "resp_gemini_signature"}
+	var output bytes.Buffer
+	if err := state.consume(&output, []byte(`{
+		"candidates":[{"content":{"parts":[{"functionCall":{
+			"id":"call_sig","name":"shell","args":{"cmd":"pwd"},"thoughtSignature":"sig-1"
+		}}]}}]
+	}`), nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := state.complete(&output, nil); err != nil {
+		t.Fatal(err)
+	}
+	text := output.String()
+	if !strings.Contains(text, "event: response.function_call_arguments.delta") ||
+		!strings.Contains(text, `"thought_signature":"sig-1"`) {
+		t.Fatalf("signature delta event = %s", text)
+	}
+	if !strings.Contains(text, `"gemini_thought_signature":"sig-1"`) {
+		t.Fatalf("signature completion item = %s", text)
+	}
+}
+
 func TestProdex04357GeminiStreamRuntimeFallbackCallIDAndUnicodeThoughtTyping(t *testing.T) {
 	state := &geminiStreamState{responseID: "resp_gemini_2"}
 	var sparse bytes.Buffer

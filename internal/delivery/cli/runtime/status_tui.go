@@ -79,9 +79,6 @@ func (model statusTUIModel) View() string {
 	var output strings.Builder
 	output.WriteString("Godex Status\n\n")
 	if model.overview != nil {
-		output.WriteString("Updated: ")
-		output.WriteString(time.Now().Format("2006-01-02 15:04:05"))
-		output.WriteByte('\n')
 		for _, field := range statusFields(*model.overview, model.resource) {
 			_, _ = fmt.Fprintf(&output, "%s: %s\n", field[0], field[1])
 		}

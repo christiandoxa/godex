@@ -688,11 +688,22 @@ func TestProdex04356ProfileStatusRateCodeIsNotQuota(t *testing.T) {
 	}
 }
 
+func TestProdex04361ScalarErrorQuotaCodeIsQuota(t *testing.T) {
+	for _, code := range []string{
+		"insufficient_quota", "credit_balance_exhausted", "organization_spend_limit_exceeded",
+		"project_spend_limit_exceeded", "quota_exhausted", "quota_exceeded", "resource_exhausted",
+		"usage_limit_reached", "usage_not_included", "workspace_member_credits_depleted",
+	} {
+		if !isQuotaResponse([]byte(fmt.Sprintf(`{"error":%q}`, code))) {
+			t.Errorf("scalar error code was not classified as quota: %q", code)
+		}
+	}
+}
+
 func TestProdex04356ProfileStatusUsageMessageCorpusIsQuota(t *testing.T) {
 	messages := []string{
 		"You've hit your usage limit.",
 		"You have hit your usage limit.",
-		"You hit your usage limit.",
 		"The usage limit has been reached.",
 		"Usage limit has been reached.",
 		"Usage limit reached; try again at 5:08 PM.",
@@ -705,6 +716,9 @@ func TestProdex04356ProfileStatusUsageMessageCorpusIsQuota(t *testing.T) {
 		if !openAIWorkspaceQuotaResponse([]byte(message)) {
 			t.Errorf("message was not classified as quota: %q", message)
 		}
+	}
+	if openAIWorkspaceQuotaResponse([]byte("You hit your usage limit.")) {
+		t.Fatal("bare 'you hit your usage limit' must not classify 402/403 workspace recovery")
 	}
 }
 
@@ -739,6 +753,37 @@ func TestProdex04356HTTP429StructuredSSESignalsKeepTaggedPrecedence(t *testing.T
 			}
 			if !fixture.wantQuota && classification.Class != providerentity.ErrorRateLimit {
 				t.Fatalf("classification = %#v, want rate limit", classification)
+			}
+		})
+	}
+}
+
+func TestProdex04361HTTP429RateLimitHeaderOverridesBody(t *testing.T) {
+	router := newProdex04356Router(t, &prodex04356Gateway{}, prodex04356Accounts())
+	for _, fixture := range []struct {
+		name      string
+		header    string
+		wantQuota bool
+	}{
+		{name: "rate", header: "rate_limit_reached"},
+		{name: "workspace member", header: "workspace_member_credits_depleted", wantQuota: true},
+		{name: "workspace owner usage", header: "workspace_owner_usage_limit_reached", wantQuota: true},
+	} {
+		t.Run(fixture.name, func(t *testing.T) {
+			response := &proxymodel.Response{
+				StatusCode: http.StatusTooManyRequests,
+				Header: http.Header{
+					"X-Codex-Rate-Limit-Reached-Type": []string{fixture.header},
+				},
+				Body: io.NopCloser(strings.NewReader(`{"error":{"code":"rate_limit_exceeded"}}`)),
+			}
+			outcome, pending, err := router.classify(response, "openai")
+			if err != nil {
+				t.Fatal(err)
+			}
+			pending.close()
+			if outcome.kind != responseRetry || outcome.quota != fixture.wantQuota {
+				t.Fatalf("header %q outcome = %#v, want quota=%t", fixture.header, outcome, fixture.wantQuota)
 			}
 		})
 	}

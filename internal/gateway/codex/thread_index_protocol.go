@@ -2,6 +2,7 @@ package codex
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,13 @@ const (
 	threadIndexPageLimit     = 100
 	threadIndexClientName    = "prodex-thread-index-reconciliation"
 	threadIndexClientVersion = "0.435.6"
+	threadIndexMaxJSONBytes  = 64 * 1024 * 1024
+	threadIndexMaxJSONNodes  = 1_048_576
+)
+
+var (
+	errThreadIndexJSONBytes = errors.New("codex app-server thread-index JSON input exceeded its ABI bound")
+	errThreadIndexJSONNodes = errors.New("codex app-server thread-index JSON tree exceeded its ABI bound")
 )
 
 func reconcileCodexThreadIndexProtocol(stdout io.Reader, stdin io.Writer) error {
@@ -77,7 +85,10 @@ func writeCodexAppServerMessage(writer io.Writer, message any) error {
 
 func readCodexAppServerResponse(reader *bufio.Reader, requestID uint64) (json.RawMessage, error) {
 	for {
-		line, readErr := reader.ReadBytes('\n')
+		line, readErr := readBoundedThreadIndexLine(reader)
+		if errors.Is(readErr, errThreadIndexJSONBytes) {
+			return nil, readErr
+		}
 		if len(line) == 0 {
 			if readErr != nil {
 				if errors.Is(readErr, io.EOF) {
@@ -86,6 +97,12 @@ func readCodexAppServerResponse(reader *bufio.Reader, requestID uint64) (json.Ra
 				return nil, fmt.Errorf("read codex app-server response: %w", readErr)
 			}
 			continue
+		}
+		if err := validateThreadIndexJSON(line); err != nil {
+			if errors.Is(err, errThreadIndexJSONNodes) {
+				return nil, err
+			}
+			return nil, errors.New("codex app-server returned invalid JSON during thread index repair")
 		}
 		var message map[string]json.RawMessage
 		if err := json.Unmarshal(line, &message); err != nil {
@@ -114,6 +131,131 @@ func readCodexAppServerResponse(reader *bufio.Reader, requestID uint64) (json.Ra
 			return nil, errors.New("codex app-server response is missing its result")
 		}
 		return result, nil
+	}
+}
+
+func readBoundedThreadIndexLine(reader *bufio.Reader) ([]byte, error) {
+	var line []byte
+	for {
+		chunk, err := reader.ReadSlice('\n')
+		if len(line) > threadIndexMaxJSONBytes || len(chunk) > threadIndexMaxJSONBytes-len(line) {
+			return nil, errThreadIndexJSONBytes
+		}
+		needed := len(line) + len(chunk)
+		if needed > cap(line) {
+			capacity := cap(line) * 2
+			if capacity < needed {
+				capacity = needed
+			}
+			if capacity > threadIndexMaxJSONBytes {
+				capacity = threadIndexMaxJSONBytes
+			}
+			grown := make([]byte, len(line), capacity)
+			copy(grown, line)
+			line = grown
+		}
+		line = append(line, chunk...)
+		if err == nil || !errors.Is(err, bufio.ErrBufferFull) {
+			return line, err
+		}
+	}
+}
+
+type threadIndexJSONFrame struct {
+	kind       byte
+	expectsKey bool
+}
+
+func validateThreadIndexJSON(content []byte) error {
+	decoder := json.NewDecoder(bytes.NewReader(content))
+	decoder.UseNumber()
+	frames := make([]threadIndexJSONFrame, 0, 8)
+	nodes := 0
+	tooManyNodes := false
+	rootSeen := false
+	rootDone := false
+
+	beginValue := func() bool {
+		if rootDone {
+			return false
+		}
+		if len(frames) == 0 {
+			if rootSeen {
+				return false
+			}
+			rootSeen = true
+		} else if frames[len(frames)-1].kind == '{' && frames[len(frames)-1].expectsKey {
+			return false
+		}
+		if nodes < threadIndexMaxJSONNodes {
+			nodes++
+		} else {
+			tooManyNodes = true
+		}
+		return true
+	}
+	completeValue := func() {
+		if len(frames) == 0 {
+			rootDone = true
+			return
+		}
+		if frames[len(frames)-1].kind == '{' {
+			frames[len(frames)-1].expectsKey = true
+		}
+	}
+
+	for {
+		token, err := decoder.Token()
+		if errors.Is(err, io.EOF) {
+			if !rootDone {
+				return errors.New("incomplete JSON")
+			}
+			if tooManyNodes {
+				return errThreadIndexJSONNodes
+			}
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if delimiter, ok := token.(json.Delim); ok {
+			switch delimiter {
+			case '{':
+				if !beginValue() {
+					return errors.New("invalid JSON value")
+				}
+				frames = append(frames, threadIndexJSONFrame{kind: '{', expectsKey: true})
+			case '[':
+				if !beginValue() {
+					return errors.New("invalid JSON value")
+				}
+				frames = append(frames, threadIndexJSONFrame{kind: '['})
+			case '}':
+				if len(frames) == 0 || frames[len(frames)-1].kind != '{' || !frames[len(frames)-1].expectsKey {
+					return errors.New("invalid JSON object")
+				}
+				frames = frames[:len(frames)-1]
+				completeValue()
+			case ']':
+				if len(frames) == 0 || frames[len(frames)-1].kind != '[' {
+					return errors.New("invalid JSON array")
+				}
+				frames = frames[:len(frames)-1]
+				completeValue()
+			}
+			continue
+		}
+		if len(frames) > 0 && frames[len(frames)-1].kind == '{' && frames[len(frames)-1].expectsKey {
+			if _, ok := token.(string); !ok {
+				return errors.New("invalid JSON object key")
+			}
+			frames[len(frames)-1].expectsKey = false
+			continue
+		}
+		if !beginValue() {
+			return errors.New("multiple JSON values")
+		}
+		completeValue()
 	}
 }
 

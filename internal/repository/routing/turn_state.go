@@ -219,20 +219,48 @@ func prepareResponseTurnStateDirectory(profileHome string) (string, error) {
 }
 
 func makeResponseTurnStateRoom(directory string) error {
-	root, err := os.Open(directory)
-	if err != nil {
-		return err
-	}
-	entries, err := root.Readdirnames(responseTurnStateFiles + 2)
-	closeErr := root.Close()
-	if err != nil && err != io.EOF {
-		return errors.Join(err, closeErr)
-	}
-	if closeErr != nil {
-		return closeErr
-	}
-	if len(entries) > responseTurnStateFiles+1 {
-		return errors.New("response turn state directory is over limit")
+	var entries []string
+	for {
+		root, err := os.Open(directory)
+		if err != nil {
+			return err
+		}
+		names, err := root.Readdirnames(responseTurnStateFiles + 2)
+		closeErr := root.Close()
+		if err != nil && err != io.EOF {
+			return errors.Join(err, closeErr)
+		}
+		if closeErr != nil {
+			return closeErr
+		}
+		if len(names) <= responseTurnStateFiles+1 {
+			entries = names
+			break
+		}
+		cleaned := false
+		for _, name := range names {
+			if !strings.HasPrefix(name, ".atomic-") {
+				continue
+			}
+			path := filepath.Join(directory, name)
+			info, err := os.Lstat(path)
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			if err != nil {
+				return err
+			}
+			if !info.Mode().IsRegular() {
+				continue
+			}
+			if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return err
+			}
+			cleaned = true
+		}
+		if !cleaned {
+			return errors.New("response turn state directory is over limit")
+		}
 	}
 	type file struct {
 		name    string

@@ -2,7 +2,6 @@ package codex
 
 import (
 	"context"
-	"os/exec"
 	"strings"
 )
 
@@ -37,7 +36,7 @@ func (process *CodexProcess) RunRuntimeDirect(
 	}
 	defer release()
 
-	command := exec.CommandContext(ctx, binary, arguments...)
+	command := terminalCommand(ctx, binary, arguments)
 	environment := codexThreadIndexEnvironment(codexHome, process.sharedCodexHome)
 	if noProxy {
 		environment = removeUpstreamProxyEnvironment(environment)

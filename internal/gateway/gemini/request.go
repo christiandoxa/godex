@@ -37,10 +37,6 @@ func translateResponsesRequest(body []byte, model string) (translatedRequest, er
 	if err != nil {
 		return translatedRequest{}, err
 	}
-	encoded, err := json.Marshal(native)
-	if err != nil {
-		return translatedRequest{}, errors.New("failed to serialize translated Gemini generateContent request")
-	}
 	selectedModel := strings.TrimSpace(model)
 	if requested, _ := request["model"].(string); strings.TrimSpace(requested) != "" {
 		selectedModel = strings.TrimSpace(requested)
@@ -48,8 +44,42 @@ func translateResponsesRequest(body []byte, model string) (translatedRequest, er
 	if selectedModel == "" {
 		selectedModel = "auto"
 	}
+	hardenGeminiToolCallThoughtSignatures(native, selectedModel)
+	encoded, err := json.Marshal(native)
+	if err != nil {
+		return translatedRequest{}, errors.New("failed to serialize translated Gemini generateContent request")
+	}
 	stream, _ := request["stream"].(bool)
 	return translatedRequest{body: encoded, metadata: metadata, model: selectedModel, stream: stream}, nil
+}
+
+func hardenGeminiToolCallThoughtSignatures(body map[string]any, model string) int {
+	if !strings.Contains(model, "gemini-3") {
+		return 0
+	}
+	contents, _ := body["contents"].([]any)
+	injected := 0
+	for _, rawContent := range contents {
+		content, _ := rawContent.(map[string]any)
+		if content["role"] != "model" {
+			continue
+		}
+		parts, _ := content["parts"].([]any)
+		foundFunctionCall := false
+		for _, rawPart := range parts {
+			part, _ := rawPart.(map[string]any)
+			if _, exists := part["functionCall"]; !exists {
+				continue
+			}
+			call, _ := part["functionCall"].(map[string]any)
+			if !foundFunctionCall && geminiNativeThoughtSignature(part, call) == "" {
+				part["thoughtSignature"] = "skip_thought_signature_validator"
+				injected++
+			}
+			foundFunctionCall = true
+		}
+	}
+	return injected
 }
 
 func parseResponsesRequest(body []byte) (map[string]any, error) {

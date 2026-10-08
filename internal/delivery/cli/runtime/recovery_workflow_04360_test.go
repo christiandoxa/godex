@@ -33,3 +33,61 @@ func TestProdex04360StructuredWorkflowRecoveryClassesMatchTaggedSource(t *testin
 		})
 	}
 }
+
+func TestProdex04361WorkflowRecoveryHonorsProviderStatusBoundaries(t *testing.T) {
+	for _, tc := range []struct {
+		name, raw, want string
+	}{
+		{
+			name: "transport variant with client status is terminal",
+			raw:  `{"type":"event_msg","payload":{"type":"error","http_status_code":400,"codex_error_info":"responseStreamDisconnected"}}`,
+		},
+		{
+			name: "transport variant with transient status retries",
+			raw:  `{"type":"event_msg","payload":{"type":"error","http_status_code":503,"codex_error_info":"responseStreamDisconnected"}}`,
+			want: "transport",
+		},
+		{
+			name: "nested transport status is checked",
+			raw:  `{"type":"error","error":{"codex_error_info":{"responseTooManyFailedAttempts":{"httpStatusCode":400}}}}`,
+		},
+		{
+			name: "unexpected status server failure is transient",
+			raw:  `{"type":"event_msg","payload":{"type":"error","message":"unexpected status 503 Service Unavailable: unavailable","codex_error_info":"other"}}`,
+			want: "transport",
+		},
+		{
+			name: "unexpected status auth stays auth",
+			raw:  `{"type":"event_msg","payload":{"type":"error","message":"unexpected status 401 Unauthorized: Unauthorized","codex_error_info":"other"}}`,
+			want: "auth",
+		},
+		{
+			name: "unexpected status quota uses authoritative text",
+			raw:  `{"type":"event_msg","payload":{"type":"error","message":"unexpected status 403 Forbidden: You've hit your usage limit. Try again later.","codex_error_info":"other"}}`,
+			want: "usage_limit",
+		},
+		{
+			name: "unexpected status profile body rotates unavailable profile",
+			raw:  `{"type":"event_msg","payload":{"type":"error","message":"unexpected status 403 Forbidden: {\"detail\":{\"code\":\"deactivated_workspace\"}} , url: https://example.test","codex_error_info":"other"}}`,
+			want: "profile_unavailable",
+		},
+		{
+			name: "bare unexpected rate status is terminal",
+			raw:  `{"type":"event_msg","payload":{"type":"error","message":"unexpected status 429 Too Many Requests: rate limited","codex_error_info":"other"}}`,
+		},
+		{
+			name: "non-authoritative usage wording is terminal",
+			raw:  `{"type":"event_msg","payload":{"type":"error","message":"unexpected status 403 Forbidden: The usage limit has been reached","codex_error_info":"other"}}`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var record map[string]any
+			if err := json.Unmarshal([]byte(tc.raw), &record); err != nil {
+				t.Fatal(err)
+			}
+			if got := structuredWorkflowRecoveryClass04360(record); got != tc.want {
+				t.Fatalf("class=%q want %q", got, tc.want)
+			}
+		})
+	}
+}

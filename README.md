@@ -122,14 +122,6 @@ protected export/import passwords are entered through a masked Bubble Tea prompt
 when the matching `PRODEX_PROFILE_*_PASSWORD` environment variable is unset.
 Non-TTY workflows remain fail-closed and require explicit flags/environment.
 
-Bundle imports use a private metadata-only lifecycle journal plus per-target
-rollback backups. Profile operations recover interrupted imports before reading
-or mutating profile state: a fully persisted after-state is finalized and cleaned
-up, while a partial transaction rolls back actions in reverse order and restores
-the previous standalone/account selections. Credential contents never enter the
-lifecycle journal. If neither the existing state nor the source bundle selects an
-active profile, importing a new profile keeps the active selection empty.
-
 `godex profile import claude` imports an existing Claude Code OAuth credential
 from `CLAUDE_CONFIG_DIR` or `~/.claude/.credentials.json`. The source is read as
 a bounded regular file, symlinked roots/files are rejected, and the managed copy
@@ -246,19 +238,13 @@ normalization used by chat-compatible responses. `pro -> flash` /
 Completions and native Messages stay passthrough, Models list/single remains local,
 and Responses Compact remains the bounded local fallback with no model call.
 
-Buffered DeepSeek responses and live SSE now use the tagged response contract,
-including sparse response defaults, reasoning/tool output, raw function-argument
-deltas, empty-delta events, and terminal completion shaping. `deepseek.web_search_mode`
-is resolved from `config.toml` before `PRODEX_DEEPSEEK_WEB_SEARCH_MODE` and
-supports `auto`, `off`, `openai_chat`, and `anthropic`; strict-tools requests
-use the tagged beta-base routing policy. Web-search Responses in native mode use
-DeepSeek's `/anthropic/v1/messages` endpoint with `x-api-key` and
-`anthropic-version`, translating system/tool history, namespaced tools, native
-web search, buffered responses, and Anthropic SSE back to Responses. In `auto`,
-only tagged safe translation loss falls back to Chat; explicit `anthropic` mode
-fails closed. Native stream first-event inspection is bounded by
-`PRODEX_RUNTIME_PROXY_SSE_LOOKAHEAD_TIMEOUT_MS` (default 1000 ms) before model
-or credential retry is allowed.
+Buffered DeepSeek Responses and SSE now shape reasoning/tool output, function
+arguments, empty text deltas, and completion events. `deepseek.web_search_mode`
+uses `config.toml` before its environment fallback: `off` rejects search,
+`openai_chat` forwards it through Chat Completions, and `auto` uses the native
+Messages bridge for supported requests. Strict-tool Responses use the configured
+beta base URL. The native Messages bridge remains a partial 0.435.1 parity gap;
+unsupported explicit `anthropic` requests fail before upstream.
 
 Gemini API-key launches are also supported with `godex run --provider gemini`.
 Key precedence is `--api-key`, `GEMINI_API_KEYS`, `GOOGLE_API_KEYS`,
@@ -271,22 +257,19 @@ semantic summarization and returns the bounded local fallback when that fails.
 For Responses, only structured Gemini quota/rate 429s advance the model chain;
 other 429 responses retain their original status and body.
 Messages and Embeddings pass through to their requested paths. Raw API keys stay
-in the invocation-local gateway. GET Models list/single requests use the exact
-Prodex 0.435.1 Gemini catalog locally; unknown models return the tagged 404 and
-non-GET Models requests pass upstream. OAuth runtime remains disabled. Legacy
-Gemini OAuth profile quota returns the tagged migration guidance without reading
-credentials or making a network request. OpenAI profiles whose Codex
-`config.toml` selects a non-OpenAI `model_provider` report that configured
-provider instead of probing OpenAI quota. Legacy Gemini OAuth profiles can also
-be migrated through profile bundles: plain/encrypted exports carry an empty
-`auth_json`, tagged Gemini provider metadata, and one validated private
-`gemini_oauth.json`. This preserves migration compatibility without re-enabling
-Gemini OAuth runtime/login.
+in the invocation-local gateway. GET Models list/single requests use the tagged
+local catalog; unknown models return its 404 response and non-GET requests pass
+upstream. Runtime use of Gemini OAuth profiles remains disabled, and their legacy
+quota view returns disabled-auth guidance without a network request. Bundle
+export/import preserve Prodex 0.435.1's Gemini provider `email`, optional
+`project_id`, and exact `secret_files[].path` value `gemini_oauth.json`;
+unencrypted bundles contain the credential while password-protected bundles
+encrypt the payload. Profile metadata and CLI summaries omit the credential.
 
 Launch the native Antigravity CLI with `godex s gemini --cli agy` (or
 `godex super gemini --cli agy`; `godex run --provider gemini --cli agy` remains
-available). Godex adds `--dangerously-skip-permissions`, passes remaining arguments
-to `agy`, and does not use Godex account/profile selection or the Gemini API-key
+available). Godex adds `--dangerously-skip-permissions`, passes remaining arguments to
+`agy`, and does not use Godex account/profile selection or the Gemini API-key
 proxy. Run `godex login --with-antigravity` to delegate global sign-in to
 `agy auth login`; this does not create a Godex profile. Set `PRODEX_AGY_BIN` to
 override the `agy` executable. Pass `--model MODEL` to set a default model;
@@ -414,17 +397,15 @@ bounded runtime summary/tail, and `--quota` for per-profile quota readiness.
 `doctor --bundle [PATH] --redacted` emits a redacted diagnostic bundle; omitting
 PATH or using `-` writes it to stdout, while file bundles are written privately
 and atomically. `--tail-bytes` defaults to 128 KiB and is capped at 8 MiB.
-Automatic import-lifecycle recovery runs before profile operations.
-`doctor --repair-import-auth-journals` recovers an interrupted profile-store auth
-replacement and reports repaired/remaining orphan-journal status in human, runtime
-JSON, and redacted bundle diagnostics. Account-store import updates remain outside
-this journal path. `doctor --repair-session-index` runs full shared-session
-maintenance before Codex app-server reconciliation: attachment paths are stabilized,
-session metadata ordering and mtimes are repaired, goal-database attachment paths and
-the versioned maintenance cache are updated, then active and archived thread listings
-reconcile Codex's index. Successful repair is reported on stderr; runtime-policy
-suggestions remain unsupported. Interactive human doctor panels use Bubble Tea;
-non-TTY output remains line-oriented.
+`doctor --repair-import-auth-journals` recovers an interrupted auth update for a
+profile-store profile and reports the number of journals recovered. Its journal
+contains path and phase metadata only; the previous auth file stays inside that
+profile's `CODEX_HOME`. This covers only the profile store's auth-file update,
+not Prodex's complete import-lifecycle recovery. Account-store import updates do
+not use this journal. Full session-index repair and runtime-policy suggestions
+remain unsupported.
+Interactive human doctor panels use Bubble Tea; non-TTY output remains
+line-oriented.
 
 Available profile, account, and runtime commands:
 
@@ -437,7 +418,7 @@ Available profile, account, and runtime commands:
 | godex current | Show the active profile and its `CODEX_HOME`. |
 | godex use NAME | Set the active profile. |
 | godex profile remove NAME [--delete-home] | Unregister a profile; managed home deletion is explicit. |
-| godex profile import-current [NAME] | Import the ChatGPT login from the current Codex home. |
+| godex profile import-current [NAME] [--insecure] | Copy the current Codex home into a managed account; `--insecure` bypasses the source directory permission check. |
 | godex accounts | List managed ChatGPT account identities. |
 | godex account use SELECTOR | Set the preferred account for account rotation. |
 | godex account remove SELECTOR | Remove a managed account and its isolated home. |
@@ -501,12 +482,11 @@ first row exactly like Prodex. Managed Copilot profiles now expose the 0.435.1
 user-quota view through the existing exact-account token resolver: login,
 plan/access, chat/completions remaining versus monthly totals, blocked/readiness,
 monthly reset date, and minimum remaining percentage are derived without storing
-Copilot tokens in Godex. `quota --raw PROFILE` now follows the 0.435.1
-provider-specific path: Copilot returns the bounded user-info JSON, Anthropic/Kiro/AGY
-return external quota JSON, and legacy Gemini OAuth returns the disabled/migration
-guidance before network access. OpenAI profiles configured with a non-OpenAI
-`model_provider` use the `model-provider:<id>` auth label, are non-quota-compatible,
-and expose the configured-provider snapshot/raw JSON instead of probing OpenAI.
+Copilot tokens in Godex. Gemini API keys are launch-scoped rather than persisted
+profiles; legacy Gemini OAuth profiles return Prodex's disabled-auth guidance
+without a network request. OpenAI profiles with a non-OpenAI `model_provider`
+in `config.toml` report the configured provider and source instead of probing
+OpenAI quota.
 
 `godex redeem PROFILE` performs the same explicit two-step manual flow as Prodex:
 it checks current usage first, asks for confirmation when the nearest 5-hour or
@@ -527,18 +507,23 @@ AlreadyRedeemed, and retries only when both 5-hour and weekly windows are usable
 Hard continuation affinity redeems/retries only its owner profile. Missing quota
 evidence, natural reset within five minutes, zero credits, non-quota/transient
 failures, and non-OpenAI providers never spend a credit. Redemption/retry remains
-pre-commit HTTP/SSE behavior; Godex still does not implement WebSocket/Realtime.
+pre-commit HTTP/SSE behavior. The loopback proxy routes each Responses WebSocket
+text message through account selection, binds response IDs to the selected
+account, and retries eligible precommit failures. It reuses terminal upstream
+sessions per client tunnel, reconnects after 60 seconds idle, and retries an
+explicit connection-limit error once on the same account. Realtime/live paths
+retain a raw tunnel. Responses WebSocket precommit quota failures use the
+configured auto-redeem retry path. Known-owner `previous_response_not_found`
+failures return the tagged 409 `stale_continuation` error. Prodex's cached
+pre-send quota gate and automatic cross-owner or turn-state recovery remain
+unsupported.
 
 `godex ping openai` is intentionally cost-bearing: it submits the minimal `hello`
 turn through official Codex for each selected OpenAI profile. It uses a private
 diagnostic working directory, a 45-second per-profile timeout, up to four workers,
-and strips provider API-key environment variables before launch. Large-context
-models use the same tagged context-window enrichment as Prodex: root config takes
-precedence, then `models_cache.json`, then the exact 0.435.1 OpenAI catalog; tagged
-max-context families prefer cached maximums and missing auto-compact limits default
-to 90% of the selected context. Human output streams profile results as workers
-finish; `--json` emits one stable aggregate object. Failure details are bounded and
-secret-redacted. No ping runs implicitly.
+and strips provider API-key environment variables before launch. Human output
+streams profile results as workers finish; `--json` emits one stable aggregate
+object. Failure details are bounded and secret-redacted. No ping runs implicitly.
 
 `godex update` resolves the latest stable GitHub release with a five-minute private
 cache, takes an exclusive install lock, re-checks the actual running binary under
@@ -563,9 +548,12 @@ direct deterministic login path.
 
 Selectors match an exact account ID, friendly name, or email. Ambiguous
 selectors fail. Unknown top-level commands are treated as Codex subcommands and
-run through the same managed account runtime. Repeating login for an existing ChatGPT account updates its
-profile credentials instead of creating a duplicate. Existing sessions, history,
-and Codex configuration survive repeat login and import-current.
+run through the same managed account runtime. Repeating login for an existing
+ChatGPT account updates its profile credentials instead of creating a duplicate.
+A new `profile import-current` account receives a private copy of the current
+Codex home. If that identity already exists, Godex updates authentication and
+preserves the managed home. Existing sessions, history, and Codex configuration
+survive repeat login and import-current.
 
 
 Interactive terminal surfaces that correspond to Prodex TUIs use
@@ -579,9 +567,10 @@ PgUp/PgDn, Home/End, digit shortcuts, Enter, and q/Esc cancellation. Non-TTY and
 machine-readable modes keep plain output for scripts and pipes.
 
 The menu dispatches ChatGPT/device login, persisted OpenAI/API-compatible API-key
-login, plus Claude and Copilot import flows. Selecting the API-key entry opens a
-Bubble Tea sequence for the masked key, optional OpenAI-compatible base URL, and
-managed profile name; `godex login --with-api-key` uses the same flow directly.
+login, native Antigravity sign-in, plus Claude and Copilot import flows. Selecting
+the API-key entry opens a Bubble Tea sequence for the masked key, optional
+OpenAI-compatible base URL, and managed profile name; `godex login --with-api-key`
+uses the same flow directly.
 `--base-url` and `--openai-base-url` are aliases, and an empty prompted URL keeps
 the default OpenAI endpoint. The key is stored only in the managed profile's
 private `auth.json`; an optional custom endpoint is stored separately in
@@ -613,8 +602,10 @@ control, backups, bug reports, or fixtures.
 - [Architecture](docs/ARCHITECTURE.md) — package ownership and runtime design.
 - [Runtime rotation and affinity](docs/ROTATION.md) — selection, retries,
   commitment, streaming, and forwarding rules.
-- [Parity audit](docs/PARITY.md) — Prodex 0.435.1 implemented equivalents,
-  remaining 1:1 gaps, and validation limits.
+- [Parity checkpoint](docs/PARITY-04361.md) — current Prodex 0.436.1 work,
+  validation, and known limits.
+- [Historical parity audit](docs/PARITY.md) — the earlier Prodex 0.435.5
+  implementation record and remaining historical gaps.
 - [AGENTS.md](AGENTS.md) — engineering invariants for contributors.
 
 ## Build from source
@@ -664,12 +655,14 @@ with guidance to use `godex login`/`godex logout`, whose managed workflows enfor
 identity registration and exclusive credential mutation. `login status` stays
 read-only. Local session deletion/archive commands also bypass quota and routing.
 
-Model traffic uses an explicit HTTP/SSE OpenAI Responses configuration; native
-Codex account/bootstrap and authentication endpoints retain their normal HTTPS
-transport. Godex rejects unexpected WebSocket upgrades and routing/auth-store
-config overrides. It supplies both the chosen bearer credential and its ChatGPT
-account routing header. A broken committed stream fails downstream HTTP and is
-never replayed on another account.
+Managed Codex model traffic uses an explicit HTTP/SSE OpenAI Responses
+configuration; native Codex account/bootstrap and authentication endpoints keep
+their normal HTTPS transport. The loopback proxy accepts supported WebSocket
+upgrades. Responses messages enter routing individually and can rotate only
+before commitment; Realtime/live sessions keep the selected account for their
+raw tunnel. Routing/auth-store config overrides are rejected. The proxy supplies
+the chosen bearer credential and ChatGPT account routing header. A broken
+committed HTTP stream fails downstream and is never replayed on another account.
 
 Managed config is applied in the innermost `exec`, `exec resume`, `exec fork`,
 or `exec review` scope. Other Codex overrides retain their order and precedence.

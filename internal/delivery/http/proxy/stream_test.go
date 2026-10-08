@@ -23,7 +23,7 @@ func TestProxySSEQuotaRotatesOnlyBeforeOutput(t *testing.T) {
 	}{
 		{"initial quota", "", true}, {"startup metadata", metadata, true},
 		{"after output", metadata + output, false}, {"unknown event", "data: {}\n\n", false},
-		{"inspection ceiling", ":" + strings.Repeat("x", 64<<10) + "\n\n", false},
+		{"past old inspection limit", ":" + strings.Repeat("x", 64<<10) + "\n\n", true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			accounts := testRuntimeAccounts(t, "A", "token-a", "B", "token-b")

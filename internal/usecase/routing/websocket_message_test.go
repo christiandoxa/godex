@@ -174,6 +174,60 @@ func TestWebSocketReuseFailureDiscoversAndRetriesTurnStateOnSameOwner(t *testing
 	}
 }
 
+func TestWebSocketReuseTransportFailureWithoutTurnStateRetriesOwner(t *testing.T) {
+	gateway := &websocketMessageRoutingGateway{responses: []*proxymodel.Response{
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("first-frame")), WebSocketFrames: true, FirstEventCommitted: true, WebSocketResponseID: "resp_owner"},
+		{StatusCode: http.StatusBadGateway, Body: io.NopCloser(strings.NewReader("transport-failure-frame")), WebSocketFrames: true, WebSocketReusedSession: true, PrecommitFailure: &proxymodel.PrecommitFailure{Transport: true}},
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("recovered-frame")), WebSocketFrames: true, FirstEventCommitted: true, WebSocketResponseID: "resp_next"},
+	}}
+	router := newWebSocketMessageRouter(t, gateway)
+	firstRequest := websocketMessageRequest(`{"type":"response.create","session_id":"session-owner","response":{}}`)
+	firstRequest.WebSocketSessionID = 17
+	first, err := router.Forward(context.Background(), firstRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner := first.Result.AccountID
+	_ = first.Close()
+
+	continuationRequest := websocketMessageRequest(`{"type":"response.create","session_id":"session-owner","response":{"previous_response_id":"resp_owner"}}`)
+	continuationRequest.WebSocketSessionID = 17
+	continuation, err := router.Forward(context.Background(), continuationRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer continuation.Close()
+	if continuation.Result.AccountID != owner || continuation.Result.Response.WebSocketResponseID != "resp_next" || len(gateway.requests) != 3 {
+		t.Fatalf("reuse transport recovery = account %q response %q requests %d", continuation.Result.AccountID, continuation.Result.Response.WebSocketResponseID, len(gateway.requests))
+	}
+}
+
+func TestWebSocketReuseTransportFailureRetriesSessionOwnerWithoutContinuation(t *testing.T) {
+	gateway := &websocketMessageRoutingGateway{responses: []*proxymodel.Response{
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("first-frame")), WebSocketFrames: true, FirstEventCommitted: true, WebSocketResponseID: "resp_owner"},
+		{StatusCode: http.StatusBadGateway, Body: io.NopCloser(strings.NewReader("transport-failure-frame")), WebSocketFrames: true, WebSocketReusedSession: true, PrecommitFailure: &proxymodel.PrecommitFailure{Transport: true}},
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("recovered-frame")), WebSocketFrames: true, FirstEventCommitted: true, WebSocketResponseID: "resp_next"},
+	}}
+	router := newWebSocketMessageRouter(t, gateway)
+	first, err := router.Forward(context.Background(), websocketMessageRequest(`{"type":"response.create","session_id":"session-owner","response":{}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner := first.Result.AccountID
+	_ = first.Close()
+
+	request := websocketMessageRequest(`{"type":"response.create","session_id":"session-owner","input":[{"type":"message","role":"user","content":"next"}]}`)
+	request.WebSocketSessionID = 17
+	continuation, err := router.Forward(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer continuation.Close()
+	if continuation.Result.AccountID != owner || continuation.Result.Response.WebSocketResponseID != "resp_next" || len(gateway.requests) != 3 {
+		t.Fatalf("session-owner transport recovery = account %q response %q requests %d", continuation.Result.AccountID, continuation.Result.Response.WebSocketResponseID, len(gateway.requests))
+	}
+}
+
 func TestWebSocketPreviousResponseRetriesFollowBoundedTurnStateSchedule(t *testing.T) {
 	for _, test := range []struct {
 		name          string

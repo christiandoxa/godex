@@ -199,7 +199,7 @@ func TestProdex04355TransportBackoffWaitsWhenWholeRoutePoolIsCooling(t *testing.
 	}
 }
 
-func TestProdex04355HardAffinityBypassesTransportBackoff(t *testing.T) {
+func TestProdex04361SoftSessionAffinityRespectsTransportBackoff(t *testing.T) {
 	now := time.Unix(120_000, 0)
 	gateway := &transportParityGateway{}
 	router, err := NewRouter(Config{
@@ -209,11 +209,42 @@ func TestProdex04355HardAffinityBypassesTransportBackoff(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := router.affinity.remember(t.Context(), transportAccountA, affinityKeys{session: "session-hard-transport"}, now); err != nil {
+	if err := router.affinity.remember(t.Context(), transportAccountA, affinityKeys{session: "session-soft-transport"}, now); err != nil {
 		t.Fatal(err)
 	}
 	request := transportParityRequest("/responses")
-	request.Body = []byte(`{"session_id":"session-hard-transport"}`)
+	request.Body = []byte(`{"session_id":"session-soft-transport"}`)
+	router.persistTransportBackoff(t.Context(), transportAccountA, request.QuotaSelection)
+
+	exchange, err := router.Forward(t.Context(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer exchange.Close()
+	if exchange.Result.AccountID != transportAccountB || strings.Join(gateway.owners, ",") != transportAccountB {
+		t.Fatalf("soft session affinity ignored transport cooldown: owner=%q attempts=%v", exchange.Result.AccountID, gateway.owners)
+	}
+	owner, err := router.affinity.owner(t.Context(), affinityKeys{session: "session-soft-transport"}, now)
+	if err != nil || owner != transportAccountB {
+		t.Fatalf("session owner after fallback = %q, err=%v; want %q", owner, err, transportAccountB)
+	}
+}
+
+func TestProdex04361HardPreviousResponseAffinityBypassesTransportBackoff(t *testing.T) {
+	now := time.Unix(120_000, 0)
+	gateway := &transportParityGateway{}
+	router, err := NewRouter(Config{
+		Gateway: gateway, PreferredAccount: transportAccountB, Now: func() time.Time { return now },
+		Accounts: func(context.Context) ([]proxymodel.Account, error) { return transportParityAccounts(), nil },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := router.affinity.remember(t.Context(), transportAccountA, affinityKeys{previous: "resp-hard-transport"}, now); err != nil {
+		t.Fatal(err)
+	}
+	request := transportParityRequest("/responses")
+	request.Body = []byte(`{"previous_response_id":"resp-hard-transport"}`)
 	router.persistTransportBackoff(t.Context(), transportAccountA, request.QuotaSelection)
 
 	exchange, err := router.Forward(t.Context(), request)
@@ -222,7 +253,8 @@ func TestProdex04355HardAffinityBypassesTransportBackoff(t *testing.T) {
 	}
 	defer exchange.Close()
 	if exchange.Result.AccountID != transportAccountA || strings.Join(gateway.owners, ",") != transportAccountA {
-		t.Fatalf("hard affinity rotated during transport cooldown: owner=%q attempts=%v", exchange.Result.AccountID, gateway.owners)
+		t.Fatalf("hard previous-response affinity rotated during transport cooldown: owner=%q attempts=%v",
+			exchange.Result.AccountID, gateway.owners)
 	}
 }
 

@@ -279,16 +279,35 @@ func (router *Router) Forward(ctx context.Context, request proxymodel.Request) (
 		return nil, err
 	}
 	owner, durableRelease, err := router.resolveOwner(ctx, keys, request.QuotaSelection)
-	if durableRelease != nil {
-		defer durableRelease()
-	}
 	if err != nil {
 		return nil, err
+	}
+	if owner != "" && keys.hasSoftSessionAffinity(request.QuotaSelection) &&
+		router.softSessionOwnerBlocked(accounts, owner, request.QuotaSelection) && router.affinity.repository != nil {
+		durableRelease, err = router.affinity.repository.AcquireConversation(ctx)
+		if err != nil {
+			return nil, err
+		}
+		owner, err = router.affinity.refreshOwner(ctx, keys, router.now())
+		if err != nil {
+			_ = durableRelease()
+			return nil, &proxymodel.Error{StatusCode: 409, Message: "request contains conflicting conversation affinity"}
+		}
+	}
+	if durableRelease != nil {
+		defer durableRelease()
 	}
 	restorePreviousResponseTurnState(ctx, &request, accounts, owner, &keys, router.affinity, router.now())
 	result, err := router.routeRequest(ctx, request, accounts, owner, &keys)
 	if err != nil {
 		return nil, err
+	}
+	if owner != "" && keys.hasSoftSessionAffinity(request.QuotaSelection) &&
+		result.AccountID != owner && result.Response != nil && !result.Failed && result.Response.StatusCode < 400 {
+		if err := router.affinity.forgetOwned(ctx, owner, affinityKeys{session: keys.session}, router.now()); err != nil {
+			_ = result.Response.Body.Close()
+			return nil, err
+		}
 	}
 	// Carry the selected provider policy into both startup and late-stream
 	// response observation. Account IDs alone do not encode provider type.
@@ -313,55 +332,6 @@ func (router *Router) loadAccounts(ctx context.Context) ([]proxymodel.Account, e
 		return nil, &proxymodel.Error{StatusCode: 503, Message: "cannot load managed accounts"}
 	}
 	return sortRuntimeAccounts(accounts), nil
-}
-
-func (router *Router) resolveOwner(
-	ctx context.Context,
-	keys affinityKeys,
-	selection quotamodel.Selection,
-) (string, func() error, error) {
-	owner, err := router.affinity.owner(ctx, keys, router.now())
-	if err != nil {
-		return "", nil, &proxymodel.Error{StatusCode: 409, Message: "request contains conflicting conversation affinity"}
-	}
-	var durableRelease func() error
-	if owner == "" && router.affinity.repository != nil && stableConversation(keys) {
-		durableRelease, err = router.affinity.repository.AcquireConversation(ctx)
-		if err != nil {
-			return "", nil, err
-		}
-		owner, err = router.affinity.owner(ctx, keys, router.now())
-		if err != nil {
-			_ = durableRelease()
-			return "", nil, err
-		}
-	}
-	if owner == "" && opaqueContinuation(keys, selection) &&
-		(keys.previous == "" || !router.hasPreviousResponseFailure(keys.previous, selection)) {
-		if durableRelease != nil {
-			_ = durableRelease()
-		}
-		return "", nil, &proxymodel.Error{StatusCode: 409, Message: "continuation owner is unknown; continuity was preserved"}
-	}
-	return owner, durableRelease, nil
-}
-
-func stableConversation(keys affinityKeys) bool {
-	return keys.thread != "" || keys.session != ""
-}
-
-func opaqueContinuation(keys affinityKeys, selection quotamodel.Selection) bool {
-	if keys.previous != "" {
-		return true
-	}
-	return keys.turn != "" && selection.RouteKind != quotamodel.RouteKindCompact
-}
-
-func (router *Router) routeRequest(ctx context.Context, request proxymodel.Request, accounts []proxymodel.Account, owner string, keys *affinityKeys) (proxymodel.Forwarded, error) {
-	if owner != "" {
-		return router.forwardBound(ctx, request, accounts, owner, keys)
-	}
-	return router.forwardFresh(ctx, request, accounts)
 }
 
 func (router *Router) bindSuccessfulResponse(

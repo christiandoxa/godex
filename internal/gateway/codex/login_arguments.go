@@ -3,7 +3,6 @@ package codex
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"path/filepath"
 
 	entity "github.com/christiandoxa/godex/internal/entity/account"
@@ -30,7 +29,7 @@ func (process *CodexProcess) LoginArguments(
 	defer release()
 
 	commandArgs := append([]string{"login"}, arguments...)
-	command := exec.CommandContext(ctx, binary, commandArgs...)
+	command := terminalCommand(ctx, binary, commandArgs)
 	command.Env = environmentWith("CODEX_HOME", codexHome)
 	command.Stdin = process.terminal.Stdin
 	command.Stdout = process.terminal.Stdout

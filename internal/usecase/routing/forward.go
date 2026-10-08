@@ -29,7 +29,8 @@ func (router *Router) forwardBound(
 	}
 	router.recordSelectionMarker(ctx, "selection_keep_current", account, request.QuotaSelection)
 	router.recordRouteDecisionSelected(ctx, request, account)
-	response, err := router.executeWithProfileInflightWait(ctx, request, account, true)
+	hardAffinity := requestRoutingAffinity(request).hasHardAffinity(request.QuotaSelection)
+	response, err := router.executeWithProfileInflightWait(ctx, request, account, hardAffinity)
 	failed, rotatePrevious := false, false
 	if err == nil && !request.WebSocketMessage {
 		response, failed, rotatePrevious, err = router.recoverInvalidPreviousResponse(ctx, request, account, response, keys)
@@ -106,7 +107,7 @@ func (router *Router) prepareBoundOwner(
 		return proxymodel.Account{}, boundOwnerUnavailable()
 	}
 	affinity := requestRoutingAffinity(request)
-	hardAffinity := affinity.hasAffinity()
+	hardAffinity := affinity.hasHardAffinity(request.QuotaSelection)
 	hardQuotaAffinity := affinity.previous != "" || affinity.turn != "" ||
 		(request.QuotaSelection.RouteKind == quotamodel.RouteKindCompact && affinity.session != "")
 	if !hardQuotaAffinity && account.EligibleAfter.After(router.now()) {
@@ -138,6 +139,24 @@ func (router *Router) boundOwnerBlocked(account proxymodel.Account, hardAffinity
 	return router.isQuarantined(account.ID, now) ||
 		(!hardAffinity && router.transportBackoffRemaining(account.ID, selection, now) > 0) ||
 		(!hardAffinity && account.EligibleAfter.After(now))
+}
+
+func (router *Router) softSessionOwnerBlocked(
+	accounts []proxymodel.Account,
+	owner string,
+	selection quotamodel.Selection,
+) bool {
+	account, err := boundOwnerAccount(accounts, owner)
+	if err != nil || !account.Enabled || account.Home == "" {
+		return true
+	}
+	now := router.now()
+	router.refreshCachedQuotaChecks(accounts, selection, now)
+	state, cached := router.cachedQuotaCheck(owner, selection, now)
+	return router.isQuarantined(owner, now) || account.EligibleAfter.After(now) ||
+		(cached && !state.ready && (state.retryAt.IsZero() || state.retryAt.After(now))) ||
+		router.transportBackoffRemaining(owner, selection, now) > 0 ||
+		router.routeCircuitRemaining(owner, selection, now) > 0
 }
 
 func boundOwnerUnavailable() error {
@@ -247,6 +266,7 @@ func pendingForwarded(
 	outcome responseOutcome,
 	pending *pendingResponse,
 ) proxymodel.Forwarded {
+	pending.commitStream()
 	return proxymodel.Forwarded{
 		Response: pending.response, Prefix: pending.prefix, AccountID: accountID,
 		Failed: outcome.failed || outcome.kind != responsePass,

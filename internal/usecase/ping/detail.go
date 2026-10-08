@@ -2,26 +2,14 @@ package ping
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 	"unicode/utf8"
 
+	redacthelper "github.com/christiandoxa/godex/internal/helper/redact"
 	pingmodel "github.com/christiandoxa/godex/internal/model/ping"
 )
 
 const pingErrorDetailMaxBytes = 4096
-
-var pingSecretPatterns = []struct {
-	pattern *regexp.Regexp
-	replace string
-}{
-	{regexp.MustCompile(`(?i)(authorization\s*:\s*bearer\s+)[^\s]+`), `${1}<redacted>`},
-	{regexp.MustCompile(`(?i)(["']?(?:access_token|refresh_token|id_token|api_key|openai_api_key|anthropic_api_key|gemini_api_key|google_api_key|github_copilot_api_key)["']?\s*[:=]\s*["']?)[^"',\s}]+`), `${1}<redacted>`},
-	{regexp.MustCompile(`(?i)(https?://)[^/@\s]+@`), `${1}<redacted>@`},
-	{regexp.MustCompile(`\bsk-[A-Za-z0-9_-]{8,}`), `<redacted>`},
-	{regexp.MustCompile(`\bgh[opsu]_[A-Za-z0-9]{20,}`), `<redacted>`},
-	{regexp.MustCompile(`\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}`), `<redacted>`},
-}
 
 func processErrorResult(profile, model, effort string, err error, latency int64) pingmodel.Result {
 	status := classifyFailure(err.Error())
@@ -52,9 +40,7 @@ func appendPingDetail(base, extra string) string {
 
 func boundedPingDetail(value string) string {
 	value = strings.TrimSpace(strings.NewReplacer("\r", " ", "\n", " ").Replace(value))
-	for _, secret := range pingSecretPatterns {
-		value = secret.pattern.ReplaceAllString(value, secret.replace)
-	}
+	value = redacthelper.Secrets(value)
 	value = strings.Join(strings.Fields(value), " ")
 	if len(value) <= pingErrorDetailMaxBytes {
 		return value

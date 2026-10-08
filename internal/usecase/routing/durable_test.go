@@ -15,14 +15,18 @@ import (
 )
 
 type bindingsFake struct {
-	values []routingentity.Binding
-	writes int
+	values    []routingentity.Binding
+	writes    int
+	onAcquire func()
 }
 
 func (f *bindingsFake) Load(context.Context) ([]routingentity.Binding, error) {
 	return append([]routingentity.Binding(nil), f.values...), nil
 }
 func (f *bindingsFake) AcquireConversation(context.Context) (func() error, error) {
+	if f.onAcquire != nil {
+		f.onAcquire()
+	}
 	return func() error { return nil }, nil
 }
 func (f *bindingsFake) Remove(_ context.Context, keys []string) error {
@@ -59,6 +63,31 @@ func TestDurableOwnerBeyondCacheCapacity(t *testing.T) {
 		t.Fatal("affinity cache exceeded its bound")
 	}
 }
+
+func TestDurableOwnerRefreshesStaleCacheUnderConversationLock(t *testing.T) {
+	keys := affinityKeys{session: "synthetic-session"}
+	binding := keys.entries()[0]
+	binding.AccountID = "account-a"
+	repository := &bindingsFake{values: []routingentity.Binding{binding}}
+	store := newAffinityStore()
+	store.repository = repository
+	now := time.Now()
+	if owner, err := store.owner(context.Background(), keys, now); err != nil || owner != "account-a" {
+		t.Fatalf("initial owner = %q, %v", owner, err)
+	}
+	binding.AccountID = "account-b"
+	repository.onAcquire = func() { repository.values = []routingentity.Binding{binding} }
+	release, err := repository.AcquireConversation(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = release() }()
+	owner, err := store.refreshOwner(context.Background(), keys, now)
+	if err != nil || owner != "account-b" {
+		t.Fatalf("refreshed owner = %q, %v", owner, err)
+	}
+}
+
 func (f *bindingsFake) Merge(_ context.Context, updates []routingentity.Binding) ([]routingentity.Binding, error) {
 	f.writes++
 	f.values = append(f.values, updates...)

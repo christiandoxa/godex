@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	entity "github.com/christiandoxa/godex/internal/entity/account"
 )
@@ -52,7 +53,7 @@ func (process *CodexProcess) Login(
 	if deviceAuth {
 		arguments = append(arguments, "--device-auth")
 	}
-	command := exec.CommandContext(ctx, binary, arguments...)
+	command := terminalCommand(ctx, binary, arguments)
 	command.Env = environmentWith("CODEX_HOME", codexHome)
 	command.Stdin = process.terminal.Stdin
 	command.Stdout = process.terminal.Stdout
@@ -91,7 +92,7 @@ func (process *CodexProcess) run(ctx context.Context, codexHome string, argument
 		return err
 	}
 	defer release()
-	command := exec.CommandContext(ctx, binary, arguments...)
+	command := terminalCommand(ctx, binary, arguments)
 	command.Env = codexThreadIndexEnvironment(codexHome, process.sharedCodexHome)
 	command.Stdin = process.terminal.Stdin
 	command.Stdout = process.terminal.Stdout
@@ -103,6 +104,13 @@ func (process *CodexProcess) run(ctx context.Context, codexHome string, argument
 		return err
 	}
 	return nil
+}
+
+func terminalCommand(ctx context.Context, binary string, arguments []string) *exec.Cmd {
+	command := exec.CommandContext(ctx, binary, arguments...)
+	command.Cancel = func() error { return nil }
+	command.WaitDelay = 2 * time.Second
+	return command
 }
 
 func (process *CodexProcess) Version(ctx context.Context) (string, error) {
