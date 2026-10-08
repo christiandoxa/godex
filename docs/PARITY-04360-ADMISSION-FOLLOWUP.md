@@ -165,6 +165,11 @@ and `crates/prodex-app/src/runtime_tools/usage_limit_recovery.rs`.
   `active → usage_limited` database transition can authorize the same
   guarded, one-shot continuation even without a free-form error message.
   Missing goal databases still permit standard (non-goal) recovery.
+  The SQLite file URI is normalized across Linux/macOS and Windows
+  drive-letter paths, with `mode=ro` and the `query_only` pragma. A
+  Windows CI regression on the initial parity commit was traced to an
+  unnormalized path and covered by a dedicated cross-platform DSN test
+  plus read-only database mutation-rejection test.
 - Managed OpenAI `RunProfiles` now performs read-only session catalogue
   snapshots around a new headless `exec` invocation and can recover a
   **fresh** session if exactly one new session is discoverable, the

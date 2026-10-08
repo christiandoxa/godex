@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 
 	_ "modernc.org/sqlite"
@@ -33,8 +34,11 @@ func readGoalRecoveryState04360(ctx context.Context, home, id string) (goalRecov
 	if err != nil || !info.Mode().IsRegular() {
 		return goalRecoveryState04360{}, false
 	}
-	uri := (&url.URL{Scheme: "file", Path: path, RawQuery: "mode=ro"}).String()
-	database, err := sql.Open("sqlite", uri)
+	// Windows filepath.Join uses backslashes and a drive letter. A raw
+	// file URL constructed from that string is not a valid SQLite URI on
+	// Windows. Use the same normalized, query-only URI contract as the
+	// repository's Kiro SQLite read-only adapter.
+	database, err := sql.Open("sqlite", goalReadOnlyDSN04360(path, goruntime.GOOS))
 	if err != nil {
 		return goalRecoveryState04360{}, false
 	}
@@ -102,4 +106,27 @@ func goalAllowsRecovery04360(ctx context.Context, home, id string) bool {
 	default:
 		return false
 	}
+}
+
+// goalReadOnlyDSN04360 preserves Windows drive semantics and enforces a
+// query-only connection. Constructing a file URL from a raw C:\ path
+// would cause a false-negative goal state probe on Windows CI.
+func goalReadOnlyDSN04360(path, goos string) string {
+	normalized := filepath.ToSlash(path)
+	if goos == "windows" {
+		normalized = strings.ReplaceAll(path, "\\", "/")
+		if len(normalized) >= 3 && normalized[1] == ':' &&
+			normalized[2] == '/' &&
+			(normalized[0] >= 'A' && normalized[0] <= 'Z' ||
+				normalized[0] >= 'a' && normalized[0] <= 'z') {
+			normalized = "/" + normalized
+		}
+	}
+	uri := url.URL{Scheme: "file", Path: normalized}
+	query := uri.Query()
+	query.Set("mode", "ro")
+	query.Add("_pragma", "query_only(1)")
+	query.Add("_pragma", "busy_timeout(2000)")
+	uri.RawQuery = query.Encode()
+	return uri.String()
 }
