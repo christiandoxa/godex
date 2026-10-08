@@ -52,10 +52,11 @@ type PrecommitFailure struct {
 	StaleContinuation         bool
 }
 type Forwarded struct {
-	Response  *Response
-	Prefix    []byte
-	AccountID string
-	Failed    bool
+	Response     *Response
+	Prefix       []byte
+	AccountID    string
+	ProviderKind string
+	Failed       bool
 }
 type Auth struct {
 	AccessToken string `json:"-"`

@@ -290,6 +290,14 @@ func (router *Router) Forward(ctx context.Context, request proxymodel.Request) (
 	if err != nil {
 		return nil, err
 	}
+	// Carry the selected provider policy into both startup and late-stream
+	// response observation. Account IDs alone do not encode provider type.
+	for _, account := range accounts {
+		if account.ID == result.AccountID {
+			result.ProviderKind = account.Provider.Kind
+			break
+		}
+	}
 	if err := router.bindSuccessfulResponse(
 		ctx, &result, accounts, keys, request.WebSocketMessage, request.QuotaSelection, promptCacheKey,
 	); err != nil {
@@ -420,7 +428,7 @@ func (router *Router) bindSuccessfulResponse(
 		result.Response.Body.Close()
 		return err
 	}
-	if err := router.Observe(ctx, result.AccountID, result.Response.Header, result.Prefix, stream); err != nil {
+	if err := router.Observe(ctx, result.AccountID, result.Response.Header, result.Prefix, stream, result.ProviderKind); err != nil {
 		result.Response.Body.Close()
 		return err
 	}
@@ -442,17 +450,6 @@ func (router *Router) bindSuccessfulResponse(
 	if stream {
 		router.wrapResponsesStreamLatency(result.AccountID, selection, result.Response, len(result.Prefix) > 0)
 	}
-	return nil
-}
-
-func (router *Router) Observe(ctx context.Context, accountID string, headers http.Header, body []byte, stream bool) error {
-	router.observeTokenUsage(ctx, accountID, body)
-	keys := responseAffinity(headers, body, stream)
-	now := router.now()
-	if err := router.affinity.rememberVerified(ctx, accountID, keys, now); err != nil {
-		return err
-	}
-	router.affinity.rememberResponseTurnState(keys.previous, accountID, keys.turn, now)
 	return nil
 }
 

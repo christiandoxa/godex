@@ -149,18 +149,7 @@ Commands:
 Options:
   -h, --help  Print help
 `,
-	"ping/openai": `Send a minimal application request through the OpenAI/Codex runtime path.
-
-Usage: godex ping openai [OPTIONS]
-
-Options:
-  -p, --profile NAME  Probe only this OpenAI profile
-      --model MODEL   Model passed through the normal Codex request path
-      --base-url URL  Override the ChatGPT backend base URL
-      --no-proxy      Bypass upstream proxy settings
-      --json          Emit stable JSON output
-  -h, --help          Print help
-`,
+	"ping/openai": pingOpenAIHelpText,
 	"login": `Run provider login flows, using Godex profiles where supported.
 
 Usage: godex login [OPTIONS] [PROFILE_OR_LOGIN_ARG]...

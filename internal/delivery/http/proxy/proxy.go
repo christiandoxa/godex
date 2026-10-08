@@ -297,7 +297,7 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 		result.Response.Header = result.Response.Header.Clone()
 		result.Response.Header.Del("Set-Cookie")
 	}
-	proxy.forwardResponse(request.Context(), writer, result.Response, result.Prefix, result.AccountID, lifecycle)
+	proxy.forwardResponse(request.Context(), writer, result.Response, result.Prefix, result.AccountID, lifecycle, result.ProviderKind)
 }
 
 func readLimited(reader io.ReadCloser, limit int64) ([]byte, error) {

@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-func (proxy *Proxy) forwardResponse(ctx context.Context, writer http.ResponseWriter, response *proxymodel.Response, prefix []byte, accountID string, lifecycle *requestLifecycle) {
+func (proxy *Proxy) forwardResponse(ctx context.Context, writer http.ResponseWriter, response *proxymodel.Response, prefix []byte, accountID string, lifecycle *requestLifecycle, providerKinds ...string) {
 	if response == nil {
 		return
 	}
@@ -24,7 +24,11 @@ func (proxy *Proxy) forwardResponse(ctx context.Context, writer http.ResponseWri
 	lifecycle.commit()
 	writer.WriteHeader(response.StatusCode)
 	if stream {
-		proxy.finishCommittedStream(ctx, writer, response, prepared, accountID, lifecycle)
+		providerKind := ""
+		if len(providerKinds) > 0 {
+			providerKind = providerKinds[0]
+		}
+		proxy.finishCommittedStream(ctx, writer, response, prepared, accountID, lifecycle, providerKind)
 		return
 	}
 	proxy.finishCommittedBody(writer, response, prepared, lifecycle)
@@ -50,8 +54,8 @@ func clearMissingStandardHeaders(destination, source http.Header) {
 	}
 }
 
-func (proxy *Proxy) finishCommittedStream(ctx context.Context, writer http.ResponseWriter, response *proxymodel.Response, prefix []byte, accountID string, lifecycle *requestLifecycle) {
-	complete := proxy.forwardStream(ctx, writer, response.Body, prefix, accountID, response.Header)
+func (proxy *Proxy) finishCommittedStream(ctx context.Context, writer http.ResponseWriter, response *proxymodel.Response, prefix []byte, accountID string, lifecycle *requestLifecycle, providerKind string) {
+	complete := proxy.forwardStream(ctx, writer, response.Body, prefix, accountID, response.Header, providerKind)
 	copyTrailers(writer.Header(), response.Header, response.Trailer)
 	if complete {
 		lifecycle.complete()
@@ -76,23 +80,25 @@ func (proxy *Proxy) finishCommittedBody(writer http.ResponseWriter, response *pr
 	lifecycle.complete()
 }
 
-func (proxy *Proxy) forwardStream(ctx context.Context, writer http.ResponseWriter, body io.Reader, prefix []byte, accountID string, headers http.Header) bool {
+func (proxy *Proxy) forwardStream(ctx context.Context, writer http.ResponseWriter, body io.Reader, prefix []byte, accountID string, headers http.Header, providerKind string) bool {
 	forwarder := streamForwarder{
-		proxy:     proxy,
-		writer:    writer,
-		accountID: accountID,
-		headers:   headers,
-		decoder:   sse.NewDecoder(int(proxy.maxInspect)),
+		proxy:        proxy,
+		writer:       writer,
+		accountID:    accountID,
+		providerKind: providerKind,
+		headers:      headers,
+		decoder:      sse.NewDecoder(int(proxy.maxInspect)),
 	}
 	return forwarder.forward(ctx, body, prefix)
 }
 
 type streamForwarder struct {
-	proxy     *Proxy
-	writer    http.ResponseWriter
-	accountID string
-	headers   http.Header
-	decoder   *sse.Decoder
+	proxy        *Proxy
+	writer       http.ResponseWriter
+	accountID    string
+	providerKind string
+	headers      http.Header
+	decoder      *sse.Decoder
 }
 
 func (forwarder *streamForwarder) forward(ctx context.Context, body io.Reader, prefix []byte) bool {
@@ -130,7 +136,7 @@ func (forwarder *streamForwarder) remember(ctx context.Context, chunk []byte) {
 		return
 	}
 	for _, data := range forwarder.decoder.Feed(chunk) {
-		if err := forwarder.proxy.router.Observe(ctx, forwarder.accountID, forwarder.headers, data, false); err != nil {
+		if err := forwarder.proxy.router.Observe(ctx, forwarder.accountID, forwarder.headers, data, false, forwarder.providerKind); err != nil {
 			panic(http.ErrAbortHandler)
 		}
 	}
