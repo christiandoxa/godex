@@ -65,7 +65,7 @@ func (ping *OpenAI) RunObserved(
 		return pingmodel.Report{}, err
 	}
 	sort.Slice(results, func(i, j int) bool { return results[i].Profile < results[j].Profile })
-	return buildReport(results, len(targets), options, ping.now().Sub(started)), nil
+	return buildReport(results, len(targets), ping.now().Sub(started)), nil
 }
 
 func (ping *OpenAI) targets(ctx context.Context, requested string) ([]pingmodel.Target, error) {
@@ -207,7 +207,7 @@ func newResult(profile, model, effort string, status pingmodel.Status, detail st
 	}
 }
 
-func buildReport(results []pingmodel.Result, discovered int, options pingmodel.Options, elapsed time.Duration) pingmodel.Report {
+func buildReport(results []pingmodel.Result, discovered int, elapsed time.Duration) pingmodel.Report {
 	summary := pingmodel.Summary{ProfilesDiscovered: discovered, ProfilesTested: len(results), DurationMS: elapsed.Milliseconds()}
 	for _, result := range results {
 		accumulateSummary(&summary, result.Status)
@@ -217,13 +217,15 @@ func buildReport(results []pingmodel.Result, discovered int, options pingmodel.O
 	if summary.Healthy == len(results) && len(results) > 0 {
 		status = "ok"
 	}
-	effective := ""
+	requestedModel, requestedEffort, effective := "", "", ""
 	if len(results) > 0 {
+		requestedModel = results[0].Model
+		requestedEffort = results[0].Effort
 		effective = results[0].EffectiveModel
 	}
 	return pingmodel.Report{
-		Provider: "openai", Status: status, Model: options.Model, RequestedModel: options.Model,
-		Effort: options.Effort, RequestedEffort: options.Effort, EffectiveModel: effective, LatencyMS: elapsed.Milliseconds(),
+		Provider: "openai", Status: status, Model: requestedModel, RequestedModel: requestedModel,
+		Effort: requestedEffort, RequestedEffort: requestedEffort, EffectiveModel: effective, LatencyMS: elapsed.Milliseconds(),
 		Detail:   fmt.Sprintf("%d/%d profiles healthy", summary.Healthy, len(results)),
 		Profiles: results, Summary: summary,
 	}
