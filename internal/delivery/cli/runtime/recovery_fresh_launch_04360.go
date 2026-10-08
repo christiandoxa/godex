@@ -2,7 +2,6 @@ package runtime
 
 import (
 	"context"
-	"errors"
 	"strings"
 
 	sessionmodel "github.com/christiandoxa/godex/internal/model/session"
@@ -53,26 +52,17 @@ func runParsedWithOptionsWithRecovery(
 	report.AccountID = selector
 	report.UpstreamAccountID = selector
 	chooser := runSessionLauncher{runner: runner, profiles: profiles, options: opts}
-	candidate, ok := chooser.recoveryCandidate04360(ctx, report)
-	if !ok {
-		return original
-	}
 	resumed, ok := retargetCodexExecRecovery04360(args, report.ID)
-	if ok {
-		// For a fresh Codex exec, the input had no "resume" subcommand
-		// yet. Apply the persisted model/effort only *after* retargeting.
-		resumed = restoreResumeSessionSettings(resumed, report)
-	}
 	if !ok {
 		return original
 	}
-	if err := sessions.ReleaseRecoveryBinding(ctx, report.ID); err != nil {
-		return errors.Join(original, err)
-	}
+	// For fresh exec, retarget first and restore persisted model/effort
+	// from the unique newly created session before a follow-up attempt.
+	resumed = restoreResumeSessionSettings(resumed, report)
 	resumed = append(resumed, recoveryContinuationPrompt04360)
-	// The second launch re-checks runtime quota, privileges and account
-	// availability. A second failure never recursively starts another turn.
-	return runner.RunWithOptions(ctx, candidate.AccountID, resumed, opts)
+	return chooser.recoverPersistedSessionThroughPool04360(
+		ctx, report, resumed, original, true, sessions.ReleaseRecoveryBinding,
+	)
 }
 
 func freshExecInvocation04360(args []string) bool {

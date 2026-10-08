@@ -3,7 +3,6 @@ package runtime
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
@@ -41,34 +40,18 @@ func (launcher runSessionLauncher) RunSessionReportWithRecovery(
 	if initial == nil || ctx.Err() != nil || recoveryExitCancelled04360(initial) {
 		return initial
 	}
-	if checkpoint.newAcceptedRecoveryClass04360(ctx, report.ID) == "" &&
-		!goalBefore.newUsageLimit04360(ctx) {
-		return initial
-	}
-	// The tagged goal monitor will not relaunch completed, cancelled or
-	// otherwise terminal goals. Missing goal state is an ordinary session.
-	if !goalAllowsRecovery04360(ctx, report.CodexHome, report.ID) {
-		return initial
-	}
-	candidate, ok := launcher.recoveryCandidate04360(ctx, report)
-	if !ok {
-		return initial
-	}
 	resumed, ok := retargetCodexExecRecovery04360(
 		restoreResumeSessionSettings(args, report), report.ID,
 	)
 	if !ok {
 		return initial
 	}
-	// Clear old owner only when all guards have passed. If this fails,
-	// never send a continuation to a different provider with stale binding.
-	if err := bindingForget(ctx, report.ID); err != nil {
-		return errors.Join(initial, fmt.Errorf("session recovery affinity release failed: %w", err))
-	}
 	resumed = append(resumed, recoveryContinuationPrompt04360)
-	// The runtime runner enforces quota preflight and fresh account
-	// eligibility again before launching the candidate.
-	return launcher.runner.RunWithOptions(ctx, candidate.AccountID, resumed, launcher.options)
+	verified := checkpoint.newAcceptedRecoveryClass04360(ctx, report.ID) != "" ||
+		goalBefore.newUsageLimit04360(ctx)
+	return launcher.recoverPersistedSessionThroughPool04360(
+		ctx, report, resumed, initial, verified, bindingForget,
+	)
 }
 
 func (launcher runSessionLauncher) recoveryEligible04360(
@@ -96,6 +79,12 @@ func (launcher runSessionLauncher) recoveryEligible04360(
 func (launcher runSessionLauncher) recoveryCandidate04360(
 	ctx context.Context, report sessionmodel.Report,
 ) (profilemodel.LaunchTarget, bool) {
+	return launcher.recoveryCandidateExcluding04360(ctx, report, nil)
+}
+
+func (launcher runSessionLauncher) recoveryCandidateExcluding04360(
+	ctx context.Context, report sessionmodel.Report, attempted map[string]bool,
+) (profilemodel.LaunchTarget, bool) {
 	source, ok := launcher.profiles.(interface {
 		SessionProfiles(context.Context) ([]sessionmodel.ProfileHome, error)
 	})
@@ -109,6 +98,7 @@ func (launcher runSessionLauncher) recoveryCandidate04360(
 	// Enforce the tagged multi-profile quota-compatible requirement.
 	for _, home := range homes {
 		if !home.Enabled || home.Provider != "openai" || home.AccountID == "" ||
+			attempted[home.AccountID] ||
 			home.AccountID == report.AccountID || home.AccountID == report.UpstreamAccountID {
 			continue
 		}

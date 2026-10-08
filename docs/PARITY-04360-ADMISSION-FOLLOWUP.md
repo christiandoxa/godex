@@ -105,7 +105,7 @@ eligibility).
   authenticated OpenAI/ChatGPT managed profile, and successful durable
   release of the old session-owner binding. Existing profile/quota preflight
   runs again before the backup launch. No profile is silently created.
-- Only **one** automatic continuation is launched. The tagged source's
+- At the Follow-up 3 checkpoint, only **one** automatic continuation was launched. The tagged source's
   `exec resume` native argument policy is preserved: original prompt and
   `--thread-source` are discarded, the new session ID replaces `--last`
   or a previous ID, and explicitly selected model/reasoning settings and
@@ -163,7 +163,7 @@ and `crates/prodex-app/src/runtime_tools/usage_limit_recovery.rs`.
   queries. `active`, `paused`, `blocked` and `usage_limited` are
   resumable; terminal goals cannot be relaunched. A genuine newer
   `active → usage_limited` database transition can authorize the same
-  guarded, one-shot continuation even without a free-form error message.
+  guarded continuation even without a free-form error message.
   Missing goal databases still permit standard (non-goal) recovery.
   The SQLite file URI is normalized across Linux/macOS and Windows
   drive-letter paths, with `mode=ro` and the `query_only` pragma. A
@@ -193,11 +193,51 @@ and `crates/prodex-app/src/runtime_tools/usage_limit_recovery.rs`.
 
 **What remains different from exact Prodex:** the native session-start
 hook mechanism and goal monitor while a child is running have not been
-replicated; standard known- and new-session recovery currently performs
-at most one safe continuation. Prodex can retry transient profile pools
-over further generations and handle additional rollout formats and edge
-cases. The existence of this new recovery path is **not** sufficient
+replicated. At the Follow-up 4 checkpoint, recovery performed
+at most one safe continuation; see Follow-up 5 for bounded
+multi-generation behavior. Prodex can also recycle transient pools
+after backoff and handle additional rollout formats and edge cases. The existence of this new recovery path is **not** sufficient
 evidence of complete 1:1 workflow parity.
+
+## Follow-up 5: bounded, source-matched multi-generation profile recovery
+
+The exact tagged Prodex `0.436.0` recovery strategy tracks attempted
+profiles and avoids repeating a profile in the same recovery-pool pass
+(`crates/prodex-app/src/runtime_tools/usage_limit_recovery.rs` and
+`crates/prodex-app/src/app_commands/runtime_launch/run_command_strategy.rs`).
+
+Godex now runs a **bounded pass over distinct eligible ChatGPT-managed
+OpenAI profiles** for both already-known `exec resume` sessions and newly
+discovered headless `exec` sessions:
+
+- Before **each** next child launch, Godex checkpoints the same persisted
+  Codex rollout and goal database. If that child fails, a subsequent
+  recovery requires a *new* accepted-turn structured error or a new
+  `active → usage_limited` goal transition relative to the latest
+  checkpoint. A stale error from an earlier generation never authorizes
+  another launch.
+- Failed/previously attempted profiles are excluded from the current pool
+  pass. Durable session-owner affinity is released before each retarget,
+  and each new profile undergoes the existing runtime quota/account
+  selection. Authenticated profiles are independently re-resolved.
+- The same canonical `exec resume` plan preserves explicit
+  `--cyber-access-program`, model and reasoning-effort settings while
+  removing the original user prompt. Exit 130, context cancellation,
+  unavailable owner release, terminal goal status, missing/newly malformed
+  rollout or lack of fresh evidence ends the recovery without replay.
+- The pass is capped at 32 **distinct** candidate profiles for bounded
+  execution. Red/green tests exercise A→B→C success, absence of new
+  second-attempt evidence (immediate stop), pool exhaustion without
+  trying B twice, and fresh-session recovery through `RunProfiles` with
+  the same protections. Tests inspect actual selected profile homes and
+  preserved continuation arguments.
+
+**Remaining difference:** Prodex can wait five seconds and recycle the
+transient-error candidate pool based on new quota availability, use a
+native `SessionStart` hook and observe the goal state *while* Codex is
+running. Godex intentionally **does not silently loop forever** after
+exhausting its verified distinct-profile pass; that behavior cannot be
+promoted to full parity without compatible scheduling and live evidence.
 
 ## Still NOT closed; do not promote as full parity
 
@@ -209,12 +249,12 @@ evidence of complete 1:1 workflow parity.
    end-to-end; mere admission-lane saturation must not trigger shedding.
 2. **Full goal/workflow relaunch lifecycle:** fresh-session `exec`
    discovery, bounded compressed rollout reads, read-only goal status
-   transitions and exact structured transient error classes now have
-   meaningful source-matched tests. However Prodex's native session-start
-   hook, in-process goal monitor and multiple profile-pool retry
-   generations are not fully reproduced. The Go implementation currently
-   allows only a single evidence-gated child-exit relaunch, and native
-   online lifecycle parity remains unproven.
+   transitions, structured transient error classes and per-generation
+   distinct-profile rotation now have meaningful source-matched tests.
+   Prodex's native session-start hook, online in-process goal monitor,
+   five-second transient-pool wait/recycle scheduler, and all native
+   launch/continuation conditions are **not** fully reproduced;
+   real-world workflow parity remains unproven.
 3. **Full continuation/transport coverage:** HTTP Responses/Compact
    admission now bypasses the saturated lane for a verified owner and
    retains the global cap, with bounded request-body inspection.
