@@ -166,12 +166,24 @@ func applyDeepSeekResponseFormat(result, object map[string]any, messages []any) 
 
 func deepSeekModel(object map[string]any, override string) string {
 	if strings.TrimSpace(override) != "" {
-		return strings.TrimSpace(override)
+		return canonicalDeepSeekModel(override)
 	}
 	if model, ok := object["model"].(string); ok && strings.TrimSpace(model) != "" {
-		return strings.TrimSpace(model)
+		return canonicalDeepSeekModel(model)
 	}
 	return "deepseek-v4-pro"
+}
+
+func canonicalDeepSeekModel(model string) string {
+	model = strings.TrimSpace(model)
+	switch strings.ToLower(model) {
+	case "auto", "pro":
+		return "deepseek-v4-pro"
+	case "flash":
+		return "deepseek-v4-flash"
+	default:
+		return model
+	}
 }
 
 func rejectRequestFields(object map[string]any) error {

@@ -102,6 +102,28 @@ func TestDeepSeekResponsesRequestMapsJSONModeAndModelOverride(t *testing.T) {
 	}
 }
 
+func TestDeepSeekResponsesRequestCanonicalizesModelAliases(t *testing.T) {
+	for _, test := range []struct {
+		name, body, override, want string
+	}{
+		{name: "pro body alias", body: `{"model":"pro","input":"hello"}`, want: "deepseek-v4-pro"},
+		{name: "case folded flash body alias", body: `{"model":"FLASH","input":"hello"}`, want: "deepseek-v4-flash"},
+		{name: "auto override alias", body: `{"input":"hello"}`, override: "auto", want: "deepseek-v4-pro"},
+		{name: "custom model preserved", body: `{"model":"custom-model","input":"hello"}`, want: "custom-model"},
+		{name: "override keeps precedence", body: `{"model":"pro","input":"hello"}`, override: "custom-model", want: "custom-model"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			translated, err := ResponsesRequest([]byte(test.body), RequestOptions{Model: test.override})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := decodeDeepSeekRequest(t, translated)["model"]; got != test.want {
+				t.Fatalf("translated model = %#v, want %q", got, test.want)
+			}
+		})
+	}
+}
+
 func TestDeepSeekResponsesRequestTranslatesHistoryAndRoles(t *testing.T) {
 	translated, err := ResponsesRequest([]byte(`{
 		"input":[

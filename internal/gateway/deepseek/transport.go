@@ -185,7 +185,7 @@ func (transport *RuntimeTransport) finishResponseAttempt(
 	if err != nil {
 		return nil, false, firstEventRetryUsed, err
 	}
-	classification := providerentity.ClassifyError(buffered.StatusCode, buffered.body)
+	classification := classifyDeepSeekErrorBody(buffered.StatusCode, buffered.body)
 	if hasNextModel && providerentity.RetryableAcrossModels(classification.Class) {
 		return nil, true, firstEventRetryUsed, nil
 	}

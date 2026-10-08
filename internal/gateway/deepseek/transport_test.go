@@ -369,6 +369,61 @@ func TestDeepSeekBare429DoesNotAdvanceModel(t *testing.T) {
 	}
 }
 
+func TestDeepSeek529RequiresAProviderErrorSignalForModelFallback(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		status     int
+		body       string
+		wantCalls  int
+		wantStatus int
+	}{
+		{name: "bare 529", status: 529, body: `{}`, wantCalls: 1, wantStatus: 529},
+		{name: "529 with overload text", status: 529, body: `{"error":{"message":"server overloaded"}}`, wantCalls: 2, wantStatus: http.StatusOK},
+		{name: "503 status signal", status: http.StatusServiceUnavailable, body: `{}`, wantCalls: 2, wantStatus: http.StatusOK},
+		{name: "structured 429 code", status: http.StatusTooManyRequests, body: `{"error":{"code":"rate_limit_exceeded"}}`, wantCalls: 2, wantStatus: http.StatusOK},
+		{name: "reason code", status: http.StatusBadRequest, body: `{"error":{"reason":"rate_limit_error"}}`, wantCalls: 2, wantStatus: http.StatusOK},
+		{name: "unsupported shared quota code", status: http.StatusBadRequest, body: `{"error":{"code":"usage_limit_reached"}}`, wantCalls: 1, wantStatus: http.StatusBadRequest},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			calls := 0
+			server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+				calls++
+				writer.Header().Set("Content-Type", "application/json")
+				if calls == 1 {
+					writer.WriteHeader(test.status)
+					_, _ = io.WriteString(writer, test.body)
+					return
+				}
+				_, _ = io.WriteString(writer, `{"choices":[{"message":{"content":"ok"}}]}`)
+			}))
+			defer server.Close()
+			transport, err := NewRuntimeTransport(server.URL, "fixture-key", server.Client())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer transport.Close()
+			response, err := transport.Execute(context.Background(), proxymodel.Request{
+				Method: http.MethodPost, Path: mountPath + "/responses",
+				Body: []byte(`{"model":"pro","input":"hello"}`),
+			}, proxymodel.Account{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer response.Body.Close()
+			body, err := io.ReadAll(response.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if calls != test.wantCalls || response.StatusCode != test.wantStatus {
+				t.Fatalf("calls/status = %d/%d, want %d/%d", calls, response.StatusCode, test.wantCalls, test.wantStatus)
+			}
+			if test.wantCalls == 1 && string(body) != test.body {
+				t.Fatalf("error body = %q, want exact upstream body %q", body, test.body)
+			}
+		})
+	}
+}
+
 func TestDeepSeekBufferedResponseMergesRequestAndProviderMetadata(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")
