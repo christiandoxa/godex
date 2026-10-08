@@ -162,6 +162,9 @@ func (handler *activeRequestHandler) ServeHTTP(writer http.ResponseWriter, reque
 		return
 	}
 	lane := admissionLaneForRequest(request)
+	if lane == admissionLaneStandard && handler.shedOptionalStartupMetadata(writer, request.URL.Path) {
+		return
+	}
 	if !handler.acquireRequest(request, lane) {
 		return
 	}
@@ -185,7 +188,10 @@ func (handler *activeRequestHandler) acquireWithMetadata(ctx context.Context, la
 	var waitStarted time.Time
 	for {
 		handler.mu.Lock()
-		if handler.active < handler.limits.global && handler.laneActive[lane] < handler.limits.lane[lane] {
+		// Prodex admits important models/MCP bootstrap traffic even when
+		// the standard lane is full, but never above the global request cap.
+		priority := lane == admissionLaneStandard && startupStandardPriorityPath(path)
+		if handler.active < handler.limits.global && (handler.laneActive[lane] < handler.limits.lane[lane] || priority) {
 			handler.active++
 			handler.laneActive[lane]++
 			handler.admissionsTotal[lane]++
