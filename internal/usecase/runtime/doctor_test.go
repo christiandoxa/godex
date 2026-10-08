@@ -224,3 +224,61 @@ func TestDoctorTailEventsHonorsByteBudget(t *testing.T) {
 		t.Fatalf("tiny tail returned %d events", len(got))
 	}
 }
+
+func TestProdex04358DoctorTailUsesKnownMessageMarkerAfterUnknownKind(t *testing.T) {
+	events := []runtimemodel.Event{{
+		Kind:    "unknown_marker",
+		Message: "notice request_id=req-1 selection_pick profile=alpha",
+	}}
+	got := doctorTailEvents(events, 4096)
+	if len(got) != 1 {
+		t.Fatalf("tail events = %#v", got)
+	}
+	if got[0].Kind != "selection_pick" {
+		t.Fatalf("marker = %q, want selection_pick", got[0].Kind)
+	}
+	if got[0].Fields["request_id"] != "req-1" || got[0].Fields["profile"] != "alpha" {
+		t.Fatalf("message fields = %#v", got[0].Fields)
+	}
+}
+
+func TestProdex04358DoctorMarkerPrecedenceAndFieldOverride(t *testing.T) {
+	event := runtimemodel.Event{
+		Kind:    "profile_health",
+		Message: "request=7 selection_pick profile=message-profile reason=message-reason",
+		Fields:  map[string]string{"reason": "json-reason"},
+	}
+	got := normalizeDoctorEvent04358(event)
+	if got.Kind != "profile_health" {
+		t.Fatalf("known JSON marker lost precedence: %q", got.Kind)
+	}
+	if got.Fields["request"] != "7" || got.Fields["profile"] != "message-profile" ||
+		got.Fields["reason"] != "json-reason" {
+		t.Fatalf("merged fields = %#v", got.Fields)
+	}
+
+	if marker := doctorMarkerFromMessage04358("request=7 selection_pick profile=alpha"); marker != "selection_pick" {
+		t.Fatalf("leading-field marker = %q", marker)
+	}
+	if marker := doctorMarkerFromMessage04358("notice unknown=value"); marker != "" {
+		t.Fatalf("unknown message marker = %q", marker)
+	}
+}
+
+func TestProdex04358DoctorMessageFieldsRedactSecretsAndControls(t *testing.T) {
+	event := runtimemodel.Event{
+		Kind: "unknown_marker",
+		Message: "[2026-05-12 00:00:00Z] notice stream_read_error " +
+			"authorization=\"Bearer fixture-secret-sentinel\" route=\"/v1/responses\x1b[31m\"",
+	}
+	got := normalizeDoctorEvent04358(event)
+	if got.Kind != "stream_read_error" {
+		t.Fatalf("marker = %q", got.Kind)
+	}
+	if got.Fields["authorization"] != "<redacted>" {
+		t.Fatalf("authorization = %q", got.Fields["authorization"])
+	}
+	if strings.Contains(got.Fields["route"], "\x1b") || strings.Contains(got.Fields["route"], "\n") {
+		t.Fatalf("route contains terminal controls: %q", got.Fields["route"])
+	}
+}

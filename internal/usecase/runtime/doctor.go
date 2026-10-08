@@ -255,6 +255,7 @@ func doctorTailEvents(events []runtimemodel.Event, maxBytes int) []runtimemodel.
 	}
 	result := append([]runtimemodel.Event(nil), events[start:]...)
 	for index := range result {
+		result[index] = normalizeDoctorEvent04358(result[index])
 		result[index].AccountID = ""
 	}
 	return result
