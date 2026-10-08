@@ -188,20 +188,18 @@ func applyGeminiOtherControls(chat, request map[string]any) error {
 }
 
 func applyThoughtSignatures(messages, input any) {
-	items, ok := input.([]any)
-	if !ok {
-		return
-	}
 	signatures := make(map[string]string)
-	for _, raw := range items {
-		item, ok := raw.(map[string]any)
-		if !ok || item["type"] != "function_call" {
-			continue
-		}
-		callID, _ := item["call_id"].(string)
-		signature, _ := item["gemini_thought_signature"].(string)
-		if callID != "" && strings.TrimSpace(signature) != "" {
-			signatures[callID] = signature
+	if items, ok := input.([]any); ok {
+		for _, raw := range items {
+			item, ok := raw.(map[string]any)
+			if !ok || item["type"] != "function_call" {
+				continue
+			}
+			signature, present, valid := geminiThoughtSignature(item)
+			callID, _ := item["call_id"].(string)
+			if present && valid && callID != "" {
+				signatures[callID] = signature
+			}
 		}
 	}
 	converted, _ := messages.([]any)
@@ -210,12 +208,59 @@ func applyThoughtSignatures(messages, input any) {
 		calls, _ := message["tool_calls"].([]any)
 		for _, rawCall := range calls {
 			call, _ := rawCall.(map[string]any)
-			callID, _ := call["id"].(string)
-			if signature := signatures[callID]; signature != "" {
-				call["extra_content"] = map[string]any{"google": map[string]any{"thought_signature": signature}}
+			signature, present, valid := geminiThoughtSignature(call)
+			if present {
+				if !valid {
+					continue
+				}
+			} else {
+				callID, _ := call["id"].(string)
+				signature = signatures[callID]
+				if signature == "" {
+					continue
+				}
 			}
+			for _, key := range []string{"gemini_thought_signature", "thought_signature", "thoughtSignature"} {
+				delete(call, key)
+			}
+			call["extra_content"] = map[string]any{"google": map[string]any{"thought_signature": signature}}
 		}
 	}
+}
+
+func geminiThoughtSignature(object map[string]any) (string, bool, bool) {
+	for _, path := range [][]string{
+		{"extra_content", "google", "thought_signature"},
+		{"gemini_thought_signature"},
+		{"thought_signature"},
+		{"thoughtSignature"},
+		{"function", "gemini_thought_signature"},
+		{"function", "thought_signature"},
+		{"function", "thoughtSignature"},
+	} {
+		value, present := geminiSignatureField(object, path...)
+		if !present {
+			continue
+		}
+		text, ok := value.(string)
+		return text, true, ok && strings.TrimSpace(text) != ""
+	}
+	return "", false, false
+}
+
+func geminiSignatureField(object map[string]any, path ...string) (any, bool) {
+	var value any = object
+	for _, key := range path {
+		current, ok := value.(map[string]any)
+		if !ok {
+			return nil, false
+		}
+		value, ok = current[key]
+		if !ok {
+			return nil, false
+		}
+	}
+	return value, true
 }
 
 func ensureJSONInstruction(chat map[string]any) {

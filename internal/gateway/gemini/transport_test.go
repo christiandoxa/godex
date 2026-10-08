@@ -227,6 +227,70 @@ func TestGeminiResponsesUsesRequestedModelAndBearerAuth(t *testing.T) {
 	}
 }
 
+func TestGeminiResponsesThoughtSignatureUsesFirstPresentCandidate(t *testing.T) {
+	var native map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		body, err := io.ReadAll(request.Body)
+		if err != nil {
+			t.Errorf("read translated request: %v", err)
+		} else if err := json.Unmarshal(body, &native); err != nil {
+			t.Errorf("decode translated request: %v", err)
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(writer, `{"responseId":"resp_sig","modelVersion":"gemini-3.5-flash","candidates":[{"content":{"parts":[{"text":"ok"}]},"finishReason":"STOP"}]}`)
+	}))
+	defer server.Close()
+
+	transport, err := NewRuntimeTransport(server.URL, "fixture-key", server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer transport.Close()
+	response, err := transport.Execute(context.Background(), proxymodel.Request{
+		Method: http.MethodPost,
+		Path:   mountPath + "/responses",
+		Body: []byte(`{"model":"gemini-3.5-flash","input":[
+			{"type":"message","role":"user","content":"continue"},
+			{"type":"function_call","call_id":"call-null","name":"shell","arguments":"{}","extra_content":{"google":{"thought_signature":null}},"gemini_thought_signature":"must-not-win"},
+			{"type":"function_call","call_id":"call-blank","name":"shell","arguments":"{}","gemini_thought_signature":" 　","thought_signature":"must-not-win"},
+			{"type":"function_call","call_id":"call-nested","name":"shell","arguments":"{}","function":{"thoughtSignature":" winner　"}},
+			{"type":"function_call","call_id":"call-type","name":"shell","arguments":"{}","gemini_thought_signature":42,"thought_signature":"must-not-win"},
+			{"type":"function_call","call_id":"call-valid","name":"shell","arguments":"{}","thought_signature":" sig "},
+			{"type":"function_call","call_id":"call-google","name":"shell","arguments":"{}","extra_content":{"google":{"thought_signature":"google"}},"gemini_thought_signature":"must-not-win"}
+		]}`),
+	}, proxymodel.Account{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("translated response status = %d", response.StatusCode)
+	}
+
+	got := make(map[string]string)
+	contents, _ := native["contents"].([]any)
+	for _, rawContent := range contents {
+		content, _ := rawContent.(map[string]any)
+		parts, _ := content["parts"].([]any)
+		for _, rawPart := range parts {
+			part, _ := rawPart.(map[string]any)
+			call, _ := part["functionCall"].(map[string]any)
+			id, _ := call["id"].(string)
+			if signature, ok := call["thoughtSignature"].(string); ok {
+				got[id] = signature
+			}
+		}
+	}
+	if got["call-nested"] != " winner　" || got["call-valid"] != " sig " || got["call-google"] != "google" {
+		t.Fatalf("selected Gemini thought signatures = %#v", got)
+	}
+	for _, id := range []string{"call-null", "call-blank", "call-type"} {
+		if _, ok := got[id]; ok {
+			t.Fatalf("invalid Gemini thought signature candidate %q fell through: %#v", id, got)
+		}
+	}
+}
+
 func TestGeminiUnstructured429IsReturnedWithoutFallback(t *testing.T) {
 	const body = "Quota exhausted for this account\n"
 	calls := 0
