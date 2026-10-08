@@ -22,11 +22,11 @@ func (service *Catalog) Resolve(ctx context.Context, selector string) (sessionmo
 	prefix := make([]sessionmodel.Report, 0, 1)
 	names := make([]sessionmodel.Report, 0, 1)
 	for _, report := range reports {
-		if strings.EqualFold(report.ID, selector) {
+		if sessionIDMatchesSelector(report.ID, selector, true) {
 			exact = append(exact, report)
 			continue
 		}
-		if strings.HasPrefix(strings.ToLower(report.ID), strings.ToLower(selector)) {
+		if sessionIDMatchesSelector(report.ID, selector, false) {
 			prefix = append(prefix, report)
 		}
 		if !sessionReportArchived(report.Path) && sessionReportSourceAllowed(report, false) &&
