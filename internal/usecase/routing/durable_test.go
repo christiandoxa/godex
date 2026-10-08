@@ -12,11 +12,13 @@ import (
 
 	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
+	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
 
 type bindingsFake struct {
 	values    []routingentity.Binding
 	writes    int
+	acquires  int
 	onAcquire func()
 }
 
@@ -24,6 +26,7 @@ func (f *bindingsFake) Load(context.Context) ([]routingentity.Binding, error) {
 	return append([]routingentity.Binding(nil), f.values...), nil
 }
 func (f *bindingsFake) AcquireConversation(context.Context) (func() error, error) {
+	f.acquires++
 	if f.onAcquire != nil {
 		f.onAcquire()
 	}
@@ -85,6 +88,39 @@ func TestDurableOwnerRefreshesStaleCacheUnderConversationLock(t *testing.T) {
 	owner, err := store.refreshOwner(context.Background(), keys, now)
 	if err != nil || owner != "account-b" {
 		t.Fatalf("refreshed owner = %q, %v", owner, err)
+	}
+}
+
+func TestSoftSessionRefreshReusesDurableConversationLock(t *testing.T) {
+	now := time.Unix(200, 0)
+	keys := affinityKeys{session: "synthetic-session"}
+	binding := keys.entries()[0]
+	binding.AccountID = "account-a"
+	repository := &bindingsFake{}
+	repository.onAcquire = func() { repository.values = []routingentity.Binding{binding} }
+	router, err := NewRouter(Config{
+		Gateway: &countingGateway{}, Bindings: repository, PreferredAccount: "account-b",
+		Now: func() time.Time { return now },
+		Accounts: func(context.Context) ([]proxymodel.Account, error) {
+			return []proxymodel.Account{
+				{ID: "account-a", Home: "/a", Enabled: true, EligibleAfter: now.Add(time.Minute)},
+				{ID: "account-b", Home: "/b", Enabled: true},
+			}, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	exchange, err := router.Forward(context.Background(), proxymodel.Request{
+		Header:         http.Header{"X-Codex-Session-Id": []string{keys.session}},
+		QuotaSelection: quotamodel.Selection{RouteKind: quotamodel.RouteKindResponses},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer exchange.Close()
+	if repository.acquires != 1 {
+		t.Fatalf("conversation lock acquisitions = %d, want 1", repository.acquires)
 	}
 }
 

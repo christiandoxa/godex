@@ -273,7 +273,6 @@ func (router *Router) Forward(ctx context.Context, request proxymodel.Request) (
 			release()
 		}
 	}()
-
 	accounts, err := router.loadAccounts(ctx)
 	if err != nil {
 		return nil, err
@@ -284,9 +283,10 @@ func (router *Router) Forward(ctx context.Context, request proxymodel.Request) (
 	}
 	if owner != "" && keys.hasSoftSessionAffinity(request.QuotaSelection) &&
 		router.softSessionOwnerBlocked(accounts, owner, request.QuotaSelection) && router.affinity.repository != nil {
-		durableRelease, err = router.affinity.repository.AcquireConversation(ctx)
-		if err != nil {
-			return nil, err
+		if durableRelease == nil {
+			if durableRelease, err = router.affinity.repository.AcquireConversation(ctx); err != nil {
+				return nil, err
+			}
 		}
 		owner, err = router.affinity.refreshOwner(ctx, keys, router.now())
 		if err != nil {
