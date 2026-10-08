@@ -189,6 +189,9 @@ func (runner *Runner) launchWithOptions(
 }
 
 type RuntimeLaunchOptions struct {
+	// NativeWithoutProxy is used only when the selected OpenAI profile
+	// lacks Prodex's qualifying rotation pool and no governance is forced.
+	NativeWithoutProxy  bool
 	SmartContextEnabled bool
 	SkipQuotaPreflight  bool
 	AutoRedeem          *bool
@@ -238,6 +241,10 @@ func (runner *Runner) launchHomeWithOptions(
 			}
 		}
 		home = overlay.Home
+	}
+	if options.NativeWithoutProxy && provider.Kind == "" &&
+		!options.SmartContextEnabled && !options.PresidioEnabled && !options.SuperOverlay {
+		return runner.runRuntimeChild(ctx, home, arguments)
 	}
 	proxyRunner, ok := runner.process.(proxyCodex)
 	if !ok {

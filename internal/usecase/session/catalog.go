@@ -31,6 +31,15 @@ type Launcher interface {
 	RunSession(context.Context, string, string, []string) error
 }
 
+// A recovery-aware launcher may observe a verified post-child failure
+// and decide whether an already-resolved session can safely resume.
+type sessionChildRecoveryLauncher interface {
+	RunSessionReportWithRecovery(
+		context.Context, sessionmodel.Report, []string, bool,
+		func(context.Context, string) error,
+	) error
+}
+
 type Catalog struct {
 	accounts        accountStore
 	reader          reader

@@ -42,6 +42,21 @@ func runDryRun(
 
 	projected := append([]string(nil), codexArguments...)
 	runtimeProxy := true
+	// Prodex 0.436.0 does not start its rotation proxy merely because a
+	// profile exists. For managed OpenAI profiles, a second, qualified
+	// account must actually be eligible for rotation.
+	if target.Name != "" && target.Provider == "openai" &&
+		selection.URL == "" && selection.Provider == "" {
+		if probe, ok := profiles.(interface {
+			RuntimeRotationEligible(context.Context, string) (bool, error)
+		}); ok {
+			eligible, probeErr := probe.RuntimeRotationEligible(ctx, target.Name)
+			if probeErr != nil {
+				return probeErr
+			}
+			runtimeProxy = eligible && !selection.NoAutoRotate
+		}
+	}
 	providerKind := ""
 	if selection.URL != "" {
 		projected, err = runtimeusecase.PreviewLocalProviderArguments(localProviderConfig(selection), projected)

@@ -100,7 +100,9 @@ func (catalog *Catalog) ResumeArgumentsWithLauncher(
 		return err
 	}
 	var launchErr error
-	if aware, ok := launcher.(ReportLauncher); ok {
+	if aware, ok := launcher.(sessionChildRecoveryLauncher); ok {
+		launchErr = aware.RunSessionReportWithRecovery(ctx, report, args, input.Local, catalog.bindingForget)
+	} else if aware, ok := launcher.(ReportLauncher); ok {
 		launchErr = aware.RunSessionReport(ctx, report, args, input.Local)
 	} else if input.Local {
 		launchErr = launcher.RunLocal(ctx, report.AccountID, args)

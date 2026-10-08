@@ -3,7 +3,7 @@
 448	cmd/godex/main.go
 608	internal/delivery/cli/dispatcher.go
 437	internal/delivery/cli/public_help.go
-477	internal/delivery/cli/runtime/run.go
+431	internal/delivery/cli/runtime/run.go
 487	internal/delivery/cli/runtime/status_resource.go
 901	internal/delivery/cli/runtime/super.go
 502	internal/delivery/cli/runtime/super_launch.go

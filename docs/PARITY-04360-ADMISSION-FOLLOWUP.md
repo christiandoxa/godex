@@ -1,4 +1,4 @@
-# Prodex 0.436.0 parity follow-up: admission and remaining blockers
+# Prodex 0.436.0 parity follow-up: admission, recovery and remaining blockers
 
 **Status: partial parity.** This checkpoint improves source-matched admission
 behavior. It does not certify full 1:1 behavior against Prodex 0.436.0,
@@ -76,6 +76,67 @@ into it in ordinary production yet; unset inputs mean no imaginary
 backlog pressure. This closes the *decision policy when a truthful signal
 exists*, not the complete source-to-output parity of all overload scenarios.
 
+## Follow-up 3: guarded known-session child-exit recovery and native launch
+
+Exact tagged source owners:
+`crates/prodex-app/src/app_commands/runtime_launch/usage_limit_recovery.rs`
+(rollout evidence windows, usage-limit classification),
+`crates/prodex-app/src/app_commands/runtime_launch/usage_limit_recovery/plan.rs`
+(success/cancellation/no-auto-rotate guards and profile selection),
+`crates/prodex-app/src/runtime_tools/usage_limit_recovery.rs` (the relaunch
+orchestration), `mojo/prodex_core/launch_args.mojo` (RetargetExec),
+`crates/prodex-runtime-launch/tests/src/lib/args_codex_0161.rs` (Cyber option
+retarget), and `crates/prodex-app/src/runtime_launch/profile.rs` (rotation
+eligibility).
+
+**Now covered for a previously resolved `exec resume` session:**
+
+- The session catalogue passes the resolved report and durable binding-release
+  callback to a recovery-aware launcher. Existing launchers still use the
+  unmodified launch interface.
+- Before invoking Codex, a checkpoint records the end of a private, regular
+  `.jsonl` rollout. After a non-success child exit, a recovery is eligible
+  only if **new, complete** records show an accepted user turn followed by
+  an exact structured usage-limit error for this session. The scan is bounded
+  (1 MiB total and 64 KiB per record), checks nested session identity, and
+  rejects symlinks, old errors, untrusted plain-text claims, truncated events
+  and cancelled executions.
+- The fallback requires auto-rotation to be allowed, a second enabled,
+  authenticated OpenAI/ChatGPT managed profile, and successful durable
+  release of the old session-owner binding. Existing profile/quota preflight
+  runs again before the backup launch. No profile is silently created.
+- Only **one** automatic continuation is launched. The tagged source's
+  `exec resume` native argument policy is preserved: original prompt and
+  `--thread-source` are discarded, the new session ID replaces `--last`
+  or a previous ID, and explicitly selected model/reasoning settings and
+  Codex `--cyber-access-program` remain intact. The continuation prompt
+  explicitly instructs Codex not to repeat completed tool actions.
+- Synthetic child-process integration and session-catalog dispatch tests
+  demonstrate the successful recovery path **and** missing marker, missing
+  binding release, backup not authenticated, `--no-auto-rotate`, and
+  conflicting/foreign/stale signal fail-closed cases. No upstream model
+  turn was sent by these tests.
+- The default Godex `run --dry-run` and selected OpenAI launch now use the
+  exact Prodex decision to **omit a synthetic rotation proxy** without a
+  qualifying profile pool (at least two profiles, existing selected home,
+  and a quota-compatible profile). A real `prodex 0.436.0` binary and
+  locally built Godex were run in isolated credential-free homes; both
+  reported `Provider: openai`, `Runtime proxy: disabled`, and preserved
+  the native `--cyber-access-program standard` argument. Synthetic
+  production-launch tests verify that the non-qualified native path is
+  executed, rather than merely printed in the dry-run UI.
+- `run.go`'s original native-command helpers were moved to a dedicated
+  source file, lowering its source-size baseline from 477 to 431 lines.
+
+**Not yet equivalent:** the exact Prodex monitor also discovers **fresh**
+session IDs via Codex's session-start hook, watches goal database state,
+reads compressed `.jsonl.zst` rollouts, classifies additional transient
+workflow errors, and retries qualified profile pools across multiple
+recovery generations. Godex's new child-exit recovery is **only for a
+previously resolved `exec resume` session with a recent structured
+usage-limit signal and a verified backup OpenAI account**. Do not infer
+full retry/replay or goal-monitor parity from its existence.
+
 ## Still NOT closed; do not promote as full parity
 
 1. **Complete queue/backoff lifecycle parity:** the Compact policy is
@@ -84,14 +145,12 @@ exists*, not the complete source-to-output parity of all overload scenarios.
    expose Prodex's three asynchronous queue sources or independently
    reproduce all worker/overload scenarios. This remains unverified
    end-to-end; mere admission-lane saturation must not trigger shedding.
-2. **Automatic usage-limit/goal retry after child exit**: exact Prodex
-   `crates/prodex-app/src/runtime_tools/usage_limit_recovery.rs`
-   observes child-exit signals, selects a recovery profile, retargets
-   `exec resume` using the canonical native planner, carries
-   model/effort and program arguments, and may schedule further retries.
-   Godex's existing router handles upstream precommit recovery and its
-   session catalogue resolves explicit continuations; this is **not**
-   evidence of parity for the full Codex child-exit relaunch workflow.
+2. **Complete child-exit goal/workflow recovery:** known `exec resume`
+   usage-limit continuation is now guarded and exercised end-to-end with a
+   synthetic Codex process. Fresh-session ID discovery, goal database
+   transitions, compressed rollout scanning, other transient workflow
+   classes and multi-generation pool retry remain different or unproven.
+   This is not a full replacement for Prodex's recovery monitor.
 3. **Full continuation/transport coverage:** HTTP Responses/Compact
    admission now bypasses the saturated lane for a verified owner and
    retains the global cap, with bounded request-body inspection.
