@@ -82,8 +82,9 @@ func (router *Router) forwardFresh(
 			continue
 		}
 
+		var saturatedAccounts []proxymodel.Account
 		result, found, transient, saturated, err := router.tryFreshCandidates(
-			ctx, request, current, &last, excluded, retryable, &firstEventRetryUsed,
+			ctx, request, current, &last, excluded, retryable, &firstEventRetryUsed, &saturatedAccounts,
 		)
 		if err != nil || found {
 			return result, err
@@ -113,10 +114,11 @@ func (router *Router) forwardFresh(
 		}
 
 		if saturated {
-			if err := router.waitForProfileInflight(ctx); err != nil {
+			if err := router.waitForProfileInflight(ctx, request, saturatedAccounts); err != nil {
 				return proxymodel.Forwarded{}, err
 			}
-			recoverySweeps++
+			// Capacity waiting is local, not an upstream attempt; it must
+			// not consume recovery/backoff sweeps or reset failure state.
 			freshAccounts, freshCandidates, _, err := router.refreshFreshCandidatesAfterWait(ctx, request, retryable)
 			if err != nil {
 				return proxymodel.Forwarded{}, err

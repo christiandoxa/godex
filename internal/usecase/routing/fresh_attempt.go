@@ -15,6 +15,7 @@ func (router *Router) tryFreshCandidates(
 	last **pendingResponse,
 	excluded, retryable map[string]bool,
 	firstEventRetryUsed *bool,
+	saturatedAccounts *[]proxymodel.Account,
 ) (proxymodel.Forwarded, bool, bool, bool, error) {
 	sawTransient := false
 	sawSaturated := false
@@ -36,6 +37,7 @@ func (router *Router) tryFreshCandidates(
 		}
 		if saturated {
 			sawSaturated = true
+			*saturatedAccounts = append(*saturatedAccounts, account)
 			continue
 		}
 		excluded[account.ID] = true
@@ -110,7 +112,7 @@ func (router *Router) tryFreshQuotaRedeem(
 			return proxymodel.Forwarded{}, false, nil, nil
 		}
 		if saturated {
-			if err := router.waitForProfileInflight(ctx); err != nil {
+			if err := router.waitForProfileInflight(ctx, request, []proxymodel.Account{redeemed}); err != nil {
 				return proxymodel.Forwarded{}, false, nil, err
 			}
 			continue

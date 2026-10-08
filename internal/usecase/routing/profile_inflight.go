@@ -112,8 +112,29 @@ func (router *Router) tryAcquireProfileInflight(
 	}, true
 }
 
-func (router *Router) waitForProfileInflight(ctx context.Context) error {
+// waitForProfileInflight rechecks capacity under the same lock protecting the
+// permit counter and generation. A release between a rejected acquisition and
+// waiter registration must not strand an unsent request until the next epoch.
+func (router *Router) waitForProfileInflight(
+	ctx context.Context,
+	request proxymodel.Request,
+	candidates []proxymodel.Account,
+) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if len(candidates) == 0 {
+		return nil
+	}
+	weight := requestProfileInflightWeight(request)
 	router.mu.Lock()
+	limit := effectiveProfileInflightHardLimit(router.profileInflightHardLimit, weight)
+	for _, candidate := range candidates {
+		if router.inflight[candidate.ID] <= limit-weight {
+			router.mu.Unlock()
+			return nil
+		}
+	}
 	changed := router.inflightChanged
 	wait := router.profileInflightWait
 	router.mu.Unlock()
@@ -165,7 +186,7 @@ func (router *Router) executeWithProfileInflightWait(
 		if err != nil || acquired {
 			return response, err
 		}
-		if err := router.waitForProfileInflight(ctx); err != nil {
+		if err := router.waitForProfileInflight(ctx, request, []proxymodel.Account{account}); err != nil {
 			return nil, err
 		}
 	}
