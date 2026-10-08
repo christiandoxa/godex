@@ -28,6 +28,7 @@ type Config struct {
 	SmartContextEnabled              bool
 	Redactor                         BodyRedactor
 	ActiveRequestLimit               int
+	PressureSnapshot                 func() AdmissionPressure
 	MaxRequestBytes, MaxInspectBytes int64
 }
 type Proxy struct {
@@ -43,6 +44,7 @@ type Proxy struct {
 	brokerLog                 *brokerLiveLog
 	smartContextEnabled       bool
 	redactor                  BodyRedactor
+	pressureSnapshot          func() AdmissionPressure
 	admission                 *activeRequestHandler
 	listener                  net.Listener
 	done                      chan struct{}
@@ -74,6 +76,7 @@ func NewProxy(config Config) (*Proxy, error) {
 		maxRequest: config.MaxRequestBytes, maxInspect: config.MaxInspectBytes,
 		smartContextEnabled:       config.SmartContextEnabled,
 		redactor:                  config.Redactor,
+		pressureSnapshot:          config.PressureSnapshot,
 		tunnels:                   make(map[*websocketTunnel]struct{}),
 		responsesWebSocketTunnels: make(map[*responsesWebSocketTunnel]struct{}),
 	}

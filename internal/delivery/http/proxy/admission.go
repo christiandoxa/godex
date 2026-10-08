@@ -33,12 +33,18 @@ type activeRequestHandler struct {
 	next http.Handler
 	wait admissionWaitFunc
 
-	mu         sync.Mutex
-	active     int
-	laneActive [admissionLaneCount]int
-	changed    chan struct{}
-	limits     admissionLimits
-	activity   activityRecorder
+	mu                 sync.Mutex
+	active             int
+	laneActive         [admissionLaneCount]int
+	changed            chan struct{}
+	limits             admissionLimits
+	activity           activityRecorder
+	ownedAdmission     func(context.Context, admissionLane, http.Header, []byte) bool
+	compactOwner       func(context.Context, admissionLane, http.Header, []byte) bool
+	pressureSnapshot   func() AdmissionPressure
+	localOverloadUntil time.Time
+	now                func() time.Time
+	inspectLimit       int64
 
 	admissionsTotal            [admissionLaneCount]uint64
 	releasesTotal              [admissionLaneCount]uint64
@@ -76,10 +82,17 @@ func newActiveRequestHandlerWithLimitsAndRecorder(next http.Handler, limits admi
 			limits.lane[lane] = limits.global
 		}
 	}
-	return &activeRequestHandler{
+	handler := &activeRequestHandler{
 		next: next, wait: waitAdmissionSignal,
 		changed: make(chan struct{}), limits: limits, activity: activity,
 	}
+	if proxy, ok := next.(*Proxy); ok && proxy.router != nil {
+		handler.ownedAdmission = proxy.hasVerifiedAdmissionOwner
+		handler.compactOwner = proxy.hasVerifiedCompactPressureOwner
+		handler.pressureSnapshot = proxy.pressureSnapshot
+		handler.inspectLimit = proxy.maxRequest
+	}
+	return handler
 }
 
 func waitAdmissionSignal(ctx context.Context, changed <-chan struct{}) bool {
@@ -165,7 +178,16 @@ func (handler *activeRequestHandler) ServeHTTP(writer http.ResponseWriter, reque
 	if lane == admissionLaneStandard && handler.shedOptionalStartupMetadata(writer, request.URL.Path) {
 		return
 	}
+	if lane == admissionLaneCompact && handler.pressureMode(lane) &&
+		!handler.requestHasCompactPressureOwner(request) {
+		writeFreshCompactPressureResponse(writer)
+		return
+	}
 	if !handler.acquireRequest(request, lane) {
+		if request.Context().Err() == nil {
+			handler.markLocalOverload()
+			writeLocalAdmissionOverloadResponse(writer, lane, isWebSocketUpgradeRequest(request))
+		}
 		return
 	}
 	defer handler.release(lane)
@@ -181,17 +203,22 @@ func (handler *activeRequestHandler) acquireRequest(request *http.Request, lane 
 	if isWebSocketUpgradeRequest(request) {
 		transport = "websocket"
 	}
-	return handler.acquireWithMetadata(request.Context(), lane, request.URL.Path, transport)
+	bypass := handler.requestHasOwnedAdmissionAffinity(request, lane)
+	return handler.acquireWithPolicy(request.Context(), lane, request.URL.Path, transport, bypass)
 }
 
 func (handler *activeRequestHandler) acquireWithMetadata(ctx context.Context, lane admissionLane, path, transport string) bool {
+	return handler.acquireWithPolicy(ctx, lane, path, transport, false)
+}
+
+func (handler *activeRequestHandler) acquireWithPolicy(ctx context.Context, lane admissionLane, path, transport string, bypassOwnedLane bool) bool {
 	var waitStarted time.Time
 	for {
 		handler.mu.Lock()
 		// Prodex admits important models/MCP bootstrap traffic even when
 		// the standard lane is full, but never above the global request cap.
 		priority := lane == admissionLaneStandard && startupStandardPriorityPath(path)
-		if handler.active < handler.limits.global && (handler.laneActive[lane] < handler.limits.lane[lane] || priority) {
+		if handler.active < handler.limits.global && (handler.laneActive[lane] < handler.limits.lane[lane] || priority || bypassOwnedLane) {
 			handler.active++
 			handler.laneActive[lane]++
 			handler.admissionsTotal[lane]++

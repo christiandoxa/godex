@@ -76,7 +76,7 @@ func (handler *activeRequestHandler) shedOptionalStartupMetadata(writer http.Res
 	handler.mu.Lock()
 	active, limit := handler.laneActive[admissionLaneStandard], handler.limits.lane[admissionLaneStandard]
 	handler.mu.Unlock()
-	if active < max(1, max(limit, 1)/2) {
+	if active < max(1, max(limit, 1)/2) && !handler.pressureMode(admissionLaneStandard) {
 		return false
 	}
 	if status == http.StatusOK {
