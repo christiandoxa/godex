@@ -23,6 +23,22 @@ func TestProdex04360ChildExitRecoveryUsesOnlyNewStructuredAcceptedSignal(t *test
 			`{"type":"error","error":{"code":"invalid_api_key"}}` + "\n", false},
 		{"accepted then fake log string", `{"type":"response_item","payload":{"role":"user"}}` + "\n" +
 			`{"type":"event_msg","payload":{"message":"You've hit your usage limit."}}` + "\n", false},
+		{"old turn accepted then new turn starts without user acceptance",
+			`{"type":"response_item","payload":{"role":"user"}}` + "\n" +
+				`{"type":"event_msg","payload":{"type":"turn_started"}}` + "\n" +
+				`{"type":"error","error":{"code":"usage_limit_reached"}}` + "\n", false},
+		{"old turn accepted then app server completed",
+			`{"type":"response_item","payload":{"role":"user"}}` + "\n" +
+				`{"method":"turn/completed","params":{"turn":{"status":"completed"}}}` + "\n" +
+				`{"type":"error","error":{"code":"usage_limit_reached"}}` + "\n", false},
+		{"old turn accepted then native turn started without user acceptance",
+			`{"type":"response_item","payload":{"role":"user"}}` + "\n" +
+				`{"method":"turn/started"}` + "\n" +
+				`{"type":"event_msg","payload":{"type":"error","codex_error_info":"usage_limit_exceeded"}}` + "\n", false},
+		{"old turn committed then unrelated error",
+			`{"type":"response_item","payload":{"role":"user"}}` + "\n" +
+				`{"type":"turn.completed","turn":{"status":"completed"}}` + "\n" +
+				`{"type":"error","error":{"code":"usage_limit_reached"}}` + "\n", false},
 		{"accepted then foreign ID", `{"type":"response_item","payload":{"role":"user"}}` + "\n" +
 			`{"type":"error","session_id":"00000000-0000-4000-8000-000000000002","error":{"code":"usage_limit_reached"}}` + "\n", false},
 		{"accepted then foreign nested session", `{"type":"response_item","payload":{"role":"user"}}` + "\n" +

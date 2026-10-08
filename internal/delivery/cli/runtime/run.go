@@ -147,7 +147,7 @@ func runProfileSelection(
 		return runLaunchTarget(ctx, runner, sessions, profiles, target, codexArguments, false, launchOptions)
 	}
 	if selection.Account != "" {
-		return runParsedWithOptions(ctx, runner, sessions, selection.Account, codexArguments, launchOptions)
+		return runParsedWithOptionsWithRecovery(ctx, runner, sessions, profiles, selection.Account, codexArguments, launchOptions)
 	}
 	if profiles != nil {
 		target, active, err := profiles.ActiveLaunch(ctx)
@@ -177,7 +177,7 @@ func runLaunchTarget(
 		return err
 	}
 	if target.AccountID != "" && target.Provider == "openai" && target.Auth != "api-key" {
-		return runParsedWithOptions(ctx, runner, sessions, target.AccountID, arguments, launchOptions)
+		return runParsedWithOptionsWithRecovery(ctx, runner, sessions, profiles, target.AccountID, arguments, launchOptions)
 	}
 	if profiles == nil || target.Name == "" {
 		return errors.New("profile launch metadata is incomplete")

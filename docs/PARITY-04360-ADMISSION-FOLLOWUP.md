@@ -137,6 +137,63 @@ previously resolved `exec resume` session with a recent structured
 usage-limit signal and a verified backup OpenAI account**. Do not infer
 full retry/replay or goal-monitor parity from its existence.
 
+## Follow-up 4: fresh-session evidence, compressed rollouts and goal transitions
+
+The previously open recovery gaps were re-audited against Prodex's exact
+`0.436.0` tag and the rollout and goal contracts in
+`crates/prodex-app/src/app_commands/runtime_launch/usage_limit_recovery.rs`,
+`usage_limit_recovery/workflow.rs`,
+`crates/prodex-app/src/app_commands/runtime_launch/usage_limit_recovery/plan.rs`,
+and `crates/prodex-app/src/runtime_tools/usage_limit_recovery.rs`.
+
+**New verified behavior:**
+
+- The Godex session repository now discovers `rollout-*.jsonl.zst`, parses
+  the decoded Codex session metadata and preserves model, effort and
+  source metadata. The streaming decoder, output and per-record buffers
+  are bounded; file symlinks are excluded.
+- A known-session child-exit checkpoint can now read compressed rollouts,
+  including a compressed frame appended to an existing file or an atomic
+  compressed rewrite. Instead of relying on compressed physical length or
+  inode reuse, it verifies the SHA-256 of the previous **decoded prefix**
+  and checks only the newly decoded suffix. Historical events, changed
+  history, incomplete records and oversized compressed streams cannot
+  authorize relaunch.
+- Goal database status is checked read-only with parameterized SQLite
+  queries. `active`, `paused`, `blocked` and `usage_limited` are
+  resumable; terminal goals cannot be relaunched. A genuine newer
+  `active → usage_limited` database transition can authorize the same
+  guarded, one-shot continuation even without a free-form error message.
+  Missing goal databases still permit standard (non-goal) recovery.
+- Managed OpenAI `RunProfiles` now performs read-only session catalogue
+  snapshots around a new headless `exec` invocation and can recover a
+  **fresh** session if exactly one new session is discoverable, the
+  persisted `session_meta` matches its UUID/path, and its accepted turn
+  terminates with a structured recovery error. No recovery occurs for
+  multiple concurrent new sessions, unknown/foreign identities, cancelled
+  child processes, missing durable binding-release support or unsuitable
+  fallback profiles. The new `exec resume` argument planner preserves
+  persisted model/effort and avoids repeating the original prompt.
+- Exact Codex structured recovery variants for `usage_limit`,
+  `rate_limit`, `overload`, `auth` and `transport` are recognized
+  from terminal event/turn errors. A bare 429 or plain-text log does not
+  trigger replay. Acceptance evidence is reset at both Codex and app-server turn
+  boundaries, so an old accepted turn cannot authorize a new
+  ambiguous one. Multi-variant error unions fail closed.
+- Each of the above paths has focused regression fixtures. The
+  fresh-session test exercises the real `RunProfiles` dispatcher with
+  a synthetic child that creates a Codex rollout, while compressed
+  known-session and goal transition tests exercise the real recovery
+  launcher and binding-release order.
+
+**What remains different from exact Prodex:** the native session-start
+hook mechanism and goal monitor while a child is running have not been
+replicated; standard known- and new-session recovery currently performs
+at most one safe continuation. Prodex can retry transient profile pools
+over further generations and handle additional rollout formats and edge
+cases. The existence of this new recovery path is **not** sufficient
+evidence of complete 1:1 workflow parity.
+
 ## Still NOT closed; do not promote as full parity
 
 1. **Complete queue/backoff lifecycle parity:** the Compact policy is
@@ -145,12 +202,14 @@ full retry/replay or goal-monitor parity from its existence.
    expose Prodex's three asynchronous queue sources or independently
    reproduce all worker/overload scenarios. This remains unverified
    end-to-end; mere admission-lane saturation must not trigger shedding.
-2. **Complete child-exit goal/workflow recovery:** known `exec resume`
-   usage-limit continuation is now guarded and exercised end-to-end with a
-   synthetic Codex process. Fresh-session ID discovery, goal database
-   transitions, compressed rollout scanning, other transient workflow
-   classes and multi-generation pool retry remain different or unproven.
-   This is not a full replacement for Prodex's recovery monitor.
+2. **Full goal/workflow relaunch lifecycle:** fresh-session `exec`
+   discovery, bounded compressed rollout reads, read-only goal status
+   transitions and exact structured transient error classes now have
+   meaningful source-matched tests. However Prodex's native session-start
+   hook, in-process goal monitor and multiple profile-pool retry
+   generations are not fully reproduced. The Go implementation currently
+   allows only a single evidence-gated child-exit relaunch, and native
+   online lifecycle parity remains unproven.
 3. **Full continuation/transport coverage:** HTTP Responses/Compact
    admission now bypasses the saturated lane for a verified owner and
    retains the global cap, with bounded request-body inspection.

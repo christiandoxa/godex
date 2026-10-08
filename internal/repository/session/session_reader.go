@@ -12,6 +12,7 @@ import (
 	"time"
 
 	sessionentity "github.com/christiandoxa/godex/internal/entity/session"
+	"github.com/klauspost/compress/zstd"
 )
 
 const (
@@ -121,7 +122,7 @@ func sessionWalkEntry(ctx context.Context, root string, entry os.DirEntry, walkE
 }
 
 func sessionFileName(name string) bool {
-	return strings.HasPrefix(name, "rollout-") && (strings.HasSuffix(name, ".jsonl") || strings.HasSuffix(name, ".json"))
+	return strings.HasPrefix(name, "rollout-") && (strings.HasSuffix(name, ".jsonl") || strings.HasSuffix(name, ".json") || strings.HasSuffix(name, ".jsonl.zst"))
 }
 
 func readSessionReport(ctx context.Context, path string) (sessionentity.Session, bool, error) {
@@ -143,7 +144,16 @@ func readSessionReport(ctx context.Context, path string) (sessionentity.Session,
 		UpdatedAt:   info.ModTime().UTC().Format(time.RFC3339),
 		UpdatedUnix: info.ModTime().Unix(),
 	}
-	scanner := bufio.NewScanner(io.LimitReader(file, maxSessionScanBytes))
+	var reader io.Reader = file
+	if strings.HasSuffix(path, ".jsonl.zst") {
+		decoder, decodeErr := zstd.NewReader(file, zstd.WithDecoderMaxMemory(8<<20))
+		if decodeErr != nil {
+			return sessionentity.Session{}, false, fmt.Errorf("decode compressed Codex session: %w", decodeErr)
+		}
+		defer decoder.Close()
+		reader = decoder
+	}
+	scanner := bufio.NewScanner(io.LimitReader(reader, maxSessionScanBytes))
 	scanner.Buffer(make([]byte, 64<<10), maxSessionLineBytes)
 	for scanner.Scan() {
 		if err := ctx.Err(); err != nil {

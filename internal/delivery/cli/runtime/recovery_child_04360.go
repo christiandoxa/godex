@@ -31,6 +31,7 @@ func (launcher runSessionLauncher) RunSessionReportWithRecovery(
 		return launcher.RunSessionReport(ctx, report, args, local)
 	}
 	checkpoint := captureRecoveryCheckpoint04360(report.Path)
+	goalBefore := captureGoalTransition04360(ctx, report.CodexHome, report.ID)
 	// No verified read position means no safe way to distinguish an old
 	// error from this attempt's error.
 	if !checkpoint.valid {
@@ -40,7 +41,13 @@ func (launcher runSessionLauncher) RunSessionReportWithRecovery(
 	if initial == nil || ctx.Err() != nil || recoveryExitCancelled04360(initial) {
 		return initial
 	}
-	if !checkpoint.newAcceptedUsageLimit04360(ctx, report.ID) {
+	if checkpoint.newAcceptedRecoveryClass04360(ctx, report.ID) == "" &&
+		!goalBefore.newUsageLimit04360(ctx) {
+		return initial
+	}
+	// The tagged goal monitor will not relaunch completed, cancelled or
+	// otherwise terminal goals. Missing goal state is an ordinary session.
+	if !goalAllowsRecovery04360(ctx, report.CodexHome, report.ID) {
 		return initial
 	}
 	candidate, ok := launcher.recoveryCandidate04360(ctx, report)
