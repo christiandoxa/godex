@@ -100,7 +100,7 @@ func nestedExecCommand(command string) bool {
 
 func codexOptionTakesValue(argument string) bool {
 	switch argument {
-	case "--model", "-m", "--profile", "-p", "--cd", "-C", "--sandbox", "-s", "--ask-for-approval", "-a", "--image", "-i", "--enable", "--disable", "--color", "--output-last-message", "-o", "--output-schema", "--local-provider", "--add-dir", "--thread-source":
+	case "--model", "-m", "--profile", "-p", "--cd", "-C", "--sandbox", "-s", "--ask-for-approval", "-a", "--image", "-i", "--enable", "--disable", "--color", "--output-last-message", "-o", "--output-schema", "--local-provider", "--add-dir", "--thread-source", "--cyber-access-program":
 		return true
 	}
 	return false

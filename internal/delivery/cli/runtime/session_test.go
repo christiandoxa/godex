@@ -18,7 +18,7 @@ func TestNativeSessionArgumentForms(t *testing.T) {
 		{[]string{"-C", "/synthetic/project", "exec", "--json", "resume", id}, 5},
 		{[]string{"--config=model=synthetic", "e", "fork", id}, 3},
 		{[]string{"resume", "--profile", "abcd", id}, 3},
-		{[]string{"resume", "--", id}, 2},
+		{[]string{"resume", "--", id}, -1}, // Prodex 0.436.0 Mojo launch_first treats -- as a literal boundary.
 		{[]string{"queue", "--thread", id, "--message", "message"}, 2},
 		{[]string{"--model", "synthetic", "queue", "--message", "--thread=literal", "--thread=0000"}, 5},
 		{[]string{"queue", "--message", id, "--thread", "thread name"}, -1},

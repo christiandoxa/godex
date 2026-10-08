@@ -40,9 +40,8 @@ func sessionArgument(arguments []string) (int, []string) {
 func findResumeSessionSelector(args []string, start int) int {
 	for i := start; i < len(args); {
 		if args[i] == "--" {
-			if i+1 < len(args) && strings.TrimSpace(args[i+1]) != "" {
-				return i + 1
-			}
+			// The tagged Mojo launch_first stops at the literal separator.
+			// A UUID-looking prompt is not a resumable session selector.
 			return -1
 		}
 		if args[i] == "--last" {
@@ -187,7 +186,7 @@ func nextCommandWord(arguments []string, start int) int {
 
 func nativeOptionTakesValue(argument string) bool {
 	switch argument {
-	case "-c", "--config", "-m", "--model", "-C", "--cd", "-i", "--image", "-p", "--profile", "-s", "--sandbox", "-a", "--ask-for-approval", "--enable", "--disable", "--add-dir", "--color", "-o", "--output-last-message", "--output-schema", "--thread-source", "--local-provider", "--listen", "--code-mode-host":
+	case "-c", "--config", "-m", "--model", "-C", "--cd", "-i", "--image", "-p", "--profile", "-s", "--sandbox", "-a", "--ask-for-approval", "--enable", "--disable", "--add-dir", "--color", "-o", "--output-last-message", "--output-schema", "--thread-source", "--cyber-access-program", "--local-provider", "--listen", "--code-mode-host":
 		return true
 	case "--remote", "--remote-auth-token-env", "--ws-auth", "--ws-token-file", "--ws-token-sha256", "--ws-shared-secret-file", "--ws-issuer", "--ws-audience", "--ws-max-clock-skew-seconds":
 		return true
