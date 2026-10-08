@@ -67,3 +67,26 @@ func TestProdex04358PingDynamicCatalogVisibilityIsExact(t *testing.T) {
 		t.Fatalf("visible model ids = %#v, want uppercase-listed and missing-visibility", models)
 	}
 }
+
+func TestProdex04358PingDynamicCatalogNullSupportIsUnspecified(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("CODEX_HOME", home)
+	cache := `{"models":[
+        {"slug":"null-support","supported_in_api":null},
+        {"slug":"false-support","supported_in_api":false},
+        {"slug":"missing-support"},
+        {"slug":"string-support","supported_in_api":"false"}]}`
+	if err := os.WriteFile(filepath.Join(home, "models_cache.json"), []byte(cache), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	models := pingDynamicModels()
+	want := []string{"null-support", "missing-support", "string-support"}
+	if len(models) != len(want) {
+		t.Fatalf("models = %#v, want %v", models, want)
+	}
+	for i, model := range models {
+		if model.id != want[i] {
+			t.Fatalf("model[%d] = %q, want %q", i, model.id, want[i])
+		}
+	}
+}

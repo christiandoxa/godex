@@ -201,11 +201,11 @@ func dynamicString(values map[string]json.RawMessage, keys ...string) string {
 }
 
 func rawBool(values map[string]json.RawMessage, key string) (bool, bool) {
-	var value bool
-	if json.Unmarshal(values[key], &value) != nil {
+	var value *bool
+	if json.Unmarshal(values[key], &value) != nil || value == nil {
 		return false, false
 	}
-	return value, true
+	return *value, true
 }
 
 func rawPriority(values map[string]json.RawMessage) uint64 {
