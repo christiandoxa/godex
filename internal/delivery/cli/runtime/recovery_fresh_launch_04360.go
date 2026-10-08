@@ -45,8 +45,11 @@ func runParsedWithOptionsWithRecovery(
 	if !ok || report.AccountID != "" && report.AccountID != selector ||
 		report.UpstreamAccountID != "" && report.UpstreamAccountID != selector ||
 		report.ModelProvider != "" && report.ModelProvider != "openai" ||
-		freshSessionRecoveryClass04360(ctx, report.Path, report.ID) == "" ||
 		!goalAllowsRecovery04360(ctx, report.CodexHome, report.ID) {
+		return original
+	}
+	failureClass := freshSessionRecoveryClass04360(ctx, report.Path, report.ID)
+	if failureClass == "" {
 		return original
 	}
 	report.AccountID = selector
@@ -61,7 +64,7 @@ func runParsedWithOptionsWithRecovery(
 	resumed = restoreResumeSessionSettings(resumed, report)
 	resumed = append(resumed, recoveryContinuationPrompt04360)
 	return chooser.recoverPersistedSessionThroughPool04360(
-		ctx, report, resumed, original, true, sessions.ReleaseRecoveryBinding,
+		ctx, report, resumed, original, failureClass, sessions.ReleaseRecoveryBinding,
 	)
 }
 

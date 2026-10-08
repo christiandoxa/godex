@@ -4,45 +4,88 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"time"
 
 	sessionmodel "github.com/christiandoxa/godex/internal/model/session"
 )
 
-// A fixed, bounded pass through distinct eligible profiles mirrors the
-// profile-pool exhaustion stage of Prodex 0.436.0 recovery. Every child
-// generation is independently monitored from a fresh pre-child
-// checkpoint, with no reused acceptance evidence from an older turn.
-//
-// This is intentionally NOT the tagged source's open-ended transient
-// wait/retry scheduler; recycling a fully exhausted pool safely requires
-// an independent availability signal and cancellable wait cycle.
 const maxVerifiedRecoveryProfiles04360 = 32
+const runtimeRecoveryRetryInterval04360 = 5 * time.Second
+
+// Prodex 0.436.0 classifies only these three workflow errors as
+// eligible to retry a fully exhausted profile pool after a wait.
+func recoveryClassRetriesAfterPoolRound04360(class string) bool {
+	return class == "rate_limit" || class == "overload" || class == "transport"
+}
+
+// Ctrl+C is conveyed to the application context by main's
+// signal.NotifyContext. Cancellation always interrupts the wait.
+func waitRuntimeRecoveryRound04360(ctx context.Context) bool {
+	if ctx.Err() != nil {
+		return false
+	}
+	timer := time.NewTimer(runtimeRecoveryRetryInterval04360)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return ctx.Err() == nil
+	}
+}
 
 func (launcher runSessionLauncher) recoverPersistedSessionThroughPool04360(
 	ctx context.Context,
 	report sessionmodel.Report,
 	resumed []string,
 	failed error,
-	verified bool,
+	failureClass string,
 	forget func(context.Context, string) error,
 ) error {
 	attempted := map[string]bool{
 		report.AccountID:         true,
 		report.UpstreamAccountID: true,
 	}
-	for generation := 0; generation < maxVerifiedRecoveryProfiles04360; generation++ {
-		if !verified || ctx.Err() != nil || recoveryExitCancelled04360(failed) {
+	triedThisRound := 0
+	for {
+		if failureClass == "" || recoveryExitCancelled04360(failed) {
 			return failed
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
 		}
 		if !goalAllowsRecovery04360(ctx, report.CodexHome, report.ID) {
 			return failed
 		}
 		candidate, ok := launcher.recoveryCandidateExcluding04360(ctx, report, attempted)
-		if !ok {
-			return failed
+		if !ok || triedThisRound >= maxVerifiedRecoveryProfiles04360 {
+			// Do not wait forever without a single qualified backup.
+			// A completed quota-limit or auth error does not recycle.
+			if triedThisRound == 0 || !recoveryClassRetriesAfterPoolRound04360(failureClass) {
+				return failed
+			}
+			wait := launcher.recoveryWait
+			if wait == nil {
+				wait = waitRuntimeRecoveryRound04360
+			}
+			fmt.Fprintln(os.Stderr,
+				"Godex: transient profile pool unavailable; retrying in 5 seconds (Ctrl+C to cancel)")
+			if !wait(ctx) {
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
+				return failed
+			}
+			attempted = map[string]bool{
+				report.AccountID:         true,
+				report.UpstreamAccountID: true,
+			}
+			triedThisRound = 0
+			continue
 		}
-		// An invalid/unavailable checkpoint means subsequent retry evidence
-		// could not be attributed to this child. Refuse to launch.
+		// A new verified checkpoint is mandatory before every subsequent
+		// child. No replay can use evidence retained from an older attempt.
 		nextCheckpoint := captureRecoveryCheckpoint04360(report.Path)
 		if !nextCheckpoint.valid {
 			return failed
@@ -52,19 +95,21 @@ func (launcher runSessionLauncher) recoverPersistedSessionThroughPool04360(
 			return errors.Join(failed, fmt.Errorf("session recovery affinity release failed: %w", err))
 		}
 		attempted[candidate.AccountID] = true
-		// The same canonical exec-resume plan is safe across attempts:
-		// it carries no original prompt and only refers to the persisted
-		// thread. The runner rechecks account state and quota each time.
+		triedThisRound++
 		nextErr := launcher.runner.RunWithOptions(ctx, candidate.AccountID, resumed, launcher.options)
 		if nextErr == nil {
 			return nil
 		}
-		if ctx.Err() != nil || recoveryExitCancelled04360(nextErr) {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if recoveryExitCancelled04360(nextErr) {
 			return nextErr
 		}
 		failed = nextErr
-		verified = nextCheckpoint.newAcceptedRecoveryClass04360(ctx, report.ID) != "" ||
-			nextGoal.newUsageLimit04360(ctx)
+		failureClass = nextCheckpoint.newAcceptedRecoveryClass04360(ctx, report.ID)
+		if failureClass == "" && nextGoal.newUsageLimit04360(ctx) {
+			failureClass = "usage_limit"
+		}
 	}
-	return failed
 }

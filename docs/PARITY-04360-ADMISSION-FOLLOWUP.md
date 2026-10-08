@@ -232,12 +232,48 @@ discovered headless `exec` sessions:
   the same protections. Tests inspect actual selected profile homes and
   preserved continuation arguments.
 
-**Remaining difference:** Prodex can wait five seconds and recycle the
-transient-error candidate pool based on new quota availability, use a
-native `SessionStart` hook and observe the goal state *while* Codex is
-running. Godex intentionally **does not silently loop forever** after
-exhausting its verified distinct-profile pass; that behavior cannot be
-promoted to full parity without compatible scheduling and live evidence.
+**Remaining difference at the Follow-up 5 checkpoint:** the transient
+recycle timer, native `SessionStart` hook and live goal observer were
+unimplemented. Follow-up 6 implements the cancellable transient timer;
+the live session-start/goal-monitor contracts remain open.
+
+## Follow-up 6: cancellable transient-pool retry after five seconds
+
+Prodex's exact `0.436.0` source uses
+`GOAL_USAGE_LIMIT_RETRY_INTERVAL = Duration::from_secs(5)` and
+recycles the attempted-profile pool only when
+`RuntimeWorkflowRecoveryClass::retries_after_pool_round()` is
+true for `rate_limit`, `overload` or `transport`. Godex now
+implements the corresponding **five-second, Ctrl+C-cancellable wait**:
+
+- Once a pass has attempted at least one qualified backup and exhausts
+  its distinct candidates, an evidence-verified transient failure logs
+  that a retry is scheduled and waits five seconds. The next pass
+  refreshes candidate profiles and account/quota availability, clears
+  the attempted set for that round, and still excludes the original
+  session owner. Failures without an accepted-turn structured marker,
+  non-transient errors (including usage-limit and auth), or an entirely
+  unqualified pool do **not** recycle or wait.
+- Main's existing `signal.NotifyContext` delivers Ctrl+C and
+  shutdown cancellations to this wait; a cancellation returns immediately.
+  After the wait, the same per-child decoded-rollout/goal-state
+  checkpoint and binding-release protections apply to every future
+  attempt. No original prompt or previous tool call is resent as an
+  instruction.
+- Deterministic regression tests inject a no-delay wait to prove
+  the sequence `A → B → C → (wait) → B` for a transient
+  structured rate-limit, no pool recycling for usage-limit, stop on
+  missing new evidence, and stop when cancellation occurs during a
+  retry wait. The production interval and prompt abort are separately
+  tested without sleeping five seconds in CI.
+
+**Still different/unproven:** Prodex's native `SessionStart`
+hook and online monitor can make decisions *while* a child is running;
+Godex currently checks the verified rollout/goal database **after
+child exit**. The asynchronous background persistence/probe queues
+and full live differential provider/transport matrix also remain
+unverified. Therefore these additional recovery contracts do **not**
+constitute full 1:1 parity.
 
 ## Still NOT closed; do not promote as full parity
 
@@ -252,9 +288,9 @@ promoted to full parity without compatible scheduling and live evidence.
    transitions, structured transient error classes and per-generation
    distinct-profile rotation now have meaningful source-matched tests.
    Prodex's native session-start hook, online in-process goal monitor,
-   five-second transient-pool wait/recycle scheduler, and all native
-   launch/continuation conditions are **not** fully reproduced;
-   real-world workflow parity remains unproven.
+   and all native launch/continuation conditions are **not** fully
+   reproduced. The five-second transient-pool scheduler now has
+   cancellable tests, but real-world workflow parity remains unproven.
 3. **Full continuation/transport coverage:** HTTP Responses/Compact
    admission now bypasses the saturated lane for a verified owner and
    retains the global cap, with bounded request-body inspection.

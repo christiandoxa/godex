@@ -39,6 +39,7 @@ type sequentialRecoveryProcess04360 struct {
 	path      string
 	failUntil int
 	emit      map[int]bool
+	variant   string
 	calls     [][]string
 	homes     []string
 }
@@ -55,8 +56,12 @@ func (p *sequentialRecoveryProcess04360) Run(_ context.Context, home string, arg
 		if err != nil {
 			return err
 		}
+		variant := p.variant
+		if variant == "" {
+			variant = "rate_limit_exceeded"
+		}
 		_, err = f.WriteString(`{"type":"response_item","payload":{"type":"message","role":"user"}}` + "\n" +
-			`{"type":"error","error":{"codex_error_info":"rate_limit_exceeded"}}` + "\n")
+			`{"type":"error","error":{"codex_error_info":"` + variant + `"}}` + "\n")
 		if err != nil {
 			_ = f.Close()
 			return err
@@ -96,7 +101,7 @@ func TestProdex04360KnownSessionRecoveryWalksDistinctProfilesUnderFreshEvidence(
 			runner := runtimeusecase.NewRunner(accounts, process, nil)
 			launcher := runSessionLauncher{runner: runner, profiles: &multiProfileRecoverySource04360{
 				fakeLocalLaunchProfiles: &fakeLocalLaunchProfiles{},
-			}}
+			}, recoveryWait: func(context.Context) bool { return false }}
 			forget := 0
 			err := launcher.RunSessionReportWithRecovery(t.Context(), sessionmodel.Report{
 				ID: id, Path: path, CodexHome: home, AccountID: "a", UpstreamAccountID: "a",

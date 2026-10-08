@@ -47,10 +47,12 @@ func (launcher runSessionLauncher) RunSessionReportWithRecovery(
 		return initial
 	}
 	resumed = append(resumed, recoveryContinuationPrompt04360)
-	verified := checkpoint.newAcceptedRecoveryClass04360(ctx, report.ID) != "" ||
-		goalBefore.newUsageLimit04360(ctx)
+	failureClass := checkpoint.newAcceptedRecoveryClass04360(ctx, report.ID)
+	if failureClass == "" && goalBefore.newUsageLimit04360(ctx) {
+		failureClass = "usage_limit"
+	}
 	return launcher.recoverPersistedSessionThroughPool04360(
-		ctx, report, resumed, initial, verified, bindingForget,
+		ctx, report, resumed, initial, failureClass, bindingForget,
 	)
 }
 

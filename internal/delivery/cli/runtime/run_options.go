@@ -27,6 +27,9 @@ type runSessionLauncher struct {
 	profiles  launchProfiles
 	selection runtimemodel.Selection
 	options   runtimeusecase.RuntimeLaunchOptions
+	// Optional per-launch wait override for deterministic cancellation tests.
+	// Production uses the exact Prodex five-second transient retry interval.
+	recoveryWait func(context.Context) bool
 }
 
 func (launcher runSessionLauncher) Run(ctx context.Context, selector string, args []string) error {
