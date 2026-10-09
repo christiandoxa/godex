@@ -197,9 +197,9 @@ func NewRouter(config Config) (*Router, error) {
 	}
 	router.selectionSequence.Store(config.SelectionSequenceSeed)
 	router.persistenceEnabled.Store(true)
-	router.affinity.repository = config.Bindings
-	router.affinity.clock = router.now
-	router.affinity.persistenceEnabled = router.persistenceWritesEnabled
+	if err := router.initializeAffinityPersistence(config); err != nil {
+		return nil, fmt.Errorf("load continuation statuses: %w", err)
+	}
 	if config.RoutingState != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()

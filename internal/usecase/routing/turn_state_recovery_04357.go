@@ -93,6 +93,14 @@ func (store *affinityStore) releaseOwnedDead(
 	if len(remove) == 0 {
 		return nil
 	}
+	for _, entry := range remove {
+		if kind := continuationStatusKind(entry.Kind); kind != "" {
+			store.markContinuationDeadLocked(kind, entry.Key, now)
+			if err := store.persistContinuationDeadLocked(ctx, kind, entry.Key, now); err != nil {
+				return err
+			}
+		}
+	}
 	if remover, ok := store.repository.(affinityBindingRemover); ok && store.writesEnabled() {
 		keys := make([]string, 0, len(remove))
 		for _, entry := range remove {
@@ -104,9 +112,6 @@ func (store *affinityStore) releaseOwnedDead(
 	}
 	for _, entry := range remove {
 		delete(store.values, entry.Key)
-		if kind := continuationStatusKind(entry.Kind); kind != "" {
-			store.markContinuationDeadLocked(kind, entry.Key, now)
-		}
 	}
 	store.pruneContinuationStatusesLocked(now)
 	return nil

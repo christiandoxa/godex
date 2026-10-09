@@ -46,6 +46,14 @@ func (store *affinityStore) forgetDeadResponse(
 	if binding, ok := store.values[key]; ok && binding.accountID != accountID {
 		return nil
 	}
+	now := time.Now()
+	if store.clock != nil {
+		now = store.clock()
+	}
+	store.markContinuationDeadLocked("response", key, now)
+	if err := store.persistContinuationDeadLocked(ctx, "response", key, now); err != nil {
+		return err
+	}
 	if repository, ok := store.repository.(responseTurnStateRemover); ok && profileHome != "" && store.writesEnabled() {
 		if err := repository.RemoveResponseTurnState(ctx, profileHome, key); err != nil {
 			return fmt.Errorf("remove stale response turn state: %w", err)
@@ -56,11 +64,6 @@ func (store *affinityStore) forgetDeadResponse(
 			return fmt.Errorf("remove stale response binding: %w", err)
 		}
 	}
-	now := time.Now()
-	if store.clock != nil {
-		now = store.clock()
-	}
-	store.markContinuationDeadLocked("response", key, now)
 	delete(store.values, key)
 	if state, ok := store.turnStates[key]; ok && state.accountID == accountID {
 		delete(store.turnStates, key)
@@ -91,11 +94,6 @@ func (store *affinityStore) forgetAccount(ctx context.Context, accountID string,
 			values = append(values, key)
 		}
 	}
-	if store.repository != nil && len(values) > 0 && store.writesEnabled() {
-		if err := store.repository.Remove(ctx, values); err != nil {
-			return fmt.Errorf("remove account affinity: %w", err)
-		}
-	}
 	now := time.Now()
 	if store.clock != nil {
 		now = store.clock()
@@ -103,7 +101,17 @@ func (store *affinityStore) forgetAccount(ctx context.Context, accountID string,
 	for _, key := range values {
 		if status, ok := store.statuses[key]; ok {
 			store.markContinuationDeadLocked(status.kind, key, now)
+			if err := store.persistContinuationDeadLocked(ctx, status.kind, key, now); err != nil {
+				return err
+			}
 		}
+	}
+	if store.repository != nil && len(values) > 0 && store.writesEnabled() {
+		if err := store.repository.Remove(ctx, values); err != nil {
+			return fmt.Errorf("remove account affinity: %w", err)
+		}
+	}
+	for _, key := range values {
 		delete(store.values, key)
 	}
 	return nil

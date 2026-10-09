@@ -35,16 +35,19 @@ func (store *affinityStore) forgetPreviousResponse(
 	if current, ok := store.values[key]; ok && current.accountID != accountID {
 		return nil
 	}
-	if remover, ok := store.repository.(affinityBindingRemover); ok && store.writesEnabled() {
-		if err := remover.Remove(ctx, []string{key}); err != nil {
-			return fmt.Errorf("remove dead previous-response binding: %w", err)
-		}
-	}
 	now := time.Now()
 	if store.clock != nil {
 		now = store.clock()
 	}
 	store.markContinuationDeadLocked("response", key, now)
+	if err := store.persistContinuationDeadLocked(ctx, "response", key, now); err != nil {
+		return err
+	}
+	if remover, ok := store.repository.(affinityBindingRemover); ok && store.writesEnabled() {
+		if err := remover.Remove(ctx, []string{key}); err != nil {
+			return fmt.Errorf("remove dead previous-response binding: %w", err)
+		}
+	}
 	delete(store.values, key)
 	return nil
 }
