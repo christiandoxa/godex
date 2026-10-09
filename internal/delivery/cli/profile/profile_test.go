@@ -69,6 +69,17 @@ func TestProfileCommandsAddListCurrentUseAndRemove(t *testing.T) {
 	}
 }
 
+func TestProfileCurrentReportsEmptySelection(t *testing.T) {
+	catalog, _ := newProfileCatalog(t)
+	var output bytes.Buffer
+	if err := Run(context.Background(), catalog, &output, []string{"current"}); err != nil {
+		t.Fatalf("current without profiles: %v", err)
+	}
+	if output.String() != "No active profile.\n" {
+		t.Fatalf("empty current output = %q", output.String())
+	}
+}
+
 func TestProfileCopyCurrentAndExternalDeletionSafety(t *testing.T) {
 	catalog, current := newProfileCatalog(t)
 	if err := os.WriteFile(filepath.Join(current, "config.toml"), []byte("model = \"synthetic\"\n"), 0o600); err != nil {

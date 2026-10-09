@@ -90,7 +90,21 @@ func current(ctx context.Context, catalog *profileusecase.Catalog, out io.Writer
 	}
 	report, err := catalog.Current(ctx)
 	if err != nil {
-		return err
+		if !errors.Is(err, profileusecase.ErrNoActiveProfile) {
+			return err
+		}
+		reports, listErr := catalog.List(ctx)
+		if listErr != nil {
+			return listErr
+		}
+		if _, writeErr := fmt.Fprintln(out, "No active profile."); writeErr != nil {
+			return writeErr
+		}
+		if len(reports) == 1 {
+			_, writeErr := fmt.Fprintf(out, "Only profile: %s\nCODEX_HOME: %s\n", reports[0].Profile.Name, reports[0].Profile.CodexHome)
+			return writeErr
+		}
+		return nil
 	}
 	_, err = fmt.Fprintf(out, "Profile: %s\nProvider: %s\nCODEX_HOME: %s\nManaged: %t\n", report.Profile.Name, report.Profile.Provider.Kind, report.Profile.CodexHome, report.Profile.Managed)
 	return err

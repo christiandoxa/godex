@@ -11,6 +11,10 @@ import (
 	profileentity "github.com/christiandoxa/godex/internal/entity/profile"
 )
 
+// ErrNoActiveProfile distinguishes an empty active selection from storage or
+// state corruption so delivery can render the canonical empty-state report.
+var ErrNoActiveProfile = errors.New("no active profile")
+
 func (catalog *Catalog) List(ctx context.Context) ([]Report, error) {
 	var reports []Report
 	err := catalog.withBundleImportLock(ctx, func() error {
@@ -74,7 +78,7 @@ func (catalog *Catalog) current(ctx context.Context) (Report, error) {
 	}
 	account, err := catalog.accounts.Current(ctx)
 	if err != nil {
-		return Report{}, errors.New("no active profile")
+		return Report{}, ErrNoActiveProfile
 	}
 	return Report{Profile: accountProfile(account, catalog.accounts.CodexHome(account.ID)), Active: true, Enabled: account.Enabled, AccountID: account.ID}, nil
 }
