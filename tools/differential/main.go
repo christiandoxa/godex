@@ -27,7 +27,6 @@ import (
 
 const (
 	prodexCommit = "4c61dc0a84a6cf4852feb08e3a8406c1846bb5ad"
-	godexCommit  = "4bf54d91d14942948bbe91e1f9f23cea7a947275"
 	apiKey       = "synthetic-provider-key"
 	bodyLimit    = 1 << 20
 )
@@ -108,12 +107,13 @@ func run() error {
 	prodexBin := flags.String("prodex", "", "exact Prodex 0.436.1 product binary")
 	godexBin := flags.String("godex", "", "Godex baseline product binary")
 	prodexSource := flags.String("prodex-source", "", "exact Prodex 0.436.1 source checkout")
-	godexSource := flags.String("godex-source", "", "Godex baseline source checkout")
+	godexSource := flags.String("godex-source", "", "Godex source checkout")
+	godexExpectedCommit := flags.String("godex-commit", "", "expected Godex source commit SHA (full 40 hexadecimal characters)")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		return err
 	}
-	if *prodexBin == "" || *godexBin == "" || *prodexSource == "" || *godexSource == "" {
-		return errors.New("usage: differential --prodex BIN --godex BIN --prodex-source DIR --godex-source DIR")
+	if *prodexBin == "" || *godexBin == "" || *prodexSource == "" || *godexSource == "" || len(*godexExpectedCommit) != 40 {
+		return errors.New("usage: differential --prodex BIN --godex BIN --prodex-source DIR --godex-source DIR --godex-commit FULL_SHA")
 	}
 	prodexSourceCommit, err := gitCommit(*prodexSource)
 	if err != nil {
@@ -126,8 +126,8 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("inspect Godex source: %w", err)
 	}
-	if godexSourceCommit != godexCommit {
-		return fmt.Errorf("Godex source commit %s, want baseline %s", godexSourceCommit, godexCommit)
+	if godexSourceCommit != *godexExpectedCommit {
+		return fmt.Errorf("Godex source commit %s, want exact expected %s", godexSourceCommit, *godexExpectedCommit)
 	}
 
 	root, err := os.MkdirTemp("", "godex-differential-")
@@ -149,13 +149,9 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("Godex scenario: %w", err)
 	}
-	differences := compare(prodexRun, godexRun)
+	status, differences := parityStatus(prodexRun, godexRun)
 	if !negativeControl() {
 		return errors.New("negative control failed: status mismatch escaped comparison")
-	}
-	status := "PASS"
-	if len(differences) != 0 || prodexRun.ExitStatus != 0 || godexRun.ExitStatus != 0 {
-		status = "IMPLEMENTED-NOT-VERIFIED"
 	}
 	result := report{
 		Status: status, ProdexSource: prodexSourceCommit, GodexSource: godexSourceCommit,
@@ -169,6 +165,9 @@ func run() error {
 		return err
 	}
 	fmt.Println(string(encoded))
+	if status != "PASS" {
+		return fmt.Errorf("differential mismatch: reference exit=%d, Godex exit=%d, fields=%v", prodexRun.ExitStatus, godexRun.ExitStatus, differences)
+	}
 	return nil
 }
 
@@ -223,7 +222,13 @@ func runProduct(root string, mock *mockServer, name, binary, commit string) (pro
 			return productRun{}, fmt.Errorf("run %s: %w", name, err)
 		}
 	}
-	clientExchange, _ := readExchange(childResult)
+	clientExchange, err := readExchange(childResult)
+	if err != nil {
+		return productRun{}, fmt.Errorf("%s produced no valid child response evidence: %w", name, err)
+	}
+	if mock.count() == start {
+		return productRun{}, fmt.Errorf("%s produced no upstream request evidence", name)
+	}
 	return productRun{
 		Name: name, Binary: resolved, Version: version, Commit: commit, SHA256: digest,
 		Command:    []string{name, "super", "--provider", "deepseek", "--api-key", "<synthetic-key>", "--base-url", "http://127.0.0.1:<mock>/v1", "--no-presidio", "--no-sub-agent", "exec", "synthetic differential probe"},
@@ -429,6 +434,14 @@ func codexBaseURL(arguments []string) string {
 func shimFailure(message string) int {
 	_, _ = fmt.Fprintln(os.Stderr, message)
 	return 1
+}
+
+func parityStatus(left, right productRun) (string, []string) {
+	differences := compare(left, right)
+	if len(differences) != 0 || left.ExitStatus != 0 || right.ExitStatus != 0 {
+		return "FAIL", differences
+	}
+	return "PASS", differences
 }
 
 func compare(left, right productRun) []string {
