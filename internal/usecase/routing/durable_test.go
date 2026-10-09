@@ -218,3 +218,28 @@ func TestConcurrentFirstCallsReserveOneConversationOwner(t *testing.T) {
 		t.Fatal("unknown continuation was treated as fresh")
 	}
 }
+
+func TestResponsesUnknownContinuationAttemptsUpstream(t *testing.T) {
+	gateway := &countingGateway{}
+	router, err := NewRouter(Config{
+		Gateway: gateway,
+		Accounts: func(context.Context) ([]proxymodel.Account, error) {
+			return []proxymodel.Account{{ID: "account-a", Home: "/a", Enabled: true}}, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	exchange, err := router.Forward(context.Background(), proxymodel.Request{
+		Header:         make(http.Header),
+		Body:           []byte(`{"previous_response_id":"unknown"}`),
+		QuotaSelection: quotamodel.Selection{RouteKind: quotamodel.RouteKindResponses},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer exchange.Close()
+	if exchange.Result.AccountID != "account-a" || len(gateway.owners) != 1 {
+		t.Fatalf("unknown Responses continuation = account %q calls=%v", exchange.Result.AccountID, gateway.owners)
+	}
+}

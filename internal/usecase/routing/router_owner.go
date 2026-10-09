@@ -29,6 +29,7 @@ func (router *Router) resolveOwner(
 		}
 	}
 	if owner == "" && opaqueContinuation(keys, selection) &&
+		!allowsUnboundResponsesContinuation(keys, selection) &&
 		(keys.previous == "" || !router.hasPreviousResponseFailure(keys.previous, selection)) {
 		if durableRelease != nil {
 			_ = durableRelease()
@@ -47,6 +48,13 @@ func opaqueContinuation(keys affinityKeys, selection quotamodel.Selection) bool 
 		return true
 	}
 	return keys.turn != "" && selection.RouteKind != quotamodel.RouteKindCompact
+}
+
+// Responses can discover an unbound previous-response owner by making the
+// bounded upstream attempt. Other transports keep unknown opaque affinity
+// fail-closed because they cannot safely replay it on a fresh profile.
+func allowsUnboundResponsesContinuation(keys affinityKeys, selection quotamodel.Selection) bool {
+	return selection.RouteKind == quotamodel.RouteKindResponses && keys.previous != ""
 }
 
 func (router *Router) routeRequest(
