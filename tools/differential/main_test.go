@@ -185,3 +185,26 @@ func TestSingleKey503RequiresOriginalServiceStatus(t *testing.T) {
 		t.Fatal("silently healed provider outage was accepted")
 	}
 }
+
+// The terminal 503 must not prevent a healthy retry on a later process after
+// provider health state is loaded from the same isolated persistent home.
+func TestRecoverAfter503RequiresHealthySecondGeneration(t *testing.T) {
+	outage := productRun{
+		Name: "prodex", ExitStatus: 2,
+		Client:   exchange{Status: 503, Body: "rate_limit_exceeded"},
+		Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, Body: syntheticFixtureRequest}},
+	}
+	recovered := productRun{
+		Name: "prodex", ExitStatus: 0,
+		Client:   exchange{Status: 200, Body: syntheticFixtureResponse},
+		Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, Body: syntheticFixtureRequest}},
+	}
+	scenario := scenarioResult{Name: "recover-after-503", Runs: []productRun{outage, recovered, outage, recovered}}
+	if violations := scenarioInvariants(scenario); len(violations) != 0 {
+		t.Fatalf("valid provider recovery rejected: %v", violations)
+	}
+	scenario.Runs[3] = outage
+	if violations := scenarioInvariants(scenario); len(violations) == 0 {
+		t.Fatal("persisted health state that blocks later healthy request was ignored")
+	}
+}

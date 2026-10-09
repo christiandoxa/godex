@@ -141,7 +141,7 @@ func run() error {
 	prodexSource := flags.String("prodex-source", "", "exact Prodex 0.436.1 source checkout")
 	godexSource := flags.String("godex-source", "", "Godex candidate source checkout")
 	expectedGodexCommit := flags.String("godex-commit", "", "expected Godex source HEAD commit SHA")
-	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, retry, single-key-429, single-key-503, cancel, restart, or recover-after-429")
+	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, retry, single-key-429, single-key-503, cancel, restart, recover-after-429, or recover-after-503")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		return err
 	}
@@ -212,6 +212,9 @@ func run() error {
 		}},
 		{"recover-after-429", func() (scenarioResult, error) {
 			return runRecoverAfter429(root, mock, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit)
+		}},
+		{"recover-after-503", func() (scenarioResult, error) {
+			return runRecoverAfter503(root, mock, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit)
 		}},
 	}
 	var scenarios []scenarioResult
@@ -308,8 +311,16 @@ func runRestartScenario(root string, mock *mockServer, prodexBin, godexBin, prod
 // state root, a new process must complete the next healthy turn. This proves
 // durable retry/backoff state cannot permanently poison a sole provider key.
 func runRecoverAfter429(root string, mock *mockServer, prodexBin, godexBin, prodexCommit, godexCommit string) (scenarioResult, error) {
-	root = filepath.Join(root, "recover-after-429")
-	firstError := mockPlan{FirstStatus: http.StatusTooManyRequests}
+	return runRecoverAfterProviderFailure(root, mock, prodexBin, godexBin, prodexCommit, godexCommit, "recover-after-429", http.StatusTooManyRequests)
+}
+
+func runRecoverAfter503(root string, mock *mockServer, prodexBin, godexBin, prodexCommit, godexCommit string) (scenarioResult, error) {
+	return runRecoverAfterProviderFailure(root, mock, prodexBin, godexBin, prodexCommit, godexCommit, "recover-after-503", http.StatusServiceUnavailable)
+}
+
+func runRecoverAfterProviderFailure(root string, mock *mockServer, prodexBin, godexBin, prodexCommit, godexCommit, scenario string, failedStatus int) (scenarioResult, error) {
+	root = filepath.Join(root, scenario)
+	firstError := mockPlan{FirstStatus: failedStatus}
 	recovered := mockPlan{}
 	options := runOptions{}
 	prodexFirst, err := runProduct(root, mock, "prodex", prodexBin, prodexCommit, firstError, options)
@@ -330,7 +341,7 @@ func runRecoverAfter429(root string, mock *mockServer, prodexBin, godexBin, prod
 	}
 	all := []productRun{prodexFirst, prodexNext, godexFirst, godexNext}
 	differences := append(compare(prodexFirst, godexFirst), compare(prodexNext, godexNext)...)
-	return scenarioResult{Name: "recover-after-429", Comparison: uniqueStrings(differences), Runs: all}, nil
+	return scenarioResult{Name: scenario, Comparison: uniqueStrings(differences), Runs: all}, nil
 }
 
 func runProduct(root string, mock *mockServer, name, binary, commit string, plan mockPlan, options runOptions) (productRun, error) {
@@ -688,7 +699,7 @@ func shimFailure(message string) int {
 func scenarioInvariants(scenario scenarioResult) []string {
 	var failures []string
 	wantRuns := 2
-	if scenario.Name == "restart" || scenario.Name == "recover-after-429" {
+	if scenario.Name == "restart" || scenario.Name == "recover-after-429" || scenario.Name == "recover-after-503" {
 		wantRuns = 4
 	}
 	if len(scenario.Runs) != wantRuns {
@@ -697,10 +708,14 @@ func scenarioInvariants(scenario scenarioResult) []string {
 	for index, run := range scenario.Runs {
 		prefix := scenario.Name + "." + run.Name
 		phase := scenario.Name
-		if scenario.Name == "recover-after-429" {
-			// Two paired process generations, first 429 then healthy 200.
+		if scenario.Name == "recover-after-429" || scenario.Name == "recover-after-503" {
+			// Two paired process generations, first terminal error then 200.
 			if index == 0 || index == 2 {
-				phase = "single-key-429"
+				if scenario.Name == "recover-after-429" {
+					phase = "single-key-429"
+				} else {
+					phase = "single-key-503"
+				}
 			} else {
 				phase = "success"
 			}
