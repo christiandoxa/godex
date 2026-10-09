@@ -106,3 +106,11 @@ is compared by failure class, validated loopback route and cancellation
 state; all other diagnostics remain strict. Because Godex intentionally omits
 Prodex's progress banner, this is a scoped semantic exception rather than an
 assertion that raw CLI stderr matches.
+
+
+The differential harness now also reads real synthetic-run state files after
+exit and rejects invalid JSON, foreign rollouts, unexpected history,
+world-writable state, leaked synthetic provider keys, and divergent routing
+recovery snapshots. These integrity checks are necessary but do not prove
+cross-implementation state persistence semantics: the raw durable-state
+layout mismatch remains a release blocker.

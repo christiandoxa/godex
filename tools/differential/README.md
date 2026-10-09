@@ -82,3 +82,21 @@ loopback routes. Any unexpected auth error, warning, quota diagnostic,
 non-loopback destination, or changed cancellation reason fails the test.
 This is a documented CLI-presentation difference, **not literal stderr
 byte-for-byte parity**.
+
+
+### Fixture durable-state integrity
+
+Both products are checked independently for output artifacts that the
+synthetic provider workflow must not create: foreign Codex sessions, polluted
+Codex history, invalid JSON state, leaked synthetic credentials, and
+inconsistent routing/last-good recovery snapshots. File permissions are
+checked against world-writable artifacts and file size/type bounds. These
+checks run on **actual temporary state files** after each product exits, with
+negative controls for corruption and secret leakage.
+
+The Rust and Go repositories use deliberately different private bookkeeping
+layouts. Raw durable file inventories and digests are still included and
+compared under the fail-closed strict gate. The integrity checks do **not**
+certify equivalence of account/goal/journal semantics, so the raw layout
+difference remains a blocker pending domain-specific restart/fault injection
+proof.

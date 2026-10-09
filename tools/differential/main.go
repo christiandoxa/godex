@@ -62,21 +62,22 @@ type fileState struct {
 }
 
 type productRun struct {
-	Name       string            `json:"name"`
-	Binary     string            `json:"binary"`
-	Version    string            `json:"version"`
-	Commit     string            `json:"commit"`
-	SHA256     string            `json:"sha256"`
-	Command    []string          `json:"command"`
-	ExitStatus int               `json:"exit_status"`
-	Stdout     string            `json:"stdout"`
-	Stderr     string            `json:"stderr"`
-	Client     exchange          `json:"client_exchange"`
-	Upstream   []upstreamRequest `json:"upstream_requests"`
-	Events     []upstreamEvent   `json:"events"`
-	Retries    int               `json:"retry_attempts"`
-	Cancelled  bool              `json:"cancelled"`
-	Files      []fileState       `json:"durable_files"`
+	Name           string            `json:"name"`
+	Binary         string            `json:"binary"`
+	Version        string            `json:"version"`
+	Commit         string            `json:"commit"`
+	SHA256         string            `json:"sha256"`
+	Command        []string          `json:"command"`
+	ExitStatus     int               `json:"exit_status"`
+	Stdout         string            `json:"stdout"`
+	Stderr         string            `json:"stderr"`
+	Client         exchange          `json:"client_exchange"`
+	Upstream       []upstreamRequest `json:"upstream_requests"`
+	Events         []upstreamEvent   `json:"events"`
+	Retries        int               `json:"retry_attempts"`
+	Cancelled      bool              `json:"cancelled"`
+	Files          []fileState       `json:"durable_files"`
+	StateIntegrity []string          `json:"state_integrity_errors,omitempty"`
 }
 
 type scenarioResult struct {
@@ -364,7 +365,8 @@ func runProduct(root string, mock *mockServer, name, binary, commit string, plan
 		Command:    []string{name, "super", "--provider", "deepseek", "--api-key", "<synthetic-key>", "--base-url", "http://127.0.0.1:<mock>/v1", "--no-presidio", "--no-sub-agent", "exec", "synthetic differential probe"},
 		ExitStatus: exit, Stdout: redact(stdout.String()), Stderr: redact(stderr.String()),
 		Client: clientExchange, Upstream: upstream, Events: events,
-		Retries: max(0, len(upstream)-1), Cancelled: options.cancel && hasEvent(events, "upstream.cancelled"), Files: snapshot(productRoot),
+		Retries: max(0, len(upstream)-1), Cancelled: options.cancel && hasEvent(events, "upstream.cancelled"),
+		Files: snapshot(productRoot), StateIntegrity: auditFixtureDurableState(productRoot),
 	}, nil
 }
 
@@ -683,6 +685,9 @@ func scenarioInvariants(scenario scenarioResult) []string {
 		}
 		if len(run.Upstream) != wantRequests || run.Retries != wantRequests-1 {
 			failures = append(failures, prefix+".upstream_attempts")
+		}
+		if len(run.StateIntegrity) != 0 {
+			failures = append(failures, prefix+".state_integrity")
 		}
 		for _, upstream := range run.Upstream {
 			if !upstream.AuthOK || upstream.Method != http.MethodPost || upstream.Path != "/v1/chat/completions" {
