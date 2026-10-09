@@ -81,7 +81,7 @@ a substitute for independent observable behavioral verification.
   continuation recovery guarantees.
 - A second, independent **managed-profile lifecycle differential** was
   added to the release gate. It uses the exact SHA-256-pinned Prodex
-  0.437.0 executable and a clean-commit Godex binary. Thirteen separate
+  0.437.0 executable and a clean-commit Godex binary. Nineteen separate
   CLI stages cover empty listing, create alpha/beta, default activation,
   duplicate rejection, active switch, current-profile retrieval, rejected
   unknown selection, removal without deleting the home, restart/current
@@ -91,7 +91,10 @@ a substitute for independent observable behavioral verification.
   rather than equal file bytes. The gate independently verifies versions,
   active names, providers, managed home paths, private file modes, no
   unexpected auth.json, no profile-directory pollution, and matching
-  exit codes. Negative tests reject corrupted/unknown state fields, stale
+  exit codes. A separate external CODEX_HOME fixture checks user-owned
+  directory registration, non-destructive removal and refusal to delete
+  that directory even when --delete-home is supplied. Negative tests reject
+  corrupted/unknown state fields, stale
   last-run records, nonempty session/response bindings, mismatched managed
   homes, stale or dirty Godex binaries, and a noncanonical Prodex digest.
   Each operation is a new process with an isolated HOME and no credentials.

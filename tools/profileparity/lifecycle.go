@@ -20,11 +20,12 @@ type stateProjection struct {
 	Names  []string
 }
 type profileFixture struct {
-	name       string
-	binary     string
-	home       string
-	configHome string
-	env        []string
+	name         string
+	binary       string
+	home         string
+	configHome   string
+	externalHome string
+	env          []string
 }
 type lifecycleStep struct {
 	name            string
@@ -51,6 +52,12 @@ func profileSteps() []lifecycleStep {
 		{"delete_beta_home", []string{"profile", "remove", "--delete-home", "beta"}, true, stateProjection{"", []string{}}, true, false, "beta"},
 		{"list_empty", []string{"profile", "list"}, true, stateProjection{}, true, false, "No profiles configured"},
 		{"reject_missing_removal", []string{"profile", "remove", "missing"}, false, stateProjection{}, true, false, ""},
+		{"register_external", []string{"profile", "add", "external", "--codex-home", "@EXTERNAL_HOME@"}, true, stateProjection{"external", []string{"external"}}, true, false, "external"},
+		{"list_external", []string{"profile", "list"}, true, stateProjection{"external", []string{"external"}}, true, false, "external"},
+		{"reject_external_delete", []string{"profile", "remove", "--delete-home", "external"}, false, stateProjection{"external", []string{"external"}}, true, false, "refusing to delete external"},
+		{"restart_read_external", []string{"current"}, true, stateProjection{"external", []string{"external"}}, true, false, "external"},
+		{"remove_external_keep_home", []string{"profile", "remove", "external"}, true, stateProjection{}, true, false, "external"},
+		{"list_empty_after_external", []string{"profile", "list"}, true, stateProjection{}, true, false, "No profiles configured"},
 	}
 }
 
@@ -62,7 +69,14 @@ func checkProfileLifecycle(root string, opts cliOptions) ([]stepResult, error) {
 		directory := filepath.Join(root, item.name)
 		userHome := filepath.Join(directory, "user")
 		configHome := filepath.Join(directory, item.name)
+		externalHome := filepath.Join(directory, "external")
 		if err := os.MkdirAll(userHome, 0o700); err != nil {
+			return nil, err
+		}
+		if err := os.Mkdir(externalHome, 0o700); err != nil {
+			return nil, err
+		}
+		if err := os.WriteFile(filepath.Join(externalHome, "untouched.txt"), []byte("keep-external-home"), 0o600); err != nil {
 			return nil, err
 		}
 		variables := []string{
@@ -81,7 +95,7 @@ func checkProfileLifecycle(root string, opts cliOptions) ([]stepResult, error) {
 		}
 		fixtures = append(fixtures, profileFixture{
 			name: item.name, binary: item.binary, home: userHome,
-			configHome: configHome, env: variables,
+			configHome: configHome, externalHome: externalHome, env: variables,
 		})
 	}
 
@@ -113,6 +127,9 @@ func checkProfileLifecycle(root string, opts cliOptions) ([]stepResult, error) {
 			if err := checkManagedHomes(item, step.alphaHome, step.betaHome); err != nil {
 				return nil, fmt.Errorf("%s %s homes: %w", item.name, step.name, err)
 			}
+			if err := checkExternalHome(item); err != nil {
+				return nil, fmt.Errorf("%s %s external home: %w", item.name, step.name, err)
+			}
 			observed = append(observed, projection)
 			codes = append(codes, code)
 		}
@@ -129,9 +146,15 @@ func checkProfileLifecycle(root string, opts cliOptions) ([]stepResult, error) {
 }
 
 func invokeProfileCommand(fixture profileFixture, args []string) (int, string, error) {
+	replaced := append([]string(nil), args...)
+	for i, arg := range replaced {
+		if arg == "@EXTERNAL_HOME@" {
+			replaced[i] = fixture.externalHome
+		}
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
 	defer cancel()
-	command := exec.CommandContext(ctx, fixture.binary, args...)
+	command := exec.CommandContext(ctx, fixture.binary, replaced...)
 	command.Dir = fixture.home
 	command.Env = fixture.env
 	output, err := command.CombinedOutput()
@@ -288,7 +311,7 @@ func containsName(names []string, target string) bool {
 	return false
 }
 func verifyEntry(name string, raw []byte, root string) error {
-	if name != "alpha" && name != "beta" {
+	if name != "alpha" && name != "beta" && name != "external" {
 		return errors.New("unexpected persisted profile name")
 	}
 	var entry struct {
@@ -302,9 +325,14 @@ func verifyEntry(name string, raw []byte, root string) error {
 		return err
 	}
 	expected := filepath.Join(root, "profiles", name)
-	if !entry.Managed || entry.Provider.Kind != "openai" ||
+	wantManaged := true
+	if name == "external" {
+		expected = filepath.Join(filepath.Dir(root), "external")
+		wantManaged = false
+	}
+	if entry.Managed != wantManaged || entry.Provider.Kind != "openai" ||
 		filepath.Clean(entry.CodexHome) != expected {
-		return fmt.Errorf("managed profile %s metadata disagrees with fixture", name)
+		return fmt.Errorf("profile %s metadata disagrees with fixture", name)
 	}
 	return nil
 }
@@ -355,6 +383,28 @@ func checkManagedHomes(fixture profileFixture, alpha, beta bool) error {
 		if _, err := os.Lstat(filepath.Join(path, "auth.json")); !errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("credential-free fixture generated unexpected authentication material")
 		}
+	}
+	return nil
+}
+
+// Registration of a user-owned CODEX_HOME is metadata-only. Even when asked
+// to delete a profile, the tool must preserve its external directory, files,
+// and private permissions; neither application may remove it as managed state.
+func checkExternalHome(fixture profileFixture) error {
+	root, err := os.Lstat(fixture.externalHome)
+	if err != nil {
+		return err
+	}
+	if !root.IsDir() || root.Mode()&os.ModeSymlink != 0 ||
+		(runtime.GOOS != "windows" && root.Mode().Perm()&0o077 != 0) {
+		return errors.New("external profile home became unsafe")
+	}
+	data, err := os.ReadFile(filepath.Join(fixture.externalHome, "untouched.txt"))
+	if err != nil {
+		return err
+	}
+	if string(data) != "keep-external-home" {
+		return errors.New("external profile contents were modified")
 	}
 	return nil
 }

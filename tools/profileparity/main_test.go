@@ -116,10 +116,10 @@ func TestProdex04370RejectsCorruptOrUnexpectedManagedState(t *testing.T) {
 }
 func TestProdex04370ProfileLifecycleStageOracleIsIndependent(t *testing.T) {
 	steps := profileSteps()
-	if len(steps) < 13 {
+	if len(steps) != 19 {
 		t.Fatalf("expected profile lifecycle coverage, got %d", len(steps))
 	}
-	if steps[0].name != "initial_list" || steps[len(steps)-1].name != "reject_missing_removal" {
+	if steps[0].name != "initial_list" || steps[len(steps)-1].name != "list_empty_after_external" {
 		t.Fatalf("profile test stage coverage drifted: %+v", steps)
 	}
 	valid := stateProjection{Active: "beta", Names: []string{"beta"}}
@@ -195,5 +195,47 @@ func TestProdex04370ProfileRootSymlinkCannotEscapeIsolatedFixture(t *testing.T) 
 	fixture := profileFixture{name: "godex", configHome: root}
 	if err := checkManagedHomes(fixture, false, false); err == nil {
 		t.Fatal("symlinked managed-profile root escaped isolated state boundary")
+	}
+}
+
+// External CODEX_HOME is user-owned. Correct metadata marks it unmanaged
+// and removal must never mutate or delete the directory contents.
+func TestProdex04370ExternalProfileMetadataAndHomeProtection(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "external")
+	if err := os.Mkdir(home, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, "untouched.txt"), []byte("keep-external-home"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := checkExternalHome(profileFixture{externalHome: home}); err != nil {
+		t.Fatal(err)
+	}
+	for _, product := range []string{"prodex", "godex"} {
+		t.Run(product, func(t *testing.T) {
+			value := fixtureProfile("external", filepath.Join(root, product))
+			value["managed"] = false
+			value["codex_home"] = home
+			raw := serialize(t, value)
+			if err := verifyEntry("external", raw, filepath.Join(root, product)); err != nil {
+				t.Fatalf("valid externally owned profile metadata rejected: %v", err)
+			}
+			value["managed"] = true
+			if err := verifyEntry("external", serialize(t, value), filepath.Join(root, product)); err == nil {
+				t.Fatal("external profile was accepted as managed")
+			}
+			value["managed"] = false
+			value["codex_home"] = filepath.Join(root, product, "profiles", "external")
+			if err := verifyEntry("external", serialize(t, value), filepath.Join(root, product)); err == nil {
+				t.Fatal("external profile path was falsely marked as protected user home")
+			}
+		})
+	}
+	if err := os.WriteFile(filepath.Join(home, "untouched.txt"), []byte("modified"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := checkExternalHome(profileFixture{externalHome: home}); err == nil {
+		t.Fatal("foreign CODEX_HOME mutation escaped oracle")
 	}
 }
