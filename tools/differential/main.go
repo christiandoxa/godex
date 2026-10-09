@@ -100,13 +100,13 @@ type report struct {
 }
 
 type mockPlan struct {
-	FirstStatus       int
-	Delay             time.Duration
-	RotateKeys        bool
-	ToolCall          bool
-	Stream            bool
-	StreamQuota       bool
-	StreamRetryHeader bool
+	FirstStatus           int
+	Delay                 time.Duration
+	RotateKeys            bool
+	ToolCall              bool
+	Stream                bool
+	StreamQuota           bool
+	DeepSeekEmbeddedError bool
 }
 
 type runOptions struct {
@@ -151,7 +151,7 @@ func run() error {
 	prodexSource := flags.String("prodex-source", "", "exact Prodex 0.437.0 source checkout")
 	godexSource := flags.String("godex-source", "", "Godex candidate source checkout")
 	expectedGodexCommit := flags.String("godex-commit", "", "expected Godex source HEAD commit SHA")
-	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, sse-stream, sse-rate-limit, retry, stream-header-retry, single-key-401, single-key-403, single-key-429, single-key-503, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
+	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, sse-stream, sse-rate-limit, retry, deepseek-sse-terminal, single-key-401, single-key-403, single-key-429, single-key-503, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		return err
 	}
@@ -240,12 +240,12 @@ func run() error {
 			// must be selected *by the proxy*, with just one client request.
 			return runPair(root, mock, "key-rotation-429", mockPlan{RotateKeys: true}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{rotate: true})
 		}},
-		{"stream-header-retry", func() (scenarioResult, error) {
-			// The primary credential returns HTTP 200 with response.failed
-			// and nested structured Retry-After. The proxy must rotate before
-			// commitment to the healthy secondary credential.
-			return runPair(root, mock, "stream-header-retry",
-				mockPlan{StreamRetryHeader: true}, *prodexBin, *godexBin,
+		{"deepseek-sse-terminal", func() (scenarioResult, error) {
+			// Prodex commits the DeepSeek translation stream. An embedded
+			// upstream error must remain client-visible without a second
+			// API-key attempt even if the configured pool has two keys.
+			return runPair(root, mock, "deepseek-sse-terminal",
+				mockPlan{DeepSeekEmbeddedError: true}, *prodexBin, *godexBin,
 				prodexSourceCommit, godexSourceCommit, runOptions{rotate: true})
 		}},
 		{"key-rotation-restart", func() (scenarioResult, error) {
@@ -638,7 +638,7 @@ func (mock *mockServer) serveHTTP(writer http.ResponseWriter, request *http.Requ
 		}
 	}
 	status := plan.FirstStatus
-	if plan.StreamRetryHeader {
+	if plan.DeepSeekEmbeddedError {
 		status = http.StatusOK
 	} else if plan.RotateKeys {
 		if keySlot == "secondary" {
@@ -663,8 +663,8 @@ func (mock *mockServer) serveHTTP(writer http.ResponseWriter, request *http.Requ
 			responseBody = `{"error":{"code":"rate_limit_exceeded"}}`
 		}
 	}
-	if plan.StreamRetryHeader && keySlot == "primary" {
-		responseBody = "event: response.failed\r\ndata: {\"type\":\"response.failed\",\"response\":{\"error\":{\"code\":\"rate_limit_exceeded\",\"message\":\"Please try again in 1s.\",\"headers\":{\"Retry-After\":\"5\"}}}}\r\n\r\n"
+	if plan.DeepSeekEmbeddedError && keySlot == "primary" {
+		responseBody = "data: {\"error\":{\"code\":\"rate_limit_exceeded\",\"message\":\"Please try again in 1s.\",\"headers\":{\"Retry-After\":\"5\"}}}\r\n\r\n"
 		writer.Header().Set("Content-Type", "text/event-stream")
 		writer.Header().Set("X-Synthetic-Upstream", "differential-v1")
 		writer.WriteHeader(status)
@@ -899,6 +899,10 @@ func scenarioInvariants(scenario scenarioResult) []string {
 			if run.Client.Status != http.StatusTooManyRequests || !strings.Contains(run.Client.Body, "rate_limit_exceeded") {
 				failures = append(failures, prefix+".unhandled_rate_limit")
 			}
+		case "deepseek-sse-terminal":
+			if run.Client.Status != http.StatusOK || !validFixtureFailedSSE(run.Client.Body) {
+				failures = append(failures, prefix+".embedded_stream_error")
+			}
 		case "tool-call":
 			if run.Client.Status != http.StatusOK || !validFixtureToolCallResponse(run.Client.Body) {
 				failures = append(failures, prefix+".tool_call_semantics")
@@ -924,13 +928,13 @@ func scenarioInvariants(scenario scenarioResult) []string {
 			failures = append(failures, prefix+".exit_status")
 		}
 		wantRequests := 1
-		if phase == "retry" || phase == "key-rotation-429" || phase == "stream-header-retry" {
+		if phase == "retry" || phase == "key-rotation-429" {
 			wantRequests = 2
 		}
 		if phase == "key-rotation-restart" {
 			wantRequests = len(run.Upstream)
 		}
-		if phase == "key-rotation-429" || phase == "stream-header-retry" {
+		if phase == "key-rotation-429" {
 			if len(run.Upstream) == 2 &&
 				(run.Upstream[0].KeySlot != "primary" ||
 					run.Upstream[1].KeySlot != "secondary") {
@@ -954,7 +958,11 @@ func scenarioInvariants(scenario scenarioResult) []string {
 			if !upstream.AuthOK || upstream.Method != http.MethodPost || upstream.Path != "/v1/chat/completions" {
 				failures = append(failures, prefix+".upstream_auth_or_route")
 			}
-			if phase != "key-rotation-429" && phase != "stream-header-retry" && phase != "key-rotation-restart" && upstream.KeySlot != "single" {
+			if phase == "deepseek-sse-terminal" {
+				if upstream.KeySlot != "primary" {
+					failures = append(failures, prefix+".unexpected_credential_rotation")
+				}
+			} else if phase != "key-rotation-429" && phase != "key-rotation-restart" && upstream.KeySlot != "single" {
 				failures = append(failures, prefix+".wrong_credential_slot")
 			}
 			validRequest := validFixtureRequest(upstream.Body)
@@ -977,7 +985,8 @@ func compare(left, right productRun) []string {
 	stream := strings.Contains(strings.ToLower(left.Client.Headers.Get("Content-Type")), "text/event-stream") &&
 		strings.Contains(strings.ToLower(right.Client.Headers.Get("Content-Type")), "text/event-stream")
 	if stream {
-		if !equivalentFixtureSSE(strings.TrimSuffix(left.Stdout, "\n"), strings.TrimSuffix(right.Stdout, "\n")) {
+		a, b := strings.TrimSuffix(left.Stdout, "\n"), strings.TrimSuffix(right.Stdout, "\n")
+		if !equivalentFixtureSSE(a, b) && !equivalentFixtureFailedSSE(a, b) {
 			differences = append(differences, "stdout")
 		}
 	} else if left.Stdout != right.Stdout {
@@ -993,7 +1002,8 @@ func compare(left, right productRun) []string {
 		differences = append(differences, "client.headers")
 	}
 	if stream {
-		if !equivalentFixtureSSE(left.Client.Body, right.Client.Body) {
+		if !equivalentFixtureSSE(left.Client.Body, right.Client.Body) &&
+			!equivalentFixtureFailedSSE(left.Client.Body, right.Client.Body) {
 			differences = append(differences, "client.body")
 		}
 	} else if left.Client.Body != right.Client.Body {

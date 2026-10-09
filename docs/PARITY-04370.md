@@ -40,9 +40,19 @@ a substitute for independent observable behavioral verification.
 - Structured SSE retry precedence, WebSocket precommit provenance,
   cancellation/no-replay fences, HTTP-date, invalid headers, zero delays,
   cap, and stream size limits have focused synthetic negative controls.
-- A standalone differential scenario exercises a real SSE failure from a
-  rate-limited primary synthetic key and expects proxy-controlled rotation
-  to a separate healthy secondary key.
+- A standalone differential scenario exercises a real embedded DeepSeek
+  provider SSE error with two synthetic keys. The tagged Prodex translator
+  has already selected its stream writer, so it forwards the terminal
+  response.failed event to Codex **without** replaying or rotating to the
+  secondary key. A fixture that supplied an already translated Responses
+  event to the Chat Completions upstream was rejected as invalid evidence
+  and replaced with an actual DeepSeek error envelope. Negative controls
+  require exactly one upstream attempt, one failed SSE event, original
+  code/message, source-generated UUIDv7, and bounded timestamp.
+- Precommit SSE and WebSocket **OpenAI** streamed retry advice is a separate
+  contract: nested Retry-After 5 overrides the shorter message, with
+  explicit-zero/date/invalid-header precedence. It must not be conflated
+  with an already committed DeepSeek translator stream.
 - The existing DeepSeek buffered responses, tool calls, streaming, auth
   failures, 429/503, restart and retry tests remain in the reference
   harness and must be rerun against **0.437.0**, not treated as inherited

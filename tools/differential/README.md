@@ -32,7 +32,7 @@ or untracked files; a locally edited Prodex checkout cannot serve as the oracle.
 The resulting PASS is limited to the sixteen named synthetic scenarios and is
 not equivalent to a global provider, live-TUI or transport parity certificate.
 
-Use `--scenario success|tool-call|sse-stream|sse-rate-limit|retry|stream-header-retry|single-key-401|single-key-403|single-key-429|single-key-503|key-rotation-429|key-rotation-restart|cancel|restart|recover-after-429|recover-after-503` to rerun one case while
+Use `--scenario success|tool-call|sse-stream|sse-rate-limit|retry|deepseek-sse-terminal|single-key-401|single-key-403|single-key-429|single-key-503|key-rotation-429|key-rotation-restart|cancel|restart|recover-after-429|recover-after-503` to rerun one case while
 investigating a mismatch; the default is `--scenario all`.
 
 
@@ -209,13 +209,22 @@ frames. Negative controls reject malformed reset values, bogus percentages,
 and unexpected headers.
 
 
-### Prodex 0.437.0 new stream-header-retry scenario
+### Prodex 0.437.0 DeepSeek embedded-error terminal scenario
 
-In addition to the earlier DeepSeek fixtures, a single Codex client
-request now triggers a first HTTP 200 SSE response.failed event with
-nested Retry-After 5, a one-second message hint, and an alternate API
-key that succeeds. The source-audited Go precommit policy must honor
-the structured header and use the healthy secondary credential without
-replaying a committed stream. This is an independent executable check,
-not just a unit test. The oracle remains fail-closed on raw state-layout
-differences and does not certify all WebSocket/client versions.
+A single Codex client request starts a DeepSeek translation stream with
+two synthetic credentials configured. The primary upstream responds with
+HTTP 200 and an embedded Chat Completions error carrying a structured
+Retry-After value. The canonical Prodex 0.437.0 translator has already
+committed its outgoing SSE writer: the error must be forwarded as a
+single response.failed frame, **not** silently retried on the secondary
+credential. This scenario detects incorrect retries, changed failure codes,
+messages, malformed or stale timestamps, non-UUIDv7 response identities,
+extra frames, and corrupted provider state.
+
+The separate source-audited unit/integration tests for *precommit* SSE
+and WebSocket errors verify nested structured Retry-After precedence
+(5s versus a 1s message), date parsing, zero advice, caps and no-replay
+after commit. A DeepSeek error embedded in an already committed translator
+is not an eligible precommit retry and must remain client-visible.
+
+Raw durable file layout remains an independent fail-closed release blocker.

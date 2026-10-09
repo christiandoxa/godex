@@ -32,6 +32,10 @@ func translateResponseWithConversation(
 		return &proxymodel.Response{
 			StatusCode: response.StatusCode, Header: header,
 			Body: deepSeekChatSSEWithConversation(response.Body, requestID, conversationMessages, requestMetadata, conversations), Trailer: response.Trailer,
+			// The tagged Prodex DeepSeek bridge has selected its translated
+			// SSE writer. Embedded provider events (including rate limits)
+			// must reach the client, not initiate another credential turn.
+			FirstEventCommitted: true,
 		}, nil
 	}
 	defer response.Body.Close()

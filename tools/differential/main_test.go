@@ -1,11 +1,15 @@
 package main
 
 import (
+	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime/debug"
+	"strings"
 	"testing"
+	"time"
 )
 
 const (
@@ -312,25 +316,40 @@ func TestProviderAuthErrorOracleRejectsMatchingButWrongErrors(t *testing.T) {
 	}
 }
 
-// The Codex shim performs one request. Retrying a failed SSE first event must
-// originate in the proxy, and the retry must select a different API key.
-func TestProdex04370SSEHeaderRetryRequiresIndependentKeyRotation(t *testing.T) {
-	makeRun := func(primary, secondary string) productRun {
-		return productRun{
-			ExitStatus: 0, Client: exchange{Status: 200, Body: syntheticFixtureResponse},
-			Upstream: []upstreamRequest{
-				{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, KeySlot: primary, Body: syntheticFixtureRequest},
-				{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, KeySlot: secondary, Body: syntheticFixtureRequest},
-			},
-			Retries: 1,
+// The canonical DeepSeek translator commits before exposing provider errors
+// as SSE. Retries after translation would hide the actual failure from Codex.
+func TestProdex04370DeepSeekEmbeddedSSEErrorIsTerminal(t *testing.T) {
+	wire := fmt.Sprintf("event: response.failed\r\ndata: {\"created_at\":%d,\"response\":{\"error\":{\"code\":\"rate_limit_exceeded\",\"message\":\"Please try again in 1s.\"},\"id\":\"resp_deepseek_01a11f94-b55e-73ce-ac35-d0f0438a99f3\"},\"sequence_number\":0,\"type\":\"response.failed\"}\r\n\r\n", time.Now().Unix())
+	run := productRun{
+		Name:       "prodex",
+		ExitStatus: 0,
+		Client:     exchange{Status: 200, Body: wire, Headers: http.Header{"Content-Type": {"text/event-stream; charset=utf-8"}}},
+		Upstream: []upstreamRequest{{
+			Method: "POST", Path: "/v1/chat/completions", AuthOK: true,
+			KeySlot: "primary", Body: syntheticFixtureRequest,
+		}},
+	}
+	scenario := scenarioResult{Name: "deepseek-sse-terminal", Runs: []productRun{run, run}}
+	if failures := scenarioInvariants(scenario); len(failures) != 0 {
+		t.Fatalf("canonical terminal DeepSeek SSE rejected: %v", failures)
+	}
+	mutated := run
+	mutated.Upstream = append(append([]upstreamRequest{}, run.Upstream...), upstreamRequest{
+		Method: "POST", Path: "/v1/chat/completions", AuthOK: true,
+		KeySlot: "secondary", Body: syntheticFixtureRequest,
+	})
+	scenario.Runs[1] = mutated
+	if failures := scenarioInvariants(scenario); len(failures) == 0 {
+		t.Fatal("provider error retried on secondary key without detection")
+	}
+	for _, corrupt := range []string{
+		strings.Replace(wire, "rate_limit_exceeded", "wrong_code", 1),
+		strings.Replace(wire, "Please try again in 1s.", "incorrect message", 1),
+		strings.Replace(wire, "resp_deepseek_01a11f94-b55e-73ce-ac35-d0f0438a99f3", "invalid-id", 1),
+		wire + "event: response.completed\r\ndata: {}\r\n\r\n",
+	} {
+		if validFixtureFailedSSE(corrupt) || equivalentFixtureFailedSSE(wire, corrupt) {
+			t.Fatal("semantically incorrect terminal provider stream accepted")
 		}
-	}
-	good := makeRun("primary", "secondary")
-	if failures := scenarioInvariants(scenarioResult{Name: "stream-header-retry", Runs: []productRun{good, good}}); len(failures) != 0 {
-		t.Fatalf("valid proxy-owned SSE retry rejected: %v", failures)
-	}
-	invalid := makeRun("primary", "primary")
-	if failures := scenarioInvariants(scenarioResult{Name: "stream-header-retry", Runs: []productRun{good, invalid}}); len(failures) == 0 {
-		t.Fatal("replaying same rate-limited credential was accepted")
 	}
 }
