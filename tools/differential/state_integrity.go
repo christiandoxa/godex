@@ -177,6 +177,9 @@ func allowedFixtureStateFile(name string) bool {
 	}
 	sequence := strings.TrimSuffix(strings.TrimPrefix(name, prefix), ".tmp")
 	parts := strings.Split(sequence, ".")
+	if len(parts) == 4 && parts[0] == "last-good" {
+		parts = parts[1:]
+	}
 	if len(parts) != 3 {
 		return false
 	}
