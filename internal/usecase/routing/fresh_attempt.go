@@ -175,7 +175,7 @@ func (router *Router) freshAttempt(
 	ctx context.Context,
 	request proxymodel.Request,
 	account proxymodel.Account,
-	terminalExternal429 bool,
+	terminalExternalFailure bool,
 ) (*proxymodel.Forwarded, *pendingResponse, bool, error) {
 	response, acquired, err := router.tryExecuteWithProfileInflight(ctx, request, account, false)
 	if !acquired {
@@ -232,11 +232,13 @@ func (router *Router) freshAttempt(
 			return nil, pending, false, nil
 		}
 	}
-	if terminalExternal429 && response.StatusCode == http.StatusTooManyRequests && outcome.kind == responseRetry {
-		// Prodex 0.436.1 exhausts a lone DeepSeek/third-party credential and
-		// returns its original 429. A fresh-retry sweep would instead wait for
-		// a nonexistent alternate key and time out before replying to Codex.
-		// This is terminal, not proof of a disabled account or exhausted pool.
+	if terminalExternalFailure && outcome.kind == responseRetry &&
+		(response.StatusCode == http.StatusTooManyRequests ||
+			response.StatusCode == http.StatusServiceUnavailable) {
+		// Prodex 0.436.1 returns the original upstream 429/503 when a lone
+		// external credential has no alternate model or key to try. Waiting
+		// for the same credential would cause a false Codex client timeout.
+		// The next independent request remains eligible for the same key.
 		router.recordRouteOutcome(ctx, account.ID, request.QuotaSelection, response,
 			responseOutcome{kind: responsePass, failed: true})
 		return &proxymodel.Forwarded{

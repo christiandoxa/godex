@@ -169,3 +169,19 @@ func TestRecoverAfter429RequiresHealthySecondGeneration(t *testing.T) {
 		t.Fatal("restart that remains rate-limited incorrectly passed")
 	}
 }
+
+func TestSingleKey503RequiresOriginalServiceStatus(t *testing.T) {
+	runs := []productRun{
+		{Name: "prodex", ExitStatus: 2, Client: exchange{Status: 503, Body: "rate_limit_exceeded"},
+			Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, Body: syntheticFixtureRequest}}},
+		{Name: "godex", ExitStatus: 2, Client: exchange{Status: 503, Body: "rate_limit_exceeded"},
+			Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, Body: syntheticFixtureRequest}}},
+	}
+	if failures := scenarioInvariants(scenarioResult{Name: "single-key-503", Runs: runs}); len(failures) != 0 {
+		t.Fatalf("canonical single-key service outage rejected: %v", failures)
+	}
+	runs[1].Client.Status = 200
+	if failures := scenarioInvariants(scenarioResult{Name: "single-key-503", Runs: runs}); len(failures) == 0 {
+		t.Fatal("silently healed provider outage was accepted")
+	}
+}

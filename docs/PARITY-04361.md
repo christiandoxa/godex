@@ -115,9 +115,16 @@ recovery snapshots. These integrity checks are necessary but do not prove
 cross-implementation state persistence semantics: the raw durable-state
 layout mismatch remains a release blocker.
 
-The expanded six-scenario differential suite includes a real cross-process
+The expanded seven-scenario differential suite includes a real cross-process
 429-to-healthy recovery on the same isolated state root. This verifies that
 terminal provider failures do not poison subsequent process launches. Raw
 internal file inventories remain visible and have not been treated as proof
 of equal persistence semantics; corrupt journal, multi-profile state repair,
 and goal-monitor restarts require independent behavioral tests.
+
+
+The tagged Prodex runtime likewise returns a sole-credential upstream
+service-unavailable (503) response when no alternate model/credential is
+eligible. A router fix prevents Godex from silently waiting for the same
+credential until Codex times out; independent gateway, routing and executable
+comparisons verify both terminal 429 and 503 paths.

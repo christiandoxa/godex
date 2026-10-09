@@ -141,7 +141,7 @@ func run() error {
 	prodexSource := flags.String("prodex-source", "", "exact Prodex 0.436.1 source checkout")
 	godexSource := flags.String("godex-source", "", "Godex candidate source checkout")
 	expectedGodexCommit := flags.String("godex-commit", "", "expected Godex source HEAD commit SHA")
-	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, retry, single-key-429, cancel, restart, or recover-after-429")
+	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, retry, single-key-429, single-key-503, cancel, restart, or recover-after-429")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		return err
 	}
@@ -198,6 +198,11 @@ func run() error {
 			// The shim sends exactly one request; an upstream 429 must reach
 			// Codex without retry when no alternate model/key exists.
 			return runPair(root, mock, "single-key-429", mockPlan{FirstStatus: http.StatusTooManyRequests}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{})
+		}},
+		{"single-key-503", func() (scenarioResult, error) {
+			// An upstream service outage is terminal without another eligible
+			// model or credential; no same-key loop may swallow the failure.
+			return runPair(root, mock, "single-key-503", mockPlan{FirstStatus: http.StatusServiceUnavailable}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{})
 		}},
 		{"cancel", func() (scenarioResult, error) {
 			return runPair(root, mock, "cancel", mockPlan{Delay: 2 * time.Second}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{cancel: true})
@@ -711,6 +716,11 @@ func scenarioInvariants(scenario scenarioResult) []string {
 			wantExit = 2
 			if run.Client.Status != http.StatusTooManyRequests || !strings.Contains(run.Client.Body, "rate_limit_exceeded") {
 				failures = append(failures, prefix+".unhandled_rate_limit")
+			}
+		case "single-key-503":
+			wantExit = 2
+			if run.Client.Status != http.StatusServiceUnavailable || !strings.Contains(run.Client.Body, "rate_limit_exceeded") {
+				failures = append(failures, prefix+".unhandled_service_failure")
 			}
 		default:
 			if run.Client.Status != http.StatusOK || !validFixtureResponse(run.Client.Body) {
