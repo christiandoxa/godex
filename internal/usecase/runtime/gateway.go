@@ -249,5 +249,6 @@ func (runner *Runner) startGateway(
 		_ = proxy.Close(context.WithoutCancel(ctx))
 		return nil, err
 	}
+	runner.warmupStartupProbes(ctx, provider.Kind, accounts, upstream, false)
 	return &Gateway{proxy: proxy}, nil
 }

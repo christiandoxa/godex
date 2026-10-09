@@ -42,6 +42,14 @@ type quotaPreflight interface {
 	Ready(context.Context, accountentity.Account) (bool, error)
 }
 
+// quotaStartupWarmup is an optional quota capability used to refresh the
+// launch pool before the child Codex process starts. It is deliberately
+// separate from quotaPreflight: startup probes are best effort and must not
+// turn a skipped admission check into a launch failure.
+type quotaStartupWarmup interface {
+	WarmupStartupProbes(context.Context, []accountentity.Account, string, bool)
+}
+
 type providerCredentialResolver interface {
 	APIKeys(string, string) ([]string, error)
 }
@@ -296,8 +304,46 @@ func (runner *Runner) launchHomeWithOptions(
 	if err := proxy.Start(); err != nil {
 		return err
 	}
+	runner.warmupStartupProbes(ctx, provider.Kind, profiles, upstream, options.UpstreamNoProxy)
 	runErr = runner.runThroughRuntimeProxy(ctx, proxyRunner, home, proxy.Endpoint(), runtimeArguments, provider.Kind, options.SuperOverlay)
 	return closeRuntimeProxy(ctx, proxy, runErr)
+}
+
+func (runner *Runner) warmupStartupProbes(
+	ctx context.Context,
+	providerKind string,
+	profiles []proxyconfig.Account,
+	upstream string,
+	noProxy bool,
+) {
+	if runner == nil || strings.TrimSpace(providerKind) != "" || runner.quota == nil {
+		return
+	}
+	warmup, ok := runner.quota.(quotaStartupWarmup)
+	if !ok || len(profiles) == 0 {
+		return
+	}
+	managed, err := runner.accounts.List(ctx)
+	if err != nil {
+		return
+	}
+	managedByID := make(map[string]accountentity.Account, len(managed))
+	for _, account := range managed {
+		managedByID[account.ID] = account
+	}
+	accounts := make([]accountentity.Account, 0, len(profiles))
+	for _, profile := range profiles {
+		account, exists := managedByID[profile.ID]
+		if !exists || strings.TrimSpace(account.ID) == "" {
+			continue
+		}
+		account.Enabled = profile.Enabled
+		accounts = append(accounts, account)
+	}
+	if len(accounts) == 0 {
+		return
+	}
+	warmup.WarmupStartupProbes(ctx, accounts, upstream, noProxy)
 }
 
 func (runner *Runner) prepareProviderLaunch(
