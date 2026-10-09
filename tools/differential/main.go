@@ -146,7 +146,7 @@ func run() error {
 	prodexSource := flags.String("prodex-source", "", "exact Prodex 0.436.1 source checkout")
 	godexSource := flags.String("godex-source", "", "Godex candidate source checkout")
 	expectedGodexCommit := flags.String("godex-commit", "", "expected Godex source HEAD commit SHA")
-	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, retry, single-key-429, single-key-503, key-rotation-429, cancel, restart, recover-after-429, or recover-after-503")
+	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, retry, single-key-429, single-key-503, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		return err
 	}

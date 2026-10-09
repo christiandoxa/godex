@@ -115,7 +115,7 @@ recovery snapshots. These integrity checks are necessary but do not prove
 cross-implementation state persistence semantics: the raw durable-state
 layout mismatch remains a release blocker.
 
-The expanded nine-scenario differential suite includes a real cross-process
+The expanded ten-scenario differential suite includes a real cross-process
 429-to-healthy recovery on the same isolated state root. This verifies that
 terminal provider failures do not poison subsequent process launches. Raw
 internal file inventories remain visible and have not been treated as proof
@@ -139,7 +139,7 @@ through filename-level normalization.
 
 Prodex's 503 provider-health sidecar and narrowly formatted atomic-write
 temporary files are audited and distinguished from unexpected persisted
-state. The nine-scenario differential suite, including the
+state. The ten-scenario differential suite, including the
 503-to-healthy cross-process case, verifies user-visible behavior for
 one synthetic key, **not multi-profile health ranking equivalence**.
 
@@ -158,3 +158,14 @@ rate-limited, and success requires selecting the distinct secondary key
 without the Codex client retrying. The accepted key is represented only
 by an opaque slot label in test output. This still does not establish
 all provider/auth combinations or multi-profile health ranking parity.
+
+
+**Open multi-key persistence mismatch (reproduced):** The independent
+DeepSeek API-key rotation fixture sends 429 from primary and 200 from
+secondary. Both products initially rotate primary→secondary. After a
+fresh process restart on the same synthetic home, Prodex 0.436.1 again
+attempts primary→secondary; Godex immediately selects secondary due to its
+persisted primary-key retry backoff. Tests deliberately retain this difference
+as FAIL. A fix must distinguish ephemeral API-key pool lifetime from durable
+managed-profile retry protection; simply disabling all backoff persistence
+would weaken required recovery and security semantics.

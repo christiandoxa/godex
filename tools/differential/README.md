@@ -15,7 +15,7 @@ go build -trimpath -o /tmp/godex-candidate ./cmd/godex
 ```
 
 The harness creates separate temporary homes, starts one loopback mock upstream,
-and runs both products independently through nine bounded scenarios: a successful request; a
+and runs both products independently through ten bounded scenarios: a successful request; a
 synthetic 429 followed by a retry owned by the **Codex shim**; a single-key
 429 that must remain terminal without **proxy** retry; cancellation while
 upstream is delayed; two launches against the same home; and a terminal 429 followed by a
@@ -29,10 +29,10 @@ candidate executable's embedded Go VCS revision and requires `vcs.modified=false
 A stale binary, dirty build, or build without VCS metadata fails before execution.
 Both reference and candidate source trees must also have no tracked modifications
 or untracked files; a locally edited Prodex checkout cannot serve as the oracle.
-The resulting PASS is limited to the nine named synthetic scenarios and is
+The resulting PASS is limited to the ten named synthetic scenarios and is
 not equivalent to a global provider, live-TUI or transport parity certificate.
 
-Use `--scenario success|retry|single-key-429|single-key-503|key-rotation-429|cancel|restart|recover-after-429|recover-after-503` to rerun one case while
+Use `--scenario success|retry|single-key-429|single-key-503|key-rotation-429|key-rotation-restart|cancel|restart|recover-after-429|recover-after-503` to rerun one case while
 investigating a mismatch; the default is `--scenario all`.
 
 
@@ -53,7 +53,7 @@ retry; all cases require the expected number of upstream requests.
 The negative controls alone never imply parity. Current header, durable state,
 stderr, and upstream metadata differences are intentionally still reported.
 
-Do not interpret this nine-scenario harness as proof of full 1:1 parity;
+Do not interpret this ten-scenario harness as proof of full 1:1 parity;
 additional transport, provider, and persistence contracts remain to verify.
 
 ### Strict fixture oracle and audited transport metadata
@@ -152,3 +152,16 @@ while the Codex shim makes a single client request. The verifier checks
 the exact primary→secondary key-slot sequence, two upstream requests,
 translated output, and no provider key persisted or printed. Retrying
 the same credential does not satisfy the independent oracle.
+
+
+### Known material key-rotation restart mismatch
+
+The cross-process key-rotation-restart fixture uses two provider keys on each
+of two launches against the same isolated state home. On the tagged Prodex
+0.436.1 binary, both launches attempt primary then secondary after primary
+returns 429. Godex succeeds on both launches but the second process selects
+secondary immediately because the first process persisted a cooldown for
+primary. The differential test compares ordered upstream key-slot labels
+and therefore reports this mismatch even when both final responses are 200.
+Do not mark this case as parity PASS without correcting its source-audited
+retry/backoff lifetime policy and checking managed-profile behavior remains safe.
