@@ -93,3 +93,19 @@ func TestCleanCanonicalSourceCheckRejectsNewFiles(t *testing.T) {
 		t.Fatal("untracked source change was accepted as canonical")
 	}
 }
+
+// The real Prodex 0.436.1 single-key 429 path does NOT retry in the proxy.
+func TestSingleKey429RejectsUnownedProxyRetries(t *testing.T) {
+	runs := []productRun{
+		{Name: "prodex", ExitStatus: 2, Client: exchange{Status: 429, Body: "rate_limit_exceeded"}, Upstream: []upstreamRequest{{Method: "POST"}}},
+		{Name: "godex", ExitStatus: 2, Client: exchange{Status: 429, Body: "rate_limit_exceeded"}, Upstream: []upstreamRequest{{Method: "POST"}}},
+	}
+	if failures := scenarioInvariants(scenarioResult{Name: "single-key-429", Runs: runs}); len(failures) != 0 {
+		t.Fatalf("canonical terminal rate-limit rejected: %v", failures)
+	}
+	runs[1].Upstream = append(runs[1].Upstream, upstreamRequest{Method: "POST"})
+	runs[1].Retries = 1
+	if failures := scenarioInvariants(scenarioResult{Name: "single-key-429", Runs: runs}); len(failures) == 0 {
+		t.Fatal("unexpected proxy retry was incorrectly accepted")
+	}
+}

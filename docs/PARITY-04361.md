@@ -10,8 +10,10 @@ The canonical 0.436.0 to 0.436.1 delta extraction is in
 Closed in this checkpoint:
 
 - DeepSeek Responses error and request shaping follows the tagged provider
-  contract, including bounded native fallback behavior and one pre-commit
-  retry for a structured rate-limit response when no model fallback remains.
+  contract, including bounded native fallback behavior. With one configured credential
+  and one explicit model, a structured HTTP 429 is terminal; automatic
+  same-key/same-model retry previously diverged from the tagged Prodex runtime
+  and is now regression-tested separately from Codex-client retries.
 - Gemini thought-signature precedence, Gemini 3 first-call hardening, and
   streamed signature fields are preserved across native request, buffered
   response, and SSE translation.
@@ -56,7 +58,7 @@ upstream model call was used.
 Known gaps are deliberate: Godex queues quota usage snapshot writes for the
 process lifetime, but does not mirror Prodex's full runtime state-save,
 continuation-journal, or probe-refresh workers. Soft-affinity identity migration
-is not modeled, and the four-scenario differential harness still reports
+is not modeled, and the five-scenario differential harness still reports
 header, durable-state, diagnostic, and upstream-request metadata differences.
 Success, retry, cancellation, and restart outcomes now agree on status, body,
 and retry counts; the remaining observations keep this checkpoint at
@@ -76,7 +78,10 @@ or uncommitted oracle/candidate trees. See
 This four-scenario gate is necessary but **not sufficient** to certify full
 feature-for-feature parity. Provider/auth, TUI/app-server, WebSocket/SSE
 continuation, and durable restart behavior still require broader cross-binary
-evidence. The current DeepSeek loopback comparison has unresolved header,
-upstream-request, stderr, and state-layout differences. Do not publish v0.2.1
+evidence. The DeepSeek loopback suite explicitly distinguishes Codex-client
+retry from provider-owned retry, including an exact-source single-key 429
+case. The remaining response-header, upstream-request, startup diagnostics,
+and state-layout observations must be compared as semantic contracts rather
+than silently normalized. Do not publish v0.2.1
 until all material mismatches are resolved and the larger parity matrix is
 verified.

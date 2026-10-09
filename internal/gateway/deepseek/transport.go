@@ -194,9 +194,9 @@ func (transport *RuntimeTransport) finishResponseAttempt(
 	if hasNextModel && providerentity.RetryableAcrossModels(classification.Class) {
 		return nil, true, firstEventRetryUsed, nil
 	}
-	if !hasNextModel && !firstEventRetryUsed && classification.Class == providerentity.ErrorRateLimit {
-		return nil, true, true, nil
-	}
+	// The canonical Prodex 0.436.1 runtime retries only when another model
+	// or an eligible credential is available. One API key and one explicit
+	// model must return the rate limit rather than retrying the same key.
 	return buffered.proxyResponse(), false, firstEventRetryUsed, nil
 }
 
@@ -294,20 +294,8 @@ func (transport *RuntimeTransport) executePassthrough(ctx context.Context, input
 	if err != nil {
 		return nil, err
 	}
-	if current.kind == routeChat && response.StatusCode == http.StatusTooManyRequests {
-		buffered, bufferErr := bufferError(response)
-		if bufferErr != nil {
-			return nil, bufferErr
-		}
-		if classifyDeepSeekErrorBody(buffered.StatusCode, buffered.body).Class == providerentity.ErrorRateLimit {
-			response, err = transport.send(ctx, input, current, input.Body)
-			if err != nil {
-				return nil, err
-			}
-			return proxyResponse(response), nil
-		}
-		return buffered.proxyResponse(), nil
-	}
+	// A single configured credential has no alternate key to rotate to.
+	// Preserve upstream 429 and other terminal statuses for chat passthrough.
 	return proxyResponse(response), nil
 }
 

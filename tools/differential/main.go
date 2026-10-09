@@ -139,7 +139,7 @@ func run() error {
 	prodexSource := flags.String("prodex-source", "", "exact Prodex 0.436.1 source checkout")
 	godexSource := flags.String("godex-source", "", "Godex candidate source checkout")
 	expectedGodexCommit := flags.String("godex-commit", "", "expected Godex source HEAD commit SHA")
-	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, retry, cancel, or restart")
+	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, retry, single-key-429, cancel, or restart")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		return err
 	}
@@ -191,6 +191,11 @@ func run() error {
 		}},
 		{"retry", func() (scenarioResult, error) {
 			return runPair(root, mock, "retry", mockPlan{FirstStatus: http.StatusTooManyRequests}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{retry: true})
+		}},
+		{"single-key-429", func() (scenarioResult, error) {
+			// The shim sends exactly one request; an upstream 429 must reach
+			// Codex without retry when no alternate model/key exists.
+			return runPair(root, mock, "single-key-429", mockPlan{FirstStatus: http.StatusTooManyRequests}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{})
 		}},
 		{"cancel", func() (scenarioResult, error) {
 			return runPair(root, mock, "cancel", mockPlan{Delay: 2 * time.Second}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{cancel: true})
@@ -648,13 +653,21 @@ func scenarioInvariants(scenario scenarioResult) []string {
 	for _, run := range scenario.Runs {
 		prefix := scenario.Name + "." + run.Name
 		wantExit := 0
-		if scenario.Name == "cancel" {
+		switch scenario.Name {
+		case "cancel":
 			wantExit = 1 // Both canonical clients terminate their interrupted shim.
 			if !run.Cancelled {
 				failures = append(failures, prefix+".cancellation_missing")
 			}
-		} else if run.Client.Status != http.StatusOK || run.Client.Body == "" {
-			failures = append(failures, prefix+".response_missing")
+		case "single-key-429":
+			wantExit = 2
+			if run.Client.Status != http.StatusTooManyRequests || !strings.Contains(run.Client.Body, "rate_limit_exceeded") {
+				failures = append(failures, prefix+".unhandled_rate_limit")
+			}
+		default:
+			if run.Client.Status != http.StatusOK || run.Client.Body == "" {
+				failures = append(failures, prefix+".response_missing")
+			}
 		}
 		if run.ExitStatus != wantExit {
 			failures = append(failures, prefix+".exit_status")

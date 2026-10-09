@@ -383,7 +383,7 @@ func TestDeepSeekChatAndMessagesRemainPassthrough(t *testing.T) {
 	}
 }
 
-func TestDeepSeekChatRateLimitRetriesOnce(t *testing.T) {
+func TestDeepSeekChatSingleCredentialPreservesRateLimit(t *testing.T) {
 	calls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		calls++
@@ -408,12 +408,12 @@ func TestDeepSeekChatRateLimitRetriesOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer response.Body.Close()
-	if calls != 2 || response.StatusCode != http.StatusOK {
-		t.Fatalf("rate-limit retry calls/status = %d/%d, want 2/200", calls, response.StatusCode)
+	if calls != 1 || response.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("single-credential rate limit calls/status = %d/%d, want 1/429", calls, response.StatusCode)
 	}
 }
 
-func TestDeepSeekResponsesRateLimitRetriesSameModel(t *testing.T) {
+func TestDeepSeekResponsesSingleModelPreservesRateLimit(t *testing.T) {
 	calls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		calls++
@@ -438,8 +438,8 @@ func TestDeepSeekResponsesRateLimitRetriesSameModel(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer response.Body.Close()
-	if calls != 2 || response.StatusCode != http.StatusOK {
-		t.Fatalf("same-model rate-limit retry calls/status = %d/%d, want 2/200", calls, response.StatusCode)
+	if calls != 1 || response.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("single-model rate limit calls/status = %d/%d, want 1/429", calls, response.StatusCode)
 	}
 }
 
