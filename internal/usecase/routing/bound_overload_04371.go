@@ -102,7 +102,10 @@ func (router *Router) retryBoundTurnStateOverload(
 ) (*proxymodel.Response, responseOutcome, *pendingResponse, error) {
 	if request.WebSocketMessage || request.QuotaSelection.RouteKind != quotamodel.RouteKindResponses ||
 		keys == nil || keys.turn == "" || keys.previous != "" ||
-		!keys.hasHardAffinity(request.QuotaSelection) || !requestedResponsesStream(request) {
+		!keys.hasHardAffinity(request.QuotaSelection) {
+		// The SSE precommit classifier already honors original stream:true
+		// when MIME is absent, and an explicit event-stream MIME regardless
+		// of request.stream. Do not require the redundant request flag here.
 		return response, outcome, pending, nil
 	}
 	for retries := 0; ; retries++ {

@@ -36,7 +36,13 @@ Responses precommit recovery changes.
    251ms jitter, millisecond-rounded upstream Retry-After precedence,
    no shortening of long retry advice to force an early attempt, and
    no same-owner retry for previously committed streams or previous-ID
-   continuation repair. Admission slots are released before each wait,
+   continuation repair. An explicit upstream text/event-stream MIME takes
+   precedence even if the original request sets stream:false: the response
+   has already been identified as an SSE precommit overload, so the bound
+   retry must not depend on a redundant request flag. This was reproduced
+   as a failing-before test and fixed. Conversely, explicit JSON/text
+   or headerless unary responses are not reclassified and retried. Admission
+   slots are released before each wait,
    reacquired for the same owner, and verified to have no underflow or
    leaks after recovery or exhaustion. A real six-attempt negative-control
    test verifies that the original upstream failure remains observable
@@ -56,6 +62,16 @@ an independent requirement to reimplement the same internal modules in Go.
   external profile lifecycle test, from a clean committed Godex candidate.
 - The retained Codex 0.162.0 app-server qualification tests still use a
   SHA-256-verified upstream binary and an isolated credential-free home.
+- The bound retry tests also verify source-header Retry-After precedence
+  over embedded error-message/header advice, even when upstream advice
+  exceeds the available 60-second deadline. Three shuffled race-test
+  iterations of the routing and HTTP proxy packages passed.
+- **Open issue from credential-free runtime probe:** Official Prodex and
+  Godex gateway processes with a synthetic OpenAI API-key profile did not
+  reach the local fake upstream. Prodex returned 502/503 while Godex
+  timed out in the probe. This has not been normalized, fixed, or counted
+  as parity. Real OpenAI gateway initialization and authenticated
+  precommit recovery need separate source-grounded E2E work.
 - **Not yet certified:** raw durable-file layouts differ, and broader
   multi-profile recovery, OAuth/user auth, queue lifecycle, TUI, live
   goal monitoring, WebSocket transport and all provider integrations

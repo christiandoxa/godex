@@ -22,6 +22,7 @@ type boundOverload04371Gateway struct {
 	alwaysFail   bool
 	firstPayload string
 	retryAfter   string
+	contentType  string
 }
 
 func (g *boundOverload04371Gateway) Execute(_ context.Context, _ proxymodel.Request, account proxymodel.Account) (*proxymodel.Response, error) {
@@ -39,6 +40,9 @@ func (g *boundOverload04371Gateway) Execute(_ context.Context, _ proxymodel.Requ
 	header := make(http.Header)
 	if g.retryAfter != "" {
 		header.Set("Retry-After", g.retryAfter)
+	}
+	if g.contentType != "" {
+		header.Set("Content-Type", g.contentType)
 	}
 	return &proxymodel.Response{
 		StatusCode: http.StatusOK, Header: header,
@@ -286,5 +290,138 @@ func TestProdex04371BoundOverloadStopsAfterFiveSameOwnerRetries(t *testing.T) {
 	router.mu.Unlock()
 	if active != 0 || acquired != 6 || released != 6 {
 		t.Fatalf("retry exhaustion leaked profile admission: active=%d acquired=%d released=%d", active, acquired, released)
+	}
+}
+
+// In Prodex 0.437.1 the source HTTP Retry-After takes precedence over
+// retry advice embedded in a precommit SSE event. Long advice must be
+// honored by refusing to attempt outside the 60-second planning window.
+func TestProdex04371BoundOverloadHeaderAndEmbeddedAdvicePrecedence(t *testing.T) {
+	stream := "data: {\"type\":\"response.failed\",\"response\":{\"error\":{\"code\":\"server_is_overloaded\",\"message\":\"Please retry in 1s.\",\"headers\":{\"Retry-After\":\"5\"}}}}\n\n"
+	prefix := &pendingResponse{prefix: []byte(stream)}
+	now := time.Unix(1_600_000_000, 0)
+	fixtures := []struct {
+		name     string
+		header   string
+		want     time.Duration
+		eligible bool
+	}{
+		{"embedded_advice", "", 5 * time.Second, true},
+		{"source_header_overrides", "2", 2 * time.Second, true},
+		{"long_source_header", "300", 300 * time.Second, false},
+		{"bad_source_header_falls_back", "invalid", 5 * time.Second, true},
+	}
+	for _, fixture := range fixtures {
+		t.Run(fixture.name, func(t *testing.T) {
+			response := &proxymodel.Response{Header: make(http.Header)}
+			if fixture.header != "" {
+				response.Header.Set("Retry-After", fixture.header)
+			}
+			delay, present := boundOverloadAdvice(response, prefix, now)
+			if !present || delay != fixture.want {
+				t.Fatalf("retry metadata: got=%v/%t want=%v/true", delay, present, fixture.want)
+			}
+			_, eligible := boundOverloadRetryDelay(true, false, false, 0, 0, delay, present, 0)
+			if eligible != fixture.eligible {
+				t.Fatalf("retry planning accepted oversize advice: eligible=%t want=%t", eligible, fixture.eligible)
+			}
+		})
+	}
+}
+
+// Tagged Prodex 0.437.1 considers an explicit upstream SSE MIME authoritative
+// even when the client's original request omitted stream:true. Bound
+// turn-state retry policy must not depend on a redundant input stream flag
+// once the actual upstream is known to be an uncommitted SSE overload.
+func TestProdex04371ExplicitUpstreamSSEBoundTurnRetryWithoutStreamTrue(t *testing.T) {
+	const owner = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	gateway := &boundOverload04371Gateway{contentType: "text/event-stream"}
+	router, err := NewRouter(Config{
+		Gateway: gateway, PreferredAccount: owner,
+		Accounts: func(context.Context) ([]proxymodel.Account, error) {
+			return []proxymodel.Account{{ID: owner, Home: "/synthetic", Enabled: true}}, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := router.affinity.rememberVerified(t.Context(), owner, affinityKeys{turn: "sse-explicit"}, router.now()); err != nil {
+		t.Fatal(err)
+	}
+	req := proxymodel.Request{
+		Path:           "/backend-api/codex/responses",
+		Header:         http.Header{"X-Codex-Turn-State": []string{"sse-explicit"}},
+		Body:           []byte(`{"stream":false,"input":[]}`),
+		QuotaSelection: quotamodel.Selection{RouteKind: quotamodel.RouteKindResponses},
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	exchange, err := router.Forward(ctx, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer exchange.Close()
+	body, err := io.ReadAll(exchange.Result.Response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	combined := string(exchange.Result.Prefix) + string(body)
+	if !strings.Contains(combined, "recovered-same-turn") || strings.Contains(combined, "server_is_overloaded") {
+		t.Fatalf("explicit upstream SSE wasn't retried on same owner: %q", combined)
+	}
+	if len(gateway.owners) != 2 || gateway.owners[0] != owner || gateway.owners[1] != owner {
+		t.Fatalf("retry crossed owner or never happened: %v", gateway.owners)
+	}
+}
+
+// A server_is_overloaded-looking payload is *not* sufficient to turn a
+// buffered response into a streaming retry. The 0.437.1 explicit-MIME
+// precedence protects JSON and non-streaming bodies from side effects.
+func TestProdex04371BoundTurnDoesNotRetryExplicitNonSSE(t *testing.T) {
+	const owner = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	for _, fixture := range []struct {
+		name  string
+		mime  string
+		input string
+	}{
+		{"explicit_json", "application/json", `{"stream":true,"input":[]}`},
+		{"explicit_text", "text/plain", `{"stream":true,"input":[]}`},
+		{"headerless_unary", "", `{"stream":false,"input":[]}`},
+	} {
+		t.Run(fixture.name, func(t *testing.T) {
+			gateway := &boundOverload04371Gateway{contentType: fixture.mime}
+			router, err := NewRouter(Config{
+				Gateway: gateway, PreferredAccount: owner,
+				Accounts: func(context.Context) ([]proxymodel.Account, error) {
+					return []proxymodel.Account{{ID: owner, Home: "/synthetic", Enabled: true}}, nil
+				},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := router.affinity.rememberVerified(t.Context(), owner, affinityKeys{turn: "sticky-nonstream"}, router.now()); err != nil {
+				t.Fatal(err)
+			}
+			response, err := router.Forward(t.Context(), proxymodel.Request{
+				Path:           "/backend-api/codex/responses",
+				Header:         http.Header{"X-Codex-Turn-State": []string{"sticky-nonstream"}},
+				Body:           []byte(fixture.input),
+				QuotaSelection: quotamodel.Selection{RouteKind: quotamodel.RouteKindResponses},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer response.Close()
+			if len(gateway.owners) != 1 {
+				t.Fatalf("wrongly retried non-SSE body: %v", gateway.owners)
+			}
+			content, err := io.ReadAll(response.Result.Response.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(response.Result.Prefix)+string(content), "server_is_overloaded") {
+				t.Fatal("original buffered/error response was hidden")
+			}
+		})
 	}
 }
