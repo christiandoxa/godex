@@ -111,7 +111,7 @@ func runStartupProbeCase(root, binary, product string, probeCase startupProbeCas
 	}
 	usage := newUsageServer(probeCase.status, probeCase.response)
 	defer usage.Close()
-	result, err := runStartupGateway(fixture, usage.server.URL+"/backend-api")
+	result, err := runStartupGateway(fixture, usage.server.URL+"/backend-api", probeCase.wantState)
 	if err != nil {
 		return startupProbeResult{}, err
 	}
@@ -157,7 +157,7 @@ func (usage *usageServer) paths() []string {
 
 func (usage *usageServer) Close() { usage.server.Close() }
 
-func runStartupGateway(fixture profileFixture, baseURL string) (startupProbeResult, error) {
+func runStartupGateway(fixture profileFixture, baseURL string, wantSnapshot bool) (startupProbeResult, error) {
 	command := exec.Command(fixture.binary, "gateway", "--listen", "127.0.0.1:0", "--base-url", baseURL)
 	command.Dir = fixture.home
 	command.Env = fixture.env
@@ -174,6 +174,13 @@ func runStartupGateway(fixture profileFixture, baseURL string) (startupProbeResu
 	go scanStartupEndpoint(stdout, endpoint)
 	select {
 	case <-endpoint:
+		if wantSnapshot {
+			if err := waitForUsageSnapshotFile(fixture.configHome); err != nil {
+				_ = command.Process.Kill()
+				_ = command.Wait()
+				return startupProbeResult{}, err
+			}
+		}
 	case <-time.After(8 * time.Second):
 		_ = command.Process.Kill()
 		_ = command.Wait()
@@ -184,6 +191,24 @@ func runStartupGateway(fixture profileFixture, baseURL string) (startupProbeResu
 		return startupProbeResult{}, fmt.Errorf("gateway exit=%d: %w; stderr=%s", command.ProcessState.ExitCode(), waitErr, stderr.String())
 	}
 	return startupProbeResult{exitCode: 0}, nil
+}
+
+func waitForUsageSnapshotFile(configHome string) error {
+	path := filepath.Join(configHome, "runtime-usage-snapshots.json")
+	deadline := time.Now().Add(2 * time.Second)
+	ticker := time.NewTicker(25 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		if _, err := os.Stat(path); err == nil {
+			return nil
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("usage snapshot was not written: %s", path)
+		}
+		<-ticker.C
+	}
 }
 
 func scanStartupEndpoint(reader io.Reader, endpoint chan<- string) {
@@ -214,6 +239,8 @@ func stopStartupGateway(command *exec.Cmd) error {
 func validateUsageSnapshot(configHome string, wantSnapshot bool) (bool, error) {
 	path := filepath.Join(configHome, "runtime-usage-snapshots.json")
 	deadline := time.Now().Add(2 * time.Second)
+	ticker := time.NewTicker(25 * time.Millisecond)
+	defer ticker.Stop()
 	for {
 		raw, err := os.ReadFile(path)
 		if err == nil {
@@ -231,7 +258,7 @@ func validateUsageSnapshot(configHome string, wantSnapshot bool) (bool, error) {
 		if time.Now().After(deadline) {
 			return false, fmt.Errorf("usage snapshot availability: %w", err)
 		}
-		time.Sleep(25 * time.Millisecond)
+		<-ticker.C
 	}
 }
 
