@@ -2,6 +2,7 @@ package quota
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -37,23 +38,30 @@ func TestWarmupStartupProbesUsesSyncThenQueuedWarmLimit(t *testing.T) {
 		{ID: "three", Enabled: true},
 		{ID: "four", Enabled: true},
 	}
-	usage := &countingUsage{}
+	usage := &startupCountingUsage{}
 	status := NewStatus(fakeAccounts{accounts: accounts}, usage)
 	defer status.Close()
 	observed := status.ProbeRefreshRevision()
 
 	status.WarmupStartupProbes(context.Background(), accounts, "", false)
-	if usage.calls != startupProbeSyncWarmLimit {
-		t.Fatalf("synchronous startup probes = %d, want %d", usage.calls, startupProbeSyncWarmLimit)
+	if calls := usage.calls.Load(); calls != startupProbeSyncWarmLimit {
+		t.Fatalf("synchronous startup probes = %d, want %d", calls, startupProbeSyncWarmLimit)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	if !status.WaitProbeRefresh(ctx, observed) {
 		t.Fatal("queued startup probes did not complete")
 	}
-	if usage.calls != startupProbeWarmLimit {
-		t.Fatalf("total startup probes = %d, want %d", usage.calls, startupProbeWarmLimit)
+	if calls := usage.calls.Load(); calls != startupProbeWarmLimit {
+		t.Fatalf("total startup probes = %d, want %d", calls, startupProbeWarmLimit)
 	}
+}
+
+type startupCountingUsage struct{ calls atomic.Int32 }
+
+func (usage *startupCountingUsage) Fetch(context.Context, string) (quotamodel.Usage, error) {
+	usage.calls.Add(1)
+	return quotamodel.Usage{}, nil
 }
 
 func TestWarmupStartupProbesIgnoresDisabledAccountsAndProbeFailures(t *testing.T) {

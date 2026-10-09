@@ -23,7 +23,6 @@
 492	internal/gateway/deepseek/stream_state.go
 514	internal/gateway/gemini/native_response.go
 558	internal/gateway/presidio/engine.go
-417	internal/usecase/quota/usage_cache.go
 421	internal/usecase/routing/broker_metrics.go
 455	internal/usecase/routing/router.go
 403	internal/usecase/routing/websocket_quota_full_context.go
