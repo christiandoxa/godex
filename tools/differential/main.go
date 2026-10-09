@@ -153,12 +153,18 @@ func run() error {
 	if prodexSourceCommit != prodexCommit {
 		return fmt.Errorf("Prodex source commit %s, want exact 0.436.1 commit %s", prodexSourceCommit, prodexCommit)
 	}
+	if err := requireCleanSource(*prodexSource); err != nil {
+		return fmt.Errorf("Prodex reference must be an unmodified canonical checkout: %w", err)
+	}
 	godexSourceCommit, err := gitCommit(*godexSource)
 	if err != nil {
 		return fmt.Errorf("inspect Godex source: %w", err)
 	}
 	if godexSourceCommit != *expectedGodexCommit {
 		return fmt.Errorf("Godex source commit %s, want %s", godexSourceCommit, *expectedGodexCommit)
+	}
+	if err := requireCleanSource(*godexSource); err != nil {
+		return fmt.Errorf("Godex candidate source must be a committed checkout: %w", err)
 	}
 	// The flag alone is not proof that --godex came from this source.
 	// Read its embedded Go VCS metadata and reject stale or dirty builds.
@@ -830,6 +836,20 @@ func productVersion(binary string) (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(string(output)), nil
+}
+
+// requireCleanSource prevents treating a modified reference checkout as an
+// exact-tag oracle, or a source tree changed after build as the candidate.
+func requireCleanSource(root string) error {
+	cmd := exec.Command("git", "-C", root, "status", "--porcelain=v1", "--untracked-files=all")
+	output, err := cmd.Output()
+	if err != nil {
+		return err
+	}
+	if len(bytes.TrimSpace(output)) != 0 {
+		return errors.New("uncommitted or untracked changes are present")
+	}
+	return nil
 }
 
 func gitCommit(root string) (string, error) {

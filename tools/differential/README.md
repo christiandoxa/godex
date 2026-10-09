@@ -25,6 +25,10 @@ for every observed category. It requires the exact Prodex source commit and
 version before running. In addition to the Godex source commit, it verifies the
 candidate executable's embedded Go VCS revision and requires `vcs.modified=false`.
 A stale binary, dirty build, or build without VCS metadata fails before execution.
+Both reference and candidate source trees must also have no tracked modifications
+or untracked files; a locally edited Prodex checkout cannot serve as the oracle.
+The resulting PASS is limited to the four named synthetic scenarios and is
+not equivalent to a global provider, live-TUI or transport parity certificate.
 
 Use `--scenario success|retry|cancel|restart` to rerun one case while
 investigating a mismatch; the default is `--scenario all`.

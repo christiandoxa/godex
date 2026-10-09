@@ -1,6 +1,9 @@
 package main
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
 	"runtime/debug"
 	"testing"
 )
@@ -72,5 +75,21 @@ func TestGodexBuildSettingsMatchExactCleanSource(t *testing.T) {
 				t.Fatal("invalid binary source provenance accepted")
 			}
 		})
+	}
+}
+
+func TestCleanCanonicalSourceCheckRejectsNewFiles(t *testing.T) {
+	root := t.TempDir()
+	if out, err := exec.Command("git", "-C", root, "init", "--quiet").CombinedOutput(); err != nil {
+		t.Fatalf("init isolated source repo: %v: %s", err, out)
+	}
+	if err := requireCleanSource(root); err != nil {
+		t.Fatalf("clean source rejected: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "unexpected.go"), []byte("package main"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := requireCleanSource(root); err == nil {
+		t.Fatal("untracked source change was accepted as canonical")
 	}
 }
