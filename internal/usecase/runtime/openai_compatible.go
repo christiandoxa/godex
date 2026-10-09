@@ -58,7 +58,7 @@ func (runner *Runner) RunOpenAICompatibleProfileWithOptions(
 	if err != nil {
 		return err
 	}
-	id := profileRoutingID("openai-compatible:" + home)
+	id := providerRoutingID(home, provider)
 	return runner.launchHomeWithOptions(
 		ctx, home, id, provider, nil,
 		[]proxymodel.Account{{ID: id, Home: home, Enabled: true, Provider: provider}},

@@ -141,11 +141,7 @@ func (runner *Runner) StartGatewayProfile(
 	if err != nil {
 		return nil, err
 	}
-	idSeed := home
-	if strings.TrimSpace(provider.Kind) != "" {
-		idSeed = provider.Kind + ":" + home
-	}
-	accountID := profileRoutingID(idSeed)
+	accountID := providerRoutingID(home, provider)
 	account := proxymodel.Account{
 		ID: accountID, Home: home, Enabled: true, Provider: provider,
 	}

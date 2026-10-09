@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
+	profileentity "github.com/christiandoxa/godex/internal/entity/profile"
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 	profilerepo "github.com/christiandoxa/godex/internal/repository/profile"
 )
@@ -125,5 +126,34 @@ func TestCatalogRejectsDuplicateNamesAndHomes(t *testing.T) {
 	}
 	if _, err := catalog.Add(context.Background(), profilemodel.AddRequest{Name: "external", CodexHome: accounts.CodexHome("account-id"), Insecure: true}); err == nil {
 		t.Fatal("duplicate home accepted")
+	}
+}
+
+func TestSessionProfilesOpenAICompatibleRoutingIncludesEndpoint(t *testing.T) {
+	repo := profilerepo.NewStore(t.TempDir())
+	baseURL := "https://upstream.example/v1"
+	profile := profileentity.Profile{
+		Name: "api-key", CodexHome: repo.ManagedHome("api-key"), Managed: true,
+		Provider: profileentity.Provider{Kind: profileentity.ProviderOpenAI},
+	}
+	if _, created, err := repo.LoginOpenAIAPIKey(
+		context.Background(), profile,
+		[]byte(`{"auth_mode":"apikey","OPENAI_API_KEY":"synthetic-key"}`),
+		&baseURL, true, true,
+	); err != nil || !created {
+		t.Fatalf("create API-key profile: created=%t err=%v", created, err)
+	}
+
+	catalog := NewCatalog(repo, &fakeAccounts{}, t.TempDir())
+	profiles, err := catalog.SessionProfiles(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(profiles) != 1 {
+		t.Fatalf("session profiles = %+v", profiles)
+	}
+	want := profilemodel.RoutingID("openai-compatible:" + profile.CodexHome + ":" + baseURL)
+	if len(profiles[0].RoutingIDs) != 1 || profiles[0].RoutingIDs[0] != want {
+		t.Fatalf("routing IDs = %v, want %q", profiles[0].RoutingIDs, want)
 	}
 }

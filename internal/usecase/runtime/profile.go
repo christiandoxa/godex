@@ -56,7 +56,7 @@ func (runner *Runner) RunProviderProfileWithOptions(
 	if strings.TrimSpace(provider.Kind) == "" {
 		return errors.New(runtimeProviderKindRequired)
 	}
-	profileID := profileRoutingID(provider.Kind + ":" + home)
+	profileID := providerRoutingID(home, provider)
 	return runner.launchHomeWithOptions(
 		ctx, home, profileID, provider, nil,
 		[]proxymodel.Account{{ID: profileID, Home: home, Enabled: true, Provider: provider}},
@@ -101,7 +101,7 @@ func (runner *Runner) RunProviderProfilesWithOptions(
 		if profile.Provider.Kind != provider.Kind {
 			return errors.New("runtime provider pool contains a conflicting provider kind")
 		}
-		id := profileRoutingID(provider.Kind + ":" + currentHome)
+		id := providerRoutingID(currentHome, profile.Provider)
 		accounts = append(accounts, proxymodel.Account{
 			ID: id, Home: currentHome, Enabled: profile.Enabled,
 			RouteOrder: len(accounts) + 1, Provider: profile.Provider,
@@ -253,4 +253,17 @@ func validateRuntimeHome(codexHome string) (string, error) {
 
 func profileRoutingID(home string) string {
 	return profilemodel.RoutingID(home)
+}
+
+// providerRoutingID makes a provider profile's endpoint part of its local
+// routing identity. A persisted continuation must fail closed after an
+// endpoint migration instead of being sent to a different upstream identity.
+// Empty endpoints preserve the historical seed for providers that do not
+// expose one in profile metadata.
+func providerRoutingID(home string, provider proxymodel.Provider) string {
+	seed := strings.TrimSpace(provider.Kind) + ":" + home
+	if endpoint := strings.TrimSpace(provider.APIURL); endpoint != "" {
+		seed += ":" + endpoint
+	}
+	return profileRoutingID(seed)
 }

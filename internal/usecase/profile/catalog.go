@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
 	profileentity "github.com/christiandoxa/godex/internal/entity/profile"
@@ -145,15 +146,15 @@ func (catalog *Catalog) sessionRoutingIDs(ctx context.Context, report Report) []
 	home := report.Profile.CodexHome
 	kind := string(report.Profile.Provider.Kind)
 	if kind == "openai" {
-		_, compatible, _ := catalog.profiles.ReadOpenAICompatibleBaseURL(home)
+		baseURL, compatible, _ := catalog.profiles.ReadOpenAICompatibleBaseURL(home)
 		authLabel := ""
 		if catalog.quotaAuth != nil {
 			if auth, err := catalog.quotaAuth.InspectQuotaAuth(ctx, home); err == nil {
 				authLabel = auth.Label
 			}
 		}
-		if compatible {
-			return []string{profilemodel.RoutingID("openai-compatible:" + home)}
+		if compatible && baseURL != "" {
+			return []string{profilemodel.RoutingID("openai-compatible:" + home + ":" + baseURL)}
 		}
 		if authLabel == "api-key" {
 			return nil
@@ -166,7 +167,11 @@ func (catalog *Catalog) sessionRoutingIDs(ctx context.Context, report Report) []
 	if kind == "" {
 		return nil
 	}
-	return []string{profilemodel.RoutingID(kind + ":" + home)}
+	seed := kind + ":" + home
+	if endpoint := strings.TrimSpace(report.Profile.Provider.APIURL); endpoint != "" {
+		seed += ":" + endpoint
+	}
+	return []string{profilemodel.RoutingID(seed)}
 }
 
 func (catalog *Catalog) SetAuthInspector(inspector authInspector) {
