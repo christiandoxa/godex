@@ -135,3 +135,10 @@ outage response and a later healthy process restart against Prodex 0.436.1.
 Prodex's runtime profile score sidecar may be written following an overload;
 this material state transition must be evaluated explicitly, not omitted
 through filename-level normalization.
+
+
+Prodex's 503 provider-health sidecar and narrowly formatted atomic-write
+temporary files are audited and distinguished from unexpected persisted
+state. The eight-scenario differential suite, including the
+503-to-healthy cross-process case, verifies user-visible behavior for
+one synthetic key, **not multi-profile health ranking equivalence**.

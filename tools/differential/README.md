@@ -123,3 +123,13 @@ an upstream outage do not block a later healthy request. Prodex writes a
 runtime-scores sidecar after the failure; this is a real state transition,
 so the differential audit must review its semantics rather than treating
 it as harmless private-file noise.
+
+
+The exact Prodex 0.436.1 runtime can create a versioned
+runtime-scores.json health sidecar, associated locks, and numeric
+runtime-scores.json.*.tmp artifacts following an upstream overload. The
+temporary files are only accepted with the audited three-number naming
+scheme, bounded file type and size, and synthetic-secret scanning.
+These artifacts are not treated as proof of equal **health scoring**:
+the fixture verifies the subsequent process's observable routing outcome,
+while multi-profile health priority still needs its own oracle.

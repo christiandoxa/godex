@@ -89,3 +89,25 @@ func TestDurableStateIntegrityRejectsDivergentRecoverySnapshot(t *testing.T) {
 		t.Fatal("routing state and recovery backup diverged undetected")
 	}
 }
+
+func TestHealthScoreSidecarTempAllowlistRejectsFilenameSpoofing(t *testing.T) {
+	for _, name := range []string{
+		"state/runtime-scores.json", "state/runtime-scores.json.lock",
+		"state/state.json.lock", "state/runtime-scores.json.1234.5678.2.tmp",
+	} {
+		if !allowedFixtureStateFile(name) {
+			t.Fatalf("known Rust sidecar rejected: %s", name)
+		}
+	}
+	for _, name := range []string{
+		"state/runtime-scores.json.evil.123.2.tmp",
+		"state/runtime-scores.json.1.2.tmp",
+		"state/runtime-scores.json.1.2.3.tmp.more",
+		"state/runtime-scores.json.1.2.3.tmp/payload",
+		"state/runtime-scores.json.1.2.3.bak",
+	} {
+		if allowedFixtureStateFile(name) {
+			t.Fatalf("spoofed Rust sidecar accepted: %s", name)
+		}
+	}
+}

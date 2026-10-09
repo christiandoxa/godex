@@ -142,9 +142,36 @@ func allowedFixtureStateFile(name string) bool {
 		"state/routing-memory.guard", "state/routing-retry-backoff.guard",
 		"state/routing-transport-backoff.guard", "state/routing.guard",
 		"state/routing.json", "state/routing.json.last-good",
-		"state/state.guard":
+		"state/state.guard", "state/state.json.lock",
+		"state/runtime-scores.json", "state/runtime-scores.json.lock",
+		"state/runtime-scores.json.last-good":
 		return true
 	}
-	return strings.HasPrefix(name, "state/runtime-broker-live-runtime-") &&
-		strings.HasSuffix(name, ".json.lock") && len(name) >= 48 && len(name) <= 160
+	if strings.HasPrefix(name, "state/runtime-broker-live-runtime-") &&
+		strings.HasSuffix(name, ".json.lock") && len(name) >= 48 && len(name) <= 160 {
+		return true
+	}
+	// Prodex writes versioned health-score sidecars atomically. A failed
+	// write may leave a numbered .tmp; it is not the authoritative snapshot.
+	// Limit this exception to the exact Rust writer's three numeric segments.
+	prefix := "state/runtime-scores.json."
+	if !strings.HasPrefix(name, prefix) || !strings.HasSuffix(name, ".tmp") {
+		return false
+	}
+	sequence := strings.TrimSuffix(strings.TrimPrefix(name, prefix), ".tmp")
+	parts := strings.Split(sequence, ".")
+	if len(parts) != 3 {
+		return false
+	}
+	for _, part := range parts {
+		if len(part) == 0 || len(part) > 20 {
+			return false
+		}
+		for _, digit := range part {
+			if digit < '0' || digit > '9' {
+				return false
+			}
+		}
+	}
+	return true
 }
