@@ -87,6 +87,23 @@ an independent requirement to reimplement the same internal modules in Go.
   one synchronous probe and bounded queued probes, with profile homes and
   base-URL/no-proxy policy preserved. The oracle waits for the durable state
   before comparing the two implementations.
+- **Completed-body half-close forwarding:** A raw TCP client that sends a
+  complete `POST /responses` body and then half-closes its write side is
+  forwarded by both binaries. Before the fix, Godex treated the server request
+  context cancellation as a failed request and returned an empty 200 without
+  contacting the upstream; the fixed proxy captures the complete body before
+  detaching that transport cancellation. Incomplete bodies still fail before
+  dispatch, and the focused proxy regression covers both paths.
+- **Provider endpoint identity:** Continuation routing identities now include a
+  configured provider API URL. A persisted continuation cannot silently move
+  to a different upstream after endpoint migration, while an unchanged
+  endpoint retains a stable identity. The runtime and profile-catalog tests
+  cover the migration and stability cases.
+- **App-server argument encoding:** Companion app-server launch arguments now
+  encode control characters as valid TOML escapes. The regression previously
+  failed on a model containing BEL because `strconv.Quote` emitted an invalid
+  `\\a` escape; the corrected serializer is qualified against the official
+  Codex 0.162.0 app-server binary.
 - **Not yet certified:** raw durable-file layouts differ, and broader
   multi-profile recovery, OAuth/user auth, queue lifecycle, TUI, live
   goal monitoring, WebSocket transport and all provider integrations
