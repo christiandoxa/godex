@@ -1,14 +1,15 @@
 # Differential harness
 
-Build and run from this worktree:
+Build and run from a clean, committed Godex worktree:
 
 ```bash
 go test ./tools/differential
 go build -trimpath -o /tmp/differential ./tools/differential
+go build -trimpath -o /tmp/godex-candidate ./cmd/godex
 /tmp/differential \
-  --prodex /tmp/prodex-04361-reference-20261009-01/target/debug/prodex \
-  --godex /tmp/godex-w15-current \
-  --prodex-source /tmp/prodex-04361-reference-20261009-01 \
+  --prodex /absolute/path/to/prodex-0.436.1 \
+  --godex /tmp/godex-candidate \
+  --prodex-source /absolute/path/to/prodex-0.436.1-source \
   --godex-source "$PWD" \
   --godex-commit "$(git rev-parse HEAD)"
 ```
@@ -21,15 +22,18 @@ run records bounded stdout/stderr, child response, upstream requests, ordered
 upstream events, retry count, cancellation observation, exit status, and a
 redacted durable-state snapshot. The comparison also has mutation sentinels
 for every observed category. It requires the exact Prodex source commit and
-version before running; the Godex source commit is recorded from the supplied
-checkout so the harness can run against any local candidate build.
+version before running. In addition to the Godex source commit, it verifies the
+candidate executable's embedded Go VCS revision and requires `vcs.modified=false`.
+A stale binary, dirty build, or build without VCS metadata fails before execution.
 
 Use `--scenario success|retry|cancel|restart` to rerun one case while
 investigating a mismatch; the default is `--scenario all`.
 
 
 Run only from a committed, clean candidate checkout; build the Godex binary
-from that exact source. The supplied --godex-commit pin must match HEAD.
+from that exact source. The supplied --godex-commit pin must match HEAD **and the binary's embedded
+Go VCS build revision**. The harness refuses binaries built from dirty or
+uncommitted source.
 The canonical reference is Prodex tag 0.436.1, not an arbitrary binary release.
 
 **Fail-closed behavior:** the harness prints a structured JSON comparison and

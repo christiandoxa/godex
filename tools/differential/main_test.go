@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"runtime/debug"
+	"testing"
+)
 
 func TestNegativeControlDetectsClientStatusMismatch(t *testing.T) {
 	if !negativeControl() {
@@ -43,5 +46,31 @@ func TestComparisonRejectsDifferentResponseBody(t *testing.T) {
 	b := productRun{Client: exchange{Status: 200, Body: "incorrect"}}
 	if differences := compare(a, b); !contains(differences, "client.body") {
 		t.Fatalf("body mismatch was not detected: %v", differences)
+	}
+}
+
+func TestGodexBuildSettingsMatchExactCleanSource(t *testing.T) {
+	const expected = "382c2a1f171568b4c43296115a75cdc34ac1ee5c"
+	valid := []debug.BuildSetting{
+		{Key: "vcs.revision", Value: expected},
+		{Key: "vcs.modified", Value: "false"},
+	}
+	if err := verifyGodexBuildSettings(valid, expected); err != nil {
+		t.Fatalf("clean build rejected: %v", err)
+	}
+	for _, test := range []struct {
+		name     string
+		settings []debug.BuildSetting
+	}{
+		{"dirty", []debug.BuildSetting{{Key: "vcs.revision", Value: expected}, {Key: "vcs.modified", Value: "true"}}},
+		{"stale", []debug.BuildSetting{{Key: "vcs.revision", Value: "4bf54d91d14942948bbe91e1f9f23cea7a947275"}, {Key: "vcs.modified", Value: "false"}}},
+		{"no_buildinfo", nil},
+		{"unknown_dirty_flag", []debug.BuildSetting{{Key: "vcs.revision", Value: expected}}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if err := verifyGodexBuildSettings(test.settings, expected); err == nil {
+				t.Fatal("invalid binary source provenance accepted")
+			}
+		})
 	}
 }

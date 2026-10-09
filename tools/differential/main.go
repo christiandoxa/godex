@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"debug/buildinfo"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -18,6 +19,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -157,6 +159,11 @@ func run() error {
 	}
 	if godexSourceCommit != *expectedGodexCommit {
 		return fmt.Errorf("Godex source commit %s, want %s", godexSourceCommit, *expectedGodexCommit)
+	}
+	// The flag alone is not proof that --godex came from this source.
+	// Read its embedded Go VCS metadata and reject stale or dirty builds.
+	if err := verifyGodexBinaryProvenance(*godexBin, godexSourceCommit); err != nil {
+		return fmt.Errorf("verify Godex executable provenance: %w", err)
 	}
 	root, err := os.MkdirTemp("", "godex-differential-")
 	if err != nil {
@@ -784,6 +791,33 @@ func snapshot(root string) []fileState {
 	})
 	sort.Slice(result, func(i, j int) bool { return result[i].Path < result[j].Path })
 	return result
+}
+
+func verifyGodexBinaryProvenance(binary, expectedCommit string) error {
+	info, err := buildinfo.ReadFile(binary)
+	if err != nil {
+		return fmt.Errorf("read binary build information: %w", err)
+	}
+	return verifyGodexBuildSettings(info.Settings, expectedCommit)
+}
+
+func verifyGodexBuildSettings(settings []debug.BuildSetting, expectedCommit string) error {
+	var revision, modified string
+	for _, setting := range settings {
+		switch setting.Key {
+		case "vcs.revision":
+			revision = setting.Value
+		case "vcs.modified":
+			modified = setting.Value
+		}
+	}
+	if len(expectedCommit) != 40 || revision != expectedCommit {
+		return fmt.Errorf("binary git revision %q does not match expected source %q", revision, expectedCommit)
+	}
+	if modified != "false" {
+		return fmt.Errorf("binary was not built from a clean committed tree (vcs.modified=%q)", modified)
+	}
+	return nil
 }
 
 func productVersion(binary string) (string, error) {
