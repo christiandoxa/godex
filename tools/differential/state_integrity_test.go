@@ -111,3 +111,46 @@ func TestHealthScoreSidecarTempAllowlistRejectsFilenameSpoofing(t *testing.T) {
 		}
 	}
 }
+
+func TestEmptyProdexHealthScoreEnvelopeRejectsPersistedSelectionState(t *testing.T) {
+	for _, input := range []string{
+		`{"generation":1,"value":{}}`,
+		`{"generation":20,"value":{}}`,
+	} {
+		if !validEmptyProdexHealthScoreSnapshot([]byte(input)) {
+			t.Fatalf("valid empty score sidecar rejected: %s", input)
+		}
+	}
+	for _, input := range []string{
+		`{"generation":0,"value":{}}`,
+		`{"generation":1,"value":{"profile-A":{"health":3}}}`,
+		`{"generation":1,"value":null}`,
+		`{"generation":1,"value":[]}`,
+		`{"generation":1,"value":{},"unknown":"extra"}`,
+		`{"generation":1,"value":`,
+	} {
+		if validEmptyProdexHealthScoreSnapshot([]byte(input)) {
+			t.Fatalf("nonempty/corrupt Prodex score sidecar accepted: %s", input)
+		}
+	}
+}
+func TestProdexScoreTempWithMaterialHealthFailsAudit(t *testing.T) {
+	root := fixtureStateRoot(t)
+	path := filepath.Join(root, "state", "runtime-scores.json.12345.67890.2.tmp")
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(`{"generation":1,"value":{"profile-A":{"penalty":4}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, failure := range auditFixtureDurableState(root) {
+		if strings.HasPrefix(failure, "nonempty_or_corrupt_prodex_health_scores") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("material Prodex health sidecar was not rejected")
+	}
+}

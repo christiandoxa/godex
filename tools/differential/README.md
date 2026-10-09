@@ -133,3 +133,13 @@ scheme, bounded file type and size, and synthetic-secret scanning.
 These artifacts are not treated as proof of equal **health scoring**:
 the fixture verifies the subsequent process's observable routing outcome,
 while multi-profile health priority still needs its own oracle.
+
+
+The synthetic fixture's sole-key Prodex health-score writer was observed to
+leave a versioned envelope with generation >= 1 and an empty value map.
+The state auditor now decodes committed and in-flight health-score sidecars
+and fails on corrupt envelopes, unknown fields, or nonempty scores, which
+would affect provider selection. Godex's route-memory list is separately
+required to be empty. This proves both lack active health-selection state
+for the single-key fixture, not that arbitrary multi-profile health ranking
+policies agree.

@@ -142,3 +142,11 @@ temporary files are audited and distinguished from unexpected persisted
 state. The eight-scenario differential suite, including the
 503-to-healthy cross-process case, verifies user-visible behavior for
 one synthetic key, **not multi-profile health ranking equivalence**.
+
+
+A source-audited sidecar check decodes Prodex runtime health-score snapshots
+(including bounded atomic-save temp files) and requires empty score maps for
+the single-key synthetic fixture; Godex route-memory and backoff state must
+also be empty. Nonempty provider scores fail independent negative-control
+tests. The multi-profile scoring and continuation-journal contracts remain
+outside this narrow proof.

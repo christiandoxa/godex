@@ -92,6 +92,10 @@ func auditFixtureDurableState(root string) []string {
 			if json.Unmarshal(snapshot[listKey], &entries) != nil || len(entries) != 0 {
 				violations = append(violations, "stale_provider_state:"+listKey)
 			}
+		case "state/runtime-scores.json", "state/runtime-scores.json.last-good":
+			if !validEmptyProdexHealthScoreSnapshot(data) {
+				violations = append(violations, "nonempty_or_corrupt_prodex_health_scores")
+			}
 		case "state/logs/runtime.jsonl":
 			for _, line := range bytes.Split(data, []byte("\n")) {
 				if len(bytes.TrimSpace(line)) != 0 && !json.Valid(line) {
@@ -99,6 +103,11 @@ func auditFixtureDurableState(root string) []string {
 					break
 				}
 			}
+		}
+		if strings.HasPrefix(relative, "state/runtime-scores.json.") &&
+			strings.HasSuffix(relative, ".tmp") && allowedFixtureStateFile(relative) &&
+			!validEmptyProdexHealthScoreSnapshot(data) {
+			violations = append(violations, "nonempty_or_corrupt_prodex_health_scores")
 		}
 		if strings.HasPrefix(relative, "codex/sessions/") &&
 			!strings.HasSuffix(relative, ".lock") {
@@ -178,4 +187,23 @@ func allowedFixtureStateFile(name string) bool {
 		}
 	}
 	return true
+}
+
+// This fixture contains no persistent profile identities. A health-score
+// snapshot containing nonempty scores would change routing semantics and must
+// fail, regardless of whether it is a committed sidecar or a leftover temp.
+func validEmptyProdexHealthScoreSnapshot(data []byte) bool {
+	var envelope map[string]json.RawMessage
+	if json.Unmarshal(data, &envelope) != nil || len(envelope) != 2 {
+		return false
+	}
+	var generation uint64
+	if json.Unmarshal(envelope["generation"], &generation) != nil || generation == 0 {
+		return false
+	}
+	var scores map[string]json.RawMessage
+	if json.Unmarshal(envelope["value"], &scores) != nil || scores == nil {
+		return false
+	}
+	return len(scores) == 0
 }
