@@ -66,3 +66,24 @@ func TestCancellationDiagnosticsRequireMatchingReasonAndLocalProxy(t *testing.T)
 		})
 	}
 }
+
+// Credential count is part of the tagged launch contract: a second key
+// enables rotation; the one-key banner must not be accepted for that case.
+func TestProdexTwoKeyLaunchBannerIsExact(t *testing.T) {
+	reference := productRun{
+		Stderr:  prodexDeepSeekTwoKeyLaunchBanner,
+		Command: []string{"<synthetic-multiple-credentials-in-environment>"},
+	}
+	candidate := productRun{Stderr: ""}
+	if !equivalentRuntimeDiagnostics(reference, candidate) {
+		t.Fatal("tagged two-key launch banner rejected")
+	}
+	reference.Stderr = prodexDeepSeekLaunchBanner
+	if equivalentRuntimeDiagnostics(reference, candidate) {
+		t.Fatal("misleading one-key banner accepted for two-key provider pool")
+	}
+	reference.Stderr = prodexDeepSeekTwoKeyLaunchBanner + "quota preflight actually attempted\n"
+	if equivalentRuntimeDiagnostics(reference, candidate) {
+		t.Fatal("unexpected diagnostic ignored for two-key mode")
+	}
+}

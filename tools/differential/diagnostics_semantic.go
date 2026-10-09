@@ -15,6 +15,21 @@ const prodexDeepSeekLaunchBanner = "Prodex launch: preparing runtime launch...\n
 	"tokenizer. Using one provider API key; API-key rotation is skipped and quota preflight stays disabled.\n" +
 	"Prodex launch: starting child process...\n"
 
+const prodexDeepSeekTwoKeyLaunchBanner = "Prodex launch: preparing runtime launch...\n" +
+	"Prodex launch: Smart Context runtime proxy requested.\n" +
+	"Prodex launch: local provider bridge requested.\n" +
+	"[ Runtime Provider ] ============================================================================================\n" +
+	"Using provider 'deepseek' through the local compatibility proxy. Smart Context rewrites require a proven\n" +
+	"tokenizer. API-key rotation is enabled across 2 keys; quota preflight stays disabled.\n" +
+	"Prodex launch: starting child process...\n"
+
+func expectedProdexLaunchBanner(command []string) string {
+	if contains(command, "<synthetic-multiple-credentials-in-environment>") {
+		return prodexDeepSeekTwoKeyLaunchBanner
+	}
+	return prodexDeepSeekLaunchBanner
+}
+
 const cancelledCodexRequestSuffix = ": context deadline exceeded (Client.Timeout exceeded while awaiting headers)\n"
 
 // Only the exact tagged startup banner is considered presentation metadata.
@@ -24,10 +39,11 @@ func equivalentRuntimeDiagnostics(reference, candidate productRun) bool {
 	if reference.Stderr == candidate.Stderr {
 		return true
 	}
-	if !strings.HasPrefix(reference.Stderr, prodexDeepSeekLaunchBanner) {
+	banner := expectedProdexLaunchBanner(reference.Command)
+	if !strings.HasPrefix(reference.Stderr, banner) {
 		return false
 	}
-	remaining := strings.TrimPrefix(reference.Stderr, prodexDeepSeekLaunchBanner)
+	remaining := strings.TrimPrefix(reference.Stderr, banner)
 	if remaining == "" && candidate.Stderr == "" {
 		return true
 	}
