@@ -85,6 +85,9 @@ func (store *Store) SetRouteHealth(ctx context.Context, accountID, route string,
 			break
 		}
 	}
+	if index >= 0 && !replaceRouteHealth(scores[index], updated) {
+		return scores[index], nil
+	}
 	if value == 0 {
 		if index >= 0 {
 			scores = append(scores[:index], scores[index+1:]...)
@@ -99,6 +102,16 @@ func (store *Store) SetRouteHealth(ctx context.Context, accountID, route string,
 		return routingentity.RouteHealthScore{}, err
 	}
 	return updated, nil
+}
+
+func replaceRouteHealth(current, incoming routingentity.RouteHealthScore) bool {
+	if incoming.UpdatedUnix != current.UpdatedUnix {
+		return incoming.UpdatedUnix > current.UpdatedUnix
+	}
+	if incoming.Score == 0 {
+		return current.Score != 0
+	}
+	return current.Score != 0 && incoming.Score > current.Score
 }
 
 func (store *Store) AdjustRouteHealth(

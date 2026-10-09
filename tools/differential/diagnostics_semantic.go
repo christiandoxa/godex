@@ -10,7 +10,7 @@ import (
 const prodexDeepSeekLaunchBanner = "Prodex launch: preparing runtime launch...\n" +
 	"Prodex launch: Smart Context runtime proxy requested.\n" +
 	"Prodex launch: local provider bridge requested.\n" +
-	"[ Runtime Provider ] ============================================================================================\n" +
+	"[ Runtime Provider ] =========================================================================================\n" +
 	"Using provider 'deepseek' through the local compatibility proxy. Smart Context rewrites require a proven\n" +
 	"tokenizer. Using one provider API key; API-key rotation is skipped and quota preflight stays disabled.\n" +
 	"Prodex launch: starting child process...\n"
@@ -18,7 +18,7 @@ const prodexDeepSeekLaunchBanner = "Prodex launch: preparing runtime launch...\n
 const prodexDeepSeekTwoKeyLaunchBanner = "Prodex launch: preparing runtime launch...\n" +
 	"Prodex launch: Smart Context runtime proxy requested.\n" +
 	"Prodex launch: local provider bridge requested.\n" +
-	"[ Runtime Provider ] ============================================================================================\n" +
+	"[ Runtime Provider ] =========================================================================================\n" +
 	"Using provider 'deepseek' through the local compatibility proxy. Smart Context rewrites require a proven\n" +
 	"tokenizer. API-key rotation is enabled across 2 keys; quota preflight stays disabled.\n" +
 	"Prodex launch: starting child process...\n"

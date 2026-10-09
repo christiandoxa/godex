@@ -50,6 +50,17 @@ func TestRoutingSnapshotRejectsUnknownVersionsAndUnsafeFiles(t *testing.T) {
 	}
 }
 
+func TestRoutingSnapshotRejectsNegativeBindingTimestamp(t *testing.T) {
+	home := t.TempDir()
+	content := `{"version":1,"bindings":[{"kind":"session","key":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","account_id":"11111111111111111111111111111111","updated_unix":-1}]}`
+	if err := os.WriteFile(filepath.Join(home, "routing.json"), []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewStore(home).Load(context.Background()); err == nil {
+		t.Fatal("negative binding timestamp accepted")
+	}
+}
+
 func TestRoutingSnapshotRejectsPartialStateWithoutOverwritingIt(t *testing.T) {
 	root := t.TempDir()
 	path := filepath.Join(root, "routing.json")

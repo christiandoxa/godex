@@ -17,6 +17,9 @@ type Binding struct {
 }
 
 func (b Binding) Validate() error {
+	if b.UpdatedUnix < 0 {
+		return errors.New("invalid routing binding timestamp")
+	}
 	switch b.Kind {
 	case "previous", "turn", "session", "thread":
 	default:

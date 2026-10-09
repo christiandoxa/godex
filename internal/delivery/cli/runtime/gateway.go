@@ -98,6 +98,9 @@ func startCurrentGateway(
 		gateway, err := runner.StartGatewayCurrent(ctx, options)
 		return gateway, nil, err
 	}
+	if target.Provider == "openai" && target.Auth == "api-key" {
+		return nil, nil, errors.New("gateway provider does not expose an OpenAI-compatible proxy")
+	}
 	if target.AccountID != "" {
 		gateway, err := runner.StartGatewayAccount(ctx, target.AccountID, options)
 		return gateway, nil, err

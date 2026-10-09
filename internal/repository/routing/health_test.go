@@ -72,6 +72,54 @@ func TestRouteHealthSuccessWithoutPenaltyDoesNotWriteSnapshot(t *testing.T) {
 	}
 }
 
+func TestSetRouteHealthPreservesNewerOrStrongerSnapshot(t *testing.T) {
+	root := t.TempDir()
+	store := NewStore(root)
+	if _, err := store.SetRouteHealth(t.Context(), "account-a", "responses", 5, time.Unix(200, 0)); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := store.SetRouteHealth(t.Context(), "account-a", "responses", 2, time.Unix(199, 0)); err != nil {
+		t.Fatal(err)
+	} else if got.Score != 5 || got.UpdatedUnix != 200 {
+		t.Fatalf("stale route-health update = %+v", got)
+	}
+	if got, err := store.SetRouteHealth(t.Context(), "account-a", "responses", 3, time.Unix(200, 0)); err != nil {
+		t.Fatal(err)
+	} else if got.Score != 5 || got.UpdatedUnix != 200 {
+		t.Fatalf("weaker tied route-health update = %+v", got)
+	}
+	if got, err := store.SetRouteHealth(t.Context(), "account-a", "responses", 6, time.Unix(200, 0)); err != nil {
+		t.Fatal(err)
+	} else if got.Score != 6 || got.UpdatedUnix != 200 {
+		t.Fatalf("stronger tied route-health update = %+v", got)
+	}
+	if got, err := store.SetRouteHealth(t.Context(), "account-a", "responses", 1, time.Unix(201, 0)); err != nil {
+		t.Fatal(err)
+	} else if got.Score != 1 || got.UpdatedUnix != 201 {
+		t.Fatalf("newer route-health update = %+v", got)
+	}
+}
+
+func TestSetRouteHealthClearsOnlyWithFreshTimestamp(t *testing.T) {
+	root := t.TempDir()
+	store := NewStore(root)
+	if _, err := store.SetRouteHealth(t.Context(), "account-a", "responses", 2, time.Unix(200, 0)); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := store.SetRouteHealth(t.Context(), "account-a", "responses", 0, time.Unix(199, 0)); err != nil {
+		t.Fatal(err)
+	} else if got.Score != 2 || got.UpdatedUnix != 200 {
+		t.Fatalf("stale clear = %+v", got)
+	}
+	if _, err := store.SetRouteHealth(t.Context(), "account-a", "responses", 0, time.Unix(201, 0)); err != nil {
+		t.Fatal(err)
+	}
+	scores, err := store.LoadRouteHealth(t.Context(), time.Unix(201, 0))
+	if err != nil || len(scores) != 0 {
+		t.Fatalf("fresh clear scores = %+v, error = %v", scores, err)
+	}
+}
+
 func TestRouteHealthSnapshotRejectsUnsupportedAndUnsafeFiles(t *testing.T) {
 	for _, content := range []string{`{"version":2,"scores":[]}`, `{"version":1,"scores":[]} {}`} {
 		root := t.TempDir()

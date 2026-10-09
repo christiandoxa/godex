@@ -16,11 +16,10 @@ func processBirthIdentity(pid uint32) string {
 	if err != nil {
 		return ""
 	}
-	_, rest, ok := strings.Cut(string(stat), ") ")
-	if !ok {
+	fields, err := linuxProcessFields(string(stat))
+	if err != nil {
 		return ""
 	}
-	fields := strings.Fields(rest)
 	if len(fields) <= 19 {
 		return ""
 	}

@@ -66,12 +66,20 @@ an independent requirement to reimplement the same internal modules in Go.
   over embedded error-message/header advice, even when upstream advice
   exceeds the available 60-second deadline. Three shuffled race-test
   iterations of the routing and HTTP proxy packages passed.
-- **Open issue from credential-free runtime probe:** Official Prodex and
-  Godex gateway processes with a synthetic OpenAI API-key profile did not
-  reach the local fake upstream. Prodex returned 502/503 while Godex
-  timed out in the probe. This has not been normalized, fixed, or counted
-  as parity. Real OpenAI gateway initialization and authenticated
-  precommit recovery need separate source-grounded E2E work.
+- **OpenAI API-key gateway startup parity:** A synthetic API-key profile is
+  intentionally a direct native Codex launch, not a Godex HTTP gateway
+  profile. With that profile active, both the pinned Prodex binary and Godex
+  reject `gateway` before opening a listener with `gateway provider does not
+  expose an OpenAI-compatible proxy`; neither sends a request to the fake
+  upstream. ChatGPT-authenticated profiles continue to use the native OpenAI
+  gateway transport, and their request forwarding is covered by the isolated
+  fixture evidence above.
+- **Durable state validation and process leases:** Routing snapshots reject
+  negative binding timestamps, and persisted route-health updates preserve a
+  newer or stronger record when an older process reports late. On Linux,
+  runtime broker cleanup treats a zombie PID as stale, matching the tagged
+  process-absence proof while retaining live leases. Focused regressions and
+  race tests cover these state and lifecycle boundaries.
 - **Not yet certified:** raw durable-file layouts differ, and broader
   multi-profile recovery, OAuth/user auth, queue lifecycle, TUI, live
   goal monitoring, WebSocket transport and all provider integrations
