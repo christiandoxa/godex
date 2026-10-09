@@ -3,6 +3,8 @@ package quota
 import (
 	"context"
 	"errors"
+	"fmt"
+	"path/filepath"
 	"strings"
 
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
@@ -17,6 +19,11 @@ func (status *Status) runProfiles(ctx context.Context, options Options) ([]quota
 	reports := make([]quotamodel.Report, 0, len(targets))
 	for _, inspected := range targets {
 		target := inspected.target
+		if options.Selector != "" && target.Provider == "openai" &&
+			strings.EqualFold(strings.TrimSpace(target.Auth), "no-auth") &&
+			inspected.modelProvider == nil {
+			return nil, fmt.Errorf("auth secret not found at %s. Run `codex login` first.", filepath.Join(target.CodexHome, "auth.json"))
+		}
 		report := quotamodel.Report{
 			ProfileName: target.Name, Provider: target.Provider, Auth: target.Auth,
 			Email: target.Email, Active: target.Active, Enabled: target.Enabled,

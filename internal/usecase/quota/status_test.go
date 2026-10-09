@@ -367,6 +367,17 @@ func TestStatusProfileViewDefaultsToActiveAndRawUsesProfileHome(t *testing.T) {
 	}
 }
 
+func TestStatusExplicitNoAuthProfileFailsLikeProdex(t *testing.T) {
+	status := NewStatus(fakeAccounts{}, &trackingUsage{})
+	status.SetProfiles(fakeProfileSource{targets: []profilemodel.QuotaTarget{{
+		Name: "logged-out", CodexHome: "/profiles/logged-out", Provider: "openai", Auth: "no-auth", Enabled: true,
+	}}})
+	_, err := status.Run(context.Background(), Options{Selector: "logged-out"})
+	if err == nil || err.Error() != "auth secret not found at /profiles/logged-out/auth.json. Run `codex login` first." {
+		t.Fatalf("explicit no-auth quota error = %v", err)
+	}
+}
+
 func TestStatusRawReturnsConfiguredCodexProviderSnapshot(t *testing.T) {
 	usage := &trackingUsage{}
 	inspector := &fakeModelProviderInspector{setting: &profilemodel.ModelProviderSetting{
