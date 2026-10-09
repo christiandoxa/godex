@@ -69,7 +69,16 @@ func (transport *Transport) ExecuteWebSocket(ctx context.Context, input proxymod
 func (transport *Transport) execute(ctx context.Context, input proxymodel.Request, account proxymodel.Account, websocket bool) (*proxymodel.Response, error) {
 	auth, err := transport.auth.ReadAuth(ctx, account.Home)
 	if err != nil {
-		return nil, err
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		if !managedProxyMount(input.Path) {
+			return nil, err
+		}
+		return nil, &proxymodel.Error{
+			StatusCode: http.StatusBadGateway,
+			Message:    "proxied request could not be prepared",
+		}
 	}
 	response, err := transport.executeWithAuth(ctx, input, account, websocket, auth)
 	if err != nil || response.StatusCode != http.StatusUnauthorized {
@@ -96,6 +105,15 @@ func (transport *Transport) execute(ctx context.Context, input proxymodel.Reques
 	}
 	_ = response.Body.Close()
 	return transport.executeWithAuth(ctx, input, account, websocket, refreshed)
+}
+
+func managedProxyMount(path string) bool {
+	for _, mount := range []string{backendAPIPath + "/prodex", backendAPIPath + "/godex"} {
+		if path == mount || strings.HasPrefix(path, mount+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 func runtimeAuthChanged(previous, current proxymodel.Auth) bool {

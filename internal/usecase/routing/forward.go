@@ -40,6 +40,9 @@ func (router *Router) forwardBound(
 		if ctx.Err() != nil {
 			return proxymodel.Forwarded{}, ctx.Err()
 		}
+		if isProxyPreparationError(err) {
+			return proxymodel.Forwarded{}, err
+		}
 		transportFailure := isTransportFailure(err)
 		if transportFailure {
 			router.recordTransportExecutionFailure(ctx, account.ID, request.QuotaSelection, err)

@@ -2,6 +2,7 @@ package routing
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
@@ -185,6 +186,9 @@ func (router *Router) freshAttempt(
 		if ctx.Err() != nil {
 			return nil, nil, false, ctx.Err()
 		}
+		if isProxyPreparationError(err) {
+			return nil, nil, false, err
+		}
 		transport := isTransportFailure(err)
 		if transport {
 			router.recordTransportExecutionFailure(ctx, account.ID, request.QuotaSelection, err)
@@ -260,6 +264,13 @@ func (router *Router) freshAttempt(
 	pending.profileUnavailable = outcome.profileUnavailable
 	pending.transient = outcome.transient
 	return nil, pending, false, nil
+}
+
+func isProxyPreparationError(err error) bool {
+	var presentation *proxymodel.Error
+	return errors.As(err, &presentation) &&
+		presentation.StatusCode == http.StatusBadGateway &&
+		presentation.Message == "proxied request could not be prepared"
 }
 
 // applyRetryOutcome preserves historical durable retry backoff for managed
