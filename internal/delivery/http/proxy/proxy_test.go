@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -8,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -675,6 +677,111 @@ func TestProxyCancellationStopsUpstream(t *testing.T) {
 	case <-result:
 	case <-time.After(time.Second):
 		t.Fatal("downstream request did not finish")
+	}
+}
+
+func TestProxyForwardsCapturedBodyAfterClientHalfClose(t *testing.T) {
+	accounts := testRuntimeAccounts(t, "A", "token-a", "B", "token-b")
+	seenBody := make(chan []byte, 1)
+	upstream := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		body, err := io.ReadAll(request.Body)
+		if err != nil {
+			t.Errorf("read upstream body: %v", err)
+			return
+		}
+		seenBody <- body
+		writer.Header().Set("Content-Type", "application/json")
+		writer.WriteHeader(http.StatusMultiStatus)
+		_, _ = io.WriteString(writer, `{"reply":"ok"}`)
+	}))
+	defer upstream.Close()
+	proxy := newTestProxy(t, upstream.URL, accounts)
+
+	endpoint := strings.TrimPrefix(proxy.URL, "http://")
+	connection, err := net.DialTimeout("tcp", endpoint, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer connection.Close()
+	_ = connection.SetDeadline(time.Now().Add(5 * time.Second))
+	body := []byte(`{"model":"test"}`)
+	request := fmt.Sprintf(
+		"POST /backend-api/prodex/responses HTTP/1.1\r\nHost: %s\r\nContent-Length: %d\r\nConnection: close\r\nContent-Type: application/json\r\n\r\n%s",
+		endpoint, len(body), body,
+	)
+	if _, err := io.WriteString(connection, request); err != nil {
+		t.Fatal(err)
+	}
+	tcpConnection, ok := connection.(*net.TCPConn)
+	if !ok {
+		t.Fatal("raw test connection is not TCP")
+	}
+	if err := tcpConnection.CloseWrite(); err != nil {
+		t.Fatal(err)
+	}
+	rawResponse, err := io.ReadAll(connection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(rawResponse)), nil)
+	if err != nil {
+		t.Fatalf("parse proxy response: %v (raw %q)", err, rawResponse)
+	}
+	responseBody, err := io.ReadAll(response.Body)
+	_ = response.Body.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.StatusCode != http.StatusMultiStatus || string(responseBody) != `{"reply":"ok"}` {
+		t.Fatalf("half-closed response = status %d body %q (raw %q)", response.StatusCode, responseBody, rawResponse)
+	}
+	select {
+	case got := <-seenBody:
+		if !bytes.Equal(got, body) {
+			t.Fatalf("upstream body = %q, want %q", got, body)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("upstream did not receive the captured request")
+	}
+}
+
+func TestProxyDoesNotForwardIncompleteBodyAfterClientHalfClose(t *testing.T) {
+	accounts := testRuntimeAccounts(t, "A", "token-a", "B", "token-b")
+	upstreamRequests := make(chan struct{}, 1)
+	upstream := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		upstreamRequests <- struct{}{}
+		writer.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+	proxy := newTestProxy(t, upstream.URL, accounts)
+
+	endpoint := strings.TrimPrefix(proxy.URL, "http://")
+	connection, err := net.DialTimeout("tcp", endpoint, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer connection.Close()
+	_ = connection.SetDeadline(time.Now().Add(5 * time.Second))
+	body := []byte(`{"model":"test"}`)
+	request := fmt.Sprintf(
+		"POST /backend-api/prodex/responses HTTP/1.1\r\nHost: %s\r\nContent-Length: %d\r\nConnection: close\r\nContent-Type: application/json\r\n\r\n%s",
+		endpoint, len(body)+1, body,
+	)
+	if _, err := io.WriteString(connection, request); err != nil {
+		t.Fatal(err)
+	}
+	tcpConnection, ok := connection.(*net.TCPConn)
+	if !ok {
+		t.Fatal("raw test connection is not TCP")
+	}
+	if err := tcpConnection.CloseWrite(); err != nil {
+		t.Fatal(err)
+	}
+	_, _ = io.ReadAll(connection)
+	select {
+	case <-upstreamRequests:
+		t.Fatal("incomplete half-closed request reached upstream")
+	case <-time.After(250 * time.Millisecond):
 	}
 }
 

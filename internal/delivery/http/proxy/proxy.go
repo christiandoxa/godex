@@ -199,6 +199,7 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 	defer proxy.activeRequests.Add(-1)
 	activity := proxy.startActivity(request)
 	activityContext := context.WithoutCancel(request.Context())
+	requestContext := request.Context()
 	defer proxy.finishActivity(activityContext, activity)
 	lifecycle := &requestLifecycle{}
 	websocket := isWebSocketUpgradeRequest(request)
@@ -247,8 +248,19 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 			writeTextResponse(writer, status, message)
 			return
 		}
+		// net/http cancels a server request context when a client half-closes
+		// its connection. Once the complete body is captured, the request can
+		// still be forwarded safely; retain cancellation while the body is
+		// being read so incomplete requests never reach an upstream.
+		var stopRequestContext context.CancelFunc
+		if requestContext.Err() != nil {
+			requestContext = context.WithoutCancel(requestContext)
+		} else if request.RequestURI != "" {
+			requestContext, stopRequestContext = requestContextAfterBody(requestContext)
+			defer stopRequestContext()
+		}
 		if proxy.redactor != nil && len(body) > 0 {
-			redacted, err := proxy.redactor.Redact(request.Context(), body)
+			redacted, err := proxy.redactor.Redact(requestContext, body)
 			if err != nil {
 				activity.fail(http.StatusBadGateway, "presidio_redaction_failed")
 				writeTextResponse(writer, http.StatusBadGateway, "gateway PII redaction failed")
@@ -270,14 +282,14 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 		)
 		body = smart.Body
 	}
-	exchange, err := proxy.router.Forward(request.Context(), proxymodel.Request{
+	exchange, err := proxy.router.Forward(requestContext, proxymodel.Request{
 		RequestID: activity.sequence, Method: request.Method, Path: request.URL.Path,
 		RawPath: request.URL.EscapedPath(), RawQuery: request.URL.RawQuery,
 		Header: request.Header.Clone(), Body: body,
 		QuotaSelection: quotaSelection(request.URL.Path, websocket, body),
 	})
 	if err != nil {
-		if request.Context().Err() != nil {
+		if requestContext.Err() != nil {
 			activity.fail(0, "request canceled")
 			return
 		}
@@ -311,7 +323,7 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 		result.Response.Header = result.Response.Header.Clone()
 		result.Response.Header.Del("Set-Cookie")
 	}
-	proxy.forwardResponse(request.Context(), writer, result.Response, result.Prefix, result.AccountID, lifecycle, result.ProviderKind)
+	proxy.forwardResponse(requestContext, writer, result.Response, result.Prefix, result.AccountID, lifecycle, result.ProviderKind)
 }
 
 func writeProxyError(writer http.ResponseWriter, path string, status int, message string) {
@@ -355,4 +367,28 @@ func readLimited(reader io.ReadCloser, limit int64) ([]byte, error) {
 		return nil, errRequestBodyTooLarge
 	}
 	return data, nil
+}
+
+const requestContextCancellationGrace = time.Millisecond
+
+func requestContextAfterBody(ctx context.Context) (context.Context, context.CancelFunc) {
+	forwardContext, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	go func() {
+		timer := time.NewTimer(requestContextCancellationGrace)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			// A server connection that closes immediately after sending a
+			// complete body is safe to finish, just like the captured request
+			// path in the reference runtime.
+			return
+		case <-timer.C:
+		}
+		select {
+		case <-ctx.Done():
+			cancel()
+		case <-forwardContext.Done():
+		}
+	}()
+	return forwardContext, cancel
 }
