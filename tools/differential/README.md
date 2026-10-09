@@ -7,9 +7,9 @@ go test ./tools/differential
 go build -trimpath -o /tmp/differential ./tools/differential
 go build -trimpath -o /tmp/godex-candidate ./cmd/godex
 /tmp/differential \
-  --prodex /absolute/path/to/prodex-0.436.1 \
+  --prodex /absolute/path/to/prodex-0.437.0 \
   --godex /tmp/godex-candidate \
-  --prodex-source /absolute/path/to/prodex-0.436.1-source \
+  --prodex-source /absolute/path/to/prodex-0.437.0-source \
   --godex-source "$PWD" \
   --godex-commit "$(git rev-parse HEAD)"
 ```
@@ -40,7 +40,7 @@ Run only from a committed, clean candidate checkout; build the Godex binary
 from that exact source. The supplied --godex-commit pin must match HEAD **and the binary's embedded
 Go VCS build revision**. The harness refuses binaries built from dirty or
 uncommitted source.
-The canonical reference is Prodex tag 0.436.1, not an arbitrary binary release.
+The canonical reference is Prodex tag 0.437.0, not an arbitrary binary release.
 
 **Fail-closed behavior:** the harness prints a structured JSON comparison and
 returns a nonzero process exit for any mismatch, missing child/upstream evidence,
