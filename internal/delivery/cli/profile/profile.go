@@ -111,6 +111,14 @@ func current(ctx context.Context, catalog *profileusecase.Catalog, out io.Writer
 }
 
 func use(ctx context.Context, catalog *profileusecase.Catalog, out io.Writer, arguments []string) error {
+	if len(arguments) == 0 {
+		current, err := catalog.Current(ctx)
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(out, "Active profile: %s\n", current.Profile.Name)
+		return err
+	}
 	name, err := parseProfileSelector(arguments)
 	if err != nil {
 		return err

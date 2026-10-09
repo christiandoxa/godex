@@ -54,6 +54,13 @@ func TestProfileCommandsAddListCurrentUseAndRemove(t *testing.T) {
 		t.Fatalf("current output = %q", output.String())
 	}
 	output.Reset()
+	if err := Run(context.Background(), catalog, &output, []string{"use"}); err != nil {
+		t.Fatal(err)
+	}
+	if output.String() != "Active profile: work\n" {
+		t.Fatalf("implicit profile use output = %q", output.String())
+	}
+	output.Reset()
 	if err := Run(context.Background(), catalog, &output, []string{"use", "--profile", "work"}); err != nil {
 		t.Fatal(err)
 	}
