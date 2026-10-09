@@ -1,7 +1,6 @@
 package runtime
 
 import (
-	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -352,17 +351,6 @@ func superPlaywrightCommand() (string, bool) {
 		return "", false
 	}
 	return npx, true
-}
-
-func superProbeCommand(program string, args ...string) (string, bool) {
-	ctx, cancel := context.WithTimeout(context.Background(), superToolProbeTimeout)
-	defer cancel()
-	command := exec.CommandContext(ctx, program, args...)
-	output, err := command.CombinedOutput()
-	if err != nil || ctx.Err() != nil {
-		return "", false
-	}
-	return string(output), true
 }
 
 func firstSuperLine(value string) string {
