@@ -42,6 +42,8 @@ type stepResult struct {
 	Profiles   []string `json:"profiles"`
 	ProdexExit int      `json:"prodex_exit"`
 	GodexExit  int      `json:"godex_exit"`
+	Requests   int      `json:"usage_requests,omitempty"`
+	Snapshot   bool     `json:"usage_snapshot,omitempty"`
 }
 
 func main() {
@@ -98,6 +100,11 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("profile parity failed closed: %w", err)
 	}
+	startupStages, err := checkStartupWarmup(work, options)
+	if err != nil {
+		return fmt.Errorf("startup probe parity failed closed: %w", err)
+	}
+	stages = append(stages, startupStages...)
 	encoded, err := json.MarshalIndent(resultReport{
 		Status: "PASS", CanonicalSource: canonicalProdexCommit,
 		CandidateSource: options.godexCommit, Steps: stages,
