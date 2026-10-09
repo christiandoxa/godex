@@ -122,7 +122,7 @@ func (router *Router) handleBoundWebSocketResponse(
 		router.clearQuotaBlocked(account.ID)
 		return pendingForwarded(account.ID, outcome, pending), nil
 	}
-	router.applyRetryOutcome(ctx, account.ID, request.QuotaSelection, outcome)
+	router.applyRetryOutcomeForAccount(ctx, account, request.QuotaSelection, outcome)
 	return router.handleBoundWebSocketRetryable(
 		ctx, request, accounts, account, outcome, pending,
 	)
@@ -345,7 +345,7 @@ func (router *Router) forwardWebSocketQuotaLastChance(
 	if outcome.kind == responsePass {
 		router.clearQuotaBlocked(account.ID)
 	} else {
-		router.applyRetryOutcome(ctx, account.ID, request.QuotaSelection, outcome)
+		router.applyRetryOutcomeForAccount(ctx, account, request.QuotaSelection, outcome)
 	}
 	return pendingForwarded(account.ID, outcome, pending), nil
 }

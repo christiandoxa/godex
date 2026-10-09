@@ -245,7 +245,7 @@ func (router *Router) handleBoundResponseWithFailure(
 		router.clearQuotaBlocked(account.ID)
 		return pendingForwarded(account.ID, outcome, pending), nil
 	}
-	router.applyRetryOutcome(ctx, account.ID, request.QuotaSelection, outcome)
+	router.applyRetryOutcomeForAccount(ctx, account, request.QuotaSelection, outcome)
 	if outcome.quota && router.autoRedeem {
 		redeemed, ok, redeemErr := router.tryAutoRedeem(ctx, accounts, account.ID, request)
 		if redeemErr != nil {

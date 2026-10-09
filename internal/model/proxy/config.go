@@ -16,7 +16,11 @@ type Account struct {
 	Enabled       bool
 	EligibleAfter time.Time
 	RouteOrder    int
-	Provider      Provider
+	// EphemeralAPIKey marks a credential supplied to this launcher rather
+	// than a durable managed profile. Its retry quarantine must not survive
+	// another process launch using the same provider credentials.
+	EphemeralAPIKey bool
+	Provider        Provider
 }
 
 type BrokerConfig struct {

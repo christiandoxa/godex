@@ -104,6 +104,7 @@ type Router struct {
 	profileInflightAdmissionsTotal        uint64
 	profileInflightReleasesTotal          uint64
 	profileInflightReleaseUnderflowsTotal uint64
+	ephemeralCredentialIDs                map[string]struct{}
 	quarantine                            map[string]quarantineState
 	quotaBlocked                          map[string]bool
 	quotaChecks                           map[quotaCheckKey]quotaCheck
@@ -183,7 +184,8 @@ func NewRouter(config Config) (*Router, error) {
 		preferred: strings.TrimSpace(config.PreferredAccount),
 		now:       config.Now, wait: config.Wait, maxInspect: config.MaxInspectBytes,
 		affinity: newAffinityStore(), quarantine: make(map[string]quarantineState),
-		inflight: make(map[string]int), inflightChanged: make(chan struct{}),
+		ephemeralCredentialIDs: make(map[string]struct{}),
+		inflight:               make(map[string]int), inflightChanged: make(chan struct{}),
 		profileInflightHardLimit: config.ProfileInflightHardLimit, profileInflightWait: config.ProfileInflightWait,
 		quotaBlocked: make(map[string]bool), quotaChecks: make(map[quotaCheckKey]quotaCheck),
 		routeHealth:              make(map[routeHealthKey]routingentity.RouteHealthScore),
@@ -324,14 +326,6 @@ func (router *Router) Forward(ctx context.Context, request proxymodel.Request) (
 	}
 	transferred = true
 	return &Exchange{Result: result, release: release}, nil
-}
-
-func (router *Router) loadAccounts(ctx context.Context) ([]proxymodel.Account, error) {
-	accounts, err := router.source(ctx)
-	if err != nil {
-		return nil, &proxymodel.Error{StatusCode: 503, Message: "cannot load managed accounts"}
-	}
-	return sortRuntimeAccounts(accounts), nil
 }
 
 func (router *Router) bindSuccessfulResponse(

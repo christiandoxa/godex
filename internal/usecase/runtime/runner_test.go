@@ -604,8 +604,9 @@ func assertProviderCredentialIdentities(
 			strings.Contains(credential.ID, "key") || credential.ID != accounts[index].ID {
 			t.Fatalf("synthetic credential identity drifted: id=%q account=%#v", credential.ID, accounts[index])
 		}
-		if accounts[index].Provider != provider || accounts[index].Home != home || !accounts[index].Enabled {
-			t.Fatalf("synthetic account = %#v", accounts[index])
+		if accounts[index].Provider != provider || accounts[index].Home != home ||
+			!accounts[index].Enabled || !accounts[index].EphemeralAPIKey {
+			t.Fatalf("synthetic account does not retain ephemeral origin = %#v", accounts[index])
 		}
 	}
 }

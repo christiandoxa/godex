@@ -186,6 +186,7 @@ func (runner *Runner) providerAPIKeyPool(
 		accounts = append(accounts, proxymodel.Account{
 			ID: id, Home: home, Enabled: true,
 			RouteOrder: len(accounts) + 1, Provider: provider,
+			EphemeralAPIKey: true,
 		})
 		credentials = append(credentials, proxymodel.ProviderCredential{ID: id, Secret: apiKey})
 	}

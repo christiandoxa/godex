@@ -252,7 +252,7 @@ func (router *Router) freshAttempt(
 		return result, nil, false, nil
 	}
 	router.recordRouteOutcome(ctx, account.ID, request.QuotaSelection, response, outcome)
-	router.applyRetryOutcome(ctx, account.ID, request.QuotaSelection, outcome)
+	router.applyRetryOutcomeForAccount(ctx, account, request.QuotaSelection, outcome)
 	pending.firstEventRetry = outcome.firstEventRetry
 	pending.accountID = account.ID
 	pending.authFailure = outcome.kind == responseAuthFailure
@@ -262,7 +262,18 @@ func (router *Router) freshAttempt(
 	return nil, pending, false, nil
 }
 
+// applyRetryOutcome preserves historical durable retry backoff for managed
+// profile IDs. Call applyRetryOutcomeForAccount when launch-origin metadata is
+// available, so ephemeral API keys do not poison subsequent process launches.
 func (router *Router) applyRetryOutcome(ctx context.Context, accountID string, selection quotamodel.Selection, outcome responseOutcome) {
+	router.applyRetryOutcomeWithPersistence(ctx, accountID, selection, outcome, true)
+}
+
+func (router *Router) applyRetryOutcomeForAccount(ctx context.Context, account proxymodel.Account, selection quotamodel.Selection, outcome responseOutcome) {
+	router.applyRetryOutcomeWithPersistence(ctx, account.ID, selection, outcome, !account.EphemeralAPIKey)
+}
+
+func (router *Router) applyRetryOutcomeWithPersistence(ctx context.Context, accountID string, selection quotamodel.Selection, outcome responseOutcome, persist bool) {
 	duration := outcome.quarantine
 	if outcome.quota {
 		duration = router.quotaQuarantineDuration(accountID, selection, outcome.quotaResetAt)
@@ -279,7 +290,13 @@ func (router *Router) applyRetryOutcome(ctx context.Context, accountID string, s
 		if duration <= 0 {
 			duration = defaultProfileRetryBackoff
 		}
-		router.persistRetryBackoff(ctx, accountID, duration)
+		if persist {
+			router.persistRetryBackoff(ctx, accountID, duration)
+		} else {
+			// A transient API-key pool still quarantines the failed key for
+			// the current runtime, but has no durable rotation cooldown.
+			router.quarantineAccount(accountID, duration)
+		}
 	}
 }
 
