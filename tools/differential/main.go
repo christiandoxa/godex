@@ -141,7 +141,7 @@ func run() error {
 	prodexSource := flags.String("prodex-source", "", "exact Prodex 0.436.1 source checkout")
 	godexSource := flags.String("godex-source", "", "Godex candidate source checkout")
 	expectedGodexCommit := flags.String("godex-commit", "", "expected Godex source HEAD commit SHA")
-	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, retry, single-key-429, cancel, or restart")
+	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, retry, single-key-429, cancel, restart, or recover-after-429")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		return err
 	}
@@ -204,6 +204,9 @@ func run() error {
 		}},
 		{"restart", func() (scenarioResult, error) {
 			return runRestartScenario(root, mock, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit)
+		}},
+		{"recover-after-429", func() (scenarioResult, error) {
+			return runRecoverAfter429(root, mock, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit)
 		}},
 	}
 	var scenarios []scenarioResult
@@ -294,6 +297,35 @@ func runRestartScenario(root string, mock *mockServer, prodexBin, godexBin, prod
 	}
 	differences = uniqueStrings(differences)
 	return scenarioResult{Name: "restart", Comparison: differences, Runs: []productRun{prodexFirst, prodexSecond, godexFirst, godexSecond}}, nil
+}
+
+// The first process sees a structured terminal 429. Without deleting its
+// state root, a new process must complete the next healthy turn. This proves
+// durable retry/backoff state cannot permanently poison a sole provider key.
+func runRecoverAfter429(root string, mock *mockServer, prodexBin, godexBin, prodexCommit, godexCommit string) (scenarioResult, error) {
+	root = filepath.Join(root, "recover-after-429")
+	firstError := mockPlan{FirstStatus: http.StatusTooManyRequests}
+	recovered := mockPlan{}
+	options := runOptions{}
+	prodexFirst, err := runProduct(root, mock, "prodex", prodexBin, prodexCommit, firstError, options)
+	if err != nil {
+		return scenarioResult{}, fmt.Errorf("Prodex initial terminal 429: %w", err)
+	}
+	prodexNext, err := runProduct(root, mock, "prodex", prodexBin, prodexCommit, recovered, options)
+	if err != nil {
+		return scenarioResult{}, fmt.Errorf("Prodex later healthy request: %w", err)
+	}
+	godexFirst, err := runProduct(root, mock, "godex", godexBin, godexCommit, firstError, options)
+	if err != nil {
+		return scenarioResult{}, fmt.Errorf("Godex initial terminal 429: %w", err)
+	}
+	godexNext, err := runProduct(root, mock, "godex", godexBin, godexCommit, recovered, options)
+	if err != nil {
+		return scenarioResult{}, fmt.Errorf("Godex later healthy request: %w", err)
+	}
+	all := []productRun{prodexFirst, prodexNext, godexFirst, godexNext}
+	differences := append(compare(prodexFirst, godexFirst), compare(prodexNext, godexNext)...)
+	return scenarioResult{Name: "recover-after-429", Comparison: uniqueStrings(differences), Runs: all}, nil
 }
 
 func runProduct(root string, mock *mockServer, name, binary, commit string, plan mockPlan, options runOptions) (productRun, error) {
@@ -651,16 +683,25 @@ func shimFailure(message string) int {
 func scenarioInvariants(scenario scenarioResult) []string {
 	var failures []string
 	wantRuns := 2
-	if scenario.Name == "restart" {
+	if scenario.Name == "restart" || scenario.Name == "recover-after-429" {
 		wantRuns = 4
 	}
 	if len(scenario.Runs) != wantRuns {
 		failures = append(failures, scenario.Name+".run_count")
 	}
-	for _, run := range scenario.Runs {
+	for index, run := range scenario.Runs {
 		prefix := scenario.Name + "." + run.Name
+		phase := scenario.Name
+		if scenario.Name == "recover-after-429" {
+			// Two paired process generations, first 429 then healthy 200.
+			if index == 0 || index == 2 {
+				phase = "single-key-429"
+			} else {
+				phase = "success"
+			}
+		}
 		wantExit := 0
-		switch scenario.Name {
+		switch phase {
 		case "cancel":
 			wantExit = 1 // Both canonical clients terminate their interrupted shim.
 			if !run.Cancelled {
@@ -680,7 +721,7 @@ func scenarioInvariants(scenario scenarioResult) []string {
 			failures = append(failures, prefix+".exit_status")
 		}
 		wantRequests := 1
-		if scenario.Name == "retry" {
+		if phase == "retry" {
 			wantRequests = 2
 		}
 		if len(run.Upstream) != wantRequests || run.Retries != wantRequests-1 {

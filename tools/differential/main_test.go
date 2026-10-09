@@ -148,3 +148,24 @@ func TestFixtureOracleRejectsSymmetricCorruption(t *testing.T) {
 		t.Fatal("incorrect usage accepted")
 	}
 }
+
+// A rate-limited first run is terminal, but fresh traffic after restart
+// must use the same configured provider successfully, without backoff poisoning.
+func TestRecoverAfter429RequiresHealthySecondGeneration(t *testing.T) {
+	bad := productRun{
+		Name: "prodex", ExitStatus: 2, Client: exchange{Status: 429, Body: "rate_limit_exceeded"},
+		Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, Body: syntheticFixtureRequest}},
+	}
+	good := productRun{
+		Name: "prodex", ExitStatus: 0, Client: exchange{Status: 200, Body: syntheticFixtureResponse},
+		Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, Body: syntheticFixtureRequest}},
+	}
+	scenario := scenarioResult{Name: "recover-after-429", Runs: []productRun{bad, good, bad, good}}
+	if failures := scenarioInvariants(scenario); len(failures) != 0 {
+		t.Fatalf("valid process recovery rejected: %v", failures)
+	}
+	scenario.Runs[3] = bad
+	if failures := scenarioInvariants(scenario); len(failures) == 0 {
+		t.Fatal("restart that remains rate-limited incorrectly passed")
+	}
+}

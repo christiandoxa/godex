@@ -15,10 +15,11 @@ go build -trimpath -o /tmp/godex-candidate ./cmd/godex
 ```
 
 The harness creates separate temporary homes, starts one loopback mock upstream,
-and runs both products independently through five bounded scenarios: a successful request; a
+and runs both products independently through six bounded scenarios: a successful request; a
 synthetic 429 followed by a retry owned by the **Codex shim**; a single-key
 429 that must remain terminal without **proxy** retry; cancellation while
-upstream is delayed; and two launches against the same home. Each
+upstream is delayed; two launches against the same home; and a terminal 429 followed by a
+fresh process with the same home and a healthy provider, which must succeed. Each
 run records bounded stdout/stderr, child response, upstream requests, ordered
 upstream events, retry count, cancellation observation, exit status, and a
 redacted durable-state snapshot. The comparison also has mutation sentinels
@@ -28,10 +29,10 @@ candidate executable's embedded Go VCS revision and requires `vcs.modified=false
 A stale binary, dirty build, or build without VCS metadata fails before execution.
 Both reference and candidate source trees must also have no tracked modifications
 or untracked files; a locally edited Prodex checkout cannot serve as the oracle.
-The resulting PASS is limited to the five named synthetic scenarios and is
+The resulting PASS is limited to the six named synthetic scenarios and is
 not equivalent to a global provider, live-TUI or transport parity certificate.
 
-Use `--scenario success|retry|single-key-429|cancel|restart` to rerun one case while
+Use `--scenario success|retry|single-key-429|cancel|restart|recover-after-429` to rerun one case while
 investigating a mismatch; the default is `--scenario all`.
 
 
@@ -52,7 +53,7 @@ retry; all cases require the expected number of upstream requests.
 The negative controls alone never imply parity. Current header, durable state,
 stderr, and upstream metadata differences are intentionally still reported.
 
-Do not interpret this five-scenario harness as proof of full 1:1 parity;
+Do not interpret this six-scenario harness as proof of full 1:1 parity;
 additional transport, provider, and persistence contracts remain to verify.
 
 ### Strict fixture oracle and audited transport metadata
@@ -100,3 +101,12 @@ compared under the fail-closed strict gate. The integrity checks do **not**
 certify equivalence of account/goal/journal semantics, so the raw layout
 difference remains a blocker pending domain-specific restart/fault injection
 proof.
+
+
+The recover-after-429 case runs **four real product processes** across two
+isolated per-product homes: the first process receives a terminal structured
+429, then a fresh process with the same persistent home must complete a
+healthy request without stale retry/backoff state. The oracle checks actual
+upstream attempt counts and both process generations, rather than simply
+comparing equal file hashes. This tests one lifecycle path, not every
+persistence or concurrent-recovery contract.
