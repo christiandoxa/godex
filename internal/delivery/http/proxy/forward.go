@@ -54,7 +54,10 @@ func (proxy *Proxy) prepareResponsePrefix(writer http.ResponseWriter, response *
 }
 
 func clearMissingStandardHeaders(destination, source http.Header) {
-	for _, header := range []string{"Content-Type", "Content-Length", "Date"} {
+	// Let net/http add a current Date when upstream did not supply one.
+	// A nil Date header suppresses the RFC-required server timestamp and
+	// diverges from the Prodex 0.436.1 local proxy response.
+	for _, header := range []string{"Content-Type", "Content-Length"} {
 		if !hasHeader(source, header) {
 			destination[header] = nil
 		}
