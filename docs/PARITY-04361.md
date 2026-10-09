@@ -58,7 +58,7 @@ upstream model call was used.
 Known gaps are deliberate: Godex queues quota usage snapshot writes for the
 process lifetime, but does not mirror Prodex's full runtime state-save,
 continuation-journal, or probe-refresh workers. Soft-affinity identity migration
-is not modeled, and the current fourteen-scenario differential harness still reports raw
+is not modeled, and the current fifteen-scenario differential harness still reports raw
 durable-state layout differences.
 Success, retry, cancellation, and restart outcomes now agree on status, body,
 and retry counts; the remaining observations keep this checkpoint at
@@ -75,7 +75,7 @@ job fails closed on divergent observable outcomes, corrupt/missing evidence,
 or uncommitted oracle/candidate trees. See
 `scripts/verify-release-parity.sh` and `tools/differential/README.md`.
 
-This fourteen-scenario synthetic gate is necessary but **not sufficient** to certify full
+This fifteen-scenario synthetic gate is necessary but **not sufficient** to certify full
 feature-for-feature parity. Provider/auth, TUI/app-server, WebSocket/SSE
 continuation, and durable restart behavior still require broader cross-binary
 evidence. The DeepSeek loopback suite explicitly distinguishes Codex-client
@@ -88,7 +88,7 @@ verified.
 
 ## Differential evidence refinement
 
-The fourteen synthetic DeepSeek scenarios include a terminal single-key 429
+The fifteen synthetic DeepSeek scenarios include a terminal single-key 429
 without Codex shim retries. Successful and 429 responses have matching status,
 body, retry decisions and upstream attempt counts after the routing fixes.
 Strict fixture-oracle guards verify provider Authorization, request model, user
@@ -115,7 +115,7 @@ recovery snapshots. These integrity checks are necessary but do not prove
 cross-implementation state persistence semantics: the raw durable-state
 layout mismatch remains a release blocker.
 
-The expanded fourteen-scenario differential suite includes a real cross-process
+The expanded fifteen-scenario differential suite includes a real cross-process
 429-to-healthy recovery on the same isolated state root. This verifies that
 terminal provider failures do not poison subsequent process launches. Raw
 internal file inventories remain visible and have not been treated as proof
@@ -139,7 +139,7 @@ through filename-level normalization.
 
 Prodex's 503 provider-health sidecar and narrowly formatted atomic-write
 temporary files are audited and distinguished from unexpected persisted
-state. The fourteen-scenario differential suite, including the
+state. The fifteen-scenario differential suite, including the
 503-to-healthy cross-process case, verifies user-visible behavior for
 one synthetic key, **not multi-profile health ranking equivalence**.
 
@@ -191,3 +191,13 @@ additions improve verified provider wire coverage. Full parity remains
 unproven where other providers, state contracts or transports have not
 been differentially exercised; the raw durable-file mismatch remains a
 fail-closed release blocker.
+
+
+An additional exact-binary SSE rate-limit scenario projects synthetic
+X-Ratelimit request/token counters into seven Codex streaming response
+headers, including pinned absolute reset times. This avoids conflating
+nonsemantic stream transport framing with the user-visible quota contract.
+The Prodex 0.436.1 and Godex outputs agree for this fixture, including the
+five-event stream, strict rate-limit metadata, and absence of stray upstream
+headers. The full parity gate remains blocked by raw durable layout and
+other as-yet-unverified product surfaces.

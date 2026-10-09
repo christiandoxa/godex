@@ -15,7 +15,7 @@ go build -trimpath -o /tmp/godex-candidate ./cmd/godex
 ```
 
 The harness creates separate temporary homes, starts one loopback mock upstream,
-and runs both products independently through fourteen bounded scenarios: a successful request; a
+and runs both products independently through fifteen bounded scenarios: a successful request; a
 synthetic 429 followed by a retry owned by the **Codex shim**; a single-key
 429 that must remain terminal without **proxy** retry; cancellation while
 upstream is delayed; two launches against the same home; and a terminal 429 followed by a
@@ -29,10 +29,10 @@ candidate executable's embedded Go VCS revision and requires `vcs.modified=false
 A stale binary, dirty build, or build without VCS metadata fails before execution.
 Both reference and candidate source trees must also have no tracked modifications
 or untracked files; a locally edited Prodex checkout cannot serve as the oracle.
-The resulting PASS is limited to the fourteen named synthetic scenarios and is
+The resulting PASS is limited to the fifteen named synthetic scenarios and is
 not equivalent to a global provider, live-TUI or transport parity certificate.
 
-Use `--scenario success|tool-call|sse-stream|retry|single-key-401|single-key-403|single-key-429|single-key-503|key-rotation-429|key-rotation-restart|cancel|restart|recover-after-429|recover-after-503` to rerun one case while
+Use `--scenario success|tool-call|sse-stream|sse-rate-limit|retry|single-key-401|single-key-403|single-key-429|single-key-503|key-rotation-429|key-rotation-restart|cancel|restart|recover-after-429|recover-after-503` to rerun one case while
 investigating a mismatch; the default is `--scenario all`.
 
 
@@ -53,7 +53,7 @@ retry; all cases require the expected number of upstream requests.
 The negative controls alone never imply parity. Current header, durable state,
 stderr, and upstream metadata differences are intentionally still reported.
 
-Do not interpret this fourteen-scenario harness as proof of full 1:1 parity;
+Do not interpret this fifteen-scenario harness as proof of full 1:1 parity;
 additional transport, provider, and persistence contracts remain to verify.
 
 ### Strict fixture oracle and audited transport metadata
@@ -197,3 +197,13 @@ events. Every other event field, sequence, output text, usage value and
 response metadata is compared to an independent exact fixture, with
 negative controls for extra fields/events, wrong IDs and incorrect usage.
 The raw persistent-state layouts remain a separate hard comparison.
+
+
+The SSE rate-limit scenario supplies deterministic, future absolute
+reset timestamps (in seconds and milliseconds) and synthetic consumption
+fractions. Its Codex projection is verified for both requests and tokens
+with strict field names, percentages, and absolute reset epochs. Unrelated
+upstream headers, cookies, and framing must not leak through the translated
+SSE response, and the reference event sequence remains the exact same five
+frames. Negative controls reject malformed reset values, bogus percentages,
+and unexpected headers.
