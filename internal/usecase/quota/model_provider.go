@@ -3,6 +3,7 @@ package quota
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
@@ -13,6 +14,10 @@ type inspectedProfileQuotaTarget struct {
 	target           profilemodel.QuotaTarget
 	modelProvider    *profilemodel.ModelProviderSetting
 	modelProviderErr error
+}
+
+func noAuthQuotaError(target profilemodel.QuotaTarget) error {
+	return fmt.Errorf("auth secret not found at %s. Run `codex login` first.", filepath.Join(target.CodexHome, "auth.json"))
 }
 
 func (status *Status) inspectProfileQuotaTarget(ctx context.Context, target profilemodel.QuotaTarget) inspectedProfileQuotaTarget {

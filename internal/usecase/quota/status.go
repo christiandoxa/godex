@@ -176,6 +176,9 @@ func (status *Status) Raw(ctx context.Context, selector, baseURL string) ([]byte
 		if inspected.modelProvider != nil {
 			return codexModelProviderQuotaJSON(*inspected.modelProvider)
 		}
+		if strings.EqualFold(strings.TrimSpace(target.Auth), "no-auth") {
+			return nil, noAuthQuotaError(target)
+		}
 		if target.Provider != "openai" {
 			gateway := status.externalProvider(target.Provider)
 			if gateway == nil {
