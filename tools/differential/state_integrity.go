@@ -31,6 +31,12 @@ func auditFixtureDurableState(root string) []string {
 		}
 		relative = filepath.ToSlash(relative)
 		if entry.IsDir() {
+			// Node/npm compilation caches are volatile runner artifacts, not
+			// durable application state or provider credentials. Inspect
+			// every other HOME path to detect unintended persistence.
+			if relative == "user/.npm" || relative == "user/node-compile-cache" {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		info, err := entry.Info()
