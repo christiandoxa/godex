@@ -100,12 +100,13 @@ type report struct {
 }
 
 type mockPlan struct {
-	FirstStatus int
-	Delay       time.Duration
-	RotateKeys  bool
-	ToolCall    bool
-	Stream      bool
-	StreamQuota bool
+	FirstStatus       int
+	Delay             time.Duration
+	RotateKeys        bool
+	ToolCall          bool
+	Stream            bool
+	StreamQuota       bool
+	StreamRetryHeader bool
 }
 
 type runOptions struct {
@@ -150,7 +151,7 @@ func run() error {
 	prodexSource := flags.String("prodex-source", "", "exact Prodex 0.437.0 source checkout")
 	godexSource := flags.String("godex-source", "", "Godex candidate source checkout")
 	expectedGodexCommit := flags.String("godex-commit", "", "expected Godex source HEAD commit SHA")
-	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, sse-stream, sse-rate-limit, retry, single-key-401, single-key-403, single-key-429, single-key-503, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
+	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, sse-stream, sse-rate-limit, retry, stream-header-retry, single-key-401, single-key-403, single-key-429, single-key-503, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		return err
 	}
@@ -238,6 +239,14 @@ func run() error {
 			// The first API key always fails. A second independent credential
 			// must be selected *by the proxy*, with just one client request.
 			return runPair(root, mock, "key-rotation-429", mockPlan{RotateKeys: true}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{rotate: true})
+		}},
+		{"stream-header-retry", func() (scenarioResult, error) {
+			// The primary credential returns HTTP 200 with response.failed
+			// and nested structured Retry-After. The proxy must rotate before
+			// commitment to the healthy secondary credential.
+			return runPair(root, mock, "stream-header-retry",
+				mockPlan{StreamRetryHeader: true}, *prodexBin, *godexBin,
+				prodexSourceCommit, godexSourceCommit, runOptions{rotate: true})
 		}},
 		{"key-rotation-restart", func() (scenarioResult, error) {
 			return runRotationRestart(root, mock, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit)
@@ -629,7 +638,9 @@ func (mock *mockServer) serveHTTP(writer http.ResponseWriter, request *http.Requ
 		}
 	}
 	status := plan.FirstStatus
-	if plan.RotateKeys {
+	if plan.StreamRetryHeader {
+		status = http.StatusOK
+	} else if plan.RotateKeys {
 		if keySlot == "secondary" {
 			status = http.StatusOK
 		} else {
@@ -651,6 +662,17 @@ func (mock *mockServer) serveHTTP(writer http.ResponseWriter, request *http.Requ
 		default:
 			responseBody = `{"error":{"code":"rate_limit_exceeded"}}`
 		}
+	}
+	if plan.StreamRetryHeader && keySlot == "primary" {
+		responseBody = "event: response.failed\r\ndata: {\"type\":\"response.failed\",\"response\":{\"error\":{\"code\":\"rate_limit_exceeded\",\"message\":\"Please try again in 1s.\",\"headers\":{\"Retry-After\":\"5\"}}}}\r\n\r\n"
+		writer.Header().Set("Content-Type", "text/event-stream")
+		writer.Header().Set("X-Synthetic-Upstream", "differential-v1")
+		writer.WriteHeader(status)
+		_, _ = io.WriteString(writer, responseBody)
+		mock.mu.Lock()
+		mock.events = append(mock.events, upstreamEvent{Kind: "upstream.response", Attempt: attempt, Status: status})
+		mock.mu.Unlock()
+		return
 	}
 	if plan.StreamQuota && status == http.StatusOK {
 		writer.Header().Set("X-Ratelimit-Limit-Requests", "100")
@@ -902,13 +924,13 @@ func scenarioInvariants(scenario scenarioResult) []string {
 			failures = append(failures, prefix+".exit_status")
 		}
 		wantRequests := 1
-		if phase == "retry" || phase == "key-rotation-429" {
+		if phase == "retry" || phase == "key-rotation-429" || phase == "stream-header-retry" {
 			wantRequests = 2
 		}
 		if phase == "key-rotation-restart" {
 			wantRequests = len(run.Upstream)
 		}
-		if phase == "key-rotation-429" {
+		if phase == "key-rotation-429" || phase == "stream-header-retry" {
 			if len(run.Upstream) == 2 &&
 				(run.Upstream[0].KeySlot != "primary" ||
 					run.Upstream[1].KeySlot != "secondary") {
@@ -932,7 +954,7 @@ func scenarioInvariants(scenario scenarioResult) []string {
 			if !upstream.AuthOK || upstream.Method != http.MethodPost || upstream.Path != "/v1/chat/completions" {
 				failures = append(failures, prefix+".upstream_auth_or_route")
 			}
-			if phase != "key-rotation-429" && phase != "key-rotation-restart" && upstream.KeySlot != "single" {
+			if phase != "key-rotation-429" && phase != "stream-header-retry" && phase != "key-rotation-restart" && upstream.KeySlot != "single" {
 				failures = append(failures, prefix+".wrong_credential_slot")
 			}
 			validRequest := validFixtureRequest(upstream.Body)

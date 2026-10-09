@@ -46,7 +46,10 @@ type Response struct {
 	PrecommitFailure        *PrecommitFailure
 }
 type PrecommitFailure struct {
-	Code                      string
+	Code string
+	// RetryAdviceJSON contains at most 64 KiB of precommit WebSocket error
+	// metadata for routing; it is never persisted or exposed to clients.
+	RetryAdviceJSON           []byte `json:"-"`
 	Transport                 bool
 	InvalidPreviousResponseID bool
 	StaleContinuation         bool

@@ -287,8 +287,13 @@ func (router *Router) applyRetryOutcomeWithPersistence(ctx context.Context, acco
 		return
 	}
 	if outcome.kind == responseRetry && !outcome.transport {
-		if duration <= 0 {
+		if duration <= 0 && !outcome.explicitRetryAdvice {
 			duration = defaultProfileRetryBackoff
+		}
+		if outcome.explicitRetryAdvice && duration == 0 {
+			// An explicit Retry-After: 0 means immediate eligibility; do
+			// not accidentally restore the 20-second default quarantine.
+			return
 		}
 		if persist {
 			router.persistRetryBackoff(ctx, accountID, duration)

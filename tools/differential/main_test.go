@@ -311,3 +311,26 @@ func TestProviderAuthErrorOracleRejectsMatchingButWrongErrors(t *testing.T) {
 		})
 	}
 }
+
+// The Codex shim performs one request. Retrying a failed SSE first event must
+// originate in the proxy, and the retry must select a different API key.
+func TestProdex04370SSEHeaderRetryRequiresIndependentKeyRotation(t *testing.T) {
+	makeRun := func(primary, secondary string) productRun {
+		return productRun{
+			ExitStatus: 0, Client: exchange{Status: 200, Body: syntheticFixtureResponse},
+			Upstream: []upstreamRequest{
+				{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, KeySlot: primary, Body: syntheticFixtureRequest},
+				{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, KeySlot: secondary, Body: syntheticFixtureRequest},
+			},
+			Retries: 1,
+		}
+	}
+	good := makeRun("primary", "secondary")
+	if failures := scenarioInvariants(scenarioResult{Name: "stream-header-retry", Runs: []productRun{good, good}}); len(failures) != 0 {
+		t.Fatalf("valid proxy-owned SSE retry rejected: %v", failures)
+	}
+	invalid := makeRun("primary", "primary")
+	if failures := scenarioInvariants(scenarioResult{Name: "stream-header-retry", Runs: []productRun{good, invalid}}); len(failures) == 0 {
+		t.Fatal("replaying same rate-limited credential was accepted")
+	}
+}

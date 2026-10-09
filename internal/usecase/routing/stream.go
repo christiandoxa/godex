@@ -125,14 +125,22 @@ func classifyStreamError(data []byte, headers http.Header, now time.Time, provid
 		if !externalProviderKind(providerKind) {
 			cooldown = rateLimitCooldown(headers, data)
 		}
-		return responseOutcome{
+		outcome := responseOutcome{
 			kind: responseRetry, quarantine: cooldown,
 			failed: true, transient: true, firstEventRetry: true,
-		}, false
+		}
+		if delay, ok := structuredStreamRetryAdvice(data, now); ok {
+			outcome.quarantine, outcome.explicitRetryAdvice = delay, true
+		}
+		return outcome, false
 	case providerentity.ErrorTransient:
-		return responseOutcome{
+		outcome := responseOutcome{
 			kind: responseRetry, failed: true, transient: true, healthPenalty: 2, firstEventRetry: true,
-		}, false
+		}
+		if delay, ok := structuredStreamRetryAdvice(data, now); ok {
+			outcome.quarantine, outcome.explicitRetryAdvice = delay, true
+		}
+		return outcome, false
 	}
 	if !externalProviderKind(providerKind) && openAIProfileUnavailable(data) {
 		return responseOutcome{

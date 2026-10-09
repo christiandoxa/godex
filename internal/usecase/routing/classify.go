@@ -30,6 +30,7 @@ type responseOutcome struct {
 	transport                 bool
 	healthPenalty             uint8
 	firstEventRetry           bool
+	explicitRetryAdvice       bool
 	invalidPreviousResponseID bool
 	previousResponseNotFound  bool
 }
@@ -200,14 +201,20 @@ func (proxy *Router) classifyPrecommitFailure(response *proxymodel.Response, pen
 	if classification.Class == providerentity.ErrorAuth {
 		return responseOutcome{kind: responseAuthFailure, failed: true, transport: transport, firstEventRetry: true}, pending, nil
 	}
-	return responseOutcome{
+	outcome := responseOutcome{
 		kind: responseRetry, quarantine: classification.Cooldown, failed: true,
 		quota:           classification.Class == providerentity.ErrorQuota,
 		transient:       classification.Class == providerentity.ErrorRateLimit || classification.Class == providerentity.ErrorTransient,
 		transport:       transport,
 		healthPenalty:   precommitHealthPenalty(classification.Class, transport, failure.Code),
 		firstEventRetry: true,
-	}, pending, nil
+	}
+	if outcome.transient && !transport {
+		if delay, ok := structuredStreamRetryAdvice(failure.RetryAdviceJSON, proxy.now()); ok {
+			outcome.quarantine, outcome.explicitRetryAdvice = delay, true
+		}
+	}
+	return outcome, pending, nil
 }
 
 func transientHealthPenalty(class providerentity.ErrorClass) uint8 {

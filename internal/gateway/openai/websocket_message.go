@@ -240,6 +240,12 @@ func websocketPrecommitFailure(
 	reusedSession bool,
 	reuseIdle time.Duration,
 ) *proxymodel.Response {
+	// Preserve bounded precommit error metadata for the use-case-owned
+	// Retry-After planner. Committed frames never enter this path.
+	var retryAdvice []byte
+	if event.text && len(event.payload) <= 64<<10 {
+		retryAdvice = append([]byte(nil), event.payload...)
+	}
 	return &proxymodel.Response{
 		StatusCode: http.StatusOK, Header: make(http.Header),
 		Body:                   io.NopCloser(bytes.NewReader(frames)),
@@ -251,6 +257,7 @@ func websocketPrecommitFailure(
 		FirstEventRetryUsed:    retryUsed,
 		PrecommitFailure: &proxymodel.PrecommitFailure{
 			Code: event.retryCode, InvalidPreviousResponseID: event.invalidPreviousResponseID,
+			RetryAdviceJSON: retryAdvice,
 		},
 	}
 }
