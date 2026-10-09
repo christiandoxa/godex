@@ -15,6 +15,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/pelletier/go-toml/v2"
 )
 
 const (
@@ -87,6 +89,30 @@ func TestSessionAppServerCompanionArgumentsPreserveManagedConfig(t *testing.T) {
 	}
 	if strings.Join(got, "\x00") != strings.Join(want, "\x00") {
 		t.Fatalf("companion arguments = %#v, want %#v", got, want)
+	}
+}
+
+func TestSessionAppServerCompanionArgumentsEncodeControlCharactersAsTOML(t *testing.T) {
+	model := "synthetic\a-model"
+	arguments := sessionAppServerCompanionArguments([]string{"--model", model}, "/tmp/home/.s")
+	var modelConfig string
+	for index := 0; index+1 < len(arguments); index++ {
+		if arguments[index] == "-c" && strings.HasPrefix(arguments[index+1], "model=") {
+			modelConfig = arguments[index+1]
+			break
+		}
+	}
+	if modelConfig == "" {
+		t.Fatal("companion arguments did not include model config")
+	}
+	var decoded struct {
+		Model string `toml:"model"`
+	}
+	if err := toml.Unmarshal([]byte(modelConfig+"\n"), &decoded); err != nil {
+		t.Fatalf("companion model config is invalid TOML: %v (%q)", err, modelConfig)
+	}
+	if decoded.Model != model {
+		t.Fatalf("decoded model = %q, want %q", decoded.Model, model)
 	}
 }
 

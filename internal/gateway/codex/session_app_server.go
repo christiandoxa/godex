@@ -1,7 +1,7 @@
 package codex
 
 import (
-	"strconv"
+	"fmt"
 	"strings"
 )
 
@@ -52,14 +52,46 @@ func sessionAppServerCompanionArguments(arguments []string, socket string) []str
 			result = append(result, argument)
 		case "-m", "--model":
 			if index+1 < len(arguments) {
-				result = append(result, "-c", "model="+strconv.Quote(arguments[index+1]))
+				result = append(result, "-c", "model="+tomlStringLiteral(arguments[index+1]))
 				index++
 			}
 		default:
 			if strings.HasPrefix(argument, "--model=") {
-				result = append(result, "-c", "model="+strconv.Quote(strings.TrimPrefix(argument, "--model=")))
+				result = append(result, "-c", "model="+tomlStringLiteral(strings.TrimPrefix(argument, "--model=")))
 			}
 		}
 	}
 	return result
+}
+
+func tomlStringLiteral(value string) string {
+	var escaped strings.Builder
+	escaped.Grow(len(value) + 2)
+	escaped.WriteByte('"')
+	for _, char := range value {
+		switch char {
+		case '\\':
+			escaped.WriteString(`\\`)
+		case '"':
+			escaped.WriteString(`\"`)
+		case '\b':
+			escaped.WriteString(`\b`)
+		case '\t':
+			escaped.WriteString(`\t`)
+		case '\n':
+			escaped.WriteString(`\n`)
+		case '\f':
+			escaped.WriteString(`\f`)
+		case '\r':
+			escaped.WriteString(`\r`)
+		default:
+			if char < 0x20 || char == 0x7f {
+				fmt.Fprintf(&escaped, `\u%04X`, char)
+				continue
+			}
+			escaped.WriteRune(char)
+		}
+	}
+	escaped.WriteByte('"')
+	return escaped.String()
 }
