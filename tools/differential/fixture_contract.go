@@ -5,6 +5,14 @@ import "encoding/json"
 // Verify the stable mock fixture independently. Equality between Prodex and
 // Godex alone would miss identical corruption in both products or in the shim.
 func validFixtureRequest(body string) bool {
+	return validFixtureRequestMode(body, false)
+}
+
+func validFixtureStreamingRequest(body string) bool {
+	return validFixtureRequestMode(body, true)
+}
+
+func validFixtureRequestMode(body string, wantStream bool) bool {
 	var request struct {
 		Model    string `json:"model"`
 		Stream   *bool  `json:"stream"`
@@ -15,7 +23,7 @@ func validFixtureRequest(body string) bool {
 	}
 	if json.Unmarshal([]byte(body), &request) != nil ||
 		request.Model != "deepseek-v4-pro" ||
-		request.Stream == nil || *request.Stream ||
+		request.Stream == nil || *request.Stream != wantStream ||
 		len(request.Messages) != 1 {
 		return false
 	}

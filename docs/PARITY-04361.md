@@ -58,7 +58,7 @@ upstream model call was used.
 Known gaps are deliberate: Godex queues quota usage snapshot writes for the
 process lifetime, but does not mirror Prodex's full runtime state-save,
 continuation-journal, or probe-refresh workers. Soft-affinity identity migration
-is not modeled, and the current ten-scenario differential harness still reports raw
+is not modeled, and the current fourteen-scenario differential harness still reports raw
 durable-state layout differences.
 Success, retry, cancellation, and restart outcomes now agree on status, body,
 and retry counts; the remaining observations keep this checkpoint at
@@ -75,7 +75,7 @@ job fails closed on divergent observable outcomes, corrupt/missing evidence,
 or uncommitted oracle/candidate trees. See
 `scripts/verify-release-parity.sh` and `tools/differential/README.md`.
 
-This ten-scenario synthetic gate is necessary but **not sufficient** to certify full
+This fourteen-scenario synthetic gate is necessary but **not sufficient** to certify full
 feature-for-feature parity. Provider/auth, TUI/app-server, WebSocket/SSE
 continuation, and durable restart behavior still require broader cross-binary
 evidence. The DeepSeek loopback suite explicitly distinguishes Codex-client
@@ -88,7 +88,7 @@ verified.
 
 ## Differential evidence refinement
 
-The ten synthetic DeepSeek scenarios include a terminal single-key 429
+The fourteen synthetic DeepSeek scenarios include a terminal single-key 429
 without Codex shim retries. Successful and 429 responses have matching status,
 body, retry decisions and upstream attempt counts after the routing fixes.
 Strict fixture-oracle guards verify provider Authorization, request model, user
@@ -115,7 +115,7 @@ recovery snapshots. These integrity checks are necessary but do not prove
 cross-implementation state persistence semantics: the raw durable-state
 layout mismatch remains a release blocker.
 
-The expanded ten-scenario differential suite includes a real cross-process
+The expanded fourteen-scenario differential suite includes a real cross-process
 429-to-healthy recovery on the same isolated state root. This verifies that
 terminal provider failures do not poison subsequent process launches. Raw
 internal file inventories remain visible and have not been treated as proof
@@ -139,7 +139,7 @@ through filename-level normalization.
 
 Prodex's 503 provider-health sidecar and narrowly formatted atomic-write
 temporary files are audited and distinguished from unexpected persisted
-state. The ten-scenario differential suite, including the
+state. The fourteen-scenario differential suite, including the
 503-to-healthy cross-process case, verifies user-visible behavior for
 one synthetic key, **not multi-profile health ranking equivalence**.
 
@@ -168,6 +168,26 @@ old backoff. Managed profiles still durably persist their own retry backoff
 and health scores, as verified by independent regression tests. With the
 canonical 0.436.1 Prodex binary and the exact-source Godex candidate,
 both key-rotation runs select primary→secondary on **both launches**,
-and all ten synthetic scenarios agree on exit code, translated response,
+and all prior ten synthetic scenarios agree on exit code, translated response,
 ordered upstream requests and credentials. The raw durable-file layout
 still differs, and full parity beyond these fixtures is not certified.
+
+
+## Exact DeepSeek stream and provider-error parity evidence
+
+Full binary-to-binary differential execution was extended beyond buffered
+DeepSeek messages to include a tool call, terminal authentication failures
+(401/403), and an actual SSE stream. The SSE contract identified and fixed
+three client-observable divergences: Godex previously emitted an additional
+response.output_text.done frame, included buffered-only object/created_at
+fields in the completed streaming response, and exposed upstream headers
+instead of the canonical UTF-8 SSE Content-Type projection. Ordinary
+buffered-response Date and Content-Length handling is unchanged.
+
+The SSE comparator validates event count, ordering, sequence, body and usage
+against an independent fixed reference before normalizing only the opaque
+numeric output-item ID, which must match between added/done events. These
+additions improve verified provider wire coverage. Full parity remains
+unproven where other providers, state contracts or transports have not
+been differentially exercised; the raw durable-file mismatch remains a
+fail-closed release blocker.

@@ -867,6 +867,10 @@ func scenarioInvariants(scenario scenarioResult) []string {
 			if run.Client.Status != http.StatusOK || !validFixtureToolCallResponse(run.Client.Body) {
 				failures = append(failures, prefix+".tool_call_semantics")
 			}
+		case "sse-stream":
+			if run.Client.Status != http.StatusOK || !validFixtureSSE(run.Client.Body) {
+				failures = append(failures, prefix+".stream_semantics")
+			}
 		case "single-key-503":
 			wantExit = 2
 			if run.Client.Status != http.StatusServiceUnavailable || !strings.Contains(run.Client.Body, "rate_limit_exceeded") {
@@ -914,7 +918,11 @@ func scenarioInvariants(scenario scenarioResult) []string {
 			if phase != "key-rotation-429" && phase != "key-rotation-restart" && upstream.KeySlot != "single" {
 				failures = append(failures, prefix+".wrong_credential_slot")
 			}
-			if !validFixtureRequest(upstream.Body) {
+			validRequest := validFixtureRequest(upstream.Body)
+			if phase == "sse-stream" {
+				validRequest = validFixtureStreamingRequest(upstream.Body)
+			}
+			if !validRequest {
 				failures = append(failures, prefix+".upstream_request_invalid")
 			}
 		}
@@ -927,7 +935,13 @@ func compare(left, right productRun) []string {
 	if left.ExitStatus != right.ExitStatus {
 		differences = append(differences, "exit_status")
 	}
-	if left.Stdout != right.Stdout {
+	stream := strings.Contains(strings.ToLower(left.Client.Headers.Get("Content-Type")), "text/event-stream") &&
+		strings.Contains(strings.ToLower(right.Client.Headers.Get("Content-Type")), "text/event-stream")
+	if stream {
+		if !equivalentFixtureSSE(strings.TrimSuffix(left.Stdout, "\n"), strings.TrimSuffix(right.Stdout, "\n")) {
+			differences = append(differences, "stdout")
+		}
+	} else if left.Stdout != right.Stdout {
 		differences = append(differences, "stdout")
 	}
 	if !equivalentRuntimeDiagnostics(left, right) {
@@ -939,7 +953,11 @@ func compare(left, right productRun) []string {
 	if !equivalentClientHeaders(left.Client.Headers, right.Client.Headers) {
 		differences = append(differences, "client.headers")
 	}
-	if left.Client.Body != right.Client.Body {
+	if stream {
+		if !equivalentFixtureSSE(left.Client.Body, right.Client.Body) {
+			differences = append(differences, "client.body")
+		}
+	} else if left.Client.Body != right.Client.Body {
 		differences = append(differences, "client.body")
 	}
 	if !equivalentUpstreamRequests(left.Upstream, right.Upstream) {

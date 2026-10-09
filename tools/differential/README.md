@@ -15,7 +15,7 @@ go build -trimpath -o /tmp/godex-candidate ./cmd/godex
 ```
 
 The harness creates separate temporary homes, starts one loopback mock upstream,
-and runs both products independently through ten bounded scenarios: a successful request; a
+and runs both products independently through fourteen bounded scenarios: a successful request; a
 synthetic 429 followed by a retry owned by the **Codex shim**; a single-key
 429 that must remain terminal without **proxy** retry; cancellation while
 upstream is delayed; two launches against the same home; and a terminal 429 followed by a
@@ -29,10 +29,10 @@ candidate executable's embedded Go VCS revision and requires `vcs.modified=false
 A stale binary, dirty build, or build without VCS metadata fails before execution.
 Both reference and candidate source trees must also have no tracked modifications
 or untracked files; a locally edited Prodex checkout cannot serve as the oracle.
-The resulting PASS is limited to the ten named synthetic scenarios and is
+The resulting PASS is limited to the fourteen named synthetic scenarios and is
 not equivalent to a global provider, live-TUI or transport parity certificate.
 
-Use `--scenario success|retry|single-key-429|single-key-503|key-rotation-429|key-rotation-restart|cancel|restart|recover-after-429|recover-after-503` to rerun one case while
+Use `--scenario success|tool-call|sse-stream|retry|single-key-401|single-key-403|single-key-429|single-key-503|key-rotation-429|key-rotation-restart|cancel|restart|recover-after-429|recover-after-503` to rerun one case while
 investigating a mismatch; the default is `--scenario all`.
 
 
@@ -53,7 +53,7 @@ retry; all cases require the expected number of upstream requests.
 The negative controls alone never imply parity. Current header, durable state,
 stderr, and upstream metadata differences are intentionally still reported.
 
-Do not interpret this ten-scenario harness as proof of full 1:1 parity;
+Do not interpret this fourteen-scenario harness as proof of full 1:1 parity;
 additional transport, provider, and persistence contracts remain to verify.
 
 ### Strict fixture oracle and audited transport metadata
@@ -171,3 +171,29 @@ In two-key mode the diagnostic contract uses the exact tagged Prodex
 startup message indicating rotation across two keys, rather than treating
 a single-key banner as equivalent. Both modes reject any additional
 unexpected auth/quota or process-error diagnostic.
+
+
+### New wire-contract scenarios: tool calls, authorization and streaming
+
+The exact Prodex 0.436.1 DeepSeek adapter is also tested with (1) a
+Chat Completions tool call translated to Responses with exact call ID,
+name and structured arguments, (2) one-key terminal HTTP 401 and 403
+authentication/access errors with preserved status, code, and message,
+and (3) an actual streaming Responses request with a synthetic upstream
+SSE stream.
+
+For SSE the oracle requires exactly five frames in this order:
+response.created, response.output_item.added, response.output_text.delta,
+response.output_item.done, and response.completed. The tagged reference
+does not emit response.output_text.done. The streaming completed response
+is sparse: created_at belongs to the event envelope, not the nested
+response; object is also absent. DeepSeek event headers are projected to
+the Codex SSE MIME type without forwarding arbitrary upstream headers.
+
+Rust and Go assign different opaque numeric output-item IDs, but the
+comparator accepts a difference **only** for a valid unsigned numeric
+msg_deepseek_ suffix that is internally consistent across added/done
+events. Every other event field, sequence, output text, usage value and
+response metadata is compared to an independent exact fixture, with
+negative controls for extra fields/events, wrong IDs and incorrect usage.
+The raw persistent-state layouts remain a separate hard comparison.
