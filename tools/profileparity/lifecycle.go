@@ -41,6 +41,14 @@ func profileSteps() []lifecycleStep {
 	return []lifecycleStep{
 		{"initial_list", []string{"profile", "list"}, true, stateProjection{}, false, false, "No profiles configured"},
 		{"reject_unsupported_gateway_provider", []string{"gateway", "--provider", "openai"}, false, stateProjection{}, false, false, "invalid --provider"},
+		{"reject_gateway_unknown_option", []string{"gateway", "--no-such-option"}, false, stateProjection{}, false, false, "--no-such-option"},
+		{"reject_gateway_missing_provider", []string{"gateway", "--provider"}, false, stateProjection{}, false, false, "--provider"},
+		{"reject_gateway_missing_listen", []string{"gateway", "--listen"}, false, stateProjection{}, false, false, "--listen"},
+		{"reject_gateway_missing_base_url", []string{"gateway", "--base-url"}, false, stateProjection{}, false, false, "--base-url"},
+		{"reject_gateway_missing_api_key", []string{"gateway", "--api-key"}, false, stateProjection{}, false, false, "--api-key"},
+		{"reject_gateway_positional_argument", []string{"gateway", "positional"}, false, stateProjection{}, false, false, "positional"},
+		{"reject_gateway_conflicting_presidio", []string{"gateway", "--presidio", "--no-presidio"}, false, stateProjection{}, false, false, "--no-presidio"},
+		{"reject_gateway_late_unknown_option", []string{"gateway", "--listen", "127.0.0.1:0", "--no-such-option"}, false, stateProjection{}, false, false, "--no-such-option"},
 		{"reject_profileless_raw_key_gateway", []string{
 			"gateway", "--provider", "deepseek", "--api-key", "synthetic-gateway-credential",
 			"--base-url", "http://127.0.0.1:1/v1", "--listen", "127.0.0.1:0",

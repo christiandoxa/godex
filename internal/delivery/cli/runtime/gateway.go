@@ -32,7 +32,7 @@ func Gateway(
 ) error {
 	options, err := parseGatewayArguments(arguments)
 	if err != nil {
-		return err
+		return gatewayArgumentUsageError{cause: err}
 	}
 	if runner == nil {
 		return errors.New("runtime support is not configured")

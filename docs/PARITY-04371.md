@@ -91,3 +91,15 @@ argument-usage error and reports the same exit status without swallowing
 the diagnostic. The independent profile lifecycle oracle gained a
 21st CLI stage that checks both binary exit codes and unchanged profile
 state. This does not imply gateway request processing is fully equivalent.
+
+
+### Expanded gateway syntax differential
+
+A command-line matrix against Prodex 0.437.1 identified eight more
+argument-validation cases that previously returned runtime exit code 1
+on Godex but parser exit code 2 on Prodex: missing values, unexpected
+options/positional args, and mutually exclusive Presidio toggles.
+Godex's gateway argument parser now wraps these as typed CLI usage
+errors without changing actual runtime startup failures. The
+credential-free cross-binary lifecycle oracle exercises all cases
+as separate subprocesses, expanding its coverage to 29 steps.

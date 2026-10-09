@@ -1,7 +1,7 @@
 # Prodex 0.437.1 managed-profile lifecycle differential
 
 This tool compares real Prodex and Godex binaries, each operating in a
-separate fresh HOME/PRODEX_HOME/GODEX_HOME, over 21 sequential CLI operations.
+separate fresh HOME/PRODEX_HOME/GODEX_HOME, over 29 sequential CLI operations.
 Every CLI invocation is a new process. No account login, provider API key,
 or external model request is needed. The subprocess receives a minimal
 environment with nonfunctional outbound proxy settings.
@@ -67,3 +67,14 @@ usage error with exit code 2, not a runtime error with exit code 1.
 A source-audited typed Go CLI argument error preserves the original message
 while giving the canonical parser status. This check runs before any profile
 is created and must not mutate the synthetic state.
+
+
+### Gateway argument validation matrix
+
+Eight further syntactic errors have been added to the executable
+differential: unknown or late unknown options, missing provider/listen/
+base-url/api-key arguments, unexpected positional input, and conflicting
+--presidio with --no-presidio. All must return exit 2 from both
+executable CLIs without changing the credential-free persisted state.
+A separate Go test ensures a valid argument set that fails during
+runtime initialization is **not** misclassified as a usage error.
