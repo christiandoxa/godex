@@ -20,7 +20,7 @@
 470	internal/delivery/http/proxy/broker_admin.go
 471	internal/delivery/http/proxy/smart_context.go
 407	internal/gateway/deepseek/anthropic_stream_response.go
-515	internal/gateway/deepseek/stream_state.go
+492	internal/gateway/deepseek/stream_state.go
 514	internal/gateway/gemini/native_response.go
 558	internal/gateway/presidio/engine.go
 417	internal/usecase/quota/usage_cache.go

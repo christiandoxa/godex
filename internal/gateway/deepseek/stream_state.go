@@ -343,6 +343,11 @@ func (state *deepSeekChatStreamState) complete() ([]byte, bool, error) {
 	}
 	response["output"] = output
 	mergeResponseMetadata(response, state.responseMetadata)
+	// The tagged Prodex DeepSeek SSE completion value is a sparse stream
+	// projection, not the buffered Responses object. created_at belongs to
+	// the event envelope; object and created_at are absent from response.
+	delete(response, "object")
+	delete(response, "created_at")
 
 	var events [][]byte
 	for _, tool := range completedTools {
@@ -357,15 +362,12 @@ func (state *deepSeekChatStreamState) complete() ([]byte, bool, error) {
 			"response_id": state.responseID, "output_index": 0, "summary_index": 0, "text": state.reasoning.String(),
 		}))
 	}
-	if state.outputText.Len() > 0 {
-		events = append(events, anthropicStreamEvent("response.output_text.done", map[string]any{
-			"type": "response.output_text.done", "sequence_number": state.nextSequenceNumber(),
-			"response_id": state.responseID, "text": state.outputText.String(),
-		}))
-		if !state.outputTextItemDone {
-			state.outputTextItemDone = true
-			events = append(events, state.outputTextItemDoneEvent())
-		}
+	if state.outputText.Len() > 0 && !state.outputTextItemDone {
+		// Prodex 0.436.1 completes the message item directly. Emitting
+		// response.output_text.done here creates an extra client-visible
+		// event and shifts all subsequent sequence numbers.
+		state.outputTextItemDone = true
+		events = append(events, state.outputTextItemDoneEvent())
 	}
 	events = append(events, anthropicStreamEvent("response.completed", map[string]any{
 		"type": "response.completed", "sequence_number": state.nextSequenceNumber(),
@@ -416,31 +418,6 @@ func (state *deepSeekChatStreamState) createdEvent() []byte {
 	return anthropicStreamEvent("response.created", map[string]any{
 		"type": "response.created", "sequence_number": state.nextSequenceNumber(),
 		"created_at": state.createdAt.Unix(), "response": map[string]any{"id": state.responseID},
-	})
-}
-
-func (state *deepSeekChatStreamState) outputTextItemID() string {
-	return fmt.Sprintf("msg_deepseek_%d", state.requestID)
-}
-
-func (state *deepSeekChatStreamState) outputTextItemAddedEvent() []byte {
-	return anthropicStreamEvent("response.output_item.added", map[string]any{
-		"type": "response.output_item.added", "sequence_number": state.nextSequenceNumber(),
-		"response_id": state.responseID,
-		"item": map[string]any{
-			"id": state.outputTextItemID(), "type": "message", "role": "assistant", "content": []any{},
-		},
-	})
-}
-
-func (state *deepSeekChatStreamState) outputTextItemDoneEvent() []byte {
-	return anthropicStreamEvent("response.output_item.done", map[string]any{
-		"type": "response.output_item.done", "sequence_number": state.nextSequenceNumber(),
-		"response_id": state.responseID,
-		"item": map[string]any{
-			"id": state.outputTextItemID(), "type": "message", "role": "assistant",
-			"content": []any{map[string]any{"type": "output_text", "text": state.outputText.String()}},
-		},
 	})
 }
 

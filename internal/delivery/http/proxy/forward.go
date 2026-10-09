@@ -27,6 +27,12 @@ func (proxy *Proxy) forwardResponse(ctx context.Context, writer http.ResponseWri
 	}
 	copyResponseHeaders(writer.Header(), response.Header)
 	clearMissingStandardHeaders(writer.Header(), response.Header)
+	if stream && !hasHeader(response.Header, "Date") {
+		// The canonical streaming bridge does not synthesize a Date. Keep
+		// the stream envelope stable while leaving ordinary HTTP responses
+		// to net/http's normal Date behavior.
+		writer.Header()["Date"] = nil
+	}
 	declareResponseTrailers(writer.Header(), response.Header, response.Trailer)
 	lifecycle.commit()
 	writer.WriteHeader(response.StatusCode)

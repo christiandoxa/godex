@@ -103,3 +103,32 @@ func TestProxyDoesNotInventLengthForPartiallyBufferedBody(t *testing.T) {
 		t.Fatalf("partially inspected response got invalid framing: length=%d body=%q", response.ContentLength, body)
 	}
 }
+
+// Streams use their translated event-stream headers and do not add a
+// synthetic Date that is absent in the tagged Prodex proxy response.
+func TestProdex04361SSEHeadersDoNotSynthesizeDate(t *testing.T) {
+	proxy := &Proxy{maxInspect: 4096}
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		proxy.forwardResponse(context.Background(), writer, &proxymodel.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"text/event-stream; charset=utf-8"}},
+			Body:       io.NopCloser(strings.NewReader("event: response.completed\r\ndata: {}\r\n\r\n")),
+		}, nil, "", &requestLifecycle{})
+	}))
+	defer server.Close()
+	response, err := http.Get(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	wire, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.Header.Get("Date") != "" || response.Header.Get("Content-Type") != "text/event-stream; charset=utf-8" {
+		t.Fatalf("SSE response headers drifted: %#v", response.Header)
+	}
+	if !strings.Contains(string(wire), "event: response.completed") {
+		t.Fatalf("SSE event body truncated: %q", wire)
+	}
+}
