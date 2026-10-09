@@ -4,6 +4,8 @@ package superexpose
 
 import (
 	"bufio"
+	"encoding/json"
+	"errors"
 	"net"
 	"strings"
 	"testing"
@@ -66,4 +68,54 @@ func TestAppServerReadTextAnswersPing(t *testing.T) {
 		t.Fatalf("read text = %q err=%v", text, err)
 	}
 	<-done
+}
+
+func TestAppServerThreadReadRejectsMalformedTurnIDs(t *testing.T) {
+	for _, turnID := range []string{strings.Repeat("x", 129), "turn-" + string(rune(0x85))} {
+		t.Run("malformed", func(t *testing.T) {
+			server, client := net.Pipe()
+			socket := &appServerSocket{conn: client, reader: bufio.NewReader(client)}
+			root := t.TempDir()
+			target := resolvedSessionTarget{
+				threadID:    "thread-id",
+				environment: targetEnvironment{pwd: root},
+			}
+			response := map[string]any{
+				"id": 1,
+				"result": map[string]any{"thread": map[string]any{
+					"id": "thread-id", "sessionId": "thread-id", "ephemeral": false,
+					"canAcceptDirectInput": true, "cwd": root,
+					"status": map[string]any{"type": "active"},
+					"turns": []any{map[string]any{
+						"id": turnID, "status": map[string]any{"type": "inProgress"},
+					}},
+				}},
+			}
+			done := make(chan error, 1)
+			go func() {
+				frame, err := websocketframe.ReadHeader(server)
+				if err == nil {
+					_, err = frame.ReadPayload(server, appServerMaxMessageSize)
+				}
+				if err == nil {
+					payload, marshalErr := json.Marshal(response)
+					err = marshalErr
+					if err == nil {
+						err = websocketframe.WriteFrame(server, 1, payload, false)
+					}
+				}
+				done <- err
+			}()
+			requestID := uint64(1)
+			activity, err := appServerThreadRead(socket, target, true, &requestID)
+			if activity != nil || !errors.Is(err, sessionVerificationInconclusive) {
+				t.Fatalf("malformed turn ID accepted: activity=%#v err=%v", activity, err)
+			}
+			_ = server.Close()
+			_ = client.Close()
+			if err := <-done; err != nil && !errors.Is(err, net.ErrClosed) {
+				t.Fatalf("fake app-server: %v", err)
+			}
+		})
+	}
 }

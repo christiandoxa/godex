@@ -7,6 +7,7 @@ import (
 	"errors"
 	"path/filepath"
 	"strings"
+	"unicode"
 
 	"github.com/google/uuid"
 )
@@ -125,7 +126,7 @@ func openAppServerTarget(target resolvedSessionTarget, includeTurns bool) (*appS
 				continue
 			}
 			turnID, _ := turn["id"].(string)
-			if turnID == "" || activity.activeTurnID != "" {
+			if !validAppServerTurnID(turnID) || activity.activeTurnID != "" {
 				return fail(sessionVerificationInconclusive)
 			}
 			activity.activeTurnID = turnID
@@ -293,13 +294,17 @@ func appServerThreadRead(socket *appServerSocket, target resolvedSessionTarget, 
 				continue
 			}
 			id, _ := turn["id"].(string)
-			if id == "" || activity.activeTurnID != "" {
+			if !validAppServerTurnID(id) || activity.activeTurnID != "" {
 				return nil, sessionVerificationInconclusive
 			}
 			activity.activeTurnID = id
 		}
 	}
 	return activity, nil
+}
+
+func validAppServerTurnID(value string) bool {
+	return value != "" && len(value) <= 128 && !strings.ContainsFunc(value, unicode.IsControl)
 }
 
 func drainAppServerQueue(socket *appServerSocket, target resolvedSessionTarget, requestID *uint64) ([]string, bool, bool, error) {
