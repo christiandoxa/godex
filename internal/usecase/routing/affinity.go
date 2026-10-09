@@ -244,20 +244,7 @@ func (store *affinityStore) rememberVerified(ctx context.Context, accountID stri
 		store.touchContinuationEntriesLocked(continuationEntries(keys), now, true)
 		return nil
 	}
-	for _, key := range keyValues {
-		current, exists := store.values[key]
-		owner := accountID
-		if exists && current.accountID != accountID {
-			owner = routingentity.ConflictAccountID
-		}
-		if current.accountID == routingentity.ConflictAccountID {
-			owner = routingentity.ConflictAccountID
-		}
-		store.sequence++
-		store.values[key] = affinityValue{accountID: owner, expires: now.Add(affinityTTL), sequence: store.sequence}
-	}
-	store.touchContinuationEntriesLocked(continuationEntries(keys), now, true)
-	store.pruneLocked(now)
+	store.rememberVerifiedInMemoryLocked(accountID, keyValues, keys, now)
 	return nil
 }
 

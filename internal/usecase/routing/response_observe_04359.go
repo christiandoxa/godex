@@ -20,12 +20,12 @@ func (router *Router) Observe(ctx context.Context, accountID string, headers htt
 		}
 	}
 	now := router.now()
-	if err := router.affinity.rememberVerified(ctx, accountID, keys, now); err != nil {
+	if err := router.rememberVerifiedAccountBinding(ctx, accountID, keys, now); err != nil {
 		return err
 	}
 	router.affinity.rememberResponseTurnState(keys.previous, accountID, keys.turn, now)
 	for _, id := range extraIDs {
-		if err := router.affinity.rememberVerified(ctx, accountID, affinityKeys{previous: id}, now); err != nil {
+		if err := router.rememberVerifiedAccountBinding(ctx, accountID, affinityKeys{previous: id}, now); err != nil {
 			return err
 		}
 	}

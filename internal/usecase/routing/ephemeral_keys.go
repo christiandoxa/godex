@@ -3,6 +3,7 @@ package routing
 import (
 	"context"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
+	"time"
 )
 
 func (router *Router) loadAccounts(ctx context.Context) ([]proxymodel.Account, error) {
@@ -65,4 +66,29 @@ func (router *Router) persistAccountState(accountID string) bool {
 	_, ephemeral := router.ephemeralCredentialIDs[accountID]
 	router.mu.Unlock()
 	return !ephemeral
+}
+
+// rememberVerifiedAccountBinding keeps ephemeral provider responses local
+// while preserving durable ownership for actual managed provider profiles.
+func (router *Router) rememberVerifiedAccountBinding(ctx context.Context, accountID string, keys affinityKeys, now time.Time) error {
+	router.mu.Lock()
+	_, ephemeral := router.ephemeralCredentialIDs[accountID]
+	router.mu.Unlock()
+	if ephemeral {
+		return router.affinity.rememberVerifiedVolatile(accountID, keys, now)
+	}
+	return router.affinity.rememberVerified(ctx, accountID, keys, now)
+}
+
+// A synthetic API key must not leave a durable WebSocket turn-state sidecar
+// in the profile home. Cache it in memory for the current session only.
+func (router *Router) rememberAccountTurnState(ctx context.Context, responseID, accountID, profileHome, turnState string, now time.Time) {
+	router.mu.Lock()
+	_, ephemeral := router.ephemeralCredentialIDs[accountID]
+	router.mu.Unlock()
+	if ephemeral {
+		router.affinity.rememberResponseTurnState(responseID, accountID, turnState, now)
+		return
+	}
+	router.affinity.rememberResponseTurnStateForHome(ctx, responseID, accountID, profileHome, turnState, now)
 }

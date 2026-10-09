@@ -154,3 +154,43 @@ func TestProdexScoreTempWithMaterialHealthFailsAudit(t *testing.T) {
 		t.Fatal("material Prodex health sidecar was not rejected")
 	}
 }
+
+func TestSyntheticEphemeralAffinityStateMustBeEmpty(t *testing.T) {
+	valid := []byte(`{"version":1,"bindings":[]}`)
+	if !emptyFixtureRoutingBindings(valid) {
+		t.Fatal("clean volatile provider routing state was rejected")
+	}
+	for _, bad := range [][]byte{
+		[]byte(`{"version":1,"bindings":[{"kind":"previous","key":"abc","account_id":"def"}]}`),
+		[]byte(`{"version":1,"bindings":null}`),
+		[]byte(`{"version":2,"bindings":[]}`),
+		[]byte(`{"version":1,"bindings":[],"hidden":1}`),
+		[]byte(`{"version":1,"bindings":{}}`),
+		[]byte(`{broken}`),
+	} {
+		if emptyFixtureRoutingBindings(bad) {
+			t.Fatalf("persisted provider or corrupt routing state accepted: %s", bad)
+		}
+	}
+}
+func TestSyntheticEphemeralBindingCannotEscapeThroughStateAudit(t *testing.T) {
+	root := fixtureStateRoot(t)
+	path := filepath.Join(root, "state", "routing.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	bad := []byte(`{"version":1,"bindings":[{"kind":"previous","key":"abc","account_id":"def"}]}`)
+	if err := os.WriteFile(path, bad, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, violation := range auditFixtureDurableState(root) {
+		if strings.HasPrefix(violation, "unexpected_ephemeral_affinity_binding") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("durable previous_response binding escaped fixture oracle")
+	}
+}

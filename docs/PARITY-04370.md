@@ -63,6 +63,17 @@ a substitute for independent observable behavioral verification.
   failures, 429/503, restart and retry tests remain in the reference
   harness and must be rerun against **0.437.0**, not treated as inherited
   PASS without executing them.
+- A real synthetic run exposed a material difference in the durable
+  state: the previous Godex candidate persisted a hashed previous-response
+  affinity binding for a launch-local DeepSeek key, while the tagged
+  Prodex run left no equivalent durable conversation binding. Godex now
+  keeps verified affinity and WebSocket turn-state for ephemeral API-key
+  accounts in memory only; managed profiles retain their durable bindings
+  and sidecars. Regression tests verify both sides of that boundary.
+  The differential state auditor rejects any synthetic previous-response
+  binding remaining in routing.json, including unknown or malformed
+  state fields. This does not change the separate managed-profile
+  continuation recovery guarantees.
 - The raw durable-file layout comparison is still fail-closed. Equivalent
   private Rust-vs-Go persistence layout, multi-profile recovery, queue
   lifecycle, TUI, app-server, WebSocket, and other provider surfaces

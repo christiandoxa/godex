@@ -357,10 +357,10 @@ func (router *Router) bindSuccessfulResponse(
 			}
 		}
 		now := router.now()
-		if err := router.affinity.rememberVerified(ctx, result.AccountID, keys, now); err != nil {
+		if err := router.rememberVerifiedAccountBinding(ctx, result.AccountID, keys, now); err != nil {
 			return err
 		}
-		router.affinity.rememberResponseTurnStateForHome(
+		router.rememberAccountTurnState(
 			ctx, keys.previous, result.AccountID, responseTurnStateHome(accounts, result.AccountID), keys.turn, now,
 		)
 		return nil
@@ -371,10 +371,10 @@ func (router *Router) bindSuccessfulResponse(
 			keys.turn = turnState
 		}
 		now := router.now()
-		if err := router.affinity.rememberVerified(ctx, result.AccountID, keys, now); err != nil {
+		if err := router.rememberVerifiedAccountBinding(ctx, result.AccountID, keys, now); err != nil {
 			return err
 		}
-		router.affinity.rememberResponseTurnStateForHome(
+		router.rememberAccountTurnState(
 			ctx, keys.previous, result.AccountID, responseTurnStateHome(accounts, result.AccountID), keys.turn, now,
 		)
 		return nil
@@ -388,7 +388,7 @@ func (router *Router) bindSuccessfulResponse(
 		}
 		result.Prefix = prefix
 	}
-	if err := router.affinity.rememberVerified(ctx, result.AccountID, keys, router.now()); err != nil {
+	if err := router.rememberVerifiedAccountBinding(ctx, result.AccountID, keys, router.now()); err != nil {
 		result.Response.Body.Close()
 		return err
 	}

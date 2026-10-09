@@ -73,6 +73,9 @@ func auditFixtureDurableState(root string) []string {
 			}
 		case "state/routing.json":
 			routing = data
+			if !emptyFixtureRoutingBindings(data) {
+				violations = append(violations, "unexpected_ephemeral_affinity_binding")
+			}
 		case "state/routing.json.last-good":
 			lastGood = data
 		case "state/retry-backoff.json", "state/route-memory.json":
@@ -207,4 +210,23 @@ func validEmptyProdexHealthScoreSnapshot(data []byte) bool {
 		return false
 	}
 	return len(scores) == 0
+}
+
+// The isolated API-key test has no managed profile sessions to persist.
+// A serialized affinity would change credential selection after restart,
+// as seen in the previous key-rotation bug.
+func emptyFixtureRoutingBindings(data []byte) bool {
+	var payload map[string]json.RawMessage
+	if json.Unmarshal(data, &payload) != nil || len(payload) != 2 {
+		return false
+	}
+	var version int
+	if json.Unmarshal(payload["version"], &version) != nil || version != 1 {
+		return false
+	}
+	var bindings []json.RawMessage
+	if json.Unmarshal(payload["bindings"], &bindings) != nil || string(payload["bindings"]) == "null" {
+		return false
+	}
+	return len(bindings) == 0
 }

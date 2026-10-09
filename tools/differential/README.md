@@ -228,3 +228,15 @@ after commit. A DeepSeek error embedded in an already committed translator
 is not an eligible precommit retry and must remain client-visible.
 
 Raw durable file layout remains an independent fail-closed release blocker.
+
+
+### No synthetic-key conversation binding survives a process restart
+
+The isolated DeepSeek API-key fixture has no managed account identity.
+A provider request must not persist a previous-response affinity owner
+for that launch-local key. The state auditor checks routing.json's exact
+versioned shape and requires an empty bindings array; malformed, unknown,
+or populated records fail even if both products' immediate responses
+match. Managed-profile ownership and WebSocket turn-state still persist
+on their separate tested paths. Private file layouts and other state
+contracts remain fail-closed until independently verified.
