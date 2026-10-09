@@ -87,6 +87,7 @@ type affinityStore struct {
 	statuses           map[string]continuationStatus
 	clock              func() time.Time
 	persistenceEnabled func() bool
+	ephemeralOwners    map[string]struct{}
 	sequence           uint64
 }
 
@@ -334,6 +335,11 @@ func (store *affinityStore) loadLocked(bindings []routingentity.Binding, keys []
 	for i := len(bindings) - 1; i >= 0; i-- {
 		binding := bindings[i]
 		if !slices.Contains(keys, binding.Key) {
+			continue
+		}
+		if _, ephemeral := store.ephemeralOwners[binding.AccountID]; ephemeral {
+			// An earlier Godex version may have saved a launch-local
+			// API-key affinity. Treat it as stale, not a managed owner.
 			continue
 		}
 		store.sequence++

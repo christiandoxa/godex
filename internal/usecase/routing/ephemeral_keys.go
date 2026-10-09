@@ -32,6 +32,7 @@ func (router *Router) observeEphemeralCredentials(accounts []proxymodel.Account)
 			continue
 		}
 		router.ephemeralCredentialIDs[account.ID] = struct{}{}
+		router.affinity.registerEphemeralOwner(account.ID)
 		delete(router.quarantine, account.ID)
 		for key := range router.routeHealth {
 			if key.accountID == account.ID {

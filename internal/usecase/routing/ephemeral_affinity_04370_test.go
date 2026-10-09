@@ -6,7 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
+	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 	routingrepo "github.com/christiandoxa/godex/internal/repository/routing"
@@ -111,5 +113,81 @@ func TestProdex04370EphemeralWebSocketTurnStateIsNeverWrittenToProfileHome(t *te
 				t.Fatalf("turn-state sidecar exists=%t want=%t err=%v", savedFile, fixture.wantFile, statErr)
 			}
 		})
+	}
+}
+
+// Older Godex builds durably recorded synthetic previous_response bindings.
+// A new transient-key launch must ignore those entries, without deleting
+// persistent managed-profile affinity or overwriting the user's state.
+func TestProdex04370LegacyEphemeralAffinityCannotHijackNewLaunch(t *testing.T) {
+	const transientID = "aabbccddeeff00112233445566778899"
+	const managedID = "11223344556677889900aabbccddeeff"
+	repo := routingrepo.NewStore(t.TempDir())
+	now := time.Now()
+	oldKey := affinityKeys{previous: "resp-old-transient"}.entries()[0]
+	oldKey.AccountID = transientID
+	oldKey.UpdatedUnix = now.Unix()
+	managedKey := affinityKeys{previous: "resp-managed"}.entries()[0]
+	managedKey.AccountID = managedID
+	managedKey.UpdatedUnix = now.Unix()
+	var oldEntries = []routingentity.Binding{oldKey, managedKey}
+	if _, err := repo.Merge(t.Context(), oldEntries); err != nil {
+		t.Fatal(err)
+	}
+	source := func(context.Context) ([]proxymodel.Account, error) {
+		return []proxymodel.Account{
+			{ID: transientID, Enabled: true, EphemeralAPIKey: true},
+			{ID: managedID, Enabled: true},
+		}, nil
+	}
+	newRouter := func() *Router {
+		r, err := NewRouter(Config{Bindings: repo, Gateway: &countingGateway{}, Accounts: source, Now: func() time.Time { return now }})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r
+	}
+	first := newRouter()
+	// Simulate a stale cached binding before source/account registration.
+	staleOwner, err := first.affinity.owner(t.Context(), affinityKeys{previous: "resp-old-transient"}, now)
+	if err != nil || staleOwner != transientID {
+		t.Fatalf("fixture old owner=%q err=%v", staleOwner, err)
+	}
+	if _, err := first.loadAccounts(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	for _, fixture := range []struct{ key, want string }{
+		{"resp-old-transient", ""},
+		{"resp-managed", managedID},
+	} {
+		owner, err := first.affinity.owner(t.Context(), affinityKeys{previous: fixture.key}, now)
+		if err != nil || owner != fixture.want {
+			t.Fatalf("post-upgrade %q owner=%q want=%q err=%v", fixture.key, owner, fixture.want, err)
+		}
+	}
+	if err := first.rememberVerifiedAccountBinding(t.Context(), transientID, affinityKeys{previous: "resp-new-transient"}, now); err != nil {
+		t.Fatal(err)
+	}
+	owner, err := first.affinity.owner(t.Context(), affinityKeys{previous: "resp-new-transient"}, now)
+	if err != nil || owner != transientID {
+		t.Fatalf("current transient owner=%q err=%v", owner, err)
+	}
+	second := newRouter()
+	if _, err := second.loadAccounts(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	for _, fixture := range []struct{ key, want string }{
+		{"resp-old-transient", ""},
+		{"resp-new-transient", ""},
+		{"resp-managed", managedID},
+	} {
+		owner, err := second.affinity.owner(t.Context(), affinityKeys{previous: fixture.key}, now)
+		if err != nil || owner != fixture.want {
+			t.Fatalf("restart %q owner=%q want=%q err=%v", fixture.key, owner, fixture.want, err)
+		}
+	}
+	persisted, err := repo.Load(t.Context())
+	if err != nil || len(persisted) != 2 {
+		t.Fatalf("upgrade must be non-destructive: persisted=%v err=%v", persisted, err)
 	}
 }

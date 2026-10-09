@@ -72,7 +72,12 @@ a substitute for independent observable behavioral verification.
   and sidecars. Regression tests verify both sides of that boundary.
   The differential state auditor rejects any synthetic previous-response
   binding remaining in routing.json, including unknown or malformed
-  state fields. This does not change the separate managed-profile
+  state fields. The runtime also filters legacy synthetic-account bindings
+  written by older Godex versions **without destructive migration**; it
+  leaves managed-account ownership records intact and maintains volatile
+  affinity for requests within the current process. Independent tests
+  verify the initial cache, restart, and non-destructive managed-profile
+  behavior. This does not change the separate managed-profile
   continuation recovery guarantees.
 - The raw durable-file layout comparison is still fail-closed. Equivalent
   private Rust-vs-Go persistence layout, multi-profile recovery, queue
