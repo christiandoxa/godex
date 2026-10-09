@@ -69,7 +69,9 @@ func (router *Router) tryFreshCandidate(
 	accounts []proxymodel.Account,
 	account proxymodel.Account,
 ) (proxymodel.Forwarded, bool, *pendingResponse, bool, error) {
-	result, pending, saturated, err := router.freshAttempt(ctx, request, account)
+	result, pending, saturated, err := router.freshAttempt(
+		ctx, request, account, len(accounts) == 1 && externalProviderKind(account.Provider.Kind),
+	)
 	if err != nil {
 		return proxymodel.Forwarded{}, false, nil, false, err
 	}
@@ -107,7 +109,9 @@ func (router *Router) tryFreshQuotaRedeem(
 	}
 	pending.close()
 	for {
-		result, retryPending, saturated, err := router.freshAttempt(ctx, request, redeemed)
+		result, retryPending, saturated, err := router.freshAttempt(
+			ctx, request, redeemed, len(accounts) == 1 && externalProviderKind(redeemed.Provider.Kind),
+		)
 		if err != nil {
 			if ctx.Err() != nil {
 				return proxymodel.Forwarded{}, false, nil, ctx.Err()
@@ -171,6 +175,7 @@ func (router *Router) freshAttempt(
 	ctx context.Context,
 	request proxymodel.Request,
 	account proxymodel.Account,
+	terminalExternal429 bool,
 ) (*proxymodel.Forwarded, *pendingResponse, bool, error) {
 	response, acquired, err := router.tryExecuteWithProfileInflight(ctx, request, account, false)
 	if !acquired {
@@ -226,6 +231,17 @@ func (router *Router) freshAttempt(
 			pending.previousResponseNotFound = true
 			return nil, pending, false, nil
 		}
+	}
+	if terminalExternal429 && response.StatusCode == http.StatusTooManyRequests && outcome.kind == responseRetry {
+		// Prodex 0.436.1 exhausts a lone DeepSeek/third-party credential and
+		// returns its original 429. A fresh-retry sweep would instead wait for
+		// a nonexistent alternate key and time out before replying to Codex.
+		// This is terminal, not proof of a disabled account or exhausted pool.
+		router.recordRouteOutcome(ctx, account.ID, request.QuotaSelection, response,
+			responseOutcome{kind: responsePass, failed: true})
+		return &proxymodel.Forwarded{
+			Response: response, Prefix: pending.prefix, AccountID: account.ID, Failed: true,
+		}, nil, false, nil
 	}
 	if outcome.kind == responsePass {
 		router.clearQuotaBlocked(account.ID)
