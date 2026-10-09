@@ -90,3 +90,24 @@ func validFixtureToolCallResponse(body string) bool {
 	}
 	return args["key"] == "alpha"
 }
+
+// Provider authentication failures must reach the client with the authentic
+// error code. Matching HTTP status alone does not prove the error was preserved.
+func validFixtureError(body, expectedCode string) bool {
+	var root struct {
+		Error struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if json.Unmarshal([]byte(body), &root) != nil || root.Error.Code != expectedCode {
+		return false
+	}
+	switch expectedCode {
+	case "invalid_api_key":
+		return root.Error.Message == "synthetic credential rejected"
+	case "access_denied":
+		return root.Error.Message == "synthetic provider forbidden"
+	}
+	return false
+}

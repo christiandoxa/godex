@@ -276,3 +276,38 @@ func TestToolCallFixtureRequiresExactCallIdentityAndArguments(t *testing.T) {
 		}
 	}
 }
+
+func TestProviderAuthErrorOracleRejectsMatchingButWrongErrors(t *testing.T) {
+	fixtures := []struct {
+		code string
+		ok   string
+		bad  []string
+	}{
+		{"invalid_api_key",
+			`{"error":{"code":"invalid_api_key","message":"synthetic credential rejected"}}`,
+			[]string{
+				`{"error":{"code":"rate_limit_exceeded","message":"synthetic credential rejected"}}`,
+				`{"error":{"code":"invalid_api_key","message":"unknown"}}`,
+				`{"status":"unauthorized"}`,
+			}},
+		{"access_denied",
+			`{"error":{"code":"access_denied","message":"synthetic provider forbidden"}}`,
+			[]string{
+				`{"error":{"code":"access_denied","message":"credentials revoked"}}`,
+				`{"error":{"code":"invalid_api_key","message":"synthetic provider forbidden"}}`,
+				`{"error":{"message":"synthetic provider forbidden"}}`,
+			}},
+	}
+	for _, fixture := range fixtures {
+		t.Run(fixture.code, func(t *testing.T) {
+			if !validFixtureError(fixture.ok, fixture.code) {
+				t.Fatal("canonical synthetic provider error rejected")
+			}
+			for _, bad := range fixture.bad {
+				if validFixtureError(bad, fixture.code) {
+					t.Fatalf("mutated provider error accepted: %s", bad)
+				}
+			}
+		})
+	}
+}

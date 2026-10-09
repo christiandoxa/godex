@@ -147,7 +147,7 @@ func run() error {
 	prodexSource := flags.String("prodex-source", "", "exact Prodex 0.436.1 source checkout")
 	godexSource := flags.String("godex-source", "", "Godex candidate source checkout")
 	expectedGodexCommit := flags.String("godex-commit", "", "expected Godex source HEAD commit SHA")
-	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, retry, single-key-429, single-key-503, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
+	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, retry, single-key-401, single-key-403, single-key-429, single-key-503, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		return err
 	}
@@ -209,6 +209,12 @@ func run() error {
 			// The shim sends exactly one request; an upstream 429 must reach
 			// Codex without retry when no alternate model/key exists.
 			return runPair(root, mock, "single-key-429", mockPlan{FirstStatus: http.StatusTooManyRequests}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{})
+		}},
+		{"single-key-401", func() (scenarioResult, error) {
+			return runPair(root, mock, "single-key-401", mockPlan{FirstStatus: http.StatusUnauthorized}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{})
+		}},
+		{"single-key-403", func() (scenarioResult, error) {
+			return runPair(root, mock, "single-key-403", mockPlan{FirstStatus: http.StatusForbidden}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{})
 		}},
 		{"single-key-503", func() (scenarioResult, error) {
 			// An upstream service outage is terminal without another eligible
@@ -621,7 +627,14 @@ func (mock *mockServer) serveHTTP(writer http.ResponseWriter, request *http.Requ
 		responseBody = `{"id":"chatcmpl-differential-tool","object":"chat.completion","created":1,"model":"deepseek-v4-pro","choices":[{"index":0,"message":{"role":"assistant","content":null,"tool_calls":[{"id":"call-differential","type":"function","function":{"name":"lookup","arguments":"{\"key\":\"alpha\"}"}}]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":2,"completion_tokens":1,"total_tokens":3}}`
 	}
 	if status != http.StatusOK {
-		responseBody = `{"error":{"code":"rate_limit_exceeded"}}`
+		switch status {
+		case http.StatusUnauthorized:
+			responseBody = `{"error":{"code":"invalid_api_key","message":"synthetic credential rejected"}}`
+		case http.StatusForbidden:
+			responseBody = `{"error":{"code":"access_denied","message":"synthetic provider forbidden"}}`
+		default:
+			responseBody = `{"error":{"code":"rate_limit_exceeded"}}`
+		}
 	}
 	writer.Header().Set("Content-Type", "application/json")
 	writer.Header().Set("X-Synthetic-Upstream", "differential-v1")
@@ -810,6 +823,15 @@ func scenarioInvariants(scenario scenarioResult) []string {
 			wantExit = 1 // Both canonical clients terminate their interrupted shim.
 			if !run.Cancelled {
 				failures = append(failures, prefix+".cancellation_missing")
+			}
+		case "single-key-401", "single-key-403":
+			wantExit = 2
+			expectedStatus, expectedCode := http.StatusUnauthorized, "invalid_api_key"
+			if phase == "single-key-403" {
+				expectedStatus, expectedCode = http.StatusForbidden, "access_denied"
+			}
+			if run.Client.Status != expectedStatus || !validFixtureError(run.Client.Body, expectedCode) {
+				failures = append(failures, prefix+".terminal_provider_auth_error")
 			}
 		case "single-key-429":
 			wantExit = 2
