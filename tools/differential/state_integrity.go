@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -50,7 +51,10 @@ func auditFixtureDurableState(root string) []string {
 		if !allowedFixtureStateFile(relative) {
 			violations = append(violations, "unknown_persistent_file:"+relative)
 		}
-		if info.Mode().Perm()&0o002 != 0 {
+		// Go file mode bits do not describe Windows ACL permissions.
+		// Apply POSIX permission assertions only where their semantics hold;
+		// Windows still gets type, bounds, content, path, and secret checks.
+		if runtime.GOOS != "windows" && info.Mode().Perm()&0o002 != 0 {
 			violations = append(violations, "world_writable_file:"+relative)
 		}
 		data, err := os.ReadFile(path)
