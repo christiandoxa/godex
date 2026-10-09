@@ -79,10 +79,27 @@ a substitute for independent observable behavioral verification.
   verify the initial cache, restart, and non-destructive managed-profile
   behavior. This does not change the separate managed-profile
   continuation recovery guarantees.
-- The raw durable-file layout comparison is still fail-closed. Equivalent
-  private Rust-vs-Go persistence layout, multi-profile recovery, queue
-  lifecycle, TUI, app-server, WebSocket, and other provider surfaces
-  require additional independent runtime evidence.
+- A second, independent **managed-profile lifecycle differential** was
+  added to the release gate. It uses the exact SHA-256-pinned Prodex
+  0.437.0 executable and a clean-commit Godex binary. Thirteen separate
+  CLI stages cover empty listing, create alpha/beta, default activation,
+  duplicate rejection, active switch, current-profile retrieval, rejected
+  unknown selection, removal without deleting the home, restart/current
+  persistence, deletion with home removal, and rejected unknown deletion.
+  Because Rust stores profiles in a keyed state.json map and Godex stores
+  them in a profiles.json array, it compares exact **domain projections**
+  rather than equal file bytes. The gate independently verifies versions,
+  active names, providers, managed home paths, private file modes, no
+  unexpected auth.json, no profile-directory pollution, and matching
+  exit codes. Negative tests reject corrupted/unknown state fields, stale
+  last-run records, nonempty session/response bindings, mismatched managed
+  homes, stale or dirty Godex binaries, and a noncanonical Prodex digest.
+  Each operation is a new process with an isolated HOME and no credentials.
+- The raw durable-file layout comparison is still fail-closed. The new
+  managed-profile test proves one meaningful cross-process persistence
+  domain but does **not** prove arbitrary multi-profile recovery,
+  background queues, goals, TUI, app-server, WebSocket or every provider.
+  Those surfaces require additional independent runtime evidence.
 
 ## Official Codex 0.162.0 qualification fixture
 

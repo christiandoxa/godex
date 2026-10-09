@@ -30,6 +30,18 @@ test "$("$tmp/prodex" --version)" = "prodex 0.437.0"
 # Go's build VCS metadata must identify the clean release commit, not WIP.
 go build -trimpath -o "$tmp/godex" ./cmd/godex
 go build -trimpath -o "$tmp/differential" ./tools/differential
+go build -trimpath -o "$tmp/profileparity" ./tools/profileparity
+
+# Independent managed-profile persistence oracle. Every CLI action is a new
+# subprocess with an isolated credential-free home, and the state projections
+# must match across creation, active switching, rejected writes and deletion.
+"$tmp/profileparity" \
+  --prodex "$tmp/prodex" --godex "$tmp/godex" \
+  --prodex-source "$tmp/prodex-source" \
+  --godex-source "$root" --godex-commit "$(git rev-parse HEAD)"
+
+# Separate real-provider DeepSeek mock/oracle, still fail-closed on all material
+# mismatches including the private durable-file layout.
 "$tmp/differential" \
   --prodex "$tmp/prodex" --godex "$tmp/godex" \
   --prodex-source "$tmp/prodex-source" \
