@@ -238,3 +238,24 @@ func TestAllSyntheticProviderCredentialsAreRedacted(t *testing.T) {
 		}
 	}
 }
+
+func TestRotationRestartRejectsWrongCredentialAfterPersistence(t *testing.T) {
+	request := func(slot string) upstreamRequest {
+		return upstreamRequest{Method: "POST", Path: "/v1/chat/completions", AuthOK: true,
+			KeySlot: slot, Body: syntheticFixtureRequest}
+	}
+	first := productRun{ExitStatus: 0, Client: exchange{Status: 200, Body: syntheticFixtureResponse},
+		Upstream: []upstreamRequest{request("primary"), request("secondary")}, Retries: 1}
+	next := productRun{ExitStatus: 0, Client: exchange{Status: 200, Body: syntheticFixtureResponse},
+		Upstream: []upstreamRequest{request("secondary")}, Retries: 0}
+	scenario := scenarioResult{Name: "key-rotation-restart", Runs: []productRun{first, next, first, next}}
+	if failures := scenarioInvariants(scenario); len(failures) != 0 {
+		t.Fatalf("expected healthy second process rejected: %v", failures)
+	}
+	wrong := next
+	wrong.Upstream = []upstreamRequest{request("primary")}
+	scenario.Runs[3] = wrong
+	if failures := scenarioInvariants(scenario); len(failures) == 0 {
+		t.Fatal("persisted routing selected a failed primary but passed")
+	}
+}

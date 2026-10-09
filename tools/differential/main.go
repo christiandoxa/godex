@@ -214,6 +214,9 @@ func run() error {
 			// must be selected *by the proxy*, with just one client request.
 			return runPair(root, mock, "key-rotation-429", mockPlan{RotateKeys: true}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{rotate: true})
 		}},
+		{"key-rotation-restart", func() (scenarioResult, error) {
+			return runRotationRestart(root, mock, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit)
+		}},
 		{"cancel", func() (scenarioResult, error) {
 			return runPair(root, mock, "cancel", mockPlan{Delay: 2 * time.Second}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{cancel: true})
 		}},
@@ -352,6 +355,33 @@ func runRecoverAfterProviderFailure(root string, mock *mockServer, prodexBin, go
 	all := []productRun{prodexFirst, prodexNext, godexFirst, godexNext}
 	differences := append(compare(prodexFirst, godexFirst), compare(prodexNext, godexNext)...)
 	return scenarioResult{Name: scenario, Comparison: uniqueStrings(differences), Runs: all}, nil
+}
+
+// Test actual durable credential eligibility rather than treating two
+// successful first-turn responses as proof of matching rotation policy.
+func runRotationRestart(root string, mock *mockServer, prodexBin, godexBin, prodexCommit, godexCommit string) (scenarioResult, error) {
+	root = filepath.Join(root, "key-rotation-restart")
+	plan := mockPlan{RotateKeys: true}
+	opts := runOptions{rotate: true}
+	prodexFirst, err := runProduct(root, mock, "prodex", prodexBin, prodexCommit, plan, opts)
+	if err != nil {
+		return scenarioResult{}, fmt.Errorf("Prodex rotation first process: %w", err)
+	}
+	prodexSecond, err := runProduct(root, mock, "prodex", prodexBin, prodexCommit, plan, opts)
+	if err != nil {
+		return scenarioResult{}, fmt.Errorf("Prodex rotation second process: %w", err)
+	}
+	godexFirst, err := runProduct(root, mock, "godex", godexBin, godexCommit, plan, opts)
+	if err != nil {
+		return scenarioResult{}, fmt.Errorf("Godex rotation first process: %w", err)
+	}
+	godexSecond, err := runProduct(root, mock, "godex", godexBin, godexCommit, plan, opts)
+	if err != nil {
+		return scenarioResult{}, fmt.Errorf("Godex rotation second process: %w", err)
+	}
+	runs := []productRun{prodexFirst, prodexSecond, godexFirst, godexSecond}
+	differences := append(compare(prodexFirst, godexFirst), compare(prodexSecond, godexSecond)...)
+	return scenarioResult{Name: "key-rotation-restart", Comparison: uniqueStrings(differences), Runs: runs}, nil
 }
 
 func runProduct(root string, mock *mockServer, name, binary, commit string, plan mockPlan, options runOptions) (productRun, error) {
@@ -744,7 +774,7 @@ func shimFailure(message string) int {
 func scenarioInvariants(scenario scenarioResult) []string {
 	var failures []string
 	wantRuns := 2
-	if scenario.Name == "restart" || scenario.Name == "recover-after-429" || scenario.Name == "recover-after-503" {
+	if scenario.Name == "restart" || scenario.Name == "recover-after-429" || scenario.Name == "recover-after-503" || scenario.Name == "key-rotation-restart" {
 		wantRuns = 4
 	}
 	if len(scenario.Runs) != wantRuns {
@@ -794,11 +824,21 @@ func scenarioInvariants(scenario scenarioResult) []string {
 		if phase == "retry" || phase == "key-rotation-429" {
 			wantRequests = 2
 		}
+		if phase == "key-rotation-restart" {
+			wantRequests = len(run.Upstream)
+		}
 		if phase == "key-rotation-429" {
 			if len(run.Upstream) == 2 &&
 				(run.Upstream[0].KeySlot != "primary" ||
 					run.Upstream[1].KeySlot != "secondary") {
 				failures = append(failures, prefix+".credential_rotation_order")
+			}
+		}
+		if phase == "key-rotation-restart" {
+			if len(run.Upstream) < 1 || len(run.Upstream) > 2 ||
+				run.Upstream[len(run.Upstream)-1].KeySlot != "secondary" ||
+				(len(run.Upstream) == 2 && run.Upstream[0].KeySlot != "primary") {
+				failures = append(failures, prefix+".invalid_restart_credential_selection")
 			}
 		}
 		if len(run.Upstream) != wantRequests || run.Retries != wantRequests-1 {
@@ -811,7 +851,7 @@ func scenarioInvariants(scenario scenarioResult) []string {
 			if !upstream.AuthOK || upstream.Method != http.MethodPost || upstream.Path != "/v1/chat/completions" {
 				failures = append(failures, prefix+".upstream_auth_or_route")
 			}
-			if phase != "key-rotation-429" && upstream.KeySlot != "single" {
+			if phase != "key-rotation-429" && phase != "key-rotation-restart" && upstream.KeySlot != "single" {
 				failures = append(failures, prefix+".wrong_credential_slot")
 			}
 			if !validFixtureRequest(upstream.Body) {
