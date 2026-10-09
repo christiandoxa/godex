@@ -105,6 +105,7 @@ type mockPlan struct {
 	RotateKeys  bool
 	ToolCall    bool
 	Stream      bool
+	StreamQuota bool
 }
 
 type runOptions struct {
@@ -149,7 +150,7 @@ func run() error {
 	prodexSource := flags.String("prodex-source", "", "exact Prodex 0.436.1 source checkout")
 	godexSource := flags.String("godex-source", "", "Godex candidate source checkout")
 	expectedGodexCommit := flags.String("godex-commit", "", "expected Godex source HEAD commit SHA")
-	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, sse-stream, retry, single-key-401, single-key-403, single-key-429, single-key-503, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
+	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, sse-stream, sse-rate-limit, retry, single-key-401, single-key-403, single-key-429, single-key-503, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		return err
 	}
@@ -208,6 +209,11 @@ func run() error {
 			// Exercise a real streaming Responses request through both
 			// independent proxy processes, not a buffered JSON response.
 			return runPair(root, mock, "sse-stream", mockPlan{Stream: true}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{stream: true})
+		}},
+		{"sse-rate-limit", func() (scenarioResult, error) {
+			// Deterministic future reset timestamps and consumption ratios
+			// prove the provider quota headers are projected to Codex format.
+			return runPair(root, mock, "sse-rate-limit", mockPlan{Stream: true, StreamQuota: true}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{stream: true})
 		}},
 		{"retry", func() (scenarioResult, error) {
 			return runPair(root, mock, "retry", mockPlan{FirstStatus: http.StatusTooManyRequests}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{retry: true})
@@ -646,6 +652,14 @@ func (mock *mockServer) serveHTTP(writer http.ResponseWriter, request *http.Requ
 			responseBody = `{"error":{"code":"rate_limit_exceeded"}}`
 		}
 	}
+	if plan.StreamQuota && status == http.StatusOK {
+		writer.Header().Set("X-Ratelimit-Limit-Requests", "100")
+		writer.Header().Set("X-Ratelimit-Remaining-Requests", "75")
+		writer.Header().Set("X-Ratelimit-Reset-Requests", "1893456000")
+		writer.Header().Set("X-Ratelimit-Limit-Tokens", "200")
+		writer.Header().Set("X-Ratelimit-Remaining-Tokens", "0")
+		writer.Header().Set("X-Ratelimit-Reset-Tokens", "1893456000000")
+	}
 	if plan.Stream && status == http.StatusOK {
 		responseBody = "data: {\"id\":\"chatcmpl-differential-stream\",\"model\":\"deepseek-v4-pro\",\"created\":1,\"choices\":[{\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\n" +
 			"data: {\"id\":\"chatcmpl-differential-stream\",\"model\":\"deepseek-v4-pro\",\"created\":1,\"choices\":[{\"delta\":{\"content\":\"synthetic-ok\"},\"finish_reason\":null}]}\n\n" +
@@ -867,9 +881,12 @@ func scenarioInvariants(scenario scenarioResult) []string {
 			if run.Client.Status != http.StatusOK || !validFixtureToolCallResponse(run.Client.Body) {
 				failures = append(failures, prefix+".tool_call_semantics")
 			}
-		case "sse-stream":
+		case "sse-stream", "sse-rate-limit":
 			if run.Client.Status != http.StatusOK || !validFixtureSSE(run.Client.Body) {
 				failures = append(failures, prefix+".stream_semantics")
+			}
+			if phase == "sse-rate-limit" && !validFixtureStreamingQuotaHeaders(run.Client.Headers) {
+				failures = append(failures, prefix+".stream_quota_headers")
 			}
 		case "single-key-503":
 			wantExit = 2
@@ -919,7 +936,7 @@ func scenarioInvariants(scenario scenarioResult) []string {
 				failures = append(failures, prefix+".wrong_credential_slot")
 			}
 			validRequest := validFixtureRequest(upstream.Body)
-			if phase == "sse-stream" {
+			if phase == "sse-stream" || phase == "sse-rate-limit" {
 				validRequest = validFixtureStreamingRequest(upstream.Body)
 			}
 			if !validRequest {

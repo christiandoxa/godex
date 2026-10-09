@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"reflect"
 	"strconv"
 	"strings"
@@ -134,4 +135,20 @@ func validateFixtureStreamEvent(index int, event map[string]any, opaqueID *strin
 		}
 	}
 	return nil
+}
+
+// This scenario uses a pinned future epoch, not a relative server clock.
+// All seven client-visible streaming headers must match the provider's
+// Codex rate-limit projection, with no leaked raw upstream fields.
+func validFixtureStreamingQuotaHeaders(source http.Header) bool {
+	expected := http.Header{
+		"Content-Type":                             []string{"text/event-stream; charset=utf-8"},
+		"X-Deepseek-Requests-Limit-Name":           []string{"DeepSeek requests"},
+		"X-Deepseek-Requests-Primary-Used-Percent": []string{"25"},
+		"X-Deepseek-Requests-Primary-Reset-At":     []string{"1893456000"},
+		"X-Deepseek-Tokens-Limit-Name":             []string{"DeepSeek tokens"},
+		"X-Deepseek-Tokens-Primary-Used-Percent":   []string{"100"},
+		"X-Deepseek-Tokens-Primary-Reset-At":       []string{"1893456000"},
+	}
+	return reflect.DeepEqual(canonicalHeaders(source), canonicalHeaders(expected))
 }
