@@ -8,6 +8,11 @@ import (
 	"testing"
 )
 
+const (
+	syntheticFixtureRequest  = `{"model":"deepseek-v4-pro","stream":false,"messages":[{"role":"user","content":"same request"}]}`
+	syntheticFixtureResponse = `{"object":"response","model":"deepseek-v4-pro","output":[{"type":"message","content":[{"type":"output_text","text":"synthetic-ok"}]}],"usage":{"input_tokens":2,"output_tokens":1,"total_tokens":3}}`
+)
+
 func TestNegativeControlDetectsClientStatusMismatch(t *testing.T) {
 	if !negativeControl() {
 		t.Fatal("comparison did not detect changed client status")
@@ -32,8 +37,8 @@ func TestScenarioInvariantsRejectEquivalentFailedRuns(t *testing.T) {
 
 func TestScenarioInvariantsAllowExpectedInterruptedExit(t *testing.T) {
 	scenario := scenarioResult{Name: "cancel", Runs: []productRun{
-		{Name: "prodex", ExitStatus: 1, Cancelled: true, Upstream: []upstreamRequest{{Method: "POST"}}},
-		{Name: "godex", ExitStatus: 1, Cancelled: true, Upstream: []upstreamRequest{{Method: "POST"}}},
+		{Name: "prodex", ExitStatus: 1, Cancelled: true, Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, Body: syntheticFixtureRequest}}},
+		{Name: "godex", ExitStatus: 1, Cancelled: true, Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, Body: syntheticFixtureRequest}}},
 	}}
 	if failures := scenarioInvariants(scenario); len(failures) != 0 {
 		t.Fatalf("expected interrupted client outcome rejected: %v", failures)
@@ -97,15 +102,49 @@ func TestCleanCanonicalSourceCheckRejectsNewFiles(t *testing.T) {
 // The real Prodex 0.436.1 single-key 429 path does NOT retry in the proxy.
 func TestSingleKey429RejectsUnownedProxyRetries(t *testing.T) {
 	runs := []productRun{
-		{Name: "prodex", ExitStatus: 2, Client: exchange{Status: 429, Body: "rate_limit_exceeded"}, Upstream: []upstreamRequest{{Method: "POST"}}},
-		{Name: "godex", ExitStatus: 2, Client: exchange{Status: 429, Body: "rate_limit_exceeded"}, Upstream: []upstreamRequest{{Method: "POST"}}},
+		{Name: "prodex", ExitStatus: 2, Client: exchange{Status: 429, Body: "rate_limit_exceeded"}, Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, Body: syntheticFixtureRequest}}},
+		{Name: "godex", ExitStatus: 2, Client: exchange{Status: 429, Body: "rate_limit_exceeded"}, Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, Body: syntheticFixtureRequest}}},
 	}
 	if failures := scenarioInvariants(scenarioResult{Name: "single-key-429", Runs: runs}); len(failures) != 0 {
 		t.Fatalf("canonical terminal rate-limit rejected: %v", failures)
 	}
-	runs[1].Upstream = append(runs[1].Upstream, upstreamRequest{Method: "POST"})
+	runs[1].Upstream = append(runs[1].Upstream, upstreamRequest{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, Body: syntheticFixtureRequest})
 	runs[1].Retries = 1
 	if failures := scenarioInvariants(scenarioResult{Name: "single-key-429", Runs: runs}); len(failures) == 0 {
 		t.Fatal("unexpected proxy retry was incorrectly accepted")
+	}
+}
+
+// Two products can match on an invalid credential after their Authorization
+// bytes are redacted. The independent oracle must reject that false PASS.
+func TestScenarioInvariantsDetectsTwoMatchingWrongCredentials(t *testing.T) {
+	invalid := productRun{
+		ExitStatus: 0,
+		Client:     exchange{Status: 200, Body: syntheticFixtureResponse},
+		Upstream:   []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: false, Body: syntheticFixtureRequest}},
+	}
+	if differences := compare(invalid, invalid); len(differences) != 0 {
+		t.Fatalf("fixture should compare equal before oracle: %v", differences)
+	}
+	if failures := scenarioInvariants(scenarioResult{Name: "success", Runs: []productRun{invalid, invalid}}); len(failures) == 0 {
+		t.Fatal("matching invalid Authorization headers escaped the independent oracle")
+	}
+}
+
+func TestFixtureOracleRejectsSymmetricCorruption(t *testing.T) {
+	if !validFixtureRequest(syntheticFixtureRequest) || !validFixtureResponse(syntheticFixtureResponse) {
+		t.Fatal("canonical fixture rejected")
+	}
+	if validFixtureRequest(`{"model":"wrong","stream":false,"messages":[{"role":"user","content":"same request"}]}`) {
+		t.Fatal("wrong model accepted")
+	}
+	if validFixtureRequest(`{"model":"deepseek-v4-pro","stream":true,"messages":[{"role":"user","content":"same request"}]}`) {
+		t.Fatal("wrong stream mode accepted")
+	}
+	if validFixtureResponse(`{"object":"response","model":"deepseek-v4-pro","output":[{"type":"message","content":[{"type":"output_text","text":"wrong"}]}],"usage":{"input_tokens":2,"output_tokens":1,"total_tokens":3}}`) {
+		t.Fatal("incorrect assistant response accepted")
+	}
+	if validFixtureResponse(`{"object":"response","model":"deepseek-v4-pro","output":[{"type":"message","content":[{"type":"output_text","text":"synthetic-ok"}]}],"usage":{"input_tokens":2,"output_tokens":1,"total_tokens":400}}`) {
+		t.Fatal("incorrect usage accepted")
 	}
 }

@@ -38,6 +38,7 @@ type upstreamRequest struct {
 	Path    string      `json:"path"`
 	Headers http.Header `json:"headers"`
 	Body    string      `json:"body"`
+	AuthOK  bool        `json:"synthetic_auth_valid"`
 }
 
 type upstreamEvent struct {
@@ -449,6 +450,9 @@ func (mock *mockServer) serveHTTP(writer http.ResponseWriter, request *http.Requ
 		return
 	}
 	headers := request.Header.Clone()
+	// Redaction alone would hide a wrong key on both sides. Keep a boolean
+	// assertion of the exact synthetic credential before erasing its bytes.
+	authOK := headers.Get("Authorization") == "Bearer "+apiKey
 	if headers.Get("Authorization") != "" {
 		headers.Set("Authorization", "<redacted>")
 	}
@@ -456,6 +460,7 @@ func (mock *mockServer) serveHTTP(writer http.ResponseWriter, request *http.Requ
 	attempt := len(mock.requests) - mock.planStart + 1
 	mock.requests = append(mock.requests, upstreamRequest{
 		Method: request.Method, Path: request.URL.RequestURI(), Headers: headers, Body: string(body),
+		AuthOK: authOK,
 	})
 	mock.events = append(mock.events, upstreamEvent{Kind: "upstream.request", Attempt: attempt})
 	plan := mock.plan
@@ -665,8 +670,8 @@ func scenarioInvariants(scenario scenarioResult) []string {
 				failures = append(failures, prefix+".unhandled_rate_limit")
 			}
 		default:
-			if run.Client.Status != http.StatusOK || run.Client.Body == "" {
-				failures = append(failures, prefix+".response_missing")
+			if run.Client.Status != http.StatusOK || !validFixtureResponse(run.Client.Body) {
+				failures = append(failures, prefix+".response_invalid")
 			}
 		}
 		if run.ExitStatus != wantExit {
@@ -678,6 +683,14 @@ func scenarioInvariants(scenario scenarioResult) []string {
 		}
 		if len(run.Upstream) != wantRequests || run.Retries != wantRequests-1 {
 			failures = append(failures, prefix+".upstream_attempts")
+		}
+		for _, upstream := range run.Upstream {
+			if !upstream.AuthOK || upstream.Method != http.MethodPost || upstream.Path != "/v1/chat/completions" {
+				failures = append(failures, prefix+".upstream_auth_or_route")
+			}
+			if !validFixtureRequest(upstream.Body) {
+				failures = append(failures, prefix+".upstream_request_invalid")
+			}
 		}
 	}
 	return failures
@@ -697,13 +710,13 @@ func compare(left, right productRun) []string {
 	if left.Client.Status != right.Client.Status {
 		differences = append(differences, "client.status")
 	}
-	if !reflect.DeepEqual(left.Client.Headers, right.Client.Headers) {
+	if !equivalentClientHeaders(left.Client.Headers, right.Client.Headers) {
 		differences = append(differences, "client.headers")
 	}
 	if left.Client.Body != right.Client.Body {
 		differences = append(differences, "client.body")
 	}
-	if !reflect.DeepEqual(left.Upstream, right.Upstream) {
+	if !equivalentUpstreamRequests(left.Upstream, right.Upstream) {
 		differences = append(differences, "upstream.requests")
 	}
 	if !reflect.DeepEqual(left.Events, right.Events) {

@@ -54,3 +54,21 @@ stderr, and upstream metadata differences are intentionally still reported.
 
 Do not interpret this five-scenario harness as proof of full 1:1 parity;
 additional transport, provider, and persistence contracts remain to verify.
+
+### Strict fixture oracle and audited transport metadata
+
+The mock verifies the exact synthetic Bearer credential **before redacting** its
+bytes, and every upstream request must use POST /v1/chat/completions with the
+expected model, user text, and non-streaming request. Every successful response
+must contain the expected translated output and usage totals. Equal invalid
+credentials or equal corrupted model output cannot pass.
+
+HTTP header comparison remains exact except for three explicitly audited
+transport fingerprints: the current Date value (both must parse as fresh HTTP
+dates), Prodex's default Server: tiny-http (Rust) versus Godex's absent server
+fingerprint, and the tagged HTTP client's duplicate identical Go-http-client/1.1
+User-Agent versus one occurrence in Go. All other headers, including
+Authorization evidence, Accept, Content-Type, Content-Length, Retry-After, and
+X-Codex-*, retain strict comparison and negative-control tests. These exceptions
+are **not** global exclusions or proof that opaque durable-state layouts are
+equivalent.

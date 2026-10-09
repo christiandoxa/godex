@@ -61,3 +61,54 @@ func TestProdex04361SingleExternalCredential429IsTerminal(t *testing.T) {
 		})
 	}
 }
+
+// A terminal 429 must not silently poison the only key's route eligibility.
+// Prodex permits a fresh later client request to use the same key again.
+type singleExternal429ThenOK struct{ calls int }
+
+func (fake *singleExternal429ThenOK) Execute(
+	_ context.Context, _ proxymodel.Request, _ proxymodel.Account,
+) (*proxymodel.Response, error) {
+	fake.calls++
+	status, payload := http.StatusOK, `{"ok":true}`
+	if fake.calls == 1 {
+		status, payload = http.StatusTooManyRequests, `{"error":{"code":"rate_limit_exceeded"}}`
+	}
+	return &proxymodel.Response{
+		StatusCode: status,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(payload)),
+	}, nil
+}
+
+func TestProdex04361SingleExternal429DoesNotBlockNextIndependentTurn(t *testing.T) {
+	gateway := &singleExternal429ThenOK{}
+	router, err := NewRouter(Config{
+		Gateway: gateway,
+		Accounts: func(context.Context) ([]proxymodel.Account, error) {
+			return []proxymodel.Account{{ID: "single", Home: "/synthetic", Enabled: true, Provider: proxymodel.Provider{Kind: "deepseek"}}}, nil
+		},
+		PreferredAccount: "single",
+		MaxInspectBytes:  1024,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	for index, expected := range []int{http.StatusTooManyRequests, http.StatusOK} {
+		exchange, err := router.Forward(ctx, proxymodel.Request{Header: make(http.Header)})
+		if err != nil {
+			t.Fatalf("turn %d: %v", index+1, err)
+		}
+		if exchange.Result.Response.StatusCode != expected {
+			t.Fatalf("turn %d returned %d, want %d", index+1, exchange.Result.Response.StatusCode, expected)
+		}
+		if err := exchange.Close(); err != nil {
+			t.Fatalf("turn %d close: %v", index+1, err)
+		}
+	}
+	if gateway.calls != 2 {
+		t.Fatalf("one upstream execution per client turn expected, got %d", gateway.calls)
+	}
+}

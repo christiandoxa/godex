@@ -85,3 +85,16 @@ and state-layout observations must be compared as semantic contracts rather
 than silently normalized. Do not publish v0.2.1
 until all material mismatches are resolved and the larger parity matrix is
 verified.
+
+## Differential evidence refinement
+
+The five synthetic DeepSeek scenarios now exercise a terminal single-key 429
+without Codex shim retries. Successful and 429 responses have matching status,
+body, retry decisions and upstream attempt counts after the routing fixes.
+Strict fixture-oracle guards verify provider Authorization, request model, user
+text, response output and usage independently of cross-product equality.
+Exact whitelisting documents the three nonsemantic transport fingerprints
+(Date timestamps, Rust server identity, and duplicate identical default
+User-Agent values), with mutation tests rejecting drift in every other header.
+The remaining raw diagnostics and opaque durable-state layout divergences
+are still visible as blockers, not automatically declared equivalent.
