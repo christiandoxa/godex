@@ -80,3 +80,14 @@ an independent requirement to reimplement the same internal modules in Go.
 Therefore a passing Go test suite or isolated fixture does **not** prove
 full feature-for-feature parity. The v0.2.1 release gate remains
 fail-closed on unverified material behavior.
+
+
+## CLI provider-preset validation
+
+The exact 0.437.1 binary rejects gateway --provider openai with argument
+exit status 2, since openai is the native route and is not an external
+provider preset. Godex previously returned status 1. It now uses a typed
+argument-usage error and reports the same exit status without swallowing
+the diagnostic. The independent profile lifecycle oracle gained a
+21st CLI stage that checks both binary exit codes and unchanged profile
+state. This does not imply gateway request processing is fully equivalent.

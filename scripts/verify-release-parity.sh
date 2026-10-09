@@ -32,7 +32,7 @@ go build -trimpath -o "$tmp/godex" ./cmd/godex
 go build -trimpath -o "$tmp/differential" ./tools/differential
 go build -trimpath -o "$tmp/profileparity" ./tools/profileparity
 
-# Independent managed-profile persistence oracle. All 20 CLI actions run in
+# Independent managed-profile persistence oracle. All 21 CLI actions run in
 # separate subprocesses with isolated credential-free homes; state projections
 # must match across creation, active switching, rejected writes and deletion.
 "$tmp/profileparity" \

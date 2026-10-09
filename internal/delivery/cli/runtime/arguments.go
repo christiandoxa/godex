@@ -310,7 +310,7 @@ func normalizeExternalProvider(value string) (string, error) {
 	case "kiro":
 		return "kiro", nil
 	default:
-		return "", fmt.Errorf("invalid --provider: supported values are anthropic, copilot, deepseek, gemini, kiro, got %q", strings.ToLower(strings.TrimSpace(value)))
+		return "", unsupportedProviderArgument{value: strings.ToLower(strings.TrimSpace(value))}
 	}
 }
 

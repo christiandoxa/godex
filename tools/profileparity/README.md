@@ -1,7 +1,7 @@
 # Prodex 0.437.1 managed-profile lifecycle differential
 
 This tool compares real Prodex and Godex binaries, each operating in a
-separate fresh HOME/PRODEX_HOME/GODEX_HOME, over 20 sequential CLI operations.
+separate fresh HOME/PRODEX_HOME/GODEX_HOME, over 21 sequential CLI operations.
 Every CLI invocation is a new process. No account login, provider API key,
 or external model request is needed. The subprocess receives a minimal
 environment with nonfunctional outbound proxy settings.
@@ -58,3 +58,12 @@ provider profile can still open and close the raw-key gateway successfully.
 
 This narrow startup contract does not prove gateway request behavior with
 an unauthenticated OpenAI profile. That remains independently unverified.
+
+
+### CLI parser failure parity
+
+Both product CLIs must reject an invalid gateway --provider openai as a
+usage error with exit code 2, not a runtime error with exit code 1.
+A source-audited typed Go CLI argument error preserves the original message
+while giving the canonical parser status. This check runs before any profile
+is created and must not mutate the synthetic state.

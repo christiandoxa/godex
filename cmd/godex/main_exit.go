@@ -24,6 +24,13 @@ func exitCode(ctx context.Context, err error) int {
 	var coded interface{ ExitCode() int }
 	if errors.As(err, &coded) {
 		if code := coded.ExitCode(); code >= 0 {
+			// Child programs report their own diagnostics. Locally rejected
+			// CLI arguments have no child stderr, so print their message
+			// while preserving the canonical parser's exit status.
+			var argument interface{ CLIArgumentError() bool }
+			if errors.As(err, &argument) && argument.CLIArgumentError() {
+				_, _ = fmt.Fprintln(os.Stderr, errorPrefix, err)
+			}
 			return code
 		}
 	}
