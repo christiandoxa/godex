@@ -64,6 +64,15 @@ func auditFixtureDurableState(root string) []string {
 			routing = data
 		case "state/routing.json.last-good":
 			lastGood = data
+		case "state/retry-backoff.json":
+			var snapshot struct {
+				Backoffs []json.RawMessage `json:"backoffs"`
+			}
+			if json.Unmarshal(data, &snapshot) != nil {
+				violations = append(violations, "unreadable_retry_backoffs")
+			} else if len(snapshot.Backoffs) != 0 {
+				violations = append(violations, "stale_provider_retry_backoff")
+			}
 		}
 		if strings.HasPrefix(relative, "codex/sessions/") &&
 			!strings.HasSuffix(relative, ".lock") {
