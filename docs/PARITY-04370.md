@@ -28,7 +28,13 @@ contracts in the tagged release notes:
    at commit c1382380de69521303b416720a52f42d51af6248, but does not
    make that exact version mandatory. Existing capability minimum remains
    0.153.2. The local Codex installation was 0.161.0 when inspected;
-   no Codex 0.162.0 real-app-server compatibility claim is made here.
+   it was not modified. A separate official 0.162.0 CLI and app-server
+   were downloaded to an isolated temporary directory, validated
+   against GitHub's release asset SHA-256 digests and version-checked.
+   The actual Godex thread-index reconciliation protocol completed
+   initialize and active/archived thread/list RPCs against the official
+   0.162.0 app-server with an empty temporary HOME and CODEX_HOME.
+   No authenticated model-turn or unrestricted capability claim is made.
 
 The release additionally qualifies Ponytail 5.1.0 and moves several
 selection, provider, identity and rendering implementations into Mojo.
@@ -61,6 +67,22 @@ a substitute for independent observable behavioral verification.
   private Rust-vs-Go persistence layout, multi-profile recovery, queue
   lifecycle, TUI, app-server, WebSocket, and other provider surfaces
   require additional independent runtime evidence.
+
+## Official Codex 0.162.0 qualification fixture
+
+SHA-256-verified Codex assets from OpenAI release rust-v0.162.0
+were checked without installing or replacing the user's Codex:
+
+- codex-x86_64-unknown-linux-musl.zst:
+  058ae1d3b280a6800fb2e625cf93a671e4700df25053acb7cea272c0aff012a8
+- codex-app-server-x86_64-unknown-linux-musl.zst:
+  2e38fb0a4c6246f1c514399c873ade46338c0dfc1ff52a1801fed12fd6e6c791
+
+The opt-in test
+TestProdex04370OfficialCodex0162AppServerThreadIndexBoundary
+uses GODEX_TEST_CODEX_0162_APP_SERVER_BIN to exercise the real
+thread-index RPC protocol against the official binary. It issues no
+model request, accesses no user's home, and changes no installed binary.
 
 **Full parity and Godex v0.2.1 release are NOT certified until all
 material behavioral surfaces and official release gates are verified.**
