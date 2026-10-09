@@ -154,14 +154,20 @@ translated output, and no provider key persisted or printed. Retrying
 the same credential does not satisfy the independent oracle.
 
 
-### Known material key-rotation restart mismatch
+### Closed: key-rotation persistence regression
 
-The cross-process key-rotation-restart fixture uses two provider keys on each
-of two launches against the same isolated state home. On the tagged Prodex
-0.436.1 binary, both launches attempt primary then secondary after primary
-returns 429. Godex succeeds on both launches but the second process selects
-secondary immediately because the first process persisted a cooldown for
-primary. The differential test compares ordered upstream key-slot labels
-and therefore reports this mismatch even when both final responses are 200.
-Do not mark this case as parity PASS without correcting its source-audited
-retry/backoff lifetime policy and checking managed-profile behavior remains safe.
+The cross-process key-rotation-restart fixture uses two provider keys on
+each of two launches against the same isolated home. The official Prodex
+0.436.1 binary and candidate Godex binary now both attempt
+primary→secondary on each process generation. Godex's launch-only API-key
+pool uses in-memory health and retry state, while managed profiles retain
+durable backoff. Independent tests reject a reattempt within the same
+process, durable cooldown leakage across processes, or loss of managed
+profile retry persistence. The raw durable file comparison remains
+fail-closed; this narrow fix alone does not establish full persistence parity.
+
+
+In two-key mode the diagnostic contract uses the exact tagged Prodex
+startup message indicating rotation across two keys, rather than treating
+a single-key banner as equivalent. Both modes reject any additional
+unexpected auth/quota or process-error diagnostic.

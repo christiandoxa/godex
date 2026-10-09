@@ -58,8 +58,8 @@ upstream model call was used.
 Known gaps are deliberate: Godex queues quota usage snapshot writes for the
 process lifetime, but does not mirror Prodex's full runtime state-save,
 continuation-journal, or probe-refresh workers. Soft-affinity identity migration
-is not modeled, and the five-scenario differential harness still reports
-header, durable-state, diagnostic, and upstream-request metadata differences.
+is not modeled, and the current ten-scenario differential harness still reports raw
+durable-state layout differences.
 Success, retry, cancellation, and restart outcomes now agree on status, body,
 and retry counts; the remaining observations keep this checkpoint at
 IMPLEMENTED-NOT-VERIFIED.
@@ -75,7 +75,7 @@ job fails closed on divergent observable outcomes, corrupt/missing evidence,
 or uncommitted oracle/candidate trees. See
 `scripts/verify-release-parity.sh` and `tools/differential/README.md`.
 
-This four-scenario gate is necessary but **not sufficient** to certify full
+This ten-scenario synthetic gate is necessary but **not sufficient** to certify full
 feature-for-feature parity. Provider/auth, TUI/app-server, WebSocket/SSE
 continuation, and durable restart behavior still require broader cross-binary
 evidence. The DeepSeek loopback suite explicitly distinguishes Codex-client
@@ -88,7 +88,7 @@ verified.
 
 ## Differential evidence refinement
 
-The five synthetic DeepSeek scenarios now exercise a terminal single-key 429
+The ten synthetic DeepSeek scenarios include a terminal single-key 429
 without Codex shim retries. Successful and 429 responses have matching status,
 body, retry decisions and upstream attempt counts after the routing fixes.
 Strict fixture-oracle guards verify provider Authorization, request model, user
@@ -96,8 +96,8 @@ text, response output and usage independently of cross-product equality.
 Exact whitelisting documents the three nonsemantic transport fingerprints
 (Date timestamps, Rust server identity, and duplicate identical default
 User-Agent values), with mutation tests rejecting drift in every other header.
-The remaining raw diagnostics and opaque durable-state layout divergences
-are still visible as blockers, not automatically declared equivalent.
+The remaining opaque durable-state layout divergence is still
+visible as a blocker, not automatically declared equivalent.
 
 
 The diagnostic comparator now distinguishes the tagged Prodex launch banner
@@ -160,12 +160,14 @@ by an opaque slot label in test output. This still does not establish
 all provider/auth combinations or multi-profile health ranking parity.
 
 
-**Open multi-key persistence mismatch (reproduced):** The independent
-DeepSeek API-key rotation fixture sends 429 from primary and 200 from
-secondary. Both products initially rotate primary→secondary. After a
-fresh process restart on the same synthetic home, Prodex 0.436.1 again
-attempts primary→secondary; Godex immediately selects secondary due to its
-persisted primary-key retry backoff. Tests deliberately retain this difference
-as FAIL. A fix must distinguish ephemeral API-key pool lifetime from durable
-managed-profile retry protection; simply disabling all backoff persistence
-would weaken required recovery and security semantics.
+**Closed: API-key pool rotation persistence.** Godex now marks only
+launch-local API-key pool accounts as ephemeral and confines their retry,
+route-health, and circuit decisions to the process lifetime. The same
+credential hash can be used again by a new process without inheriting an
+old backoff. Managed profiles still durably persist their own retry backoff
+and health scores, as verified by independent regression tests. With the
+canonical 0.436.1 Prodex binary and the exact-source Godex candidate,
+both key-rotation runs select primary→secondary on **both launches**,
+and all ten synthetic scenarios agree on exit code, translated response,
+ordered upstream requests and credentials. The raw durable-file layout
+still differs, and full parity beyond these fixtures is not certified.
