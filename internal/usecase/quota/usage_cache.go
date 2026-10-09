@@ -69,8 +69,12 @@ func (status *Status) cachedAvailabilityUsageAtPolicy(
 	if err == nil {
 		if baseURL == "" {
 			status.storeUsage(home, usage, now)
-			status.storeUsageSnapshot(ctx, accountID, usage, now)
 		}
+		// Prodex persists a successful startup probe even when the caller
+		// supplied a loopback or test upstream override. Keep that durable
+		// snapshot separate from the default live cache so an override cannot
+		// silently become the next request's transport.
+		status.storeUsageSnapshot(ctx, accountID, usage, now)
 		return usage, quotamodel.SourceLive, nil
 	}
 	if snapshot, ok := status.cachedPersistedSnapshot(ctx, accountID, now); ok {

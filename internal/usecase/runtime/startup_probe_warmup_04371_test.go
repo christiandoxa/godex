@@ -10,21 +10,21 @@ import (
 
 type startupWarmupQuota04371 struct {
 	events   *[]string
-	accounts []accountentity.Account
+	profiles []proxyconfig.Account
 }
 
 func (quota *startupWarmupQuota04371) Ready(context.Context, accountentity.Account) (bool, error) {
 	return true, nil
 }
 
-func (quota *startupWarmupQuota04371) WarmupStartupProbes(
+func (quota *startupWarmupQuota04371) WarmupStartupProfiles(
 	_ context.Context,
-	accounts []accountentity.Account,
+	profiles []proxyconfig.Account,
 	_ string,
 	_ bool,
 ) {
 	*quota.events = append(*quota.events, "warmup")
-	quota.accounts = append([]accountentity.Account(nil), accounts...)
+	quota.profiles = append([]proxyconfig.Account(nil), profiles...)
 }
 
 type startupWarmupProcess04371 struct{ events *[]string }
@@ -78,7 +78,7 @@ func TestProdex04371StartupWarmupRunsAfterProxyStartBeforeChildOnSkip(t *testing
 	if got, want := events, []string{"proxy", "warmup", "child"}; len(got) != len(want) || got[0] != want[0] || got[1] != want[1] || got[2] != want[2] {
 		t.Fatalf("startup event order = %#v, want %#v", got, want)
 	}
-	if len(quota.accounts) != 2 || quota.accounts[0].ID != "one" || quota.accounts[1].ID != "two" {
-		t.Fatalf("warmup accounts = %#v", quota.accounts)
+	if len(quota.profiles) != 2 || quota.profiles[0].ID != "one" || quota.profiles[1].ID != "two" {
+		t.Fatalf("warmup profiles = %#v", quota.profiles)
 	}
 }

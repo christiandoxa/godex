@@ -15,5 +15,5 @@ func (status *Status) scheduleCachedProbeRefresh(ctx context.Context, accountID,
 	if !ok || now.Sub(snapshot.checkedAt) < usageCacheFreshness-probeRefreshLead {
 		return
 	}
-	_ = status.scheduleProbeRefresh(ctx, accountID, home, "")
+	_ = status.scheduleProbeRefresh(ctx, accountID, home, "", false)
 }

@@ -47,7 +47,7 @@ type quotaPreflight interface {
 // separate from quotaPreflight: startup probes are best effort and must not
 // turn a skipped admission check into a launch failure.
 type quotaStartupWarmup interface {
-	WarmupStartupProbes(context.Context, []accountentity.Account, string, bool)
+	WarmupStartupProfiles(context.Context, []proxyconfig.Account, string, bool)
 }
 
 type providerCredentialResolver interface {
@@ -323,27 +323,7 @@ func (runner *Runner) warmupStartupProbes(
 	if !ok || len(profiles) == 0 {
 		return
 	}
-	managed, err := runner.accounts.List(ctx)
-	if err != nil {
-		return
-	}
-	managedByID := make(map[string]accountentity.Account, len(managed))
-	for _, account := range managed {
-		managedByID[account.ID] = account
-	}
-	accounts := make([]accountentity.Account, 0, len(profiles))
-	for _, profile := range profiles {
-		account, exists := managedByID[profile.ID]
-		if !exists || strings.TrimSpace(account.ID) == "" {
-			continue
-		}
-		account.Enabled = profile.Enabled
-		accounts = append(accounts, account)
-	}
-	if len(accounts) == 0 {
-		return
-	}
-	warmup.WarmupStartupProbes(ctx, accounts, upstream, noProxy)
+	warmup.WarmupStartupProfiles(ctx, profiles, upstream, noProxy)
 }
 
 func (runner *Runner) prepareProviderLaunch(

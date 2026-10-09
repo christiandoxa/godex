@@ -30,9 +30,15 @@ func (status *Status) AvailabilityAtPolicy(
 	if !account.Enabled {
 		return quotamodel.Availability{}, nil
 	}
-	usage, source, err := status.cachedAvailabilityUsageAtPolicy(
-		ctx, account.ID, status.accounts.CodexHome(account.ID), nil, baseURL, noProxy,
-	)
+	return status.availabilityAtPolicyForHome(ctx, account.ID, status.accounts.CodexHome(account.ID), baseURL, noProxy)
+}
+
+func (status *Status) availabilityAtPolicyForHome(
+	ctx context.Context,
+	accountID, home, baseURL string,
+	noProxy bool,
+) (quotamodel.Availability, error) {
+	usage, source, err := status.cachedAvailabilityUsageAtPolicy(ctx, accountID, home, nil, baseURL, noProxy)
 	if err != nil {
 		return quotamodel.Availability{}, err
 	}

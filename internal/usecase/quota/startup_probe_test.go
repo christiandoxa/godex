@@ -3,6 +3,7 @@ package quota
 import (
 	"context"
 	"testing"
+	"time"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
@@ -11,24 +12,47 @@ import (
 func TestWarmupStartupProbesBoundsRefreshesAndReusesCache(t *testing.T) {
 	accounts := []accountentity.Account{
 		{ID: "one", Enabled: true},
+	}
+	usage := &countingUsage{}
+	status := NewStatus(fakeAccounts{accounts: accounts}, usage)
+
+	status.WarmupStartupProbes(context.Background(), accounts, "", false)
+	if usage.calls != 1 {
+		t.Fatalf("startup probe calls = %d, want 1", usage.calls)
+	}
+	status.WarmupStartupProbes(context.Background(), accounts, "", false)
+	if usage.calls != 1 {
+		t.Fatalf("second warmup calls = %d, want 1", usage.calls)
+	}
+	status.WarmupStartupProbes(context.Background(), accounts, "", false)
+	if usage.calls != 1 {
+		t.Fatalf("fresh startup cache caused %d calls, want 1", usage.calls)
+	}
+}
+
+func TestWarmupStartupProbesUsesSyncThenQueuedWarmLimit(t *testing.T) {
+	accounts := []accountentity.Account{
+		{ID: "one", Enabled: true},
 		{ID: "two", Enabled: true},
 		{ID: "three", Enabled: true},
 		{ID: "four", Enabled: true},
 	}
 	usage := &countingUsage{}
 	status := NewStatus(fakeAccounts{accounts: accounts}, usage)
+	defer status.Close()
+	observed := status.ProbeRefreshRevision()
 
 	status.WarmupStartupProbes(context.Background(), accounts, "", false)
+	if usage.calls != startupProbeSyncWarmLimit {
+		t.Fatalf("synchronous startup probes = %d, want %d", usage.calls, startupProbeSyncWarmLimit)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if !status.WaitProbeRefresh(ctx, observed) {
+		t.Fatal("queued startup probes did not complete")
+	}
 	if usage.calls != startupProbeWarmLimit {
-		t.Fatalf("startup probe calls = %d, want %d", usage.calls, startupProbeWarmLimit)
-	}
-	status.WarmupStartupProbes(context.Background(), accounts, "", false)
-	if usage.calls != startupProbeWarmLimit+1 {
-		t.Fatalf("second warmup calls = %d, want %d", usage.calls, startupProbeWarmLimit+1)
-	}
-	status.WarmupStartupProbes(context.Background(), accounts, "", false)
-	if usage.calls != startupProbeWarmLimit+1 {
-		t.Fatalf("fresh startup cache caused %d calls, want %d", usage.calls, startupProbeWarmLimit+1)
+		t.Fatalf("total startup probes = %d, want %d", usage.calls, startupProbeWarmLimit)
 	}
 }
 
@@ -42,7 +66,13 @@ func TestWarmupStartupProbesIgnoresDisabledAccountsAndProbeFailures(t *testing.T
 		"/managed/ready": {},
 	}})
 
+	observed := status.ProbeRefreshRevision()
 	status.WarmupStartupProbes(context.Background(), accounts, "", false)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if !status.WaitProbeRefresh(ctx, observed) {
+		t.Fatal("startup refresh did not complete")
+	}
 	if _, ok := status.cachedLiveUsage("/managed/ready", status.now()); !ok {
 		t.Fatal("successful startup probe was not cached")
 	}

@@ -2,11 +2,15 @@ package quota
 
 import (
 	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
+	quotarepo "github.com/christiandoxa/godex/internal/repository/quota"
 )
 
 func TestAvailabilitySharesFiveMinuteUsageSnapshotWithRouteChecks(t *testing.T) {
@@ -39,6 +43,32 @@ func TestAvailabilitySharesFiveMinuteUsageSnapshotWithRouteChecks(t *testing.T) 
 	}
 	if usage.calls != 2 {
 		t.Fatalf("quota fetches after expiry = %d, want 2", usage.calls)
+	}
+}
+
+func TestProdex04371AvailabilityPersistsSuccessfulOverrideProbe(t *testing.T) {
+	account := accountentity.Account{ID: "one", Enabled: true}
+	usage := &overridePolicyUsage{}
+	status := NewStatus(fakeAccounts{accounts: []accountentity.Account{account}}, usage)
+	root := t.TempDir()
+	status.SetQueuedUsageSnapshotStore(quotarepo.NewUsageSnapshotStore(root))
+	status.now = func() time.Time { return time.Unix(100, 0) }
+	if _, err := status.AvailabilityAtPolicy(context.Background(), account, "http://127.0.0.1:1/backend-api", false); err != nil {
+		t.Fatal(err)
+	}
+	status.Close()
+	data, err := os.ReadFile(filepath.Join(root, "runtime-usage-snapshots.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var envelope struct {
+		Value map[string]quotamodel.UsageSnapshot `json:"value"`
+	}
+	if err := json.Unmarshal(data, &envelope); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := envelope.Value[account.ID]; !ok {
+		t.Fatalf("override probe snapshot missing account %q: %s", account.ID, data)
 	}
 }
 
