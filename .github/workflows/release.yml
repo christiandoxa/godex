@@ -31,6 +31,9 @@ jobs:
           ./scripts/check-cross-build.sh
           sh -n install.sh
           ./scripts/test-installers.sh
+      - name: Verify Prodex 0.436.1 behavioral parity
+        shell: bash
+        run: ./scripts/verify-release-parity.sh
       - name: PowerShell syntax
         shell: pwsh
         run: |

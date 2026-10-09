@@ -61,3 +61,22 @@ header, durable-state, diagnostic, and upstream-request metadata differences.
 Success, retry, cancellation, and restart outcomes now agree on status, body,
 and retry counts; the remaining observations keep this checkpoint at
 IMPLEMENTED-NOT-VERIFIED.
+
+
+## Release parity gate (candidate checkpoint)
+
+The release workflow now requires an executable synthetic differential run
+against the **exact Prodex 0.436.1 source** and the SHA-256-pinned official
+Linux release executable. Godex must be built from the clean tagged release
+commit, with VCS metadata matching the supplied source commit. The release
+job fails closed on divergent observable outcomes, corrupt/missing evidence,
+or uncommitted oracle/candidate trees. See
+`scripts/verify-release-parity.sh` and `tools/differential/README.md`.
+
+This four-scenario gate is necessary but **not sufficient** to certify full
+feature-for-feature parity. Provider/auth, TUI/app-server, WebSocket/SSE
+continuation, and durable restart behavior still require broader cross-binary
+evidence. The current DeepSeek loopback comparison has unresolved header,
+upstream-request, stderr, and state-layout differences. Do not publish v0.2.1
+until all material mismatches are resolved and the larger parity matrix is
+verified.
