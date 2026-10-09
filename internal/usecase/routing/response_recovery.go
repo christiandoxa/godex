@@ -110,7 +110,8 @@ func inspectablePreviousResponse(response *proxymodel.Response) bool {
 		return true
 	}
 	return response.StatusCode == http.StatusOK &&
-		strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream")
+		(strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream") ||
+			(response.RequestedStreaming && strings.TrimSpace(response.Header.Get("Content-Type")) == ""))
 }
 
 func fullHistoryRecoveryRequest(request proxymodel.Request) (proxymodel.Request, bool) {

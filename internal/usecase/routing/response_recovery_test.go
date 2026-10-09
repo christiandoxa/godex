@@ -184,6 +184,48 @@ func TestResponsesInvalidPreviousIDSSERecoversOnSameOwnerOnce(t *testing.T) {
 	}
 }
 
+func TestResponsesInvalidPreviousIDHeaderlessRequestedSSERecovers(t *testing.T) {
+	const invalid = "event: error\ndata: {\"type\":\"error\",\"status\":400,\"error\":{\"type\":\"invalid_request_error\",\"message\":\"Invalid `previous_response_id`.\"}}\n\n"
+	const recovered = "event: response.completed\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp-new\"}}\n\n"
+	for _, fixture := range []struct {
+		name         string
+		stream       bool
+		contentType  string
+		wantRecovery bool
+	}{
+		{name: "requested headerless SSE", stream: true, wantRecovery: true},
+		{name: "requested explicit JSON", stream: true, contentType: "application/json"},
+		{name: "unary headerless", stream: false},
+	} {
+		t.Run(fixture.name, func(t *testing.T) {
+			body := `{"stream":false,"previous_response_id":"resp-dead","input":[{"type":"message","role":"user","content":"turn one"},{"type":"message","role":"assistant","content":"answer one"},{"type":"message","role":"user","content":"turn two"}],"client_metadata":{"session_id":"session-a"}}`
+			if fixture.stream {
+				body = strings.Replace(body, `"stream":false`, `"stream":true`, 1)
+			}
+			gateway := &responseRecoveryGateway{replies: []responseRecoveryReply{
+				{http.StatusOK, fixture.contentType, invalid},
+				{http.StatusOK, fixture.contentType, recovered},
+			}}
+			router := newResponseRecoveryRouter(t, gateway, true)
+			exchange, err := router.Forward(context.Background(), responsesRecoveryRequest(body))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer exchange.Close()
+			wantRequests := 1
+			if fixture.wantRecovery {
+				wantRequests = 2
+			}
+			if len(gateway.requests) != wantRequests {
+				t.Fatalf("attempts = %d, want %d", len(gateway.requests), wantRequests)
+			}
+			if fixture.wantRecovery && strings.Contains(string(gateway.requests[1].Body), "previous_response_id") {
+				t.Fatalf("headerless SSE recovery retained stale id: %s", gateway.requests[1].Body)
+			}
+		})
+	}
+}
+
 func TestResponsesInvalidPreviousIDRetriesAtMostOnce(t *testing.T) {
 	const body = `{"previous_response_id":"resp-dead","input":[{"type":"message","role":"user"},{"type":"message","role":"assistant"},{"type":"message","role":"user"}],"session_id":"session-a"}`
 	const invalid = `{"type":"error","status":400,"error":{"type":"invalid_request_error","message":"Invalid ` + "`previous_response_id`" + `."}}`
