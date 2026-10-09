@@ -38,7 +38,7 @@ func TestWarmupStartupProbesUsesSyncThenQueuedWarmLimit(t *testing.T) {
 		{ID: "three", Enabled: true},
 		{ID: "four", Enabled: true},
 	}
-	usage := &startupCountingUsage{}
+	usage := &startupCountingUsage{release: make(chan struct{})}
 	status := NewStatus(fakeAccounts{accounts: accounts}, usage)
 	defer status.Close()
 	observed := status.ProbeRefreshRevision()
@@ -47,19 +47,29 @@ func TestWarmupStartupProbesUsesSyncThenQueuedWarmLimit(t *testing.T) {
 	if calls := usage.calls.Load(); calls != startupProbeSyncWarmLimit {
 		t.Fatalf("synchronous startup probes = %d, want %d", calls, startupProbeSyncWarmLimit)
 	}
+	close(usage.release)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	if !status.WaitProbeRefresh(ctx, observed) {
-		t.Fatal("queued startup probes did not complete")
+	for usage.calls.Load() < startupProbeWarmLimit {
+		observed = status.ProbeRefreshRevision()
+		if !status.WaitProbeRefresh(ctx, observed) {
+			t.Fatal("queued startup probes did not complete")
+		}
 	}
 	if calls := usage.calls.Load(); calls != startupProbeWarmLimit {
 		t.Fatalf("total startup probes = %d, want %d", calls, startupProbeWarmLimit)
 	}
 }
 
-type startupCountingUsage struct{ calls atomic.Int32 }
+type startupCountingUsage struct {
+	calls   atomic.Int32
+	release chan struct{}
+}
 
-func (usage *startupCountingUsage) Fetch(context.Context, string) (quotamodel.Usage, error) {
+func (usage *startupCountingUsage) Fetch(_ context.Context, home string) (quotamodel.Usage, error) {
+	if home != "/managed/one" {
+		<-usage.release
+	}
 	usage.calls.Add(1)
 	return quotamodel.Usage{}, nil
 }
