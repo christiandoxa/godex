@@ -72,3 +72,13 @@ Authorization evidence, Accept, Content-Type, Content-Length, Retry-After, and
 X-Codex-*, retain strict comparison and negative-control tests. These exceptions
 are **not** global exclusions or proof that opaque durable-state layouts are
 equivalent.
+
+
+The source-pinned DeepSeek runtime produces a known fixed stderr startup
+banner on Prodex, whereas Godex emits none. The narrow comparator accepts
+only that exact banner, and for cancellation it requires both programs to
+report the same client timeout semantics through their validated respective
+loopback routes. Any unexpected auth error, warning, quota diagnostic,
+non-loopback destination, or changed cancellation reason fails the test.
+This is a documented CLI-presentation difference, **not literal stderr
+byte-for-byte parity**.

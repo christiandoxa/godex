@@ -704,7 +704,7 @@ func compare(left, right productRun) []string {
 	if left.Stdout != right.Stdout {
 		differences = append(differences, "stdout")
 	}
-	if left.Stderr != right.Stderr {
+	if !equivalentRuntimeDiagnostics(left, right) {
 		differences = append(differences, "stderr")
 	}
 	if left.Client.Status != right.Client.Status {

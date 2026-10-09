@@ -98,3 +98,11 @@ Exact whitelisting documents the three nonsemantic transport fingerprints
 User-Agent values), with mutation tests rejecting drift in every other header.
 The remaining raw diagnostics and opaque durable-state layout divergences
 are still visible as blockers, not automatically declared equivalent.
+
+
+The diagnostic comparator now distinguishes the tagged Prodex launch banner
+from actual runtime failure evidence. A single explicit local client timeout
+is compared by failure class, validated loopback route and cancellation
+state; all other diagnostics remain strict. Because Godex intentionally omits
+Prodex's progress banner, this is a scoped semantic exception rather than an
+assertion that raw CLI stderr matches.
