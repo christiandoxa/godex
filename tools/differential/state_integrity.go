@@ -30,9 +30,6 @@ func auditFixtureDurableState(root string) []string {
 			return err
 		}
 		relative = filepath.ToSlash(relative)
-		if relative == "user" && entry.IsDir() {
-			return filepath.SkipDir // not a persistent provider or Codex state root
-		}
 		if entry.IsDir() {
 			return nil
 		}
@@ -43,6 +40,9 @@ func auditFixtureDurableState(root string) []string {
 		if !info.Mode().IsRegular() || info.Size() > maxFixtureStateFileBytes {
 			violations = append(violations, "unexpected_file_type_or_size:"+relative)
 			return nil
+		}
+		if !allowedFixtureStateFile(relative) {
+			violations = append(violations, "unknown_persistent_file:"+relative)
 		}
 		if info.Mode().Perm()&0o002 != 0 {
 			violations = append(violations, "world_writable_file:"+relative)
@@ -64,14 +64,30 @@ func auditFixtureDurableState(root string) []string {
 			routing = data
 		case "state/routing.json.last-good":
 			lastGood = data
-		case "state/retry-backoff.json":
-			var snapshot struct {
-				Backoffs []json.RawMessage `json:"backoffs"`
-			}
+		case "state/retry-backoff.json", "state/route-memory.json":
+			var snapshot map[string]json.RawMessage
 			if json.Unmarshal(data, &snapshot) != nil {
-				violations = append(violations, "unreadable_retry_backoffs")
-			} else if len(snapshot.Backoffs) != 0 {
-				violations = append(violations, "stale_provider_retry_backoff")
+				violations = append(violations, "invalid_provider_state")
+				break
+			}
+			var version int
+			if json.Unmarshal(snapshot["version"], &version) != nil || version != 1 {
+				violations = append(violations, "invalid_provider_state_version")
+			}
+			listKey := "backoffs"
+			if relative == "state/route-memory.json" {
+				listKey = "scores"
+			}
+			var entries []json.RawMessage
+			if json.Unmarshal(snapshot[listKey], &entries) != nil || len(entries) != 0 {
+				violations = append(violations, "stale_provider_state:"+listKey)
+			}
+		case "state/logs/runtime.jsonl":
+			for _, line := range bytes.Split(data, []byte("\n")) {
+				if len(bytes.TrimSpace(line)) != 0 && !json.Valid(line) {
+					violations = append(violations, "invalid_runtime_log_json")
+					break
+				}
 			}
 		}
 		if strings.HasPrefix(relative, "codex/sessions/") &&
@@ -103,4 +119,26 @@ func auditFixtureDurableState(root string) []string {
 		violations = append(violations, "state_permission_denied")
 	}
 	return violations
+}
+
+// Only files observed in the exact tagged Prodex 0.436.1 and Godex fixture
+// may appear. New profile, secret, or session files require explicit review.
+func allowedFixtureStateFile(name string) bool {
+	switch name {
+	case "child-exchange.json", "codex/history.jsonl",
+		"codex/sessions/.prodex-maintenance.lock",
+		"state/profile-lifecycle.json.lock", "state/runtime-housekeeping.last-run",
+		"state/runtime-housekeeping.lock", "state/update-check.lock",
+		"state/logs/runtime.guard", "state/logs/runtime.jsonl",
+		"state/previous-response-failures.guard", "state/profile-import-lifecycle.guard",
+		"state/profiles.guard", "state/retry-backoff.json",
+		"state/route-memory.json", "state/routing-health.guard",
+		"state/routing-memory.guard", "state/routing-retry-backoff.guard",
+		"state/routing-transport-backoff.guard", "state/routing.guard",
+		"state/routing.json", "state/routing.json.last-good",
+		"state/state.guard":
+		return true
+	}
+	return strings.HasPrefix(name, "state/runtime-broker-live-runtime-") &&
+		strings.HasSuffix(name, ".json.lock") && len(name) >= 48 && len(name) <= 160
 }

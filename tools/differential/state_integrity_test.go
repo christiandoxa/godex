@@ -39,7 +39,12 @@ func TestDurableStateIntegrityDetectsIndependentCorruption(t *testing.T) {
 		{"bad_routing_json", "state/routing.json", "{broken", "invalid_state_json"},
 		{"secret_leak", "state/retry-backoff.json", fmt.Sprintf(`{"key":%q}`, apiKey), "synthetic_provider_secret_persisted"},
 		{"bad_child_evidence", "child-exchange.json", "{broken", "invalid_client_evidence"},
-		{"quarantine_after_recovery", "state/retry-backoff.json", `{"version":1,"backoffs":[{"account_id":"synthetic","until_unix":9999999999}]}`, "stale_provider_retry_backoff"},
+		{"unexpected_file", "state/unknown-critical.bin", "x", "unknown_persistent_file"},
+		{"unexpected_user_file", "user/.config/service-account.json", "{}", "unknown_persistent_file"},
+		{"route_poisoning", "state/route-memory.json", `{"version":1,"scores":[{"account_id":"fake","score":99}]}`, "stale_provider_state:scores"},
+		{"log_corruption", "state/logs/runtime.jsonl", "this is not json", "invalid_runtime_log_json"},
+
+		{"quarantine_after_recovery", "state/retry-backoff.json", `{"version":1,"backoffs":[{"account_id":"synthetic","until_unix":9999999999}]}`, "stale_provider_state:backoffs"},
 	}
 	for _, fixture := range fixtures {
 		t.Run(fixture.name, func(t *testing.T) {
