@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -415,29 +414,6 @@ func (router *Router) bindSuccessfulResponse(
 		router.wrapResponsesStreamLatency(result.AccountID, selection, result.Response, len(result.Prefix) > 0)
 	}
 	return nil
-}
-
-func (router *Router) execute(ctx context.Context, request proxymodel.Request, account proxymodel.Account) (*proxymodel.Response, error) {
-	release := router.beginRequestInFlight(account.ID, request.QuotaSelection)
-	response, err := router.executeAccount(ctx, request, account)
-	if err != nil {
-		if response != nil && response.Body != nil {
-			_ = response.Body.Close()
-		}
-		release()
-		return nil, err
-	}
-	if response == nil || response.Body == nil {
-		release()
-		return response, nil
-	}
-	body := &inFlightBody{ReadCloser: response.Body, release: release}
-	if duplex, ok := response.Body.(io.ReadWriteCloser); ok {
-		response.Body = &inFlightDuplexBody{inFlightBody: body, duplex: duplex}
-	} else {
-		response.Body = body
-	}
-	return response, nil
 }
 
 func (router *Router) executeAccount(ctx context.Context, request proxymodel.Request, account proxymodel.Account) (*proxymodel.Response, error) {

@@ -43,7 +43,11 @@ type Response struct {
 	WebSocketRealtimeDuplex bool
 	FirstEventRetryUsed     bool
 	FirstEventCommitted     bool
-	PrecommitFailure        *PrecommitFailure
+	// RequestedStreaming is internal routing evidence from the original
+	// Responses request. It prevents a missing upstream Content-Type from
+	// bypassing the precommit SSE inspector. Never serialize this field.
+	RequestedStreaming bool `json:"-"`
+	PrecommitFailure   *PrecommitFailure
 }
 type PrecommitFailure struct {
 	Code string

@@ -162,8 +162,9 @@ func (proxy *Router) classifySpecialResponse(
 	case response.FirstEventCommitted:
 		return responseOutcome{}, pending, nil, true
 	case response.StatusCode == http.StatusOK &&
-		strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream") &&
-		response.Header.Get("Content-Encoding") == "":
+		response.Header.Get("Content-Encoding") == "" &&
+		(strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream") ||
+			(response.RequestedStreaming && strings.TrimSpace(response.Header.Get("Content-Type")) == "")):
 		outcome, pending, err := proxy.inspectStream(response, pending, providerKind)
 		if err != nil {
 			pending.transient = true

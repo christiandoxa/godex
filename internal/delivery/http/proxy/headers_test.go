@@ -132,3 +132,38 @@ func TestProdex04361SSEHeadersDoNotSynthesizeDate(t *testing.T) {
 		t.Fatalf("SSE event body truncated: %q", wire)
 	}
 }
+
+// The 0.437.1 headerless Responses stream must remain a stream *and*
+// must not invent a Content-Type or Date. An ordinary HTTP response still
+// gets the Go server's correct framing headers.
+func TestProdex04371HeaderlessSSEPreservesUnspecifiedMIMEOnWire(t *testing.T) {
+	wire := "data: {\"type\":\"response.output_text.delta\",\"delta\":\"first\"}\n\n" +
+		"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp-04371\"}}\n\n"
+	proxy := &Proxy{maxInspect: 3}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		proxy.forwardResponse(context.Background(), w, &proxymodel.Response{
+			StatusCode:         http.StatusOK,
+			Header:             make(http.Header),
+			RequestedStreaming: true,
+			Body:               io.NopCloser(strings.NewReader(wire)),
+		}, nil, "", &requestLifecycle{})
+	}))
+	defer server.Close()
+	response, err := http.Get(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	got, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.StatusCode != http.StatusOK || string(got) != wire {
+		t.Fatalf("headerless SSE output corrupted: status=%d body=%q", response.StatusCode, got)
+	}
+	for _, key := range []string{"Content-Type", "Date", "Content-Length"} {
+		if got := response.Header.Get(key); got != "" {
+			t.Fatalf("headerless stream gained %s=%q", key, got)
+		}
+	}
+}

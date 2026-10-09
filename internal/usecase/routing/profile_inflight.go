@@ -162,6 +162,9 @@ func (router *Router) tryExecuteWithProfileInflight(
 		release()
 		return nil, true, err
 	}
+	if response != nil {
+		response.RequestedStreaming = requestedResponsesStream(request)
+	}
 	if response == nil || response.Body == nil {
 		release()
 		return response, true, nil

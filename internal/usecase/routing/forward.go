@@ -30,6 +30,7 @@ func (router *Router) forwardBound(
 	router.recordSelectionMarker(ctx, "selection_keep_current", account, request.QuotaSelection)
 	router.recordRouteDecisionSelected(ctx, request, account)
 	hardAffinity := requestRoutingAffinity(request).hasHardAffinity(request.QuotaSelection)
+	boundAttemptStarted := time.Now()
 	response, err := router.executeWithProfileInflightWait(ctx, request, account, hardAffinity)
 	failed, rotatePrevious := false, false
 	if err == nil && !request.WebSocketMessage {
@@ -90,7 +91,7 @@ func (router *Router) forwardBound(
 	if failed {
 		return router.legacyBoundResponse(ctx, request, account, response, true), nil
 	}
-	return router.handleBoundResponseWithFailure(ctx, request, accounts, account, response, false, keys)
+	return router.handleBoundResponseWithFailure(ctx, request, accounts, account, response, false, keys, boundAttemptStarted)
 }
 
 func boundOwnerAccount(accounts []proxymodel.Account, owner string) (proxymodel.Account, error) {
@@ -196,7 +197,7 @@ func (router *Router) handleBoundResponse(
 	response *proxymodel.Response,
 ) (proxymodel.Forwarded, error) {
 	keys := requestRoutingAffinity(request)
-	return router.handleBoundResponseWithFailure(ctx, request, accounts, account, response, false, &keys)
+	return router.handleBoundResponseWithFailure(ctx, request, accounts, account, response, false, &keys, time.Now())
 }
 
 func (router *Router) handleBoundResponseWithFailure(
@@ -207,6 +208,7 @@ func (router *Router) handleBoundResponseWithFailure(
 	response *proxymodel.Response,
 	failed bool,
 	keys *affinityKeys,
+	boundAttemptStarted time.Time,
 ) (proxymodel.Forwarded, error) {
 	outcome, pending, err := router.classify(response, account.Provider.Kind)
 	if err != nil {
@@ -238,6 +240,12 @@ func (router *Router) handleBoundResponseWithFailure(
 			StatusCode: status,
 			Message:    message,
 		}
+	}
+	response, outcome, pending, err = router.retryBoundTurnStateOverload(
+		ctx, request, account, keys, response, outcome, pending, boundAttemptStarted,
+	)
+	if err != nil {
+		return proxymodel.Forwarded{}, err
 	}
 	outcome.failed = outcome.failed || failed
 	router.recordRouteOutcome(ctx, account.ID, request.QuotaSelection, response, outcome)

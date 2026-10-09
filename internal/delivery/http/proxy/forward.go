@@ -20,7 +20,9 @@ func (proxy *Proxy) forwardResponse(ctx context.Context, writer http.ResponseWri
 	if response == nil {
 		return
 	}
-	stream := strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream")
+	stream := strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream") ||
+		(response.RequestedStreaming && strings.TrimSpace(response.Header.Get("Content-Type")) == "" &&
+			response.Header.Get("Content-Encoding") == "")
 	prepared, ok := proxy.prepareResponsePrefix(writer, response, prefix, stream)
 	if !ok {
 		return
