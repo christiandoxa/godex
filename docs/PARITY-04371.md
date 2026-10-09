@@ -80,6 +80,13 @@ an independent requirement to reimplement the same internal modules in Go.
   runtime broker cleanup treats a zombie PID as stale, matching the tagged
   process-absence proof while retaining live leases. Focused regressions and
   race tests cover these state and lifecycle boundaries.
+- **Startup quota warmup:** The managed-profile lifecycle oracle now covers a
+  successful usage probe and an upstream 503. Each binary performs exactly one
+  `/backend-api/wham/usage` request at startup; success persists a valid
+  generation-one usage snapshot, while failure persists none. The warmup uses
+  one synchronous probe and bounded queued probes, with profile homes and
+  base-URL/no-proxy policy preserved. The oracle waits for the durable state
+  before comparing the two implementations.
 - **Not yet certified:** raw durable-file layouts differ, and broader
   multi-profile recovery, OAuth/user auth, queue lifecycle, TUI, live
   goal monitoring, WebSocket transport and all provider integrations

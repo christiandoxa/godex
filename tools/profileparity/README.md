@@ -36,6 +36,18 @@ runtime behavior matches. The separate DeepSeek differential and release
 gate remain required and fail-closed.
 
 
+### Startup quota warmup
+
+Two startup cases extend the lifecycle oracle beyond the 29 profile and CLI
+operations. With a compatible managed profile and a synthetic successful
+usage response, both binaries issue exactly one `/backend-api/wham/usage`
+request and persist a valid generation-one usage snapshot. With the same
+profile and an upstream 503, both issue exactly one request and persist no
+snapshot. The cases use a loopback fixture and wait for the durable snapshot
+before comparing state, so they verify the bounded startup probe contract
+without requiring a real account or upstream service.
+
+
 ### External CODEX_HOME ownership
 
 The profile lifecycle also creates a synthetic pre-existing external
