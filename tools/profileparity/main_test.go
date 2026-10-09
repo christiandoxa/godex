@@ -116,7 +116,7 @@ func TestProdex04370RejectsCorruptOrUnexpectedManagedState(t *testing.T) {
 }
 func TestProdex04370ProfileLifecycleStageOracleIsIndependent(t *testing.T) {
 	steps := profileSteps()
-	if len(steps) != 19 {
+	if len(steps) != 20 {
 		t.Fatalf("expected profile lifecycle coverage, got %d", len(steps))
 	}
 	if steps[0].name != "initial_list" || steps[len(steps)-1].name != "list_empty_after_external" {
@@ -135,7 +135,7 @@ func TestProdex04370ProfileLifecycleStageOracleIsIndependent(t *testing.T) {
 	if !equivalentStateProjection(valid, stateProjection{Active: "beta", Names: []string{"beta"}}) {
 		t.Fatal("identical persisted state comparison failed")
 	}
-	if reflect.DeepEqual(profileSteps()[5].state, profileSteps()[7].state) != true {
+	if reflect.DeepEqual(profileSteps()[6].state, profileSteps()[8].state) != true {
 		t.Fatal("failed profile use must preserve exact prior state")
 	}
 }

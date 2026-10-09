@@ -123,3 +123,22 @@ model request, accesses no user's home, and changes no installed binary.
 **Full parity and Godex v0.2.1 release are NOT certified until all
 material behavioral surfaces and official release gates are verified.**
 A green Go test suite alone is not release authorization.
+
+
+## Provider gateway startup selection (open parity boundary)
+
+A credential-free local test found another semantic startup mismatch:
+Prodex 0.437.0 refuses to start a DeepSeek gateway with a raw --api-key
+when no compatible/active managed profile is registered; Godex originally
+opened a listener. The tagged Prodex runtime selects a compatible
+profile before constructing its provider gateway. Godex now refuses the
+profileless case, and positive tests show a resolved compatible profile
+still starts and closes the gateway. The canonical refusal is checked
+on both executable CLIs in the 20-stage profile lifecycle differential.
+
+With a *registered but unauthenticated* OpenAI profile, a separate manual
+loopback fixture exposed additional differences in HTTP gateway behavior
+(Prodex error responses versus Godex's successful DeepSeek proxy).
+That fixture is not certified parity and needs source-based analysis
+before deciding whether it is a feature extension or correctness gap.
+No real provider credentials or user profiles were used.

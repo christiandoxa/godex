@@ -141,6 +141,14 @@ func startProviderGateway(
 		if err != nil {
 			return nil, nil, err
 		}
+		if !found {
+			// Prodex 0.437.0 resolves a Codex-compatible profile before
+			// opening its gateway, including external-provider API-key
+			// mode. A raw key cannot fabricate a managed profile identity.
+			return nil, nil, errors.New(
+				"no active profile selected and no Codex-compatible profiles are available; use godex use --profile <name> or pass --profile",
+			)
+		}
 	}
 
 	keys, err := runner.ProviderAPIKeys(options.provider, options.apiKey)

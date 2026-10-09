@@ -40,6 +40,10 @@ type lifecycleStep struct {
 func profileSteps() []lifecycleStep {
 	return []lifecycleStep{
 		{"initial_list", []string{"profile", "list"}, true, stateProjection{}, false, false, "No profiles configured"},
+		{"reject_profileless_raw_key_gateway", []string{
+			"gateway", "--provider", "deepseek", "--api-key", "synthetic-gateway-credential",
+			"--base-url", "http://127.0.0.1:1/v1", "--listen", "127.0.0.1:0",
+		}, false, stateProjection{}, false, false, "no active profile selected"},
 		{"create_alpha", []string{"profile", "add", "alpha"}, true, stateProjection{"alpha", []string{"alpha"}}, true, false, "alpha"},
 		{"duplicate_alpha_rejected", []string{"profile", "add", "alpha"}, false, stateProjection{"alpha", []string{"alpha"}}, true, false, ""},
 		{"create_beta", []string{"profile", "add", "beta"}, true, stateProjection{"alpha", []string{"alpha", "beta"}}, true, true, "beta"},

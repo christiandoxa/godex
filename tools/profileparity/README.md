@@ -1,7 +1,7 @@
 # Prodex 0.437.0 managed-profile lifecycle differential
 
 This tool compares real Prodex and Godex binaries, each operating in a
-separate fresh HOME/PRODEX_HOME/GODEX_HOME, over 19 sequential CLI operations.
+separate fresh HOME/PRODEX_HOME/GODEX_HOME, over 20 sequential CLI operations.
 Every CLI invocation is a new process. No account login, provider API key,
 or external model request is needed. The subprocess receives a minimal
 environment with nonfunctional outbound proxy settings.
@@ -45,3 +45,16 @@ and leave it untouched when the profile entry is eventually removed.
 Any symlinked, world-readable or modified external directory fails the
 domain oracle. Tests reject a false managed designation or an external
 path redirected under a managed profile home.
+
+
+### Profileless provider gateway startup
+
+The additional negative CLI case supplies a synthetic DeepSeek --api-key
+but deliberately configures no managed/active Codex-compatible profile.
+Prodex 0.437.0 requires compatible profile selection before starting the
+gateway, so both implementations must reject startup with exit 1 and
+leave all state unchanged. The separate Go regression proves a configured
+provider profile can still open and close the raw-key gateway successfully.
+
+This narrow startup contract does not prove gateway request behavior with
+an unauthenticated OpenAI profile. That remains independently unverified.
