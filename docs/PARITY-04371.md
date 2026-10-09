@@ -104,6 +104,17 @@ an independent requirement to reimplement the same internal modules in Go.
   failed on a model containing BEL because `strconv.Quote` emitted an invalid
   `\\a` escape; the corrected serializer is qualified against the official
   Codex 0.162.0 app-server binary.
+- **App-server turn identity validation:** Super app-server inspection now
+  rejects empty, oversized, or Unicode-control turn IDs before sending
+  `turn/interrupt`. A synthetic Unix app-server regression reproduces the
+  tagged Codex boundary for a 129-byte ID and a C1 control character, and the
+  credential-free official Codex 0.162.0 thread-index qualification remains
+  passing.
+- **Optional-tool probe cancellation:** Super's bounded `node`/`npx` probes
+  run in an isolated process group and terminate descendants on timeout or
+  cancellation. This prevents inherited output pipes from keeping a canceled
+  probe blocked; a descendant-pipe regression and the normal-PATH differential
+  suite both complete without the former probe hang.
 - **Not yet certified:** raw durable-file layouts differ, and broader
   multi-profile recovery, OAuth/user auth, queue lifecycle, TUI, live
   goal monitoring, WebSocket transport and all provider integrations
