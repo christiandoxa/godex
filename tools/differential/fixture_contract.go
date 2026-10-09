@@ -51,3 +51,42 @@ func validFixtureResponse(body string) bool {
 	content := response.Output[0].Content[0]
 	return content.Type == "output_text" && content.Text == "synthetic-ok"
 }
+
+// A successful tool-call response has a specific stable call identity and
+// structured arguments. Do not count an ordinary text answer as equivalent.
+func validFixtureToolCallResponse(body string) bool {
+	var decoded struct {
+		Object string `json:"object"`
+		Model  string `json:"model"`
+		Output []struct {
+			Type      string          `json:"type"`
+			CallID    string          `json:"call_id"`
+			Name      string          `json:"name"`
+			Arguments json.RawMessage `json:"arguments"`
+		} `json:"output"`
+		Usage struct {
+			Input  int `json:"input_tokens"`
+			Output int `json:"output_tokens"`
+			Total  int `json:"total_tokens"`
+		} `json:"usage"`
+	}
+	if json.Unmarshal([]byte(body), &decoded) != nil ||
+		decoded.Object != "response" || decoded.Model != "deepseek-v4-pro" ||
+		decoded.Usage.Input != 2 || decoded.Usage.Output != 1 || decoded.Usage.Total != 3 ||
+		len(decoded.Output) != 1 {
+		return false
+	}
+	call := decoded.Output[0]
+	if call.Type != "function_call" || call.CallID != "call-differential" || call.Name != "lookup" {
+		return false
+	}
+	var serialized string
+	if json.Unmarshal(call.Arguments, &serialized) != nil {
+		return false
+	}
+	var args map[string]any
+	if json.Unmarshal([]byte(serialized), &args) != nil || len(args) != 1 {
+		return false
+	}
+	return args["key"] == "alpha"
+}

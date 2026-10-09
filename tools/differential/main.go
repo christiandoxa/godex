@@ -103,6 +103,7 @@ type mockPlan struct {
 	FirstStatus int
 	Delay       time.Duration
 	RotateKeys  bool
+	ToolCall    bool
 }
 
 type runOptions struct {
@@ -146,7 +147,7 @@ func run() error {
 	prodexSource := flags.String("prodex-source", "", "exact Prodex 0.436.1 source checkout")
 	godexSource := flags.String("godex-source", "", "Godex candidate source checkout")
 	expectedGodexCommit := flags.String("godex-commit", "", "expected Godex source HEAD commit SHA")
-	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, retry, single-key-429, single-key-503, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
+	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, retry, single-key-429, single-key-503, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		return err
 	}
@@ -195,6 +196,11 @@ func run() error {
 	}{
 		{"success", func() (scenarioResult, error) {
 			return runPair(root, mock, "success", mockPlan{}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{})
+		}},
+		{"tool-call", func() (scenarioResult, error) {
+			// A real function call must preserve its ID, name and JSON
+			// arguments when bridging Chat Completions to Responses.
+			return runPair(root, mock, "tool-call", mockPlan{ToolCall: true}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{})
 		}},
 		{"retry", func() (scenarioResult, error) {
 			return runPair(root, mock, "retry", mockPlan{FirstStatus: http.StatusTooManyRequests}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{retry: true})
@@ -611,6 +617,9 @@ func (mock *mockServer) serveHTTP(writer http.ResponseWriter, request *http.Requ
 		status = http.StatusOK
 	}
 	responseBody := `{"id":"chatcmpl-differential","object":"chat.completion","created":1,"model":"deepseek-v4-pro","choices":[{"index":0,"message":{"role":"assistant","content":"synthetic-ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":2,"completion_tokens":1,"total_tokens":3}}`
+	if plan.ToolCall && status == http.StatusOK {
+		responseBody = `{"id":"chatcmpl-differential-tool","object":"chat.completion","created":1,"model":"deepseek-v4-pro","choices":[{"index":0,"message":{"role":"assistant","content":null,"tool_calls":[{"id":"call-differential","type":"function","function":{"name":"lookup","arguments":"{\"key\":\"alpha\"}"}}]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":2,"completion_tokens":1,"total_tokens":3}}`
+	}
 	if status != http.StatusOK {
 		responseBody = `{"error":{"code":"rate_limit_exceeded"}}`
 	}
@@ -806,6 +815,10 @@ func scenarioInvariants(scenario scenarioResult) []string {
 			wantExit = 2
 			if run.Client.Status != http.StatusTooManyRequests || !strings.Contains(run.Client.Body, "rate_limit_exceeded") {
 				failures = append(failures, prefix+".unhandled_rate_limit")
+			}
+		case "tool-call":
+			if run.Client.Status != http.StatusOK || !validFixtureToolCallResponse(run.Client.Body) {
+				failures = append(failures, prefix+".tool_call_semantics")
 			}
 		case "single-key-503":
 			wantExit = 2

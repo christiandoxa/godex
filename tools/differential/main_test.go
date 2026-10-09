@@ -259,3 +259,20 @@ func TestRotationRestartRejectsWrongCredentialAfterPersistence(t *testing.T) {
 		t.Fatal("persisted routing selected a failed primary but passed")
 	}
 }
+
+func TestToolCallFixtureRequiresExactCallIdentityAndArguments(t *testing.T) {
+	valid := `{"object":"response","model":"deepseek-v4-pro","output":[{"type":"function_call","call_id":"call-differential","name":"lookup","arguments":"{\"key\":\"alpha\"}"}],"usage":{"input_tokens":2,"output_tokens":1,"total_tokens":3}}`
+	if !validFixtureToolCallResponse(valid) {
+		t.Fatal("correct fixed function call rejected")
+	}
+	for _, body := range []string{
+		`{"object":"response","model":"deepseek-v4-pro","output":[{"type":"function_call","call_id":"wrong","name":"lookup","arguments":"{}"}],"usage":{"input_tokens":2,"output_tokens":1,"total_tokens":3}}`,
+		`{"object":"response","model":"deepseek-v4-pro","output":[{"type":"function_call","call_id":"call-differential","name":"lookup","arguments":"{\"key\":\"beta\"}"}],"usage":{"input_tokens":2,"output_tokens":1,"total_tokens":3}}`,
+		`{"object":"response","model":"deepseek-v4-pro","output":[{"type":"message","call_id":"call-differential","name":"lookup","arguments":"{\"key\":\"alpha\"}"}],"usage":{"input_tokens":2,"output_tokens":1,"total_tokens":3}}`,
+		`{"object":"response","model":"deepseek-v4-pro","output":[{"type":"function_call","call_id":"call-differential","name":"lookup","arguments":"{\"key\":\"alpha\"}"}],"usage":{"input_tokens":2,"output_tokens":1,"total_tokens":4}}`,
+	} {
+		if validFixtureToolCallResponse(body) {
+			t.Fatalf("incorrect tool-call was accepted: %s", body)
+		}
+	}
+}
