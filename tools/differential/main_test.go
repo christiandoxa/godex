@@ -37,8 +37,8 @@ func TestScenarioInvariantsRejectEquivalentFailedRuns(t *testing.T) {
 
 func TestScenarioInvariantsAllowExpectedInterruptedExit(t *testing.T) {
 	scenario := scenarioResult{Name: "cancel", Runs: []productRun{
-		{Name: "prodex", ExitStatus: 1, Cancelled: true, Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, Body: syntheticFixtureRequest}}},
-		{Name: "godex", ExitStatus: 1, Cancelled: true, Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, Body: syntheticFixtureRequest}}},
+		{Name: "prodex", ExitStatus: 1, Cancelled: true, Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, KeySlot: "single", Body: syntheticFixtureRequest}}},
+		{Name: "godex", ExitStatus: 1, Cancelled: true, Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, KeySlot: "single", Body: syntheticFixtureRequest}}},
 	}}
 	if failures := scenarioInvariants(scenario); len(failures) != 0 {
 		t.Fatalf("expected interrupted client outcome rejected: %v", failures)
@@ -102,13 +102,13 @@ func TestCleanCanonicalSourceCheckRejectsNewFiles(t *testing.T) {
 // The real Prodex 0.436.1 single-key 429 path does NOT retry in the proxy.
 func TestSingleKey429RejectsUnownedProxyRetries(t *testing.T) {
 	runs := []productRun{
-		{Name: "prodex", ExitStatus: 2, Client: exchange{Status: 429, Body: "rate_limit_exceeded"}, Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, Body: syntheticFixtureRequest}}},
-		{Name: "godex", ExitStatus: 2, Client: exchange{Status: 429, Body: "rate_limit_exceeded"}, Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, Body: syntheticFixtureRequest}}},
+		{Name: "prodex", ExitStatus: 2, Client: exchange{Status: 429, Body: "rate_limit_exceeded"}, Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, KeySlot: "single", Body: syntheticFixtureRequest}}},
+		{Name: "godex", ExitStatus: 2, Client: exchange{Status: 429, Body: "rate_limit_exceeded"}, Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, KeySlot: "single", Body: syntheticFixtureRequest}}},
 	}
 	if failures := scenarioInvariants(scenarioResult{Name: "single-key-429", Runs: runs}); len(failures) != 0 {
 		t.Fatalf("canonical terminal rate-limit rejected: %v", failures)
 	}
-	runs[1].Upstream = append(runs[1].Upstream, upstreamRequest{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, Body: syntheticFixtureRequest})
+	runs[1].Upstream = append(runs[1].Upstream, upstreamRequest{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, KeySlot: "single", Body: syntheticFixtureRequest})
 	runs[1].Retries = 1
 	if failures := scenarioInvariants(scenarioResult{Name: "single-key-429", Runs: runs}); len(failures) == 0 {
 		t.Fatal("unexpected proxy retry was incorrectly accepted")
@@ -154,11 +154,11 @@ func TestFixtureOracleRejectsSymmetricCorruption(t *testing.T) {
 func TestRecoverAfter429RequiresHealthySecondGeneration(t *testing.T) {
 	bad := productRun{
 		Name: "prodex", ExitStatus: 2, Client: exchange{Status: 429, Body: "rate_limit_exceeded"},
-		Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, Body: syntheticFixtureRequest}},
+		Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, KeySlot: "single", Body: syntheticFixtureRequest}},
 	}
 	good := productRun{
 		Name: "prodex", ExitStatus: 0, Client: exchange{Status: 200, Body: syntheticFixtureResponse},
-		Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, Body: syntheticFixtureRequest}},
+		Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, KeySlot: "single", Body: syntheticFixtureRequest}},
 	}
 	scenario := scenarioResult{Name: "recover-after-429", Runs: []productRun{bad, good, bad, good}}
 	if failures := scenarioInvariants(scenario); len(failures) != 0 {
@@ -173,9 +173,9 @@ func TestRecoverAfter429RequiresHealthySecondGeneration(t *testing.T) {
 func TestSingleKey503RequiresOriginalServiceStatus(t *testing.T) {
 	runs := []productRun{
 		{Name: "prodex", ExitStatus: 2, Client: exchange{Status: 503, Body: "rate_limit_exceeded"},
-			Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, Body: syntheticFixtureRequest}}},
+			Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, KeySlot: "single", Body: syntheticFixtureRequest}}},
 		{Name: "godex", ExitStatus: 2, Client: exchange{Status: 503, Body: "rate_limit_exceeded"},
-			Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, Body: syntheticFixtureRequest}}},
+			Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, KeySlot: "single", Body: syntheticFixtureRequest}}},
 	}
 	if failures := scenarioInvariants(scenarioResult{Name: "single-key-503", Runs: runs}); len(failures) != 0 {
 		t.Fatalf("canonical single-key service outage rejected: %v", failures)
@@ -192,12 +192,12 @@ func TestRecoverAfter503RequiresHealthySecondGeneration(t *testing.T) {
 	outage := productRun{
 		Name: "prodex", ExitStatus: 2,
 		Client:   exchange{Status: 503, Body: "rate_limit_exceeded"},
-		Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, Body: syntheticFixtureRequest}},
+		Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, KeySlot: "single", Body: syntheticFixtureRequest}},
 	}
 	recovered := productRun{
 		Name: "prodex", ExitStatus: 0,
 		Client:   exchange{Status: 200, Body: syntheticFixtureResponse},
-		Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, Body: syntheticFixtureRequest}},
+		Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, KeySlot: "single", Body: syntheticFixtureRequest}},
 	}
 	scenario := scenarioResult{Name: "recover-after-503", Runs: []productRun{outage, recovered, outage, recovered}}
 	if violations := scenarioInvariants(scenario); len(violations) != 0 {
@@ -206,5 +206,35 @@ func TestRecoverAfter503RequiresHealthySecondGeneration(t *testing.T) {
 	scenario.Runs[3] = outage
 	if violations := scenarioInvariants(scenario); len(violations) == 0 {
 		t.Fatal("persisted health state that blocks later healthy request was ignored")
+	}
+}
+
+func TestMultipleCredentialsRotateOnlyAfterFailedPrimary(t *testing.T) {
+	request := func(slot string) upstreamRequest {
+		return upstreamRequest{
+			Method: "POST", Path: "/v1/chat/completions", AuthOK: true,
+			KeySlot: slot, Body: syntheticFixtureRequest,
+		}
+	}
+	passed := productRun{
+		ExitStatus: 0, Client: exchange{Status: 200, Body: syntheticFixtureResponse},
+		Upstream: []upstreamRequest{request("primary"), request("secondary")},
+		Retries:  1,
+	}
+	if failures := scenarioInvariants(scenarioResult{Name: "key-rotation-429", Runs: []productRun{passed, passed}}); len(failures) != 0 {
+		t.Fatalf("correct independent rotation rejected: %v", failures)
+	}
+	mutated := passed
+	mutated.Upstream = []upstreamRequest{request("primary"), request("primary")}
+	if failures := scenarioInvariants(scenarioResult{Name: "key-rotation-429", Runs: []productRun{passed, mutated}}); len(failures) == 0 {
+		t.Fatal("same credential replayed after 429 but oracle passed")
+	}
+}
+
+func TestAllSyntheticProviderCredentialsAreRedacted(t *testing.T) {
+	for _, key := range []string{apiKey, rotationPrimaryKey, rotationSecondaryKey} {
+		if got := redact("credential=" + key); got != "credential=<synthetic-key>" {
+			t.Fatalf("synthetic credential leaked: %q", got)
+		}
 	}
 }

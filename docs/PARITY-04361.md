@@ -115,7 +115,7 @@ recovery snapshots. These integrity checks are necessary but do not prove
 cross-implementation state persistence semantics: the raw durable-state
 layout mismatch remains a release blocker.
 
-The expanded eight-scenario differential suite includes a real cross-process
+The expanded nine-scenario differential suite includes a real cross-process
 429-to-healthy recovery on the same isolated state root. This verifies that
 terminal provider failures do not poison subsequent process launches. Raw
 internal file inventories remain visible and have not been treated as proof
@@ -139,7 +139,7 @@ through filename-level normalization.
 
 Prodex's 503 provider-health sidecar and narrowly formatted atomic-write
 temporary files are audited and distinguished from unexpected persisted
-state. The eight-scenario differential suite, including the
+state. The nine-scenario differential suite, including the
 503-to-healthy cross-process case, verifies user-visible behavior for
 one synthetic key, **not multi-profile health ranking equivalence**.
 
@@ -150,3 +150,11 @@ the single-key synthetic fixture; Godex route-memory and backoff state must
 also be empty. Nonempty provider scores fail independent negative-control
 tests. The multi-profile scoring and continuation-journal contracts remain
 outside this narrow proof.
+
+
+An additional synthetic two-key DeepSeek differential scenario checks
+the provider credential-rotation contract: the primary key is always
+rate-limited, and success requires selecting the distinct secondary key
+without the Codex client retrying. The accepted key is represented only
+by an opaque slot label in test output. This still does not establish
+all provider/auth combinations or multi-profile health ranking parity.

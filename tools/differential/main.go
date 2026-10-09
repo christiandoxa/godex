@@ -28,9 +28,11 @@ import (
 )
 
 const (
-	prodexCommit = "4c61dc0a84a6cf4852feb08e3a8406c1846bb5ad"
-	apiKey       = "synthetic-provider-key"
-	bodyLimit    = 1 << 20
+	prodexCommit         = "4c61dc0a84a6cf4852feb08e3a8406c1846bb5ad"
+	apiKey               = "synthetic-provider-key"
+	bodyLimit            = 1 << 20
+	rotationPrimaryKey   = "synthetic-primary-credential"
+	rotationSecondaryKey = "synthetic-secondary-credential"
 )
 
 type upstreamRequest struct {
@@ -39,6 +41,7 @@ type upstreamRequest struct {
 	Headers http.Header `json:"headers"`
 	Body    string      `json:"body"`
 	AuthOK  bool        `json:"synthetic_auth_valid"`
+	KeySlot string      `json:"synthetic_key_slot,omitempty"`
 }
 
 type upstreamEvent struct {
@@ -99,11 +102,13 @@ type report struct {
 type mockPlan struct {
 	FirstStatus int
 	Delay       time.Duration
+	RotateKeys  bool
 }
 
 type runOptions struct {
 	retry  bool
 	cancel bool
+	rotate bool
 }
 
 type mockServer struct {
@@ -141,7 +146,7 @@ func run() error {
 	prodexSource := flags.String("prodex-source", "", "exact Prodex 0.436.1 source checkout")
 	godexSource := flags.String("godex-source", "", "Godex candidate source checkout")
 	expectedGodexCommit := flags.String("godex-commit", "", "expected Godex source HEAD commit SHA")
-	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, retry, single-key-429, single-key-503, cancel, restart, recover-after-429, or recover-after-503")
+	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, retry, single-key-429, single-key-503, key-rotation-429, cancel, restart, recover-after-429, or recover-after-503")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		return err
 	}
@@ -203,6 +208,11 @@ func run() error {
 			// An upstream service outage is terminal without another eligible
 			// model or credential; no same-key loop may swallow the failure.
 			return runPair(root, mock, "single-key-503", mockPlan{FirstStatus: http.StatusServiceUnavailable}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{})
+		}},
+		{"key-rotation-429", func() (scenarioResult, error) {
+			// The first API key always fails. A second independent credential
+			// must be selected *by the proxy*, with just one client request.
+			return runPair(root, mock, "key-rotation-429", mockPlan{RotateKeys: true}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{rotate: true})
 		}},
 		{"cancel", func() (scenarioResult, error) {
 			return runPair(root, mock, "cancel", mockPlan{Delay: 2 * time.Second}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{cancel: true})
@@ -377,7 +387,11 @@ func runProduct(root string, mock *mockServer, name, binary, commit string, plan
 	if err != nil {
 		return productRun{}, err
 	}
-	args := []string{"super", "--provider", "deepseek", "--api-key", apiKey, "--base-url", mock.baseURL() + "/v1", "--no-presidio", "--no-sub-agent", "exec", "synthetic differential probe"}
+	args := []string{"super", "--provider", "deepseek"}
+	if !options.rotate {
+		args = append(args, "--api-key", apiKey)
+	}
+	args = append(args, "--base-url", mock.baseURL()+"/v1", "--no-presidio", "--no-sub-agent", "exec", "synthetic differential probe")
 	stdout, stderr := &limitedBuffer{}, &limitedBuffer{}
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
@@ -410,12 +424,22 @@ func runProduct(root string, mock *mockServer, name, binary, commit string, plan
 	events := mock.eventsSince(eventStart)
 	return productRun{
 		Name: name, Binary: resolved, Version: version, Commit: commit, SHA256: digest,
-		Command:    []string{name, "super", "--provider", "deepseek", "--api-key", "<synthetic-key>", "--base-url", "http://127.0.0.1:<mock>/v1", "--no-presidio", "--no-sub-agent", "exec", "synthetic differential probe"},
+		Command:    redactedScenarioCommand(name, options.rotate),
 		ExitStatus: exit, Stdout: redact(stdout.String()), Stderr: redact(stderr.String()),
 		Client: clientExchange, Upstream: upstream, Events: events,
 		Retries: max(0, len(upstream)-1), Cancelled: options.cancel && hasEvent(events, "upstream.cancelled"),
 		Files: snapshot(productRoot), StateIntegrity: auditFixtureDurableState(productRoot),
 	}, nil
+}
+
+func redactedScenarioCommand(name string, rotate bool) []string {
+	command := []string{name, "super", "--provider", "deepseek"}
+	if rotate {
+		command = append(command, "<synthetic-multiple-credentials-in-environment>")
+	} else {
+		command = append(command, "--api-key", "<synthetic-key>")
+	}
+	return append(command, "--base-url", "http://127.0.0.1:<mock>/v1", "--no-presidio", "--no-sub-agent", "exec", "synthetic differential probe")
 }
 
 func productEnv(name, stateHome, codexHome, userHome, shim, childResult string, options runOptions) []string {
@@ -430,6 +454,9 @@ func productEnv(name, stateHome, codexHome, userHome, shim, childResult string, 
 	}
 	if options.retry {
 		env = append(env, "DIFFERENTIAL_RETRY=1")
+	}
+	if options.rotate {
+		env = append(env, "DEEPSEEK_API_KEYS="+rotationPrimaryKey+","+rotationSecondaryKey)
 	}
 	if options.cancel {
 		env = append(env, "DIFFERENTIAL_CANCEL=1")
@@ -500,9 +527,20 @@ func (mock *mockServer) serveHTTP(writer http.ResponseWriter, request *http.Requ
 		return
 	}
 	headers := request.Header.Clone()
-	// Redaction alone would hide a wrong key on both sides. Keep a boolean
-	// assertion of the exact synthetic credential before erasing its bytes.
-	authOK := headers.Get("Authorization") == "Bearer "+apiKey
+	// A synthetic credential must be from the exact configured set.
+	// Record only the slot, never its value, in the comparison report.
+	authorization := headers.Get("Authorization")
+	keySlot := ""
+	if authorization == "Bearer "+apiKey {
+		keySlot = "single"
+	}
+	if authorization == "Bearer "+rotationPrimaryKey {
+		keySlot = "primary"
+	}
+	if authorization == "Bearer "+rotationSecondaryKey {
+		keySlot = "secondary"
+	}
+	authOK := keySlot != ""
 	if headers.Get("Authorization") != "" {
 		headers.Set("Authorization", "<redacted>")
 	}
@@ -510,7 +548,8 @@ func (mock *mockServer) serveHTTP(writer http.ResponseWriter, request *http.Requ
 	attempt := len(mock.requests) - mock.planStart + 1
 	mock.requests = append(mock.requests, upstreamRequest{
 		Method: request.Method, Path: request.URL.RequestURI(), Headers: headers, Body: string(body),
-		AuthOK: authOK,
+		AuthOK:  authOK,
+		KeySlot: keySlot,
 	})
 	mock.events = append(mock.events, upstreamEvent{Kind: "upstream.request", Attempt: attempt})
 	plan := mock.plan
@@ -532,7 +571,13 @@ func (mock *mockServer) serveHTTP(writer http.ResponseWriter, request *http.Requ
 		}
 	}
 	status := plan.FirstStatus
-	if status == 0 || attempt != 1 {
+	if plan.RotateKeys {
+		if keySlot == "secondary" {
+			status = http.StatusOK
+		} else {
+			status = http.StatusTooManyRequests
+		}
+	} else if status == 0 || attempt != 1 {
 		status = http.StatusOK
 	}
 	responseBody := `{"id":"chatcmpl-differential","object":"chat.completion","created":1,"model":"deepseek-v4-pro","choices":[{"index":0,"message":{"role":"assistant","content":"synthetic-ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":2,"completion_tokens":1,"total_tokens":3}}`
@@ -746,8 +791,15 @@ func scenarioInvariants(scenario scenarioResult) []string {
 			failures = append(failures, prefix+".exit_status")
 		}
 		wantRequests := 1
-		if phase == "retry" {
+		if phase == "retry" || phase == "key-rotation-429" {
 			wantRequests = 2
+		}
+		if phase == "key-rotation-429" {
+			if len(run.Upstream) == 2 &&
+				(run.Upstream[0].KeySlot != "primary" ||
+					run.Upstream[1].KeySlot != "secondary") {
+				failures = append(failures, prefix+".credential_rotation_order")
+			}
 		}
 		if len(run.Upstream) != wantRequests || run.Retries != wantRequests-1 {
 			failures = append(failures, prefix+".upstream_attempts")
@@ -758,6 +810,9 @@ func scenarioInvariants(scenario scenarioResult) []string {
 		for _, upstream := range run.Upstream {
 			if !upstream.AuthOK || upstream.Method != http.MethodPost || upstream.Path != "/v1/chat/completions" {
 				failures = append(failures, prefix+".upstream_auth_or_route")
+			}
+			if phase != "key-rotation-429" && upstream.KeySlot != "single" {
+				failures = append(failures, prefix+".wrong_credential_slot")
 			}
 			if !validFixtureRequest(upstream.Body) {
 				failures = append(failures, prefix+".upstream_request_invalid")
@@ -971,7 +1026,12 @@ func fileSHA256(path string) (string, error) {
 	return fmt.Sprintf("%x", hash.Sum(nil)), nil
 }
 
-func redact(value string) string { return strings.ReplaceAll(value, apiKey, "<synthetic-key>") }
+func redact(value string) string {
+	for _, secret := range []string{apiKey, rotationPrimaryKey, rotationSecondaryKey} {
+		value = strings.ReplaceAll(value, secret, "<synthetic-key>")
+	}
+	return value
+}
 
 func contains(values []string, target string) bool {
 	for _, value := range values {

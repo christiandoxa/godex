@@ -61,7 +61,8 @@ func auditFixtureDurableState(root string) []string {
 		if err != nil {
 			return err
 		}
-		if bytes.Contains(data, []byte(apiKey)) {
+		if bytes.Contains(data, []byte(apiKey)) || bytes.Contains(data, []byte(rotationPrimaryKey)) ||
+			bytes.Contains(data, []byte(rotationSecondaryKey)) {
 			violations = append(violations, "synthetic_provider_secret_persisted:"+relative)
 		}
 		switch relative {
