@@ -104,12 +104,14 @@ type mockPlan struct {
 	Delay       time.Duration
 	RotateKeys  bool
 	ToolCall    bool
+	Stream      bool
 }
 
 type runOptions struct {
 	retry  bool
 	cancel bool
 	rotate bool
+	stream bool
 }
 
 type mockServer struct {
@@ -147,7 +149,7 @@ func run() error {
 	prodexSource := flags.String("prodex-source", "", "exact Prodex 0.436.1 source checkout")
 	godexSource := flags.String("godex-source", "", "Godex candidate source checkout")
 	expectedGodexCommit := flags.String("godex-commit", "", "expected Godex source HEAD commit SHA")
-	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, retry, single-key-401, single-key-403, single-key-429, single-key-503, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
+	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, sse-stream, retry, single-key-401, single-key-403, single-key-429, single-key-503, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		return err
 	}
@@ -201,6 +203,11 @@ func run() error {
 			// A real function call must preserve its ID, name and JSON
 			// arguments when bridging Chat Completions to Responses.
 			return runPair(root, mock, "tool-call", mockPlan{ToolCall: true}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{})
+		}},
+		{"sse-stream", func() (scenarioResult, error) {
+			// Exercise a real streaming Responses request through both
+			// independent proxy processes, not a buffered JSON response.
+			return runPair(root, mock, "sse-stream", mockPlan{Stream: true}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{stream: true})
 		}},
 		{"retry", func() (scenarioResult, error) {
 			return runPair(root, mock, "retry", mockPlan{FirstStatus: http.StatusTooManyRequests}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{retry: true})
@@ -500,6 +507,9 @@ func productEnv(name, stateHome, codexHome, userHome, shim, childResult string, 
 	if options.rotate {
 		env = append(env, "DEEPSEEK_API_KEYS="+rotationPrimaryKey+","+rotationSecondaryKey)
 	}
+	if options.stream {
+		env = append(env, "DIFFERENTIAL_STREAM=1")
+	}
 	if options.cancel {
 		env = append(env, "DIFFERENTIAL_CANCEL=1")
 	}
@@ -636,7 +646,15 @@ func (mock *mockServer) serveHTTP(writer http.ResponseWriter, request *http.Requ
 			responseBody = `{"error":{"code":"rate_limit_exceeded"}}`
 		}
 	}
-	writer.Header().Set("Content-Type", "application/json")
+	if plan.Stream && status == http.StatusOK {
+		responseBody = "data: {\"id\":\"chatcmpl-differential-stream\",\"model\":\"deepseek-v4-pro\",\"created\":1,\"choices\":[{\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\n" +
+			"data: {\"id\":\"chatcmpl-differential-stream\",\"model\":\"deepseek-v4-pro\",\"created\":1,\"choices\":[{\"delta\":{\"content\":\"synthetic-ok\"},\"finish_reason\":null}]}\n\n" +
+			"data: {\"id\":\"chatcmpl-differential-stream\",\"model\":\"deepseek-v4-pro\",\"created\":1,\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":2,\"completion_tokens\":1,\"total_tokens\":3}}\n\n" +
+			"data: [DONE]\n\n"
+		writer.Header().Set("Content-Type", "text/event-stream")
+	} else {
+		writer.Header().Set("Content-Type", "application/json")
+	}
 	writer.Header().Set("X-Synthetic-Upstream", "differential-v1")
 	writer.WriteHeader(status)
 	_, _ = io.WriteString(writer, responseBody)
@@ -684,6 +702,9 @@ func runCodexShim(arguments []string) int {
 	}
 	endpoint.Path = strings.TrimRight(endpoint.Path, "/") + "/responses"
 	requestBody := []byte(`{"model":"deepseek-v4-pro","input":[{"role":"user","content":[{"type":"input_text","text":"same request"}]}],"stream":false}`)
+	if os.Getenv("DIFFERENTIAL_STREAM") == "1" {
+		requestBody = []byte(`{"model":"deepseek-v4-pro","input":[{"role":"user","content":[{"type":"input_text","text":"same request"}]}],"stream":true}`)
+	}
 	timeout := 8 * time.Second
 	if os.Getenv("DIFFERENTIAL_CANCEL") == "1" {
 		timeout = 1 * time.Second
@@ -701,7 +722,11 @@ func runCodexShim(arguments []string) int {
 			return shimFailure("synthetic Codex shim could not build request")
 		}
 		request.Header.Set("Content-Type", "application/json")
-		request.Header.Set("Accept", "application/json")
+		if os.Getenv("DIFFERENTIAL_STREAM") == "1" {
+			request.Header.Set("Accept", "text/event-stream")
+		} else {
+			request.Header.Set("Accept", "application/json")
+		}
 		request.Header.Set("Traceparent", "00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01")
 		response, err := client.Do(request)
 		if err != nil {
