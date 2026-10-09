@@ -41,7 +41,7 @@ func (store *Store) LoadContinuationStatuses(
 	if err := store.prepare(); err != nil {
 		return nil, fmt.Errorf("prepare continuation status store: %w", err)
 	}
-	release, err := lockfile.Acquire(ctx, filepath.Join(store.root, "continuation-status.guard"))
+	release, err := lockfile.Acquire(ctx, filepath.Join(store.root, "routing.guard"))
 	if err != nil {
 		return nil, fmt.Errorf("lock continuation status store: %w", err)
 	}
@@ -69,7 +69,7 @@ func (store *Store) SaveContinuationStatus(
 	if err := store.prepare(); err != nil {
 		return fmt.Errorf("prepare continuation status store: %w", err)
 	}
-	release, err := lockfile.Acquire(ctx, filepath.Join(store.root, "continuation-status.guard"))
+	release, err := lockfile.Acquire(ctx, filepath.Join(store.root, "routing.guard"))
 	if err != nil {
 		return fmt.Errorf("lock continuation status store: %w", err)
 	}

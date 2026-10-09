@@ -64,8 +64,10 @@ responses continue forwarding without being buffered in full.
 Valid Retry-After values influence quarantine duration. Quarantine entries are
 bounded and expire. Quarantine is in memory. Continuity bindings are backed by a bounded, versioned
 hashed ownership snapshot, so restart and cache expiry recover the owner.
-Unknown opaque continuations fail instead of becoming fresh requests. Stable
-thread/session bindings are protected from expiry and eviction.
+Unknown WebSocket and other non-Responses opaque continuations fail instead of
+becoming fresh requests. An unbound HTTP Responses `previous_response_id` gets
+one bounded upstream attempt for discovery. Stable thread/session bindings are
+protected from expiry and eviction.
 
 ## Commitment and streaming
 

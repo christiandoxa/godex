@@ -51,6 +51,10 @@ func requestWithoutTurnState(request proxymodel.Request) proxymodel.Request {
 }
 
 func (store *affinityStore) deadTurnState(value string, now time.Time) bool {
+	return store.deadTurnStateContext(context.Background(), value, now)
+}
+
+func (store *affinityStore) deadTurnStateContext(ctx context.Context, value string, now time.Time) bool {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return false
@@ -60,6 +64,9 @@ func (store *affinityStore) deadTurnState(value string, now time.Time) bool {
 	defer store.mu.Unlock()
 	store.pruneLocked(now)
 	store.pruneContinuationStatusesLocked(now)
+	if _, live := store.values[key]; !live {
+		_ = store.loadMissingLocked(ctx, affinityKeys{turn: value}, now)
+	}
 	if _, live := store.values[key]; live {
 		return false
 	}
@@ -118,8 +125,12 @@ func (store *affinityStore) releaseOwnedDead(
 }
 
 func (router *Router) scrubDeadTurnState(request proxymodel.Request) proxymodel.Request {
+	return router.scrubDeadTurnStateContext(context.Background(), request)
+}
+
+func (router *Router) scrubDeadTurnStateContext(ctx context.Context, request proxymodel.Request) proxymodel.Request {
 	keys := requestRoutingAffinity(request)
-	if keys.turn == "" || !router.affinity.deadTurnState(keys.turn, router.now()) {
+	if keys.turn == "" || !router.affinity.deadTurnStateContext(ctx, keys.turn, router.now()) {
 		return request
 	}
 	return requestWithoutTurnState(request)

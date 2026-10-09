@@ -677,7 +677,9 @@ Upstream conversation ownership survives process restarts in a bounded
 `routing.json` containing hashes and account metadata, never raw continuation
 secrets or credentials. A resumed session keeps its rollout home and uses the
 account that served it, even if the first request rotated accounts. Unknown
-opaque continuations fail clearly. Native/imported sessions without an existing
+WebSocket and other non-Responses opaque continuations fail clearly; an
+unbound HTTP Responses `previous_response_id` gets one bounded upstream attempt
+so the upstream can identify whether it is valid. Native/imported sessions without an existing
 binding use their containing profile. Stable ownership is retained; the store
 refuses new conversations if its 8,192 protected-binding ceiling is reached.
 Looking up an older durable owner does not depend on the 4,096-entry cache.
