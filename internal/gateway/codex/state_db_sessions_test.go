@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,6 +16,26 @@ import (
 )
 
 const stateDBMaintenanceHelperMode = "GODEX_TEST_STATE_DB_MAINTENANCE"
+
+func TestStateDBReadOnlyURIPreservesWindowsDrives(t *testing.T) {
+	for _, tc := range []struct {
+		name, path, goos, wantPath string
+	}{
+		{"windows_drive", `C:\Users\Runner One\state_5.sqlite`, "windows", "/C:/Users/Runner One/state_5.sqlite"},
+		{"windows_lower", `d:\codex\state_5.sqlite`, "windows", "/d:/codex/state_5.sqlite"},
+		{"unix", "/tmp/My Home/state_5.sqlite", "linux", "/tmp/My Home/state_5.sqlite"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			u, err := url.Parse(stateDBReadOnlyURIForOS(tc.path, tc.goos))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if u.Scheme != "file" || u.Host != "" || u.Path != tc.wantPath || u.Query().Get("mode") != "ro" {
+				t.Fatalf("unsafe state DB path URI: %s parsed as %#v", tc.path, u)
+			}
+		})
+	}
+}
 
 func TestStateDBRolloutRecoveryRepairsOnlyVerifiedOverlayRows(t *testing.T) {
 	root := t.TempDir()
@@ -54,6 +75,7 @@ func TestStateDBRolloutRecoveryRepairsOnlyVerifiedOverlayRows(t *testing.T) {
 		t.Fatal(err)
 	}
 	database = openStateDBTest(t, stateDB)
+	t.Cleanup(func() { _ = database.Close() })
 	var got string
 	if err := database.QueryRow("SELECT rollout_path FROM threads WHERE id = ?1", sessionID).Scan(&got); err != nil {
 		t.Fatal(err)

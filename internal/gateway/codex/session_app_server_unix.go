@@ -24,11 +24,11 @@ func (process *CodexProcess) runWithSessionAppServer(
 	command *exec.Cmd,
 	arguments []string,
 ) error {
-	socket := filepath.Join(codexHome, ".s")
-	if err := prepareSessionAppServerSocket(socket); err != nil {
+	socket, cleanup, err := privateSessionAppServerSocket(codexHome)
+	if err != nil {
 		return err
 	}
-	defer os.Remove(socket)
+	defer cleanup()
 
 	companion := exec.Command(binary, sessionAppServerCompanionArguments(arguments, socket)...)
 	companion.Dir = codexHome
@@ -70,6 +70,34 @@ func (process *CodexProcess) runWithSessionAppServer(
 		return err
 	}
 	return nil
+}
+
+// privateSessionAppServerSocket keeps the usual profile-owned socket when
+// its path is portable to macOS, and uses an exclusive 0700 temporary
+// directory for longer paths (which Unix sockets cannot bind reliably).
+func privateSessionAppServerSocket(codexHome string) (string, func(), error) {
+	const portableUnixSocketPathBytes = 90
+	socket := filepath.Join(codexHome, ".s")
+	if len(socket) <= portableUnixSocketPathBytes {
+		if err := prepareSessionAppServerSocket(socket); err != nil {
+			return "", nil, err
+		}
+		return socket, func() { _ = os.Remove(socket) }, nil
+	}
+	directory, err := os.MkdirTemp("", "gd-session-")
+	if err != nil {
+		return "", nil, fmt.Errorf("create private Codex app-server socket directory: %w", err)
+	}
+	socket = filepath.Join(directory, ".s")
+	if len(socket) > portableUnixSocketPathBytes {
+		_ = os.RemoveAll(directory)
+		return "", nil, errors.New("temporary Codex app-server socket path is too long")
+	}
+	if err := prepareSessionAppServerSocket(socket); err != nil {
+		_ = os.RemoveAll(directory)
+		return "", nil, err
+	}
+	return socket, func() { _ = os.RemoveAll(directory) }, nil
 }
 
 func waitForSessionChild(ctx context.Context, command *exec.Cmd) error {

@@ -25,4 +25,24 @@ for target in \
   test -s "$output"
 done
 
-echo 'Cross-build matrix: passed'
+# Production cross-builds do not compile _test.go files. Guard test-only
+# build tags and platform-specific helpers before the remote CI matrix.
+for target in darwin/arm64 windows/amd64; do
+  IFS=/ read -r goos goarch <<<"$target"
+  for package in \
+    internal/delivery/cli/superexpose \
+    internal/gateway/codex \
+    internal/usecase/runtime; do
+    binary="${package//\//_}"
+    output="$output_dir/${binary}_${goos}_${goarch}.test"
+    if [[ "$goos" == windows ]]; then
+      output+='.exe'
+    fi
+    echo "Compiling tests $goos/$goarch $package"
+    CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" \
+      go test -c -o "$output" "./$package"
+    test -s "$output"
+  done
+done
+
+echo 'Cross-build and cross-test compile matrix: passed'

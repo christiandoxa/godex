@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
@@ -31,7 +32,7 @@ func TestResumedSessionRunsSharedMaintenanceBeforeLaunch(t *testing.T) {
 	if err := runner.RunSession(context.Background(), "home", "home", []string{"resume", "session"}); err != nil {
 		t.Fatal(err)
 	}
-	if process.shared != "/shared/codex" || process.cache != "/godex" {
+	if process.shared != "/shared/codex" || process.cache != filepath.Dir(filepath.Clean("/godex/profiles")) {
 		t.Fatalf("maintenance roots = %q/%q", process.shared, process.cache)
 	}
 	if len(process.homes) != 1 || process.homes[0] != "/profiles/home" {

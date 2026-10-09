@@ -144,6 +144,28 @@ func TestRunThroughProxyWithSessionServerOwnsCompanionLifecycle(t *testing.T) {
 	}
 }
 
+func TestRunThroughProxyWithLongSessionHomeReapsPrivateCompanion(t *testing.T) {
+	root := t.TempDir()
+	marker := filepath.Join(root, "events")
+	wrapper := sessionCompanionWrapper(t)
+	t.Setenv(sessionCompanionHelperEnv, "1")
+	t.Setenv(sessionCompanionMarkerEnv, marker)
+	home := filepath.Join(root, strings.Repeat("x", 100), "home")
+	if err := os.MkdirAll(home, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	process := NewCodexProcess(wrapper, Terminal{Stdin: strings.NewReader(""), Stdout: io.Discard, Stderr: io.Discard})
+	if err := process.RunThroughProxyWithSessionServer(t.Context(), home, "http://127.0.0.1:1234", []string{"--model", "synthetic"}, ""); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(string(mustSessionCompanionFile(t, marker))); got != "companion\nchild" {
+		t.Fatalf("long-home companion lifecycle = %q", got)
+	}
+	if _, err := os.Lstat(filepath.Join(home, ".s")); !os.IsNotExist(err) {
+		t.Fatalf("long-home socket survived: %v", err)
+	}
+}
+
 func TestRunThroughProxyWithSessionServerLeavesNativeResumeUnchanged(t *testing.T) {
 	root := t.TempDir()
 	marker := filepath.Join(root, "events")
@@ -197,7 +219,11 @@ func sessionCompanionWrapper(t *testing.T) string {
 	if err := os.WriteFile(path, []byte(content), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("GODEX_TEST_SESSION_COMPANION_BINARY", os.Args[0])
+	binary, err := filepath.Abs(os.Args[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GODEX_TEST_SESSION_COMPANION_BINARY", binary)
 	return path
 }
 

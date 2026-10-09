@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -311,7 +312,23 @@ func sessionPathContained(root, path string) bool {
 }
 
 func stateDBReadOnlyURI(path string) string {
-	value := url.URL{Scheme: "file", Path: filepath.ToSlash(path)}
+	return stateDBReadOnlyURIForOS(path, runtime.GOOS)
+}
+
+// stateDBReadOnlyURIForOS preserves drive paths as file:///C:/... on Windows.
+// A raw drive path in url.URL.Path otherwise parses as a file URL with a host,
+// causing state database probes and verified rollout repairs to be skipped.
+func stateDBReadOnlyURIForOS(path, goos string) string {
+	normalized := filepath.ToSlash(path)
+	if goos == "windows" {
+		normalized = strings.ReplaceAll(path, "\\", "/")
+		if len(normalized) >= 3 && normalized[1] == ':' && normalized[2] == '/' &&
+			(normalized[0] >= 'A' && normalized[0] <= 'Z' ||
+				normalized[0] >= 'a' && normalized[0] <= 'z') {
+			normalized = "/" + normalized
+		}
+	}
+	value := url.URL{Scheme: "file", Path: normalized}
 	value.RawQuery = "mode=ro"
 	return value.String()
 }
