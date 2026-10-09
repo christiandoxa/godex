@@ -4,8 +4,50 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
+	"strings"
+
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
+
+type sharedSessionMaintainer interface {
+	MaintainSessions(string, string) error
+}
+
+func (runner *Runner) ensureAccountEnabled(ctx context.Context, accountID string) error {
+	accountID = strings.TrimSpace(accountID)
+	if accountID == "" {
+		return errors.New("managed account ID is required")
+	}
+	accounts, err := runner.accounts.List(ctx)
+	if err != nil {
+		return err
+	}
+	for _, account := range accounts {
+		if account.ID != accountID {
+			continue
+		}
+		if !account.Enabled {
+			return errors.New("selected account is disabled")
+		}
+		return nil
+	}
+	return errors.New("selected account is unavailable")
+}
+
+func (runner *Runner) maintainSharedSessionState(ctx context.Context) error {
+	if runner == nil || runner.process == nil || runner.sharedCodexHome == "" || runner.managedProfilesRoot == "" {
+		return nil
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	maintainer, ok := runner.process.(sharedSessionMaintainer)
+	if !ok {
+		return nil
+	}
+	return maintainer.MaintainSessions(runner.sharedCodexHome, filepath.Dir(runner.managedProfilesRoot))
+}
 
 func (runner *Runner) pinProfiles(ctx context.Context, ids []string) (func() error, error) {
 	if leases, ok := runner.accounts.(interface {
@@ -48,6 +90,9 @@ func (runner *Runner) RunSessionWithOptions(
 	options RuntimeLaunchOptions,
 ) (err error) {
 	if err := runner.prepareSharedAccountHomes(ctx); err != nil {
+		return err
+	}
+	if err := runner.maintainSharedSessionState(ctx); err != nil {
 		return err
 	}
 	accounts, err := runner.accounts.List(ctx)

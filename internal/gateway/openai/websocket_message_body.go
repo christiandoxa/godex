@@ -1,6 +1,7 @@
 package openai
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"sync"
@@ -98,6 +99,10 @@ func (body *websocketResponseBody) Read(buffer []byte) (int, error) {
 	}
 }
 
+func (body *websocketResponseBody) Write(payload []byte) (int, error) {
+	return body.connection.Write(payload)
+}
+
 func (body *websocketResponseBody) startFrame() error {
 	frame, err := websocketframe.ReadHeader(body.connection)
 	if err != nil {
@@ -183,14 +188,22 @@ func (body *websocketResponseBody) handleControlFrame(frame websocketframe.Frame
 	if err != nil {
 		return err
 	}
-	switch frame.Opcode {
-	case 9:
-		return websocketframe.WriteFrame(body.connection, 10, payload, true)
-	case 10:
-		return nil
-	default:
-		return io.ErrUnexpectedEOF
+	if frame.Opcode == 8 {
+		payload, err = websocketframe.NormalizeClosePayload(payload)
+		if err != nil {
+			return err
+		}
+	} else if frame.Opcode != 9 && frame.Opcode != 10 {
+		return errors.New("unsupported upstream websocket control frame")
 	}
+	var encoded bytes.Buffer
+	if err := websocketframe.WriteFrame(&encoded, frame.Opcode, payload, false); err != nil {
+		return err
+	}
+	body.prefix = append(body.prefix[:0], encoded.Bytes()...)
+	body.offset = 0
+	body.done = frame.Opcode == 8
+	return nil
 }
 
 func websocketTerminalShouldReset(kind string) bool {

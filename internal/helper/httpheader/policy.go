@@ -7,11 +7,16 @@ import (
 
 func ConnectionTokens(headers http.Header) map[string]bool {
 	tokens := make(map[string]bool)
-	for _, value := range headers.Values("Connection") {
-		for _, token := range strings.Split(value, ",") {
-			canonical := http.CanonicalHeaderKey(strings.TrimSpace(token))
-			if canonical != "" {
-				tokens[canonical] = true
+	for key, values := range headers {
+		if !strings.EqualFold(strings.TrimSpace(key), "Connection") {
+			continue
+		}
+		for _, value := range values {
+			for _, token := range strings.Split(value, ",") {
+				canonical := http.CanonicalHeaderKey(strings.TrimSpace(token))
+				if canonical != "" {
+					tokens[canonical] = true
+				}
 			}
 		}
 	}

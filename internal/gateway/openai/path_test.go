@@ -27,3 +27,20 @@ func TestUpstreamPathMatchesCodexMount(t *testing.T) {
 		})
 	}
 }
+
+func TestProtectDotSegmentsKeepsUpstreamPathOpaque(t *testing.T) {
+	for _, testCase := range []struct {
+		name, path, wantPath, wantRaw string
+	}{
+		{name: "plain parent", path: "/backend-api/codex/../secret", wantPath: "/backend-api/codex/%2e%2e/secret", wantRaw: "/backend-api/codex/%252e%252e/secret"},
+		{name: "encoded parent", path: "/backend-api/codex/%2e%2e/secret", wantPath: "/backend-api/codex/%2e%2e/secret", wantRaw: "/backend-api/codex/%252e%252e/secret"},
+		{name: "ordinary", path: "/backend-api/codex/responses", wantPath: "/backend-api/codex/responses", wantRaw: "/backend-api/codex/responses"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			path, raw := protectDotSegments(testCase.path, "")
+			if path != testCase.wantPath || raw != testCase.wantRaw {
+				t.Fatalf("protectDotSegments(%q) = %q/%q, want %q/%q", testCase.path, path, raw, testCase.wantPath, testCase.wantRaw)
+			}
+		})
+	}
+}

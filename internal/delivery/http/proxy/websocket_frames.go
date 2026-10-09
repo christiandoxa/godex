@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/christiandoxa/godex/internal/helper/websocketframe"
 )
@@ -16,7 +17,8 @@ type websocketFrameWriter struct {
 	mu     sync.Mutex
 }
 
-func copyWebSocketFrames(reader io.Reader, writer *websocketFrameWriter) error {
+func copyWebSocketClientFrames(reader io.Reader, upstream io.Writer, toClient *websocketFrameWriter) error {
+	state := websocketClientForwardState{}
 	for {
 		frame, err := websocketframe.ReadHeader(reader)
 		if errors.Is(err, io.EOF) {
@@ -25,27 +27,22 @@ func copyWebSocketFrames(reader io.Reader, writer *websocketFrameWriter) error {
 		if err != nil {
 			return err
 		}
-		if err := writer.copyFrame(reader, frame); err != nil {
+		err = forwardWebSocketClientFrame(reader, upstream, toClient, frame, &state)
+		if err != nil {
 			return err
+		}
+		if state.closed {
+			return nil
 		}
 	}
 }
 
-func copyWebSocketClientFrames(reader io.Reader, upstream io.Writer, toClient *websocketFrameWriter) error {
-	var skippingBinary bool
-	for {
-		frame, err := websocketframe.ReadHeader(reader)
-		if errors.Is(err, io.EOF) {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		skippingBinary, err = forwardWebSocketClientFrame(reader, upstream, toClient, frame, skippingBinary)
-		if err != nil {
-			return err
-		}
-	}
+type websocketClientForwardState struct {
+	messageOpen   bool
+	messageOpcode byte
+	messageBytes  uint64
+	textPayload   []byte
+	closed        bool
 }
 
 func forwardWebSocketClientFrame(
@@ -53,42 +50,110 @@ func forwardWebSocketClientFrame(
 	upstream io.Writer,
 	toClient *websocketFrameWriter,
 	frame websocketframe.Frame,
-	skippingBinary bool,
-) (bool, error) {
-	if frame.Opcode == 9 && frame.PayloadLength <= 125 {
-		payload, err := frame.ReadPayload(reader, 125)
-		if err != nil {
-			return skippingBinary, err
-		}
-		frame.Unmask(payload)
-		return skippingBinary, toClient.writeFrame(10, payload)
+	state *websocketClientForwardState,
+) error {
+	if frame.Header[0]&0x70 != 0 || !frame.Masked() {
+		return errors.New("invalid client websocket frame")
 	}
+	if frame.PayloadLength > websocketDefaultMaxFrameBytes {
+		return errors.New("websocket frame exceeds protocol size limit")
+	}
+	if frame.Opcode >= 8 {
+		return forwardWebSocketClientControl(reader, upstream, toClient, frame, state)
+	}
+	return forwardWebSocketClientData(reader, upstream, toClient, frame, state)
+}
 
-	wasSkippingBinary := skippingBinary
-	binaryMessage := frame.Opcode == 2 || frame.Opcode == 0 && wasSkippingBinary
-	switch frame.Opcode {
-	case 2:
-		skippingBinary = !frame.Final
-	case 0:
-		if wasSkippingBinary && frame.Final {
-			skippingBinary = false
-		}
+func forwardWebSocketClientControl(
+	reader io.Reader,
+	upstream io.Writer,
+	toClient *websocketFrameWriter,
+	frame websocketframe.Frame,
+	state *websocketClientForwardState,
+) error {
+	if !frame.Final || frame.PayloadLength > 125 {
+		return errors.New("invalid websocket control frame")
 	}
-	if binaryMessage {
-		if _, err := io.CopyN(io.Discard, reader, int64(frame.PayloadLength)); err != nil {
-			return skippingBinary, err
+	payload, err := frame.ReadPayload(reader, 125)
+	if err != nil {
+		return err
+	}
+	frame.Unmask(payload)
+	switch frame.Opcode {
+	case 8:
+		payload, err = websocketframe.NormalizeClosePayload(payload)
+		if err != nil {
+			return err
 		}
-		if frame.Final && (frame.Opcode == 2 || wasSkippingBinary) {
+		if err := websocketframe.WriteFrame(upstream, 8, payload, true); err != nil {
+			return err
+		}
+		if err := toClient.writeFrame(8, payload); err != nil {
+			return err
+		}
+		state.closed = true
+		return nil
+	case 9:
+		return toClient.writeFrame(10, payload)
+	case 10:
+		return nil
+	default:
+		return errors.New("unsupported websocket control frame")
+	}
+}
+
+func forwardWebSocketClientData(
+	reader io.Reader,
+	upstream io.Writer,
+	toClient *websocketFrameWriter,
+	frame websocketframe.Frame,
+	state *websocketClientForwardState,
+) error {
+	if !state.messageOpen {
+		if frame.Opcode != 1 && frame.Opcode != 2 {
+			return errors.New("unexpected websocket continuation frame")
+		}
+		state.messageOpcode = frame.Opcode
+	} else if frame.Opcode != 0 {
+		return errors.New("invalid fragmented websocket message")
+	}
+	if state.messageBytes > websocketDefaultMaxMessageBytes-frame.PayloadLength {
+		return errors.New("websocket message exceeds protocol size limit")
+	}
+	state.messageBytes += frame.PayloadLength
+	if state.messageOpcode == 2 {
+		if _, err := io.CopyN(io.Discard, reader, int64(frame.PayloadLength)); err != nil {
+			return err
+		}
+		state.messageOpen = !frame.Final
+		if frame.Final {
+			state.messageOpcode, state.messageBytes = 0, 0
 			if err := toClient.writeText([]byte(websocketBinaryMessageError)); err != nil {
-				return skippingBinary, err
+				return err
 			}
 		}
-		return skippingBinary, nil
+		return nil
 	}
-	if err := frame.CopyTo(reader, upstream); err != nil {
-		return skippingBinary, err
+
+	payload, err := frame.ReadPayload(reader, frame.PayloadLength)
+	if err != nil {
+		return err
 	}
-	return skippingBinary, nil
+	text := append([]byte(nil), payload...)
+	frame.Unmask(text)
+	state.textPayload = append(state.textPayload, text...)
+	if frame.Final && !utf8.Valid(state.textPayload) {
+		return errors.New("websocket text message is not valid UTF-8")
+	}
+	if err := frame.WriteTo(upstream, payload); err != nil {
+		return err
+	}
+	state.messageOpen = !frame.Final
+	if frame.Final {
+		state.messageOpcode, state.messageBytes = 0, 0
+		state.textPayload = state.textPayload[:0]
+	}
+	return nil
 }
 
 func (writer *websocketFrameWriter) copyFrame(reader io.Reader, frame websocketframe.Frame) error {

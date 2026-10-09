@@ -30,10 +30,13 @@ func (catalog *Catalog) withBundleImportLock(ctx context.Context, operation func
 		return err
 	}
 	defer func() { err = errors.Join(err, release()) }()
-	if err = catalog.recoverBundleImportsLocked(ctx); err != nil {
+	recoveryCtx := context.WithoutCancel(ctx)
+	// A journal is evidence of an already-started mutation. Finish its
+	// rollback/cleanup even when the new command's context was canceled.
+	if err = catalog.recoverBundleImportsLocked(recoveryCtx); err != nil {
 		return err
 	}
-	if err = catalog.profiles.CleanupOrphanedImportStagingHomes(ctx); err != nil {
+	if err = catalog.profiles.CleanupOrphanedImportStagingHomes(recoveryCtx); err != nil {
 		return err
 	}
 	return operation()

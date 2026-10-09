@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
@@ -48,6 +49,24 @@ func TestProdex04356GatewayAccountUsesFixedProfileWithoutQuotaPreflight(t *testi
 	}
 	if !proxy.closed {
 		t.Fatal("gateway proxy was not closed")
+	}
+}
+
+func TestGatewayAccountRejectsDisabledManagedAccount(t *testing.T) {
+	accounts := &fakeLaunchAccounts{
+		accounts: []accountentity.Account{{ID: "disabled", Name: "disabled", Enabled: false}},
+		homes:    map[string]string{"disabled": t.TempDir()},
+	}
+	factoryCalled := false
+	runner := NewRunner(accounts, &fakeProcess{}, func(proxymodel.Config) (Proxy, error) {
+		factoryCalled = true
+		return &fakeProxy{}, nil
+	})
+	if _, err := runner.StartGatewayAccount(t.Context(), "disabled", GatewayStartOptions{}); err == nil || !strings.Contains(err.Error(), "disabled") {
+		t.Fatalf("disabled gateway account error = %v", err)
+	}
+	if factoryCalled {
+		t.Fatal("disabled gateway account reached proxy factory")
 	}
 }
 

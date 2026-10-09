@@ -720,10 +720,89 @@ func TestProxyStopsWhenRequestBodyReadIsCanceled(t *testing.T) {
 	proxy.ServeHTTP(httptest.NewRecorder(), request)
 }
 
+func TestProxyMapsRequestBodyReadFailureToBadGateway(t *testing.T) {
+	proxy, err := newProxyForTest(ProxyConfig{
+		UpstreamURL: "http://upstream.test/backend-api",
+		Accounts:    func(context.Context) ([]RuntimeAccount, error) { return nil, nil },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodPost, "/responses", errorReadCloser{})
+	response := httptest.NewRecorder()
+	proxy.ServeHTTP(response, request)
+	if response.Code != http.StatusBadGateway || response.Body.String() != "proxied request could not be captured" ||
+		response.Header().Get("Content-Type") != "text/plain; charset=utf-8" {
+		t.Fatalf("body read failure = status %d, content-type %q, body %q", response.Code, response.Header().Get("Content-Type"), response.Body.String())
+	}
+}
+
+func TestProxyMapsResponsesServiceUnavailableToReferenceJSONError(t *testing.T) {
+	response := httptest.NewRecorder()
+	writeProxyError(response, "/backend-api/prodex/responses", http.StatusServiceUnavailable, "retry")
+	if response.Code != http.StatusServiceUnavailable || response.Header().Get("Content-Type") != "application/json" ||
+		response.Header().Get("Cache-Control") != "no-store" || response.Body.String() != `{"error":{"code":"service_unavailable","message":"retry"}}` {
+		t.Fatalf("responses service-unavailable = status %d headers %#v body %q", response.Code, response.Header(), response.Body.String())
+	}
+}
+
+func TestProxyKeepsStandardServiceUnavailableTextError(t *testing.T) {
+	response := httptest.NewRecorder()
+	writeProxyError(response, "/backend-api/prodex/chat/completions", http.StatusServiceUnavailable, "retry")
+	if response.Code != http.StatusServiceUnavailable || response.Header().Get("Content-Type") != "text/plain; charset=utf-8" || response.Body.String() != "retry" {
+		t.Fatalf("standard service-unavailable = status %d headers %#v body %q", response.Code, response.Header(), response.Body.String())
+	}
+}
+
+func TestProxyMapsOversizedRequestBodyToRequestEntityTooLarge(t *testing.T) {
+	proxy, err := newProxyForTest(ProxyConfig{
+		UpstreamURL:     "http://upstream.test/backend-api",
+		MaxRequestBytes: 3,
+		Accounts:        func(context.Context) ([]RuntimeAccount, error) { return nil, nil },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodPost, "/responses", strings.NewReader("four"))
+	response := httptest.NewRecorder()
+	proxy.ServeHTTP(response, request)
+	if response.Code != http.StatusRequestEntityTooLarge || response.Body.String() != "proxied request body is too large" {
+		t.Fatalf("oversized request = status %d, body %q", response.Code, response.Body.String())
+	}
+}
+
+func TestProxyRejectsDeclaredOversizedBodyBeforeReading(t *testing.T) {
+	proxy, err := newProxyForTest(ProxyConfig{
+		UpstreamURL:     "http://upstream.test/backend-api",
+		MaxRequestBytes: 3,
+		Accounts:        func(context.Context) ([]RuntimeAccount, error) { return nil, nil },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := &countingReadCloser{}
+	request := httptest.NewRequest(http.MethodPost, "/responses", body)
+	request.ContentLength = 4
+	response := httptest.NewRecorder()
+	proxy.ServeHTTP(response, request)
+	if response.Code != http.StatusRequestEntityTooLarge || body.reads != 0 {
+		t.Fatalf("declared oversized request = status %d, reads %d", response.Code, body.reads)
+	}
+}
+
 type errorReadCloser struct{}
 
 func (errorReadCloser) Read([]byte) (int, error) { return 0, errors.New("synthetic body read failure") }
 func (errorReadCloser) Close() error             { return nil }
+
+type countingReadCloser struct{ reads int }
+
+func (reader *countingReadCloser) Read([]byte) (int, error) {
+	reader.reads++
+	return 0, io.EOF
+}
+
+func (reader *countingReadCloser) Close() error { return nil }
 
 func TestProxyStartsOnLoopbackAndCloses(t *testing.T) {
 	accounts := testRuntimeAccounts(t, "A", "token-a", "B", "token-b")

@@ -160,7 +160,7 @@ func monitor(ctx context.Context, cmd *exec.Cmd, outputDone, inputDone <-chan er
 			select {
 			case childErr := <-childDone:
 				return childStatusResult(childErr, waitStderr(stderrDone))
-			case <-time.After(monitorInterval):
+			case <-time.After(outputDrainTimeout):
 			}
 			stopProcessTree(cmd)
 			awaitChild(childDone)

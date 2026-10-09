@@ -47,6 +47,7 @@ func translateResponse(response *http.Response, requestMetadata map[string]any) 
 	if err := decoder.Decode(&native); err != nil {
 		return nil, errors.New("failed to parse Gemini response JSON")
 	}
+	native = normalizedGeminiResponse(native)
 	translated, err := json.Marshal(geminiNativeResponsesValue(native, requestMetadata, time.Now().Unix()))
 	if err != nil {
 		return nil, errors.New("failed to serialize Gemini Responses JSON")

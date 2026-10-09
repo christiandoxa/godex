@@ -107,6 +107,78 @@ func TestDeepSeekResponsesTranslateFallbackAndHeaders(t *testing.T) {
 	}
 }
 
+func TestDeepSeekRuntimeForwardsCodexMetadataAndReplacesCallerAuth(t *testing.T) {
+	var got http.Header
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		got = request.Header.Clone()
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(writer, `{"id":"chat_ok","model":"deepseek-v4-pro","choices":[{"message":{"role":"assistant","content":"ok"}}]}`)
+	}))
+	defer server.Close()
+	transport, err := NewRuntimeTransport(server.URL, "fixture-key", server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer transport.Close()
+	response, err := transport.Execute(context.Background(), proxymodel.Request{
+		Method: http.MethodPost,
+		Path:   mountPath + "/responses",
+		Header: http.Header{
+			"Authorization":                    {"Bearer caller-secret"},
+			"Accept":                           {"application/json"},
+			"Content-Type":                     {"application/json"},
+			"Chatgpt-Account-Id":               {"caller-account"},
+			"Connection":                       {"keep-alive, X-Local-Hop"},
+			"X-Local-Hop":                      {"strip-me"},
+			"X-Prodex-Internal-Request-Origin": {"strip-me"},
+			"X-Godex-Internal-Request-Origin":  {"strip-me"},
+			"Cookie":                           {"session=secret"},
+			"X-Codex-Turn-State":               {"turn-state"},
+			"X-Codex-Turn-Metadata":            {`{"session_id":"session-state"}`},
+			"X-Codex-Beta-Features":            {"feature-a"},
+			"X-Openai-Subagent":                {"1"},
+			"Session_Id":                       {"session-state"},
+			"X-Custom":                         {"keep-me"},
+			"User-Agent":                       {"codex-cli-test"},
+		},
+		Body: []byte(`{"input":"hello"}`),
+	}, proxymodel.Account{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if values := got.Values("Accept"); len(values) != 2 || values[0] != "text/event-stream, application/json" || values[1] != "application/json" {
+		t.Fatalf("Accept values = %#v", values)
+	}
+	if values := got.Values("Content-Type"); len(values) != 2 || values[0] != "application/json" || values[1] != "application/json" {
+		t.Fatalf("Content-Type values = %#v", values)
+	}
+	for _, name := range []string{"Chatgpt-Account-Id", "Connection", "X-Local-Hop", "X-Prodex-Internal-Request-Origin", "X-Godex-Internal-Request-Origin", "Cookie"} {
+		if got.Get(name) != "" {
+			t.Fatalf("%s unexpectedly forwarded: %v", name, got)
+		}
+	}
+	if got.Get("Authorization") != "Bearer fixture-key" ||
+		got.Get("X-Codex-Turn-State") != "turn-state" ||
+		got.Get("X-Codex-Turn-Metadata") != `{"session_id":"session-state"}` ||
+		got.Get("X-Codex-Beta-Features") != "feature-a" ||
+		got.Get("X-Openai-Subagent") != "1" ||
+		got.Get("Session_Id") != "session-state" ||
+		got.Get("X-Custom") != "keep-me" ||
+		got.Get("User-Agent") != "codex-cli-test" {
+		t.Fatalf("forwarded headers = %v", got)
+	}
+}
+
+func TestDeepSeekApplyHeadersRetainsDuplicateUserAgent(t *testing.T) {
+	destination := make(http.Header)
+	applyHeaders(destination, http.Header{"User-Agent": {"codex-cli-test"}}, "fixture-key", false)
+	values := destination.Values("User-Agent")
+	if len(values) != 2 || values[0] != "codex-cli-test" || values[1] != "codex-cli-test" {
+		t.Fatalf("User-Agent values = %#v, want duplicated caller value", values)
+	}
+}
+
 func TestDeepSeekStrictResponsesUseConfiguredBetaBase(t *testing.T) {
 	type captured struct {
 		path, query, searchContext string
@@ -308,6 +380,66 @@ func TestDeepSeekChatAndMessagesRemainPassthrough(t *testing.T) {
 		default:
 			t.Fatalf("unexpected passthrough request = %#v", got)
 		}
+	}
+}
+
+func TestDeepSeekChatRateLimitRetriesOnce(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		calls++
+		writer.Header().Set("Content-Type", "application/json")
+		if calls == 1 {
+			writer.WriteHeader(http.StatusTooManyRequests)
+			_, _ = io.WriteString(writer, `{"error":{"code":"rate_limit_exceeded"}}`)
+			return
+		}
+		_, _ = io.WriteString(writer, `{"ok":true}`)
+	}))
+	defer server.Close()
+	transport, err := NewRuntimeTransport(server.URL, "fixture-key", server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer transport.Close()
+	response, err := transport.Execute(context.Background(), proxymodel.Request{
+		Method: http.MethodPost, Path: mountPath + "/chat/completions", Body: []byte(`{"model":"deepseek-v4-pro"}`),
+	}, proxymodel.Account{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if calls != 2 || response.StatusCode != http.StatusOK {
+		t.Fatalf("rate-limit retry calls/status = %d/%d, want 2/200", calls, response.StatusCode)
+	}
+}
+
+func TestDeepSeekResponsesRateLimitRetriesSameModel(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		calls++
+		writer.Header().Set("Content-Type", "application/json")
+		if calls == 1 {
+			writer.WriteHeader(http.StatusTooManyRequests)
+			_, _ = io.WriteString(writer, `{"error":{"code":"rate_limit_exceeded"}}`)
+			return
+		}
+		_, _ = io.WriteString(writer, `{"choices":[{"message":{"content":"ok"}}]}`)
+	}))
+	defer server.Close()
+	transport, err := NewRuntimeTransport(server.URL, "fixture-key", server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer transport.Close()
+	response, err := transport.Execute(context.Background(), proxymodel.Request{
+		Method: http.MethodPost, Path: mountPath + "/responses", Body: []byte(`{"model":"deepseek-v4-pro","input":"hello"}`),
+	}, proxymodel.Account{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if calls != 2 || response.StatusCode != http.StatusOK {
+		t.Fatalf("same-model rate-limit retry calls/status = %d/%d, want 2/200", calls, response.StatusCode)
 	}
 }
 

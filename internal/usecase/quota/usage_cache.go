@@ -35,10 +35,10 @@ func (status *Status) cachedAvailabilityUsageAtPolicy(
 	baseURL = strings.TrimSpace(baseURL)
 	if baseURL == "" {
 		if usage, ok := status.cachedLiveUsage(home, now); ok {
+			status.scheduleCachedProbeRefresh(ctx, accountID, home, now)
 			return usage, quotamodel.SourceLive, nil
 		}
 	}
-
 	// Cache hits stay local.
 	// Only misses consume the bounded probe gate.
 	// Provider errors still release it.

@@ -54,7 +54,12 @@ esac
 
 archive="godex_${version}_${os_name}_${arch}.tar.gz"
 temporary="$(mktemp -d 2>/dev/null || mktemp -d -t godex)"
-trap 'rm -rf "$temporary"' EXIT HUP INT TERM
+staged_destination=""
+cleanup() {
+  [ -z "$staged_destination" ] || rm -f "$staged_destination"
+  rm -rf "$temporary"
+}
+trap cleanup EXIT HUP INT TERM
 
 curl -fsSL "$release_base/$tag/$archive" -o "$temporary/$archive" || fail "cannot download $archive"
 curl -fsSL "$release_base/$tag/checksums.txt" -o "$temporary/checksums.txt" || fail "cannot download checksums.txt"
@@ -74,7 +79,11 @@ fi
 tar -xzf "$temporary/$archive" -C "$temporary"
 [ -f "$temporary/godex" ] || fail "archive does not contain godex"
 chmod 0755 "$temporary/godex"
-"$temporary/godex" --version >/dev/null || fail "downloaded binary failed its version check"
+version_output="$("$temporary/godex" --version 2>/dev/null)" || fail "downloaded binary failed its version check"
+case "$version_output" in
+  "godex $version" | "godex $version "*) ;;
+  *) fail "downloaded binary reported an unexpected version" ;;
+esac
 
 mkdir -p "$install_dir"
 destination="$install_dir/godex"
@@ -82,6 +91,7 @@ staged_destination="$destination.tmp.$$"
 cp "$temporary/godex" "$staged_destination"
 chmod 0755 "$staged_destination"
 mv -f "$staged_destination" "$destination"
+staged_destination=""
 
 printf 'Installed %s to %s\n' "$("$destination" --version)" "$destination"
 case ":$PATH:" in

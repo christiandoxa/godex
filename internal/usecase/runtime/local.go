@@ -41,6 +41,9 @@ func (runner *Runner) RunLocal(ctx context.Context, selector string, args []stri
 		}
 		defer func() { err = errors.Join(err, release()) }()
 	}
+	if err := runner.ensureAccountEnabled(ctx, account.ID); err != nil {
+		return err
+	}
 	return runner.runRuntimeChild(ctx, runner.accounts.CodexHome(account.ID), args)
 }
 

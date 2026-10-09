@@ -26,9 +26,10 @@ release_dir="$fixture_root/releases/v0.0.1"
 source_dir="$fixture_root/source"
 success_dir="$fixture_root/success"
 failure_dir="$fixture_root/failure"
+mismatch_dir="$fixture_root/mismatch"
 mkdir -p "$release_dir" "$source_dir"
 
-printf '%s\n' '#!/bin/sh' 'if [ "${1:-}" = "--version" ]; then printf "godex synthetic\n"; fi' > "$source_dir/godex"
+printf '%s\n' '#!/bin/sh' 'if [ "${1:-}" = "--version" ]; then printf "godex 0.0.1 (commit synthetic, built synthetic)\n"; fi' > "$source_dir/godex"
 chmod 0755 "$source_dir/godex"
 archive="godex_0.0.1_${os_name}_${arch}.tar.gz"
 tar -czf "$release_dir/$archive" -C "$source_dir" godex
@@ -46,6 +47,25 @@ GODEX_RELEASE_BASE_URL="file://$fixture_root/releases" \
 GODEX_INSTALL_DIR="$success_dir" \
 "$project_dir/install.sh" >/dev/null
 [ -x "$success_dir/godex" ] || fail "verified archive was not installed"
+
+printf '%s\n' '#!/bin/sh' 'if [ "${1:-}" = "--version" ]; then printf "godex 9.9.9 (commit synthetic, built synthetic)\n"; fi' > "$source_dir/godex"
+tar -czf "$release_dir/$archive" -C "$source_dir" godex
+(
+  cd "$release_dir"
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$archive" > checksums.txt
+  else
+    shasum -a 256 "$archive" > checksums.txt
+  fi
+)
+if GODEX_VERSION=0.0.1 \
+  GODEX_RELEASE_BASE_URL="file://$fixture_root/releases" \
+  GODEX_INSTALL_DIR="$mismatch_dir" \
+  "$project_dir/install.sh" >"$fixture_root/mismatch.log" 2>&1; then
+  fail "binary version mismatch was accepted"
+fi
+grep -q 'unexpected version' "$fixture_root/mismatch.log" || fail "version mismatch was not reported"
+[ ! -e "$mismatch_dir/godex" ] || fail "binary was installed after version mismatch"
 
 printf 'tampered' >> "$release_dir/$archive"
 if GODEX_VERSION=0.0.1 \

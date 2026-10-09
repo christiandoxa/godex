@@ -3,6 +3,8 @@ package gemini
 import (
 	"bytes"
 	"encoding/json"
+	"io"
+	"net/http"
 	"strings"
 	"testing"
 )
@@ -141,5 +143,26 @@ func TestProdex04357GeminiStreamRuntimeCompletesOnDoneSentinel(t *testing.T) {
 	}
 	if !strings.Contains(output.String(), "event: response.completed") || !state.completed {
 		t.Fatalf("[DONE] did not complete runtime stream: output=%q completed=%t", output.String(), state.completed)
+	}
+}
+
+func TestGeminiNativeStreamPrematureEOFFails(t *testing.T) {
+	response := translateGeminiNativeStream(&http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": {"text/event-stream"}},
+		Body: io.NopCloser(strings.NewReader(
+			`data: {"responseId":"resp-partial","candidates":[{"content":{"parts":[{"text":"partial"}]}}]}`,
+		)),
+	}, nil)
+	body, err := io.ReadAll(response.Body)
+	_ = response.Body.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(body)
+	if !strings.Contains(text, "event: response.failed") ||
+		!strings.Contains(text, `"code":"provider_stream_error"`) ||
+		strings.Contains(text, "event: response.completed") {
+		t.Fatalf("premature Gemini EOF = %s", text)
 	}
 }

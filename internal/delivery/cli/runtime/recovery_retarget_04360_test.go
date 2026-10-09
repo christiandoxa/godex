@@ -51,3 +51,21 @@ func TestProdex04360RetargetRecoveryDoesNotReplayUnapprovedCommands(t *testing.T
 		}
 	}
 }
+
+func TestProdex04361RetargetTUIRecoveryDropsPromptAndKeepsOptions(t *testing.T) {
+	args := []string{
+		"--model", "gpt-6.1-sol", "resume", target04360, "old prompt",
+		"--no-alt-screen", "-C", "/synthetic/workspace",
+	}
+	got, ok := retargetCodexTUIRecovery04360(args, target04360)
+	want := []string{
+		"--model", "gpt-6.1-sol", "resume", target04360,
+		"--no-alt-screen", "-C", "/synthetic/workspace",
+	}
+	if !ok || !reflect.DeepEqual(got, want) {
+		t.Fatalf("TUI recovery args=%#v ok=%t want %#v", got, ok, want)
+	}
+	if _, ok := retargetCodexTUIRecovery04360([]string{"resume", "--last"}, target04360); ok {
+		t.Fatal("unresolved TUI selector accepted")
+	}
+}

@@ -148,6 +148,9 @@ func (runner *Runner) RunLocalProvider(
 		}
 		return err
 	}
+	if !account.Enabled {
+		return errors.New("selected account is disabled")
+	}
 	if leases, ok := runner.accounts.(interface {
 		AcquireProfiles(context.Context, []string) (func() error, error)
 	}); ok {

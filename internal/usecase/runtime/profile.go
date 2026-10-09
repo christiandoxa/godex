@@ -224,6 +224,9 @@ func (runner *Runner) RunProviderAPIKeysAccountWithOptions(
 		return err
 	}
 	defer func() { runErr = errors.Join(runErr, release()) }()
+	if err := runner.ensureAccountEnabled(ctx, accountID); err != nil {
+		return err
+	}
 	home := runner.accounts.CodexHome(accountID)
 	return runner.RunProviderAPIKeysWithOptions(ctx, home, provider, apiKeys, args, options)
 }

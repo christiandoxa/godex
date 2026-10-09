@@ -60,7 +60,8 @@ iwr https://github.com/christiandoxa/godex/releases/latest/download/install.ps1 
 
 The installers select the current operating system and architecture, verify
 the archive SHA-256 digest against checksums.txt, install godex, and run
-godex --version.
+godex --version. The staged binary must report the requested release version
+before it replaces an existing installation.
 
 For a pinned version or custom install directory:
 

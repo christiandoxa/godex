@@ -265,3 +265,37 @@ func TestProdex04357GeminiBufferedUsageDefaultsAndMaxTokensDetails(t *testing.T)
 		t.Fatalf("raw wrong-type usage metadata was not preserved: %#v", gemini)
 	}
 }
+
+func TestProdex04361GeminiResponsesUnwrapsTraceEnvelope(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(writer, `{"traceId":"trace-envelope","response":{"modelVersion":"gemini-3.5-flash","candidates":[{"content":{"parts":[{"text":"wrapped"}]},"finishReason":"STOP"}]}}`)
+	}))
+	defer server.Close()
+	transport, err := NewRuntimeTransport(server.URL+"/v1beta", "fixture-key", server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer transport.Close()
+
+	response, err := transport.Execute(context.Background(), proxymodel.Request{
+		Method: http.MethodPost,
+		Path:   mountPath + "/responses",
+		Body:   []byte(`{"model":"gemini-3.5-flash","input":"hello"}`),
+	}, proxymodel.Account{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	var translated map[string]any
+	if err := json.NewDecoder(response.Body).Decode(&translated); err != nil {
+		t.Fatal(err)
+	}
+	if translated["id"] != "trace-envelope" || translated["model"] != "gemini-3.5-flash" {
+		t.Fatalf("trace envelope identity = %#v", translated)
+	}
+	output := translated["output"].([]any)
+	if len(output) != 1 || output[0].(map[string]any)["content"].([]any)[0].(map[string]any)["text"] != "wrapped" {
+		t.Fatalf("trace envelope output = %#v", output)
+	}
+}

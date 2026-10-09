@@ -14,7 +14,7 @@ $InstallDir = if ($env:GODEX_INSTALL_DIR) {
     Join-Path $HOME ".godex\bin"
 }
 $ReleaseBase = if ($env:GODEX_RELEASE_BASE_URL) {
-    $env:GODEX_RELEASE_BASE_URL.TrimEnd("/")
+    $env:GODEX_RELEASE_BASE_URL.TrimEnd("/").TrimEnd("\")
 } else {
     "https://github.com/$Repository/releases/download"
 }
@@ -30,7 +30,7 @@ if ($env:GODEX_VERSION) {
     }
 }
 if ([string]::IsNullOrWhiteSpace($Tag)) { Fail "latest release did not contain a tag" }
-if ($Tag -notmatch '^v[0-9][0-9A-Za-z.+-]*$') { Fail "release tag is invalid" }
+if ($Tag -cnotmatch '^v[0-9][0-9A-Za-z.+-]*$') { Fail "release tag is invalid" }
 $Version = $Tag.Substring(1)
 
 $Architecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
@@ -43,6 +43,7 @@ switch ($Architecture) {
 $Archive = "godex_${Version}_windows_${Arch}.zip"
 $Temporary = Join-Path ([System.IO.Path]::GetTempPath()) ("godex-" + [Guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $Temporary | Out-Null
+$StagedDestination = $null
 
 try {
     $ArchivePath = Join-Path $Temporary $Archive
@@ -66,14 +67,18 @@ try {
     Expand-Archive -Path $ArchivePath -DestinationPath $Extracted
     $Source = Join-Path $Extracted "godex.exe"
     if (-not (Test-Path $Source -PathType Leaf)) { Fail "archive does not contain godex.exe" }
-    & $Source --version | Out-Null
+    $VersionOutput = (& $Source --version | Out-String).Trim()
     if ($LASTEXITCODE -ne 0) { Fail "downloaded binary failed its version check" }
+    if ($VersionOutput -notmatch "^godex $([regex]::Escape($Version))(?:\s|$)") {
+        Fail "downloaded binary reported an unexpected version"
+    }
 
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
     $Destination = Join-Path $InstallDir "godex.exe"
     $StagedDestination = "$Destination.tmp.$PID"
     Copy-Item -Path $Source -Destination $StagedDestination -Force
     Move-Item -Path $StagedDestination -Destination $Destination -Force
+    $StagedDestination = $null
 
     $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
     $PathEntries = @()
@@ -87,5 +92,8 @@ try {
     $InstalledVersion = (& $Destination --version | Out-String).Trim()
     Write-Host "Installed $InstalledVersion to $Destination"
 } finally {
+    if ($StagedDestination -and (Test-Path $StagedDestination -PathType Leaf)) {
+        Remove-Item -Force $StagedDestination -ErrorAction SilentlyContinue
+    }
     Remove-Item -Recurse -Force $Temporary -ErrorAction SilentlyContinue
 }

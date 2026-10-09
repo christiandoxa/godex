@@ -30,6 +30,8 @@ jobs:
         run: go test -race -shuffle=on -count=1 ./...
       - name: Build
         run: go build -trimpath ./cmd/godex
+      - name: Cross-build release targets
+        run: ./scripts/check-cross-build.sh
       - name: Source size
         run: ./scripts/check-source-size.sh
       - name: TUI framework guard
@@ -62,6 +64,8 @@ jobs:
       - name: Test
         run: go test -shuffle=on -count=1 ./...
       - name: Build
+        env:
+          CGO_ENABLED: "0"
         run: go build -trimpath ./cmd/godex
       - name: PowerShell installer parser
         if: matrix.os == 'windows-latest'

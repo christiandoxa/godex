@@ -313,13 +313,34 @@ Tagged source: `crates/prodex-app/src/app_commands/runtime_launch/goal_resume.rs
   marker validation, user override and consumer dispatch are
   detected by the same regression fixtures.
 
-**Still open:** the exact Prodex monitor also maintains live goal
-state while the Codex child runs, injects an optional `notify`
-fallback where appropriate, and handles native TUI and other
-app-server transports. The hook added here covers **headless
-managed `exec` only**; it does not certify those other
-monitoring/lifecycle paths or the asynchronous background-queue
-sources as 1:1 equivalents.
+The hook and live observer now cover managed OpenAI launches whose
+SessionStart marker is available. App-server commands, user-owned hook
+overrides, optional `notify` fallback, and asynchronous background queues
+remain separate parity gaps.
+
+## Follow-up 8: live goal observer and cancellable relaunch
+
+The exact Prodex 0.436.1 monitor was compared with
+`app_commands/runtime_launch/usage_limit_recovery.rs` and the runtime launch
+execution path. Godex now wires a read-only `goals_1.sqlite` repository into
+the runtime use case and observes the marker-identified session while its
+Codex child is still running.
+
+- A previously observed `active` goal arms the monitor. A historical
+  `usage_limited` row stays inert; a fresh transition cancels only the child
+  launch through its context.
+- The monitor waits for a distinct, enabled ChatGPT OpenAI profile with quota
+  readiness, releases the old session binding before relaunch, and resumes the
+  persisted session with `/goal resume` without replaying the original prompt.
+- Parent cancellation, terminal goal state, unavailable persistence, stale
+  state, explicit `--no-auto-rotate`, and missing fallback profiles stop the
+  path without releasing or replaying the session.
+- Repository tests prove the latest persisted row is read-only. Runtime tests
+  exercise child cancellation, affinity release, fallback selection, and the
+  stale/no-rotation negative controls through `RunProfiles`.
+
+The remaining difference from exact Prodex is bounded live recovery across
+multiple generations and native app-server/custom-hook integrations.
 
 ## Still NOT closed; do not promote as full parity
 
@@ -333,13 +354,13 @@ sources as 1:1 equivalents.
    discovery, bounded compressed rollout reads, read-only goal status
    transitions, structured transient error classes and per-generation
    distinct-profile rotation now have meaningful source-matched tests.
-   The headless managed-exec session-start hook is now implemented
-   with native Codex 0.161.0 config validation, but the online
-   in-process goal monitor, TUI/other app-server hook integration,
-   optional notify fallback and all native launch/continuation
-   conditions are **not** fully reproduced. The five-second
-   transient-pool scheduler has cancellable tests, but real-world
-   workflow parity remains unproven.
+   The headless managed-exec session-start hook and marker-backed online
+   goal monitor are implemented with native Codex 0.161.0 config validation,
+   but TUI/app-server hook integration, optional notify fallback, bounded
+   multi-generation live recovery, and all native launch/continuation
+   conditions are **not** fully reproduced. The five-second transient-pool
+   scheduler has cancellable tests, but real-world workflow parity remains
+   unproven.
 3. **Full continuation/transport coverage:** HTTP Responses/Compact
    admission now bypasses the saturated lane for a verified owner and
    retains the global cap, with bounded request-body inspection.

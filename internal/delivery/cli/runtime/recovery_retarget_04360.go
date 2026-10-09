@@ -1,6 +1,10 @@
 package runtime
 
-import "strings"
+import (
+	"strings"
+
+	sessionentity "github.com/christiandoxa/godex/internal/entity/session"
+)
 
 // retargetCodexExecRecovery04360 mirrors the source-scoped RetargetExec
 // operation in Prodex 0.436.0's launch_args.mojo planner. In particular,
@@ -33,6 +37,27 @@ func retargetCodexExecRecovery04360(args []string, sessionID string) ([]string, 
 	result = appendRecoveryOptions04360(result, args[:command])
 	result = append(result, "exec", "resume", sessionID)
 	result = appendRecoveryOptions04360(result, args[command+1:])
+	return result, true
+}
+
+// retargetCodexTUIRecovery04360 mirrors Prodex's RetargetTui operation. A
+// native TUI resume keeps its global and trailing options, replaces the
+// selected session with the verified one, and drops the previous prompt.
+func retargetCodexTUIRecovery04360(args []string, sessionID string) ([]string, bool) {
+	if !sessionentity.ValidID(sessionID) {
+		return nil, false
+	}
+	command := nativeCommandIndex(args)
+	if command < 0 || args[command] != "resume" {
+		return nil, false
+	}
+	selector := findResumeSessionSelector(args, command+1)
+	if selector < 0 || args[selector] != sessionID {
+		return nil, false
+	}
+	result := appendRecoveryOptions04360(nil, args[:command])
+	result = append(result, "resume", sessionID)
+	result = appendRecoveryOptions04360(result, args[selector+1:])
 	return result, true
 }
 

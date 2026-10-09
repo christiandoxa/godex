@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"unicode/utf8"
 )
 
 type Frame struct {
@@ -30,6 +31,9 @@ func ReadHeader(reader io.Reader) (Frame, error) {
 			return Frame{}, err
 		}
 		length = uint64(binary.BigEndian.Uint16(header[headerLen : headerLen+2]))
+		if length < 126 {
+			return Frame{}, errors.New("websocket frame uses a non-minimal payload length")
+		}
 		headerLen += 2
 	case 127:
 		if _, err := io.ReadFull(reader, header[headerLen:headerLen+8]); err != nil {
@@ -38,6 +42,9 @@ func ReadHeader(reader io.Reader) (Frame, error) {
 		length = binary.BigEndian.Uint64(header[headerLen : headerLen+8])
 		if length>>63 != 0 {
 			return Frame{}, errors.New("websocket frame length exceeds supported range")
+		}
+		if length < 1<<16 {
+			return Frame{}, errors.New("websocket frame uses a non-minimal payload length")
 		}
 		headerLen += 8
 	}
@@ -51,6 +58,37 @@ func ReadHeader(reader io.Reader) (Frame, error) {
 	frame.Header = append([]byte(nil), header[:headerLen]...)
 	frame.PayloadLength = length
 	return frame, nil
+}
+
+// NormalizeClosePayload validates a close payload and maps a disallowed status
+// code to the protocol-violation close used by the websocket implementations.
+func NormalizeClosePayload(payload []byte) ([]byte, error) {
+	switch len(payload) {
+	case 0:
+		return payload, nil
+	case 1:
+		return nil, errors.New("invalid websocket close sequence")
+	}
+	if !utf8.Valid(payload[2:]) {
+		return nil, errors.New("websocket close reason is not valid UTF-8")
+	}
+	code := binary.BigEndian.Uint16(payload[:2])
+	if WebSocketCloseCodeAllowed(code) {
+		return payload, nil
+	}
+	normalized := make([]byte, 2, 2+len("Protocol violation"))
+	binary.BigEndian.PutUint16(normalized, 1002)
+	return append(normalized, "Protocol violation"...), nil
+}
+
+// WebSocketCloseCodeAllowed reports whether a close status is valid on the wire.
+func WebSocketCloseCodeAllowed(code uint16) bool {
+	switch code {
+	case 1000, 1001, 1002, 1003, 1007, 1008, 1009, 1010, 1011, 1012, 1013:
+		return true
+	default:
+		return code >= 3000 && code <= 4999
+	}
 }
 
 func (frame Frame) Masked() bool { return frame.masked }

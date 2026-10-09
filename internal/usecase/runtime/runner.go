@@ -31,6 +31,13 @@ type providerProxyCodex interface {
 	RunThroughProxyProvider(context.Context, string, string, []string, string) error
 }
 
+// sessionProxyCodex is an optional gateway capability used by Super's
+// interactive launches. Keeping it optional preserves the narrow process port
+// for fakes and gateways that do not expose an app-server companion.
+type sessionProxyCodex interface {
+	RunThroughProxyWithSessionServer(context.Context, string, string, []string, string) error
+}
+
 type quotaPreflight interface {
 	Ready(context.Context, accountentity.Account) (bool, error)
 }
@@ -56,11 +63,19 @@ type Runner struct {
 	managedProfilesRoot string
 	sessionLocker       codexSessionLocker
 	presidioResolver    presidioConfigResolver
+	goalRecoveryReader  GoalRecoveryStateReader
 	autoRedeem          bool
 }
 
-func NewRunner(accounts launchAccounts, process codexProcess, newProxy ProxyFactory) *Runner {
-	return &Runner{accounts: accounts, process: process, newProxy: newProxy}
+func NewRunner(
+	accounts launchAccounts, process codexProcess, newProxy ProxyFactory,
+	goalReaders ...GoalRecoveryStateReader,
+) *Runner {
+	runner := &Runner{accounts: accounts, process: process, newProxy: newProxy}
+	if len(goalReaders) > 0 {
+		runner.goalRecoveryReader = goalReaders[0]
+	}
+	return runner
 }
 
 func (runner *Runner) SetQuotaPreflight(preflight quotaPreflight) {
@@ -94,35 +109,10 @@ func (runner *Runner) SetSharedCodexHome(home string) {
 	}
 }
 
-func (runner *Runner) SetProviderCredentialResolver(resolver providerCredentialResolver) {
-	runner.credentials = resolver
-}
-
 func (runner *Runner) SetPresidioConfigResolver(resolver func(context.Context, bool) (*proxyconfig.PresidioConfig, error)) {
 	if runner != nil {
 		runner.presidioResolver = resolver
 	}
-}
-
-func (runner *Runner) SetAutoRedeem(enabled bool) {
-	if runner != nil {
-		runner.autoRedeem = enabled
-	}
-}
-
-func (runner *Runner) ProviderAPIKeys(provider, explicit string) ([]string, error) {
-	if runner.credentials == nil {
-		return nil, errors.New("runtime provider credential resolver is not configured")
-	}
-	return runner.credentials.APIKeys(provider, explicit)
-}
-
-func (runner *Runner) CurrentCodexHome() string {
-	return runner.currentHome
-}
-
-func (runner *Runner) Run(ctx context.Context, selector string, arguments []string) error {
-	return runner.RunWithOptions(ctx, selector, arguments, RuntimeLaunchOptions{})
 }
 
 func (runner *Runner) RunWithOptions(
@@ -306,7 +296,7 @@ func (runner *Runner) launchHomeWithOptions(
 	if err := proxy.Start(); err != nil {
 		return err
 	}
-	runErr = runner.runThroughRuntimeProxy(ctx, proxyRunner, home, proxy.Endpoint(), runtimeArguments, provider.Kind)
+	runErr = runner.runThroughRuntimeProxy(ctx, proxyRunner, home, proxy.Endpoint(), runtimeArguments, provider.Kind, options.SuperOverlay)
 	return closeRuntimeProxy(ctx, proxy, runErr)
 }
 
@@ -361,7 +351,13 @@ func (runner *Runner) runThroughRuntimeProxy(
 	home, endpoint string,
 	arguments []string,
 	providerKind string,
+	sessionServer bool,
 ) error {
+	if sessionServer {
+		if companion, ok := runner.process.(sessionProxyCodex); ok {
+			return companion.RunThroughProxyWithSessionServer(ctx, home, endpoint, arguments, providerKind)
+		}
+	}
 	if providerKind != "" {
 		if isolated, ok := runner.process.(providerProxyCodex); ok {
 			return isolated.RunThroughProxyProvider(ctx, home, endpoint, arguments, providerKind)

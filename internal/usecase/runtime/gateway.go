@@ -117,6 +117,10 @@ func (runner *Runner) StartGatewayAccount(
 	if err != nil {
 		return nil, err
 	}
+	if err := runner.ensureAccountEnabled(ctx, accountID); err != nil {
+		_ = release()
+		return nil, err
+	}
 	account := proxymodel.Account{ID: accountID, Home: home, Enabled: true}
 	gateway, err := runner.startGateway(ctx, options, proxymodel.Provider{}, nil, []proxymodel.Account{account}, accountID, true)
 	if err != nil {

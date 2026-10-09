@@ -94,6 +94,33 @@ func TestExecuteWebSocketRejectsInvalidAccept(t *testing.T) {
 	}
 }
 
+func TestWebSocketHTTPClientBoundsResponseHeaderWait(t *testing.T) {
+	base := &http.Client{Transport: &http.Transport{ResponseHeaderTimeout: 30 * time.Second}}
+	client := newWebSocketHTTPClient(base)
+	defer client.CloseIdleConnections()
+	transport := client.Transport.(*http.Transport)
+	if transport.ResponseHeaderTimeout != websocketConnectTimeout {
+		t.Fatalf("websocket response-header timeout = %s, want %s", transport.ResponseHeaderTimeout, websocketConnectTimeout)
+	}
+	if base.Transport.(*http.Transport).ResponseHeaderTimeout != 30*time.Second {
+		t.Fatal("WebSocket timeout changed the shared HTTP transport")
+	}
+}
+
+func TestWebSocketHandshakeContextCancelsAtTimeout(t *testing.T) {
+	ctx, cancel, timer := websocketHandshakeContext(context.Background(), time.Millisecond)
+	defer cancel()
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+	case <-time.After(time.Second):
+		t.Fatal("WebSocket handshake context did not time out")
+	}
+	if ctx.Err() == nil {
+		t.Fatal("timed-out WebSocket handshake context remained active")
+	}
+}
+
 func TestExecuteWebSocketReturnsAfterUpstream101BeforeSocketCloses(t *testing.T) {
 	handshakeSent := make(chan struct{})
 	upstreamRead := make(chan byte, 1)

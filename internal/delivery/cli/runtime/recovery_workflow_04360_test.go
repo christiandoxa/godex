@@ -91,3 +91,26 @@ func TestProdex04361WorkflowRecoveryHonorsProviderStatusBoundaries(t *testing.T)
 		})
 	}
 }
+
+func TestProdex04361WorkflowRecoveryRecognizesQuotaCodeEvidence(t *testing.T) {
+	for _, tc := range []struct {
+		name, raw, want string
+	}{
+		{"usage limit code", `{"type":"error","error":{"code":"usage_limit_reached"}}`, "usage_limit"},
+		{"provider quota code", `{"type":"error","error":{"code":"insufficient_quota"}}`, "usage_limit"},
+		{"quota reason is trimmed and case folded", `{"type":"error","error":{"reason":" RESOURCE_EXHAUSTED "}}`, "usage_limit"},
+		{"workspace code in nested error", `{"type":"error","error":{"error":{"type":"workspace_member_credits_depleted"}}}`, "usage_limit"},
+		{"rate limit code is not exhausted quota", `{"type":"error","error":{"code":"rate_limit_exceeded"}}`, ""},
+		{"quota wording without code is not evidence", `{"type":"error","error":{"message":"insufficient_quota"}}`, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var record map[string]any
+			if err := json.Unmarshal([]byte(tc.raw), &record); err != nil {
+				t.Fatal(err)
+			}
+			if got := structuredWorkflowRecoveryClass04360(record); got != tc.want {
+				t.Fatalf("class=%q want %q", got, tc.want)
+			}
+		})
+	}
+}

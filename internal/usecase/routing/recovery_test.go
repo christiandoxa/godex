@@ -2,6 +2,7 @@ package routing
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -51,6 +52,15 @@ func TestFreshRequestWaitsForQuarantinedUsableAccount(t *testing.T) {
 	if exchange.Result.AccountID != "a" || exchange.Result.Response.StatusCode != http.StatusOK ||
 		!reflect.DeepEqual(gateway.calls, []string{"a"}) || !reflect.DeepEqual(waits, []time.Duration{15 * time.Second}) {
 		t.Fatalf("recovery owner/status/attempts/waits = %q/%d/%v/%v", exchange.Result.AccountID, exchange.Result.Response.StatusCode, gateway.calls, waits)
+	}
+}
+
+func TestFreshTransportExhaustionMapsToServiceUnavailable(t *testing.T) {
+	last := &pendingResponse{transport: true}
+	_, err := finishFresh(&last)
+	var routeErr *proxymodel.Error
+	if !errors.As(err, &routeErr) || routeErr.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("transport exhaustion error = %v, want HTTP 503", err)
 	}
 }
 

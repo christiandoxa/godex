@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/christiandoxa/godex/internal/helper/httpheader"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
@@ -20,6 +21,7 @@ import (
 const DefaultUpstreamURL = "https://chatgpt.com/backend-api"
 const upstreamHeaderWait = 30e9
 const upstreamIdleTime = 90e9
+const websocketConnectTimeout = 15 * time.Second
 
 type authReader interface {
 	ReadAuth(context.Context, string) (proxymodel.Auth, error)
@@ -30,6 +32,7 @@ type unauthorizedAuthRefresher interface {
 }
 type Transport struct {
 	client                   *http.Client
+	websocketClient          *http.Client
 	upstream                 *url.URL
 	auth                     authReader
 	cookies                  *webSocketCookieJar
@@ -49,8 +52,9 @@ func NewTransport(upstream string, client *http.Client, auth authReader) (*Trans
 	if auth == nil {
 		return nil, errors.New("selected account authentication reader is required")
 	}
+	client = cloneHTTPClient(client)
 	return &Transport{
-		client: cloneHTTPClient(client), upstream: parsed, auth: auth, cookies: newWebSocketCookieJar(),
+		client: client, websocketClient: newWebSocketHTTPClient(client), upstream: parsed, auth: auth, cookies: newWebSocketCookieJar(),
 		websocketMessageSessions: make(map[uint64]websocketMessageSession),
 	}, nil
 }
@@ -107,7 +111,10 @@ func (transport *Transport) executeWithAuth(
 ) (*proxymodel.Response, error) {
 	target := *transport.upstream
 	target.Path = upstreamPath(target.Path, input.Path)
-	target.RawPath = upstreamPath(transport.upstream.EscapedPath(), input.RawPath)
+	if input.RawPath != "" {
+		target.RawPath = upstreamPath(transport.upstream.EscapedPath(), input.RawPath)
+	}
+	target.Path, target.RawPath = protectDotSegments(target.Path, target.RawPath)
 	target.RawQuery = input.RawQuery
 	request, err := http.NewRequestWithContext(ctx, input.Method, target.String(), bytes.NewReader(input.Body))
 	if err != nil {
@@ -136,7 +143,17 @@ func (transport *Transport) executeWithAuth(
 	if auth.AccountID != "" {
 		request.Header.Set("ChatGPT-Account-Id", auth.AccountID)
 	}
+	var connectCancel context.CancelFunc
+	var connectTimer *time.Timer
+	if websocket {
+		requestContext, cancel, timer := websocketHandshakeContext(ctx, websocketConnectTimeout)
+		request = request.WithContext(requestContext)
+		connectCancel, connectTimer = cancel, timer
+	}
 	client := transport.client
+	if websocket {
+		client = transport.websocketClient
+	}
 	if websocket && client.Jar != nil {
 		copy := *client
 		copy.Jar = nil
@@ -144,9 +161,22 @@ func (transport *Transport) executeWithAuth(
 	}
 	response, err := client.Do(request)
 	if err != nil {
+		if websocket {
+			if !connectTimer.Stop() {
+				connectCancel()
+				return nil, context.DeadlineExceeded
+			}
+			connectCancel()
+		}
 		return nil, err
 	}
 	if websocket {
+		// Stop the handshake deadline after headers; the upgraded body owns cancellation.
+		if !connectTimer.Stop() {
+			_ = response.Body.Close()
+			connectCancel()
+			return nil, context.DeadlineExceeded
+		}
 		transport.cookies.capture(websocketCookieProfile(account), request.URL, response.Header)
 	}
 	if websocket && response.StatusCode == http.StatusSwitchingProtocols {
@@ -154,12 +184,18 @@ func (transport *Transport) executeWithAuth(
 			!httpheader.ConnectionTokens(response.Header)[http.CanonicalHeaderKey("Upgrade")] ||
 			!validWebSocketAccept(websocketKey, response.Header.Get("Sec-WebSocket-Accept")) {
 			_ = response.Body.Close()
+			connectCancel()
 			return nil, errors.New("upstream websocket handshake response is invalid")
 		}
-		if _, ok := response.Body.(io.ReadWriteCloser); !ok {
+		duplex, ok := response.Body.(io.ReadWriteCloser)
+		if !ok {
 			_ = response.Body.Close()
+			connectCancel()
 			return nil, errors.New("upstream websocket connection is not duplex")
 		}
+		response.Body = &websocketHandshakeBody{ReadCloser: response.Body, duplex: duplex, cancel: connectCancel}
+	} else if websocket {
+		response.Body = &websocketHandshakeBody{ReadCloser: response.Body, cancel: connectCancel}
 	}
 	return &proxymodel.Response{StatusCode: response.StatusCode, Header: response.Header, Body: response.Body, Trailer: response.Trailer}, nil
 }
@@ -183,7 +219,22 @@ func validWebSocketAccept(key, accept string) bool {
 func (transport *Transport) Close() {
 	transport.closeWebSocketMessageSessions()
 	transport.client.CloseIdleConnections()
+	transport.websocketClient.CloseIdleConnections()
 	transport.cookies.clear()
+}
+
+func newWebSocketHTTPClient(client *http.Client) *http.Client {
+	copy := *client
+	transport, ok := client.Transport.(*http.Transport)
+	if !ok {
+		return &copy
+	}
+	transport = transport.Clone()
+	if transport.ResponseHeaderTimeout == 0 || transport.ResponseHeaderTimeout > websocketConnectTimeout {
+		transport.ResponseHeaderTimeout = websocketConnectTimeout
+	}
+	copy.Transport = transport
+	return &copy
 }
 
 func cloneHTTPClient(client *http.Client) *http.Client {

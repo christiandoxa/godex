@@ -11,6 +11,7 @@ import (
 
 	providerentity "github.com/christiandoxa/godex/internal/entity/provider"
 	compactgateway "github.com/christiandoxa/godex/internal/gateway/compact"
+	"github.com/christiandoxa/godex/internal/helper/httpheader"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
@@ -108,7 +109,8 @@ func (transport *RuntimeTransport) executeResponses(ctx context.Context, input p
 	}
 	firstEventRetryUsed := input.FirstEventRetryUsed
 	conversations := transport.conversationsForRequest(input)
-	for index, candidate := range models {
+	for index := 0; index < len(models); index++ {
+		candidate := models[index]
 		attempt, err := transport.prepareResponseAttempt(input, current, candidate, conversations)
 		if err != nil {
 			return nil, err
@@ -125,6 +127,9 @@ func (transport *RuntimeTransport) executeResponses(ctx context.Context, input p
 			return nil, err
 		}
 		if retry {
+			if index+1 == len(models) {
+				models = append(models, candidate)
+			}
 			continue
 		}
 		return final, nil
@@ -188,6 +193,9 @@ func (transport *RuntimeTransport) finishResponseAttempt(
 	classification := classifyDeepSeekErrorBody(buffered.StatusCode, buffered.body)
 	if hasNextModel && providerentity.RetryableAcrossModels(classification.Class) {
 		return nil, true, firstEventRetryUsed, nil
+	}
+	if !hasNextModel && !firstEventRetryUsed && classification.Class == providerentity.ErrorRateLimit {
+		return nil, true, true, nil
 	}
 	return buffered.proxyResponse(), false, firstEventRetryUsed, nil
 }
@@ -286,6 +294,20 @@ func (transport *RuntimeTransport) executePassthrough(ctx context.Context, input
 	if err != nil {
 		return nil, err
 	}
+	if current.kind == routeChat && response.StatusCode == http.StatusTooManyRequests {
+		buffered, bufferErr := bufferError(response)
+		if bufferErr != nil {
+			return nil, bufferErr
+		}
+		if classifyDeepSeekErrorBody(buffered.StatusCode, buffered.body).Class == providerentity.ErrorRateLimit {
+			response, err = transport.send(ctx, input, current, input.Body)
+			if err != nil {
+				return nil, err
+			}
+			return proxyResponse(response), nil
+		}
+		return buffered.proxyResponse(), nil
+	}
 	return proxyResponse(response), nil
 }
 
@@ -333,21 +355,36 @@ func deepSeekMessagesPath(basePath string) string {
 }
 
 func applyHeaders(destination, source http.Header, apiKey string, nativeMessages bool) {
-	destination.Set(contentTypeHeader, "application/json")
-	destination.Set("Accept-Encoding", "identity")
-	destination.Set("Accept", "text/event-stream, application/json")
+	// Prodex adds provider defaults before forwarding caller headers. Keeping
+	// both values matters for clients that inspect repeated negotiation headers.
+	destination.Add(contentTypeHeader, "application/json")
+	destination.Add("Accept-Encoding", "identity")
+	destination.Add("Accept", "text/event-stream, application/json")
 	if nativeMessages {
-		destination.Set("x-api-key", apiKey)
-		destination.Set("anthropic-version", anthropicVersion)
+		destination.Add("x-api-key", apiKey)
+		destination.Add("anthropic-version", anthropicVersion)
 	} else {
-		destination.Set("Authorization", "Bearer "+apiKey)
+		destination.Add("Authorization", "Bearer "+apiKey)
 	}
 	if userAgent := source.Get("User-Agent"); userAgent != "" {
-		destination.Set("User-Agent", userAgent)
+		destination.Add("User-Agent", userAgent)
 	}
-	for _, name := range []string{"traceparent", "tracestate", "baggage"} {
-		if value := source.Get(name); value != "" {
-			destination.Set(name, value)
+	copyRequestHeaders(destination, source)
+}
+
+func copyRequestHeaders(destination, source http.Header) {
+	connectionHeaders := httpheader.ConnectionTokens(source)
+	for key, values := range source {
+		name := strings.ToLower(strings.TrimSpace(key))
+		if httpheader.IsRequestTransport(name) || connectionHeaders[http.CanonicalHeaderKey(key)] ||
+			strings.HasPrefix(name, "sec-websocket-") || strings.HasPrefix(name, "x-godex-internal-") ||
+			strings.HasPrefix(name, "x-prodex-internal-") || name == "authorization" ||
+			name == "chatgpt-account-id" || name == "cookie" || name == "x-api-key" ||
+			name == "anthropic-version" {
+			continue
+		}
+		for _, value := range values {
+			destination.Add(key, value)
 		}
 	}
 }

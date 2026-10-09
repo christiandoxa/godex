@@ -54,9 +54,17 @@ func (router *Router) forwardBound(
 				return result, recoveryErr
 			}
 		}
+		status := http.StatusBadGateway
+		if transportFailure {
+			status = http.StatusServiceUnavailable
+		}
+		message := "conversation owner could not be reached; continuity was preserved"
+		if transportFailure {
+			message = upstreamTransportFailureMessage
+		}
 		return proxymodel.Forwarded{}, &proxymodel.Error{
-			StatusCode: http.StatusBadGateway,
-			Message:    "conversation owner could not be reached; continuity was preserved",
+			StatusCode: status,
+			Message:    message,
 		}
 	}
 	if rotatePrevious {
@@ -203,16 +211,32 @@ func (router *Router) handleBoundResponseWithFailure(
 	outcome, pending, err := router.classify(response, account.Provider.Kind)
 	if err != nil {
 		if pending != nil && pending.transient {
-			if isTransportFailure(err) {
+			transportFailure := isTransportFailure(err)
+			if transportFailure {
 				router.recordTransportExecutionFailure(ctx, account.ID, request.QuotaSelection, err)
 			} else {
 				router.recordRouteFailure(ctx, account.ID, request.QuotaSelection)
 			}
+			if transportFailure {
+				result, handled, recoveryErr := router.recoverBoundRetryableFailure(
+					ctx, request, accounts, account, keys,
+					responseOutcome{kind: responseRetry, transient: true, transport: true}, pending,
+				)
+				if recoveryErr != nil || handled {
+					return result, recoveryErr
+				}
+			}
 		}
 		closePendingResponse(pending)
+		status := http.StatusBadGateway
+		message := "conversation owner response failed before commitment"
+		if pending != nil && pending.transient && pending.transport {
+			status = http.StatusServiceUnavailable
+			message = upstreamTransportFailureMessage
+		}
 		return proxymodel.Forwarded{}, &proxymodel.Error{
-			StatusCode: http.StatusBadGateway,
-			Message:    "conversation owner response failed before commitment",
+			StatusCode: status,
+			Message:    message,
 		}
 	}
 	outcome.failed = outcome.failed || failed

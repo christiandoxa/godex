@@ -133,3 +133,89 @@ func TestLateMultilineSSEOwnershipSurvivesRestart(t *testing.T) {
 		t.Fatalf("late metadata lost after restart: status=%d, calls=%d", response.StatusCode, calls)
 	}
 }
+
+func TestProxySSETrimsEventTypeBeforeRetryClassification(t *testing.T) {
+	accounts := testRuntimeAccounts(t, "A", "token-a", "B", "token-b")
+	var seen []string
+	upstream := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		seen = append(seen, request.Header.Get("ChatGPT-Account-Id"))
+		writer.Header().Set("Content-Type", "text/event-stream")
+		if len(seen) == 1 {
+			_, _ = io.WriteString(writer,
+				"data: {\"type\":\" response.created \"}\n\n"+
+					"data: {\"type\":\"response.failed\",\"errors\":[{\"code\":\"usage_limit_reached\"}]}\n\n")
+			return
+		}
+		_, _ = io.WriteString(writer, "data: {\"type\":\"response.output_text.delta\",\"delta\":\"recovered\"}\n\n")
+	}))
+	defer upstream.Close()
+
+	proxy := newTestProxy(t, upstream.URL, accounts)
+	response := doProxyJSON(t, proxy.URL+"/responses", `{}`, nil)
+	body, err := io.ReadAll(response.Body)
+	_ = response.Body.Close()
+	if err != nil || response.StatusCode != http.StatusOK || string(body) != "data: {\"type\":\"response.output_text.delta\",\"delta\":\"recovered\"}\n\n" {
+		t.Fatalf("whitespace SSE retry = status:%d body:%q err:%v", response.StatusCode, body, err)
+	}
+	if !reflect.DeepEqual(seen, []string{"workspace-A", "workspace-B"}) {
+		t.Fatalf("whitespace SSE accounts = %#v", seen)
+	}
+}
+
+func TestProxySSEQuotaWinsPreviousResponseNotFound(t *testing.T) {
+	accounts := testRuntimeAccounts(t, "A", "token-a", "B", "token-b")
+	var seen []string
+	upstream := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		seen = append(seen, request.Header.Get("ChatGPT-Account-Id"))
+		writer.Header().Set("Content-Type", "text/event-stream")
+		if len(seen) == 1 {
+			_, _ = io.WriteString(writer, "data: {\"type\":\"response.failed\",\"errors\":[{\"code\":\"previous_response_not_found\"},{\"code\":\"usage_limit_reached\"}]}\n\n")
+			return
+		}
+		_, _ = io.WriteString(writer, "data: {\"type\":\"response.output_text.delta\",\"delta\":\"quota-rotated\"}\n\n")
+	}))
+	defer upstream.Close()
+
+	proxy := newTestProxy(t, upstream.URL, accounts)
+	response := doProxyJSON(t, proxy.URL+"/responses", `{}`, nil)
+	body, err := io.ReadAll(response.Body)
+	_ = response.Body.Close()
+	if err != nil || response.StatusCode != http.StatusOK || !strings.Contains(string(body), "quota-rotated") {
+		t.Fatalf("mixed SSE retry = status:%d body:%q err:%v", response.StatusCode, body, err)
+	}
+	if !reflect.DeepEqual(seen, []string{"workspace-A", "workspace-B"}) {
+		t.Fatalf("mixed SSE accounts = %#v", seen)
+	}
+}
+
+func TestProxySSEFinalUnterminatedEventBindsContinuation(t *testing.T) {
+	accounts := testRuntimeAccounts(t, "A", "token-a", "B", "token-b")
+	var seen []string
+	upstream := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		seen = append(seen, request.Header.Get("ChatGPT-Account-Id"))
+		writer.Header().Set("Content-Type", "text/event-stream")
+		if len(seen) == 1 {
+			_, _ = io.WriteString(writer, "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp-final\"}}")
+			return
+		}
+		_, _ = io.WriteString(writer, "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp-followup\"}}")
+	}))
+	defer upstream.Close()
+
+	proxy := newTestProxy(t, upstream.URL, accounts)
+	first := doProxyJSON(t, proxy.URL+"/responses", `{}`, nil)
+	if body, err := io.ReadAll(first.Body); err != nil || string(body) != "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp-final\"}}" {
+		t.Fatalf("unterminated first stream = %q err:%v", body, err)
+	}
+	_ = first.Body.Close()
+
+	second := doProxyJSON(t, proxy.URL+"/responses", `{"previous_response_id":"resp-final"}`, nil)
+	body, err := io.ReadAll(second.Body)
+	_ = second.Body.Close()
+	if err != nil || second.StatusCode != http.StatusOK || !strings.Contains(string(body), "resp-followup") {
+		t.Fatalf("unterminated continuation = status:%d body:%q err:%v", second.StatusCode, body, err)
+	}
+	if !reflect.DeepEqual(seen, []string{"workspace-A", "workspace-A"}) {
+		t.Fatalf("unterminated continuation accounts = %#v", seen)
+	}
+}

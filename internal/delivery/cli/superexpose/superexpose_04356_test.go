@@ -1016,8 +1016,20 @@ func TestProdex04356OpenAITunnelReadinessRejectsChildExitAfterHealth(t *testing.
 				return
 			}
 			_ = tunnel.command.Process.Kill()
-			time.Sleep(50 * time.Millisecond)
-			writer.WriteHeader(http.StatusOK)
+			exitTimer := time.NewTimer(time.Second)
+			defer exitTimer.Stop()
+			for {
+				select {
+				case _, ok := <-tunnel.exit:
+					if !ok {
+						writer.WriteHeader(http.StatusOK)
+						return
+					}
+				case <-exitTimer.C:
+					writer.WriteHeader(http.StatusServiceUnavailable)
+					return
+				}
+			}
 		default:
 			writer.WriteHeader(http.StatusNotFound)
 		}

@@ -84,7 +84,10 @@ type Status struct {
 	usageCache    map[string]usageSnapshot
 	snapshotCache map[string]quotamodel.UsageSnapshot
 	snapshots     usageSnapshotStore
+	snapshotQueue *queuedUsageSnapshotStore
 	probes        probeRefreshGate
+	probeQueueMu  sync.Mutex
+	probeQueue    *ProbeRefreshQueue
 }
 
 func NewStatus(accounts accountStore, usage usageGateway) *Status {
@@ -100,7 +103,43 @@ func (status *Status) SetUsageSnapshotStore(store usageSnapshotStore) {
 	status.usageMu.Lock()
 	defer status.usageMu.Unlock()
 	status.snapshots = store
+	status.snapshotQueue = nil
 	status.snapshotCache = make(map[string]quotamodel.UsageSnapshot)
+}
+
+// SetQueuedUsageSnapshotStore moves snapshot writes off the request path.
+func (status *Status) SetQueuedUsageSnapshotStore(store usageSnapshotStore) {
+	status.usageMu.Lock()
+	defer status.usageMu.Unlock()
+	if store == nil {
+		status.snapshots = nil
+		status.snapshotQueue = nil
+		status.snapshotCache = make(map[string]quotamodel.UsageSnapshot)
+		return
+	}
+	queued := newQueuedUsageSnapshotStore(store)
+	status.snapshots = queued
+	status.snapshotQueue = queued
+	status.snapshotCache = make(map[string]quotamodel.UsageSnapshot)
+}
+
+// ShutdownUsageSnapshotSave drains the process-lifetime snapshot writer.
+func (status *Status) ShutdownUsageSnapshotSave(ctx context.Context) error {
+	status.usageMu.Lock()
+	queue := status.snapshotQueue
+	status.usageMu.Unlock()
+	if queue == nil {
+		return nil
+	}
+	return queue.shutdown(ctx)
+}
+
+// Close stops status-owned background work before process exit.
+func (status *Status) Close() {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	_ = status.ShutdownProbeRefresh(ctx)
+	_ = status.ShutdownUsageSnapshotSave(ctx)
 }
 
 func (status *Status) SetVirtual(virtual virtualGateway) { status.virtual = virtual }

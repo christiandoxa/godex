@@ -53,7 +53,19 @@ func (process *CodexProcess) CheckProxySupport(ctx context.Context) error {
 }
 
 func (process *CodexProcess) RunThroughProxy(ctx context.Context, codexHome, endpoint string, arguments []string) error {
-	return process.runThroughProxy(ctx, codexHome, endpoint, arguments, "")
+	return process.runThroughProxy(ctx, codexHome, endpoint, arguments, "", false)
+}
+
+// RunThroughProxyWithSessionServer starts the managed child with a private
+// Codex app-server companion. Super uses this to keep live session control in
+// the same isolated home as the foreground TUI.
+func (process *CodexProcess) RunThroughProxyWithSessionServer(
+	ctx context.Context,
+	codexHome, endpoint string,
+	arguments []string,
+	provider string,
+) error {
+	return process.runThroughProxy(ctx, codexHome, endpoint, arguments, provider, true)
 }
 
 func (process *CodexProcess) RunThroughProxyProvider(
@@ -62,7 +74,7 @@ func (process *CodexProcess) RunThroughProxyProvider(
 	arguments []string,
 	provider string,
 ) error {
-	return process.runThroughProxy(ctx, codexHome, endpoint, arguments, provider)
+	return process.runThroughProxy(ctx, codexHome, endpoint, arguments, provider, false)
 }
 
 func (process *CodexProcess) runThroughProxy(
@@ -70,6 +82,7 @@ func (process *CodexProcess) runThroughProxy(
 	codexHome, endpoint string,
 	arguments []string,
 	provider string,
+	withSessionServer bool,
 ) error {
 	binary, err := process.resolveBinary()
 	if err != nil {
@@ -79,6 +92,7 @@ func (process *CodexProcess) runThroughProxy(
 		return err
 	}
 	commandServer := codexCommandServerSubcommand(arguments)
+	companion := withSessionServer && sessionAppServerEligible(arguments)
 	switch provider {
 	case "local":
 		arguments, err = localProxyArguments(endpoint, arguments)
@@ -106,6 +120,9 @@ func (process *CodexProcess) runThroughProxy(
 	command.Stdin = process.terminal.Stdin
 	command.Stdout = process.terminal.Stdout
 	command.Stderr = process.terminal.Stderr
+	if companion {
+		return process.runWithSessionAppServer(ctx, binary, codexHome, command.Env, command, arguments)
+	}
 	if err := command.Run(); err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()

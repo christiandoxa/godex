@@ -43,6 +43,7 @@ type pendingResponse struct {
 	quota                    bool
 	profileUnavailable       bool
 	transient                bool
+	transport                bool
 	previousResponseNotFound bool
 }
 
@@ -54,6 +55,9 @@ func (pending *pendingResponse) close() {
 
 func (proxy *Router) classify(response *proxymodel.Response, providerKind string) (responseOutcome, *pendingResponse, error) {
 	outcome, pending, err := proxy.classifyResponse(response, providerKind)
+	if err != nil && pending != nil && pending.transient {
+		pending.transport = isTransportFailure(err)
+	}
 	if err == nil && response != nil && (outcome.kind != responsePass || (pending != nil && pending.transient)) {
 		releaseProfileInflight(response.Body)
 	}

@@ -92,3 +92,46 @@ func TestChatSSECompletedMetadataPreservesRequestMetadata(t *testing.T) {
 		}
 	}
 }
+
+func TestChatSSEFlushesUnterminatedDone(t *testing.T) {
+	output, err := io.ReadAll(ChatSSE(io.NopCloser(strings.NewReader("data: [DONE]"))))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Count(string(output), "event: response.completed"); got != 1 {
+		t.Fatalf("unterminated done completion events = %d: %q", got, output)
+	}
+}
+
+func TestChatSSEPrematureEOFEmitsFailure(t *testing.T) {
+	output, err := io.ReadAll(ChatSSE(io.NopCloser(strings.NewReader(
+		`data: {"choices":[{"delta":{"content":"partial"}}]}`,
+	))))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(output)
+	if !strings.Contains(text, "event: response.failed") ||
+		!strings.Contains(text, `"code":"provider_stream_error"`) ||
+		strings.Contains(text, "event: response.completed") {
+		t.Fatalf("premature Chat SSE = %s", text)
+	}
+}
+
+func TestChatSSEMalformedEventEmitsFailure(t *testing.T) {
+	input := io.NopCloser(strings.NewReader(
+		"data: {\"choices\":[{\"delta\":{\"content\":\"partial\"}}]}\n\n" +
+			"data: {malformed}\n\n",
+	))
+	output, err := io.ReadAll(ChatSSE(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(output)
+	if !strings.Contains(text, "event: response.output_text.delta") ||
+		!strings.Contains(text, "event: response.failed") ||
+		!strings.Contains(text, `"code":"provider_stream_error"`) ||
+		strings.Contains(text, "event: response.completed") {
+		t.Fatalf("malformed Chat SSE = %s", text)
+	}
+}

@@ -40,6 +40,7 @@ type sequentialRecoveryProcess04360 struct {
 	failUntil int
 	emit      map[int]bool
 	variant   string
+	quotaCode string
 	calls     [][]string
 	homes     []string
 }
@@ -60,8 +61,11 @@ func (p *sequentialRecoveryProcess04360) Run(_ context.Context, home string, arg
 		if variant == "" {
 			variant = "rate_limit_exceeded"
 		}
-		_, err = f.WriteString(`{"type":"response_item","payload":{"type":"message","role":"user"}}` + "\n" +
-			`{"type":"error","error":{"codex_error_info":"` + variant + `"}}` + "\n")
+		failure := `{"type":"error","error":{"codex_error_info":"` + variant + `"}}`
+		if p.quotaCode != "" {
+			failure = `{"type":"error","error":{"code":"` + p.quotaCode + `"}}`
+		}
+		_, err = f.WriteString(`{"type":"response_item","payload":{"type":"message","role":"user"}}` + "\n" + failure + "\n")
 		if err != nil {
 			_ = f.Close()
 			return err
@@ -79,12 +83,14 @@ func TestProdex04360KnownSessionRecoveryWalksDistinctProfilesUnderFreshEvidence(
 		name                  string
 		failUntil             int
 		emit                  map[int]bool
+		quotaCode             string
 		wantCalls, wantForget int
 		success               bool
 	}{
-		{"two generations then success", 2, map[int]bool{1: true, 2: true}, 3, 2, true},
-		{"second failure without new accepted event must stop", 2, map[int]bool{1: true, 2: false}, 2, 1, false},
-		{"every candidate exhausted without replay", 3, map[int]bool{1: true, 2: true, 3: true}, 3, 2, false},
+		{"two generations then success", 2, map[int]bool{1: true, 2: true}, "", 3, 2, true},
+		{"second failure without new accepted event must stop", 2, map[int]bool{1: true, 2: false}, "", 2, 1, false},
+		{"every candidate exhausted without replay", 3, map[int]bool{1: true, 2: true, 3: true}, "", 3, 2, false},
+		{"provider quota code rotates to backup", 1, map[int]bool{1: true}, "insufficient_quota", 2, 1, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			home := t.TempDir()
@@ -92,7 +98,7 @@ func TestProdex04360KnownSessionRecoveryWalksDistinctProfilesUnderFreshEvidence(
 			if err := os.WriteFile(path, []byte(`{"type":"session_meta","payload":{"id":"`+id+`"}}`+"\n"), 0600); err != nil {
 				t.Fatal(err)
 			}
-			process := &sequentialRecoveryProcess04360{path: path, failUntil: tc.failUntil, emit: tc.emit}
+			process := &sequentialRecoveryProcess04360{path: path, failUntil: tc.failUntil, emit: tc.emit, quotaCode: tc.quotaCode}
 			accounts := &runPolicyAccounts{values: []accountentity.Account{
 				{ID: "a", Name: "first", Enabled: true},
 				{ID: "b", Name: "second", Enabled: true},

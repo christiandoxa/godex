@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -225,22 +226,32 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 			return
 		}
 	} else {
+		if request.ContentLength > proxy.maxRequest {
+			const message = "proxied request body is too large"
+			activity.fail(http.StatusRequestEntityTooLarge, message)
+			writeTextResponse(writer, http.StatusRequestEntityTooLarge, message)
+			return
+		}
 		var err error
 		body, err = readLimited(request.Body, proxy.maxRequest)
 		if err != nil {
-			if request.Context().Err() == nil {
-				activity.fail(http.StatusRequestEntityTooLarge, "request body exceeded safe retry limit")
-				http.Error(writer, "request body is too large for safe retry", http.StatusRequestEntityTooLarge)
-			} else {
+			if request.Context().Err() != nil {
 				activity.fail(0, "request canceled")
+				return
 			}
+			status, message := http.StatusBadGateway, "proxied request could not be captured"
+			if errors.Is(err, errRequestBodyTooLarge) {
+				status, message = http.StatusRequestEntityTooLarge, "proxied request body is too large"
+			}
+			activity.fail(status, message)
+			writeTextResponse(writer, status, message)
 			return
 		}
 		if proxy.redactor != nil && len(body) > 0 {
 			redacted, err := proxy.redactor.Redact(request.Context(), body)
 			if err != nil {
 				activity.fail(http.StatusBadGateway, "presidio_redaction_failed")
-				http.Error(writer, "gateway PII redaction failed", http.StatusBadGateway)
+				writeTextResponse(writer, http.StatusBadGateway, "gateway PII redaction failed")
 				return
 			}
 			body = redacted
@@ -276,7 +287,7 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 			status, message = presentation.StatusCode, presentation.Message
 		}
 		activity.fail(status, message)
-		http.Error(writer, message, status)
+		writeProxyError(writer, request.URL.Path, status, message)
 		return
 	}
 	defer exchange.Close()
@@ -303,6 +314,34 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 	proxy.forwardResponse(request.Context(), writer, result.Response, result.Prefix, result.AccountID, lifecycle, result.ProviderKind)
 }
 
+func writeProxyError(writer http.ResponseWriter, path string, status int, message string) {
+	if status == http.StatusServiceUnavailable && isResponsesPath(path) {
+		writer.Header().Set("Content-Type", "application/json")
+		writer.Header().Set("Cache-Control", "no-store")
+		writer.Header().Set("X-Content-Type-Options", "nosniff")
+		writer.WriteHeader(status)
+		payload, _ := json.Marshal(struct {
+			Error struct {
+				Code    string `json:"code"`
+				Message string `json:"message"`
+			} `json:"error"`
+		}{Error: struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		}{Code: "service_unavailable", Message: message}})
+		_, _ = writer.Write(payload)
+		return
+	}
+	writeTextResponse(writer, status, message)
+}
+
+func isResponsesPath(path string) bool {
+	path = strings.TrimRight(path, "/")
+	return strings.HasSuffix(path, "/responses") || strings.HasSuffix(path, "/responses/compact")
+}
+
+var errRequestBodyTooLarge = errors.New("request body limit exceeded")
+
 func readLimited(reader io.ReadCloser, limit int64) ([]byte, error) {
 	if reader == nil {
 		return nil, nil
@@ -313,7 +352,7 @@ func readLimited(reader io.ReadCloser, limit int64) ([]byte, error) {
 		return nil, err
 	}
 	if int64(len(data)) > limit {
-		return nil, errors.New("request body limit exceeded")
+		return nil, errRequestBodyTooLarge
 	}
 	return data, nil
 }

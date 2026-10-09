@@ -7,8 +7,11 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"sync"
 	"testing"
+	"time"
 
+	"github.com/christiandoxa/godex/internal/helper/websocketframe"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
@@ -173,4 +176,89 @@ func TestUntypedTextFrameUsesCommittedIdleTimeout(t *testing.T) {
 	if timeout != websocketCommittedStreamIdleTimeout {
 		t.Fatalf("text progress timeout = %s, want %s", timeout, websocketCommittedStreamIdleTimeout)
 	}
+}
+
+func TestUpstreamCloseIsValidatedAndAcknowledgedBeforeTransportRecovery(t *testing.T) {
+	closeSeen := make(chan bool, 1)
+	server := newWebSocketMessageParityServer(t, nil, func(connection net.Conn, reader *bufio.Reader, _ *http.Request) {
+		if _, err := readWebSocketParityRequest(reader); err != nil {
+			t.Errorf("read request: %v", err)
+			return
+		}
+		if err := websocketframe.WriteFrame(connection, 8, []byte{0x03, 0xe8}, false); err != nil {
+			t.Errorf("write close: %v", err)
+			return
+		}
+		frame, err := websocketframe.ReadHeader(reader)
+		if err != nil {
+			closeSeen <- false
+			return
+		}
+		payload, err := frame.ReadPayload(reader, 125)
+		if err == nil {
+			frame.Unmask(payload)
+		}
+		closeSeen <- err == nil && frame.Opcode == 8 && frame.Masked() && string(payload) == string([]byte{0x03, 0xe8})
+	})
+	defer server.Close()
+	transport := newWebSocketParityTransport(t, server)
+	response, err := transport.ExecuteWebSocketMessage(
+		context.Background(),
+		websocketParityRequest("{\"type\":\"response.create\"}", 73, proxymodel.WebSocketPolicy{PromoteCommittedProfile: true}),
+		proxymodel.Account{ID: "profile-a", Home: "synthetic-home"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if response.PrecommitFailure == nil || !response.PrecommitFailure.Transport {
+		t.Fatalf("upstream close response = %#v", response)
+	}
+	select {
+	case acknowledged := <-closeSeen:
+		if !acknowledged {
+			t.Fatal("upstream close was not acknowledged with a masked close frame")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("upstream did not receive a close acknowledgement")
+	}
+}
+
+func TestWebSocketReadWatchdogClosesHalfOpenConnection(t *testing.T) {
+	connection := &watchdogHalfOpenConnection{closed: make(chan struct{})}
+	watchdog := &websocketReadWatchdog{
+		connection: connection,
+		deadline:   time.Now().Add(-time.Second),
+	}
+	readDone := make(chan error, 1)
+	go func() {
+		_, err := watchdog.Read(make([]byte, 1))
+		readDone <- err
+	}()
+	watchdog.expire()
+	select {
+	case err := <-readDone:
+		if err == nil {
+			t.Fatal("half-open read returned without an error")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("watchdog did not unblock half-open read")
+	}
+}
+
+type watchdogHalfOpenConnection struct {
+	closed chan struct{}
+	once   sync.Once
+}
+
+func (connection *watchdogHalfOpenConnection) Read([]byte) (int, error) {
+	<-connection.closed
+	return 0, io.EOF
+}
+
+func (*watchdogHalfOpenConnection) Write(payload []byte) (int, error) { return len(payload), nil }
+
+func (connection *watchdogHalfOpenConnection) Close() error {
+	connection.once.Do(func() { close(connection.closed) })
+	return nil
 }

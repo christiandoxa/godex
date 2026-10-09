@@ -50,12 +50,22 @@ func declareResponseTrailers(destination, responseHeaders, trailers http.Header)
 			declared[canonical] = true
 		}
 	}
-	for _, value := range responseHeaders.Values("Trailer") {
+	for _, value := range headerValues(responseHeaders, "Trailer") {
 		add(value)
 	}
 	for key := range trailers {
 		add(key)
 	}
+}
+
+func headerValues(headers http.Header, name string) []string {
+	var values []string
+	for key, current := range headers {
+		if strings.EqualFold(strings.TrimSpace(key), name) {
+			values = append(values, current...)
+		}
+	}
+	return values
 }
 
 func shouldSkipResponseHeader(key string, connectionHeaders map[string]bool) bool {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	accountentity "github.com/christiandoxa/godex/internal/entity/account"
 	profileentity "github.com/christiandoxa/godex/internal/entity/profile"
 	profilerepo "github.com/christiandoxa/godex/internal/repository/profile"
 )
@@ -86,5 +87,20 @@ func TestResolveProviderLaunchPrefersProviderThenSafeProfileFallback(t *testing.
 	fallback, found, err := catalog.ResolveProviderLaunch(context.Background(), "kiro", "")
 	if err != nil || !found || fallback.Name != "openai-home" {
 		t.Fatalf("generic fallback = %#v, found=%t, err=%v", fallback, found, err)
+	}
+}
+
+func TestDisabledManagedAccountCannotBeResolvedForLaunch(t *testing.T) {
+	repo := profilerepo.NewStore(t.TempDir())
+	accounts := &fakeAccounts{values: []accountentity.Account{{
+		ID: "disabled-id", Name: "disabled", Enabled: false,
+	}}, current: "disabled-id"}
+	catalog := NewCatalog(repo, accounts, t.TempDir())
+
+	if _, err := catalog.ResolveLaunch(context.Background(), "disabled"); err == nil {
+		t.Fatal("disabled account unexpectedly resolved for launch")
+	}
+	if _, active, err := catalog.ActiveLaunch(context.Background()); err != nil || active {
+		t.Fatalf("disabled account active launch = active:%t err:%v", active, err)
 	}
 }

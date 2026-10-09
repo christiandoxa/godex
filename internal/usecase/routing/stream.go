@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	providerentity "github.com/christiandoxa/godex/internal/entity/provider"
 	"github.com/christiandoxa/godex/internal/helper/sse"
@@ -75,6 +77,9 @@ func startupStreamEventsOutcome(events [][]byte, headers http.Header, now time.T
 }
 
 func streamOutcome(data []byte, headers http.Header, now time.Time, providerKind string) (responseOutcome, bool) {
+	if !utf8.Valid(data) {
+		return responseOutcome{}, true
+	}
 	var event struct {
 		Type  string          `json:"type"`
 		Error json.RawMessage `json:"error"`
@@ -82,6 +87,7 @@ func streamOutcome(data []byte, headers http.Header, now time.Time, providerKind
 	if json.Unmarshal(data, &event) != nil {
 		return responseOutcome{kind: responsePass}, false
 	}
+	event.Type = strings.TrimSpace(event.Type)
 	switch event.Type {
 	case "codex.rate_limits",
 		"codex.response.metadata",
@@ -107,14 +113,6 @@ func classifyStreamError(data []byte, headers http.Header, now time.Time, provid
 	if invalidPreviousResponseID(data) {
 		return responseOutcome{kind: responsePass, failed: true, invalidPreviousResponseID: true}, false
 	}
-	if previousResponseNotFound(data) {
-		return responseOutcome{kind: responsePass, failed: true, previousResponseNotFound: true}, false
-	}
-	if !externalProviderKind(providerKind) && openAIProfileUnavailable(data) {
-		return responseOutcome{
-			kind: responseRetry, failed: true, profileUnavailable: true, firstEventRetry: true,
-		}, false
-	}
 	classification := providerentity.ClassifyError(http.StatusOK, data)
 	switch classification.Class {
 	case providerentity.ErrorQuota:
@@ -136,11 +134,19 @@ func classifyStreamError(data []byte, headers http.Header, now time.Time, provid
 			kind: responseRetry, failed: true, transient: true, healthPenalty: 2, firstEventRetry: true,
 		}, false
 	}
+	if !externalProviderKind(providerKind) && openAIProfileUnavailable(data) {
+		return responseOutcome{
+			kind: responseRetry, failed: true, profileUnavailable: true, firstEventRetry: true,
+		}, false
+	}
 	if isQuotaResponse(data) {
 		return responseOutcome{
 			kind: responseRetry, quarantine: retryAfter(headers, now), failed: true, quota: true,
 			quotaResetAt: quotaResetAtFromMessage(data, now), firstEventRetry: true,
 		}, false
+	}
+	if previousResponseNotFound(data) {
+		return responseOutcome{kind: responsePass, failed: true, previousResponseNotFound: true}, false
 	}
 	return responseOutcome{kind: responsePass, failed: true}, false
 }

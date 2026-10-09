@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
+	"io"
 	"testing"
 
 	"github.com/christiandoxa/godex/internal/helper/websocketframe"
@@ -187,6 +188,106 @@ func TestReadWebSocketClientMessageReturnsBinaryWithoutRoutingPayload(t *testing
 	}
 }
 
+func TestForwardWebSocketClientFrameValidatesDirectionAndClosesBothPeers(t *testing.T) {
+	var upstream, downstream bytes.Buffer
+	state := websocketClientForwardState{}
+	input := bytes.NewReader(protocolClientFrame(8, true, []byte{0x03, 0xe8}, true))
+	frame, err := websocketframe.ReadHeader(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := forwardWebSocketClientFrame(
+		input, &upstream, &websocketFrameWriter{writer: bufio.NewWriter(&downstream)}, frame, &state,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if !state.closed {
+		t.Fatal("close frame did not end the client stream")
+	}
+	for _, check := range []struct {
+		frame  []byte
+		masked bool
+	}{{upstream.Bytes(), true}, {downstream.Bytes(), false}} {
+		parsed, err := websocketframe.ReadHeader(bytes.NewReader(check.frame))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if parsed.Opcode != 8 || parsed.Masked() != check.masked {
+			t.Fatalf("close frame = opcode %d masked=%t", parsed.Opcode, parsed.Masked())
+		}
+	}
+}
+
+func TestForwardWebSocketClientFrameRejectsUnmasked(t *testing.T) {
+	input := bytes.NewReader(protocolClientFrame(1, true, []byte("text"), false))
+	frame, err := websocketframe.ReadHeader(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := forwardWebSocketClientFrame(input, io.Discard, &websocketFrameWriter{writer: bufio.NewWriter(io.Discard)}, frame, &websocketClientForwardState{}); err == nil {
+		t.Fatal("accepted an unmasked client frame")
+	}
+}
+
+func TestCopyWebSocketFramesAnswersUpstreamPingAndEchoesClose(t *testing.T) {
+	input := append(protocolClientFrame(9, true, []byte("ping"), false), protocolClientFrame(8, true, []byte{0x03, 0xe8}, false)...)
+	connection := &protocolFrameConn{Reader: bytes.NewReader(input)}
+	var downstream bytes.Buffer
+	if err := copyWebSocketFrames(connection, &websocketFrameWriter{writer: bufio.NewWriter(&downstream)}); err != nil {
+		t.Fatal(err)
+	}
+	upstreamReader := bytes.NewReader(connection.writes.Bytes())
+	upstream, err := websocketframe.ReadHeader(upstreamReader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pong, err := upstream.ReadPayload(upstreamReader, 125)
+	if err != nil {
+		t.Fatal(err)
+	}
+	upstream.Unmask(pong)
+	if upstream.Opcode != 10 || !upstream.Masked() || string(pong) != "ping" {
+		t.Fatalf("upstream pong = opcode %d masked=%t payload=%q", upstream.Opcode, upstream.Masked(), pong)
+	}
+	client, err := websocketframe.ReadHeader(&downstream)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clientClose, err := client.ReadPayload(&downstream, 125)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if client.Opcode != 8 || client.Masked() || !bytes.Equal(clientClose, []byte{0x03, 0xe8}) {
+		t.Fatalf("downstream close = opcode %d masked=%t payload=%v", client.Opcode, client.Masked(), clientClose)
+	}
+	upstreamClose, err := websocketframe.ReadHeader(upstreamReader)
+	if err != nil {
+		t.Fatalf("upstream close frame: %v", err)
+	}
+	closePayload, err := upstreamClose.ReadPayload(upstreamReader, 125)
+	if err != nil {
+		t.Fatal(err)
+	}
+	upstreamClose.Unmask(closePayload)
+	if upstreamClose.Opcode != 8 || !upstreamClose.Masked() || !bytes.Equal(closePayload, []byte{0x03, 0xe8}) {
+		t.Fatalf("upstream close = opcode %d masked=%t payload=%v", upstreamClose.Opcode, upstreamClose.Masked(), closePayload)
+	}
+	if err := copyWebSocketFrames(bytes.NewReader(protocolClientFrame(1, true, []byte("text"), true)), &websocketFrameWriter{writer: bufio.NewWriter(io.Discard)}); err == nil {
+		t.Fatal("accepted a masked upstream data frame")
+	}
+}
+
+type protocolFrameConn struct {
+	*bytes.Reader
+	writes bytes.Buffer
+}
+
+func (connection *protocolFrameConn) Write(payload []byte) (int, error) {
+	return connection.writes.Write(payload)
+}
+
+func (*protocolFrameConn) Close() error { return nil }
+
 func TestWebSocketCloseCodePolicyMatchesTungstenite030(t *testing.T) {
 	for _, test := range []struct {
 		code uint16
@@ -196,7 +297,7 @@ func TestWebSocketCloseCodePolicyMatchesTungstenite030(t *testing.T) {
 		{1007, true}, {1013, true}, {1014, false}, {1015, false},
 		{2999, false}, {3000, true}, {4999, true}, {5000, false},
 	} {
-		if got := websocketCloseCodeAllowed(test.code); got != test.want {
+		if got := websocketframe.WebSocketCloseCodeAllowed(test.code); got != test.want {
 			t.Fatalf("close code %d allowed=%t want=%t", test.code, got, test.want)
 		}
 	}

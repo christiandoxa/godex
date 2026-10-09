@@ -172,6 +172,58 @@ func TestProdex04360NoBindingReleaseMeansNoAutomaticRetry(t *testing.T) {
 	if launcher.recoveryEligible04360(report, []string{"exec", "resume", target04360}, false, nil) {
 		t.Fatal("unbound recovery must not proceed")
 	}
+	if launcher.recoveryEligible04360(report, []string{"resume", target04360}, false, nil) {
+		t.Fatal("unbound TUI recovery must not proceed")
+	}
+}
+
+func TestProdex04361KnownTUIGoalResumeUsesVerifiedRecoveryLifecycle(t *testing.T) {
+	const session = target04360
+	home := t.TempDir()
+	fixtureGoalDB04360(t, home, session, "active")
+	sessionFile := filepath.Join(home, "rollout-"+session+".jsonl")
+	if err := os.WriteFile(sessionFile,
+		[]byte(`{"type":"session_meta","payload":{"id":"`+session+`"}}`+"\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	process := &verifiedRecoveryProcess04360{file: sessionFile, mark: true}
+	accounts := &runPolicyAccounts{values: []accountentity.Account{
+		{ID: "a", Name: "primary", Enabled: true},
+		{ID: "b", Name: "standby", Enabled: true},
+	}, homes: map[string]string{"a": home, "b": home}}
+	profiles := &verifiedRecoveryProfiles04360{
+		fakeLocalLaunchProfiles: &fakeLocalLaunchProfiles{active: false}, eligible: true,
+	}
+	allowRotate := true
+	launcher := runSessionLauncher{
+		runner: runtimeusecase.NewRunner(accounts, process, nil), profiles: profiles,
+		options: runtimeusecase.RuntimeLaunchOptions{AllowAutoRotate: &allowRotate},
+	}
+	released := 0
+	err := launcher.RunSessionReportWithRecovery(t.Context(), sessionmodel.Report{
+		ID: session, Path: sessionFile, CodexHome: home,
+		AccountID: "a", UpstreamAccountID: "a", ModelProvider: "openai",
+		LastReasoningEffort: "ultra",
+	}, []string{"--model", "gpt-6.1-sol", "resume", session, "old prompt", "--no-alt-screen"}, false,
+		func(_ context.Context, id string) error {
+			if id != session || len(process.calls) != 1 {
+				t.Fatalf("affinity release id/call count = %q/%d", id, len(process.calls))
+			}
+			released++
+			return nil
+		})
+	if err != nil || len(process.calls) != 2 || released != 1 {
+		t.Fatalf("TUI goal recovery calls/release/error = %d/%d/%v", len(process.calls), released, err)
+	}
+	retarget := process.calls[1]
+	for _, want := range []string{"--model", "gpt-6.1-sol", "resume", session, "--no-alt-screen", `model_reasoning_effort="ultra"`, "/goal resume"} {
+		if !slices.Contains(retarget, want) {
+			t.Fatalf("TUI recovery lost %q: %#v", want, retarget)
+		}
+	}
+	if slices.Contains(retarget, "old prompt") || slices.Contains(retarget, recoveryContinuationPrompt04360) {
+		t.Fatalf("TUI goal recovery replayed prompt or used non-goal continuation: %#v", retarget)
+	}
 }
 
 func TestProdex04360RecoveryProfilerNeverPicksFailedOrUnreadyAccount(t *testing.T) {
@@ -188,6 +240,20 @@ func TestProdex04360RecoveryProfilerNeverPicksFailedOrUnreadyAccount(t *testing.
 	_, ok = launcher.recoveryCandidate04360(context.Background(), sessionmodel.Report{AccountID: "a", UpstreamAccountID: "a"})
 	if ok {
 		t.Fatal("unready profile selected")
+	}
+}
+
+func TestProdex04360RecoveryResolvesAccountNameBeforeExclusion(t *testing.T) {
+	profiles := &verifiedRecoveryProfiles04360{
+		fakeLocalLaunchProfiles: &fakeLocalLaunchProfiles{},
+		eligible:                true,
+	}
+	launcher := runSessionLauncher{profiles: profiles}
+	candidate, ok := launcher.recoveryCandidate04360(context.Background(), sessionmodel.Report{
+		AccountID: "primary", UpstreamAccountID: "primary",
+	})
+	if !ok || candidate.AccountID != "b" {
+		t.Fatalf("alias recovery candidate=%#v ok=%t", candidate, ok)
 	}
 }
 

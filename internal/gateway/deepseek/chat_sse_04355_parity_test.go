@@ -36,6 +36,13 @@ func TestProdex04355DeepSeekChatSSEPrematureEOFFails(t *testing.T) {
 	}
 }
 
+func TestDeepSeekChatSSEFlushesUnterminatedDone(t *testing.T) {
+	translated := readDeepSeekChatSSEForTest(t, io.NopCloser(strings.NewReader("data: [DONE]")))
+	if !strings.Contains(translated, "event: response.completed") || strings.Contains(translated, "event: response.failed") {
+		t.Fatalf("unterminated done stream = %s", translated)
+	}
+}
+
 func TestProdex04355DeepSeekChatSSEReadErrorFailsAfterPriorDelta(t *testing.T) {
 	stream := `data: {"id":"chatcmpl_err","choices":[{"delta":{"content":"hi"}}]}
 

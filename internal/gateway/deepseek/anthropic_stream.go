@@ -69,7 +69,7 @@ func pumpDeepSeekAnthropicSSE(
 			for _, event := range decoder.Feed(buffer[:read]) {
 				translated, supported, translateErr := state.translate(event, time.Now())
 				if translateErr != nil {
-					_ = writer.CloseWithError(translateErr)
+					writeAnthropicStreamFailure(writer, &state)
 					return
 				}
 				if supported {
@@ -111,4 +111,15 @@ func pumpDeepSeekAnthropicSSE(
 			return
 		}
 	}
+}
+
+func writeAnthropicStreamFailure(writer *io.PipeWriter, state *anthropicStreamState) {
+	failed, supported, _ := state.failed("provider_stream_error", "Anthropic stream failed", time.Now())
+	if supported {
+		if _, err := writer.Write(failed); err != nil {
+			_ = writer.CloseWithError(err)
+			return
+		}
+	}
+	_ = writer.Close()
 }

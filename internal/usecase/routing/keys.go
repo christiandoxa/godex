@@ -6,6 +6,7 @@ import (
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	"net/http"
 	"strings"
+	"unicode/utf8"
 )
 
 func requestAffinity(request proxymodel.Request, body []byte) affinityKeys {
@@ -49,7 +50,12 @@ func responseAffinity(headers http.Header, body []byte, stream bool) affinityKey
 	}
 	if stream {
 		decoder := sse.NewDecoder(len(body))
-		for _, data := range decoder.Feed(body) {
+		events := decoder.Feed(body)
+		events = append(events, decoder.Finish()...)
+		for _, data := range events {
+			if !utf8.Valid(data) {
+				continue
+			}
 			var object map[string]any
 			if json.Unmarshal(data, &object) == nil {
 				keys = mergeAffinityKeys(keys, responseObjectAffinity(object))

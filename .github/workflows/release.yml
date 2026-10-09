@@ -28,6 +28,7 @@ jobs:
           go vet ./...
           go test -race -shuffle=on -count=1 ./...
           go build -trimpath ./cmd/godex
+          ./scripts/check-cross-build.sh
           sh -n install.sh
           ./scripts/test-installers.sh
       - name: PowerShell syntax

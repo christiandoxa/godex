@@ -66,6 +66,40 @@ func TestAnthropicResponsesFallsBackAcrossModelsBeforeCredentialRotation(t *test
 	}
 }
 
+func TestAnthropicResponsesFallsBackOnStructuredSSEError(t *testing.T) {
+	var models []string
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		body, _ := io.ReadAll(request.Body)
+		var value map[string]any
+		_ = json.Unmarshal(body, &value)
+		model, _ := value["model"].(string)
+		models = append(models, model)
+		if len(models) == 1 {
+			writer.Header().Set("Content-Type", "text/event-stream")
+			writer.WriteHeader(http.StatusBadRequest)
+			_, _ = io.WriteString(writer, "event: error\ndata: {\"error\":{\"reason\":\"rate_limit_error\"}}\n\n")
+			return
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(writer, `{"id":"chat_ok","choices":[{"message":{"role":"assistant","content":"ok"}}]}`)
+	}))
+	defer server.Close()
+
+	transport := newAnthropicTestTransport(t, server.URL+"/v1", server.Client())
+	response, err := transport.Execute(context.Background(), proxymodel.Request{
+		Method: http.MethodPost,
+		Path:   anthropicMountPath + "/responses",
+		Body:   []byte(`{"model":"sonnet","input":"hello"}`),
+	}, proxymodel.Account{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK || strings.Join(models, ",") != "claude-sonnet-5-5,claude-opus-5-5" {
+		t.Fatalf("status/models = %d / %v", response.StatusCode, models)
+	}
+}
+
 func TestAnthropicResponsesBare429AndAuthDoNotAdvanceModel(t *testing.T) {
 	fixtures := []struct {
 		name   string

@@ -242,6 +242,37 @@ func TestQuotaProfileTUIViewAndQuitKeys(t *testing.T) {
 	}
 }
 
+func TestQuotaTUIKeepsLastSnapshotAfterRefreshFailure(t *testing.T) {
+	used := int64(20)
+	model := newQuotaTUIModel(context.Background(), &fakeStatus{}, showOptions{detail: true})
+	updated, _ := model.Update(quotaSnapshotMsg{reports: []quotamodel.Report{{
+		ProfileName: "work", Provider: "openai", Auth: "chatgpt", State: "ready",
+		Usage: quotamodel.Usage{Primary: &quotamodel.Window{UsedPercent: &used}},
+	}}})
+	model = updated.(quotaTUIModel)
+	updated, _ = model.Update(quotaSnapshotMsg{err: errors.New("temporary quota failure")})
+	model = updated.(quotaTUIModel)
+	if len(model.reports) != 1 || !strings.Contains(model.View(), "work") ||
+		!strings.Contains(model.View(), "Quota refresh failed") {
+		t.Fatalf("quota TUI lost last snapshot after failure: %#v / %q", model.reports, model.View())
+	}
+}
+
+func TestQuotaTUIQuitKeys(t *testing.T) {
+	model := newQuotaTUIModel(context.Background(), &fakeStatus{}, showOptions{})
+	for _, key := range []tea.KeyMsg{
+		{Type: tea.KeyEsc},
+		{Type: tea.KeyCtrlC},
+		{Type: tea.KeyCtrlZ},
+		{Type: tea.KeyRunes, Runes: []rune{'q'}},
+	} {
+		_, command := model.Update(key)
+		if command == nil {
+			t.Fatalf("key %q did not quit", key.String())
+		}
+	}
+}
+
 func TestQuotaAllTUISortsAndScrollsLikeProdex(t *testing.T) {
 	status := quotaAllTUITestStatus()
 	model := newQuotaTUIModel(context.Background(), status, showOptions{Options: quotausecase.Options{All: true}})

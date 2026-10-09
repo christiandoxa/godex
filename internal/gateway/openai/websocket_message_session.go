@@ -7,6 +7,8 @@ import (
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
+const maxWebSocketMessageSessions = 128
+
 type websocketMessageSession struct {
 	connection io.ReadWriteCloser
 	accountID  string
@@ -50,11 +52,25 @@ func (transport *Transport) recycleWebSocketMessageSession(
 	}
 	transport.websocketMessageMu.Lock()
 	old, exists := transport.websocketMessageSessions[sessionID]
+	var evicted []websocketMessageSession
 	keep := !transport.websocketMessageClosed
 	if keep {
 		transport.websocketMessageSessions[sessionID] = websocketMessageSession{
 			connection: connection, accountID: account.ID, home: account.Home,
 			turnState: turnState, completed: time.Now(),
+		}
+		// ponytail: scan the bounded pool; add an index only if eviction gets hot.
+		for len(transport.websocketMessageSessions) > maxWebSocketMessageSessions {
+			oldestID := uint64(0)
+			var oldest websocketMessageSession
+			for candidateID, candidate := range transport.websocketMessageSessions {
+				if oldestID == 0 || candidate.completed.Before(oldest.completed) ||
+					candidate.completed.Equal(oldest.completed) && candidateID < oldestID {
+					oldestID, oldest = candidateID, candidate
+				}
+			}
+			delete(transport.websocketMessageSessions, oldestID)
+			evicted = append(evicted, oldest)
 		}
 	}
 	transport.websocketMessageMu.Unlock()
@@ -63,6 +79,9 @@ func (transport *Transport) recycleWebSocketMessageSession(
 	}
 	if !keep {
 		_ = connection.Close()
+	}
+	for _, session := range evicted {
+		_ = session.connection.Close()
 	}
 }
 

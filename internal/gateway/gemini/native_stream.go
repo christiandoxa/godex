@@ -48,24 +48,47 @@ func pumpGeminiNativeStream(body io.ReadCloser, writer *io.PipeWriter, requestMe
 		if n > 0 {
 			for _, data := range decoder.Feed(buffer[:n]) {
 				if writeErr := state.consume(writer, data, requestMetadata); writeErr != nil {
-					_ = writer.CloseWithError(writeErr)
+					_ = state.failed(writer, "provider_stream_error", "Gemini stream failed")
+					_ = writer.Close()
 					return
 				}
 			}
 		}
 		if err != nil {
 			if err == io.EOF {
-				if writeErr := state.complete(writer, requestMetadata); writeErr != nil {
-					_ = writer.CloseWithError(writeErr)
-					return
+				for _, data := range decoder.Finish() {
+					if writeErr := state.consume(writer, data, requestMetadata); writeErr != nil {
+						_ = state.failed(writer, "provider_stream_error", "Gemini stream failed")
+						_ = writer.Close()
+						return
+					}
 				}
-				_ = writer.Close()
-			} else {
-				_ = writer.CloseWithError(err)
 			}
+			if !state.completed {
+				message := "Gemini stream failed"
+				if err == io.EOF {
+					message = "unexpected end of Gemini stream"
+				}
+				_ = state.failed(writer, "provider_stream_error", message)
+			}
+			_ = writer.Close()
 			return
 		}
 	}
+}
+
+func (state *geminiStreamState) failed(writer io.Writer, code, message string) error {
+	if state.completed {
+		return nil
+	}
+	state.completed = true
+	return writeGeminiSSEEvent(writer, "response.failed", map[string]any{
+		"type": "response.failed", "sequence_number": state.nextSequence(),
+		"response": map[string]any{
+			"id":    state.responseID,
+			"error": map[string]any{"code": code, "message": message},
+		},
+	})
 }
 
 func (state *geminiStreamState) consume(writer io.Writer, data []byte, requestMetadata map[string]any) error {

@@ -50,7 +50,7 @@ func structuredWorkflowRecoveryClass04360(record map[string]any) string {
 		if scope == nil {
 			continue
 		}
-		if code, _ := scope["code"].(string); code == "usage_limit_reached" || code == "usage_limit_exceeded" {
+		if workflowQuotaCode04360(scope) {
 			return "usage_limit"
 		}
 		raw, ok := scope["codex_error_info"]

@@ -37,11 +37,8 @@ func runRealtimeWebSocketDuplex(
 	}()
 	first := <-results
 	stop()
-	second := <-results
-	if first != nil {
-		return first
-	}
-	return second
+	<-results
+	return first
 }
 
 func pumpRealtimeClient(
@@ -90,6 +87,9 @@ func pumpRealtimeUpstream(
 			case 10:
 				return nil
 			case 8:
+				if err := upstream.writeMessage(8, payload); err != nil {
+					return err
+				}
 				return toClient.writeFrame(8, payload)
 			default:
 				return errors.New("unsupported realtime upstream control frame")

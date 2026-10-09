@@ -51,6 +51,35 @@ func TestReadHeaderRejectsUnsupportedPayloadLength(t *testing.T) {
 	}
 }
 
+func TestReadHeaderRejectsNonMinimalPayloadLength(t *testing.T) {
+	short := []byte{0x81, 126, 0, 1, 'x'}
+	if _, err := ReadHeader(bytes.NewReader(short)); err == nil {
+		t.Fatal("accepted a 16-bit encoding for a one-byte payload")
+	}
+	long := make([]byte, 10)
+	long[0], long[1] = 0x81, 127
+	binary.BigEndian.PutUint64(long[2:], 1<<16-1)
+	if _, err := ReadHeader(bytes.NewReader(long)); err == nil {
+		t.Fatal("accepted a 64-bit encoding for a 16-bit payload")
+	}
+}
+
+func TestNormalizeClosePayload(t *testing.T) {
+	if _, err := NormalizeClosePayload([]byte{1}); err == nil {
+		t.Fatal("accepted a one-byte close payload")
+	}
+	if _, err := NormalizeClosePayload([]byte{0x03, 0xe8, 0xff}); err == nil {
+		t.Fatal("accepted an invalid UTF-8 close reason")
+	}
+	normalized, err := NormalizeClosePayload([]byte{0x03, 0xed})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(normalized, append([]byte{0x03, 0xea}, "Protocol violation"...)) {
+		t.Fatalf("normalized close payload = %v", normalized)
+	}
+}
+
 func TestReadHeaderDistinguishesCleanAndPartialEOF(t *testing.T) {
 	if _, err := ReadHeader(bytes.NewReader(nil)); err != io.EOF {
 		t.Fatalf("empty input error = %v", err)

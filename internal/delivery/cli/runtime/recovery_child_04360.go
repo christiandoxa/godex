@@ -40,13 +40,19 @@ func (launcher runSessionLauncher) RunSessionReportWithRecovery(
 	if initial == nil || ctx.Err() != nil || recoveryExitCancelled04360(initial) {
 		return initial
 	}
-	resumed, ok := retargetCodexExecRecovery04360(
-		restoreResumeSessionSettings(args, report), report.ID,
-	)
-	if !ok {
+	resumed, execMode := retargetCodexExecRecovery04360(args, report.ID)
+	if !execMode {
+		resumed, _ = retargetCodexTUIRecovery04360(args, report.ID)
+	}
+	if resumed == nil {
 		return initial
 	}
-	resumed = append(resumed, recoveryContinuationPrompt04360)
+	resumed = restoreResumeSessionSettings(resumed, report)
+	if execMode || !goalBefore.before.present {
+		resumed = append(resumed, recoveryContinuationPrompt04360)
+	} else {
+		resumed = append(resumed, "/goal resume")
+	}
 	failureClass := checkpoint.newAcceptedRecoveryClass04360(ctx, report.ID)
 	if failureClass == "" && goalBefore.newUsageLimit04360(ctx) {
 		failureClass = "usage_limit"
@@ -74,7 +80,10 @@ func (launcher runSessionLauncher) recoveryEligible04360(
 	if err != nil || plan.kind != "" || plan.direct {
 		return false
 	}
-	_, ok := retargetCodexExecRecovery04360(args, report.ID)
+	if _, ok := retargetCodexExecRecovery04360(args, report.ID); ok {
+		return true
+	}
+	_, ok := retargetCodexTUIRecovery04360(args, report.ID)
 	return ok
 }
 
@@ -87,11 +96,16 @@ func (launcher runSessionLauncher) recoveryCandidate04360(
 func (launcher runSessionLauncher) recoveryCandidateExcluding04360(
 	ctx context.Context, report sessionmodel.Report, attempted map[string]bool,
 ) (profilemodel.LaunchTarget, bool) {
-	source, ok := launcher.profiles.(interface {
-		SessionProfiles(context.Context) ([]sessionmodel.ProfileHome, error)
-	})
+	source, ok := launcher.profiles.(recoveryProfileSource04360)
 	if !ok {
 		return profilemodel.LaunchTarget{}, false
+	}
+	excluded, ok := recoveryExcludedAccountIDs04360(ctx, source, report)
+	if !ok {
+		return profilemodel.LaunchTarget{}, false
+	}
+	for accountID := range attempted {
+		excluded[accountID] = true
 	}
 	homes, err := source.SessionProfiles(ctx)
 	if err != nil || len(homes) < 2 || ctx.Err() != nil {
@@ -100,8 +114,7 @@ func (launcher runSessionLauncher) recoveryCandidateExcluding04360(
 	// Enforce the tagged multi-profile quota-compatible requirement.
 	for _, home := range homes {
 		if !home.Enabled || home.Provider != "openai" || home.AccountID == "" ||
-			attempted[home.AccountID] ||
-			home.AccountID == report.AccountID || home.AccountID == report.UpstreamAccountID {
+			excluded[home.AccountID] {
 			continue
 		}
 		target, err := launcher.profiles.ResolveLaunch(ctx, home.Name)

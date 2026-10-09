@@ -654,11 +654,15 @@ precommit inspection. Delivery relays a committed exchange through its terminal
 event, then releases it before reading the next message. The delivery layer
 assigns one opaque session ID per client tunnel; the OpenAI gateway reuses the
 terminal upstream connection for that tunnel and account, and closes it when
-the tunnel ends. The gateway caps retained connections at 128 and reconnects
-connections idle for more than 60 seconds. An explicit connection-limit event
-on a reused session gets one fresh connection attempt on the same account.
-Response IDs bind continuations to the selected account. Realtime/live paths
-keep the raw frame tunnel. Managed Codex itself stays configured for HTTP/SSE.
+the tunnel ends. The gateway caps idle connections at 128, evicting the oldest
+completion without expiring connections by idle age. Reuse failures and
+connection-limit events get one fresh same-owner attempt. The standard
+WebSocket handshake has an overall 15-second timeout and a separate upstream
+key; custom round trippers keep their own timeout policy. The relay validates
+frame direction, fragmentation, reserved bits, control frames, UTF-8 and close
+payloads, and answers pings at the socket that received them. Response IDs bind
+continuations to the selected account. Realtime/live paths keep the raw frame
+tunnel. Managed Codex itself stays configured for HTTP/SSE.
 
 ## Durable upstream ownership
 

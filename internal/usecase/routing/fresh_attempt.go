@@ -2,11 +2,14 @@ package routing
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
+
+const upstreamTransportFailureMessage = "Runtime proxy could not secure a healthy upstream profile before the pre-commit retry budget was exhausted. Retry the request."
 
 func (router *Router) tryFreshCandidates(
 	ctx context.Context,
@@ -177,12 +180,13 @@ func (router *Router) freshAttempt(
 		if ctx.Err() != nil {
 			return nil, nil, false, ctx.Err()
 		}
-		if isTransportFailure(err) {
+		transport := isTransportFailure(err)
+		if transport {
 			router.recordTransportExecutionFailure(ctx, account.ID, request.QuotaSelection, err)
 		} else {
 			router.recordRouteFailure(ctx, account.ID, request.QuotaSelection)
 		}
-		return nil, &pendingResponse{accountID: account.ID, transient: true}, false, nil
+		return nil, &pendingResponse{accountID: account.ID, transient: true, transport: transport}, false, nil
 	}
 	outcome, pending, err := router.classify(response, account.Provider.Kind)
 	if err != nil {
@@ -193,13 +197,14 @@ func (router *Router) freshAttempt(
 			return nil, nil, false, ctx.Err()
 		}
 		if pending != nil && pending.transient {
-			if isTransportFailure(err) {
+			transport := isTransportFailure(err)
+			if transport {
 				router.recordTransportExecutionFailure(ctx, account.ID, request.QuotaSelection, err)
 			} else {
 				router.recordRouteFailure(ctx, account.ID, request.QuotaSelection)
 			}
 			pending.close()
-			return nil, &pendingResponse{accountID: account.ID, transient: true}, false, nil
+			return nil, &pendingResponse{accountID: account.ID, transient: true, transport: transport}, false, nil
 		}
 		if pending != nil {
 			pending.close()
@@ -279,6 +284,9 @@ func finishFresh(last **pendingResponse) (proxymodel.Forwarded, error) {
 	pending := *last
 	*last = nil
 	if pending.response == nil {
+		if pending.transport {
+			return proxymodel.Forwarded{}, &proxymodel.Error{StatusCode: http.StatusServiceUnavailable, Message: upstreamTransportFailureMessage}
+		}
 		return proxymodel.Forwarded{}, &proxymodel.Error{StatusCode: 502, Message: "all eligible accounts failed before upstream response commitment"}
 	}
 	if pending.previousResponseNotFound {

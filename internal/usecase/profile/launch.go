@@ -32,6 +32,9 @@ func (catalog *Catalog) ResolveLaunch(ctx context.Context, name string) (profile
 	}
 	for _, report := range listed {
 		if report.Profile.Name == name {
+			if report.AccountID != "" && !report.Enabled {
+				return profilemodel.LaunchTarget{}, fmt.Errorf("profile %q is disabled", name)
+			}
 			return catalog.launchTargetWithAuth(ctx, report)
 		}
 	}
@@ -66,6 +69,9 @@ func (catalog *Catalog) AcquireLaunch(ctx context.Context, name string) (func() 
 	for _, report := range listed {
 		if report.Profile.Name != name {
 			continue
+		}
+		if report.AccountID != "" && !report.Enabled {
+			return nil, fmt.Errorf("profile %q is disabled", name)
 		}
 		if report.AccountID != "" {
 			leases, ok := catalog.accounts.(interface {
@@ -103,6 +109,9 @@ func (catalog *Catalog) AcquireOpenAILaunch(ctx context.Context, name string) (f
 		}
 		if target.Profile.Provider.Kind != profileentity.ProviderOpenAI {
 			return fmt.Errorf("profile %q does not use provider %q", name, profileentity.ProviderOpenAI)
+		}
+		if target.AccountID != "" && !target.Enabled {
+			return fmt.Errorf("profile %q is disabled", name)
 		}
 		if target.AccountID != "" {
 			leases, ok := catalog.accounts.(interface {
@@ -197,7 +206,7 @@ func (catalog *Catalog) ActiveLaunch(ctx context.Context) (profilemodel.LaunchTa
 	if err != nil {
 		return profilemodel.LaunchTarget{}, false, err
 	}
-	if !found || report.AccountID != "" && target.Provider == string(profileentity.ProviderOpenAI) && target.Auth != "api-key" {
+	if !found || report.AccountID != "" && (!report.Enabled || target.Provider == string(profileentity.ProviderOpenAI) && target.Auth != "api-key") {
 		return profilemodel.LaunchTarget{}, false, nil
 	}
 	return target, true, nil

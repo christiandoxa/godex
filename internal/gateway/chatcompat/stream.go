@@ -35,15 +35,53 @@ func pumpChatSSE(body io.ReadCloser, writer *io.PipeWriter, providerKey string, 
 		read, err := body.Read(buffer)
 		if read > 0 {
 			if writeErr := writeTranslatedEvents(writer, decoder.Feed(buffer[:read]), providerKey, responseMetadata, metadata); writeErr != nil {
-				_ = writer.CloseWithError(writeErr)
+				closeChatSSEFailure(writer, metadata)
 				return
 			}
 		}
 		if err != nil {
-			closeChatSSEWriter(writer, err)
+			if errors.Is(err, io.EOF) {
+				if writeErr := writeTranslatedEvents(writer, decoder.Finish(), providerKey, responseMetadata, metadata); writeErr != nil {
+					closeChatSSEFailure(writer, metadata)
+					return
+				}
+				if completed, _ := metadata[streamCompletedKey].(bool); !completed {
+					if _, writeErr := writer.Write(streamFailureEvent("unexpected end of stream")); writeErr != nil {
+						_ = writer.CloseWithError(writeErr)
+						return
+					}
+				}
+				_ = writer.Close()
+				return
+			}
+			if _, writeErr := writer.Write(streamFailureEvent("provider stream failed")); writeErr != nil {
+				_ = writer.CloseWithError(writeErr)
+				return
+			}
+			_ = writer.Close()
 			return
 		}
 	}
+}
+
+func closeChatSSEFailure(writer *io.PipeWriter, metadata map[string]any) {
+	if completed, _ := metadata[streamCompletedKey].(bool); completed {
+		_ = writer.Close()
+		return
+	}
+	if _, err := writer.Write(streamFailureEvent("provider stream failed")); err != nil {
+		_ = writer.CloseWithError(err)
+		return
+	}
+	_ = writer.Close()
+}
+
+func streamFailureEvent(message string) []byte {
+	return responseEvent("response.failed", map[string]any{
+		"response": map[string]any{
+			"error": map[string]any{"code": "provider_stream_error", "message": message},
+		},
+	})
 }
 
 func writeTranslatedEvents(writer *io.PipeWriter, events [][]byte, providerKey string, responseMetadata, metadata map[string]any) error {
@@ -59,14 +97,6 @@ func writeTranslatedEvents(writer *io.PipeWriter, events [][]byte, providerKey s
 		}
 	}
 	return nil
-}
-
-func closeChatSSEWriter(writer *io.PipeWriter, err error) {
-	if errors.Is(err, io.EOF) {
-		_ = writer.Close()
-		return
-	}
-	_ = writer.CloseWithError(err)
 }
 
 func TranslateChatSSEData(data []byte) ([]byte, bool, error) {

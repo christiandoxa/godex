@@ -117,6 +117,38 @@ func TestRunLocalProviderBypassesProxyAndQuotaSelection(t *testing.T) {
 	}
 }
 
+func TestRunLocalRejectsDisabledManagedAccount(t *testing.T) {
+	accounts := activeLaunchAccounts{&fakeLaunchAccounts{
+		accounts: []accountentity.Account{{ID: "disabled", Name: "disabled", Enabled: false}},
+		homes:    map[string]string{"disabled": t.TempDir()},
+	}}
+	process := &fakeProcess{}
+	runner := NewRunner(accounts, process, nil)
+	if err := runner.RunLocal(t.Context(), "", []string{"exec", "hello"}); err == nil || !strings.Contains(err.Error(), "disabled") {
+		t.Fatalf("disabled local account error = %v", err)
+	}
+	if len(process.homes) != 0 {
+		t.Fatalf("disabled local account launched: %#v", process.homes)
+	}
+}
+
+func TestRunLocalProviderRejectsDisabledManagedAccount(t *testing.T) {
+	accounts := activeLaunchAccounts{&fakeLaunchAccounts{
+		accounts: []accountentity.Account{{ID: "disabled", Name: "disabled", Enabled: false}},
+		homes:    map[string]string{"disabled": t.TempDir()},
+	}}
+	process := &fakeProcess{}
+	runner := NewRunner(accounts, process, nil)
+	if err := runner.RunLocalProvider(context.Background(), "disabled", LocalProviderConfig{
+		URL: "http://127.0.0.1:8131",
+	}, []string{"exec", "hello"}); err == nil || !strings.Contains(err.Error(), "disabled") {
+		t.Fatalf("disabled local provider account error = %v", err)
+	}
+	if len(process.homes) != 0 {
+		t.Fatalf("disabled local provider account launched: %#v", process.homes)
+	}
+}
+
 func TestApplyProviderSelectionLimitsUsesOverridesAndClamps(t *testing.T) {
 	provider := AnthropicProvider("fixture", "")
 	contextWindow, autoCompact := uint64(4096), uint64(5000)

@@ -652,11 +652,13 @@ baseline migration.
 
 ## Verification and limits
 
-The completion gate is `make verify`: formatting, source size, vet, shuffled
-race tests, and build. Focused tests and both opt-in native parser smokes run
-before it. Windows amd64 and macOS arm64 are cross-built locally; native Windows/macOS execution
-and live OpenAI behavior are not established by that build. Prodex's Rust/Mojo
-suite and release snapshots are outside this source/test audit.
+The completion gate is `make verify`: formatting, source size, TUI framework,
+all six release-target cross-builds, installer syntax/smoke checks, vet,
+shuffled race tests, and the host build. Focused tests and both opt-in native
+parser smokes run before it. The six targets are cross-built locally; native
+Windows/macOS execution and live OpenAI behavior are not established by those
+builds. Prodex's Rust/Mojo suite and release snapshots are outside this
+source/test audit.
 
 Commands passed for the earlier core checkpoint:
 

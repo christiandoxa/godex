@@ -204,11 +204,19 @@ func classifyProviderCode(code string) (ErrorClassification, bool) {
 
 func structuredErrorCodes(body []byte) []string {
 	var value any
-	if json.Unmarshal(body, &value) != nil {
-		return nil
+	if json.Unmarshal(body, &value) == nil {
+		codes := make([]string, 0, 4)
+		collectErrorCodes(value, &codes)
+		return codes
 	}
 	codes := make([]string, 0, 4)
-	collectErrorCodes(value, &codes)
+	for _, line := range strings.Split(string(body), "\n") {
+		payload, found := strings.CutPrefix(strings.TrimSpace(line), "data:")
+		if !found || json.Unmarshal([]byte(strings.TrimSpace(payload)), &value) != nil {
+			continue
+		}
+		collectErrorCodes(value, &codes)
+	}
 	return codes
 }
 
@@ -232,7 +240,7 @@ func collectErrorCodes(value any, codes *[]string) {
 
 func isErrorCodeField(key string) bool {
 	switch strings.ToLower(strings.TrimSpace(key)) {
-	case "code", "type", "error_code", "status":
+	case "code", "type", "error_code", "reason", "status":
 		return true
 	default:
 		return false

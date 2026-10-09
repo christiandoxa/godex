@@ -98,8 +98,17 @@ func handleUpstreamWebSocketControl(connection io.ReadWriteCloser, frame websock
 		return websocketframe.WriteFrame(connection, 10, control, true)
 	case 10:
 		return nil
+	case 8:
+		control, err = websocketframe.NormalizeClosePayload(control)
+		if err != nil {
+			return err
+		}
+		if err := websocketframe.WriteFrame(connection, 8, control, true); err != nil {
+			return err
+		}
+		return io.EOF
 	default:
-		return io.ErrUnexpectedEOF
+		return errors.New("unsupported upstream websocket control frame")
 	}
 }
 

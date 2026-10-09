@@ -175,8 +175,12 @@ func translatedDeepSeekResponseWithContentType(
 	}
 	return &proxymodel.Response{
 		StatusCode: response.StatusCode,
-		Header:     translatedHeaders(response.Header, contentType),
+		Header:     translatedBufferedHeaders(contentType),
 		Body:       io.NopCloser(bytes.NewReader(translated)),
 		Trailer:    response.Trailer.Clone(),
 	}, nil
+}
+
+func translatedBufferedHeaders(contentType string) http.Header {
+	return http.Header{contentTypeHeader: []string{contentType}}
 }

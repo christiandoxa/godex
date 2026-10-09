@@ -24,6 +24,7 @@ func TestClassifyErrorMatchesProdexCorePolicy(t *testing.T) {
 		{"gemini credits quota", 429, `{"error":{"status":"insufficient_g1_credits_balance"}}`, ErrorQuota, 5 * time.Minute},
 		{"notfound", 404, `{"error":{"message":"missing"}}`, ErrorNotFound, 0},
 		{"modelcode", 500, `{"error":{"code":"model_not_supported"}}`, ErrorNotFound, 0},
+		{"sse reason", 400, "event: error\ndata: {\"error\":{\"reason\":\"rate_limit_error\"}}\n\n", ErrorRateLimit, time.Minute},
 		{"not found code", 500, `{"error":{"type":"not_found_error"}}`, ErrorNotFound, 0},
 		{"overloaded code", 400, `{"error":{"type":"overloaded_error"}}`, ErrorTransient, 10 * time.Second},
 		{"server overloaded code", 400, `{"error":{"code":"server_is_overloaded"}}`, ErrorTransient, 10 * time.Second},

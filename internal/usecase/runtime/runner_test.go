@@ -666,6 +666,23 @@ func TestRunProviderAPIKeysAccountPinsManagedHome(t *testing.T) {
 	}
 }
 
+func TestRunProviderAPIKeysAccountRejectsDisabledManagedHome(t *testing.T) {
+	home := t.TempDir()
+	accounts := &fakeLeasedLaunchAccounts{fakeLaunchAccounts: fakeLaunchAccounts{
+		accounts: []accountentity.Account{{ID: "managed", Name: "managed", Enabled: false}},
+		homes:    map[string]string{"managed": home},
+	}}
+	process := &fakeProcess{}
+	runner := NewRunner(accounts, process, nil)
+	err := runner.RunProviderAPIKeysAccount(context.Background(), "managed", AnthropicProvider("raw-anthropic", ""), []string{"fixture-key"}, []string{"exec", "hello"})
+	if err == nil || !strings.Contains(err.Error(), "disabled") {
+		t.Fatalf("disabled provider account error = %v", err)
+	}
+	if len(process.homes) != 0 || len(accounts.acquired) != 1 || !accounts.released {
+		t.Fatalf("disabled provider account launched or left lease held: process=%#v leases=%#v released=%t", process.homes, accounts.acquired, accounts.released)
+	}
+}
+
 func TestRunPropagatesAutoRedeemToProxyConfig(t *testing.T) {
 	accounts := &fakeLaunchAccounts{
 		accounts: []accountentity.Account{{ID: "one", Name: "one", Enabled: true}},

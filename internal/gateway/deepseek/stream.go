@@ -35,7 +35,15 @@ func pumpDeepSeekChatSSE(body io.ReadCloser, writer *io.PipeWriter, state *deepS
 			for _, event := range decoder.Feed(buffer[:read]) {
 				translated, supported, translateErr := state.observe(event)
 				if translateErr != nil {
-					_ = writer.CloseWithError(translateErr)
+					failed, failedSupported, failedErr := state.failed("provider_stream_error", "DeepSeek stream failed")
+					if failedErr == nil && failedSupported {
+						_, failedErr = writer.Write(failed)
+					}
+					if failedErr != nil {
+						_ = writer.CloseWithError(failedErr)
+					} else {
+						_ = writer.Close()
+					}
 					return
 				}
 				if supported {
@@ -47,6 +55,29 @@ func pumpDeepSeekChatSSE(body io.ReadCloser, writer *io.PipeWriter, state *deepS
 			}
 		}
 		if err != nil {
+			if errors.Is(err, io.EOF) {
+				for _, data := range decoder.Finish() {
+					translated, supported, translateErr := state.observe(data)
+					if translateErr != nil {
+						failed, failedSupported, failedErr := state.failed("provider_stream_error", "DeepSeek stream failed")
+						if failedErr == nil && failedSupported {
+							_, failedErr = writer.Write(failed)
+						}
+						if failedErr != nil {
+							_ = writer.CloseWithError(failedErr)
+						} else {
+							_ = writer.Close()
+						}
+						return
+					}
+					if supported {
+						if _, writeErr := writer.Write(translated); writeErr != nil {
+							_ = writer.CloseWithError(writeErr)
+							return
+						}
+					}
+				}
+			}
 			if !state.completed {
 				message := "DeepSeek stream failed"
 				if errors.Is(err, io.EOF) {

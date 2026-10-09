@@ -327,6 +327,34 @@ func TestCloseWebSocketSessionOwnsSessionLifecycle(t *testing.T) {
 	}
 }
 
+func TestRecycleWebSocketMessageSessionBoundsIdlePool(t *testing.T) {
+	transport, err := NewTransport("http://127.0.0.1", nil, websocketAuth{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer transport.Close()
+	account := proxymodel.Account{ID: "profile-a", Home: "synthetic-home"}
+	peers := make([]net.Conn, maxWebSocketMessageSessions+1)
+	for sessionID := uint64(1); sessionID <= maxWebSocketMessageSessions+1; sessionID++ {
+		client, peer := net.Pipe()
+		peers[sessionID-1] = peer
+		transport.recycleWebSocketMessageSession(sessionID, account, client, "turn-state")
+	}
+	defer func() {
+		for _, peer := range peers {
+			_ = peer.Close()
+		}
+	}()
+	transport.websocketMessageMu.Lock()
+	count := len(transport.websocketMessageSessions)
+	_, evicted := transport.websocketMessageSessions[1]
+	_, newest := transport.websocketMessageSessions[maxWebSocketMessageSessions+1]
+	transport.websocketMessageMu.Unlock()
+	if count != maxWebSocketMessageSessions || evicted || !newest {
+		t.Fatalf("idle websocket sessions = %d, evicted=%t newest=%t", count, evicted, newest)
+	}
+}
+
 func TestExecuteWebSocketMessageReconnectsOnReusedConnectionLimit(t *testing.T) {
 	var handshakes atomic.Int32
 	requests := make(chan string, 3)

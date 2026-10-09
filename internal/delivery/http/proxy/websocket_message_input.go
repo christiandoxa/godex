@@ -2,7 +2,6 @@ package proxy
 
 import (
 	"bufio"
-	"encoding/binary"
 	"errors"
 	"io"
 	"unicode/utf8"
@@ -189,29 +188,5 @@ func readClientControlFrame(
 }
 
 func normalizeWebSocketClosePayload(payload []byte) ([]byte, error) {
-	switch len(payload) {
-	case 0:
-		return payload, nil
-	case 1:
-		return nil, errors.New("invalid websocket close sequence")
-	}
-	if !utf8.Valid(payload[2:]) {
-		return nil, errors.New("websocket close reason is not valid UTF-8")
-	}
-	code := binary.BigEndian.Uint16(payload[:2])
-	if websocketCloseCodeAllowed(code) {
-		return payload, nil
-	}
-	normalized := make([]byte, 2, 2+len("Protocol violation"))
-	binary.BigEndian.PutUint16(normalized, 1002)
-	return append(normalized, "Protocol violation"...), nil
-}
-
-func websocketCloseCodeAllowed(code uint16) bool {
-	switch code {
-	case 1000, 1001, 1002, 1003, 1007, 1008, 1009, 1010, 1011, 1012, 1013:
-		return true
-	default:
-		return code >= 3000 && code <= 4999
-	}
+	return websocketframe.NormalizeClosePayload(payload)
 }

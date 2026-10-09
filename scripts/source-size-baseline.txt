@@ -14,7 +14,6 @@
 486	internal/delivery/cli/superexpose/openai_tunnel.go
 675	internal/delivery/cli/superexpose/protocol.go
 1037	internal/delivery/cli/superexpose/run_manager.go
-621	internal/delivery/cli/superexpose/session_appserver_unix.go
 837	internal/delivery/cli/superexpose/session_control.go
 432	internal/delivery/cli/superexpose/session_operations.go
 728	internal/delivery/cli/superexpose/session_output_read.go

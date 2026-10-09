@@ -19,6 +19,9 @@ func MaintainManagedSessions(sharedCodexHome, cacheRoot string) error {
 		return nil
 	}
 	defer release()
+	if err := repairStateDBRolloutPaths(sharedCodexHome); err != nil {
+		return fmt.Errorf("repair Codex state database rollout paths: %w", err)
+	}
 
 	cachePath := filepath.Join(cacheRoot, sessionMaintenanceCacheFile)
 	previous := loadSessionMaintenanceCache(cachePath)
@@ -40,6 +43,15 @@ func MaintainManagedSessions(sharedCodexHome, cacheRoot string) error {
 			}
 		}
 	}
+	stateDBCandidates, err := stateDBSessionCandidates(sharedCodexHome)
+	if err != nil {
+		return err
+	}
+	for _, candidate := range stateDBCandidates {
+		if err := maintainManagedSessionFileWithSelector(sharedCodexHome, candidate.path, candidate.selector, &next); err != nil {
+			return err
+		}
+	}
 	if err := persistSessionGoalAttachmentPaths(sharedCodexHome); err != nil {
 		return err
 	}
@@ -49,7 +61,20 @@ func MaintainManagedSessions(sharedCodexHome, cacheRoot string) error {
 	return nil
 }
 
+// MaintainSessions exposes the bounded pre-launch maintenance pass to the
+// runtime use case without exposing Codex persistence details there.
+func (process *CodexProcess) MaintainSessions(sharedCodexHome, cacheRoot string) error {
+	return MaintainManagedSessions(sharedCodexHome, cacheRoot)
+}
+
 func maintainManagedSessionFile(codexHome, sessionFile string, next *sessionMaintenanceCache) error {
+	return maintainManagedSessionFileWithSelector(codexHome, sessionFile, "", next)
+}
+
+func maintainManagedSessionFileWithSelector(
+	codexHome, sessionFile, selector string,
+	next *sessionMaintenanceCache,
+) error {
 	contents, found, err := persistSessionFileAttachments(codexHome, sessionFile)
 	if err != nil {
 		return err
@@ -57,7 +82,12 @@ func maintainManagedSessionFile(codexHome, sessionFile string, next *sessionMain
 	if !found {
 		return nil
 	}
-	repaired, err := repairSessionMetadataPrefix(sessionFile, contents)
+	var repaired bool
+	if selector == "" {
+		repaired, err = repairSessionMetadataPrefix(sessionFile, contents)
+	} else {
+		repaired, err = repairSessionMetadataPrefixWithSelector(sessionFile, selector)
+	}
 	if err != nil {
 		return err
 	}

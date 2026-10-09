@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -30,6 +31,37 @@ func TestStatusTUIViewAndKeys(t *testing.T) {
 	refreshed, refresh := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
 	if refresh == nil || !refreshed.(statusTUIModel).loading {
 		t.Fatal("r did not trigger refresh")
+	}
+}
+
+func TestStatusTUIResizeAndRefreshFailureKeepLastSnapshot(t *testing.T) {
+	model := newStatusTUIModel(context.Background(), newCLIActivity(), time.Second)
+	updated, _ := model.Update(statusSnapshotMsg{overview: mustOverview(t)})
+	model = updated.(statusTUIModel)
+	updated, _ = model.Update(tea.WindowSizeMsg{Width: 80, Height: 6})
+	model = updated.(statusTUIModel)
+	if model.height != 6 {
+		t.Fatalf("status TUI height = %d", model.height)
+	}
+	updated, _ = model.Update(statusSnapshotMsg{err: errors.New("temporary status failure")})
+	model = updated.(statusTUIModel)
+	if model.overview == nil || !strings.Contains(model.View(), "Status refresh failed") {
+		t.Fatalf("status TUI lost last snapshot after failure: %q", model.View())
+	}
+}
+
+func TestStatusTUIQuitKeys(t *testing.T) {
+	model := newStatusTUIModel(context.Background(), newCLIActivity(), time.Second)
+	for _, key := range []tea.KeyMsg{
+		{Type: tea.KeyEsc},
+		{Type: tea.KeyCtrlC},
+		{Type: tea.KeyCtrlZ},
+		{Type: tea.KeyRunes, Runes: []rune{'q'}},
+	} {
+		_, command := model.Update(key)
+		if command == nil {
+			t.Fatalf("key %q did not quit", key.String())
+		}
 	}
 }
 

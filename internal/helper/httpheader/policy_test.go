@@ -23,3 +23,10 @@ func TestHopAndConnectionPolicies(t *testing.T) {
 		t.Fatal("request framing accepted from caller")
 	}
 }
+
+func TestConnectionTokensAcceptNonCanonicalMapKeys(t *testing.T) {
+	tokens := ConnectionTokens(http.Header{"connection": []string{"X-Local-Hop"}})
+	if !tokens["X-Local-Hop"] {
+		t.Fatalf("lowercase connection key was ignored: %v", tokens)
+	}
+}

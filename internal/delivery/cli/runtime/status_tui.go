@@ -27,6 +27,7 @@ type statusTUIModel struct {
 	activity  *runtimeusecase.Activity
 	resources *statusResourceTracker
 	interval  time.Duration
+	height    int
 	overview  *runtimemodel.Overview
 	resource  statusResourceSnapshot
 	err       error
@@ -36,7 +37,7 @@ type statusTUIModel struct {
 func newStatusTUIModel(ctx context.Context, activity *runtimeusecase.Activity, interval time.Duration) statusTUIModel {
 	return statusTUIModel{
 		ctx: ctx, activity: activity, resources: newStatusResourceTracker(),
-		interval: interval, loading: true,
+		interval: interval, height: 24, loading: true,
 	}
 }
 
@@ -46,6 +47,8 @@ func (model statusTUIModel) Init() tea.Cmd {
 
 func (model statusTUIModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	switch message := message.(type) {
+	case tea.WindowSizeMsg:
+		model.height = max(6, message.Height)
 	case tea.KeyMsg:
 		switch strings.ToLower(message.String()) {
 		case "q", "esc", "ctrl+c", "ctrl+z":
@@ -79,7 +82,8 @@ func (model statusTUIModel) View() string {
 	var output strings.Builder
 	output.WriteString("Godex Status\n\n")
 	if model.overview != nil {
-		for _, field := range statusFields(*model.overview, model.resource) {
+		fields := statusFields(*model.overview, model.resource)
+		for _, field := range fields[:min(len(fields), max(1, model.height-5))] {
 			_, _ = fmt.Fprintf(&output, "%s: %s\n", field[0], field[1])
 		}
 	} else if model.loading {
@@ -117,6 +121,9 @@ func runStatusTUI(ctx context.Context, activity *runtimeusecase.Activity, out io
 	_, err := program.Run()
 	if errors.Is(err, tea.ErrProgramKilled) && ctx.Err() != nil {
 		return ctx.Err()
+	}
+	if err != nil {
+		return fmt.Errorf("status TUI failed: %w", err)
 	}
 	return err
 }

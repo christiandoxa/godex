@@ -75,7 +75,6 @@ func run() int {
 		_, _ = fmt.Fprintln(os.Stderr, errorPrefix, err)
 		return 1
 	}
-
 	store := account.NewFileStore(settings.Home)
 	process := codex.NewCodexProcess(settings.CodexBin, codex.Terminal{
 		Stdin:  os.Stdin,
@@ -94,8 +93,9 @@ func run() int {
 		return 1
 	}
 	quotaStatus := quotausecase.NewStatus(store, quotaClient)
-	quotaStatus.SetUsageSnapshotStore(quotarepo.NewUsageSnapshotStore(settings.Home))
+	quotaStatus.SetQueuedUsageSnapshotStore(quotarepo.NewUsageSnapshotStore(settings.Home))
 	quotaStatus.SetModelProviderInspector(process)
+	defer quotaStatus.Close()
 	quotaStatus.SetExternalProvider("gemini", geminigateway.ProfileQuota{})
 	autoRedeemer := quotausecase.NewAutoRedeemer(quotaClient)
 	virtualQuota := quotagateway.NewVirtual(nil)
@@ -130,7 +130,7 @@ func run() int {
 			SmartContextEnabled: config.SmartContextEnabled, Redactor: redactor,
 		})
 	})
-	runner := runtimeusecase.NewRunner(store, process, factory)
+	runner := runtimeusecase.NewRunner(store, process, factory, runtimerepo.NewGoalStateStore(settings.SharedCodexHome))
 	runner.SetProviderCatalogStore(providerCatalogs)
 	runner.SetQuotaPreflight(quotaStatus)
 	runner.SetUpstreamURL(settings.UpstreamURL)

@@ -7,7 +7,14 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"unicode/utf8"
 )
+
+func writeTextResponse(writer http.ResponseWriter, status int, message string) {
+	writer.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	writer.WriteHeader(status)
+	_, _ = io.WriteString(writer, message)
+}
 
 func (proxy *Proxy) forwardResponse(ctx context.Context, writer http.ResponseWriter, response *proxymodel.Response, prefix []byte, accountID string, lifecycle *requestLifecycle, providerKinds ...string) {
 	if response == nil {
@@ -40,7 +47,7 @@ func (proxy *Proxy) prepareResponsePrefix(writer http.ResponseWriter, response *
 	}
 	prepared, err := inspectResponse(response.Body, proxy.maxInspect)
 	if err != nil {
-		http.Error(writer, "upstream response failed before commitment", http.StatusBadGateway)
+		writeTextResponse(writer, http.StatusBadGateway, "upstream response failed before commitment")
 		return nil, false
 	}
 	return prepared, true
@@ -102,26 +109,31 @@ type streamForwarder struct {
 }
 
 func (forwarder *streamForwarder) forward(ctx context.Context, body io.Reader, prefix []byte) bool {
-	if forwarder.write(ctx, prefix) != nil {
+	if forwarder.writeChunk(ctx, prefix, false) != nil {
 		return false
 	}
 	buffer := make([]byte, 32*1024)
 	for {
 		read, err := body.Read(buffer)
-		if read > 0 && forwarder.write(ctx, buffer[:read]) != nil {
+		if read > 0 && forwarder.writeChunk(ctx, buffer[:read], true) != nil {
 			return false
 		}
 		if err != nil {
+			if err == io.EOF {
+				forwarder.rememberEvents(ctx, forwarder.decoder.Finish())
+			}
 			return err == io.EOF
 		}
 	}
 }
 
-func (forwarder *streamForwarder) write(ctx context.Context, chunk []byte) error {
+func (forwarder *streamForwarder) writeChunk(ctx context.Context, chunk []byte, observe bool) error {
 	if len(chunk) == 0 {
 		return nil
 	}
-	forwarder.remember(ctx, chunk)
+	if observe {
+		forwarder.remember(ctx, chunk)
+	}
 	if _, err := forwarder.writer.Write(chunk); err != nil {
 		return err
 	}
@@ -135,10 +147,20 @@ func (forwarder *streamForwarder) remember(ctx context.Context, chunk []byte) {
 	if forwarder.accountID == "" {
 		return
 	}
-	for _, data := range forwarder.decoder.Feed(chunk) {
-		if err := forwarder.proxy.router.Observe(ctx, forwarder.accountID, forwarder.headers, data, false, forwarder.providerKind); err != nil {
-			panic(http.ErrAbortHandler)
+	forwarder.rememberEvents(ctx, forwarder.decoder.Feed(chunk))
+}
+
+func (forwarder *streamForwarder) rememberEvents(ctx context.Context, events [][]byte) {
+	if forwarder.accountID == "" {
+		return
+	}
+	for _, data := range events {
+		if !utf8.Valid(data) {
+			continue
 		}
+		// The response is already committed. Affinity/usage observation is
+		// best-effort and must not reorder or truncate client-visible bytes.
+		_ = forwarder.proxy.router.Observe(ctx, forwarder.accountID, forwarder.headers, data, false, forwarder.providerKind)
 	}
 }
 

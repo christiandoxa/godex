@@ -291,6 +291,24 @@ func TestAnthropicReferenceStreamAcceptsEventBelowFourMiB(t *testing.T) {
 	}
 }
 
+func TestAnthropicReferenceStreamMalformedEventEmitsFailure(t *testing.T) {
+	upstream := "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_partial\"}}\n\n" +
+		"event: content_block_delta\ndata: {malformed}\n\n"
+	body := deepSeekAnthropicSSE(io.NopCloser(strings.NewReader(upstream)), nil)
+	defer body.Close()
+	translated, err := io.ReadAll(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(translated)
+	if !strings.Contains(text, "event: response.created") ||
+		!strings.Contains(text, "event: response.failed") ||
+		!strings.Contains(text, `"code":"provider_stream_error"`) ||
+		strings.Contains(text, "event: response.completed") {
+		t.Fatalf("malformed Anthropic stream = %s", text)
+	}
+}
+
 func TestAnthropicReferenceSimpleStreamUsesDeepSeekRuntimeEventShape(t *testing.T) {
 	state := anthropicStreamState{requestID: 7}
 	created, supported, err := state.translate([]byte(`{"type":"message_start","message":{"id":"msg_test","model":"deepseek-chat","usage":{"input_tokens":2}}}`), time.Unix(123, 0))
