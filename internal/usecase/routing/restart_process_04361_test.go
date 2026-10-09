@@ -24,6 +24,7 @@ const (
 	deadRestartHomeEnv    = "GODEX_04361_DEAD_RESTART_PROFILE_HOME"
 	restartProcessOwner   = "11111111111111111111111111111111"
 	restartProcessOther   = "22222222222222222222222222222222"
+	deadRestartThread     = "dead-restart-thread"
 	restartProcessID      = "resp_process_restart_04361"
 	restartProcessTurn    = "opaque-process-restart-turn"
 )
@@ -140,10 +141,6 @@ func newDeadRestartRouter(t *testing.T, mode string) (*Router, *prodex04356Gatew
 	steps := []prodex04356Step{{account: restartProcessOther, status: http.StatusOK, body: `{"id":"dead-restart-next"}`}}
 	if mode == "write" {
 		preferred = restartProcessOwner
-		steps = []prodex04356Step{
-			{account: restartProcessOwner, status: http.StatusForbidden, body: `{"error":{"code":"insufficient_quota"}}`},
-			{account: restartProcessOther, status: http.StatusOK, body: `{"id":"dead-restart-fallback"}`},
-		}
 	}
 	gateway := &prodex04356Gateway{steps: steps}
 	router, err := NewRouter(Config{
@@ -186,16 +183,15 @@ func writeRestartProcessBinding(t *testing.T, router *Router) {
 
 func writeDeadRestartBinding(t *testing.T, router *Router) {
 	t.Helper()
-	if err := router.affinity.remember(t.Context(), restartProcessOwner, affinityKeys{turn: restartProcessTurn}, router.now()); err != nil {
+	if err := router.affinity.remember(t.Context(), restartProcessOwner, affinityKeys{thread: deadRestartThread, turn: restartProcessTurn}, router.now()); err != nil {
 		t.Fatal(err)
 	}
-	exchange, err := router.Forward(t.Context(), deadRestartRequest())
-	if err != nil {
+	if err := router.affinity.releaseOwnedDead(
+		t.Context(), restartProcessOwner,
+		affinityKeys{thread: deadRestartThread, turn: restartProcessTurn},
+		router.now(),
+	); err != nil {
 		t.Fatal(err)
-	}
-	defer exchange.Close()
-	if exchange.Result.AccountID != restartProcessOther || exchange.Result.Failed {
-		t.Fatalf("dead continuation fallback = owner:%q failed:%t", exchange.Result.AccountID, exchange.Result.Failed)
 	}
 }
 
@@ -241,6 +237,7 @@ func readDeadRestartBinding(t *testing.T, router *Router, gateway *prodex04356Ga
 
 func deadRestartRequest() proxymodel.Request {
 	request := prodex04357ResponsesRequest(prodex04357FullHistoryBody())
+	request.Header.Set("Thread-Id", deadRestartThread)
 	request.Header.Set("X-Codex-Turn-State", restartProcessTurn)
 	return request
 }

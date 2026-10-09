@@ -64,14 +64,28 @@ func (store *affinityStore) deadTurnStateContext(ctx context.Context, value stri
 	defer store.mu.Unlock()
 	store.pruneLocked(now)
 	store.pruneContinuationStatusesLocked(now)
-	if _, live := store.values[key]; !live {
-		_ = store.loadMissingLocked(ctx, affinityKeys{turn: value}, now)
-	}
 	if _, live := store.values[key]; live {
 		return false
 	}
 	status, ok := store.statuses[key]
-	return ok && status.kind == "turn_state" && status.state == continuationDead
+	if !ok || status.kind != "turn_state" || status.state != continuationDead {
+		return false
+	}
+	if _, checked := store.turnBindingChecks[key]; !checked {
+		if store.turnBindingChecks == nil {
+			store.turnBindingChecks = make(map[string]struct{})
+		}
+		if len(store.turnBindingChecks) >= affinityMaxValues {
+			for oldest := range store.turnBindingChecks {
+				delete(store.turnBindingChecks, oldest)
+				break
+			}
+		}
+		store.turnBindingChecks[key] = struct{}{}
+		_ = store.loadMissingLocked(ctx, affinityKeys{turn: value}, now)
+	}
+	_, live := store.values[key]
+	return !live
 }
 
 func (store *affinityStore) releaseOwnedDead(

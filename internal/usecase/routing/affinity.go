@@ -88,14 +88,16 @@ type affinityStore struct {
 	clock              func() time.Time
 	persistenceEnabled func() bool
 	ephemeralOwners    map[string]struct{}
+	turnBindingChecks  map[string]struct{}
 	sequence           uint64
 }
 
 func newAffinityStore() *affinityStore {
 	return &affinityStore{
-		values:   make(map[string]affinityValue),
-		statuses: make(map[string]continuationStatus),
-		clock:    time.Now,
+		values:            make(map[string]affinityValue),
+		statuses:          make(map[string]continuationStatus),
+		turnBindingChecks: make(map[string]struct{}),
+		clock:             time.Now,
 	}
 }
 
