@@ -174,7 +174,7 @@ func (queue *usageSnapshotSaveQueue) run() {
 		queue.mu.Unlock()
 
 		if shouldSave && queue.ctx.Err() == nil {
-			_ = queue.save(queue.ctx, job)
+			runUsageSnapshotSaveSafely(queue.save, queue.ctx, job)
 		}
 
 		queue.mu.Lock()
@@ -183,6 +183,15 @@ func (queue *usageSnapshotSaveQueue) run() {
 		}
 		queue.mu.Unlock()
 	}
+}
+
+func runUsageSnapshotSaveSafely(
+	save func(context.Context, usageSnapshotSaveJob) error,
+	ctx context.Context,
+	job usageSnapshotSaveJob,
+) {
+	defer func() { _ = recover() }()
+	_ = save(ctx, job)
 }
 
 func (queue *usageSnapshotSaveQueue) waitForWork(wait time.Duration) {

@@ -140,6 +140,29 @@ func TestUsageSnapshotSaveQueueWritesNewRevisionAfterActiveOlderJob(t *testing.T
 	}
 }
 
+func TestUsageSnapshotSaveQueueRecoversAfterSavePanic(t *testing.T) {
+	var calls int
+	queue := newUsageSnapshotSaveQueue(func(_ context.Context, job usageSnapshotSaveJob) error {
+		calls++
+		if calls == 1 {
+			panic("synthetic save panic")
+		}
+		return nil
+	}, 4, 0)
+	if _, err := queue.enqueue(context.Background(), "first", testUsageSnapshot(1)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := queue.enqueue(context.Background(), "second", testUsageSnapshot(2)); err != nil {
+		t.Fatal(err)
+	}
+	if err := queue.shutdown(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2 {
+		t.Fatalf("save calls after panic = %d, want 2", calls)
+	}
+}
+
 func TestQueuedUsageSnapshotStoreFlushesAtProcessShutdown(t *testing.T) {
 	underlying := &memoryUsageSnapshotStore{}
 	store := newQueuedUsageSnapshotStore(underlying)

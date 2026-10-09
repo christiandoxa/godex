@@ -47,12 +47,14 @@ func TestProbeRefreshQueueDeduplicatesAndReportsCompletion(t *testing.T) {
 	}
 }
 
-func TestProbeRefreshQueueShedsPressureAndReusesKeyAfterFailure(t *testing.T) {
-	queue := NewProbeRefreshQueue(context.Background(), ProbeRefreshOptions{WorkerCount: 1, PressureLimit: 2, QueueCapacity: 8})
+func TestProbeRefreshQueueAdmitsPressureAndReusesKeyAfterFailure(t *testing.T) {
+	queue := NewProbeRefreshQueue(context.Background(), ProbeRefreshOptions{
+		WorkerCount: 1, PressureLimit: 2, QueueCapacity: 8,
+	})
 	defer queue.Close()
 	firstStarted := make(chan struct{})
 	releaseFirst := make(chan struct{})
-	done := make(chan struct{}, 3)
+	done := make(chan struct{}, 4)
 	var calls atomic.Int32
 	run := func(context.Context) error {
 		if calls.Add(1) == 1 {
@@ -75,16 +77,16 @@ func TestProbeRefreshQueueShedsPressureAndReusesKeyAfterFailure(t *testing.T) {
 	if !queue.Pressure() {
 		t.Fatal("queue did not report pending pressure")
 	}
-	if err := queue.Schedule(context.Background(), "d", run); !errors.Is(err, ErrProbeRefreshBackpressure) {
-		t.Fatalf("pressure schedule error = %v, want ErrProbeRefreshBackpressure", err)
+	if err := queue.Schedule(context.Background(), "d", run); err != nil {
+		t.Fatalf("pressure admission error = %v", err)
 	}
 	close(releaseFirst)
 	deadline := time.NewTimer(time.Second)
 	defer deadline.Stop()
-	for completed := 0; completed < 3; completed++ {
+	for completed := 0; completed < 4; completed++ {
 		select {
 		case <-deadline.C:
-			t.Fatalf("queued failures did not drain; calls=%d", calls.Load())
+			t.Fatalf("queued failures did not drain; calls=%d backlog=%d", calls.Load(), queue.Backlog())
 		case <-done:
 		}
 	}
@@ -93,59 +95,49 @@ func TestProbeRefreshQueueShedsPressureAndReusesKeyAfterFailure(t *testing.T) {
 	}
 }
 
-func TestProbeRefreshQueueRetryStopsOnShutdownCancellation(t *testing.T) {
+func TestProbeRefreshQueueRejectsOnlyAtHardCapacity(t *testing.T) {
 	queue := NewProbeRefreshQueue(context.Background(), ProbeRefreshOptions{
-		WorkerCount: 1, MaxAttempts: 3, RetryDelay: time.Second, MaxRetryDelay: time.Second,
-	})
-	started := make(chan struct{})
-	var calls atomic.Int32
-	run := func(context.Context) error {
-		calls.Add(1)
-		close(started)
-		return probeRefreshTimeoutError{}
-	}
-	if err := queue.Schedule(context.Background(), "main", run); err != nil {
-		t.Fatal(err)
-	}
-	<-started
-	if err := queue.Shutdown(context.Background()); err != nil {
-		t.Fatalf("shutdown error = %v", err)
-	}
-	if got := calls.Load(); got != 1 {
-		t.Fatalf("retry calls after cancellation = %d, want 1", got)
-	}
-	if queue.Active() != 0 || queue.Backlog() != 0 {
-		t.Fatalf("shutdown leaked queue resources: backlog=%d active=%d", queue.Backlog(), queue.Active())
-	}
-}
-
-func TestProbeRefreshQueueRetriesTransientFailureWithBoundedAttempts(t *testing.T) {
-	queue := NewProbeRefreshQueue(context.Background(), ProbeRefreshOptions{
-		WorkerCount: 1, MaxAttempts: 3, RetryDelay: time.Nanosecond, MaxRetryDelay: time.Nanosecond,
+		WorkerCount: 1, PressureLimit: 2, QueueCapacity: 3,
 	})
 	defer queue.Close()
-	var calls atomic.Int32
-	second := make(chan struct{})
-	observed := queue.Revision()
-	if err := queue.Schedule(context.Background(), "main", func(context.Context) error {
-		if calls.Add(1) == 1 {
-			return probeRefreshTimeoutError{}
-		}
-		close(second)
+	started := make(chan struct{})
+	release := make(chan struct{})
+	if err := queue.Schedule(context.Background(), "active", func(context.Context) error {
+		close(started)
+		<-release
 		return nil
 	}); err != nil {
 		t.Fatal(err)
 	}
-	select {
-	case <-second:
-	case <-time.After(time.Second):
-		t.Fatal("transient probe failure was not retried")
+	<-started
+	for _, key := range []string{"one", "two", "three"} {
+		if err := queue.Schedule(context.Background(), key, func(context.Context) error { return nil }); err != nil {
+			t.Fatalf("schedule %q: %v", key, err)
+		}
+	}
+	if !queue.Pressure() {
+		t.Fatal("queue did not report pressure before hard capacity")
+	}
+	if err := queue.Schedule(context.Background(), "four", func(context.Context) error { return nil }); !errors.Is(err, ErrProbeRefreshBackpressure) {
+		t.Fatalf("hard-capacity error = %v, want ErrProbeRefreshBackpressure", err)
+	}
+	close(release)
+}
+
+func TestProbeRefreshQueueFailureReleasesScheduledKey(t *testing.T) {
+	queue := NewProbeRefreshQueue(context.Background(), ProbeRefreshOptions{WorkerCount: 1})
+	defer queue.Close()
+	observed := queue.Revision()
+	if err := queue.Schedule(context.Background(), "main", func(context.Context) error {
+		return errors.New("synthetic timeout")
+	}); err != nil {
+		t.Fatal(err)
 	}
 	if !queue.WaitProgress(context.Background(), observed) {
-		t.Fatal("retry completion did not report progress")
+		t.Fatal("failed probe did not report progress")
 	}
-	if got := calls.Load(); got != 2 {
-		t.Fatalf("retry calls = %d, want 2", got)
+	if err := queue.Schedule(context.Background(), "main", func(context.Context) error { return nil }); err != nil {
+		t.Fatalf("failed key was not released: %v", err)
 	}
 }
 
@@ -218,9 +210,3 @@ func TestAvailabilitySchedulesNearExpiryRefreshWithoutBlocking(t *testing.T) {
 		t.Fatal(err)
 	}
 }
-
-type probeRefreshTimeoutError struct{}
-
-func (probeRefreshTimeoutError) Error() string   { return "synthetic timeout" }
-func (probeRefreshTimeoutError) Timeout() bool   { return true }
-func (probeRefreshTimeoutError) Temporary() bool { return true }

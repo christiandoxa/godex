@@ -3,15 +3,13 @@ package quota
 import (
 	"context"
 	"errors"
-	"net"
 	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
 )
 
 var (
-	ErrProbeRefreshBackpressure = errors.New("probe refresh queue is under pressure")
+	ErrProbeRefreshBackpressure = errors.New("probe refresh queue is at capacity")
 	ErrProbeRefreshClosed       = errors.New("probe refresh queue is closed")
 )
 
@@ -19,21 +17,14 @@ const (
 	defaultProbeRefreshWorkers       = 4
 	defaultProbeRefreshQueueCapacity = 64
 	defaultProbeRefreshPressureLimit = 16
-	defaultProbeRefreshAttempts      = 3
-	defaultProbeRefreshRetryDelay    = 50 * time.Millisecond
-	defaultProbeRefreshMaxRetryDelay = time.Second
 )
 
-// ProbeRefreshOptions controls the bounded background probe queue.
-// Retryable failures are retried with capped exponential backoff.
+// ProbeRefreshOptions controls the bounded background probe queue. Each job is
+// attempted once; pressure is reported separately from hard capacity.
 type ProbeRefreshOptions struct {
 	WorkerCount   int
 	QueueCapacity int
 	PressureLimit int
-	MaxAttempts   int
-	RetryDelay    time.Duration
-	MaxRetryDelay time.Duration
-	Retryable     func(error) bool
 }
 
 type probeRefreshJob struct {
@@ -92,26 +83,13 @@ func normalizeProbeRefreshOptions(options ProbeRefreshOptions) ProbeRefreshOptio
 			options.PressureLimit = options.QueueCapacity
 		}
 	}
-	if options.MaxAttempts <= 0 {
-		options.MaxAttempts = defaultProbeRefreshAttempts
-	}
-	if options.RetryDelay <= 0 {
-		options.RetryDelay = defaultProbeRefreshRetryDelay
-	}
-	if options.MaxRetryDelay <= 0 {
-		options.MaxRetryDelay = defaultProbeRefreshMaxRetryDelay
-	}
-	if options.MaxRetryDelay < options.RetryDelay {
-		options.MaxRetryDelay = options.RetryDelay
-	}
-	if options.Retryable == nil {
-		options.Retryable = probeRefreshRetryable
-	}
 	return options
 }
 
-// Schedule accepts one pending job per key. Optional refresh work is shed once
-// the pressure limit is reached; a duplicate already in flight is a no-op.
+// Schedule accepts one pending job per key. Pressure is an admission signal for
+// callers, so jobs continue to be admitted above the pressure limit until the
+// separate hard queue capacity is reached. A duplicate already in flight is a
+// no-op.
 func (queue *ProbeRefreshQueue) Schedule(ctx context.Context, key string, run func(context.Context) error) error {
 	if queue == nil {
 		return ErrProbeRefreshClosed
@@ -138,7 +116,7 @@ func (queue *ProbeRefreshQueue) Schedule(ctx context.Context, key string, run fu
 	if _, exists := queue.scheduled[key]; exists {
 		return nil
 	}
-	if queue.pending >= queue.policy.PressureLimit {
+	if queue.pending >= queue.policy.QueueCapacity {
 		return ErrProbeRefreshBackpressure
 	}
 	queue.scheduled[key] = struct{}{}
@@ -190,24 +168,10 @@ func (queue *ProbeRefreshQueue) worker() {
 }
 
 func (queue *ProbeRefreshQueue) execute(job probeRefreshJob) {
-	for attempt := 1; attempt <= queue.policy.MaxAttempts; attempt++ {
-		if err := queue.ctx.Err(); err != nil {
-			return
-		}
-		err := runProbeSafely(queue.ctx, job.run)
-		if err == nil || !queue.policy.Retryable(err) || attempt == queue.policy.MaxAttempts {
-			return
-		}
-		timer := time.NewTimer(probeRefreshRetryDelay(queue.policy, attempt))
-		select {
-		case <-queue.ctx.Done():
-			if !timer.Stop() {
-				<-timer.C
-			}
-			return
-		case <-timer.C:
-		}
+	if queue.ctx.Err() != nil {
+		return
 	}
+	_ = runProbeSafely(queue.ctx, job.run)
 }
 
 func runProbeSafely(ctx context.Context, run func(context.Context) error) (err error) {
@@ -217,26 +181,4 @@ func runProbeSafely(ctx context.Context, run func(context.Context) error) (err e
 		}
 	}()
 	return run(ctx)
-}
-
-func probeRefreshRetryDelay(options ProbeRefreshOptions, attempt int) time.Duration {
-	delay := options.RetryDelay
-	for step := 1; step < attempt; step++ {
-		if delay >= options.MaxRetryDelay/2 {
-			return options.MaxRetryDelay
-		}
-		delay *= 2
-	}
-	if delay > options.MaxRetryDelay {
-		return options.MaxRetryDelay
-	}
-	return delay
-}
-
-func probeRefreshRetryable(err error) bool {
-	if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		return false
-	}
-	var networkErr net.Error
-	return errors.As(err, &networkErr) && (networkErr.Timeout() || networkErr.Temporary())
 }
