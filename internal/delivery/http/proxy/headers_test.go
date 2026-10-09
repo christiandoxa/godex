@@ -54,3 +54,52 @@ func TestProxyAddsValidDateWhenUpstreamHasNoDate(t *testing.T) {
 		t.Fatalf("missing or stale server Date header: %q, err=%v", got, err)
 	}
 }
+
+func TestProxyRecomputesBufferedJSONContentLength(t *testing.T) {
+	proxy := &Proxy{maxInspect: 1024}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		proxy.forwardResponse(context.Background(), w, &proxymodel.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"ok":true}`)),
+		}, nil, "", &requestLifecycle{})
+	}))
+	defer server.Close()
+	response, err := http.Get(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(body) != `{"ok":true}` || response.ContentLength != int64(len(body)) {
+		t.Fatalf("incorrect buffered response framing: length=%d body=%q", response.ContentLength, body)
+	}
+}
+
+func TestProxyDoesNotInventLengthForPartiallyBufferedBody(t *testing.T) {
+	proxy := &Proxy{maxInspect: 3}
+	payload := strings.Repeat("x", 4096)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		proxy.forwardResponse(context.Background(), w, &proxymodel.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}, "Content-Length": []string{"999"}},
+			Body:       io.NopCloser(strings.NewReader(payload)),
+		}, nil, "", &requestLifecycle{})
+	}))
+	defer server.Close()
+	response, err := http.Get(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(body) != payload || response.ContentLength != -1 {
+		t.Fatalf("partially inspected response got invalid framing: length=%d body=%q", response.ContentLength, body)
+	}
+}
