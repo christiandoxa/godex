@@ -23,7 +23,7 @@ func (router *Router) Observe(ctx context.Context, accountID string, headers htt
 	if err := router.rememberVerifiedAccountBinding(ctx, accountID, keys, now); err != nil {
 		return err
 	}
-	router.affinity.rememberResponseTurnState(keys.previous, accountID, keys.turn, now)
+	router.rememberAccountTurnState(ctx, keys.previous, accountID, router.accountHome(accountID), keys.turn, now)
 	for _, id := range extraIDs {
 		if err := router.rememberVerifiedAccountBinding(ctx, accountID, affinityKeys{previous: id}, now); err != nil {
 			return err

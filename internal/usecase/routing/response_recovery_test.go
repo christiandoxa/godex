@@ -24,6 +24,7 @@ type responseRecoveryReply struct {
 
 type responseRecoveryGateway struct {
 	replies  []responseRecoveryReply
+	headers  []http.Header
 	requests []proxymodel.Request
 	accounts []string
 }
@@ -40,9 +41,13 @@ func (gateway *responseRecoveryGateway) Execute(
 		return nil, io.EOF
 	}
 	reply := gateway.replies[index]
+	header := http.Header{"Content-Type": []string{reply.contentType}}
+	if index < len(gateway.headers) && gateway.headers[index] != nil {
+		header = gateway.headers[index].Clone()
+	}
 	return &proxymodel.Response{
 		StatusCode: reply.status,
-		Header:     http.Header{"Content-Type": []string{reply.contentType}},
+		Header:     header,
 		Body:       io.NopCloser(strings.NewReader(reply.body)),
 	}, nil
 }

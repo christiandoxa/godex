@@ -111,6 +111,7 @@ type Router struct {
 	routeMemory                           map[routeMemoryKey]routingentity.RouteMemoryScore
 	routeCircuits                         map[routeHealthKey]routingentity.RouteCircuit
 	transportBackoffs                     map[routeHealthKey]routingentity.TransportBackoff
+	accountHomes                          map[string]string
 	previousResponseFailures              map[previousResponseFailureKey]routingentity.PreviousResponseFailure
 	promptCacheBindings                   map[string]promptCacheBinding
 	autoRedeem                            bool
@@ -191,6 +192,7 @@ func NewRouter(config Config) (*Router, error) {
 		routeMemory:              make(map[routeMemoryKey]routingentity.RouteMemoryScore),
 		routeCircuits:            make(map[routeHealthKey]routingentity.RouteCircuit),
 		transportBackoffs:        make(map[routeHealthKey]routingentity.TransportBackoff),
+		accountHomes:             make(map[string]string),
 		previousResponseFailures: make(map[previousResponseFailureKey]routingentity.PreviousResponseFailure),
 		promptCacheBindings:      make(map[string]promptCacheBinding),
 		autoRedeem:               config.AutoRedeem, redeemer: config.Redeemer,

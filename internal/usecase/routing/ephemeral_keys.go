@@ -11,8 +11,24 @@ func (router *Router) loadAccounts(ctx context.Context) ([]proxymodel.Account, e
 	if err != nil {
 		return nil, &proxymodel.Error{StatusCode: 503, Message: "cannot load managed accounts"}
 	}
+	router.mu.Lock()
+	if router.accountHomes == nil {
+		router.accountHomes = make(map[string]string)
+	}
+	for _, account := range accounts {
+		if account.ID != "" && !externalProviderKind(account.Provider.Kind) {
+			router.accountHomes[account.ID] = account.Home
+		}
+	}
+	router.mu.Unlock()
 	router.observeEphemeralCredentials(accounts)
 	return sortRuntimeAccounts(accounts), nil
+}
+
+func (router *Router) accountHome(accountID string) string {
+	router.mu.Lock()
+	defer router.mu.Unlock()
+	return router.accountHomes[accountID]
 }
 
 // observeEphemeralCredentials removes any stale, previously persisted
