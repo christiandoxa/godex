@@ -501,6 +501,37 @@ func TestDeepSeekBare429DoesNotAdvanceModel(t *testing.T) {
 	}
 }
 
+func TestDeepSeekMalformedSuccessfulStreamBecomesTerminal502(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		calls++
+		// A successful response with no MIME declaration is still a malformed
+		// buffered Responses result; it must not trigger model fallback.
+		_, _ = io.WriteString(writer, "data: {\"choices\":[]}\n\n")
+	}))
+	defer server.Close()
+	transport, err := NewRuntimeTransport(server.URL, "fixture-key", server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer transport.Close()
+	response, err := transport.Execute(context.Background(), proxymodel.Request{
+		Method: http.MethodPost, Path: mountPath + "/responses",
+		Body: []byte(`{"model":"pro","input":"hello","stream":true}`),
+	}, proxymodel.Account{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 || response.StatusCode != http.StatusBadGateway || string(body) != "provider response could not be processed" {
+		t.Fatalf("malformed successful stream = calls:%d status:%d body:%q", calls, response.StatusCode, body)
+	}
+}
+
 func TestDeepSeek529RequiresAProviderErrorSignalForModelFallback(t *testing.T) {
 	for _, test := range []struct {
 		name       string

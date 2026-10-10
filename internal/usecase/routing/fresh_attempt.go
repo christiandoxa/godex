@@ -239,6 +239,7 @@ func (router *Router) freshAttempt(
 	if terminalExternalFailure && outcome.kind == responseRetry &&
 		(response.StatusCode == http.StatusTooManyRequests ||
 			response.StatusCode == http.StatusInternalServerError ||
+			response.StatusCode == http.StatusBadGateway ||
 			response.StatusCode == http.StatusServiceUnavailable) {
 		// Prodex returns the original upstream 429/500/503 when a lone
 		// external credential has no alternate model or key to try. Waiting

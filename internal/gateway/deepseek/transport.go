@@ -184,6 +184,9 @@ func (transport *RuntimeTransport) finishResponseAttempt(
 		translated, err := translateResponseWithConversation(
 			response, attempt.metadata, attempt.conversations, attempt.conversationMessages, input.RequestID,
 		)
+		if err != nil {
+			return providerResponseProcessingFailure(), false, firstEventRetryUsed, nil
+		}
 		return translated, false, firstEventRetryUsed, err
 	}
 	buffered, err := bufferError(response)
@@ -219,7 +222,7 @@ func (transport *RuntimeTransport) finishNativeResponse(
 		response, attempt.metadata, input.RequestID, attempt.conversations, attempt.conversationMessages,
 	)
 	if err != nil {
-		return nil, false, precommit.retryUsed, err
+		return providerResponseProcessingFailure(), false, precommit.retryUsed, nil
 	}
 	translated.FirstEventRetryUsed = precommit.retryUsed
 	translated.FirstEventCommitted = precommit.committed

@@ -69,6 +69,14 @@ func proxyResponse(response *http.Response) *proxymodel.Response {
 	return &proxymodel.Response{StatusCode: response.StatusCode, Header: response.Header, Body: response.Body, Trailer: response.Trailer}
 }
 
+func providerResponseProcessingFailure() *proxymodel.Response {
+	return &proxymodel.Response{
+		StatusCode: http.StatusBadGateway,
+		Header:     http.Header{"Content-Type": {"text/plain; charset=utf-8"}},
+		Body:       io.NopCloser(strings.NewReader("provider response could not be processed")),
+	}
+}
+
 type bufferedResponse struct {
 	StatusCode int
 	Header     http.Header
