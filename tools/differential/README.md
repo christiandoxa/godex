@@ -15,9 +15,9 @@ go build -trimpath -o /tmp/godex-candidate ./cmd/godex
 ```
 
 The harness creates separate temporary homes, starts one loopback mock upstream,
-and runs both products independently through sixteen bounded scenarios: a successful request; a
+and runs both products independently through seventeen bounded scenarios: a successful request; a
 synthetic 429 followed by a retry owned by the **Codex shim**; a single-key
-429 that must remain terminal without **proxy** retry; cancellation while
+429, 500, or 503 that must remain terminal without **proxy** retry; cancellation while
 upstream is delayed; two launches against the same home; and a terminal 429 followed by a
 fresh process with the same home and a healthy provider, which must succeed. Each
 run records bounded stdout/stderr, child response, upstream requests, ordered
@@ -29,10 +29,10 @@ candidate executable's embedded Go VCS revision and requires `vcs.modified=false
 A stale binary, dirty build, or build without VCS metadata fails before execution.
 Both reference and candidate source trees must also have no tracked modifications
 or untracked files; a locally edited Prodex checkout cannot serve as the oracle.
-The resulting PASS is limited to the sixteen named synthetic scenarios and is
+The resulting PASS is limited to the seventeen named synthetic scenarios and is
 not equivalent to a global provider, live-TUI or transport parity certificate.
 
-Use `--scenario success|tool-call|sse-stream|sse-rate-limit|retry|deepseek-sse-terminal|single-key-401|single-key-403|single-key-429|single-key-503|key-rotation-429|key-rotation-restart|cancel|restart|recover-after-429|recover-after-503` to rerun one case while
+Use `--scenario success|tool-call|sse-stream|sse-rate-limit|retry|deepseek-sse-terminal|single-key-401|single-key-403|single-key-429|single-key-500|single-key-503|key-rotation-429|key-rotation-restart|cancel|restart|recover-after-429|recover-after-503` to rerun one case while
 investigating a mismatch; the default is `--scenario all`.
 
 
@@ -53,7 +53,7 @@ retry; all cases require the expected number of upstream requests.
 The negative controls alone never imply parity. Current header, durable state,
 stderr, and upstream metadata differences are intentionally still reported.
 
-Do not interpret this sixteen-scenario harness as proof of full 1:1 parity;
+Do not interpret this seventeen-scenario harness as proof of full 1:1 parity;
 additional transport, provider, and persistence contracts remain to verify.
 
 ### Strict fixture oracle and audited transport metadata
@@ -115,6 +115,11 @@ persistence or concurrent-recovery contract.
 The added single-key-503 scenario checks the canonical terminal HTTP 503:
 a sole provider must expose the outage unchanged rather than waiting for
 an ineligible same-key recovery attempt and returning a local timeout.
+
+
+The single-key-500 scenario applies the same terminal-response contract to a
+generic provider HTTP 500 and verifies that Godex preserves its status and
+structured error body without a same-key retry.
 
 
 The recover-after-503 fixture uses the same isolated state home before and

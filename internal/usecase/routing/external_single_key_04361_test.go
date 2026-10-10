@@ -150,3 +150,39 @@ func TestProdex04361SingleExternalCredential503IsTerminal(t *testing.T) {
 		t.Fatalf("terminal 503 body = %q, err=%v", combined, err)
 	}
 }
+
+func TestProdex04371SingleExternalCredential500IsTerminal(t *testing.T) {
+	const payload = `{"error":{"code":"internal_server_error"}}`
+	gateway := &externalRetryGateway{responses: map[string]struct {
+		status int
+		body   string
+	}{"single-key": {http.StatusInternalServerError, payload}}}
+	router, err := NewRouter(Config{
+		Gateway: gateway,
+		Accounts: func(context.Context) ([]proxymodel.Account, error) {
+			return []proxymodel.Account{{
+				ID: "single-key", Home: "/synthetic", Enabled: true,
+				Provider: proxymodel.Provider{Kind: "deepseek"},
+			}}, nil
+		},
+		PreferredAccount: "single-key", MaxInspectBytes: 1024,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 350*time.Millisecond)
+	defer cancel()
+	exchange, err := router.Forward(ctx, proxymodel.Request{Header: make(http.Header)})
+	if err != nil {
+		t.Fatalf("single 500 incorrectly waited for non-existent key: %v", err)
+	}
+	defer exchange.Close()
+	if exchange.Result.Response.StatusCode != http.StatusInternalServerError || len(gateway.calls) != 1 {
+		t.Fatalf("terminal 500 status/calls = %d/%v", exchange.Result.Response.StatusCode, gateway.calls)
+	}
+	body, err := io.ReadAll(exchange.Result.Response.Body)
+	combined := append(append([]byte(nil), exchange.Result.Prefix...), body...)
+	if err != nil || string(combined) != payload {
+		t.Fatalf("terminal 500 body = %q, err=%v", combined, err)
+	}
+}

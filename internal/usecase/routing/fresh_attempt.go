@@ -238,8 +238,9 @@ func (router *Router) freshAttempt(
 	}
 	if terminalExternalFailure && outcome.kind == responseRetry &&
 		(response.StatusCode == http.StatusTooManyRequests ||
+			response.StatusCode == http.StatusInternalServerError ||
 			response.StatusCode == http.StatusServiceUnavailable) {
-		// Prodex 0.436.1 returns the original upstream 429/503 when a lone
+		// Prodex returns the original upstream 429/500/503 when a lone
 		// external credential has no alternate model or key to try. Waiting
 		// for the same credential would cause a false Codex client timeout.
 		// The next independent request remains eligible for the same key.
