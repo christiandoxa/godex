@@ -99,6 +99,18 @@ func NewStatus(accounts accountStore, usage usageGateway) *Status {
 
 func (status *Status) SetProfiles(profiles profileSource) { status.profiles = profiles }
 
+// HasProfiles reports whether the configured profile pool contains any entry.
+func (status *Status) HasProfiles(ctx context.Context) (bool, error) {
+	if status == nil || status.profiles == nil {
+		return false, nil
+	}
+	targets, err := status.profiles.QuotaTargets(ctx)
+	if err != nil {
+		return false, err
+	}
+	return len(targets) > 0, nil
+}
+
 func (status *Status) SetUsageSnapshotStore(store usageSnapshotStore) {
 	status.usageMu.Lock()
 	defer status.usageMu.Unlock()

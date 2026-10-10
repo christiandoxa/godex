@@ -18,6 +18,7 @@ import (
 type statusRunner interface {
 	Run(context.Context, quotausecase.Options) ([]quotamodel.Report, error)
 	Raw(context.Context, string, string) ([]byte, error)
+	HasProfiles(context.Context) (bool, error)
 }
 
 func Show(ctx context.Context, status statusRunner, out io.Writer, arguments []string) error {
@@ -34,6 +35,15 @@ func Show(ctx context.Context, status statusRunner, out io.Writer, arguments []s
 	reports, err := status.Run(ctx, options.Options)
 	if err != nil {
 		return err
+	}
+	if options.once && len(reports) == 0 {
+		hasProfiles, err := status.HasProfiles(ctx)
+		if err != nil {
+			return err
+		}
+		if !hasProfiles {
+			return errors.New("no profiles configured")
+		}
 	}
 	return writeQuotaReports(out, reports, options.detail)
 }
