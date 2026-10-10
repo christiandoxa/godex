@@ -252,6 +252,57 @@ func TestRuntimeBrokerHousekeepingSweepsAllDeadLeasesWithoutDeletingForeignFiles
 	}
 }
 
+func TestRuntimeBrokerHousekeepingRemovesDeadRegistryAndKeepsLiveArtifacts(t *testing.T) {
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret, err := NewSecret("synthetic-admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry := func(pid uint32, instance string) Registry {
+		return Registry{
+			PID: pid, ListenAddr: "127.0.0.1:4321", StartedAt: 42,
+			UpstreamBaseURL: "https://chatgpt.com/backend-api", CurrentProfile: "main",
+			InstanceID: instance,
+		}
+	}
+	if err := store.SaveArtifacts(t.Context(), "dead", Capability{InstanceID: "dead-instance", AdminToken: secret}, registry(2_147_483_647, "dead-instance")); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveRegistry(t.Context(), "dead", registry(2_147_483_647, "dead-instance")); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveArtifacts(t.Context(), "live", Capability{InstanceID: "live-instance", AdminToken: secret}, registry(uint32(os.Getpid()), "live-instance")); err != nil {
+		t.Fatal(err)
+	}
+	deadLease, err := store.CreateLease("dead", 2_147_483_647)
+	if err != nil {
+		t.Fatal(err)
+	}
+	liveLease, err := store.CreateLease("live", uint32(os.Getpid()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	foreign := filepath.Join(store.home, "runtime-broker-foreign.txt")
+	if err := os.WriteFile(foreign, []byte("keep"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	store.CleanupStaleLeasesAll()
+	for _, path := range []string{store.RegistryPath("dead"), store.RegistryBackupPath("dead"), store.CapabilityPath("dead"), deadLease.Path()} {
+		if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("dead broker artifact remains %s: %v", path, err)
+		}
+	}
+	for _, path := range []string{store.RegistryPath("live"), store.CapabilityPath("live"), liveLease.Path(), foreign} {
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("live or foreign artifact removed %s: %v", path, err)
+		}
+	}
+}
+
 func itoa(value int) string {
 	return fmt.Sprintf("%d", value)
 }

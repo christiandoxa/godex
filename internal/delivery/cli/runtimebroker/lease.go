@@ -1,6 +1,7 @@
 package runtimebroker
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
@@ -9,6 +10,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/christiandoxa/godex/internal/helper/lockfile"
 )
 
 type Lease struct {
@@ -96,8 +99,8 @@ func (store *Store) CleanupStaleLeases(key string) int {
 	return live
 }
 
-// CleanupStaleLeasesAll removes dead broker leases left by a crashed child.
-// It scans only owned lease directories and leaves unrelated files untouched.
+// CleanupStaleLeasesAll removes artifacts left by crashed broker children.
+// It scans only owned broker paths and leaves unrelated files untouched.
 func (store *Store) CleanupStaleLeasesAll() {
 	if store == nil {
 		return
@@ -109,23 +112,45 @@ func (store *Store) CleanupStaleLeasesAll() {
 	if err != nil {
 		return
 	}
+	keys := make(map[string]struct{})
 	const prefix = "runtime-broker-"
-	const suffix = "-leases"
 	for _, entry := range entries {
 		name := entry.Name()
-		if !strings.HasPrefix(name, prefix) || !strings.HasSuffix(name, suffix) {
-			continue
+		key := ""
+		switch {
+		case strings.HasPrefix(name, prefix) && strings.HasSuffix(name, "-leases"):
+			key = strings.TrimSuffix(strings.TrimPrefix(name, prefix), "-leases")
+		case strings.HasPrefix(name, prefix) && strings.HasSuffix(name, ".json"):
+			key = strings.TrimSuffix(strings.TrimPrefix(name, prefix), ".json")
+		case strings.HasPrefix(name, prefix) && strings.HasSuffix(name, ".json.last-good"):
+			key = strings.TrimSuffix(strings.TrimPrefix(name, prefix), ".json.last-good")
+		case strings.HasPrefix(name, prefix) && strings.HasSuffix(name, ".capability"):
+			key = strings.TrimSuffix(strings.TrimPrefix(name, prefix), ".capability")
 		}
-		key := strings.TrimSuffix(strings.TrimPrefix(name, prefix), suffix)
-		if !validID(key) {
-			continue
+		if validID(key) {
+			keys[key] = struct{}{}
 		}
-		info, err := os.Lstat(filepath.Join(store.home, name))
-		if err != nil || info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
-			continue
-		}
-		store.CleanupStaleLeases(key)
 	}
+	for key := range keys {
+		store.CleanupStaleLeases(key)
+		store.cleanupStaleRegistry(key)
+	}
+}
+
+func (store *Store) cleanupStaleRegistry(key string) {
+	if !validID(key) {
+		return
+	}
+	release, err := lockfile.Acquire(context.Background(), store.RegistryPath(key)+".lock")
+	if err != nil {
+		return
+	}
+	defer release()
+	registry, found := store.loadRegistryUnlocked(key)
+	if !found || processAlive(int(registry.PID)) {
+		return
+	}
+	store.removeArtifactsUnlocked(key)
 }
 
 func leasePID(name string) int {
