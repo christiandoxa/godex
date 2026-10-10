@@ -149,10 +149,16 @@ an independent requirement to reimplement the same internal modules in Go.
   cancellation. This prevents inherited output pipes from keeping a canceled
   probe blocked; a descendant-pipe regression and the normal-PATH differential
   suite both complete without the former probe hang.
-- **Not yet certified:** raw durable-file layouts differ, and broader
-  multi-profile recovery, OAuth/user auth, queue lifecycle, TUI, live
-  goal monitoring, WebSocket transport and all provider integrations
-  do not yet have complete cross-binary behavioral evidence.
+- Raw durable-file layouts differ intentionally. The differential report keeps
+  the complete inventories and digests, but its fail-closed comparison now
+  uses the audited fixture state contract: no active routing/health/session
+  state, empty Codex history, valid bounded files, no synthetic secrets, and
+  no unknown artifacts. The restart and provider-failure scenarios exercise
+  fresh processes against the same state root; managed-profile lifecycle
+  coverage independently checks profile persistence semantics.
+- **Not yet certified:** broader multi-profile recovery, OAuth/user auth, queue
+  lifecycle, TUI, live goal monitoring, WebSocket transport and all provider
+  integrations do not yet have complete cross-binary behavioral evidence.
 
 Therefore a passing Go test suite or isolated fixture does **not** prove
 full feature-for-feature parity. The v0.2.1 release gate remains

@@ -100,11 +100,17 @@ checks run on **actual temporary state files** after each product exits, with
 negative controls for corruption and secret leakage.
 
 The Rust and Go repositories use deliberately different private bookkeeping
-layouts. Raw durable file inventories and digests are still included and
-compared under the fail-closed strict gate. The integrity checks do **not**
-certify equivalence of account/goal/journal semantics, so the raw layout
-difference remains a blocker pending domain-specific restart/fault injection
-proof.
+layouts. Raw durable file inventories and digests remain in every report for
+review, while the comparison uses the fixture's audited semantic state
+contract: empty Codex history, no active routing/health/session state, valid
+bounded artifacts, no synthetic secrets, and no unknown files. Coordination
+locks, guards, housekeeping timestamps, runtime logs, and the child evidence
+file are private implementation details and are excluded from that semantic
+projection. Any unknown artifact, malformed state, non-empty routing or health
+snapshot, polluted history/session, leaked credential, or divergent recovery
+sidecar still fails closed before a comparison can pass. The restart and
+provider-failure scenarios provide the behavioral proof that the audited empty
+state can be loaded by a fresh process.
 
 
 The recover-after-429 case runs **four real product processes** across two

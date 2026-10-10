@@ -61,6 +61,44 @@ func TestComparisonRejectsDifferentResponseBody(t *testing.T) {
 	}
 }
 
+func TestComparisonUsesSemanticFixtureStateAcrossPrivateLayouts(t *testing.T) {
+	prodex := productRun{
+		Files: []fileState{
+			{Path: "child-exchange.json", Size: 500},
+			{Path: "codex/history.jsonl"},
+			{Path: "codex/sessions/.prodex-maintenance.lock"},
+			{Path: "state/runtime-housekeeping.last-run", Size: 11},
+			{Path: "state/runtime-scores.json", Size: 30},
+		},
+	}
+	godex := productRun{
+		Files: []fileState{
+			{Path: "child-exchange.json", Size: 480},
+			{Path: "codex/history.jsonl"},
+			{Path: "codex/sessions/.prodex-maintenance.lock"},
+			{Path: "state/logs/runtime.jsonl", Size: 2000},
+			{Path: "state/routing.guard"},
+			{Path: "state/routing.json", Size: 24},
+		},
+	}
+	if differences := compare(prodex, godex); len(differences) != 0 {
+		t.Fatalf("equivalent private state layouts differ: %v", differences)
+	}
+	godex.Files = append(godex.Files, fileState{Path: "state/unknown.json"})
+	if differences := compare(prodex, godex); !contains(differences, "durable_files") {
+		t.Fatalf("unknown durable state escaped comparison: %v", differences)
+	}
+}
+
+func TestComparisonRejectsInvalidSemanticFixtureState(t *testing.T) {
+	clean := productRun{Files: []fileState{{Path: "codex/history.jsonl"}}}
+	corrupt := clean
+	corrupt.StateIntegrity = []string{"unexpected_codex_history"}
+	if differences := compare(clean, corrupt); !contains(differences, "durable_files") {
+		t.Fatalf("invalid state escaped comparison: %v", differences)
+	}
+}
+
 func TestGodexBuildSettingsMatchExactCleanSource(t *testing.T) {
 	const expected = "382c2a1f171568b4c43296115a75cdc34ac1ee5c"
 	valid := []debug.BuildSetting{
