@@ -30,6 +30,11 @@ func Show(ctx context.Context, status statusRunner, out io.Writer, arguments []s
 		return showRaw(ctx, status, out, options)
 	}
 	if options.watchEnabled() {
+		if options.All {
+			if err := requireProfiles(ctx, status); err != nil {
+				return err
+			}
+		}
 		return watchQuota(ctx, status, out, options)
 	}
 	reports, err := status.Run(ctx, options.Options)
@@ -37,15 +42,22 @@ func Show(ctx context.Context, status statusRunner, out io.Writer, arguments []s
 		return err
 	}
 	if options.once && len(reports) == 0 {
-		hasProfiles, err := status.HasProfiles(ctx)
-		if err != nil {
+		if err := requireProfiles(ctx, status); err != nil {
 			return err
-		}
-		if !hasProfiles {
-			return errors.New("no profiles configured")
 		}
 	}
 	return writeQuotaReports(out, reports, options.detail)
+}
+
+func requireProfiles(ctx context.Context, status statusRunner) error {
+	hasProfiles, err := status.HasProfiles(ctx)
+	if err != nil {
+		return err
+	}
+	if !hasProfiles {
+		return errors.New("no profiles configured")
+	}
+	return nil
 }
 
 func showRaw(ctx context.Context, status statusRunner, out io.Writer, options showOptions) error {

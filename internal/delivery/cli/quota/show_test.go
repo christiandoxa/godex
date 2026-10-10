@@ -46,6 +46,9 @@ func (fake *fakeStatus) Run(_ context.Context, options quotausecase.Options) ([]
 }
 
 func (fake *fakeStatus) HasProfiles(context.Context) (bool, error) {
+	if fake.reports == nil {
+		return true, nil
+	}
 	return len(fake.reports) > 0, nil
 }
 
@@ -132,6 +135,14 @@ func TestShowRejectsEmptyOneShotQuotaPool(t *testing.T) {
 	status := &fakeStatus{reports: []quotamodel.Report{}}
 	var output strings.Builder
 	if err := Show(context.Background(), status, &output, []string{"--all", "--once"}); err == nil || err.Error() != "no profiles configured" {
+		t.Fatalf("empty quota pool error = %v, output = %q", err, output.String())
+	}
+}
+
+func TestShowRejectsEmptyWatchQuotaPool(t *testing.T) {
+	status := &fakeStatus{reports: []quotamodel.Report{}}
+	var output strings.Builder
+	if err := Show(context.Background(), status, &output, []string{"--all"}); err == nil || err.Error() != "no profiles configured" {
 		t.Fatalf("empty quota pool error = %v, output = %q", err, output.String())
 	}
 }
