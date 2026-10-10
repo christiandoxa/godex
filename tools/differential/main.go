@@ -29,6 +29,7 @@ import (
 
 const (
 	prodexCommit         = "98918c32e0398990fccf45901d94da0c545d0810"
+	prodexBinarySHA256   = "171482e7ce38ebfd04b5efa564d3d118c7f542b27f30065fa29dd737d18d9d88"
 	apiKey               = "synthetic-provider-key"
 	bodyLimit            = 1 << 20
 	rotationPrimaryKey   = "synthetic-primary-credential"
@@ -151,7 +152,7 @@ func run() error {
 	prodexSource := flags.String("prodex-source", "", "exact Prodex 0.437.1 source checkout")
 	godexSource := flags.String("godex-source", "", "Godex candidate source checkout")
 	expectedGodexCommit := flags.String("godex-commit", "", "expected Godex source HEAD commit SHA")
-	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, sse-stream, sse-rate-limit, retry, deepseek-sse-terminal, single-key-401, single-key-403, single-key-429, single-key-503, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
+	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, sse-stream, sse-rate-limit, retry, deepseek-sse-terminal, single-key-401, single-key-403, single-key-429, single-key-503, single-key-500, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		return err
 	}
@@ -167,6 +168,9 @@ func run() error {
 	}
 	if err := requireCleanSource(*prodexSource); err != nil {
 		return fmt.Errorf("Prodex reference must be an unmodified canonical checkout: %w", err)
+	}
+	if err := verifyProdexArtifact(*prodexBin); err != nil {
+		return fmt.Errorf("verify Prodex executable provenance: %w", err)
 	}
 	godexSourceCommit, err := gitCommit(*godexSource)
 	if err != nil {
@@ -234,6 +238,11 @@ func run() error {
 			// An upstream service outage is terminal without another eligible
 			// model or credential; no same-key loop may swallow the failure.
 			return runPair(root, mock, "single-key-503", mockPlan{FirstStatus: http.StatusServiceUnavailable}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{})
+		}},
+		{"single-key-500", func() (scenarioResult, error) {
+			// A generic provider failure must preserve status and body when there
+			// is no alternate credential to select.
+			return runPair(root, mock, "single-key-500", mockPlan{FirstStatus: http.StatusInternalServerError}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{})
 		}},
 		{"key-rotation-429", func() (scenarioResult, error) {
 			// The first API key always fails. A second independent credential
@@ -307,6 +316,24 @@ func run() error {
 	fmt.Println(string(encoded))
 	if status != "PASS" {
 		return fmt.Errorf("differential parity mismatch: %v", differences)
+	}
+	return nil
+}
+
+func verifyProdexArtifact(binary string) error {
+	digest, err := fileSHA256(binary)
+	if err != nil {
+		return err
+	}
+	if digest != prodexBinarySHA256 {
+		return fmt.Errorf("SHA-256 %s, want %s", digest, prodexBinarySHA256)
+	}
+	version, err := productVersion(binary)
+	if err != nil {
+		return fmt.Errorf("read version: %w", err)
+	}
+	if version != "prodex 0.437.1" {
+		return fmt.Errorf("version %q, want prodex 0.437.1", version)
 	}
 	return nil
 }
@@ -659,6 +686,8 @@ func (mock *mockServer) serveHTTP(writer http.ResponseWriter, request *http.Requ
 			responseBody = `{"error":{"code":"invalid_api_key","message":"synthetic credential rejected"}}`
 		case http.StatusForbidden:
 			responseBody = `{"error":{"code":"access_denied","message":"synthetic provider forbidden"}}`
+		case http.StatusInternalServerError:
+			responseBody = `{"error":{"code":"internal_server_error","message":"synthetic provider failure"}}`
 		default:
 			responseBody = `{"error":{"code":"rate_limit_exceeded"}}`
 		}
@@ -918,6 +947,11 @@ func scenarioInvariants(scenario scenarioResult) []string {
 			wantExit = 2
 			if run.Client.Status != http.StatusServiceUnavailable || !strings.Contains(run.Client.Body, "rate_limit_exceeded") {
 				failures = append(failures, prefix+".unhandled_service_failure")
+			}
+		case "single-key-500":
+			wantExit = 2
+			if run.Client.Status != http.StatusInternalServerError || !validFixtureError(run.Client.Body, "internal_server_error") {
+				failures = append(failures, prefix+".unhandled_server_failure")
 			}
 		default:
 			if run.Client.Status != http.StatusOK || !validFixtureResponse(run.Client.Body) {
