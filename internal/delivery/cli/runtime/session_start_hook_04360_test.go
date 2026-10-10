@@ -63,6 +63,26 @@ func TestProdex04360SessionStartHookInjectsCanonicalTrustedConfig(t *testing.T) 
 	}
 }
 
+func TestProdex04371GoalNotifyFallbackPreservesConfiguredNotify(t *testing.T) {
+	home := t.TempDir()
+	marker := filepath.Join(home, "session.id")
+	args := addRuntimeGoalNotify04360(home, []string{"exec", "task"}, "/usr/bin/godex", marker)
+	if len(args) < 2 || !strings.HasPrefix(args[1], "notify=[\"/usr/bin/godex\"") ||
+		!strings.Contains(args[1], sessionStartNotifyCommand04360) {
+		t.Fatalf("notify fallback was not injected: %#v", args)
+	}
+	configured := []string{"-c", `notify=["user-notifier"]`, "exec", "task"}
+	if got := addRuntimeGoalNotify04360(home, configured, "/usr/bin/godex", marker); !reflect.DeepEqual(got, configured) {
+		t.Fatalf("explicit notify override changed: %#v", got)
+	}
+	if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte("notify = [\"user-notifier\"]\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := addRuntimeGoalNotify04360(home, []string{"exec", "task"}, "/usr/bin/godex", marker); len(got) != 2 {
+		t.Fatalf("configured notify was duplicated: %#v", got)
+	}
+}
+
 func TestProdex04360PrivateSessionHookRejectsForgedAndOversizedNotifications(t *testing.T) {
 	const session = "019c9e3d-45a0-7ad0-a6ee-b194ac2d44f9"
 	monitor, err := newSessionStartMarker04360()

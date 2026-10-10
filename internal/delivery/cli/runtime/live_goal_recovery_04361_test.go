@@ -14,6 +14,8 @@ import (
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
+	runtimemodel "github.com/christiandoxa/godex/internal/model/runtime"
+	sessionmodel "github.com/christiandoxa/godex/internal/model/session"
 	runtimerepo "github.com/christiandoxa/godex/internal/repository/runtime"
 	sessionrepo "github.com/christiandoxa/godex/internal/repository/session"
 	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
@@ -260,5 +262,47 @@ func TestProdex04361LiveGoalRecoveryRejectsStaleStateAndNoAutoRotate(t *testing.
 				t.Fatalf("negative recovery calls=%d affinity releases=%d", process.calls, released)
 			}
 		})
+	}
+}
+
+func TestProdex04371LiveGoalRecoveryUsesNewRolloutEvidence(t *testing.T) {
+	root := t.TempDir()
+	id := "019c9e3d-45a0-7ad0-a6ee-b194ac2d44f9"
+	path := filepath.Join(root, "rollout-2026-10-10T10-00-00-"+id+".jsonl")
+	initial := `{"type":"session_meta","payload":{"id":"` + id + `"}}
+{"type":"response_item","payload":{"role":"user","content":"continue"}}
+`
+	if err := os.WriteFile(path, []byte(initial), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	marker := &sessionStartMarker04360{directory: root, path: filepath.Join(root, "session.id")}
+	if err := os.WriteFile(marker.path, []byte(id+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	monitor := &liveGoalRecovery04361{
+		marker: marker,
+		read: func(context.Context, string) (runtimemodel.GoalRecoveryState, bool) {
+			return runtimemodel.GoalRecoveryState{SessionID: id, Status: "active"}, true
+		},
+		resolve: func(context.Context, string) (sessionmodel.Report, error) {
+			return sessionmodel.Report{ID: id, Path: path}, nil
+		},
+	}
+	if state, ok := monitor.readState(t.Context()); !ok || state.Status != "active" {
+		t.Fatalf("initial live goal state = %#v, ok=%t", state, ok)
+	}
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = file.WriteString(`{"type":"response_item","payload":{"role":"user","content":"next turn"}}
+{"type":"error","error":{"code":"usage_limit_reached"}}
+`)
+	if closeErr := file.Close(); err != nil || closeErr != nil {
+		t.Fatalf("append rollout evidence: write=%v close=%v", err, closeErr)
+	}
+	state, ok := monitor.readState(t.Context())
+	if !ok || state.Status != "usage_limited" || state.SessionID != id {
+		t.Fatalf("rollout evidence did not trigger recovery: %#v, ok=%t", state, ok)
 	}
 }

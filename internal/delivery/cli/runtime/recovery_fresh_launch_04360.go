@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"strings"
 
+	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 	sessionmodel "github.com/christiandoxa/godex/internal/model/session"
 	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
 	sessionusecase "github.com/christiandoxa/godex/internal/usecase/session"
@@ -51,13 +52,21 @@ func runParsedWithOptionsWithRecovery(
 		if fresh || strings.TrimSpace(runner.SharedCodexHome()) != "" {
 			if exe, exeErr := os.Executable(); exeErr == nil {
 				execArgs = marker.codexHookArgumentsForOS04360(args, exe, runtime.GOOS)
+				if home := goalRecoveryProfileHome04360(ctx, profiles, selector); home != "" {
+					execArgs = addRuntimeGoalNotify04360(home, execArgs, exe, marker.path)
+				}
 			}
 		}
 	}
 	original := error(nil)
 	triggered := false
 	if marker != nil && strings.TrimSpace(runner.SharedCodexHome()) != "" {
-		monitor := &liveGoalRecovery04361{marker: marker, read: runner.ReadGoalRecoveryState}
+		monitor := &liveGoalRecovery04361{
+			marker: marker, read: runner.ReadGoalRecoveryState,
+			resolve: func(resolveCtx context.Context, id string) (sessionmodel.Report, error) {
+				return sessions.Resolve(resolveCtx, id)
+			},
+		}
 		original, triggered = runner.RunWithGoalRecoveryMonitor(
 			ctx, selector, execArgs, opts, monitor.readState,
 		)
@@ -112,6 +121,36 @@ func runParsedWithOptionsWithRecovery(
 	return chooser.recoverPersistedSessionThroughPool04360(
 		ctx, report, resumed, original, failureClass, sessions.ReleaseRecoveryBinding,
 	)
+}
+
+func goalRecoveryProfileHome04360(
+	ctx context.Context, profiles launchProfiles, selector string,
+) string {
+	if profiles == nil {
+		return ""
+	}
+	if source, ok := profiles.(interface {
+		SessionProfiles(context.Context) ([]sessionmodel.ProfileHome, error)
+		ResolveLaunch(context.Context, string) (profilemodel.LaunchTarget, error)
+	}); ok {
+		if strings.TrimSpace(selector) != "" {
+			if homes, err := source.SessionProfiles(ctx); err == nil {
+				for _, home := range homes {
+					if home.AccountID != selector && home.Name != selector {
+						continue
+					}
+					target, err := source.ResolveLaunch(ctx, home.Name)
+					if err == nil {
+						return target.CodexHome
+					}
+				}
+			}
+		}
+		if target, active, err := profiles.ActiveLaunch(ctx); err == nil && active {
+			return target.CodexHome
+		}
+	}
+	return ""
 }
 
 func liveGoalLaunch04361(args []string) bool {

@@ -15,6 +15,7 @@ import (
 
 	sessionentity "github.com/christiandoxa/godex/internal/entity/session"
 	sessionmodel "github.com/christiandoxa/godex/internal/model/session"
+	"github.com/pelletier/go-toml/v2"
 )
 
 const sessionStartNotifyCommand04360 = "__runtime-goal-session-notify"
@@ -107,6 +108,66 @@ func (marker *sessionStartMarker04360) codexHookArgumentsForOS04360(
 		"-c", fmt.Sprintf("hooks.state={%s={trusted_hash=%s}}", key, hash),
 	}
 	return append(injected, original...)
+}
+
+// addRuntimeGoalNotify04360 installs the same bounded callback for Codex's
+// notify hook when the user has not configured one. SessionStart identifies
+// the session; notify keeps the marker useful when Codex skips that hook.
+func addRuntimeGoalNotify04360(
+	codexHome string, original []string, executable, markerPath string,
+) []string {
+	if strings.TrimSpace(executable) == "" || strings.TrimSpace(markerPath) == "" ||
+		configOverridePresent04360(original, "notify") || codexNotifyConfigured04360(codexHome) {
+		return original
+	}
+	command := []string{executable, sessionStartNotifyCommand04360, markerPath}
+	literal, err := json.Marshal(command)
+	if err != nil {
+		return original
+	}
+	return append([]string{"-c", "notify=" + string(literal)}, original...)
+}
+
+func configOverridePresent04360(args []string, wanted string) bool {
+	for index := 0; index < len(args); index++ {
+		assignment := ""
+		switch args[index] {
+		case "-c", "--config":
+			if index+1 < len(args) {
+				index++
+				assignment = args[index]
+			}
+		default:
+			assignment = strings.TrimPrefix(args[index], "--config=")
+			assignment = strings.TrimPrefix(assignment, "-c=")
+		}
+		key, _, ok := strings.Cut(assignment, "=")
+		if ok && strings.TrimSpace(key) == wanted {
+			return true
+		}
+	}
+	return false
+}
+
+func codexNotifyConfigured04360(codexHome string) bool {
+	if strings.TrimSpace(codexHome) == "" {
+		return false
+	}
+	path := filepath.Join(codexHome, "config.toml")
+	info, err := os.Stat(path)
+	if err != nil || !info.Mode().IsRegular() || info.Size() > 1<<20 {
+		return false
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	var config map[string]any
+	if toml.Unmarshal(content, &config) != nil {
+		return false
+	}
+	_, configured := config["notify"]
+	return configured
 }
 
 // Codex -c hooks.SessionStart=[...] is a TOML array, not a string.

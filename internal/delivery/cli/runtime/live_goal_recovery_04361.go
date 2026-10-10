@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 	runtimemodel "github.com/christiandoxa/godex/internal/model/runtime"
@@ -13,13 +14,15 @@ import (
 	sessionusecase "github.com/christiandoxa/godex/internal/usecase/session"
 )
 
-// liveGoalRecovery04361 observes only the goal database row for the UUID
-// delivered by Codex's trusted SessionStart hook. Historical usage_limited rows
-// stay inert until an active row was observed for this launch.
+// liveGoalRecovery04361 observes the goal row and newly appended structured
+// recovery evidence for the UUID delivered by Codex's trusted SessionStart hook.
 type liveGoalRecovery04361 struct {
-	marker    *sessionStartMarker04360
-	sessionID string
-	read      func(context.Context, string) (runtimemodel.GoalRecoveryState, bool)
+	marker         *sessionStartMarker04360
+	sessionID      string
+	read           func(context.Context, string) (runtimemodel.GoalRecoveryState, bool)
+	resolve        func(context.Context, string) (sessionmodel.Report, error)
+	checkpoint     recoveryCheckpoint04360
+	checkpointPath string
 }
 
 func (monitor *liveGoalRecovery04361) readState(ctx context.Context) (runtimemodel.GoalRecoveryState, bool) {
@@ -32,11 +35,40 @@ func (monitor *liveGoalRecovery04361) readState(ctx context.Context) (runtimemod
 	}
 	monitor.sessionID = id
 	state, ok := monitor.read(ctx, id)
-	if !ok || state.SessionID != "" && state.SessionID != id {
+	if ok && state.SessionID != "" && state.SessionID != id {
+		return runtimemodel.GoalRecoveryState{}, false
+	}
+	if monitor.resolve != nil {
+		if report, err := monitor.resolve(ctx, id); err == nil && report.Path != "" {
+			if monitor.checkpointPath != report.Path {
+				monitor.checkpoint = captureRecoveryCheckpoint04360(report.Path)
+				monitor.checkpointPath = report.Path
+			}
+			if monitor.checkpoint.newAcceptedUsageLimit04360(ctx, id) &&
+				(!ok || goalStatusResumable04361(state.Status)) {
+				state = runtimemodel.GoalRecoveryState{
+					SessionID: id,
+					Status:    "usage_limited",
+					UpdatedAt: time.Now().UnixMilli(),
+				}
+				ok = true
+			}
+		}
+	}
+	if !ok {
 		return runtimemodel.GoalRecoveryState{}, false
 	}
 	state.SessionID = id
 	return state, true
+}
+
+func goalStatusResumable04361(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "active", "paused", "blocked", "usage_limited":
+		return true
+	default:
+		return false
+	}
 }
 
 func (monitor *liveGoalRecovery04361) session() string {
