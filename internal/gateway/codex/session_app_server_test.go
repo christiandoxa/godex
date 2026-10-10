@@ -22,6 +22,7 @@ import (
 const (
 	sessionCompanionHelperEnv  = "GODEX_TEST_SESSION_COMPANION_HELPER"
 	sessionCompanionMarkerEnv  = "GODEX_TEST_SESSION_COMPANION_MARKER"
+	sessionCompanionArgsEnv    = "GODEX_TEST_SESSION_COMPANION_ARGS"
 	sessionCompanionHelperName = "TestCodexSessionCompanionHelper"
 	sessionCompanionMarkerMode = 0o600
 )
@@ -48,6 +49,11 @@ func TestCodexSessionCompanionHelper(t *testing.T) {
 		}
 		if listen == "" {
 			os.Exit(2)
+		}
+		if argsPath := os.Getenv(sessionCompanionArgsEnv); argsPath != "" {
+			if err := os.WriteFile(argsPath, []byte(strings.Join(arguments, "\x00")), sessionCompanionMarkerMode); err != nil {
+				os.Exit(6)
+			}
 		}
 		listener, err := net.Listen("unix", listen)
 		if err != nil {
@@ -116,6 +122,21 @@ func TestSessionAppServerCompanionArgumentsEncodeControlCharactersAsTOML(t *test
 	}
 }
 
+func TestSessionAppServerCompanionArgumentsPreserveFullAccessPolicy(t *testing.T) {
+	got := sessionAppServerCompanionArguments([]string{
+		"--dangerously-bypass-approvals-and-sandbox", "--model", "synthetic",
+	}, "/tmp/home/.s")
+	want := []string{
+		"app-server", "--listen", "unix:///tmp/home/.s",
+		"-c", `model="synthetic"`,
+		"-c", `approval_policy="never"`,
+		"-c", `sandbox_mode="danger-full-access"`,
+	}
+	if strings.Join(got, "\x00") != strings.Join(want, "\x00") {
+		t.Fatalf("full-access companion arguments = %#v, want %#v", got, want)
+	}
+}
+
 func TestSessionAppServerEligibilityDoesNotInspectOptionValuesAsCommands(t *testing.T) {
 	if !sessionAppServerEligible([]string{"-c", "note=--remote", "--model", "synthetic"}) {
 		t.Fatal("config value was mistaken for a remote launch")
@@ -167,6 +188,32 @@ func TestRunThroughProxyWithSessionServerOwnsCompanionLifecycle(t *testing.T) {
 	}
 	if _, err := os.Lstat(filepath.Join(home, ".s")); !os.IsNotExist(err) {
 		t.Fatalf("private app-server socket survived: %v", err)
+	}
+}
+
+func TestRunThroughProxyWithSessionServerPassesFullAccessToCompanion(t *testing.T) {
+	root := t.TempDir()
+	marker := filepath.Join(root, "events")
+	argsMarker := filepath.Join(root, "companion-args")
+	wrapper := sessionCompanionWrapper(t)
+	t.Setenv(sessionCompanionHelperEnv, "1")
+	t.Setenv(sessionCompanionMarkerEnv, marker)
+	t.Setenv(sessionCompanionArgsEnv, argsMarker)
+	home := filepath.Join(root, "home")
+	if err := os.MkdirAll(home, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	process := NewCodexProcess(wrapper, Terminal{Stdin: strings.NewReader(""), Stdout: io.Discard, Stderr: io.Discard})
+	if err := process.RunThroughProxyWithSessionServer(t.Context(), home, "http://127.0.0.1:1234", []string{"--dangerously-bypass-approvals-and-sandbox", "--model", "synthetic"}, ""); err != nil {
+		t.Fatal(err)
+	}
+	args, err := os.ReadFile(argsMarker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(args), "-c\x00approval_policy=\"never\"") ||
+		!strings.Contains(string(args), "-c\x00sandbox_mode=\"danger-full-access\"") {
+		t.Fatalf("companion omitted full-access config: %q", args)
 	}
 }
 

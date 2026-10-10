@@ -37,12 +37,15 @@ func sessionAppServerEligible(arguments []string) bool {
 
 func sessionAppServerCompanionArguments(arguments []string, socket string) []string {
 	result := []string{"app-server", "--listen", "unix://" + socket}
+	fullAccess := false
 	for index := 0; index < len(arguments); index++ {
 		argument := arguments[index]
 		if argument == "--" {
 			break
 		}
 		switch argument {
+		case "--dangerously-bypass-approvals-and-sandbox":
+			fullAccess = true
 		case "-c", "--config", "--enable", "--disable", "--code-mode-host":
 			if index+1 < len(arguments) {
 				result = append(result, argument, arguments[index+1])
@@ -60,6 +63,12 @@ func sessionAppServerCompanionArguments(arguments []string, socket string) []str
 				result = append(result, "-c", "model="+tomlStringLiteral(strings.TrimPrefix(argument, "--model=")))
 			}
 		}
+	}
+	if fullAccess {
+		result = append(result,
+			"-c", `approval_policy="never"`,
+			"-c", `sandbox_mode="danger-full-access"`,
+		)
 	}
 	return result
 }
