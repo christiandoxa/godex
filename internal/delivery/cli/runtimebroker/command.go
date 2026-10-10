@@ -60,6 +60,14 @@ func NewCommand(
 	}
 }
 
+// CleanupStaleLeases runs the bounded startup sweep owned by the broker store.
+func (command *Command) CleanupStaleLeases() {
+	if command == nil || command.store == nil {
+		return
+	}
+	command.store.CleanupStaleLeasesAll()
+}
+
 func (command *Command) Run(ctx context.Context, input io.Reader) (runErr error) {
 	if command == nil || command.runner == nil || command.profiles == nil || command.store == nil {
 		return errors.New("runtime broker support is not configured")

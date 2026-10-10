@@ -81,13 +81,51 @@ func (store *Store) CleanupStaleLeases(key string) int {
 			continue
 		}
 		pid := leasePID(entry.Name())
-		if pid != 0 && processAlive(pid) {
+		if pid == 0 {
+			continue
+		}
+		if processAlive(pid) {
 			live++
 			continue
 		}
 		_ = os.Remove(path)
 	}
+	if live == 0 {
+		_ = os.Remove(dir)
+	}
 	return live
+}
+
+// CleanupStaleLeasesAll removes dead broker leases left by a crashed child.
+// It scans only owned lease directories and leaves unrelated files untouched.
+func (store *Store) CleanupStaleLeasesAll() {
+	if store == nil {
+		return
+	}
+	if err := store.ensureHome(); err != nil {
+		return
+	}
+	entries, err := os.ReadDir(store.home)
+	if err != nil {
+		return
+	}
+	const prefix = "runtime-broker-"
+	const suffix = "-leases"
+	for _, entry := range entries {
+		name := entry.Name()
+		if !strings.HasPrefix(name, prefix) || !strings.HasSuffix(name, suffix) {
+			continue
+		}
+		key := strings.TrimSuffix(strings.TrimPrefix(name, prefix), suffix)
+		if !validID(key) {
+			continue
+		}
+		info, err := os.Lstat(filepath.Join(store.home, name))
+		if err != nil || info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+			continue
+		}
+		store.CleanupStaleLeases(key)
+	}
 }
 
 func leasePID(name string) int {

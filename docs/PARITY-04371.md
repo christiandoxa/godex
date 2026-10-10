@@ -48,6 +48,17 @@ Responses precommit recovery changes.
    test verifies that the original upstream failure remains observable
    once the retry budget is exhausted.
 
+3. **Committed Responses turn-state restart.** The tagged Responses forwarding
+   path records verified `x-codex-turn-state` with the returned response owner
+   for unary and SSE responses. Godex previously kept that metadata only in
+   memory on the generic `Observe` path, so a managed profile's next HTTP
+   continuation lost its turn state after router restart. Godex now uses the
+   already-loaded managed account home to write the private, hashed turn-state
+   sidecar used by the WebSocket path; launch-local API-key accounts remain
+   memory-only. A two-router synthetic profile regression requires the second
+   request to restore the opaque header, and fails with the old in-memory-only
+   call.
+
 The Rust/Mojo architectural reorganization in this patch is not by itself
 an independent requirement to reimplement the same internal modules in Go.
 

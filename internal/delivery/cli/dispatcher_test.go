@@ -1179,6 +1179,23 @@ func TestProdex04356HiddenRuntimeBrokerIsExplicitAndSilentFromUpdateNotice(t *te
 	}
 }
 
+func TestRuntimeHousekeepingSkipsReadOnlyAndHiddenSurfaces(t *testing.T) {
+	for _, command := range []string{"info", "log", "ping", "update", "__runtime-broker", "super"} {
+		arguments := []string{command}
+		if command == "super" {
+			arguments = append(arguments, "--dry-run")
+		}
+		if shouldRunRuntimeHousekeeping(arguments) {
+			t.Fatalf("housekeeping unexpectedly ran for %#v", arguments)
+		}
+	}
+	for _, arguments := range [][]string{{}, {"status"}, {"run"}, {"super"}} {
+		if !shouldRunRuntimeHousekeeping(arguments) {
+			t.Fatalf("housekeeping unexpectedly skipped for %#v", arguments)
+		}
+	}
+}
+
 func TestProdex04356SuperCommandsAreExplicitGodexCommands(t *testing.T) {
 	for _, command := range []string{"super", "s"} {
 		if !IsExplicitGodexCommand(command) {

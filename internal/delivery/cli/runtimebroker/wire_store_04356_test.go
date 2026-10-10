@@ -215,6 +215,43 @@ func TestProdex04356RuntimeBrokerLeaseDirRejectsSymlink(t *testing.T) {
 	}
 }
 
+func TestRuntimeBrokerHousekeepingSweepsAllDeadLeasesWithoutDeletingForeignFiles(t *testing.T) {
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	withNote := store.LeaseDir("with-note")
+	if err := os.MkdirAll(withNote, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	stale := filepath.Join(withNote, "2147483647-crashed.lease")
+	if err := os.WriteFile(stale, []byte("pid=2147483647\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	note := filepath.Join(withNote, "keep-me")
+	if err := os.WriteFile(note, []byte("unrelated"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	deadOnly := store.LeaseDir("dead-only")
+	if err := os.MkdirAll(deadOnly, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(deadOnly, "2147483647-crashed.lease"), []byte("pid=2147483647\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	store.CleanupStaleLeasesAll()
+	if _, err := os.Stat(stale); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("dead lease remains: %v", err)
+	}
+	if _, err := os.Stat(note); err != nil {
+		t.Fatalf("unrelated lease-dir file was removed: %v", err)
+	}
+	if _, err := os.Stat(deadOnly); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("empty lease directory remains: %v", err)
+	}
+}
+
 func itoa(value int) string {
 	return fmt.Sprintf("%d", value)
 }

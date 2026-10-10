@@ -84,6 +84,9 @@ func (app *App) Run(ctx context.Context, arguments []string) error {
 	if handled, err := printPublicCommandHelp(app.out, arguments); handled {
 		return err
 	}
+	if app.broker != nil && shouldRunRuntimeHousekeeping(arguments) {
+		app.broker.CleanupStaleLeases()
+	}
 	app.showUpdateNotice(ctx, arguments)
 	if len(arguments) == 0 {
 		return app.runRuntime(ctx, nil)
