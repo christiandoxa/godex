@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
 
@@ -76,7 +77,16 @@ func TestResponseAffinityReadsNestedResponseIdentifiers(t *testing.T) {
 }
 
 func TestResponseAffinityMatchesProdexResponseMetadataPrecedence(t *testing.T) {
-	got := responseAffinity(http.Header{}, []byte(`{"id":"event-id","response_id":"resp-root","object":"response","headers":{"x-codex-turn-state":"root-state"},"response":{"id":"resp-nested","headers":[["X-CODEX-TURN-STATE",[" nested-state ","later"]]],"turn_state":"response-state","turnState":"camel-state"}}`), false)
+	got := responseAffinity(http.Header{
+		"X-Session-Id": {"x-session"},
+		"Session-Id":   {"codex-session"},
+		"Session_id":   {"legacy-session"},
+	}, nil, false)
+	if got.session != "legacy-session" {
+		t.Fatalf("response session affinity = %q, want legacy-session", got.session)
+	}
+
+	got = responseAffinity(http.Header{}, []byte(`{"id":"event-id","response_id":"resp-root","object":"response","headers":{"x-codex-turn-state":"root-state"},"response":{"id":"resp-nested","headers":[["X-CODEX-TURN-STATE",[" nested-state ","later"]]],"turn_state":"response-state","turnState":"camel-state"}}`), false)
 	want := affinityKeys{previous: "resp-nested", turn: "nested-state"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("nested response metadata = %#v, want %#v", got, want)
@@ -98,6 +108,38 @@ func TestResponseAffinityMatchesProdexResponseMetadataPrecedence(t *testing.T) {
 	want = affinityKeys{previous: "resp-sse", turn: "camel-state"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("SSE response metadata = %#v, want %#v", got, want)
+	}
+}
+
+func TestRequestAffinityMatchesProdexExplicitSessionHeaderPrecedence(t *testing.T) {
+	request := proxymodel.Request{Header: http.Header{
+		"X-Session-Id": {"x-session"},
+		"Session-Id":   {"codex-session"},
+		"Session_id":   {"legacy-session"},
+	}}
+	got := requestAffinity(request, []byte(`{"session_id":"body-session"}`))
+	if got.session != "legacy-session" {
+		t.Fatalf("session affinity = %q, want legacy-session", got.session)
+	}
+}
+
+func TestRequestAffinityUsesTurnMetadataBeforeBodySession(t *testing.T) {
+	request := proxymodel.Request{Header: http.Header{
+		"X-Codex-Turn-Metadata": {`{"session_id":"turn-session"}`},
+	}}
+	got := requestAffinity(request, []byte(`{"session_id":"body-session"}`))
+	if got.session != "turn-session" {
+		t.Fatalf("turn metadata session affinity = %q, want turn-session", got.session)
+	}
+}
+
+func TestRequestAffinityIgnoresUnsupportedCodexSessionHeader(t *testing.T) {
+	request := proxymodel.Request{Header: http.Header{
+		"X-Codex-Session-Id": {"unsupported-session"},
+	}}
+	got := requestAffinity(request, []byte(`{"session_id":"body-session"}`))
+	if got.session != "body-session" {
+		t.Fatalf("unsupported header changed session affinity to %q", got.session)
 	}
 }
 

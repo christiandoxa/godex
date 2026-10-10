@@ -13,7 +13,13 @@ func requestAffinity(request proxymodel.Request, body []byte) affinityKeys {
 	keys := affinityKeys{
 		thread:  firstHeader(request.Header, "thread-id", "x-codex-thread-id"),
 		turn:    strings.TrimSpace(request.Header.Get("x-codex-turn-state")),
-		session: firstHeader(request.Header, "x-codex-session-id", "x-session-id", "session-id"),
+		session: firstHeader(request.Header, "session_id", "session-id", "x-session-id"),
+	}
+	if keys.session == "" {
+		var metadata map[string]any
+		if json.Unmarshal([]byte(request.Header.Get("x-codex-turn-metadata")), &metadata) == nil {
+			keys.session = objectString(metadata, "session_id")
+		}
 	}
 	if len(body) == 0 {
 		return keys
@@ -43,7 +49,7 @@ func responseAffinity(headers http.Header, body []byte, stream bool) affinityKey
 	keys := affinityKeys{
 		thread:  firstHeader(headers, "thread-id", "x-codex-thread-id"),
 		turn:    strings.TrimSpace(headers.Get("x-codex-turn-state")),
-		session: firstHeader(headers, "x-codex-session-id", "x-session-id", "session-id"),
+		session: firstHeader(headers, "session_id", "session-id", "x-session-id"),
 	}
 	if len(body) == 0 {
 		return keys
