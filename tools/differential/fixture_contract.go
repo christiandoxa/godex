@@ -12,6 +12,24 @@ func validFixtureStreamingRequest(body string) bool {
 	return validFixtureRequestMode(body, true)
 }
 
+func validFixtureUserIDRequest(body string) bool {
+	var request struct {
+		Model    string `json:"model"`
+		Stream   *bool  `json:"stream"`
+		UserID   string `json:"user_id"`
+		Messages []struct {
+			Role    string `json:"role"`
+			Content string `json:"content"`
+		} `json:"messages"`
+	}
+	if json.Unmarshal([]byte(body), &request) != nil ||
+		request.Model != "deepseek-v4-pro" || request.Stream == nil || *request.Stream ||
+		request.UserID != "user_123" || len(request.Messages) != 1 {
+		return false
+	}
+	return request.Messages[0].Role == "user" && request.Messages[0].Content == "same request"
+}
+
 func validFixtureRequestMode(body string, wantStream bool) bool {
 	var request struct {
 		Model    string `json:"model"`

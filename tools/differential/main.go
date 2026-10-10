@@ -115,6 +115,7 @@ type runOptions struct {
 	cancel bool
 	rotate bool
 	stream bool
+	userID bool
 }
 
 type mockServer struct {
@@ -209,6 +210,11 @@ func run() error {
 			// A real function call must preserve its ID, name and JSON
 			// arguments when bridging Chat Completions to Responses.
 			return runPair(root, mock, "tool-call", mockPlan{ToolCall: true}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{})
+		}},
+		{"deepseek-user-id", func() (scenarioResult, error) {
+			// The canonical DeepSeek adapter accepts Responses' user alias but
+			// forwards it as the provider's user_id field.
+			return runPair(root, mock, "deepseek-user-id", mockPlan{}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{userID: true})
 		}},
 		{"sse-stream", func() (scenarioResult, error) {
 			// Exercise a real streaming Responses request through both
@@ -555,6 +561,9 @@ func productEnv(name, stateHome, codexHome, userHome, shim, childResult string, 
 	if options.cancel {
 		env = append(env, "DIFFERENTIAL_CANCEL=1")
 	}
+	if options.userID {
+		env = append(env, "DIFFERENTIAL_USER_ID=1")
+	}
 	if runtime.GOOS == "windows" {
 		env = append(env, "SystemRoot="+os.Getenv("SystemRoot"))
 	}
@@ -769,6 +778,9 @@ func runCodexShim(arguments []string) int {
 	requestBody := []byte(`{"model":"deepseek-v4-pro","input":[{"role":"user","content":[{"type":"input_text","text":"same request"}]}],"stream":false}`)
 	if os.Getenv("DIFFERENTIAL_STREAM") == "1" {
 		requestBody = []byte(`{"model":"deepseek-v4-pro","input":[{"role":"user","content":[{"type":"input_text","text":"same request"}]}],"stream":true}`)
+	}
+	if os.Getenv("DIFFERENTIAL_USER_ID") == "1" {
+		requestBody = []byte(`{"model":"deepseek-v4-pro","input":[{"role":"user","content":[{"type":"input_text","text":"same request"}]}],"stream":false,"user":"user_123"}`)
 	}
 	timeout := 8 * time.Second
 	if os.Getenv("DIFFERENTIAL_CANCEL") == "1" {
@@ -1002,6 +1014,9 @@ func scenarioInvariants(scenario scenarioResult) []string {
 			validRequest := validFixtureRequest(upstream.Body)
 			if phase == "sse-stream" || phase == "sse-rate-limit" {
 				validRequest = validFixtureStreamingRequest(upstream.Body)
+			}
+			if phase == "deepseek-user-id" {
+				validRequest = validFixtureUserIDRequest(upstream.Body)
 			}
 			if !validRequest {
 				failures = append(failures, prefix+".upstream_request_invalid")

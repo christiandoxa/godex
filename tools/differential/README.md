@@ -15,7 +15,7 @@ go build -trimpath -o /tmp/godex-candidate ./cmd/godex
 ```
 
 The harness creates separate temporary homes, starts one loopback mock upstream,
-and runs both products independently through seventeen bounded scenarios: a successful request; a
+and runs both products independently through eighteen bounded scenarios: a successful request; a
 synthetic 429 followed by a retry owned by the **Codex shim**; a single-key
 429, 500, or 503 that must remain terminal without **proxy** retry; cancellation while
 upstream is delayed; two launches against the same home; and a terminal 429 followed by a
@@ -32,8 +32,12 @@ or untracked files; a locally edited Prodex checkout cannot serve as the oracle.
 The resulting PASS is limited to the seventeen named synthetic scenarios and is
 not equivalent to a global provider, live-TUI or transport parity certificate.
 
-Use `--scenario success|tool-call|sse-stream|sse-rate-limit|retry|deepseek-sse-terminal|single-key-401|single-key-403|single-key-429|single-key-500|single-key-503|key-rotation-429|key-rotation-restart|cancel|restart|recover-after-429|recover-after-503` to rerun one case while
+Use `--scenario success|tool-call|deepseek-user-id|sse-stream|sse-rate-limit|retry|deepseek-sse-terminal|single-key-401|single-key-403|single-key-429|single-key-500|single-key-503|key-rotation-429|key-rotation-restart|cancel|restart|recover-after-429|recover-after-503` to rerun one case while
 investigating a mismatch; the default is `--scenario all`.
+
+The `deepseek-user-id` fixture sends the Responses `user` alias through the
+real Codex shim and requires the upstream DeepSeek request to contain the
+canonical `user_id` field from the 0.437.1 provider conformance fixture.
 
 
 Run only from a committed, clean candidate checkout; build the Godex binary

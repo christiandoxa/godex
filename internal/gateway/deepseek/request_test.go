@@ -29,8 +29,11 @@ func TestDeepSeekResponsesRequestMapsAdvancedControls(t *testing.T) {
 	if got["model"] != "deepseek-chat" || got["stream"] != true || got["temperature"] != 0.2 || got["top_p"] != 0.8 || got["max_tokens"] != float64(512) {
 		t.Fatalf("translated controls = %#v", got)
 	}
-	if got["logprobs"] != true || got["top_logprobs"] != float64(5) || got["parallel_tool_calls"] != true || got["user"] != "user_123" {
+	if got["logprobs"] != true || got["top_logprobs"] != float64(5) || got["parallel_tool_calls"] != true || got["user_id"] != "user_123" {
 		t.Fatalf("translated optional controls = %#v", got)
+	}
+	if _, present := got["user"]; present {
+		t.Fatalf("translated request must use DeepSeek's user_id field: %#v", got)
 	}
 	if got["reasoning_effort"] != "high" {
 		t.Fatalf("reasoning effort = %#v", got)
@@ -46,6 +49,20 @@ func TestDeepSeekResponsesRequestMapsAdvancedControls(t *testing.T) {
 	messages := got["messages"].([]any)
 	if len(messages) != 2 || messages[0].(map[string]any)["role"] != "system" || messages[0].(map[string]any)["content"] != "system rules" || messages[1].(map[string]any)["content"] != "hello" {
 		t.Fatalf("messages = %#v", messages)
+	}
+}
+
+func TestDeepSeekResponsesRequestUsesCanonicalUserIDField(t *testing.T) {
+	translated, err := ResponsesRequest([]byte(`{"model":"deepseek-chat","input":"hello","user":" user_123 "}`), RequestOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := decodeDeepSeekRequest(t, translated)
+	if got["user_id"] != "user_123" {
+		t.Fatalf("user_id = %#v", got["user_id"])
+	}
+	if _, present := got["user"]; present {
+		t.Fatalf("unexpected non-canonical user field: %#v", got)
 	}
 }
 

@@ -104,7 +104,7 @@ func copyUserField(target, source map[string]any) error {
 		return err
 	}
 	if user != "" {
-		target["user"] = user
+		target["user_id"] = user
 	}
 	return nil
 }
