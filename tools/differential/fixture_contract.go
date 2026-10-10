@@ -116,6 +116,8 @@ func validFixtureError(body, expectedCode string) bool {
 		return root.Error.Message == "synthetic credential rejected"
 	case "access_denied":
 		return root.Error.Message == "synthetic provider forbidden"
+	case "internal_server_error":
+		return root.Error.Message == "synthetic provider failure"
 	}
 	return false
 }
