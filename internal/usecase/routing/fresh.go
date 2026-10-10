@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
@@ -48,6 +49,12 @@ func (router *Router) forwardFresh(
 		request.FirstEventRetryUsed = firstEventRetryUsed
 		current := freshRetryCandidates(router, candidates, retryable, request.QuotaSelection, router.now())
 		if len(current) == 0 {
+			// A transport failure that survives one recovery sweep has no
+			// response to replay. Prodex terminates that fresh request with 503
+			// instead of probing the same circuit forever.
+			if recoverySweeps > 0 && last != nil && last.transport {
+				break
+			}
 			if lastChance, ok := router.websocketQuotaReplayLastChance(request, accounts); ok {
 				return router.forwardWebSocketQuotaLastChance(ctx, request, lastChance)
 			}
@@ -80,6 +87,11 @@ func (router *Router) forwardFresh(
 			}
 			accounts, candidates = freshAccounts, freshCandidates
 			continue
+		}
+		if recoverySweeps > 0 && last != nil && last.transport && len(current) == 1 &&
+			current[0].ID == last.accountID &&
+			router.routeHealthScore(last.accountID, request.QuotaSelection, router.now()) >= routingentity.RouteCircuitHealthThreshold {
+			break
 		}
 
 		var saturatedAccounts []proxymodel.Account

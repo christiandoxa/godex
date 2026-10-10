@@ -59,6 +59,14 @@ Responses precommit recovery changes.
    request to restore the opaque header, and fails with the old in-memory-only
    call.
 
+4. **Native OpenAI transport failure bound.** The tagged runtime client uses a
+   five-second upstream connect/TLS bound. Godex now applies the same bound in
+   `gateway/openai` and ends a fresh OpenAI transport failure after one
+   recovery sweep instead of probing the same route circuit until the caller
+   times out. Against a credential-free `192.0.2.1` negative-control upstream,
+   both binaries return the same JSON 503; a binary built from the pre-fix
+   source still times out under the same comparator.
+
 The Rust/Mojo architectural reorganization in this patch is not by itself
 an independent requirement to reimplement the same internal modules in Go.
 

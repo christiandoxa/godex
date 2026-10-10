@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -21,6 +22,7 @@ import (
 const DefaultUpstreamURL = "https://chatgpt.com/backend-api"
 const upstreamHeaderWait = 30e9
 const upstreamIdleTime = 90e9
+const upstreamConnectTimeout = 5 * time.Second
 const websocketConnectTimeout = 15 * time.Second
 
 type authReader interface {
@@ -269,6 +271,18 @@ func cloneHTTPClient(client *http.Client) *http.Client {
 	}
 	if transport, ok := copy.Transport.(*http.Transport); ok {
 		transport = transport.Clone()
+		baseDial := transport.DialContext
+		transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
+			ctx, cancel := context.WithTimeout(ctx, upstreamConnectTimeout)
+			defer cancel()
+			if baseDial != nil {
+				return baseDial(ctx, network, address)
+			}
+			return (&net.Dialer{KeepAlive: 30 * time.Second}).DialContext(ctx, network, address)
+		}
+		if transport.TLSHandshakeTimeout == 0 || transport.TLSHandshakeTimeout > upstreamConnectTimeout {
+			transport.TLSHandshakeTimeout = upstreamConnectTimeout
+		}
 		transport.DisableCompression = true
 		if transport.ResponseHeaderTimeout == 0 {
 			transport.ResponseHeaderTimeout = upstreamHeaderWait

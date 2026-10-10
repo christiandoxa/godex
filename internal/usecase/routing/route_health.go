@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"time"
 
 	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
@@ -14,6 +15,16 @@ import (
 type routeHealthKey struct {
 	accountID string
 	route     string
+}
+
+func (router *Router) routeHealthScore(accountID string, selection quotamodel.Selection, now time.Time) uint8 {
+	route := routeHealthRoute(selection.RouteKind)
+	if route == "" {
+		return 0
+	}
+	router.mu.Lock()
+	defer router.mu.Unlock()
+	return router.routeHealth[routeHealthKey{accountID: accountID, route: route}].Effective(now)
 }
 
 func (router *Router) recordRouteFailure(ctx context.Context, accountID string, selection quotamodel.Selection) {
