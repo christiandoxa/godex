@@ -1,18 +1,16 @@
 package gemini
 
-import (
-	"encoding/json"
-	"errors"
-	"strings"
-)
+import "strings"
 
 func geminiGenerateContentRequest(chat, original map[string]any) (map[string]any, error) {
 	result := make(map[string]any)
 	contents := make([]any, 0)
 	var systemParts []any
+	toolNames := make(map[string]string)
 
 	messages, _ := chat["messages"].([]any)
-	for _, raw := range messages {
+	for index := 0; index < len(messages); index++ {
+		raw := messages[index]
 		message, ok := raw.(map[string]any)
 		if !ok {
 			continue
@@ -20,23 +18,26 @@ func geminiGenerateContentRequest(chat, original map[string]any) (map[string]any
 		role, _ := message["role"].(string)
 		switch role {
 		case "system", "developer":
-			for _, text := range geminiMessageTexts(message["content"]) {
-				systemParts = append(systemParts, map[string]any{"text": text})
+			for _, part := range geminiMessageParts(message["content"]) {
+				if text, ok := part.(map[string]any)["text"].(string); ok {
+					systemParts = append(systemParts, map[string]any{"text": text})
+				}
 			}
 		case "assistant":
-			parts := make([]any, 0)
-			for _, text := range geminiMessageTexts(message["content"]) {
-				parts = append(parts, map[string]any{"text": text})
-			}
+			parts := geminiMessageParts(message["content"])
 			calls, _ := message["tool_calls"].([]any)
 			for _, rawCall := range calls {
 				call, _ := rawCall.(map[string]any)
 				function, _ := call["function"].(map[string]any)
 				name, _ := function["name"].(string)
+				if strings.TrimSpace(name) == "" {
+					name = "tool_call"
+				}
 				args := geminiJSONArguments(function["arguments"])
 				item := map[string]any{"name": name, "args": args}
-				if id, _ := call["id"].(string); strings.TrimSpace(id) != "" {
-					item["id"] = id
+				if callID, _ := call["id"].(string); callID != "" {
+					toolNames[callID] = name
+					item["id"] = callID
 				}
 				if extra, ok := call["extra_content"].(map[string]any); ok {
 					if google, ok := extra["google"].(map[string]any); ok {
@@ -51,38 +52,90 @@ func geminiGenerateContentRequest(chat, original map[string]any) (map[string]any
 				contents = append(contents, map[string]any{"role": "model", "parts": parts})
 			}
 		case "tool":
-			callID, _ := message["tool_call_id"].(string)
-			name, _ := message["name"].(string)
-			if name == "" {
-				name = callID
-			}
-			response := geminiToolResponseValue(message["content"])
-			item := map[string]any{"name": name, "response": response}
-			if callID != "" {
-				item["id"] = callID
-			}
-			contents = append(contents, map[string]any{"role": "user", "parts": []any{map[string]any{"functionResponse": item}}})
-		default:
 			parts := make([]any, 0)
-			for _, text := range geminiMessageTexts(message["content"]) {
-				parts = append(parts, map[string]any{"text": text})
+			for index < len(messages) {
+				next, _ := messages[index].(map[string]any)
+				if next == nil {
+					break
+				}
+				nextRole, _ := next["role"].(string)
+				if nextRole != "tool" {
+					break
+				}
+				callID, _ := next["tool_call_id"].(string)
+				name, _ := next["name"].(string)
+				if name == "" {
+					name = toolNames[callID]
+				}
+				if name == "" {
+					name = callID
+				}
+				item := map[string]any{"name": name, "response": geminiToolResponseValue(next["content"])}
+				if callID != "" {
+					item["id"] = callID
+				}
+				parts = append(parts, map[string]any{"functionResponse": item})
+				index++
 			}
+			if len(parts) > 0 {
+				contents = append(contents, map[string]any{"role": "user", "parts": parts})
+			}
+			index--
+			continue
+		default:
+			parts := geminiMessageParts(message["content"])
 			if len(parts) > 0 {
 				contents = append(contents, map[string]any{"role": "user", "parts": parts})
 			}
 		}
 	}
+
+	contextual := make([]string, 0)
+	for _, raw := range messages {
+		message, _ := raw.(map[string]any)
+		if message == nil {
+			continue
+		}
+		role, _ := message["role"].(string)
+		if role != "user" {
+			continue
+		}
+		for _, part := range geminiMessageParts(message["content"]) {
+			if text, ok := part.(map[string]any)["text"].(string); ok && geminiIsContextualInstruction(text) {
+				contextual = append(contextual, text)
+			}
+		}
+	}
+	if len(contextual) > 0 {
+		for _, text := range contextual {
+			for index := 0; index < len(contents); index++ {
+				content, _ := contents[index].(map[string]any)
+				parts, _ := content["parts"].([]any)
+				if len(parts) == 1 {
+					if value, _ := parts[0].(map[string]any)["text"].(string); value == text {
+						contents = append(contents[:index], contents[index+1:]...)
+						index--
+						break
+					}
+				}
+			}
+		}
+		if len(systemParts) == 0 {
+			systemParts = make([]any, 0, len(contextual))
+		}
+		for _, text := range contextual {
+			systemParts = append(systemParts, map[string]any{"text": text})
+		}
+	}
 	if len(systemParts) > 0 {
-		result["systemInstruction"] = map[string]any{"parts": systemParts}
+		result["systemInstruction"] = map[string]any{"parts": []any{map[string]any{"text": geminiJoinSystemParts(systemParts)}}}
 	}
 	if len(contents) > 0 {
 		result["contents"] = contents
 	}
 
-	tools := geminiNativeTools(chat)
-	if web := geminiWebSearchOptions(original["tools"]); web != nil {
-		tools = append(tools, map[string]any{"googleSearch": map[string]any{}})
-	}
+	tools := geminiNativeBuiltinTools(original["tools"])
+	tools = append(tools, geminiNativeTools(chat)...)
 	if len(tools) > 0 {
 		result["tools"] = tools
 	}
@@ -104,244 +157,4 @@ func geminiGenerateContentRequest(chat, original map[string]any) (map[string]any
 		}
 	}
 	return result, nil
-}
-
-func geminiMessageTexts(value any) []string {
-	switch value := value.(type) {
-	case string:
-		if value != "" {
-			return []string{value}
-		}
-	case []any:
-		result := make([]string, 0, len(value))
-		for _, raw := range value {
-			switch part := raw.(type) {
-			case string:
-				if part != "" {
-					result = append(result, part)
-				}
-			case map[string]any:
-				if text, _ := part["text"].(string); text != "" {
-					result = append(result, text)
-				} else if text, _ := part["content"].(string); text != "" {
-					result = append(result, text)
-				}
-			}
-		}
-		return result
-	}
-	return nil
-}
-
-func geminiJSONArguments(value any) any {
-	switch value := value.(type) {
-	case string:
-		var parsed any
-		if json.Unmarshal([]byte(value), &parsed) == nil {
-			return parsed
-		}
-		return map[string]any{}
-	case nil:
-		return map[string]any{}
-	default:
-		return value
-	}
-}
-
-func geminiToolResponseValue(value any) any {
-	text := ""
-	switch value := value.(type) {
-	case string:
-		text = value
-	case []any:
-		if values := geminiMessageTexts(value); len(values) > 0 {
-			text = strings.Join(values, "")
-		}
-	default:
-		return map[string]any{"output": value}
-	}
-	var parsed any
-	if json.Unmarshal([]byte(text), &parsed) == nil {
-		return parsed
-	}
-	return map[string]any{"output": text}
-}
-
-func geminiNativeTools(chat map[string]any) []any {
-	items, _ := chat["tools"].([]any)
-	declarations := make([]any, 0, len(items))
-	for _, raw := range items {
-		item, _ := raw.(map[string]any)
-		function, _ := item["function"].(map[string]any)
-		if function == nil {
-			continue
-		}
-		declaration := make(map[string]any)
-		for _, key := range []string{"name", "description", "parameters"} {
-			if value, ok := function[key]; ok {
-				declaration[key] = value
-			}
-		}
-		if _, ok := declaration["name"]; ok {
-			declarations = append(declarations, declaration)
-		}
-	}
-	if len(declarations) == 0 {
-		return nil
-	}
-	return []any{map[string]any{"functionDeclarations": declarations}}
-}
-
-func geminiNativeToolConfig(value any) map[string]any {
-	if value == nil {
-		return nil
-	}
-	config := map[string]any{}
-	switch value := value.(type) {
-	case string:
-		switch value {
-		case "none":
-			config["mode"] = "NONE"
-		case "required":
-			config["mode"] = "ANY"
-		case "auto":
-			return nil
-		}
-	case map[string]any:
-		function, _ := value["function"].(map[string]any)
-		name, _ := function["name"].(string)
-		if name == "" {
-			name, _ = value["name"].(string)
-		}
-		if name != "" {
-			config["mode"] = "ANY"
-			config["allowedFunctionNames"] = []any{name}
-		}
-	}
-	if len(config) == 0 {
-		return nil
-	}
-	return map[string]any{"functionCallingConfig": config}
-}
-
-func geminiNativeGenerationConfig(original, chat map[string]any) (map[string]any, error) {
-	config := make(map[string]any)
-	aliases := []struct{ source, canonical string }{
-		{"temperature", "temperature"},
-		{"top_p", "topP"}, {"topP", "topP"},
-		{"top_k", "topK"}, {"topK", "topK"},
-		{"presence_penalty", "presencePenalty"}, {"presencePenalty", "presencePenalty"},
-		{"frequency_penalty", "frequencyPenalty"}, {"frequencyPenalty", "frequencyPenalty"},
-		{"max_tokens", "maxOutputTokens"}, {"max_output_tokens", "maxOutputTokens"},
-		{"response_schema", "responseSchema"}, {"responseSchema", "responseSchema"},
-	}
-	for _, alias := range aliases {
-		if value, exists := original[alias.source]; exists && value != nil {
-			config[alias.canonical] = value
-		}
-	}
-	if stop, exists := original["stop"]; exists && stop != nil {
-		config["stopSequences"] = stop
-	} else if stop, exists := original["stop_sequences"]; exists && stop != nil {
-		config["stopSequences"] = stop
-	}
-	if candidate, exists, err := geminiCandidateCount(original); err != nil {
-		return nil, err
-	} else if exists {
-		config["candidateCount"] = candidate
-	}
-	if effort, _ := chat["reasoning_effort"].(string); effort != "" && effort != "none" {
-		level := strings.ToUpper(effort)
-		if level == "XHIGH" || level == "MAX" {
-			level = "HIGH"
-		}
-		config["thinkingConfig"] = map[string]any{"includeThoughts": true, "thinkingLevel": level}
-	}
-	format, _ := chat["response_format"].(map[string]any)
-	if format != nil {
-		if kind, _ := format["type"].(string); kind == "json_object" {
-			config["responseMimeType"] = "application/json"
-		}
-	}
-	if schema := geminiResponseSchema(original); schema != nil {
-		config["responseJsonSchema"] = schema
-		config["responseMimeType"] = "application/json"
-	}
-	return config, nil
-}
-
-func geminiCandidateCount(request map[string]any) (int64, bool, error) {
-	snake, snakeFound := request["candidate_count"]
-	camel, camelFound := request["candidateCount"]
-	snakeActive := snakeFound && snake != nil
-	camelActive := camelFound && camel != nil
-
-	if snakeActive && camelActive && !geminiCandidateValuesEqual(snake, camel) {
-		return 0, false, errors.New("invalid_candidate_count: Gemini request fields `candidate_count` and `candidateCount` conflict")
-	}
-	if snakeActive && !geminiCandidateCountIsOne(snake) {
-		return 0, false, errors.New("invalid_candidate_count: Gemini request field `candidate_count` must be omitted, null, or 1")
-	}
-	if camelActive && !geminiCandidateCountIsOne(camel) {
-		return 0, false, errors.New("invalid_candidate_count: Gemini request field `candidateCount` must be omitted, null, or 1")
-	}
-	if snakeActive || camelActive {
-		return 1, true, nil
-	}
-	return 0, false, nil
-}
-
-func geminiCandidateValuesEqual(left, right any) bool {
-	switch left := left.(type) {
-	case json.Number:
-		right, ok := right.(json.Number)
-		return ok && left.String() == right.String()
-	case int:
-		right, ok := right.(int)
-		return ok && left == right
-	case int64:
-		right, ok := right.(int64)
-		return ok && left == right
-	default:
-		return false
-	}
-}
-
-func geminiCandidateCountIsOne(value any) bool {
-	switch value := value.(type) {
-	case json.Number:
-		return value.String() == "1"
-	case int:
-		return value == 1
-	case int64:
-		return value == 1
-	default:
-		return false
-	}
-}
-
-func geminiResponseSchema(request map[string]any) any {
-	for _, key := range []string{"responseSchema", "response_schema"} {
-		if value, ok := request[key]; ok && value != nil {
-			return value
-		}
-	}
-	for _, key := range []string{"response_format", "text"} {
-		format, _ := request[key].(map[string]any)
-		if key == "text" {
-			format, _ = format["format"].(map[string]any)
-		}
-		if format == nil {
-			continue
-		}
-		if schema, ok := format["schema"]; ok {
-			return schema
-		}
-		if nested, ok := format["json_schema"].(map[string]any); ok {
-			if schema, ok := nested["schema"]; ok {
-				return schema
-			}
-		}
-	}
-	return nil
 }

@@ -6,19 +6,6 @@ import (
 	"strings"
 )
 
-func validateInputItems(value any) error {
-	items, ok := value.([]any)
-	if !ok {
-		return nil
-	}
-	for _, item := range items {
-		if _, ok := item.(map[string]any); !ok {
-			return errors.New("Gemini OpenAI-compatible input items must be objects")
-		}
-	}
-	return nil
-}
-
 func geminiReasoningEffort(request map[string]any) (string, error) {
 	value, exists := request["reasoning_effort"]
 	if reasoning, ok := request["reasoning"].(map[string]any); ok {
@@ -37,7 +24,7 @@ func geminiReasoningEffort(request map[string]any) (string, error) {
 	}
 	switch strings.ToLower(strings.TrimSpace(effort)) {
 	case "xhigh", "max", "high":
-		return "high", nil
+		return strings.ToLower(strings.TrimSpace(effort)), nil
 	case "medium", "low", "minimal", "none":
 		return strings.ToLower(strings.TrimSpace(effort)), nil
 	default:

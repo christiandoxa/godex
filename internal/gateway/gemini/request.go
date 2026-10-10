@@ -1,13 +1,10 @@
 package gemini
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
-
-	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 )
 
 const requestMaxBytes = 16 << 20
@@ -42,7 +39,7 @@ func translateResponsesRequest(body []byte, model string) (translatedRequest, er
 		selectedModel = strings.TrimSpace(requested)
 	}
 	if selectedModel == "" {
-		selectedModel = "auto"
+		selectedModel = "gemini-2.5-pro"
 	}
 	hardenGeminiToolCallThoughtSignatures(native, selectedModel)
 	encoded, err := json.Marshal(native)
@@ -82,52 +79,29 @@ func hardenGeminiToolCallThoughtSignatures(body map[string]any, model string) in
 	return injected
 }
 
-func parseResponsesRequest(body []byte) (map[string]any, error) {
-	if len(body) > requestMaxBytes {
-		return nil, fmt.Errorf("Gemini Responses request exceeds %d bytes", requestMaxBytes)
-	}
-	decoder := json.NewDecoder(bytes.NewReader(body))
-	decoder.UseNumber()
-	var root any
-	if err := decoder.Decode(&root); err != nil {
-		return nil, fmt.Errorf("failed to parse Gemini Responses request JSON: %w", err)
-	}
-	request, ok := root.(map[string]any)
-	if !ok {
-		return nil, errors.New("Gemini Responses request body must be a JSON object")
-	}
-	if value, exists := request["model"]; exists {
-		if _, ok := value.(string); !ok {
-			return nil, errors.New("Gemini OpenAI-compatible model must be a string")
-		}
-	}
-	if err := validateInputItems(request["input"]); err != nil {
-		return nil, err
-	}
-	return request, nil
-}
-
 func translateBaseRequest(request map[string]any, model string) (map[string]any, error) {
-	copy := make(map[string]any, len(request))
-	for key, value := range request {
-		switch key {
-		case "reasoning", "reasoning_effort", "response_format", "text", "tools", "tool_choice", "user_id", "stop_sequences", "top_logprobs", "safety_identifier", "web_search_options", "logprobs", "metadata", "client_metadata", "prompt_cache_key", "prompt_cache_retention", "parallel_tool_calls":
-			continue
-		default:
-			copy[key] = value
-		}
-	}
-	encoded, err := json.Marshal(copy)
-	if err != nil {
-		return nil, errors.New("failed to serialize Gemini Responses request")
-	}
-	chatBody, err := chatcompat.ResponsesRequest(encoded, "auto", model)
+	messages, err := geminiInputMessages(request)
 	if err != nil {
 		return nil, fmt.Errorf("Gemini OpenAI-compatible request translation failed: %w", err)
 	}
-	var chat map[string]any
-	if err := json.Unmarshal(chatBody, &chat); err != nil {
-		return nil, errors.New("failed to parse translated Gemini chat request")
+	chat := map[string]any{
+		"model":    model,
+		"messages": messages,
+		"stream":   false,
+	}
+	if stream, ok := request["stream"].(bool); ok {
+		chat["stream"] = stream
+	}
+	for _, key := range []string{"temperature", "top_p", "presence_penalty", "frequency_penalty", "seed", "tools", "tool_choice", "parallel_tool_calls", "user"} {
+		if value, ok := request[key]; ok {
+			chat[key] = value
+		}
+	}
+	for _, key := range []string{"max_completion_tokens", "max_output_tokens", "max_tokens"} {
+		if value, ok := request[key]; ok {
+			chat["max_tokens"] = value
+			break
+		}
 	}
 	if parallel, ok := request["parallel_tool_calls"].(bool); ok {
 		chat["parallel_tool_calls"] = parallel
@@ -172,6 +146,7 @@ func applyGeminiToolsAndChoice(chat, request, metadata map[string]any, effort st
 		return err
 	}
 	if choice != nil && reasoningEnabled(effort) {
+		delete(chat, "tool_choice")
 		metadata["omitted_tool_choice"] = map[string]any{
 			"from":   request["tool_choice"],
 			"reason": "Gemini OpenAI-compatible thinking mode does not accept explicit tool_choice",

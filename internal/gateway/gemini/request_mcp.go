@@ -92,10 +92,7 @@ func appendFunctionTool(tools *[]any, names map[string]bool, name, description s
 		return fmt.Errorf("Gemini OpenAI-compatible function tool name %q is duplicated", name)
 	}
 	names[name] = true
-	function := map[string]any{"name": name, "parameters": schema}
-	if strings.TrimSpace(description) != "" {
-		function["description"] = description
-	}
+	function := map[string]any{"name": name, "description": description, "parameters": geminiSanitizeSchema(schema)}
 	*tools = append(*tools, map[string]any{"type": "function", "function": function})
 	return nil
 }

@@ -127,7 +127,17 @@ func TestGeminiResponsesRequestTranslatesNestedToolsAndFormats(t *testing.T) {
 		t.Fatal(err)
 	}
 	tools := native["tools"].([]any)
-	declarations := tools[0].(map[string]any)["functionDeclarations"].([]any)
+	var declarations []any
+	var foundWebSearch bool
+	for _, raw := range tools {
+		tool := raw.(map[string]any)
+		if value, ok := tool["functionDeclarations"].([]any); ok {
+			declarations = value
+		}
+		if _, ok := tool["googleSearch"]; ok {
+			foundWebSearch = true
+		}
+	}
 	if len(declarations) != 4 ||
 		declarations[0].(map[string]any)["name"] != "files__read" ||
 		declarations[1].(map[string]any)["name"] != "shell" ||
@@ -135,7 +145,7 @@ func TestGeminiResponsesRequestTranslatesNestedToolsAndFormats(t *testing.T) {
 		declarations[3].(map[string]any)["name"] != "mcp__fs__read_file" {
 		t.Fatalf("translated declarations = %#v", declarations)
 	}
-	if _, ok := tools[1].(map[string]any)["googleSearch"]; !ok {
+	if !foundWebSearch {
 		t.Fatalf("Gemini web-search tool = %#v", tools)
 	}
 	choice := native["toolConfig"].(map[string]any)["functionCallingConfig"].(map[string]any)

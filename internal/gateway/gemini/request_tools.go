@@ -37,6 +37,9 @@ func validateGeminiToolDeclaration(raw any, index int) error {
 	}
 	kind, _ := item["type"].(string)
 	_, hasFunction := item["function"]
+	if geminiBuiltinToolKind(kind) {
+		return nil
+	}
 	if kind != "function" && !hasFunction {
 		return nil
 	}
@@ -76,7 +79,7 @@ func appendGeminiTool(tools *[]any, names map[string]bool, raw any, namespace st
 		return errors.New("Gemini OpenAI-compatible tools must contain objects")
 	}
 	kind, _ := item["type"].(string)
-	if kind == "web_search" || kind == "web_search_preview" || strings.HasPrefix(kind, "web_search_preview_") {
+	if geminiBuiltinToolKind(kind) {
 		return nil
 	}
 	if kind == "namespace" {
@@ -138,8 +141,8 @@ func appendGeminiTool(tools *[]any, names map[string]bool, raw any, namespace st
 	} else if params, exists := firstPresent(function, "parameters", "parametersJsonSchema", "input_schema", "schema"); exists {
 		schema = params
 	}
-	converted := map[string]any{"name": name, "parameters": schema}
-	for _, key := range []string{"description", "strict"} {
+	converted := map[string]any{"name": name, "parameters": geminiSanitizeSchema(schema)}
+	for _, key := range []string{"description"} {
 		if value, exists := item[key]; exists {
 			if key == "strict" {
 				if _, ok := value.(bool); !ok {
@@ -148,23 +151,48 @@ func appendGeminiTool(tools *[]any, names map[string]bool, raw any, namespace st
 			}
 			converted[key] = value
 		} else if value, exists := function[key]; exists {
-			if key == "strict" {
-				if _, ok := value.(bool); !ok {
-					continue
-				}
-			}
 			converted[key] = value
 		}
+	}
+	if kind != "function" && !strings.HasPrefix(kind, "mcp") && kind != "tool_search" && kind != "custom" {
+		return fmt.Errorf("Gemini OpenAI-compatible tool type %q is not supported", kind)
 	}
 	if kind == "custom" {
 		if _, exists := converted["description"]; !exists {
 			converted["description"] = "Freeform custom tool input. Call the tool with exact raw input in the `input` string field."
 		}
-	} else if kind != "function" && !strings.HasPrefix(kind, "mcp") && kind != "tool_search" {
-		return fmt.Errorf("Gemini OpenAI-compatible tool type %q is not supported", kind)
+	} else if _, exists := converted["description"]; !exists {
+		converted["description"] = ""
 	}
 	*tools = append(*tools, map[string]any{"type": "function", "function": converted})
 	return nil
+}
+
+func geminiBuiltinToolKind(kind string) bool {
+	return kind == "code_execution" || kind == "url_context" || kind == "computer_use" ||
+		kind == "web_search" || kind == "web_search_preview" || strings.HasPrefix(kind, "web_search_preview_")
+}
+
+func geminiSanitizeSchema(value any) any {
+	switch typed := value.(type) {
+	case []any:
+		result := make([]any, len(typed))
+		for index, item := range typed {
+			result[index] = geminiSanitizeSchema(item)
+		}
+		return result
+	case map[string]any:
+		result := make(map[string]any, len(typed))
+		for key, item := range typed {
+			if key == "strict" || key == "$schema" || key == "additionalProperties" {
+				continue
+			}
+			result[key] = geminiSanitizeSchema(item)
+		}
+		return result
+	default:
+		return value
+	}
 }
 
 func firstPresent(object map[string]any, keys ...string) (any, bool) {

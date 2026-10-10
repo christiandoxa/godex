@@ -7,6 +7,50 @@ import (
 	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 )
 
+func geminiNativeBuiltinTools(value any) []any {
+	items, _ := value.([]any)
+	var computer map[string]any
+	code, web, url := false, false, false
+	for _, raw := range items {
+		item, _ := raw.(map[string]any)
+		kind, _ := item["type"].(string)
+		switch {
+		case kind == "computer_use":
+			if computer == nil {
+				computer = map[string]any{}
+				if config, ok := item["computer_use"].(map[string]any); ok {
+					if environment, ok := config["environment"]; ok {
+						computer["environment"] = environment
+					}
+					if excluded, ok := config["excluded_predefined_functions"]; ok {
+						computer["excludedPredefinedFunctions"] = excluded
+					}
+				}
+			}
+		case kind == "code_execution":
+			code = true
+		case kind == "url_context":
+			url = true
+		case kind == "web_search" || kind == "web_search_preview" || strings.HasPrefix(kind, "web_search_preview_"):
+			web = true
+		}
+	}
+	tools := make([]any, 0, 4)
+	if computer != nil {
+		tools = append(tools, map[string]any{"computerUse": computer})
+	}
+	if code {
+		tools = append(tools, map[string]any{"codeExecution": map[string]any{}})
+	}
+	if web {
+		tools = append(tools, map[string]any{"googleSearch": map[string]any{}})
+	}
+	if url {
+		tools = append(tools, map[string]any{"urlContext": map[string]any{}})
+	}
+	return tools
+}
+
 func geminiNativeToolCallItem(part, call map[string]any, fallbackID string) map[string]any {
 	name := nativeString(call["name"])
 	if strings.TrimSpace(name) == "" {
