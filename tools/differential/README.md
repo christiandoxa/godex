@@ -178,8 +178,9 @@ primary→secondary on each process generation. Godex's launch-only API-key
 pool uses in-memory health and retry state, while managed profiles retain
 durable backoff. Independent tests reject a reattempt within the same
 process, durable cooldown leakage across processes, or loss of managed
-profile retry persistence. The raw durable file comparison remains
-fail-closed; this narrow fix alone does not establish full persistence parity.
+profile retry persistence. Raw inventories remain in the report, while the
+semantic state gate stays fail-closed on unknown or active state; this narrow
+fixture alone does not establish full persistence parity.
 
 
 In two-key mode the diagnostic contract uses the exact tagged Prodex
