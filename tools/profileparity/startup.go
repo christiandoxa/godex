@@ -13,7 +13,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"strings"
 	"sync"
 	"time"
 )
@@ -29,8 +28,14 @@ type startupProbeCase struct {
 
 type startupProbeResult struct {
 	exitCode int
-	requests []string
+	requests []startupProbeRequest
 	snapshot bool
+}
+
+type startupProbeRequest struct {
+	method    string
+	path      string
+	authValid bool
 }
 
 type usageServer struct {
@@ -38,8 +43,8 @@ type usageServer struct {
 	status int
 	body   string
 
-	mu           sync.Mutex
-	requestPaths []string
+	mu         sync.Mutex
+	requestLog []startupProbeRequest
 }
 
 type usageSnapshotValue struct {
@@ -81,10 +86,13 @@ func checkStartupWarmup(root string, opts cliOptions) ([]stepResult, error) {
 }
 
 func sameStartupProbeResult(left, right startupProbeResult, wantSnapshot bool) bool {
-	return left.exitCode == right.exitCode && len(left.requests) == len(right.requests) &&
-		len(left.requests) == 1 && left.requests[0] == startupUsagePath &&
-		strings.Join(left.requests, "\x00") == strings.Join(right.requests, "\x00") &&
-		left.snapshot == right.snapshot && left.snapshot == wantSnapshot
+	if left.exitCode != right.exitCode || len(left.requests) != len(right.requests) ||
+		len(left.requests) != 1 || left.snapshot != right.snapshot || left.snapshot != wantSnapshot {
+		return false
+	}
+	return left.requests[0] == startupProbeRequest{
+		method: http.MethodGet, path: startupUsagePath, authValid: true,
+	} && left.requests[0] == right.requests[0]
 }
 
 func runStartupProbeCase(root, binary, product string, probeCase startupProbeCase) (startupProbeResult, error) {
@@ -115,7 +123,7 @@ func runStartupProbeCase(root, binary, product string, probeCase startupProbeCas
 	if err != nil {
 		return startupProbeResult{}, err
 	}
-	result.requests = usage.paths()
+	result.requests = usage.requests()
 	result.snapshot, err = validateUsageSnapshot(configHome, probeCase.wantState)
 	if err != nil {
 		return startupProbeResult{}, err
@@ -140,7 +148,13 @@ func newUsageServer(status int, body string) *usageServer {
 	usage := &usageServer{status: status, body: body}
 	usage.server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		usage.mu.Lock()
-		usage.requestPaths = append(usage.requestPaths, request.URL.Path)
+		usage.requestLog = append(usage.requestLog, startupProbeRequest{
+			method: request.Method, path: request.URL.Path,
+			authValid: request.Header.Get("Authorization") == "Bearer synthetic-access" &&
+				request.Header.Get("ChatGPT-Account-Id") == "synthetic-account" &&
+				request.Header.Get("originator") == "codex_cli_rs" &&
+				request.Header.Get("x-openai-codex-luna-reserve") == "1",
+		})
 		usage.mu.Unlock()
 		writer.Header().Set("Content-Type", "application/json")
 		writer.WriteHeader(usage.status)
@@ -149,10 +163,10 @@ func newUsageServer(status int, body string) *usageServer {
 	return usage
 }
 
-func (usage *usageServer) paths() []string {
+func (usage *usageServer) requests() []startupProbeRequest {
 	usage.mu.Lock()
 	defer usage.mu.Unlock()
-	return append([]string(nil), usage.requestPaths...)
+	return append([]startupProbeRequest(nil), usage.requestLog...)
 }
 
 func (usage *usageServer) Close() { usage.server.Close() }

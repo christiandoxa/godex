@@ -82,11 +82,13 @@ an independent requirement to reimplement the same internal modules in Go.
   race tests cover these state and lifecycle boundaries.
 - **Startup quota warmup:** The managed-profile lifecycle oracle now covers a
   successful usage probe and an upstream 503. Each binary performs exactly one
-  `/backend-api/wham/usage` request at startup; success persists a valid
-  generation-one usage snapshot, while failure persists none. The warmup uses
-  one synchronous probe and bounded queued probes, with profile homes and
-  base-URL/no-proxy policy preserved. The oracle waits for the durable state
-  before comparing the two implementations.
+  authenticated `GET /backend-api/wham/usage` request at startup, including
+  the synthetic bearer/account identity and the Codex quota compatibility
+  headers; success persists a valid generation-one usage snapshot, while
+  failure persists none. The warmup uses one synchronous probe and bounded
+  queued probes, with profile homes and base-URL/no-proxy policy preserved. The
+  oracle waits for the durable state before comparing the two implementations
+  and rejects a matching pair that sends the wrong request contract.
 - **Completed-body half-close forwarding:** A raw TCP client that sends a
   complete `POST /responses` body and then half-closes its write side is
   forwarded by both binaries. Before the fix, Godex treated the server request

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -139,6 +140,32 @@ func TestProdex04370ProfileLifecycleStageOracleIsIndependent(t *testing.T) {
 		t.Fatal("failed profile use must preserve exact prior state")
 	}
 }
+
+func TestStartupProbeOracleRejectsMutatedRequestContract(t *testing.T) {
+	valid := startupProbeResult{
+		exitCode: 0,
+		requests: []startupProbeRequest{{
+			method: http.MethodGet, path: startupUsagePath, authValid: true,
+		}},
+		snapshot: true,
+	}
+	if !sameStartupProbeResult(valid, valid, true) {
+		t.Fatal("canonical startup usage request was rejected")
+	}
+	for _, mutate := range []func(*startupProbeResult){
+		func(result *startupProbeResult) { result.requests[0].method = http.MethodPost },
+		func(result *startupProbeResult) { result.requests[0].path = "/backend-api/other" },
+		func(result *startupProbeResult) { result.requests[0].authValid = false },
+	} {
+		mutated := valid
+		mutated.requests = append([]startupProbeRequest(nil), valid.requests...)
+		mutate(&mutated)
+		if sameStartupProbeResult(valid, mutated, true) {
+			t.Fatalf("mutated startup probe request escaped the oracle: %+v", mutated.requests[0])
+		}
+	}
+}
+
 func TestProdex04370BinaryProvenanceRejectsDirtyAndStaleCandidates(t *testing.T) {
 	const revision = "1615edbc5ed723d8e8d03705ba56071ac7d01c12"
 	valid := []debug.BuildSetting{{Key: "vcs.revision", Value: revision}, {Key: "vcs.modified", Value: "false"}}
