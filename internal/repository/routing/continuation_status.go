@@ -1,19 +1,17 @@
 package routing
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"time"
 
 	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
-	"github.com/christiandoxa/godex/internal/helper/fileutil"
 	"github.com/christiandoxa/godex/internal/helper/lockfile"
 )
 
@@ -97,7 +95,10 @@ func (store *Store) SaveContinuationStatus(
 	if len(content) > maxContinuationStatusBytes {
 		return errors.New("continuation status snapshot exceeds size limit")
 	}
-	if _, err := fileutil.AtomicWrite(store.continuationStatusPath(), content); err != nil {
+	if err := writeRoutingSnapshot(store.continuationStatusPath(), content, maxContinuationStatusBytes, func(content []byte) error {
+		_, err := decodeContinuationStatuses(content)
+		return err
+	}); err != nil {
 		return fmt.Errorf("write continuation status store: %w", err)
 	}
 	return nil
@@ -105,23 +106,11 @@ func (store *Store) SaveContinuationStatus(
 
 func (store *Store) readContinuationStatuses() ([]routingentity.ContinuationStatus, error) {
 	path := store.continuationStatusPath()
-	info, err := os.Lstat(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("stat continuation status snapshot: %w", err)
-	}
-	if !info.Mode().IsRegular() || info.Size() > maxContinuationStatusBytes ||
-		(runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0) {
-		return nil, errors.New("continuation status snapshot must be a private regular file")
-	}
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, fmt.Errorf("open continuation status snapshot: %w", err)
-	}
-	defer file.Close()
-	decoder := json.NewDecoder(io.LimitReader(file, maxContinuationStatusBytes+1))
+	return readPrivateRoutingSnapshot(path, maxContinuationStatusBytes, decodeContinuationStatuses)
+}
+
+func decodeContinuationStatuses(content []byte) ([]routingentity.ContinuationStatus, error) {
+	decoder := json.NewDecoder(bytes.NewReader(content))
 	decoder.DisallowUnknownFields()
 	var snapshot continuationStatusSnapshot
 	if err := decoder.Decode(&snapshot); err != nil {

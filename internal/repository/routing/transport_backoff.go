@@ -1,18 +1,17 @@
 package routing
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"sort"
 	"time"
 
 	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
-	"github.com/christiandoxa/godex/internal/helper/fileutil"
 	"github.com/christiandoxa/godex/internal/helper/lockfile"
 )
 
@@ -140,25 +139,21 @@ func (store *Store) ClearTransportBackoff(ctx context.Context, accountID, route 
 }
 
 func (store *Store) readTransportBackoffs() (transportBackoffSnapshot, error) {
-	snapshot := transportBackoffSnapshot{Version: 1}
 	path := filepath.Join(store.root, "transport-backoff.json")
-	info, err := os.Lstat(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return snapshot, nil
-	}
+	snapshot, err := readRoutingSnapshot(path, maxTransportBackoffBytes, decodeTransportBackoffs)
 	if err != nil {
-		return snapshot, fmt.Errorf("stat routing transport backoff snapshot: %w", err)
+		return snapshot, err
 	}
-	if !info.Mode().IsRegular() || info.Size() > maxTransportBackoffBytes {
-		return snapshot, errors.New("routing transport backoff snapshot must be a bounded regular file")
+	if snapshot.Version == 0 {
+		snapshot.Version = 1
 	}
-	file, err := os.Open(path)
-	if err != nil {
-		return snapshot, fmt.Errorf("open routing transport backoff snapshot: %w", err)
-	}
-	defer file.Close()
-	decoder := json.NewDecoder(io.LimitReader(file, maxTransportBackoffBytes+1))
+	return snapshot, nil
+}
+
+func decodeTransportBackoffs(content []byte) (transportBackoffSnapshot, error) {
+	decoder := json.NewDecoder(bytes.NewReader(content))
 	decoder.DisallowUnknownFields()
+	snapshot := transportBackoffSnapshot{}
 	if err := decoder.Decode(&snapshot); err != nil {
 		return snapshot, errors.New("decode routing transport backoff snapshot")
 	}
@@ -194,8 +189,11 @@ func (store *Store) writeTransportBackoffs(backoffs []routingentity.TransportBac
 	if err != nil {
 		return err
 	}
-	_, err = fileutil.AtomicWrite(filepath.Join(store.root, "transport-backoff.json"), content)
-	return err
+	path := filepath.Join(store.root, "transport-backoff.json")
+	return writeRoutingSnapshot(path, content, maxTransportBackoffBytes, func(content []byte) error {
+		_, err := decodeTransportBackoffs(content)
+		return err
+	})
 }
 
 func retainTransportBackoffs(backoffs []routingentity.TransportBackoff, now time.Time) []routingentity.TransportBackoff {

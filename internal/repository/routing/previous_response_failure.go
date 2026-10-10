@@ -1,19 +1,18 @@
 package routing
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"sort"
 	"time"
 
 	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
-	"github.com/christiandoxa/godex/internal/helper/fileutil"
 	"github.com/christiandoxa/godex/internal/helper/lockfile"
 )
 
@@ -144,22 +143,11 @@ func (store *Store) ClearPreviousResponseFailures(ctx context.Context, accountID
 
 func (store *Store) readPreviousResponseFailures() ([]routingentity.PreviousResponseFailure, error) {
 	path := filepath.Join(store.root, "previous-response-failures.json")
-	info, err := os.Lstat(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("stat previous response failure snapshot: %w", err)
-	}
-	if !info.Mode().IsRegular() || info.Size() > maxPreviousResponseFailureBytes {
-		return nil, errors.New("previous response failure snapshot must be a bounded regular file")
-	}
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, fmt.Errorf("open previous response failure snapshot: %w", err)
-	}
-	defer file.Close()
-	decoder := json.NewDecoder(io.LimitReader(file, maxPreviousResponseFailureBytes+1))
+	return readRoutingSnapshot(path, maxPreviousResponseFailureBytes, decodePreviousResponseFailures)
+}
+
+func decodePreviousResponseFailures(content []byte) ([]routingentity.PreviousResponseFailure, error) {
+	decoder := json.NewDecoder(bytes.NewReader(content))
 	decoder.DisallowUnknownFields()
 	var snapshot previousResponseFailureSnapshot
 	if decoder.Decode(&snapshot) != nil {
@@ -203,8 +191,11 @@ func (store *Store) writePreviousResponseFailures(failures []routingentity.Previ
 	if len(content) > maxPreviousResponseFailureBytes {
 		return errors.New("previous response failure snapshot exceeds size limit")
 	}
-	_, err = fileutil.AtomicWrite(filepath.Join(store.root, "previous-response-failures.json"), content)
-	return err
+	path := filepath.Join(store.root, "previous-response-failures.json")
+	return writeRoutingSnapshot(path, content, maxPreviousResponseFailureBytes, func(content []byte) error {
+		_, err := decodePreviousResponseFailures(content)
+		return err
+	})
 }
 
 func retainPreviousResponseFailures(

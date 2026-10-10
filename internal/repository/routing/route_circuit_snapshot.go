@@ -1,17 +1,15 @@
 package routing
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"sort"
 	"time"
 
 	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
-	"github.com/christiandoxa/godex/internal/helper/fileutil"
 )
 
 const (
@@ -25,25 +23,21 @@ type routeCircuitSnapshot struct {
 }
 
 func (store *Store) readRouteCircuits() (routeCircuitSnapshot, error) {
-	snapshot := routeCircuitSnapshot{Version: 1}
 	path := filepath.Join(store.root, "route-circuits.json")
-	info, err := os.Lstat(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return snapshot, nil
-	}
+	snapshot, err := readRoutingSnapshot(path, maxRouteCircuitBytes, decodeRouteCircuits)
 	if err != nil {
-		return snapshot, fmt.Errorf("stat routing circuit snapshot: %w", err)
+		return snapshot, err
 	}
-	if !info.Mode().IsRegular() || info.Size() > maxRouteCircuitBytes {
-		return snapshot, errors.New("routing circuit snapshot must be a bounded regular file")
+	if snapshot.Version == 0 {
+		snapshot.Version = 1
 	}
-	file, err := os.Open(path)
-	if err != nil {
-		return snapshot, fmt.Errorf("open routing circuit snapshot: %w", err)
-	}
-	defer file.Close()
-	decoder := json.NewDecoder(io.LimitReader(file, maxRouteCircuitBytes+1))
+	return snapshot, nil
+}
+
+func decodeRouteCircuits(content []byte) (routeCircuitSnapshot, error) {
+	decoder := json.NewDecoder(bytes.NewReader(content))
 	decoder.DisallowUnknownFields()
+	snapshot := routeCircuitSnapshot{}
 	if err := decoder.Decode(&snapshot); err != nil {
 		return snapshot, errors.New("decode routing circuit snapshot")
 	}
@@ -79,8 +73,11 @@ func (store *Store) writeRouteCircuits(circuits []routingentity.RouteCircuit) er
 	if err != nil {
 		return err
 	}
-	_, err = fileutil.AtomicWrite(filepath.Join(store.root, "route-circuits.json"), content)
-	return err
+	path := filepath.Join(store.root, "route-circuits.json")
+	return writeRoutingSnapshot(path, content, maxRouteCircuitBytes, func(content []byte) error {
+		_, err := decodeRouteCircuits(content)
+		return err
+	})
 }
 
 func retainRouteCircuits(circuits []routingentity.RouteCircuit, now time.Time) []routingentity.RouteCircuit {

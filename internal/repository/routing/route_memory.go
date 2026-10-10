@@ -1,18 +1,17 @@
 package routing
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"sort"
 	"time"
 
 	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
-	"github.com/christiandoxa/godex/internal/helper/fileutil"
 	"github.com/christiandoxa/godex/internal/helper/lockfile"
 )
 
@@ -108,22 +107,11 @@ func (store *Store) MutateRouteMemory(ctx context.Context, accountID, route, kin
 
 func (store *Store) readRouteMemory() ([]routingentity.RouteMemoryScore, error) {
 	path := filepath.Join(store.root, "route-memory.json")
-	info, err := os.Lstat(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("stat routing memory snapshot: %w", err)
-	}
-	if !info.Mode().IsRegular() || info.Size() > maxRouteMemoryBytes {
-		return nil, errors.New("routing memory snapshot must be a bounded regular file")
-	}
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-	decoder := json.NewDecoder(io.LimitReader(file, maxRouteMemoryBytes+1))
+	return readRoutingSnapshot(path, maxRouteMemoryBytes, decodeRouteMemory)
+}
+
+func decodeRouteMemory(content []byte) ([]routingentity.RouteMemoryScore, error) {
+	decoder := json.NewDecoder(bytes.NewReader(content))
 	decoder.DisallowUnknownFields()
 	var snapshot routeMemorySnapshot
 	if decoder.Decode(&snapshot) != nil {
@@ -164,8 +152,11 @@ func (store *Store) writeRouteMemory(scores []routingentity.RouteMemoryScore) er
 	if err != nil {
 		return err
 	}
-	_, err = fileutil.AtomicWrite(filepath.Join(store.root, "route-memory.json"), content)
-	return err
+	path := filepath.Join(store.root, "route-memory.json")
+	return writeRoutingSnapshot(path, content, maxRouteMemoryBytes, func(content []byte) error {
+		_, err := decodeRouteMemory(content)
+		return err
+	})
 }
 
 func retainRouteMemory(scores []routingentity.RouteMemoryScore, now time.Time) []routingentity.RouteMemoryScore {

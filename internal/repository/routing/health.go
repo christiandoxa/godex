@@ -1,18 +1,17 @@
 package routing
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"sort"
 	"time"
 
 	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
-	"github.com/christiandoxa/godex/internal/helper/fileutil"
 	"github.com/christiandoxa/godex/internal/helper/lockfile"
 )
 
@@ -167,22 +166,11 @@ func (store *Store) AdjustRouteHealth(
 
 func (store *Store) readRouteHealth() ([]routingentity.RouteHealthScore, error) {
 	path := filepath.Join(store.root, "route-health.json")
-	info, err := os.Lstat(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("stat routing health snapshot: %w", err)
-	}
-	if !info.Mode().IsRegular() || info.Size() > maxRouteHealthBytes {
-		return nil, errors.New("routing health snapshot must be a bounded regular file")
-	}
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, fmt.Errorf("open routing health snapshot: %w", err)
-	}
-	defer file.Close()
-	decoder := json.NewDecoder(io.LimitReader(file, maxRouteHealthBytes+1))
+	return readRoutingSnapshot(path, maxRouteHealthBytes, decodeRouteHealth)
+}
+
+func decodeRouteHealth(content []byte) ([]routingentity.RouteHealthScore, error) {
+	decoder := json.NewDecoder(bytes.NewReader(content))
 	decoder.DisallowUnknownFields()
 	var snapshot routeHealthSnapshot
 	if decoder.Decode(&snapshot) != nil {
@@ -220,8 +208,11 @@ func (store *Store) writeRouteHealth(scores []routingentity.RouteHealthScore) er
 	if err != nil {
 		return err
 	}
-	_, err = fileutil.AtomicWrite(filepath.Join(store.root, "route-health.json"), content)
-	return err
+	path := filepath.Join(store.root, "route-health.json")
+	return writeRoutingSnapshot(path, content, maxRouteHealthBytes, func(content []byte) error {
+		_, err := decodeRouteHealth(content)
+		return err
+	})
 }
 
 func retainRouteHealth(scores []routingentity.RouteHealthScore, now time.Time) []routingentity.RouteHealthScore {

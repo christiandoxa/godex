@@ -132,3 +132,83 @@ func TestRouteHealthSnapshotRejectsUnsupportedAndUnsafeFiles(t *testing.T) {
 		}
 	}
 }
+
+func TestRouteHealthSnapshotRestoresLastGoodAfterRestart(t *testing.T) {
+	root := t.TempDir()
+	store := NewStore(root)
+	now := time.Unix(1_000_000, 0)
+	if _, err := store.SetRouteHealth(t.Context(), "account-a", "responses", 4, now); err != nil {
+		t.Fatal(err)
+	}
+	backup, err := os.ReadFile(filepath.Join(root, "route-health.json.last-good"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	primary := filepath.Join(root, "route-health.json")
+	if err := os.Remove(primary); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := NewStore(root).LoadRouteHealth(t.Context(), now)
+	if err != nil || len(loaded) != 1 || loaded[0].Score != 4 {
+		t.Fatalf("missing primary recovery = %+v, %v", loaded, err)
+	}
+	repaired, err := os.ReadFile(primary)
+	if err != nil || string(repaired) != string(backup) {
+		t.Fatalf("repaired primary differs from last-good copy: %v", err)
+	}
+	if err := os.WriteFile(primary, []byte(`{"version":1,"scores":[`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err = NewStore(root).LoadRouteHealth(t.Context(), now)
+	if err != nil || len(loaded) != 1 || loaded[0].Score != 4 {
+		t.Fatalf("corrupt primary recovery = %+v, %v", loaded, err)
+	}
+	repaired, err = os.ReadFile(primary)
+	if err != nil || string(repaired) != string(backup) {
+		t.Fatalf("corrupt primary repair differs from last-good copy: %v", err)
+	}
+}
+
+func TestRouteHealthSnapshotFailsClosedWhenBothCopiesAreCorrupt(t *testing.T) {
+	root := t.TempDir()
+	primary := filepath.Join(root, "route-health.json")
+	backup := primary + ".last-good"
+	if err := os.WriteFile(primary, []byte(`{"version":1,"scores":[`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(backup, []byte("not-json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewStore(root).LoadRouteHealth(t.Context(), time.Unix(1_000_000, 0)); err == nil {
+		t.Fatal("corrupt route-health snapshots were treated as empty state")
+	}
+	gotPrimary, primaryErr := os.ReadFile(primary)
+	gotBackup, backupErr := os.ReadFile(backup)
+	if primaryErr != nil || backupErr != nil || string(gotPrimary) != `{"version":1,"scores":[` || string(gotBackup) != "not-json" {
+		t.Fatalf("corrupt route-health snapshots changed: primary=%q/%v backup=%q/%v", gotPrimary, primaryErr, gotBackup, backupErr)
+	}
+}
+
+func TestRouteHealthSnapshotKeepsBackupWhenPrimaryRepairFails(t *testing.T) {
+	root := t.TempDir()
+	store := NewStore(root)
+	now := time.Unix(1_000_000, 0)
+	if _, err := store.SetRouteHealth(t.Context(), "account-a", "responses", 4, now); err != nil {
+		t.Fatal(err)
+	}
+	primary := filepath.Join(root, "route-health.json")
+	backup := primary + ".last-good"
+	if err := os.Remove(primary); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(primary, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := NewStore(root).LoadRouteHealth(t.Context(), now)
+	if err != nil || len(loaded) != 1 || loaded[0].Score != 4 {
+		t.Fatalf("backup remained unusable after repair failure: %+v, %v", loaded, err)
+	}
+	if _, err := os.Stat(backup); err != nil {
+		t.Fatalf("last-good backup was lost after repair failure: %v", err)
+	}
+}

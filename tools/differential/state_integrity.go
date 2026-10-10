@@ -21,6 +21,7 @@ const maxFixtureStateFileBytes = 8 << 20
 func auditFixtureDurableState(root string) []string {
 	var violations []string
 	var routing, lastGood []byte
+	routingSnapshots := make(map[string][]byte)
 	historyFound := false
 	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -78,7 +79,15 @@ func auditFixtureDurableState(root string) []string {
 			}
 		case "state/routing.json.last-good":
 			lastGood = data
-		case "state/retry-backoff.json", "state/route-memory.json":
+		case "state/retry-backoff.json", "state/retry-backoff.json.last-good",
+			"state/route-memory.json", "state/route-memory.json.last-good",
+			"state/route-health.json", "state/route-health.json.last-good",
+			"state/transport-backoff.json", "state/transport-backoff.json.last-good",
+			"state/route-circuits.json", "state/route-circuits.json.last-good",
+			"state/continuation-status.json", "state/continuation-status.json.last-good",
+			"state/previous-response-failures.json", "state/previous-response-failures.json.last-good":
+			base := strings.TrimSuffix(relative, ".last-good")
+			routingSnapshots[relative] = data
 			var snapshot map[string]json.RawMessage
 			if json.Unmarshal(data, &snapshot) != nil {
 				violations = append(violations, "invalid_provider_state")
@@ -89,12 +98,28 @@ func auditFixtureDurableState(root string) []string {
 				violations = append(violations, "invalid_provider_state_version")
 			}
 			listKey := "backoffs"
-			if relative == "state/route-memory.json" {
+			switch base {
+			case "state/route-memory.json":
 				listKey = "scores"
+			case "state/route-health.json":
+				listKey = "scores"
+			case "state/route-circuits.json":
+				listKey = "circuits"
+			case "state/continuation-status.json":
+				listKey = "statuses"
+			case "state/previous-response-failures.json":
+				listKey = "failures"
 			}
 			var entries []json.RawMessage
 			if json.Unmarshal(snapshot[listKey], &entries) != nil || len(entries) != 0 {
 				violations = append(violations, "stale_provider_state:"+listKey)
+			}
+			if base == "state/retry-backoff.json" {
+				var updates map[string]json.RawMessage
+				if raw, exists := snapshot["updated_at"]; exists &&
+					(json.Unmarshal(raw, &updates) != nil || len(updates) != 0) {
+					violations = append(violations, "stale_provider_state:updated_at")
+				}
 			}
 		case "state/runtime-scores.json", "state/runtime-scores.json.last-good":
 			if !validEmptyProdexHealthScoreSnapshot(data) {
@@ -138,13 +163,25 @@ func auditFixtureDurableState(root string) []string {
 			violations = append(violations, "routing_backup_diverges_from_durable_state")
 		}
 	}
+	for base, primary := range routingSnapshots {
+		if strings.HasSuffix(base, ".last-good") {
+			continue
+		}
+		backup, exists := routingSnapshots[base+".last-good"]
+		if !exists {
+			continue
+		}
+		if sha256.Sum256(primary) != sha256.Sum256(backup) {
+			violations = append(violations, "routing_sidecar_backup_diverges:"+filepath.Base(base))
+		}
+	}
 	if errors.Is(err, os.ErrPermission) {
 		violations = append(violations, "state_permission_denied")
 	}
 	return violations
 }
 
-// Only files observed in the exact tagged Prodex 0.436.1 and Godex fixture
+// Only files observed in the exact tagged Prodex 0.437.1 and Godex fixture
 // may appear. New profile, secret, or session files require explicit review.
 func allowedFixtureStateFile(name string) bool {
 	switch name {
@@ -159,6 +196,12 @@ func allowedFixtureStateFile(name string) bool {
 		"state/routing-memory.guard", "state/routing-retry-backoff.guard",
 		"state/routing-transport-backoff.guard", "state/routing.guard",
 		"state/routing.json", "state/routing.json.last-good",
+		"state/route-health.json", "state/route-health.json.last-good",
+		"state/route-memory.json.last-good", "state/retry-backoff.json.last-good",
+		"state/transport-backoff.json", "state/transport-backoff.json.last-good",
+		"state/route-circuits.json", "state/route-circuits.json.last-good",
+		"state/continuation-status.json", "state/continuation-status.json.last-good",
+		"state/previous-response-failures.json", "state/previous-response-failures.json.last-good",
 		"state/state.guard", "state/state.json.lock",
 		"state/runtime-scores.json", "state/runtime-scores.json.lock",
 		"state/runtime-scores.json.last-good":

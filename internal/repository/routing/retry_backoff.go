@@ -1,18 +1,17 @@
 package routing
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"sort"
 	"time"
 
 	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
-	"github.com/christiandoxa/godex/internal/helper/fileutil"
 	"github.com/christiandoxa/godex/internal/helper/lockfile"
 )
 
@@ -151,25 +150,24 @@ func (store *Store) ClearRetryBackoff(ctx context.Context, accountID string, now
 }
 
 func (store *Store) readRetryBackoffs() (retryBackoffSnapshot, error) {
-	snapshot := retryBackoffSnapshot{Version: 1, UpdatedAt: make(map[string]int64)}
 	path := filepath.Join(store.root, "retry-backoff.json")
-	info, err := os.Lstat(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return snapshot, nil
-	}
+	snapshot, err := readRoutingSnapshot(path, maxRetryBackoffBytes, decodeRetryBackoffs)
 	if err != nil {
-		return snapshot, fmt.Errorf("stat routing retry backoff snapshot: %w", err)
+		return snapshot, err
 	}
-	if !info.Mode().IsRegular() || info.Size() > maxRetryBackoffBytes {
-		return snapshot, errors.New("routing retry backoff snapshot must be a bounded regular file")
+	if snapshot.Version == 0 {
+		snapshot.Version = 1
 	}
-	file, err := os.Open(path)
-	if err != nil {
-		return snapshot, fmt.Errorf("open routing retry backoff snapshot: %w", err)
+	if snapshot.UpdatedAt == nil {
+		snapshot.UpdatedAt = make(map[string]int64)
 	}
-	defer file.Close()
-	decoder := json.NewDecoder(io.LimitReader(file, maxRetryBackoffBytes+1))
+	return snapshot, nil
+}
+
+func decodeRetryBackoffs(content []byte) (retryBackoffSnapshot, error) {
+	decoder := json.NewDecoder(bytes.NewReader(content))
 	decoder.DisallowUnknownFields()
+	snapshot := retryBackoffSnapshot{UpdatedAt: make(map[string]int64)}
 	if err := decoder.Decode(&snapshot); err != nil {
 		return snapshot, errors.New("decode routing retry backoff snapshot")
 	}
@@ -209,8 +207,11 @@ func (store *Store) writeRetryBackoffs(backoffs []routingentity.RetryBackoff, up
 	if err != nil {
 		return err
 	}
-	_, err = fileutil.AtomicWrite(filepath.Join(store.root, "retry-backoff.json"), content)
-	return err
+	path := filepath.Join(store.root, "retry-backoff.json")
+	return writeRoutingSnapshot(path, content, maxRetryBackoffBytes, func(content []byte) error {
+		_, err := decodeRetryBackoffs(content)
+		return err
+	})
 }
 
 func retainRetryBackoffs(backoffs []routingentity.RetryBackoff, now time.Time) []routingentity.RetryBackoff {

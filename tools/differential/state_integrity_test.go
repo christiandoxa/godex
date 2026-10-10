@@ -42,6 +42,9 @@ func TestDurableStateIntegrityDetectsIndependentCorruption(t *testing.T) {
 		{"unexpected_file", "state/unknown-critical.bin", "x", "unknown_persistent_file"},
 		{"unexpected_user_file", "user/.config/service-account.json", "{}", "unknown_persistent_file"},
 		{"route_poisoning", "state/route-memory.json", `{"version":1,"scores":[{"account_id":"fake","score":99}]}`, "stale_provider_state:scores"},
+		{"route_health_poisoning", "state/route-health.json", `{"version":1,"scores":[{"account_id":"fake","route":"responses","score":5,"updated_unix":10}]}`, "stale_provider_state:scores"},
+		{"circuit_poisoning", "state/route-circuits.json", `{"version":1,"circuits":[{"account_id":"fake","route":"responses","reopen_stage":1,"until_unix":10,"stage_updated_unix":10}]}`, "stale_provider_state:circuits"},
+		{"continuation_poisoning", "state/continuation-status.json", `{"version":1,"statuses":[{"kind":"turn_state","key":"` + strings.Repeat("a", 64) + `","state":"dead","updated_unix":10}]}`, "stale_provider_state:statuses"},
 		{"log_corruption", "state/logs/runtime.jsonl", "this is not json", "invalid_runtime_log_json"},
 
 		{"quarantine_after_recovery", "state/retry-backoff.json", `{"version":1,"backoffs":[{"account_id":"synthetic","until_unix":9999999999}]}`, "stale_provider_state:backoffs"},
@@ -87,6 +90,32 @@ func TestDurableStateIntegrityRejectsDivergentRecoverySnapshot(t *testing.T) {
 	}
 	if failures := auditFixtureDurableState(root); len(failures) == 0 {
 		t.Fatal("routing state and recovery backup diverged undetected")
+	}
+}
+
+func TestDurableStateIntegrityRejectsDivergentRoutingSidecarBackup(t *testing.T) {
+	root := fixtureStateRoot(t)
+	for name, payload := range map[string]string{
+		"state/route-health.json":           `{"version":1,"scores":[]}`,
+		"state/route-health.json.last-good": `{"version":1,"scores":[{"account_id":"fake","route":"responses","score":5,"updated_unix":10}]}`,
+	} {
+		path := filepath.Join(root, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(payload), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	found := false
+	for _, failure := range auditFixtureDurableState(root) {
+		if strings.HasPrefix(failure, "routing_sidecar_backup_diverges:route-health.json") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("divergent route-health recovery snapshot escaped the fixture audit")
 	}
 }
 
