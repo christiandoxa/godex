@@ -67,6 +67,19 @@ Responses precommit recovery changes.
    both binaries return the same JSON 503; a binary built from the pre-fix
    source still times out under the same comparator.
 
+5. **Gemini Responses request translation.** The Gemini gateway now follows the
+   tagged provider conformance cases for default and effort-specific thinking
+   budgets/levels, sanitized recursive function schemas, native built-in tools,
+   ignored `previous_response_id`, role/tool-call history, contextual system
+   instructions, and inline image parts. Focused fixture-shaped regressions and
+   race tests cover these request boundaries.
+
+6. **Routing sidecar recovery.** Routing snapshots now keep validated
+   `.last-good` copies, recover and repair missing or corrupt primaries, fail
+   closed when both copies are invalid, and preserve a valid backup when repair
+   fails. The differential state audit checks each primary/backup pair and
+   rejects divergence or stale persisted entries.
+
 The Rust/Mojo architectural reorganization in this patch is not by itself
 an independent requirement to reimplement the same internal modules in Go.
 
