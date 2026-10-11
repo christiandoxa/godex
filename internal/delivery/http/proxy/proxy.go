@@ -382,7 +382,11 @@ func requestContextAfterBody(ctx context.Context) (context.Context, context.Canc
 			// A server connection that closes immediately after sending a
 			// complete body is safe to finish, just like the captured request
 			// path in the reference runtime.
-			return
+			select {
+			case <-timer.C:
+				cancel()
+			case <-forwardContext.Done():
+			}
 		case <-timer.C:
 		}
 		select {
