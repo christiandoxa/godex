@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -109,7 +108,7 @@ func TestProdex04355HardAffinityQuotaSignalAcceptsLastChanceFallback(t *testing.
 	}
 }
 
-func TestProdex04355PreSendFullContextSignalRejectsHardCappedFallback(t *testing.T) {
+func TestProdex04372PreSendFullContextSignalKeepsHardCappedFallbackRecoverable(t *testing.T) {
 	now := time.Unix(3_000, 0)
 	accounts := websocketQuotaAccounts()
 	gateway := &websocketDispatchGateway{responses: []*proxymodel.Response{
@@ -135,20 +134,15 @@ func TestProdex04355PreSendFullContextSignalRejectsHardCappedFallback(t *testing
 	router.inflight[websocketQuotaOwnerB] = 8
 	router.mu.Unlock()
 
-	_, err = router.Forward(t.Context(), websocketDispatchRequest(`{"type":"response.create","session_id":"session-hard-cap-4355","previous_response_id":"resp-hard-cap-owner","input":[{"type":"custom_tool_call_output","call_id":"call-555","output":"done"}]}`, 555))
-	var routeErr *proxymodel.Error
-	if !errors.As(err, &routeErr) || routeErr.StatusCode != http.StatusServiceUnavailable {
-		t.Fatalf("hard-capped fallback error = %v, want 503", err)
+	signal, err := router.Forward(t.Context(), websocketDispatchRequest(`{"type":"response.create","session_id":"session-hard-cap-4355","previous_response_id":"resp-hard-cap-owner","input":[{"type":"custom_tool_call_output","call_id":"call-555","output":"done"}]}`, 555))
+	if err != nil {
+		t.Fatal(err)
 	}
-	owner, ownerErr := router.affinity.owner(t.Context(), affinityKeys{session: "session-hard-cap-4355"}, router.now())
-	if ownerErr != nil {
-		t.Fatal(ownerErr)
-	}
-	if owner != websocketQuotaOwnerA {
-		t.Fatalf("hard-capped fallback released owner = %q", owner)
-	}
+	defer signal.Close()
+	assertProdex04355FullContextSignal(t, signal, websocketQuotaOwnerA)
+	assertProdex04355AffinityReleased(t, router, "resp-hard-cap-owner", "session-hard-cap-4355")
 	if got := strings.Join(gateway.accounts, ","); got != websocketQuotaOwnerA {
-		t.Fatalf("hard-capped pre-send block reached upstream: %v", gateway.accounts)
+		t.Fatalf("hard-capped pre-send fallback reached upstream: %v", gateway.accounts)
 	}
 }
 

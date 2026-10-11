@@ -171,7 +171,7 @@ func TestProdex04356StandardBoundSessionRetryableFailuresRotateAndRebind(t *test
 				t.Fatal(err)
 			}
 			request := proxymodel.Request{
-				Header:         http.Header{"X-Codex-Session-Id": []string{"sess-bound"}},
+				Header:         http.Header{"Session-Id": []string{"sess-bound"}},
 				QuotaSelection: quotamodel.Selection{RouteKind: quotamodel.RouteKindStandard},
 			}
 			exchange, err := router.Forward(t.Context(), request)
@@ -507,7 +507,7 @@ func TestProdex04356CompactSessionRetryableFailuresRotateAndRebind(t *testing.T)
 			}
 			exchange, err := router.Forward(t.Context(), proxymodel.Request{
 				Method:         http.MethodPost,
-				Header:         http.Header{"X-Codex-Session-Id": []string{"compact-session"}},
+				Header:         http.Header{"Session-Id": []string{"compact-session"}},
 				Body:           []byte(`{"input":[{"role":"user","content":"compact"}]}`),
 				QuotaSelection: quotamodel.Selection{RouteKind: quotamodel.RouteKindCompact},
 			})

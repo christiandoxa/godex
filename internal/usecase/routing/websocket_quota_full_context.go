@@ -38,6 +38,11 @@ func (router *Router) handleBoundWebSocketPreSendQuotaBlock(
 	decision := router.websocketQuotaFallbackDecisionWithContext(
 		request, accounts, account, false,
 	)
+	if decision.kind == websocketQuotaFallbackUnavailable &&
+		metadata.previousResponseID != "" && metadata.sessionID != "" &&
+		router.websocketQuotaFullContextFallbackRecoverable(request, accounts, account) {
+		decision.kind = websocketQuotaFallbackReady
+	}
 	if decision.kind == websocketQuotaFallbackUnavailable {
 		return proxymodel.Forwarded{}, true, &proxymodel.Error{
 			StatusCode: http.StatusServiceUnavailable,
@@ -142,6 +147,11 @@ func (router *Router) handleBoundWebSocketRetryable(
 		decision := router.websocketQuotaFallbackDecisionWithContext(
 			request, accounts, account, false,
 		)
+		if decision.kind == websocketQuotaFallbackUnavailable &&
+			metadata.sessionID != "" &&
+			router.websocketQuotaFullContextFallbackRecoverable(request, accounts, account) {
+			decision.kind = websocketQuotaFallbackReady
+		}
 		if decision.kind == websocketQuotaFallbackUnavailable {
 			return pendingForwarded(account.ID, outcome, pending), nil
 		}
@@ -263,35 +273,6 @@ func (router *Router) websocketQuotaFallbackDecisionWithContext(
 		}
 	}
 	return websocketQuotaFallbackDecision{kind: websocketQuotaFallbackUnavailable}
-}
-
-func (router *Router) websocketQuotaReplayLastChance(
-	request proxymodel.Request,
-	accounts []proxymodel.Account,
-) (proxymodel.Account, bool) {
-	if !request.WebSocketMessage {
-		return proxymodel.Account{}, false
-	}
-	metadata := parseWebSocketRequestMetadata(request)
-	if metadata.sessionID == "" || metadata.previousResponseID != "" || metadata.turnState != "" {
-		return proxymodel.Account{}, false
-	}
-	now := router.now()
-	for _, blocked := range accounts {
-		if blocked.ID == "" || blocked.Home == "" || !blocked.Enabled {
-			continue
-		}
-		if !blocked.EligibleAfter.After(now) && !router.quotaBlockedAccount(blocked.ID) {
-			continue
-		}
-		decision := router.websocketQuotaFallbackDecisionWithContext(
-			request, accounts, blocked, false,
-		)
-		if decision.kind == websocketQuotaFallbackLastChance {
-			return decision.account, true
-		}
-	}
-	return proxymodel.Account{}, false
 }
 
 func sameWebSocketProvider(left, right proxymodel.Account) bool {

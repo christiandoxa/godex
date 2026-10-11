@@ -229,10 +229,12 @@ account persistence, and eligibility validation stays in the runtime use case.
   returns 400 `previous_response_not_found`, releases only that exhausted owner's
   previous/turn/session affinity, and lets the client's full-context replay bind
   another profile. Fallback availability for this signal is evaluated without the
-  stale continuation constraint, so one bounded `LastChance` profile may bypass
-  soft quarantine/circuit pressure; the hard in-flight cap and a truly unavailable
-  pool remain terminal. Pre-send blocked-owner regressions and the public WebSocket
-  production path lock this `0.435.5` behavior.
+  stale continuation constraint, so a quota-positive alternate under temporary
+  in-flight saturation, transport cooldown, or soft quarantine/circuit pressure
+  remains recoverable. Immediate last-chance dispatch still respects the hard
+  in-flight cap; a truly unavailable or quota/auth-exhausted pool remains terminal.
+  Pre-send blocked-owner regressions and the public WebSocket production path lock
+  this `0.435.5` behavior.
   Fresh work refreshes launch-excluded profiles after current candidates fail
   before commitment; the bounded request model and route select availability,
   and the five-minute cache follows the reference's quota-cache freshness

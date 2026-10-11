@@ -112,7 +112,7 @@ func TestSoftSessionRefreshReusesDurableConversationLock(t *testing.T) {
 		t.Fatal(err)
 	}
 	exchange, err := router.Forward(context.Background(), proxymodel.Request{
-		Header:         http.Header{"X-Codex-Session-Id": []string{keys.session}},
+		Header:         http.Header{"Session-Id": []string{keys.session}},
 		QuotaSelection: quotamodel.Selection{RouteKind: quotamodel.RouteKindResponses},
 	})
 	if err != nil {
