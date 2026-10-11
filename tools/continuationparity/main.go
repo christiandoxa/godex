@@ -54,13 +54,32 @@ func newBackend() *backend {
 			return
 		}
 		if mode == "cancel" {
-			<-r.Context().Done()
-			b.mu.Lock()
-			if mode == "cancel" {
-				b.cancelled++
+			w.Header().Set("Content-Type", "text/event-stream")
+			w.WriteHeader(http.StatusOK)
+			flusher, _ := w.(http.Flusher)
+			_, _ = io.WriteString(w, "event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"resp-cancel\"}}\n\n")
+			_, _ = io.WriteString(w, "event: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"cancel\"}\n\n")
+			if flusher != nil {
+				flusher.Flush()
 			}
-			b.mu.Unlock()
-			return
+			ticker := time.NewTicker(20 * time.Millisecond)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-r.Context().Done():
+					b.mu.Lock()
+					b.cancelled++
+					b.mu.Unlock()
+					return
+				case <-ticker.C:
+					if _, err := io.WriteString(w, ": keep-alive\n\n"); err != nil {
+						return
+					}
+					if flusher != nil {
+						flusher.Flush()
+					}
+				}
+			}
 		}
 		if mode == "transport" && account == "account-a" {
 			hijacker, ok := w.(http.Hijacker)
@@ -232,6 +251,15 @@ func runProduct(root string, b *backend, p product) error {
 	if postCount(mustAttempts(b)) != committedBefore+1 {
 		return errors.New("committed output was replayed on another account")
 	}
+	cancellationBefore := mustCancelled(b)
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Millisecond)
+	_, _ = postContext(ctx, client, endpoint+"/responses", `{"mode":"cancel","stream":true,"input":[]}`)
+	cancel()
+	cancellationObserved := waitForCancellation(b, cancellationBefore, time.Second)
+	if !cancellationObserved {
+		attempts, cancelled := b.snapshot()
+		return fmt.Errorf("cancellation did not reach upstream: before=%d after=%d attempts=%s", cancellationBefore, cancelled, formatAttempts(attempts))
+	}
 	continuation, err := post(client, endpoint+"/responses", `{"mode":"overload","session_id":"sess-hard","previous_response_id":"resp-main","input":[{"type":"function_call_output","call_id":"call","output":"done"}]}`)
 	continuationSafe := continuation.status == http.StatusBadRequest && strings.Contains(continuation.body, "previous_response_not_found")
 	continuationPassthrough := continuation.status >= http.StatusInternalServerError && strings.Contains(continuation.body, "server_is_overloaded")
@@ -254,9 +282,6 @@ func runProduct(root string, b *backend, p product) error {
 	if err != nil || (transport.status != http.StatusOK && transport.status != http.StatusServiceUnavailable) {
 		return fmt.Errorf("soft session transport recovery: %v status=%d body=%s", err, transport.status, transport.body)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 80*time.Millisecond)
-	_, err = postContext(ctx, client, endpoint+"/responses", `{"mode":"cancel","input":[]}`)
-	cancel()
 	stopGateway(cmd)
 	endpoint, cmd, err = startGateway(p, b.server.URL+"/backend-api")
 	if err != nil {
@@ -267,12 +292,12 @@ func runProduct(root string, b *backend, p product) error {
 	if err != nil && !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
 		return fmt.Errorf("restart rebind: %v status=%d body=%s", err, resume.status, resume.body)
 	}
-	attempts, cancelled := b.snapshot()
+	attempts, _ := b.snapshot()
 	attempts = attempts[startIndex:]
 	if len(attempts) == 0 {
 		return errors.New("loopback saw no upstream attempts")
 	}
-	fmt.Printf("%s: hard_failure=%s quota=%s replay=%s committed=%s attempts=%d modes=%s cancellation_upstream=%t trace=%s\n", p.name, summarizeExchange(continuation), summarizeExchange(quota), summarizeExchange(replay), summarizeExchange(committed), len(attempts), formatAttemptCounts(attempts), cancelled > 0, formatAttempts(attempts))
+	fmt.Printf("%s: hard_failure=%s quota=%s replay=%s committed=%s attempts=%d modes=%s cancellation_upstream=%t trace=%s\n", p.name, summarizeExchange(continuation), summarizeExchange(quota), summarizeExchange(replay), summarizeExchange(committed), len(attempts), formatAttemptCounts(attempts), cancellationObserved, formatAttempts(attempts))
 	return nil
 }
 
@@ -569,6 +594,21 @@ func waitForFile(path string, timeout time.Duration) error {
 }
 
 func mustAttempts(b *backend) []attempt { attempts, _ := b.snapshot(); return attempts }
+func mustCancelled(b *backend) int      { _, cancelled := b.snapshot(); return cancelled }
+
+func waitForCancellation(b *backend, before int, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for {
+		if mustCancelled(b) > before {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
 func postCount(attempts []attempt) int {
 	count := 0
 	for _, item := range attempts {
