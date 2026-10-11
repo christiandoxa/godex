@@ -31,11 +31,19 @@ test "$("$tmp/prodex" --version)" = "prodex 0.437.3"
 go build -trimpath -o "$tmp/godex" ./cmd/godex
 go build -trimpath -o "$tmp/differential" ./tools/differential
 go build -trimpath -o "$tmp/profileparity" ./tools/profileparity
+go build -trimpath -o "$tmp/clierrorparity" ./tools/clierrorparity
 
 # Independent managed-profile persistence oracle. All 29 CLI actions run in
 # separate subprocesses with isolated credential-free homes; state projections
 # must match across creation, active switching, rejected writes and deletion.
 "$tmp/profileparity" \
+  --prodex "$tmp/prodex" --godex "$tmp/godex" \
+  --prodex-source "$tmp/prodex-source" \
+  --godex-source "$root" --godex-commit "$(git rev-parse HEAD)"
+
+# CLI argument rejection oracle. This catches delivery paths that accidentally
+# discard user arguments before reaching their owning command parser.
+"$tmp/clierrorparity" \
   --prodex "$tmp/prodex" --godex "$tmp/godex" \
   --prodex-source "$tmp/prodex-source" \
   --godex-source "$root" --godex-commit "$(git rev-parse HEAD)"

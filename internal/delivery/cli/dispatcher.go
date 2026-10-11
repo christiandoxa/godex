@@ -104,7 +104,7 @@ func (app *App) Run(ctx context.Context, arguments []string) error {
 		return accountcli.List(ctx, app.accounts, app.out, arguments[1:])
 	case "current":
 		if app.profiles != nil {
-			return profilecli.Run(ctx, app.profiles, app.out, []string{"current"})
+			return profilecli.Run(ctx, app.profiles, app.out, append([]string{"current"}, arguments[1:]...))
 		}
 		return accountcli.Current(ctx, app.accounts, app.out, arguments[1:])
 	case "import-current":

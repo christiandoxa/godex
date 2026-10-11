@@ -27,3 +27,28 @@ platform's process supervisor or a live Codex session.
 
 The opt-in Codex wire fixture is also pinned to the official `codex-cli
 0.162.1` app-server command and validates credential-free thread-index RPCs.
+
+## Independent CLI error oracle
+
+`tools/clierrorparity` now runs a credential-free executable matrix against
+the same pinned source commit and Linux binary digest. It covers the valid
+empty-profile `current` read plus rejected positional or option forms for
+`current`, profile/session listing, `info`, `status`, and profile creation or
+removal. It also runs a synthetic mutation negative control: a candidate that
+accepts `current synthetic-extra` must fail the oracle.
+
+The first run exposed a real delivery mismatch. Canonical Prodex rejected
+`current synthetic-extra`; Godex returned success because the profile-backed
+dispatcher discarded the arguments before the profile command parser saw them.
+The dispatcher now forwards those arguments, and the regression test plus the
+executable oracle require rejection with a diagnostic. The oracle remains
+narrow: it does not claim parity for authentication, live providers or quota,
+interactive TUI rendering, or platform-specific process supervision.
+
+At this checkpoint the following domains remain **NOT VERIFIED** by the new
+executable evidence: live ChatGPT/device authentication and token refresh;
+real provider quota and transport behavior; full TUI lifecycle and terminal
+resize/signal handling; Windows and macOS runtime/process semantics beyond
+cross-build compilation; release download/install execution; and arbitrary
+durable-state or concurrent mutation paths outside the existing focused
+fixtures.

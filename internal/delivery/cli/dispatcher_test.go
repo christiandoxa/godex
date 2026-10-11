@@ -289,6 +289,21 @@ func TestDispatcherRoutesCommandDomains(t *testing.T) {
 	}
 }
 
+func TestDispatcherCurrentRejectsUnexpectedArguments(t *testing.T) {
+	root := t.TempDir()
+	profiles := profilerepo.NewStore(root)
+	accounts := accountrepo.NewFileStore(root)
+	catalog := profileusecase.NewCatalog(profiles, accounts, filepath.Join(root, "current"))
+	var output bytes.Buffer
+	app := New(nil, nil, accounts, nil, nil, nil, &output)
+	app.SetProfiles(catalog)
+
+	err := app.Run(context.Background(), []string{"current", "unexpected"})
+	if err == nil || !strings.Contains(err.Error(), "current does not accept arguments") {
+		t.Fatalf("unexpected current arguments: %v", err)
+	}
+}
+
 func TestDispatcherImportCurrentCopiesNativeHomeAndActivates(t *testing.T) {
 	accounts := accountrepo.NewFileStore(t.TempDir())
 	source := t.TempDir()
