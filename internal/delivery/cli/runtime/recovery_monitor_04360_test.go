@@ -148,3 +148,55 @@ func TestProdex04361ChildExitMonitorRejectsInPlaceStaleRolloutRewrite(t *testing
 		t.Fatal("in-place rewritten rollout reused stale checkpoint evidence")
 	}
 }
+
+func TestProdex04374NativeCompletionBoundariesResetOnlySuccessfulTurns(t *testing.T) {
+	const session = "019c9e3d-45a0-7ad0-a6ee-b194ac2d44f9"
+	for _, tc := range []struct {
+		name, append string
+	}{
+		{"task started resets old acceptance", `{"type":"response_item","payload":{"role":"user"}}
+{"type":"event_msg","payload":{"type":"task_started"}}
+{"type":"event_msg","payload":{"type":"task_complete","error":{"codex_error_info":"server_overloaded"}}}
+		`},
+		{"turn started resets old acceptance", `{"type":"response_item","payload":{"role":"user"}}
+{"type":"turn_started"}
+{"type":"turn_complete","error":{"codex_error_info":"server_overloaded"}}
+		`},
+		{"successful native completion blocks later stale error", `{"type":"response_item","payload":{"role":"user"}}
+{"type":"event_msg","payload":{"type":"task_complete","error":null}}
+{"type":"error","error":{"code":"usage_limit_reached"}}
+		`},
+		{"failed native completion arms recovery", `{"type":"response_item","payload":{"role":"user"}}
+{"type":"event_msg","payload":{"type":"task_complete","error":{"codex_error_info":"server_overloaded"}}}
+		`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "rollout-"+session+".jsonl")
+			if err := os.WriteFile(path, []byte(`{"type":"session_meta","payload":{"id":"`+session+`"}}
+`), 0600); err != nil {
+				t.Fatal(err)
+			}
+			checkpoint := captureRecoveryCheckpoint04360(path)
+			file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0600)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err = file.WriteString(strings.TrimSpace(tc.append) + "\n"); err != nil {
+				t.Fatal(err)
+			}
+			if err = file.Close(); err != nil {
+				t.Fatal(err)
+			}
+			got := checkpoint.newAcceptedRecoveryClass04360(context.Background(), session)
+			if tc.name == "failed native completion arms recovery" {
+				if got != "overload" {
+					t.Fatalf("class=%q want overload", got)
+				}
+				return
+			}
+			if got != "" {
+				t.Fatalf("class=%q, want no recovery", got)
+			}
+		})
+	}
+}

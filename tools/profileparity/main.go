@@ -1,5 +1,5 @@
 // profileparity validates managed-profile lifecycle behavior against the
-// exact Prodex 0.437.3 binary without touching user accounts or credentials.
+// exact Prodex 0.437.4 binary without touching user accounts or credentials.
 package main
 
 import (
@@ -20,8 +20,8 @@ import (
 	"time"
 )
 
-const canonicalProdexCommit = "03815a6157e7a67e83e38fc2a79bd679cc988fa0"
-const canonicalProdexBinarySHA256 = "834275c168121ce181eb7a7ff0b730b392c23e853803b6dea4a27e6166a6d074"
+const canonicalProdexCommit = "893597e911a8a2922578a09500d32b8d7c400593"
+const canonicalProdexBinarySHA256 = "6c45503762624f03dd010df258dcbff8ecd8d79312ed1627d034d95405e41efc"
 
 type cliOptions struct {
 	prodex       string
@@ -55,7 +55,7 @@ func main() {
 func run() error {
 	var options cliOptions
 	flags := flag.NewFlagSet("profileparity", flag.ContinueOnError)
-	flags.StringVar(&options.prodex, "prodex", "", "official Prodex 0.437.3 binary")
+	flags.StringVar(&options.prodex, "prodex", "", "official Prodex 0.437.4 binary")
 	flags.StringVar(&options.godex, "godex", "", "Godex candidate built from a clean commit")
 	flags.StringVar(&options.prodexSource, "prodex-source", "", "exact tagged Prodex source")
 	flags.StringVar(&options.godexSource, "godex-source", "", "exact committed Godex source")
@@ -88,7 +88,7 @@ func run() error {
 		return fmt.Errorf("Prodex binary digest mismatch: %s", digest)
 	}
 	output, err := exec.Command(options.prodex, "--version").CombinedOutput()
-	if err != nil || strings.TrimSpace(string(output)) != "prodex 0.437.3" {
+	if err != nil || strings.TrimSpace(string(output)) != "prodex 0.437.4" {
 		return fmt.Errorf("unexpected Prodex binary version: %q: %v", output, err)
 	}
 	work, err := os.MkdirTemp("", "godex-profile-parity-")

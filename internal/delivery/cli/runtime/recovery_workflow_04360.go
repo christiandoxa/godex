@@ -7,7 +7,7 @@ import (
 )
 
 // Recovery classes are restricted to structured Codex terminal errors,
-// matching the explicit variant names in Prodex 0.436.1
+// matching the explicit variant names in Prodex 0.437.4
 // usage_limit_recovery/workflow.rs. Arbitrary stderr or a bare status 429
 // never authorizes relaunch.
 
@@ -17,16 +17,22 @@ func structuredWorkflowRecoveryClass04360(record map[string]any) string {
 	switch {
 	case kind == "event_msg":
 		payload, _ := record["payload"].(map[string]any)
-		if payload["type"] != "error" {
+		switch payload["type"] {
+		case "error":
+			failure = payload
+		case "task_complete", "turn_complete":
+			failure = nativeTerminalError04360(payload)
+		default:
 			return ""
 		}
-		failure = payload
 	case kind == "error" || kind == "turn.failed" || kind == "turn_failed":
 		failure, _ = record["error"].(map[string]any)
 		if failure == nil {
 			failure = record
 		}
-	case kind == "turn.completed" || kind == "turn_completed" || kind == "task_complete":
+	case kind == "task_complete" || kind == "turn_complete":
+		failure = nativeTerminalError04360(record)
+	case kind == "turn.completed" || kind == "turn_completed":
 		turn, _ := record["turn"].(map[string]any)
 		if turn == nil {
 			turn = record
@@ -94,6 +100,20 @@ func structuredWorkflowRecoveryClass04360(record map[string]any) string {
 		}
 	}
 	return ""
+}
+
+// Native Codex completion records carry an optional terminal error directly
+// and intentionally omit the app-server status field. If a status is present,
+// it must explicitly be failed; completed and cancelled records cannot arm recovery.
+func nativeTerminalError04360(record map[string]any) map[string]any {
+	if raw, ok := record["status"]; ok {
+		status, isString := raw.(string)
+		if !isString || status != "failed" {
+			return nil
+		}
+	}
+	errorValue, _ := record["error"].(map[string]any)
+	return errorValue
 }
 
 func workflowHTTPStatus04360(record, failure map[string]any, raw any) (int, bool) {

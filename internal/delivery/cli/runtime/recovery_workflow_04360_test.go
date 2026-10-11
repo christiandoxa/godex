@@ -34,6 +34,69 @@ func TestProdex04360StructuredWorkflowRecoveryClassesMatchTaggedSource(t *testin
 	}
 }
 
+func TestProdex04374NativeTerminalCompletionMatchesTaggedWireShape(t *testing.T) {
+	for _, tc := range []struct {
+		name, info, want string
+	}{
+		{"overload", "server_overloaded", "overload"},
+		{"usage", "usage_limit_exceeded", "usage_limit"},
+		{"rate", "rate_limit_exceeded", "rate_limit"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			native := map[string]any{
+				"type":               "task_complete",
+				"root_turn_id":       "turn-fixture",
+				"turn_id":            "turn-fixture",
+				"last_agent_message": nil,
+				"error": map[string]any{
+					"message":          "synthetic terminal failure",
+					"codex_error_info": tc.info,
+				},
+			}
+			alias := cloneRecord04374(native)
+			alias["type"] = "turn_complete"
+			for _, record := range []map[string]any{
+				native,
+				alias,
+				{"type": "event_msg", "payload": native},
+				{"type": "event_msg", "payload": alias},
+			} {
+				if got := structuredWorkflowRecoveryClass04360(record); got != tc.want {
+					t.Fatalf("record=%#v class=%q want %q", record, got, tc.want)
+				}
+			}
+		})
+	}
+}
+
+func TestProdex04374NativeTerminalCompletionRejectsFalseFailures(t *testing.T) {
+	failure := map[string]any{
+		"message":          "synthetic overload",
+		"codex_error_info": "server_overloaded",
+	}
+	for _, record := range []map[string]any{
+		{"type": "event_msg", "payload": map[string]any{"type": "task_complete", "error": nil}},
+		{"type": "event_msg", "payload": map[string]any{"type": "task_complete", "status": "cancelled", "error": failure}},
+		{"type": "event_msg", "payload": map[string]any{"type": "task_complete", "status": "completed", "error": failure}},
+		{"type": "event_msg", "payload": map[string]any{"type": "task_complete", "error": "server_overloaded"}},
+		{"type": "event_msg", "payload": map[string]any{"type": "task_complete", "error": map[string]any{"message": "Selected model is at capacity."}}},
+		{"type": "task_complete", "status": "cancelled", "error": failure},
+		{"type": "response_item", "payload": map[string]any{"type": "message", "role": "user", "content": failure}},
+	} {
+		if got := structuredWorkflowRecoveryClass04360(record); got != "" {
+			t.Fatalf("record=%#v class=%q, want no recovery", record, got)
+		}
+	}
+}
+
+func cloneRecord04374(record map[string]any) map[string]any {
+	clone := make(map[string]any, len(record))
+	for key, value := range record {
+		clone[key] = value
+	}
+	return clone
+}
+
 func TestProdex04361WorkflowRecoveryHonorsProviderStatusBoundaries(t *testing.T) {
 	for _, tc := range []struct {
 		name, raw, want string

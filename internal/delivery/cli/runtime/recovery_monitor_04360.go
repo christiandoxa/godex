@@ -237,10 +237,19 @@ func recordTurnBoundary04360(record map[string]any) bool {
 	}
 	typ, _ := record["type"].(string)
 	payload, _ := record["payload"].(map[string]any)
-	if typ == "event_msg" && payload["type"] == "turn_started" {
+	if typ == "event_msg" && (payload["type"] == "task_started" || payload["type"] == "turn_started") {
 		return true
 	}
-	if typ == "turn.completed" || typ == "turn_completed" || typ == "task_complete" {
+	if typ == "task_started" || typ == "turn_started" {
+		return true
+	}
+	if typ == "event_msg" && (payload["type"] == "task_complete" || payload["type"] == "turn_complete") {
+		return nativeTerminalError04360(payload) == nil
+	}
+	if typ == "task_complete" || typ == "turn_complete" {
+		return nativeTerminalError04360(record) == nil
+	}
+	if typ == "turn.completed" || typ == "turn_completed" {
 		turn, _ := record["turn"].(map[string]any)
 		if turn == nil {
 			turn = record
