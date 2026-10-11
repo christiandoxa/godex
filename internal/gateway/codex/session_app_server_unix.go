@@ -12,7 +12,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sync"
+	"syscall"
 	"time"
+
+	"golang.org/x/term"
 )
 
 const sessionAppServerStartupTimeout = 60 * time.Second
@@ -57,11 +60,12 @@ func (process *CodexProcess) runWithSessionAppServer(
 		return err
 	}
 
+	privateChildGroup := configureCodexSessionChildProcess(command)
 	command.Args = append([]string{command.Path, "--remote", "unix://" + socket}, arguments...)
 	if err := command.Start(); err != nil {
 		return fmt.Errorf("start Codex child with app-server companion: %w", err)
 	}
-	if err := waitForSessionChild(ctx, command); err != nil {
+	if err := waitForSessionChild(ctx, command, privateChildGroup); err != nil {
 		return err
 	}
 	return nil
@@ -95,7 +99,7 @@ func privateSessionAppServerSocket(codexHome string) (string, func(), error) {
 	return socket, func() { _ = os.RemoveAll(directory) }, nil
 }
 
-func waitForSessionChild(ctx context.Context, command *exec.Cmd) error {
+func waitForSessionChild(ctx context.Context, command *exec.Cmd, privateProcessGroup bool) error {
 	done := make(chan error, 1)
 	go func() { done <- command.Wait() }()
 	select {
@@ -105,22 +109,54 @@ func waitForSessionChild(ctx context.Context, command *exec.Cmd) error {
 		}
 		return err
 	case <-ctx.Done():
-		if command.Process != nil {
-			_ = command.Process.Signal(os.Interrupt)
-		}
+		interruptCodexSessionChildProcess(command, privateProcessGroup)
 		timer := time.NewTimer(2 * time.Second)
 		defer timer.Stop()
 		select {
 		case <-done:
 			return ctx.Err()
 		case <-timer.C:
-			if command.Process != nil {
-				_ = command.Process.Kill()
-			}
+			terminateCodexSessionChildProcess(command, privateProcessGroup)
 			<-done
 			return ctx.Err()
 		}
 	}
+}
+
+// Non-TTY children own their group so cancellation reaches launcher descendants;
+// TTY children stay in the foreground group for terminal signal delivery.
+func configureCodexSessionChildProcess(command *exec.Cmd) bool {
+	if command == nil {
+		return false
+	}
+	if file, ok := command.Stdin.(*os.File); ok && file != nil && term.IsTerminal(int(file.Fd())) {
+		return false
+	}
+	if command.SysProcAttr == nil {
+		command.SysProcAttr = &syscall.SysProcAttr{}
+	}
+	command.SysProcAttr.Setpgid = true
+	return true
+}
+
+func interruptCodexSessionChildProcess(command *exec.Cmd, privateProcessGroup bool) {
+	if command == nil || command.Process == nil {
+		return
+	}
+	if privateProcessGroup && syscall.Kill(-command.Process.Pid, syscall.SIGTERM) == nil {
+		return
+	}
+	_ = command.Process.Signal(os.Interrupt)
+}
+
+func terminateCodexSessionChildProcess(command *exec.Cmd, privateProcessGroup bool) {
+	if command == nil || command.Process == nil {
+		return
+	}
+	if privateProcessGroup && syscall.Kill(-command.Process.Pid, syscall.SIGKILL) == nil {
+		return
+	}
+	_ = command.Process.Kill()
 }
 
 func prepareSessionAppServerSocket(path string) error {

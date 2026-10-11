@@ -22,12 +22,15 @@ import (
 )
 
 const (
-	sessionCompanionHelperEnv  = "GODEX_TEST_SESSION_COMPANION_HELPER"
-	sessionCompanionMarkerEnv  = "GODEX_TEST_SESSION_COMPANION_MARKER"
-	sessionCompanionArgsEnv    = "GODEX_TEST_SESSION_COMPANION_ARGS"
-	sessionCompanionTreeEnv    = "GODEX_TEST_SESSION_COMPANION_TREE"
-	sessionCompanionHelperName = "TestCodexSessionCompanionHelper"
-	sessionCompanionMarkerMode = 0o600
+	sessionCompanionHelperEnv         = "GODEX_TEST_SESSION_COMPANION_HELPER"
+	sessionCompanionMarkerEnv         = "GODEX_TEST_SESSION_COMPANION_MARKER"
+	sessionCompanionArgsEnv           = "GODEX_TEST_SESSION_COMPANION_ARGS"
+	sessionCompanionTreeEnv           = "GODEX_TEST_SESSION_COMPANION_TREE"
+	sessionCompanionForegroundTreeEnv = "GODEX_TEST_SESSION_COMPANION_FOREGROUND_TREE"
+	sessionCompanionStartupFailureEnv = "GODEX_TEST_SESSION_COMPANION_STARTUP_FAILURE"
+	sessionCompanionExitCodeEnv       = "GODEX_TEST_SESSION_COMPANION_EXIT_CODE"
+	sessionCompanionHelperName        = "TestCodexSessionCompanionHelper"
+	sessionCompanionMarkerMode        = 0o600
 )
 
 func TestCodexSessionCompanionHelper(t *testing.T) {
@@ -47,6 +50,9 @@ func TestCodexSessionCompanionHelper(t *testing.T) {
 		return
 	}
 	if len(arguments) >= 1 && arguments[0] == "app-server" {
+		if os.Getenv(sessionCompanionStartupFailureEnv) == "1" {
+			os.Exit(18)
+		}
 		listen := ""
 		for index := 1; index+1 < len(arguments); index++ {
 			if arguments[index] == "--listen" {
@@ -79,6 +85,16 @@ func TestCodexSessionCompanionHelper(t *testing.T) {
 		return
 	}
 	if hasSessionCompanionArgument(arguments, "--remote") {
+		if code := os.Getenv(sessionCompanionExitCodeEnv); code != "" {
+			exitCode, err := strconv.Atoi(code)
+			if err == nil {
+				os.Exit(exitCode)
+			}
+		}
+		if os.Getenv(sessionCompanionForegroundTreeEnv) == "1" {
+			runSessionCompanionForegroundWrapper(marker)
+			return
+		}
 		if os.Getenv(sessionCompanionTreeEnv) == "1" {
 			waitForSessionCompanionFile(filepath.Join(filepath.Dir(marker), "companion-exited"))
 			time.Sleep(100 * time.Millisecond)
@@ -93,6 +109,18 @@ func TestCodexSessionCompanionHelper(t *testing.T) {
 		return
 	}
 	appendSessionCompanionMarker(marker, "direct")
+}
+
+func runSessionCompanionForegroundWrapper(marker string) {
+	root := filepath.Dir(marker)
+	readySocket := filepath.Join(root, "foreground-ready.sock")
+	child := exec.Command(os.Args[0], "-test.run=^"+sessionCompanionHelperName+"$", "--", "native", readySocket)
+	child.Env = append(os.Environ(), sessionCompanionHelperEnv+"=1")
+	if err := child.Start(); err != nil {
+		os.Exit(19)
+	}
+	waitForSessionCompanionFile(filepath.Join(root, "native-ready"))
+	select {}
 }
 
 func runSessionCompanionWrapper(listen, marker string) {
