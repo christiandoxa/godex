@@ -200,3 +200,18 @@ func TestProdex04374NativeCompletionBoundariesResetOnlySuccessfulTurns(t *testin
 		})
 	}
 }
+
+func TestProdex04374NativeTerminalScannerRejectsForeignAndUntypedRecords(t *testing.T) {
+	const session = "019c9e3d-45a0-7ad0-a6ee-b194ac2d44f9"
+	for _, fragment := range []string{
+		`{"type":"response_item","payload":{"role":"user"}}` + "\n" +
+			`{"type":"event_msg","payload":{"type":"task_complete","thread_id":"00000000-0000-4000-8000-000000000002","error":{"codex_error_info":"usage_limit_exceeded"}}}` + "\n",
+		`{"type":"response_item","payload":{"role":"user"}}` + "\n" +
+			`{"type":"event_msg","payload":{"type":"task_complete","error":{"message":"Selected model is at capacity."}}}` + "\n" +
+			`{"type":"error","error":{"codex_error_info":"usage_limit_exceeded"}}` + "\n",
+	} {
+		if got := scanRecoveryClassFragment04360(context.Background(), session, []byte(fragment)); got != "" {
+			t.Fatalf("untrusted native completion left recovery armed: %q", got)
+		}
+	}
+}

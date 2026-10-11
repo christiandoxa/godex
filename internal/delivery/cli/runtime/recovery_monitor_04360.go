@@ -171,10 +171,6 @@ func scanRecoveryClassFragment04360(ctx context.Context, sessionID string, fragm
 		if !recordSession04360(value, sessionID) {
 			continue
 		}
-		if recordTurnBoundary04360(value) {
-			accepted = false
-			continue
-		}
 		if recordUserAccepted04360(value) {
 			accepted = true
 			continue
@@ -183,6 +179,9 @@ func scanRecoveryClassFragment04360(ctx context.Context, sessionID string, fragm
 			if class := structuredWorkflowRecoveryClass04360(value); class != "" {
 				return class
 			}
+		}
+		if recordTurnBoundary04360(value) {
+			accepted = false
 		}
 	}
 	return ""
@@ -244,10 +243,10 @@ func recordTurnBoundary04360(record map[string]any) bool {
 		return true
 	}
 	if typ == "event_msg" && (payload["type"] == "task_complete" || payload["type"] == "turn_complete") {
-		return nativeTerminalError04360(payload) == nil
+		return true
 	}
 	if typ == "task_complete" || typ == "turn_complete" {
-		return nativeTerminalError04360(record) == nil
+		return true
 	}
 	if typ == "turn.completed" || typ == "turn_completed" {
 		turn, _ := record["turn"].(map[string]any)
