@@ -357,8 +357,12 @@ func (router *Router) bindSuccessfulResponse(
 				keys.turn = turnState
 			}
 		}
+		bindingKeys, err := router.responseBindingKeys(ctx, keys, selection, result.AccountID)
+		if err != nil {
+			return err
+		}
 		now := router.now()
-		if err := router.rememberVerifiedAccountBinding(ctx, result.AccountID, keys, now); err != nil {
+		if err := router.rememberVerifiedAccountBinding(ctx, result.AccountID, bindingKeys, now); err != nil {
 			return err
 		}
 		router.rememberAccountTurnState(
@@ -371,8 +375,12 @@ func (router *Router) bindSuccessfulResponse(
 		if turnState := responseTurnStateValue(result.Response); turnState != "" {
 			keys.turn = turnState
 		}
+		bindingKeys, err := router.responseBindingKeys(ctx, keys, selection, result.AccountID)
+		if err != nil {
+			return err
+		}
 		now := router.now()
-		if err := router.rememberVerifiedAccountBinding(ctx, result.AccountID, keys, now); err != nil {
+		if err := router.rememberVerifiedAccountBinding(ctx, result.AccountID, bindingKeys, now); err != nil {
 			return err
 		}
 		router.rememberAccountTurnState(
@@ -389,7 +397,12 @@ func (router *Router) bindSuccessfulResponse(
 		}
 		result.Prefix = prefix
 	}
-	if err := router.rememberVerifiedAccountBinding(ctx, result.AccountID, keys, router.now()); err != nil {
+	bindingKeys, err := router.responseBindingKeys(ctx, keys, selection, result.AccountID)
+	if err != nil {
+		result.Response.Body.Close()
+		return err
+	}
+	if err := router.rememberVerifiedAccountBinding(ctx, result.AccountID, bindingKeys, router.now()); err != nil {
 		result.Response.Body.Close()
 		return err
 	}
@@ -416,6 +429,25 @@ func (router *Router) bindSuccessfulResponse(
 		router.wrapResponsesStreamLatency(result.AccountID, selection, result.Response, len(result.Prefix) > 0)
 	}
 	return nil
+}
+
+func (router *Router) responseBindingKeys(
+	ctx context.Context,
+	keys affinityKeys,
+	selection quotamodel.Selection,
+	accountID string,
+) (affinityKeys, error) {
+	bindingKeys := affinityKeysForRoute(keys, selection.RouteKind)
+	if selection.RouteKind == quotamodel.RouteKindCompact && bindingKeys.turn != "" && bindingKeys.session != "" {
+		turnOwner, err := router.affinity.owner(ctx, affinityKeys{turn: bindingKeys.turn}, router.now())
+		if err != nil {
+			return affinityKeys{}, err
+		}
+		if turnOwner != "" && turnOwner != accountID {
+			bindingKeys.session = ""
+		}
+	}
+	return bindingKeys, nil
 }
 
 func (router *Router) executeAccount(ctx context.Context, request proxymodel.Request, account proxymodel.Account) (*proxymodel.Response, error) {

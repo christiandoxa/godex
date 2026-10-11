@@ -17,7 +17,7 @@ func (router *Router) HasVerifiedAdmissionOwner(ctx context.Context, lane quotam
 	if router == nil || ctx.Err() != nil {
 		return false
 	}
-	keys := requestAffinity(proxymodel.Request{Header: headers}, body)
+	keys := requestAffinityForRoute(proxymodel.Request{Header: headers}, body, lane)
 	// Prodex bypasses a saturated responses/WebSocket lane for an
 	// existing previous-response/turn owner; compact also accepts an
 	// existing session owner. A free-form thread or invented session
@@ -28,6 +28,9 @@ func (router *Router) HasVerifiedAdmissionOwner(ctx context.Context, lane quotam
 	case quotamodel.RouteKindCompact:
 		keys.previous, keys.thread = "", ""
 	default:
+		return false
+	}
+	if lane == quotamodel.RouteKindCompact && !router.compactAdmissionAffinityConsistent(ctx, &keys) {
 		return false
 	}
 	if router.hasRegisteredAdmissionOwner(ctx, keys) {
@@ -49,8 +52,11 @@ func (router *Router) HasVerifiedCompactPressureOwner(ctx context.Context, heade
 	if router == nil || ctx.Err() != nil {
 		return false
 	}
-	keys := requestAffinity(proxymodel.Request{Header: headers}, body)
+	keys := requestAffinityForRoute(proxymodel.Request{Header: headers}, body, quotamodel.RouteKindCompact)
 	keys.thread = ""
+	if !router.compactAdmissionAffinityConsistent(ctx, &keys) {
+		return false
+	}
 	if router.hasRegisteredAdmissionOwner(ctx, keys) {
 		return true
 	}
@@ -59,6 +65,25 @@ func (router *Router) HasVerifiedCompactPressureOwner(ctx context.Context, heade
 		return router.hasRegisteredAdmissionOwner(ctx, keys)
 	}
 	return false
+}
+
+func (router *Router) compactAdmissionAffinityConsistent(ctx context.Context, keys *affinityKeys) bool {
+	if keys == nil || keys.previous != "" || keys.turn == "" {
+		return true
+	}
+	turnOwner, err := router.affinity.owner(ctx, affinityKeys{turn: keys.turn}, router.now())
+	if err != nil {
+		return false
+	}
+	if turnOwner == "" || keys.session == "" {
+		return true
+	}
+	sessionOwner, err := router.affinity.owner(ctx, affinityKeys{session: keys.session}, router.now())
+	if err != nil || (sessionOwner != "" && sessionOwner != turnOwner) {
+		return false
+	}
+	keys.session = ""
+	return true
 }
 
 func (router *Router) hasRegisteredAdmissionOwner(ctx context.Context, keys affinityKeys) bool {

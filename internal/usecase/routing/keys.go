@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 	"unicode/utf8"
+
+	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
 
 func requestAffinity(request proxymodel.Request, body []byte) affinityKeys {
@@ -41,6 +43,24 @@ func requestAffinity(request proxymodel.Request, body []byte) affinityKeys {
 				keys.session = objectString(metadata, "session_id")
 			}
 		}
+	}
+	return keys
+}
+
+// Hard continuation keys outrank a soft session preference on Responses and
+// WebSocket routes. Keep the original keys for cleanup and successful rebinding.
+func requestAffinityForRoute(request proxymodel.Request, body []byte, route quotamodel.RouteKind) affinityKeys {
+	keys := requestAffinity(request, body)
+	return affinityKeysForRoute(keys, route)
+}
+
+func affinityKeysForRoute(keys affinityKeys, route quotamodel.RouteKind) affinityKeys {
+	if (route == quotamodel.RouteKindResponses || route == quotamodel.RouteKindWebSocket) &&
+		(keys.previous != "" || keys.turn != "" || keys.thread != "") {
+		keys.session = ""
+	}
+	if route == quotamodel.RouteKindCompact && keys.previous != "" {
+		keys.session = ""
 	}
 	return keys
 }

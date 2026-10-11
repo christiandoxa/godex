@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
@@ -37,6 +38,75 @@ func TestAffinityHardnessMatchesProdexSessionScope(t *testing.T) {
 				t.Fatalf("soft session affinity = %t, want %t", got, test.wantSoft)
 			}
 		})
+	}
+}
+
+func TestResponsesPreviousOwnerBeatsConflictingSoftSession(t *testing.T) {
+	ownerA, ownerB := "account-a", "account-b"
+	previous := affinityKeys{previous: "response-a"}.entries()[0]
+	session := affinityKeys{session: "session-b"}.entries()[0]
+	previous.AccountID, session.AccountID = ownerA, ownerB
+	router, err := NewRouter(Config{
+		Gateway: &countingGateway{}, Bindings: &bindingsFake{
+			values: []routingentity.Binding{previous, session},
+		}, PreferredAccount: ownerB,
+		Accounts: func(context.Context) ([]proxymodel.Account, error) {
+			return []proxymodel.Account{
+				{ID: ownerA, Home: "/a", Enabled: true},
+				{ID: ownerB, Home: "/b", Enabled: true},
+			}, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	exchange, err := router.Forward(t.Context(), proxymodel.Request{
+		Header:         make(http.Header),
+		Body:           []byte(`{"previous_response_id":"response-a","session_id":"session-b"}`),
+		QuotaSelection: quotamodel.Selection{RouteKind: quotamodel.RouteKindResponses},
+	})
+	if err != nil {
+		t.Fatalf("hard continuation was shadowed by session affinity: %v", err)
+	}
+	defer exchange.Close()
+	if exchange.Result.AccountID != ownerA {
+		t.Fatalf("continuation owner = %q, want %q", exchange.Result.AccountID, ownerA)
+	}
+	if owner, err := router.affinity.owner(t.Context(), affinityKeys{session: "session-b"}, router.now()); err != nil || owner != ownerB {
+		t.Fatalf("soft session owner = %q, %v; want %q", owner, err, ownerB)
+	}
+}
+
+func TestCompactBoundTurnBeatsConflictingSession(t *testing.T) {
+	ownerA, ownerB := "account-a", "account-b"
+	turn := affinityKeys{turn: "turn-a"}.entries()[0]
+	session := affinityKeys{session: "session-b"}.entries()[0]
+	turn.AccountID, session.AccountID = ownerA, ownerB
+	router, err := NewRouter(Config{
+		Gateway: &countingGateway{}, Bindings: &bindingsFake{
+			values: []routingentity.Binding{turn, session},
+		}, PreferredAccount: ownerB,
+		Accounts: func(context.Context) ([]proxymodel.Account, error) {
+			return []proxymodel.Account{
+				{ID: ownerA, Home: "/a", Enabled: true},
+				{ID: ownerB, Home: "/b", Enabled: true},
+			}, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	exchange, err := router.Forward(t.Context(), proxymodel.Request{
+		Header:         http.Header{"X-Codex-Turn-State": {"turn-a"}},
+		Body:           []byte(`{"session_id":"session-b"}`),
+		QuotaSelection: quotamodel.Selection{RouteKind: quotamodel.RouteKindCompact},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer exchange.Close()
+	if exchange.Result.AccountID != ownerA {
+		t.Fatalf("compact turn owner = %q, want %q", exchange.Result.AccountID, ownerA)
 	}
 }
 

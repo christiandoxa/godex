@@ -12,7 +12,25 @@ func (router *Router) resolveOwner(
 	keys affinityKeys,
 	selection quotamodel.Selection,
 ) (string, func() error, error) {
-	owner, err := router.affinity.owner(ctx, keys, router.now())
+	ownerKeys := keys
+	if selection.RouteKind == quotamodel.RouteKindCompact {
+		if ownerKeys.previous != "" {
+			ownerKeys.session = ""
+		} else if ownerKeys.turn != "" {
+			turnOwner, err := router.affinity.owner(ctx, affinityKeys{turn: ownerKeys.turn}, router.now())
+			if err != nil {
+				return "", nil, &proxymodel.Error{StatusCode: 409, Message: "request contains conflicting conversation affinity"}
+			}
+			if turnOwner != "" {
+				ownerKeys.session = ""
+			}
+		}
+	} else if selection.RouteKind == quotamodel.RouteKindResponses || selection.RouteKind == quotamodel.RouteKindWebSocket {
+		if ownerKeys.previous != "" || ownerKeys.turn != "" || ownerKeys.thread != "" {
+			ownerKeys.session = ""
+		}
+	}
+	owner, err := router.affinity.owner(ctx, ownerKeys, router.now())
 	if err != nil {
 		return "", nil, &proxymodel.Error{StatusCode: 409, Message: "request contains conflicting conversation affinity"}
 	}
@@ -22,7 +40,7 @@ func (router *Router) resolveOwner(
 		if err != nil {
 			return "", nil, err
 		}
-		owner, err = router.affinity.owner(ctx, keys, router.now())
+		owner, err = router.affinity.owner(ctx, ownerKeys, router.now())
 		if err != nil {
 			_ = durableRelease()
 			return "", nil, err
