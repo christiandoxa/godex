@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"runtime"
 	"strconv"
@@ -95,15 +96,6 @@ func newActiveRequestHandlerWithLimitsAndRecorder(next http.Handler, limits admi
 		handler.inspectLimit = proxy.maxRequest
 	}
 	return handler
-}
-
-func waitAdmissionSignal(ctx context.Context, changed <-chan struct{}) bool {
-	select {
-	case <-changed:
-		return true
-	case <-ctx.Done():
-		return false
-	}
 }
 
 func defaultActiveRequestLimit() int {
@@ -222,6 +214,10 @@ func (handler *activeRequestHandler) acquireWithPolicy(
 	projectOwner admissionOwnerProjection,
 ) bool {
 	var waitStarted time.Time
+	waitInterval := admissionWaitInterval
+	if handler.pressureMode(lane) {
+		waitInterval = pressureAdmissionWaitInterval
+	}
 	for {
 		// Runtime ownership may take a different mutex. Project it before
 		// entering the admission notification mutex, then discard stale facts
@@ -260,7 +256,14 @@ func (handler *activeRequestHandler) acquireWithPolicy(
 		handler.mu.Unlock()
 		handler.recordAdmissionPressure(ctx, lane, path, transport, active, globalLimit, laneActive, laneLimit)
 
-		if !handler.wait(ctx, changed) {
+		waitCtx, cancel := context.WithTimeout(ctx, waitInterval)
+		waited := handler.wait(waitCtx, changed)
+		timedOut := errors.Is(waitCtx.Err(), context.DeadlineExceeded)
+		cancel()
+		if !waited {
+			if ctx.Err() == nil && timedOut {
+				continue
+			}
 			handler.mu.Lock()
 			handler.recordWaitLocked(time.Since(waitStarted))
 			handler.mu.Unlock()
