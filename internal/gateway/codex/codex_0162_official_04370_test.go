@@ -12,16 +12,16 @@ import (
 )
 
 // Opt-in credential-free qualification against the SHA-256-verified
-// official Codex 0.162.0 app-server binary. This checks real wire RPCs
+// official Codex 0.162.1 app-server binary. This checks real wire RPCs
 // without launching a model turn or reading the user's CODEX_HOME.
 func TestProdex04370OfficialCodex0162AppServerThreadIndexBoundary(t *testing.T) {
 	binary := os.Getenv("GODEX_TEST_CODEX_0162_APP_SERVER_BIN")
 	if binary == "" {
-		t.Skip("set GODEX_TEST_CODEX_0162_APP_SERVER_BIN to the verified official 0.162.0 binary")
+		t.Skip("set GODEX_TEST_CODEX_0162_APP_SERVER_BIN to the verified official 0.162.1 binary")
 	}
 	version, err := exec.Command(binary, "--version").CombinedOutput()
-	if err != nil || strings.TrimSpace(string(version)) != "codex-app-server 0.162.0" {
-		t.Fatalf("expected exact 0.162.0 app-server binary: output=%q error=%v", version, err)
+	if err != nil || strings.TrimSpace(string(version)) != "codex-cli 0.162.1" {
+		t.Fatalf("expected exact 0.162.1 Codex binary: output=%q error=%v", version, err)
 	}
 	contextWithDeadline, cancel := context.WithTimeout(t.Context(), 25*time.Second)
 	defer cancel()
@@ -30,7 +30,7 @@ func TestProdex04370OfficialCodex0162AppServerThreadIndexBoundary(t *testing.T) 
 	if err := os.Mkdir(codexHome, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	command := exec.CommandContext(contextWithDeadline, binary, "--listen", "stdio://")
+	command := exec.CommandContext(contextWithDeadline, binary, "app-server", "--listen", "stdio://")
 	command.Dir = home
 	command.Env = []string{
 		"HOME=" + home, "CODEX_HOME=" + codexHome,
@@ -56,7 +56,7 @@ func TestProdex04370OfficialCodex0162AppServerThreadIndexBoundary(t *testing.T) 
 		_ = command.Wait()
 	}()
 	if err := reconcileCodexThreadIndexProtocol(stdout, stdin); err != nil {
-		t.Fatalf("actual Codex 0.162.0 thread/list active and archived RPC incompatible: %v; stderr=%q", err, stderr.String())
+		t.Fatalf("actual Codex 0.162.1 thread/list active and archived RPC incompatible: %v; stderr=%q", err, stderr.String())
 	}
 	if contextWithDeadline.Err() != nil {
 		t.Fatalf("app-server did not finish credential-free protocol within bound: %v", contextWithDeadline.Err())

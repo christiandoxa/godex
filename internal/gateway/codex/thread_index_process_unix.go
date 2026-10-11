@@ -12,6 +12,7 @@ func configureCodexAppServerProcess(command *exec.Cmd) {
 		command.SysProcAttr = &syscall.SysProcAttr{}
 	}
 	command.SysProcAttr.Setpgid = true
+	configureCodexAppServerParentDeath(command.SysProcAttr)
 }
 
 func terminateCodexAppServerProcess(command *exec.Cmd) {

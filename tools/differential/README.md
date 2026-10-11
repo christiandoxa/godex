@@ -7,9 +7,9 @@ go test ./tools/differential
 go build -trimpath -o /tmp/differential ./tools/differential
 go build -trimpath -o /tmp/godex-candidate ./cmd/godex
 /tmp/differential \
-  --prodex /absolute/path/to/prodex-0.437.1 \
+  --prodex /absolute/path/to/prodex-0.437.3 \
   --godex /tmp/godex-candidate \
-  --prodex-source /absolute/path/to/prodex-0.437.1-source \
+  --prodex-source /absolute/path/to/prodex-0.437.3-source \
   --godex-source "$PWD" \
   --godex-commit "$(git rev-parse HEAD)"
 ```
@@ -37,14 +37,14 @@ investigating a mismatch; the default is `--scenario all`.
 
 The `deepseek-user-id` fixture sends the Responses `user` alias through the
 real Codex shim and requires the upstream DeepSeek request to contain the
-canonical `user_id` field from the 0.437.1 provider conformance fixture.
+canonical `user_id` field from the 0.437.3 provider conformance fixture.
 
 
 Run only from a committed, clean candidate checkout; build the Godex binary
 from that exact source. The supplied --godex-commit pin must match HEAD **and the binary's embedded
 Go VCS build revision**. The harness refuses binaries built from dirty or
 uncommitted source.
-The canonical reference is Prodex tag 0.437.1, not an arbitrary binary release.
+The canonical reference is Prodex tag 0.437.3, not an arbitrary binary release.
 
 **Fail-closed behavior:** the harness prints a structured JSON comparison and
 returns a nonzero process exit for any mismatch, missing child/upstream evidence,
@@ -225,12 +225,12 @@ frames. Negative controls reject malformed reset values, bogus percentages,
 and unexpected headers.
 
 
-### Prodex 0.437.1 DeepSeek embedded-error terminal scenario
+### Prodex 0.437.3 DeepSeek embedded-error terminal scenario
 
 A single Codex client request starts a DeepSeek translation stream with
 two synthetic credentials configured. The primary upstream responds with
 HTTP 200 and an embedded Chat Completions error carrying a structured
-Retry-After value. The canonical Prodex 0.437.1 translator has already
+Retry-After value. The canonical Prodex 0.437.3 translator has already
 committed its outgoing SSE writer: the error must be forwarded as a
 single response.failed frame, **not** silently retried on the secondary
 credential. This scenario detects incorrect retries, changed failure codes,
@@ -258,9 +258,9 @@ on their separate tested paths. Private file layouts and other state
 contracts remain fail-closed until independently verified.
 
 
-### 0.437.1 precommit delta
+### 0.437.3 precommit delta
 
-The exact-tagged 0.437.1 reference adds support for original
+The exact-tagged 0.437.3 reference adds support for original
 Responses stream:true requests whose upstream returns HTTP 200 SSE
 without Content-Type, plus bounded retry of precommit overload on a
 turn-state-only pinned owner. Those OpenAI Responses contracts are
