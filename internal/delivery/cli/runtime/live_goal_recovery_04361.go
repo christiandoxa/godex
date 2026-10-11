@@ -172,7 +172,24 @@ func relaunchLiveGoal04361(
 	if !codexArgsIncludeGoalResume04361(resumed) {
 		resumed = append(resumed, "/goal resume")
 	}
-	return runner.RunWithOptions(ctx, candidate.AccountID, resumed, opts)
+	nextCheckpoint := captureRecoveryCheckpoint04360(report.Path)
+	nextGoal := captureGoalTransition04360(ctx, report.CodexHome, sessionID)
+	nextErr := runner.RunWithOptions(ctx, candidate.AccountID, resumed, opts)
+	if nextErr == nil || ctx.Err() != nil || recoveryExitCancelled04360(nextErr) {
+		return nextErr
+	}
+	failureClass := nextCheckpoint.newAcceptedRecoveryClass04360(ctx, sessionID)
+	if failureClass == "" && nextGoal.newUsageLimit04360(ctx) {
+		failureClass = "usage_limit"
+	}
+	if failureClass == "" {
+		return nextErr
+	}
+	launcher := runSessionLauncher{runner: runner, profiles: profiles, options: opts}
+	attempted := map[string]bool{report.AccountID: true, report.UpstreamAccountID: true, candidate.AccountID: true}
+	return launcher.recoverPersistedSessionThroughPoolStarting04360(
+		ctx, report, resumed, nextErr, failureClass, sessions.ReleaseRecoveryBinding, attempted,
+	)
 }
 
 func retargetGoalRecoveryArgs04361(args []string, sessionID string) []string {

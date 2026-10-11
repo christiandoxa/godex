@@ -41,6 +41,78 @@ func (quota liveGoalQuota04361) Ready(_ context.Context, account accountentity.A
 	return account.ID == "a" || account.ID == "b" && quota.backupReady.Load(), nil
 }
 
+type liveGoalMultiProfiles04374 struct {
+	*fakeLocalLaunchProfiles
+	targets map[string]profilemodel.LaunchTarget
+	homes   []sessionmodel.ProfileHome
+}
+
+func (profiles *liveGoalMultiProfiles04374) ResolveLaunch(_ context.Context, name string) (profilemodel.LaunchTarget, error) {
+	target, ok := profiles.targets[name]
+	if !ok {
+		return profilemodel.LaunchTarget{}, errors.New("profile unavailable")
+	}
+	return target, nil
+}
+
+func (profiles *liveGoalMultiProfiles04374) SessionProfiles(context.Context) ([]sessionmodel.ProfileHome, error) {
+	return append([]sessionmodel.ProfileHome(nil), profiles.homes...), nil
+}
+
+type liveGoalMultiQuota04374 struct{ ready *atomic.Bool }
+
+func (quota liveGoalMultiQuota04374) Ready(_ context.Context, account accountentity.Account) (bool, error) {
+	return account.ID == "a" || quota.ready.Load(), nil
+}
+
+type liveGoalMultiProcess04374 struct {
+	marker  string
+	rollout string
+	session string
+	calls   []string
+	started chan struct{}
+	trigger chan struct{}
+}
+
+func (process *liveGoalMultiProcess04374) Run(ctx context.Context, home string, args []string) error {
+	process.calls = append(process.calls, home)
+	switch len(process.calls) {
+	case 1:
+		process.marker = markerPathFromArgs04361(args)
+		if process.marker == "" {
+			return errors.New("live recovery hook marker missing")
+		}
+		if err := os.WriteFile(process.marker, []byte(process.session+"\n"), 0o600); err != nil {
+			return err
+		}
+		close(process.started)
+		<-process.trigger
+		<-ctx.Done()
+		return ctx.Err()
+	case 2:
+		if home == "" || containsArg04361(args, "original task") || !containsArg04361(args, "/goal resume") {
+			return errors.New("live recovery did not resume the same goal")
+		}
+		file, err := os.OpenFile(process.rollout, os.O_APPEND|os.O_WRONLY, 0o600)
+		if err != nil {
+			return err
+		}
+		_, err = file.WriteString(
+			`{"type":"response_item","payload":{"type":"message","role":"user"}}` + "\n" +
+				`{"type":"event_msg","payload":{"type":"task_complete","error":{"codex_error_info":"server_overloaded"}}}` + "\n",
+		)
+		if closeErr := file.Close(); err != nil || closeErr != nil {
+			return errors.Join(err, closeErr)
+		}
+		return errors.New("synthetic second-profile overload")
+	default:
+		if home == "" || containsArg04361(args, "original task") || !containsArg04361(args, "/goal resume") {
+			return errors.New("third recovery did not resume the same goal")
+		}
+		return nil
+	}
+}
+
 func (process *liveGoalProcess04361) Run(ctx context.Context, home string, args []string) error {
 	process.calls++
 	process.homes = append(process.homes, home)
@@ -223,6 +295,92 @@ func TestProdex04361LiveGoalLimitCancelsChildReleasesAffinityAndResumesGoal(t *t
 	}
 	if released.Load() != 1 {
 		t.Fatalf("session affinity releases=%d", released.Load())
+	}
+}
+
+func TestProdex04374LiveGoalRecoveryUsesPlannerAcrossGenerations(t *testing.T) {
+	root, shared, id := liveGoalFixture04361(t, "active")
+	third := filepath.Join(root, "third")
+	if err := os.MkdirAll(third, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	rollout := filepath.Join(shared, "sessions", "2026", "10", "11", "rollout-2026-10-11T10-00-00-"+id+".jsonl")
+	if err := os.MkdirAll(filepath.Dir(rollout), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(rollout, []byte(`{"type":"session_meta","payload":{"id":"`+id+`"}}`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	accounts := &runPolicyAccounts{values: []accountentity.Account{
+		{ID: "a", Name: "primary", Enabled: true},
+		{ID: "b", Name: "backup", Enabled: true},
+		{ID: "c", Name: "third", Enabled: true},
+	}, homes: map[string]string{
+		"a": filepath.Join(root, "primary"), "b": filepath.Join(root, "backup"), "c": third,
+	}}
+	primary := profilemodel.LaunchTarget{
+		Name: "primary", CodexHome: filepath.Join(root, "primary"),
+		AccountID: "a", Provider: "openai", Auth: "chatgpt",
+	}
+	profiles := &liveGoalMultiProfiles04374{
+		fakeLocalLaunchProfiles: &fakeLocalLaunchProfiles{target: primary, active: true},
+		targets: map[string]profilemodel.LaunchTarget{
+			"primary": primary,
+			"backup":  {Name: "backup", CodexHome: filepath.Join(root, "backup"), AccountID: "b", Provider: "openai", Auth: "chatgpt"},
+			"third":   {Name: "third", CodexHome: third, AccountID: "c", Provider: "openai", Auth: "chatgpt"},
+		},
+		homes: []sessionmodel.ProfileHome{
+			{Name: "primary", AccountID: "a", Provider: "openai", Enabled: true},
+			{Name: "backup", AccountID: "b", Provider: "openai", Enabled: true},
+			{Name: "third", AccountID: "c", Provider: "openai", Enabled: true},
+		},
+	}
+	process := &liveGoalMultiProcess04374{
+		rollout: rollout, session: id, started: make(chan struct{}), trigger: make(chan struct{}),
+	}
+	goalStore := runtimerepo.NewGoalStateStore(shared)
+	defer goalStore.Close()
+	runner := runtimeusecase.NewRunner(accounts, process, nil, goalStore)
+	runner.SetSharedCodexHome(shared)
+	var backupsReady atomic.Bool
+	runner.SetQuotaPreflight(liveGoalMultiQuota04374{ready: &backupsReady})
+	sessions := sessionusecase.NewCatalog(accounts, sessionrepo.NewReader(), nil)
+	sessions.SetSharedCodexHome(shared)
+	var released atomic.Int32
+	sessions.SetBindingForget(func(context.Context, string) error {
+		released.Add(1)
+		return nil
+	})
+
+	done := make(chan error, 1)
+	go func() {
+		done <- RunProfiles(t.Context(), runner, sessions, profiles, []string{"exec", "original task"}, io.Discard)
+	}()
+	<-process.started
+	database, err := sql.Open("sqlite", filepath.Join(shared, "goals_1.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.Exec(
+		"UPDATE thread_goals SET status='usage_limited',updated_at_ms=? WHERE thread_id=?",
+		time.Now().UnixMilli()+1000, id,
+	); err != nil {
+		_ = database.Close()
+		t.Fatal(err)
+	}
+	if err := database.Close(); err != nil {
+		t.Fatal(err)
+	}
+	backupsReady.Store(true)
+	close(process.trigger)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if len(process.calls) != 3 || released.Load() != 2 {
+		t.Fatalf("live multi-generation calls=%d homes=%v releases=%d", len(process.calls), process.calls, released.Load())
+	}
+	if process.calls[1] != filepath.Join(root, "backup") || process.calls[2] != third {
+		t.Fatalf("live planner selected homes=%v", process.calls)
 	}
 }
 

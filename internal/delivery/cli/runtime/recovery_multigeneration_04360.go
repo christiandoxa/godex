@@ -43,10 +43,58 @@ func (launcher runSessionLauncher) recoverPersistedSessionThroughPool04360(
 	failureClass string,
 	forget func(context.Context, string) error,
 ) error {
-	attempted := map[string]bool{
-		report.AccountID:         true,
-		report.UpstreamAccountID: true,
+	return launcher.recoverPersistedSessionThroughPoolStarting04360(
+		ctx, report, resumed, failed, failureClass, forget, nil,
+	)
+}
+
+func (launcher runSessionLauncher) recoverPersistedSessionThroughPoolStarting04360(
+	ctx context.Context,
+	report sessionmodel.Report,
+	resumed []string,
+	failed error,
+	failureClass string,
+	forget func(context.Context, string) error,
+	attempted map[string]bool,
+) error {
+	if attempted == nil {
+		attempted = make(map[string]bool)
 	}
+	attempted = cloneRecoveryAttempts04360(attempted)
+	attempted[report.AccountID] = true
+	attempted[report.UpstreamAccountID] = true
+	return launcher.recoverPersistedSessionThroughPoolLoop04360(
+		ctx, report, resumed, failed, failureClass, forget, attempted,
+	)
+}
+
+func cloneRecoveryAttempts04360(attempted map[string]bool) map[string]bool {
+	copy := make(map[string]bool, len(attempted)+2)
+	for accountID, seen := range attempted {
+		if seen {
+			copy[accountID] = true
+		}
+	}
+	return copy
+}
+
+func (launcher runSessionLauncher) recoverPersistedSessionThroughPoolLoop04360(
+	ctx context.Context,
+	report sessionmodel.Report,
+	resumed []string,
+	failed error,
+	failureClass string,
+	forget func(context.Context, string) error,
+	attempted map[string]bool,
+) error {
+	if attempted == nil {
+		attempted = map[string]bool{}
+	}
+	/*
+		The loop owns all subsequent profile selection and retry waits. Live
+		goal recovery enters here only after its first replacement child has
+		produced a fresh structured failure.
+	*/
 	triedThisRound := 0
 	for {
 		if failureClass == "" || recoveryExitCancelled04360(failed) {
