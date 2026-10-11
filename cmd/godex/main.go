@@ -29,6 +29,7 @@ import (
 	providerkeygateway "github.com/christiandoxa/godex/internal/gateway/providerkey"
 	quotagateway "github.com/christiandoxa/godex/internal/gateway/quota"
 	updategateway "github.com/christiandoxa/godex/internal/gateway/update"
+	"github.com/christiandoxa/godex/internal/helper/processresource"
 	proxyconfig "github.com/christiandoxa/godex/internal/model/proxy"
 	"github.com/christiandoxa/godex/internal/repository/account"
 	profilerepo "github.com/christiandoxa/godex/internal/repository/profile"
@@ -55,10 +56,10 @@ func main() {
 }
 
 func run() int {
+	_ = processresource.PrepareDescriptorHeadroom()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	// Hidden Codex SessionStart callback must be handled before config
-	// discovery, credentials or any runtime side effects.
+	// Handle the hidden SessionStart callback before config or runtime side effects.
 	if handled, err := runtimecli.HandleSessionStartNotify04360(os.Args[1:], os.Stdin); handled {
 		if err != nil {
 			_, _ = fmt.Fprintln(os.Stderr, errorPrefix, err)
@@ -69,7 +70,6 @@ func run() int {
 	if arguments, ok := nativeAntigravityArguments(os.Args[1:]); ok {
 		return runNativeAntigravity(ctx, arguments)
 	}
-
 	settings, err := config.Load()
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, errorPrefix, err)
