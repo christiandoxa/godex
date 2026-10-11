@@ -344,3 +344,75 @@ func TestProdex04374LiveGoalRecoveryUsesNativeOverloadEvidence(t *testing.T) {
 		t.Fatalf("native overload did not trigger recovery: %#v, ok=%t", state, ok)
 	}
 }
+
+func TestProdex04374LiveGoalMonitorConsumesTurnsAndFiltersForeignThreads(t *testing.T) {
+	root := t.TempDir()
+	id := "019c9e3d-45a0-7ad0-a6ee-b194ac2d44f9"
+	path := filepath.Join(root, "rollout-2026-10-10T10-00-00-"+id+".jsonl")
+	if err := os.WriteFile(path, []byte(`{"type":"session_meta","payload":{"id":"`+id+`"}}`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	marker := &sessionStartMarker04360{directory: root, path: filepath.Join(root, "session.id")}
+	if err := os.WriteFile(marker.path, []byte(id+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	monitor := &liveGoalRecovery04361{
+		marker: marker,
+		read: func(context.Context, string) (runtimemodel.GoalRecoveryState, bool) {
+			return runtimemodel.GoalRecoveryState{SessionID: id, Status: "active"}, true
+		},
+		resolve: func(context.Context, string) (sessionmodel.Report, error) {
+			return sessionmodel.Report{ID: id, Path: path}, nil
+		},
+	}
+	if _, ok := monitor.readState(t.Context()); !ok {
+		t.Fatal("initial live goal state was not readable")
+	}
+	appendRecord := func(raw string) {
+		t.Helper()
+		file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o600)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = file.WriteString(raw + "\n"); err != nil {
+			_ = file.Close()
+			t.Fatal(err)
+		}
+		if err = file.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	appendRecord(`{"type":"response_item","payload":{"type":"message","role":"user"}}`)
+	if state, ok := monitor.readState(t.Context()); !ok || state.Status != "active" || !monitor.accepted {
+		t.Fatalf("accepted turn was not retained: %#v, accepted=%t", state, monitor.accepted)
+	}
+	consumed := monitor.scanOffset
+	appendRecord(`{"type":"task_complete","thread_id":"00000000-0000-4000-8000-000000000002","error":{"codex_error_info":"server_overloaded"}}`)
+	if state, ok := monitor.readState(t.Context()); !ok || state.Status != "active" {
+		t.Fatalf("foreign terminal event changed state: %#v, ok=%t", state, ok)
+	}
+	if monitor.scanOffset <= consumed {
+		t.Fatalf("foreign event was not consumed: before=%d after=%d", consumed, monitor.scanOffset)
+	}
+	beforeFiller := monitor.scanOffset
+	filler := strings.TrimSuffix(strings.Repeat("{}\n", int(recoveryScanCap04360/3)+100), "\n")
+	appendRecord(filler)
+	if _, ok := monitor.readState(t.Context()); !ok || monitor.scanOffset <= beforeFiller {
+		t.Fatalf("first bounded scan did not advance: before=%d after=%d", beforeFiller, monitor.scanOffset)
+	}
+	firstFillerScan := monitor.scanOffset
+	if _, ok := monitor.readState(t.Context()); !ok || monitor.scanOffset <= firstFillerScan {
+		t.Fatalf("consumed offset did not reach filler tail: before=%d after=%d", firstFillerScan, monitor.scanOffset)
+	}
+	appendRecord(`{"type":"task_started","turn_id":"new-turn"}`)
+	appendRecord(`{"type":"task_complete","turn_id":"new-turn","error":{"codex_error_info":"server_overloaded"}}`)
+	if state, ok := monitor.readState(t.Context()); !ok || state.Status != "active" || monitor.accepted {
+		t.Fatalf("new unaccepted turn reused old acceptance: %#v, accepted=%t", state, monitor.accepted)
+	}
+	appendRecord(`{"type":"response_item","payload":{"type":"message","role":"user"}}`)
+	appendRecord(`{"type":"task_complete","turn_id":"final-turn","error":{"codex_error_info":"usage_limit_exceeded"}}`)
+	state, ok := monitor.readState(t.Context())
+	if !ok || state.Status != "usage_limited" || state.SessionID != id {
+		t.Fatalf("accepted native terminal limit did not trigger recovery: %#v, ok=%t", state, ok)
+	}
+}

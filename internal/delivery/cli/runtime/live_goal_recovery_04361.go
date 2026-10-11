@@ -23,6 +23,8 @@ type liveGoalRecovery04361 struct {
 	resolve        func(context.Context, string) (sessionmodel.Report, error)
 	checkpoint     recoveryCheckpoint04360
 	checkpointPath string
+	scanOffset     int64
+	accepted       bool
 }
 
 func (monitor *liveGoalRecovery04361) readState(ctx context.Context) (runtimemodel.GoalRecoveryState, bool) {
@@ -33,7 +35,13 @@ func (monitor *liveGoalRecovery04361) readState(ctx context.Context) (runtimemod
 	if id == "" {
 		return runtimemodel.GoalRecoveryState{}, false
 	}
-	monitor.sessionID = id
+	if monitor.sessionID != id {
+		monitor.sessionID = id
+		monitor.checkpoint = recoveryCheckpoint04360{}
+		monitor.checkpointPath = ""
+		monitor.scanOffset = 0
+		monitor.accepted = false
+	}
 	state, ok := monitor.read(ctx, id)
 	if ok && state.SessionID != "" && state.SessionID != id {
 		return runtimemodel.GoalRecoveryState{}, false
@@ -43,8 +51,17 @@ func (monitor *liveGoalRecovery04361) readState(ctx context.Context) (runtimemod
 			if monitor.checkpointPath != report.Path {
 				monitor.checkpoint = captureRecoveryCheckpoint04360(report.Path)
 				monitor.checkpointPath = report.Path
+				monitor.scanOffset = 0
+				monitor.accepted = false
 			}
-			if monitor.checkpoint.newAcceptedRecoveryClass04360(ctx, id) != "" &&
+			class, nextOffset, accepted, scanned := monitor.checkpoint.scanAcceptedRecovery04360(
+				ctx, id, monitor.scanOffset, monitor.accepted,
+			)
+			if scanned {
+				monitor.scanOffset = nextOffset
+				monitor.accepted = accepted
+			}
+			if class != "" &&
 				(!ok || goalStatusResumable04361(state.Status)) {
 				state = runtimemodel.GoalRecoveryState{
 					SessionID: id,
