@@ -77,7 +77,7 @@ func (store *UsageSnapshotStore) Save(ctx context.Context, accountID string, sna
 	if envelope.Value == nil {
 		envelope.Value = make(map[string]quotamodel.UsageSnapshot)
 	}
-	if current, ok := envelope.Value[accountID]; !ok || snapshot.CheckedAt >= current.CheckedAt {
+	if current, ok := envelope.Value[accountID]; !ok || usageSnapshotAfter(snapshot, current) {
 		envelope.Value[accountID] = snapshot
 	}
 	if len(envelope.Value) > usageSnapshotsMaxEntries {
@@ -208,6 +208,66 @@ func validateUsageSnapshot(snapshot quotamodel.UsageSnapshot) error {
 		}
 	}
 	return nil
+}
+
+// usageSnapshotAfter matches Prodex's derived ordering for equal timestamps.
+func usageSnapshotAfter(left, right quotamodel.UsageSnapshot) bool {
+	if left.CheckedAt != right.CheckedAt {
+		return left.CheckedAt > right.CheckedAt
+	}
+	if compareOptionalString(left.PlanType, right.PlanType) != 0 {
+		return compareOptionalString(left.PlanType, right.PlanType) > 0
+	}
+	if leftStatus, rightStatus := usageWindowStatusRank(left.FiveHourStatus), usageWindowStatusRank(right.FiveHourStatus); leftStatus != rightStatus {
+		return leftStatus > rightStatus
+	}
+	if left.FiveHourRemainingPercent != right.FiveHourRemainingPercent {
+		return left.FiveHourRemainingPercent > right.FiveHourRemainingPercent
+	}
+	if left.FiveHourResetAt != right.FiveHourResetAt {
+		return left.FiveHourResetAt > right.FiveHourResetAt
+	}
+	if leftStatus, rightStatus := usageWindowStatusRank(left.WeeklyStatus), usageWindowStatusRank(right.WeeklyStatus); leftStatus != rightStatus {
+		return leftStatus > rightStatus
+	}
+	if left.WeeklyRemainingPercent != right.WeeklyRemainingPercent {
+		return left.WeeklyRemainingPercent > right.WeeklyRemainingPercent
+	}
+	return left.WeeklyResetAt > right.WeeklyResetAt
+}
+
+func compareOptionalString(left, right *string) int {
+	switch {
+	case left == nil && right == nil:
+		return 0
+	case left == nil:
+		return -1
+	case right == nil:
+		return 1
+	case *left < *right:
+		return -1
+	case *left > *right:
+		return 1
+	default:
+		return 0
+	}
+}
+
+func usageWindowStatusRank(status quotamodel.WindowStatus) int {
+	switch status {
+	case quotamodel.WindowReady:
+		return 0
+	case quotamodel.WindowThin:
+		return 1
+	case quotamodel.WindowCritical:
+		return 2
+	case quotamodel.WindowExhausted:
+		return 3
+	case quotamodel.WindowUnknown:
+		return 4
+	default:
+		return -1
+	}
 }
 
 func (store *UsageSnapshotStore) write(envelope usageSnapshotEnvelope) error {

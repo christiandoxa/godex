@@ -57,6 +57,70 @@ func TestProdex04355UsageSnapshotStoreLatestCheckedAtWins(t *testing.T) {
 	}
 }
 
+func TestUsageSnapshotStoreSameTimestampUsesCanonicalOrdering(t *testing.T) {
+	base := quotamodel.UsageSnapshot{
+		CheckedAt:      200,
+		FiveHourStatus: quotamodel.WindowReady, FiveHourRemainingPercent: 80, FiveHourResetAt: 1000,
+		WeeklyStatus: quotamodel.WindowReady, WeeklyRemainingPercent: 80, WeeklyResetAt: 2000,
+	}
+	for _, test := range []struct {
+		name     string
+		incoming quotamodel.UsageSnapshot
+		want     quotamodel.UsageSnapshot
+	}{
+		{name: "lower same timestamp does not replace", incoming: func() quotamodel.UsageSnapshot {
+			value := base
+			value.FiveHourRemainingPercent = 10
+			return value
+		}(), want: base},
+		{name: "higher same timestamp replaces", incoming: func() quotamodel.UsageSnapshot {
+			value := base
+			value.WeeklyRemainingPercent = 90
+			return value
+		}(), want: func() quotamodel.UsageSnapshot {
+			value := base
+			value.WeeklyRemainingPercent = 90
+			return value
+		}()},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			store := NewUsageSnapshotStore(t.TempDir())
+			if err := store.Save(t.Context(), "account-a", base); err != nil {
+				t.Fatal(err)
+			}
+			if err := store.Save(t.Context(), "account-a", test.incoming); err != nil {
+				t.Fatal(err)
+			}
+			got, ok, err := store.Load(t.Context(), "account-a")
+			if err != nil || !ok || got != test.want {
+				t.Fatalf("same-timestamp snapshot = %#v ok=%t err=%v, want %#v", got, ok, err, test.want)
+			}
+		})
+	}
+}
+
+func TestUsageSnapshotStoreRejectsUnknownCorruptEnvelope(t *testing.T) {
+	root := t.TempDir()
+	store := NewUsageSnapshotStore(root)
+	if err := store.Save(t.Context(), "account-a", quotamodel.UsageSnapshot{
+		CheckedAt:      100,
+		FiveHourStatus: quotamodel.WindowReady, FiveHourRemainingPercent: 80, FiveHourResetAt: 1000,
+		WeeklyStatus: quotamodel.WindowReady, WeeklyRemainingPercent: 80, WeeklyResetAt: 2000,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	corrupt := []byte(`{"generation":2,"value":{},"unknown":"secret"}`)
+	if err := os.WriteFile(store.path(), corrupt, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(store.backupPath(), corrupt, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := NewUsageSnapshotStore(root).Load(t.Context(), "account-a"); err == nil {
+		t.Fatal("unknown corrupt usage snapshot envelope was accepted")
+	}
+}
+
 func TestProdex04355UsageSnapshotStoreRejectsSymlinkRoot(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("symlink creation requires elevated privileges on some Windows hosts")
