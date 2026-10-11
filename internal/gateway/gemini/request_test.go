@@ -192,3 +192,9 @@ func TestGeminiResponsesRequestMapsMCPNamedToolChoice(t *testing.T) {
 		t.Fatalf("toolConfig = %#v", native["toolConfig"])
 	}
 }
+
+func TestGeminiResponsesRequestRejectsTrailingJSON(t *testing.T) {
+	if _, err := translateResponsesRequest([]byte(`{"input":"hello"} {}`), "gemini-2.5-pro"); err == nil {
+		t.Fatal("Gemini Responses request accepted trailing JSON")
+	}
+}

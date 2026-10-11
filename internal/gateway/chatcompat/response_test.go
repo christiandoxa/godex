@@ -48,6 +48,12 @@ func TestChatResponseSparseDefaults(t *testing.T) {
 	}
 }
 
+func TestChatResponseRejectsTrailingJSON(t *testing.T) {
+	if _, err := ChatResponse([]byte(`{"choices":[]} {}`), time.Unix(1, 0)); err == nil {
+		t.Fatal("chat response accepted trailing JSON")
+	}
+}
+
 func TestRTKCommandWrappingMatchesNoisySegments(t *testing.T) {
 	for input, want := range map[string]string{
 		"ls":                         "rtk ls",

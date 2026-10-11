@@ -2,6 +2,7 @@ package deepseek
 
 import (
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -162,7 +163,7 @@ func TestDeepSeekResponsesRequestTranslatesHistoryAndRoles(t *testing.T) {
 		t.Fatalf("role mapping = %#v", messages[:2])
 	}
 	call := messages[2].(map[string]any)["tool_calls"].([]any)[0].(map[string]any)["function"].(map[string]any)
-	if call["name"] != "exec" || call["arguments"] != `{"cmd":"rtk ls"}` {
+	if call["name"] != "exec" || call["arguments"] != `{"cmd":"ls"}` {
 		t.Fatalf("function call = %#v", call)
 	}
 	output := messages[3].(map[string]any)
@@ -326,5 +327,59 @@ func TestDeepSeekTranslatedRequestMetadataErrorPrecedence(t *testing.T) {
 		if _, err := TranslateResponsesRequest([]byte(fixture.body), RequestOptions{}); err == nil || !strings.Contains(err.Error(), fixture.want) {
 			t.Fatalf("body %s error = %v, want %q", fixture.body, err, fixture.want)
 		}
+	}
+}
+
+func TestProdex04373DeepSeekResponsesToolHistoryShape(t *testing.T) {
+	fixtures := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name: "assistant tool history",
+			input: `{"input":[
+				{"type":"message","role":"assistant","content":[{"type":"output_text","text":""}],"tool_calls":[{"id":"call_1","type":"function","function":{"name":"grep","arguments":"{\"pattern\":\"ProviderTranslator\"}"}}]},
+				{"type":"message","role":"tool","tool_call_id":"call_1","content":[{"type":"output_text","text":"{\"match_count\":1}"}]}
+			]}`,
+			want: `[{"role":"assistant","content":"","tool_calls":[{"id":"call_1","type":"function","function":{"name":"grep","arguments":"{\"pattern\":\"ProviderTranslator\"}"}}]},{"role":"tool","tool_call_id":"call_1","content":"{\"match_count\":1}"}]`,
+		},
+		{
+			name:  "custom tool input",
+			input: `{"input":[{"type":"custom_tool_call","call_id":"call_patch_1","name":"apply_patch","input":"*** Begin Patch\n*** End Patch"},{"type":"custom_tool_call_output","call_id":"call_patch_1","output":"applied"}]}`,
+			want:  `[{"role":"assistant","content":"","tool_calls":[{"id":"call_patch_1","type":"function","function":{"name":"apply_patch","arguments":"{\"input\":\"*** Begin Patch\\n*** End Patch\"}"}}]},{"role":"tool","tool_call_id":"call_patch_1","content":"applied"}]`,
+		},
+		{
+			name:  "local shell input",
+			input: `{"input":[{"type":"local_shell_call","call_id":"call_shell_1","action":{"command":["git","status","--short"]},"cwd":"/repo","timeout":1000},{"type":"function_call_output","call_id":"call_shell_1","output":" M Cargo.toml"}]}`,
+			want:  `[{"role":"assistant","content":"","tool_calls":[{"id":"call_shell_1","type":"function","function":{"name":"shell_command","arguments":"{\"command\":\"git status --short\",\"cwd\":\"/repo\",\"timeout\":1000}"}}]},{"role":"tool","tool_call_id":"call_shell_1","content":" M Cargo.toml"}]`,
+		},
+		{
+			name:  "mcp call output",
+			input: `{"input":[{"type":"mcp_call","id":"call_sqz_1","name":"mcp__prodex_sqz__compress","arguments":{"text":"large repeated content"},"output":"ref:abc123"}]}`,
+			want:  `[{"role":"assistant","content":"","tool_calls":[{"id":"call_sqz_1","type":"function","function":{"name":"mcp__prodex_sqz__compress","arguments":"{\"text\":\"large repeated content\"}"}}]},{"role":"tool","tool_call_id":"call_sqz_1","content":"ref:abc123"}]`,
+		},
+	}
+	for _, fixture := range fixtures {
+		t.Run(fixture.name, func(t *testing.T) {
+			translated, err := ResponsesRequest([]byte(fixture.input), RequestOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := decodeDeepSeekRequest(t, translated)["messages"]
+			var want any
+			if err := json.Unmarshal([]byte(fixture.want), &want); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Fatalf("messages = %#v, want %#v", got, want)
+			}
+		})
+	}
+}
+
+func TestDeepSeekResponsesRequestRejectsTrailingJSON(t *testing.T) {
+	if _, err := ResponsesRequest([]byte(`{"input":"hello"} {}`), RequestOptions{}); err == nil {
+		t.Fatal("DeepSeek Responses request accepted trailing JSON")
 	}
 }

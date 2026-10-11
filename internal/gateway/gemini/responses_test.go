@@ -36,3 +36,14 @@ func TestGeminiTranslatedResponseMergesRequestAndProviderMetadata(t *testing.T) 
 		}
 	}
 }
+
+func TestGeminiTranslatedResponseRejectsTrailingJSON(t *testing.T) {
+	response, err := translateResponse(&http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(`{"candidates":[]} {}`)),
+	}, nil)
+	if err == nil || response != nil {
+		t.Fatalf("trailing JSON response = %#v, error = %v", response, err)
+	}
+}

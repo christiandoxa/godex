@@ -159,3 +159,9 @@ func TestResponsesRequestCallerModelOverridesInvalidRequestModel(t *testing.T) {
 		t.Fatalf("translated = %#v", got)
 	}
 }
+
+func TestResponsesRequestRejectsTrailingJSON(t *testing.T) {
+	if _, err := ResponsesRequest([]byte(`{"input":"hello"} {}`), "default-model", ""); err == nil {
+		t.Fatal("Responses request accepted trailing JSON")
+	}
+}

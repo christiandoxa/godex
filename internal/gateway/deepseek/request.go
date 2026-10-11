@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 )
@@ -89,6 +90,9 @@ func parseResponsesObjectWithoutValidation(body []byte) (map[string]any, error) 
 	var root any
 	if err := decoder.Decode(&root); err != nil {
 		return nil, fmt.Errorf("failed to parse DeepSeek Responses request JSON: %w", err)
+	}
+	if err := decoder.Decode(new(any)); !errors.Is(err, io.EOF) {
+		return nil, errors.New("DeepSeek Responses request body must contain exactly one JSON value")
 	}
 	object, ok := root.(map[string]any)
 	if !ok {

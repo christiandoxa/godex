@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 )
@@ -70,6 +71,9 @@ func decodeChatResponse(body []byte) (map[string]any, error) {
 	decoder.UseNumber()
 	var root map[string]any
 	if err := decoder.Decode(&root); err != nil {
+		return nil, errors.New("failed to parse chat completions response JSON")
+	}
+	if err := decoder.Decode(new(any)); !errors.Is(err, io.EOF) {
 		return nil, errors.New("failed to parse chat completions response JSON")
 	}
 	return root, nil

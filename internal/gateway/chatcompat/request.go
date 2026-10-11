@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 )
 
@@ -14,6 +15,9 @@ func ResponsesRequest(body []byte, defaultModel, inputModel string) ([]byte, err
 	var root any
 	if err := decoder.Decode(&root); err != nil {
 		return nil, fmt.Errorf("failed to parse Responses request JSON: %w", err)
+	}
+	if err := decoder.Decode(new(any)); !errors.Is(err, io.EOF) {
+		return nil, errors.New("Responses request body must contain exactly one JSON value")
 	}
 	object, ok := root.(map[string]any)
 	if !ok {

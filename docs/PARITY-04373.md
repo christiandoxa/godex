@@ -52,3 +52,21 @@ resize/signal handling; Windows and macOS runtime/process semantics beyond
 cross-build compilation; release download/install execution; and arbitrary
 durable-state or concurrent mutation paths outside the existing focused
 fixtures.
+
+## Provider gateway conformance audit
+
+The pinned Prodex provider-core fixture was replayed against the Go gateway
+translations for OpenAI, DeepSeek, Anthropic, Gemini, Copilot, and Kiro request
+surfaces. The audit found a DeepSeek Responses mismatch: assistant tool history
+with empty text was dropped, custom tool input was sent as a bare argument,
+local shell calls used `exec_command`/`cmd` and discarded `cwd`/`timeout`, and an
+MCP call with an embedded result did not emit its tool output. Godex now emits
+the canonical assistant/tool message sequence and rejects trailing JSON in
+Responses request parsers, matching the Rust `serde_json::from_slice` boundary.
+
+The regression uses a loopback HTTP fixture with an exact synthetic bearer
+credential and verifies one upstream request, canonical tool-call fields, and
+no upstream request for malformed trailing JSON. Existing provider tests cover
+the native header, SSE, WebSocket, cancellation, rotation, and committed-error
+contracts. This audit does not establish live-provider behavior or a complete
+executable differential for every provider and operating system.

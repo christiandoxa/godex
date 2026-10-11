@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-
-	chatcompat "github.com/christiandoxa/godex/internal/gateway/chatcompat"
 )
 
 func deepSeekMessages(object map[string]any) ([]any, error) {
@@ -52,11 +50,11 @@ func deepSeekInputItem(item map[string]any) ([]any, error) {
 		}
 		return []any{message}, nil
 	case "function_call", "custom_tool_call", "mcp_call":
-		message, err := deepSeekToolCallItem(item, kind)
+		messages, err := deepSeekToolCallItems(item, kind)
 		if err != nil {
 			return nil, err
 		}
-		return []any{message}, nil
+		return messages, nil
 	case "local_shell_call":
 		message, err := deepSeekShellCallItem(item)
 		if err != nil {
@@ -94,10 +92,58 @@ func deepSeekMessageItem(item map[string]any) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(content) == "" {
+	message := map[string]any{"role": role, deepSeekContentKey: content}
+	if role == "tool" {
+		callID := firstStringValue(item, deepSeekToolCallIDKey, deepSeekCallIDKey, "id")
+		if strings.TrimSpace(callID) == "" {
+			return nil, errors.New(deepSeekToolCallIDRequired)
+		}
+		message[deepSeekToolCallIDKey] = callID
+	}
+	toolCalls, err := deepSeekMessageToolCalls(item["tool_calls"])
+	if err != nil {
+		return nil, err
+	}
+	if len(toolCalls) > 0 {
+		message["tool_calls"] = toolCalls
+	}
+	if strings.TrimSpace(content) == "" && len(toolCalls) == 0 {
 		return nil, nil
 	}
-	return map[string]any{"role": role, deepSeekContentKey: content}, nil
+	return message, nil
+}
+
+func deepSeekMessageToolCalls(value any) ([]any, error) {
+	if value == nil {
+		return nil, nil
+	}
+	calls, ok := value.([]any)
+	if !ok {
+		return nil, errors.New("DeepSeek message tool_calls must be an array")
+	}
+	result := make([]any, 0, len(calls))
+	for _, raw := range calls {
+		call, ok := raw.(map[string]any)
+		if !ok {
+			return nil, errors.New("DeepSeek message tool_calls entries must be objects")
+		}
+		id := firstStringValue(call, "id", deepSeekCallIDKey, deepSeekToolCallIDKey)
+		function, ok := call[deepSeekFunctionKey].(map[string]any)
+		if !ok {
+			return nil, errors.New("DeepSeek message tool call must contain function")
+		}
+		name := firstStringValue(function, "name")
+		if strings.TrimSpace(id) == "" || strings.TrimSpace(name) == "" {
+			return nil, errors.New("DeepSeek message tool call requires an id and function name")
+		}
+		result = append(result, map[string]any{
+			"id": id, "type": deepSeekFunctionKey,
+			deepSeekFunctionKey: map[string]any{
+				"name": name, deepSeekArgumentsKey: compactValue(function[deepSeekArgumentsKey]),
+			},
+		})
+	}
+	return result, nil
 }
 
 func deepSeekTextContent(value any) (string, error) {
@@ -154,7 +200,7 @@ func deepSeekContentPart(part map[string]any) (string, error) {
 	return "", fmt.Errorf("DeepSeek text-only adapter does not support message content part type `%s`", kind)
 }
 
-func deepSeekToolCallItem(item map[string]any, kind string) (map[string]any, error) {
+func deepSeekToolCallItems(item map[string]any, kind string) ([]any, error) {
 	callID := firstStringValue(item, deepSeekCallIDKey, deepSeekToolCallIDKey, "id")
 	if strings.TrimSpace(callID) == "" {
 		return nil, errors.New(deepSeekToolCallIDRequired)
@@ -174,6 +220,9 @@ func deepSeekToolCallItem(item map[string]any, kind string) (map[string]any, err
 			arguments = firstValue(item, "input", deepSeekArgumentsKey)
 		}
 	}
+	if kind == "custom_tool_call" {
+		arguments = map[string]any{"input": arguments}
+	}
 	message := assistantToolCall(callID, name, arguments)
 	if signature, _ := item["gemini_thought_signature"].(string); strings.TrimSpace(signature) != "" {
 		calls, _ := message["tool_calls"].([]any)
@@ -183,7 +232,17 @@ func deepSeekToolCallItem(item map[string]any, kind string) (map[string]any, err
 			}
 		}
 	}
-	return message, nil
+	messages := []any{message}
+	if kind == "mcp_call" {
+		if _, found := firstExistingValue(item, "output", deepSeekContentKey, "result", "error"); found {
+			output, err := deepSeekToolOutputItem(item)
+			if err != nil {
+				return nil, err
+			}
+			messages = append(messages, output)
+		}
+	}
+	return messages, nil
 }
 
 func deepSeekShellCallItem(item map[string]any) (map[string]any, error) {
@@ -211,7 +270,13 @@ func deepSeekShellCallItem(item map[string]any) (map[string]any, error) {
 	if strings.TrimSpace(command) == "" {
 		return nil, errors.New("DeepSeek local_shell_call requires a command")
 	}
-	return assistantToolCall(callID, "exec_command", map[string]any{"cmd": command}), nil
+	arguments := map[string]any{"command": command}
+	for _, key := range []string{"cwd", "timeout", "env"} {
+		if value, found := item[key]; found {
+			arguments[key] = value
+		}
+	}
+	return assistantToolCall(callID, "shell_command", arguments), nil
 }
 
 func deepSeekToolOutputItem(item map[string]any) (map[string]any, error) {
@@ -227,12 +292,11 @@ func deepSeekToolOutputItem(item map[string]any) (map[string]any, error) {
 }
 
 func assistantToolCall(callID, name string, arguments any) map[string]any {
-	argumentText := chatcompat.WrapRTKArguments(name, compactValue(arguments))
 	return map[string]any{
 		"role": "assistant", deepSeekContentKey: "",
 		"tool_calls": []any{map[string]any{
 			"id": callID, "type": deepSeekFunctionKey,
-			deepSeekFunctionKey: map[string]any{"name": name, deepSeekArgumentsKey: argumentText},
+			deepSeekFunctionKey: map[string]any{"name": name, deepSeekArgumentsKey: compactValue(arguments)},
 		}},
 	}
 }

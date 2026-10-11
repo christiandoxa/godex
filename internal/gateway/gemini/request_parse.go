@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 )
 
 func parseResponsesRequest(body []byte) (map[string]any, error) {
@@ -16,6 +17,9 @@ func parseResponsesRequest(body []byte) (map[string]any, error) {
 	var root any
 	if err := decoder.Decode(&root); err != nil {
 		return nil, fmt.Errorf("failed to parse Gemini Responses request JSON: %w", err)
+	}
+	if err := decoder.Decode(new(any)); !errors.Is(err, io.EOF) {
+		return nil, errors.New("Gemini Responses request body must contain exactly one JSON value")
 	}
 	request, ok := root.(map[string]any)
 	if !ok {
