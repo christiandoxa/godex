@@ -28,6 +28,9 @@ func structuredWorkflowRecoveryClass04360(record map[string]any) string {
 	case kind == "error" || kind == "turn.failed" || kind == "turn_failed":
 		failure, _ = record["error"].(map[string]any)
 		if failure == nil {
+			failure, _ = record["payload"].(map[string]any)
+		}
+		if failure == nil {
 			failure = record
 		}
 	case kind == "task_complete" || kind == "turn_complete":

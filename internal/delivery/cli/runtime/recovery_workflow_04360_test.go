@@ -13,6 +13,7 @@ func TestProdex04360StructuredWorkflowRecoveryClassesMatchTaggedSource(t *testin
 		{"camel rate", `{"type":"error","error":{"codexErrorInfo":"rateLimitExceeded"}}`, "rate_limit"},
 		{"server overload", `{"type":"error","error":{"codex_error_info":{"serverOverloaded":{}}}}`, "overload"},
 		{"auth failure", `{"type":"turn.failed","error":{"codex_error_info":"unauthorized"}}`, "auth"},
+		{"payload failure", `{"type":"turn.failed","payload":{"codex_error_info":"server_overloaded"}}`, "overload"},
 		{"transport", `{"type":"error","error":{"codex_error_info":"responseStreamDisconnected"}}`, "transport"},
 		{"failed turn completion", `{"method":"turn/completed","params":{"turn":{"status":"failed","error":{"codex_error_info":"usageLimitExceeded"}}}}`, "usage_limit"},
 		{"safe completed turn", `{"type":"turn.completed","turn":{"status":"completed","error":{"codex_error_info":"usageLimitExceeded"}}}`, ""},
