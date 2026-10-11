@@ -196,7 +196,7 @@ func copyAnthropicRequestHeaders(destination, source http.Header) {
 func translateAnthropicProxyResponse(response *proxymodel.Response) (*proxymodel.Response, error) {
 	contentType := strings.ToLower(response.Header.Get(contentTypeHeader))
 	if strings.Contains(contentType, "text/event-stream") {
-		header := translatedAnthropicHeaders(response.Header, "text/event-stream")
+		header := translatedAnthropicHeaders(response.Header, "text/event-stream; charset=utf-8")
 		return &proxymodel.Response{StatusCode: response.StatusCode, Header: header, Body: chatcompat.ChatSSE(response.Body), Trailer: response.Trailer}, nil
 	}
 	defer response.Body.Close()

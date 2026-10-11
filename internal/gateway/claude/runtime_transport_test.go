@@ -104,7 +104,7 @@ func TestAnthropicRuntimeTranslatesResponsesSSE(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(content), "response.output_text.delta") || !strings.Contains(string(content), "response.completed") || response.Header.Get("Content-Type") != "text/event-stream" {
+	if !strings.Contains(string(content), "response.output_text.delta") || !strings.Contains(string(content), "response.completed") || response.Header.Get("Content-Type") != "text/event-stream; charset=utf-8" {
 		t.Fatalf("SSE = %q headers=%v", content, response.Header)
 	}
 }
