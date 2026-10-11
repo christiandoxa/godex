@@ -22,15 +22,16 @@ import (
 )
 
 const (
-	sessionCompanionHelperEnv         = "GODEX_TEST_SESSION_COMPANION_HELPER"
-	sessionCompanionMarkerEnv         = "GODEX_TEST_SESSION_COMPANION_MARKER"
-	sessionCompanionArgsEnv           = "GODEX_TEST_SESSION_COMPANION_ARGS"
-	sessionCompanionTreeEnv           = "GODEX_TEST_SESSION_COMPANION_TREE"
-	sessionCompanionForegroundTreeEnv = "GODEX_TEST_SESSION_COMPANION_FOREGROUND_TREE"
-	sessionCompanionStartupFailureEnv = "GODEX_TEST_SESSION_COMPANION_STARTUP_FAILURE"
-	sessionCompanionExitCodeEnv       = "GODEX_TEST_SESSION_COMPANION_EXIT_CODE"
-	sessionCompanionHelperName        = "TestCodexSessionCompanionHelper"
-	sessionCompanionMarkerMode        = 0o600
+	sessionCompanionHelperEnv           = "GODEX_TEST_SESSION_COMPANION_HELPER"
+	sessionCompanionMarkerEnv           = "GODEX_TEST_SESSION_COMPANION_MARKER"
+	sessionCompanionArgsEnv             = "GODEX_TEST_SESSION_COMPANION_ARGS"
+	sessionCompanionTreeEnv             = "GODEX_TEST_SESSION_COMPANION_TREE"
+	sessionCompanionForegroundTreeEnv   = "GODEX_TEST_SESSION_COMPANION_FOREGROUND_TREE"
+	sessionCompanionForegroundNativeEnv = "GODEX_TEST_SESSION_COMPANION_FOREGROUND_NATIVE"
+	sessionCompanionStartupFailureEnv   = "GODEX_TEST_SESSION_COMPANION_STARTUP_FAILURE"
+	sessionCompanionExitCodeEnv         = "GODEX_TEST_SESSION_COMPANION_EXIT_CODE"
+	sessionCompanionHelperName          = "TestCodexSessionCompanionHelper"
+	sessionCompanionMarkerMode          = 0o600
 )
 
 func TestCodexSessionCompanionHelper(t *testing.T) {
@@ -115,7 +116,7 @@ func runSessionCompanionForegroundWrapper(marker string) {
 	root := filepath.Dir(marker)
 	readySocket := filepath.Join(root, "foreground-ready.sock")
 	child := exec.Command(os.Args[0], "-test.run=^"+sessionCompanionHelperName+"$", "--", "native", readySocket)
-	child.Env = append(os.Environ(), sessionCompanionHelperEnv+"=1")
+	child.Env = append(os.Environ(), sessionCompanionHelperEnv+"=1", sessionCompanionForegroundNativeEnv+"=1")
 	if err := child.Start(); err != nil {
 		os.Exit(19)
 	}
@@ -145,29 +146,32 @@ func runSessionCompanionNative(arguments []string, marker string) {
 	// Keep the synthetic child alive to exercise group cleanup after reaping.
 	clearSessionCompanionParentDeath()
 	root := filepath.Dir(marker)
-	live, err := net.Listen("unix", filepath.Join(root, "native-live"))
-	if err != nil {
+	livePath := filepath.Join(root, "native-live")
+	if err := os.WriteFile(livePath, []byte("live"), sessionCompanionMarkerMode); err != nil {
 		os.Exit(11)
 	}
-	defer live.Close()
-	ready, err := net.Listen("unix", arguments[1])
-	if err != nil {
-		os.Exit(12)
-	}
-	defer ready.Close()
 	if err := os.WriteFile(filepath.Join(root, "native-pid"), []byte(strconv.Itoa(os.Getpid())), sessionCompanionMarkerMode); err != nil {
 		os.Exit(13)
 	}
 	if err := os.WriteFile(filepath.Join(root, "native-pgid"), []byte(strconv.Itoa(syscall.Getpgrp())), sessionCompanionMarkerMode); err != nil {
 		os.Exit(14)
 	}
-	go func() {
-		connection, acceptErr := ready.Accept()
-		if acceptErr == nil {
-			_ = connection.Close()
-			_ = os.WriteFile(filepath.Join(root, "outer-connected"), []byte("done"), sessionCompanionMarkerMode)
+	var ready net.Listener
+	var err error
+	if os.Getenv(sessionCompanionForegroundNativeEnv) != "1" {
+		ready, err = net.Listen("unix", arguments[1])
+		if err != nil {
+			os.Exit(12)
 		}
-	}()
+		defer ready.Close()
+		go func() {
+			connection, acceptErr := ready.Accept()
+			if acceptErr == nil {
+				_ = connection.Close()
+				_ = os.WriteFile(filepath.Join(root, "outer-connected"), []byte("done"), sessionCompanionMarkerMode)
+			}
+		}()
+	}
 	if err := os.WriteFile(filepath.Join(root, "native-ready"), []byte("done"), sessionCompanionMarkerMode); err != nil {
 		os.Exit(17)
 	}
@@ -344,9 +348,12 @@ func TestRunThroughProxyWithSessionServerReapsWrappedNativeDescendant(t *testing
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	if connection, err := net.DialTimeout("unix", filepath.Join(root, "native-live"), 50*time.Millisecond); err == nil {
-		_ = connection.Close()
-		t.Fatal("session-owned native descendant survived teardown")
+	nativePID, err := readSessionCompanionPID(filepath.Join(root, "native-pid"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sessionCompanionProcessAlive(nativePID) && waitForSessionNativeGone(filepath.Join(root, "native-pid")) == false {
+		t.Fatalf("session-owned native descendant %d survived teardown", nativePID)
 	}
 	if err := syscall.Kill(unrelated.Process.Pid, 0); err != nil {
 		t.Fatalf("unrelated process was terminated: %v", err)
@@ -354,19 +361,34 @@ func TestRunThroughProxyWithSessionServerReapsWrappedNativeDescendant(t *testing
 }
 
 func stopSessionCompanionNative(root string) {
-	connection, err := net.DialTimeout("unix", filepath.Join(root, "native-live"), 50*time.Millisecond)
-	if err != nil {
-		return
-	}
-	_ = connection.Close()
-	content, err := os.ReadFile(filepath.Join(root, "native-pid"))
-	if err != nil {
-		return
-	}
-	pid, err := strconv.Atoi(strings.TrimSpace(string(content)))
-	if err == nil && pid > 0 {
+	pid, err := readSessionCompanionPID(filepath.Join(root, "native-pid"))
+	if err == nil && pid > 0 && sessionCompanionProcessAlive(pid) {
 		_ = syscall.Kill(pid, syscall.SIGKILL)
 	}
+}
+
+func readSessionCompanionPID(path string) (int, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return 0, err
+	}
+	pid, err := strconv.Atoi(strings.TrimSpace(string(content)))
+	if err != nil || pid <= 0 {
+		return 0, fmt.Errorf("invalid session companion PID %q", content)
+	}
+	return pid, nil
+}
+
+func sessionCompanionProcessAlive(pid int) bool {
+	if syscall.Kill(pid, 0) != nil {
+		return false
+	}
+	state, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "stat"))
+	if err == nil {
+		fields := strings.Fields(string(state))
+		return len(fields) < 3 || fields[2] != "Z"
+	}
+	return true
 }
 
 func TestRunThroughProxyWithSessionServerPassesFullAccessToCompanion(t *testing.T) {

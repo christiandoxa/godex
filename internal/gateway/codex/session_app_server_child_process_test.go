@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -56,16 +55,18 @@ func TestRunThroughProxyWithSessionServerCancellationReapsForegroundTree(t *test
 	if pgid <= 0 || pgid == syscall.Getpgrp() {
 		t.Fatalf("foreground process group = %d, parent group = %d", pgid, syscall.Getpgrp())
 	}
-	connection, err := net.DialTimeout("unix", filepath.Join(root, "native-live"), 50*time.Millisecond)
+	nativePID, err := readSessionCompanionPID(filepath.Join(root, "native-pid"))
 	if err != nil {
-		t.Fatalf("foreground descendant was not live: %v", err)
+		t.Fatal(err)
 	}
-	_ = connection.Close()
+	if !sessionCompanionProcessAlive(nativePID) {
+		t.Fatalf("foreground descendant %d was not live", nativePID)
+	}
 	cancel()
 	if err := <-finished; !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancellation error = %v", err)
 	}
-	if !waitForSessionNativeGone(filepath.Join(root, "native-live")) {
+	if !waitForSessionNativeGone(filepath.Join(root, "native-pid")) {
 		t.Fatal("session-owned foreground descendant survived cancellation")
 	}
 	if err := syscall.Kill(unrelated.Process.Pid, 0); err != nil {
@@ -144,11 +145,10 @@ func waitForSessionForegroundFile(path string) bool {
 func waitForSessionNativeGone(path string) bool {
 	deadline := time.Now().Add(time.Second)
 	for time.Now().Before(deadline) {
-		connection, err := net.DialTimeout("unix", path, 50*time.Millisecond)
-		if err != nil {
+		pid, err := readSessionCompanionPID(path)
+		if err != nil || !sessionCompanionProcessAlive(pid) {
 			return true
 		}
-		_ = connection.Close()
 		time.Sleep(time.Millisecond)
 	}
 	return false
