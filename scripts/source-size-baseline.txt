@@ -24,7 +24,6 @@
 514	internal/gateway/gemini/native_response.go
 558	internal/gateway/presidio/engine.go
 421	internal/usecase/routing/broker_metrics.go
-457	internal/usecase/routing/router.go
 460	internal/usecase/runtime/activity.go
 472	internal/usecase/runtime/super_overlay.go
 423	internal/usecase/runtime/super_subagent.go
