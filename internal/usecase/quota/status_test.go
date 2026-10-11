@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -373,7 +375,8 @@ func TestStatusExplicitNoAuthProfileFailsLikeProdex(t *testing.T) {
 		Name: "logged-out", CodexHome: "/profiles/logged-out", Provider: "openai", Auth: "no-auth", Enabled: true,
 	}}})
 	_, err := status.Run(context.Background(), Options{Selector: "logged-out"})
-	if err == nil || err.Error() != "auth secret not found at /profiles/logged-out/auth.json. Run `codex login` first." {
+	want := fmt.Sprintf("auth secret not found at %s. Run `codex login` first.", filepath.Join("/profiles/logged-out", "auth.json"))
+	if err == nil || err.Error() != want {
 		t.Fatalf("explicit no-auth quota error = %v", err)
 	}
 }
