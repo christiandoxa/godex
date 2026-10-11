@@ -92,7 +92,7 @@ type Router struct {
 	routeCircuitMu                        sync.Mutex
 	previousResponseFailureMu             sync.Mutex
 	promptCacheMu                         sync.Mutex
-	selectionSequence                     atomic.Uint64
+	selection                             selectionState
 	persistenceEnabled                    atomic.Bool
 	cursor                                int
 	preferredUsed                         bool
@@ -197,7 +197,7 @@ func NewRouter(config Config) (*Router, error) {
 		promptCacheBindings:      make(map[string]promptCacheBinding),
 		autoRedeem:               config.AutoRedeem, redeemer: config.Redeemer,
 	}
-	router.selectionSequence.Store(config.SelectionSequenceSeed)
+	router.selection.sequence.Store(config.SelectionSequenceSeed)
 	router.persistenceEnabled.Store(true)
 	if err := router.initializeAffinityPersistence(config); err != nil {
 		return nil, fmt.Errorf("load continuation statuses: %w", err)
@@ -262,7 +262,7 @@ func (exchange *Exchange) Close() error {
 }
 
 func (router *Router) Forward(ctx context.Context, request proxymodel.Request) (*Exchange, error) {
-	request.SelectionSequence = router.selectionSequence.Add(1)
+	request.SelectionSequence = router.selection.sequence.Add(1)
 	request = router.scrubDeadTurnStateContext(ctx, request)
 	promptCacheKey := requestPromptCacheKey(request)
 	keys := requestRoutingAffinity(request)

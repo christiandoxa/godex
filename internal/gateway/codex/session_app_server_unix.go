@@ -48,12 +48,7 @@ func (process *CodexProcess) runWithSessionAppServer(
 	var cleanOnce sync.Once
 	cleanCompanion := func() {
 		cleanOnce.Do(func() {
-			select {
-			case <-companionDone:
-				return
-			default:
-				terminateCodexAppServerProcess(companion)
-			}
+			terminateCodexAppServerProcess(companion)
 			<-companionDone
 		})
 	}

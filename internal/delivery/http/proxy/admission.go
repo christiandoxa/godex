@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	runtimemodel "github.com/christiandoxa/godex/internal/model/runtime"
@@ -37,6 +38,7 @@ type activeRequestHandler struct {
 	active             int
 	laneActive         [admissionLaneCount]int
 	changed            chan struct{}
+	selectionRevision  atomic.Uint64
 	limits             admissionLimits
 	activity           activityRecorder
 	ownedAdmission     func(context.Context, admissionLane, http.Header, []byte) bool
@@ -203,18 +205,34 @@ func (handler *activeRequestHandler) acquireRequest(request *http.Request, lane 
 	if isWebSocketUpgradeRequest(request) {
 		transport = "websocket"
 	}
-	bypass := handler.requestHasOwnedAdmissionAffinity(request, lane)
-	return handler.acquireWithPolicy(request.Context(), lane, request.URL.Path, transport, bypass)
+	projectOwner := handler.admissionOwnerProjection(request, lane)
+	return handler.acquireWithPolicy(request.Context(), lane, request.URL.Path, transport, projectOwner)
 }
 
 func (handler *activeRequestHandler) acquireWithMetadata(ctx context.Context, lane admissionLane, path, transport string) bool {
-	return handler.acquireWithPolicy(ctx, lane, path, transport, false)
+	return handler.acquireWithPolicy(ctx, lane, path, transport, nil)
 }
 
-func (handler *activeRequestHandler) acquireWithPolicy(ctx context.Context, lane admissionLane, path, transport string, bypassOwnedLane bool) bool {
+type admissionOwnerProjection func() bool
+
+func (handler *activeRequestHandler) acquireWithPolicy(
+	ctx context.Context,
+	lane admissionLane,
+	path, transport string,
+	projectOwner admissionOwnerProjection,
+) bool {
 	var waitStarted time.Time
 	for {
+		// Runtime ownership may take a different mutex. Project it before
+		// entering the admission notification mutex, then discard stale facts
+		// after any selection change and project again after the wakeup.
+		selectionRevision := handler.selectionRevision.Load()
+		bypassOwnedLane := projectOwner != nil && projectOwner()
 		handler.mu.Lock()
+		if handler.selectionRevision.Load() != selectionRevision {
+			handler.mu.Unlock()
+			continue
+		}
 		// Prodex admits important models/MCP bootstrap traffic even when
 		// the standard lane is full, but never above the global request cap.
 		priority := lane == admissionLaneStandard && startupStandardPriorityPath(path)
@@ -249,6 +267,14 @@ func (handler *activeRequestHandler) acquireWithPolicy(ctx context.Context, lane
 			return false
 		}
 	}
+}
+
+func (handler *activeRequestHandler) notifySelectionChange() {
+	handler.mu.Lock()
+	handler.selectionRevision.Add(1)
+	close(handler.changed)
+	handler.changed = make(chan struct{})
+	handler.mu.Unlock()
 }
 
 func (handler *activeRequestHandler) recordWaitLocked(duration time.Duration) {
@@ -309,6 +335,7 @@ func (handler *activeRequestHandler) release(lane admissionLane) {
 	} else {
 		handler.releaseUnderflowsTotal[lane]++
 	}
+	handler.selectionRevision.Add(1)
 	close(handler.changed)
 	handler.changed = make(chan struct{})
 	handler.mu.Unlock()

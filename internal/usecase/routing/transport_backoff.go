@@ -43,6 +43,7 @@ func (router *Router) persistTransportBackoff(ctx context.Context, accountID str
 	}
 	router.transportBackoffs[key] = backoff
 	router.mu.Unlock()
+	router.notifySelectionChange()
 	if router.state != nil && router.persistAccountState(accountID) {
 		_ = router.state.SetTransportBackoff(ctx, backoff, now)
 	}
@@ -58,6 +59,7 @@ func (router *Router) clearTransportBackoff(ctx context.Context, accountID strin
 	router.mu.Lock()
 	delete(router.transportBackoffs, routeHealthKey{accountID: accountID, route: route})
 	router.mu.Unlock()
+	router.notifySelectionChange()
 	if router.state != nil && router.persistAccountState(accountID) {
 		_ = router.state.ClearTransportBackoff(ctx, accountID, route)
 	}

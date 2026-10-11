@@ -45,7 +45,6 @@ func (proxy *Router) setQuarantine(accountID string, duration time.Duration, aut
 	}
 	now := proxy.now()
 	proxy.mu.Lock()
-	defer proxy.mu.Unlock()
 	if proxy.quarantine == nil {
 		proxy.quarantine = make(map[string]quarantineState)
 	}
@@ -70,6 +69,8 @@ func (proxy *Router) setQuarantine(accountID string, duration time.Duration, aut
 		until:       until,
 		authFailure: authFailure || (current.authFailure && current.until.After(now)),
 	}
+	proxy.mu.Unlock()
+	proxy.notifySelectionChange()
 }
 
 func (proxy *Router) authFailureQuarantined(accountID string, now time.Time) bool {
@@ -93,18 +94,20 @@ func (proxy *Router) pruneQuarantineLocked(now time.Time) {
 
 func (proxy *Router) clearQuarantine(accountID string) {
 	proxy.mu.Lock()
-	defer proxy.mu.Unlock()
 	delete(proxy.quarantine, accountID)
 	delete(proxy.quotaBlocked, accountID)
+	proxy.mu.Unlock()
+	proxy.notifySelectionChange()
 }
 
 func (proxy *Router) markQuotaBlocked(accountID string) {
 	proxy.mu.Lock()
-	defer proxy.mu.Unlock()
 	if proxy.quotaBlocked == nil {
 		proxy.quotaBlocked = make(map[string]bool)
 	}
 	proxy.quotaBlocked[accountID] = true
+	proxy.mu.Unlock()
+	proxy.notifySelectionChange()
 }
 
 func (proxy *Router) quotaBlockedAccount(accountID string) bool {
@@ -115,6 +118,7 @@ func (proxy *Router) quotaBlockedAccount(accountID string) bool {
 
 func (proxy *Router) clearQuotaBlocked(accountID string) {
 	proxy.mu.Lock()
-	defer proxy.mu.Unlock()
 	delete(proxy.quotaBlocked, accountID)
+	proxy.mu.Unlock()
+	proxy.notifySelectionChange()
 }

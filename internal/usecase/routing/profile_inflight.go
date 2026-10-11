@@ -108,6 +108,7 @@ func (router *Router) tryAcquireProfileInflight(
 			router.inflightChanged = make(chan struct{})
 			router.mu.Unlock()
 			router.recordProfileInflightMarker(accountID, active)
+			router.notifySelectionChange()
 		})
 	}, true
 }

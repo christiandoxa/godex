@@ -87,6 +87,7 @@ func NewProxy(config Config) (*Proxy, error) {
 	handler := newActiveRequestHandlerWithRecorder(proxy, config.ActiveRequestLimit, config.Activity)
 	if admission, ok := handler.(*activeRequestHandler); ok {
 		proxy.admission = admission
+		config.Router.SetAdmissionSelectionNotifier(admission.notifySelectionChange)
 	}
 	proxy.server = &http.Server{
 		Handler:           handler,

@@ -102,7 +102,6 @@ func (router *Router) cacheQuotaFailure(accountID string, selection quotamodel.S
 
 func (router *Router) storeQuotaCheck(key quotaCheckKey, state quotaCheck) {
 	router.mu.Lock()
-	defer router.mu.Unlock()
 	if router.quotaChecks == nil {
 		router.quotaChecks = make(map[quotaCheckKey]quotaCheck)
 	}
@@ -117,4 +116,6 @@ func (router *Router) storeQuotaCheck(key quotaCheckKey, state quotaCheck) {
 		delete(router.quotaChecks, oldestKey)
 	}
 	router.quotaChecks[key] = state
+	router.mu.Unlock()
+	router.notifySelectionChange()
 }

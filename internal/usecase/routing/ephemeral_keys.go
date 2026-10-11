@@ -91,10 +91,16 @@ func (router *Router) rememberVerifiedAccountBinding(ctx context.Context, accoun
 	router.mu.Lock()
 	_, ephemeral := router.ephemeralCredentialIDs[accountID]
 	router.mu.Unlock()
+	var err error
 	if ephemeral {
-		return router.affinity.rememberVerifiedVolatile(accountID, keys, now)
+		err = router.affinity.rememberVerifiedVolatile(accountID, keys, now)
+	} else {
+		err = router.affinity.rememberVerified(ctx, accountID, keys, now)
 	}
-	return router.affinity.rememberVerified(ctx, accountID, keys, now)
+	if err == nil {
+		router.notifySelectionChange()
+	}
+	return err
 }
 
 // A synthetic API key must not leave a durable WebSocket turn-state sidecar
@@ -105,7 +111,8 @@ func (router *Router) rememberAccountTurnState(ctx context.Context, responseID, 
 	router.mu.Unlock()
 	if ephemeral {
 		router.affinity.rememberResponseTurnState(responseID, accountID, turnState, now)
-		return
+	} else {
+		router.affinity.rememberResponseTurnStateForHome(ctx, responseID, accountID, profileHome, turnState, now)
 	}
-	router.affinity.rememberResponseTurnStateForHome(ctx, responseID, accountID, profileHome, turnState, now)
+	router.notifySelectionChange()
 }

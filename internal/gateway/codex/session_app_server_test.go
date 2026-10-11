@@ -9,8 +9,10 @@ import (
 	"io"
 	"net"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -23,6 +25,7 @@ const (
 	sessionCompanionHelperEnv  = "GODEX_TEST_SESSION_COMPANION_HELPER"
 	sessionCompanionMarkerEnv  = "GODEX_TEST_SESSION_COMPANION_MARKER"
 	sessionCompanionArgsEnv    = "GODEX_TEST_SESSION_COMPANION_ARGS"
+	sessionCompanionTreeEnv    = "GODEX_TEST_SESSION_COMPANION_TREE"
 	sessionCompanionHelperName = "TestCodexSessionCompanionHelper"
 	sessionCompanionMarkerMode = 0o600
 )
@@ -39,6 +42,10 @@ func TestCodexSessionCompanionHelper(t *testing.T) {
 		}
 	}
 	marker := os.Getenv(sessionCompanionMarkerEnv)
+	if len(arguments) >= 1 && arguments[0] == "native" {
+		runSessionCompanionNative(arguments, marker)
+		return
+	}
 	if len(arguments) >= 1 && arguments[0] == "app-server" {
 		listen := ""
 		for index := 1; index+1 < len(arguments); index++ {
@@ -55,6 +62,10 @@ func TestCodexSessionCompanionHelper(t *testing.T) {
 				os.Exit(6)
 			}
 		}
+		if os.Getenv(sessionCompanionTreeEnv) == "1" {
+			runSessionCompanionWrapper(listen, marker)
+			return
+		}
 		listener, err := net.Listen("unix", listen)
 		if err != nil {
 			os.Exit(3)
@@ -68,6 +79,10 @@ func TestCodexSessionCompanionHelper(t *testing.T) {
 		return
 	}
 	if hasSessionCompanionArgument(arguments, "--remote") {
+		if os.Getenv(sessionCompanionTreeEnv) == "1" {
+			waitForSessionCompanionFile(filepath.Join(filepath.Dir(marker), "companion-exited"))
+			time.Sleep(100 * time.Millisecond)
+		}
 		appendSessionCompanionMarker(marker, "child")
 		if os.Getenv("GODEX_TEST_SESSION_COMPANION_HOLD_CHILD") == "1" {
 			stopped := make(chan os.Signal, 1)
@@ -78,6 +93,72 @@ func TestCodexSessionCompanionHelper(t *testing.T) {
 		return
 	}
 	appendSessionCompanionMarker(marker, "direct")
+}
+
+func runSessionCompanionWrapper(listen, marker string) {
+	child := exec.Command(os.Args[0], "-test.run=^"+sessionCompanionHelperName+"$", "--", "native", listen)
+	child.Env = append(os.Environ(), sessionCompanionHelperEnv+"=1")
+	if err := child.Start(); err != nil {
+		os.Exit(7)
+	}
+	waitForSessionCompanionFile(filepath.Join(filepath.Dir(marker), "native-ready"))
+	appendSessionCompanionMarker(marker, "companion")
+	waitForSessionCompanionFile(filepath.Join(filepath.Dir(marker), "outer-connected"))
+	// Let the launcher exit with its native child still alive.
+	if err := os.WriteFile(filepath.Join(filepath.Dir(marker), "companion-exited"), []byte("done"), sessionCompanionMarkerMode); err != nil {
+		os.Exit(9)
+	}
+}
+
+func runSessionCompanionNative(arguments []string, marker string) {
+	if len(arguments) < 2 {
+		os.Exit(10)
+	}
+	// Keep the synthetic child alive to exercise group cleanup after reaping.
+	clearSessionCompanionParentDeath()
+	root := filepath.Dir(marker)
+	live, err := net.Listen("unix", filepath.Join(root, "native-live"))
+	if err != nil {
+		os.Exit(11)
+	}
+	defer live.Close()
+	ready, err := net.Listen("unix", arguments[1])
+	if err != nil {
+		os.Exit(12)
+	}
+	defer ready.Close()
+	if err := os.WriteFile(filepath.Join(root, "native-pid"), []byte(strconv.Itoa(os.Getpid())), sessionCompanionMarkerMode); err != nil {
+		os.Exit(13)
+	}
+	if err := os.WriteFile(filepath.Join(root, "native-pgid"), []byte(strconv.Itoa(syscall.Getpgrp())), sessionCompanionMarkerMode); err != nil {
+		os.Exit(14)
+	}
+	go func() {
+		connection, acceptErr := ready.Accept()
+		if acceptErr == nil {
+			_ = connection.Close()
+			_ = os.WriteFile(filepath.Join(root, "outer-connected"), []byte("done"), sessionCompanionMarkerMode)
+		}
+	}()
+	if err := os.WriteFile(filepath.Join(root, "native-ready"), []byte("done"), sessionCompanionMarkerMode); err != nil {
+		os.Exit(17)
+	}
+	appendSessionCompanionMarker(marker, "native")
+	stopped := make(chan os.Signal, 1)
+	signal.Notify(stopped, syscall.SIGTERM, os.Interrupt)
+	defer signal.Stop(stopped)
+	<-stopped
+}
+
+func waitForSessionCompanionFile(path string) {
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if _, err := os.Stat(path); err == nil {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	os.Exit(15)
 }
 
 func TestSessionAppServerCompanionArgumentsPreserveManagedConfig(t *testing.T) {
@@ -144,6 +225,9 @@ func TestSessionAppServerEligibilityDoesNotInspectOptionValuesAsCommands(t *test
 	if sessionAppServerEligible([]string{"--remote", "unix:///tmp/codex.sock"}) {
 		t.Fatal("remote launch unexpectedly received a private companion")
 	}
+	if sessionAppServerEligible([]string{"app-server", "proxy"}) {
+		t.Fatal("explicit app-server launch unexpectedly received a private companion")
+	}
 }
 
 func appendSessionCompanionMarker(path, value string) {
@@ -188,6 +272,72 @@ func TestRunThroughProxyWithSessionServerOwnsCompanionLifecycle(t *testing.T) {
 	}
 	if _, err := os.Lstat(filepath.Join(home, ".s")); !os.IsNotExist(err) {
 		t.Fatalf("private app-server socket survived: %v", err)
+	}
+}
+
+func TestRunThroughProxyWithSessionServerReapsWrappedNativeDescendant(t *testing.T) {
+	root := t.TempDir()
+	defer stopSessionCompanionNative(root)
+	marker := filepath.Join(root, "events")
+	wrapper := sessionCompanionTreeWrapper(t)
+	t.Setenv(sessionCompanionHelperEnv, "1")
+	t.Setenv(sessionCompanionMarkerEnv, marker)
+	t.Setenv(sessionCompanionTreeEnv, "1")
+	home := filepath.Join(root, "home")
+	if err := os.MkdirAll(home, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	unrelated := exec.Command("sleep", "30")
+	if err := unrelated.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_ = unrelated.Process.Kill()
+		_ = unrelated.Wait()
+	}()
+	foregroundGroup := syscall.Getpgrp()
+	process := NewCodexProcess(wrapper, Terminal{Stdin: strings.NewReader(""), Stdout: io.Discard, Stderr: io.Discard})
+	if err := process.RunThroughProxyWithSessionServer(t.Context(), home, "http://127.0.0.1:1234", []string{"--model", "synthetic"}, ""); err != nil {
+		t.Fatal(err)
+	}
+	pgid, err := strconv.Atoi(strings.TrimSpace(string(mustSessionCompanionFile(t, filepath.Join(root, "native-pgid")))))
+	if err != nil {
+		t.Fatalf("native process group = %v", err)
+	}
+	if pgid <= 0 || pgid == foregroundGroup {
+		t.Fatalf("native process group = %d, foreground group = %d", pgid, foregroundGroup)
+	}
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		if connection, dialErr := net.DialTimeout("unix", filepath.Join(root, "native-live"), 50*time.Millisecond); dialErr != nil {
+			break
+		} else {
+			_ = connection.Close()
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if connection, err := net.DialTimeout("unix", filepath.Join(root, "native-live"), 50*time.Millisecond); err == nil {
+		_ = connection.Close()
+		t.Fatal("session-owned native descendant survived teardown")
+	}
+	if err := syscall.Kill(unrelated.Process.Pid, 0); err != nil {
+		t.Fatalf("unrelated process was terminated: %v", err)
+	}
+}
+
+func stopSessionCompanionNative(root string) {
+	connection, err := net.DialTimeout("unix", filepath.Join(root, "native-live"), 50*time.Millisecond)
+	if err != nil {
+		return
+	}
+	_ = connection.Close()
+	content, err := os.ReadFile(filepath.Join(root, "native-pid"))
+	if err != nil {
+		return
+	}
+	pid, err := strconv.Atoi(strings.TrimSpace(string(content)))
+	if err == nil && pid > 0 {
+		_ = syscall.Kill(pid, syscall.SIGKILL)
 	}
 }
 
@@ -289,6 +439,21 @@ func sessionCompanionWrapper(t *testing.T) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "codex-wrapper")
 	content := "#!/bin/sh\nexec \"$GODEX_TEST_SESSION_COMPANION_BINARY\" -test.run=^" + sessionCompanionHelperName + "$ -- \"$@\"\n"
+	if err := os.WriteFile(path, []byte(content), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	binary, err := filepath.Abs(os.Args[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GODEX_TEST_SESSION_COMPANION_BINARY", binary)
+	return path
+}
+
+func sessionCompanionTreeWrapper(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "codex-wrapper")
+	content := "#!/bin/sh\n\"$GODEX_TEST_SESSION_COMPANION_BINARY\" -test.run=^" + sessionCompanionHelperName + "$ -- \"$@\"\n"
 	if err := os.WriteFile(path, []byte(content), 0o700); err != nil {
 		t.Fatal(err)
 	}
