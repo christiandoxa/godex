@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -20,6 +21,7 @@ func TestAdmissionOwnerProjectionRefreshesAfterSelectionNotification(t *testing.
 		},
 	}).(*activeRequestHandler)
 
+	var runtimeMu sync.Mutex
 	var projections atomic.Int32
 	var owner atomic.Bool
 	firstProjected := make(chan struct{})
@@ -33,6 +35,8 @@ func TestAdmissionOwnerProjectionRefreshesAfterSelectionNotification(t *testing.
 			return false
 		case 2:
 			close(secondProjected)
+			runtimeMu.Lock()
+			defer runtimeMu.Unlock()
 			return owner.Load()
 		default:
 			return owner.Load()
@@ -70,11 +74,13 @@ func TestAdmissionOwnerProjectionRefreshesAfterSelectionNotification(t *testing.
 		t.Fatal("admission waiter did not register before notification")
 	}
 
+	runtimeMu.Lock()
 	owner.Store(true)
 	handler.notifySelectionChange()
 	select {
 	case <-secondProjected:
 	case <-time.After(time.Second):
+		runtimeMu.Unlock()
 		t.Fatal("admission waiter did not re-project ownership after notification")
 	}
 	mutexAcquired := make(chan struct{})
@@ -86,8 +92,10 @@ func TestAdmissionOwnerProjectionRefreshesAfterSelectionNotification(t *testing.
 	select {
 	case <-mutexAcquired:
 	case <-time.After(time.Second):
+		runtimeMu.Unlock()
 		t.Fatal("admission notification mutex was held while projecting runtime ownership")
 	}
+	runtimeMu.Unlock()
 
 	select {
 	case acquired := <-result:
