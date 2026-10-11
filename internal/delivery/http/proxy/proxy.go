@@ -256,7 +256,7 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 		var stopRequestContext context.CancelFunc
 		if requestContext.Err() != nil {
 			requestContext = context.WithoutCancel(requestContext)
-		} else if request.RequestURI != "" {
+		} else if request.RequestURI != "" && request.Close {
 			requestContext, stopRequestContext = requestContextAfterBody(requestContext)
 			defer stopRequestContext()
 		}
@@ -382,11 +382,7 @@ func requestContextAfterBody(ctx context.Context) (context.Context, context.Canc
 			// A server connection that closes immediately after sending a
 			// complete body is safe to finish, just like the captured request
 			// path in the reference runtime.
-			select {
-			case <-timer.C:
-				cancel()
-			case <-forwardContext.Done():
-			}
+			return
 		case <-timer.C:
 		}
 		select {
