@@ -45,6 +45,11 @@ executable oracle require rejection with a diagnostic. The oracle remains
 narrow: it does not claim parity for authentication, live providers or quota,
 interactive TUI rendering, or platform-specific process supervision.
 
+During exploratory coverage, the canonical binary's no-profile `prodex status`
+path panicked with exit 101 in this non-TTY fixture. The oracle therefore only
+asserts its safe `status --json` argument rejection and makes no claim about
+empty-profile status rendering.
+
 At this checkpoint the following domains remain **NOT VERIFIED** by the new
 executable evidence: live ChatGPT/device authentication and token refresh;
 real provider quota and transport behavior; full TUI lifecycle and terminal
@@ -52,7 +57,6 @@ resize/signal handling; Windows and macOS runtime/process semantics beyond
 cross-build compilation; release download/install execution; and arbitrary
 durable-state or concurrent mutation paths outside the existing focused
 fixtures.
-
 ## Provider gateway conformance audit
 
 The pinned Prodex provider-core fixture was replayed against the Go gateway
