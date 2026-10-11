@@ -44,7 +44,7 @@ func (monitor *liveGoalRecovery04361) readState(ctx context.Context) (runtimemod
 				monitor.checkpoint = captureRecoveryCheckpoint04360(report.Path)
 				monitor.checkpointPath = report.Path
 			}
-			if monitor.checkpoint.newAcceptedUsageLimit04360(ctx, id) &&
+			if monitor.checkpoint.newAcceptedRecoveryClass04360(ctx, id) != "" &&
 				(!ok || goalStatusResumable04361(state.Status)) {
 				state = runtimemodel.GoalRecoveryState{
 					SessionID: id,
