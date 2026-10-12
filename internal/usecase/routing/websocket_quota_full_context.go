@@ -123,6 +123,11 @@ func (router *Router) handleBoundWebSocketResponse(
 		}
 	}
 	router.recordRouteOutcome(ctx, account.ID, request.QuotaSelection, response, outcome)
+	if result, handled, err := router.rotateTurnOrSessionOnlyWebSocketPreviousResponse(
+		ctx, request, accounts, account, outcome, pending,
+	); handled || err != nil {
+		return result, err
+	}
 	if outcome.kind == responsePass {
 		router.clearQuotaBlocked(account.ID)
 		return pendingForwarded(account.ID, outcome, pending), nil

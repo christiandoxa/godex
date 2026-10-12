@@ -99,7 +99,7 @@ func (router *Router) executeRouted(
 			ownerTransportRetryUsed = true
 			continue
 		}
-		if !websocketPreviousResponseNotFound(response, metadata.previousResponseID) {
+		if !websocketPreviousResponseNotFound(response) {
 			return response, nil
 		}
 		if response.PrecommitFailure.InvalidPreviousResponseID {
@@ -153,12 +153,8 @@ func (router *Router) websocketTrustedPreviousAffinity(
 	return owner != "" && owner == accountID, nil
 }
 
-func websocketPreviousResponseNotFound(
-	response *proxymodel.Response,
-	previousResponseID string,
-) bool {
+func websocketPreviousResponseNotFound(response *proxymodel.Response) bool {
 	return response != nil &&
-		strings.TrimSpace(previousResponseID) != "" &&
 		!response.FirstEventCommitted &&
 		response.PrecommitFailure != nil &&
 		strings.EqualFold(
