@@ -157,6 +157,7 @@ func (proxy *Proxy) Endpoint() string {
 	defer proxy.mu.Unlock()
 	return proxy.endpoint
 }
+
 func (proxy *Proxy) Close(ctx context.Context) error {
 	defer proxy.router.Close()
 	proxy.mu.Lock()

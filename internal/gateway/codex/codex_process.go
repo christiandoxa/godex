@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	entity "github.com/christiandoxa/godex/internal/entity/account"
@@ -21,6 +22,9 @@ type CodexProcess struct {
 	binary          string
 	terminal        Terminal
 	sharedCodexHome string
+
+	nativeRecoveryMu sync.RWMutex
+	nativeRecovery   any
 }
 
 func NewCodexProcess(binary string, terminal Terminal) *CodexProcess {

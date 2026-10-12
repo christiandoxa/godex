@@ -14,6 +14,7 @@ func (process *CodexProcess) runWithSessionAppServer(
 	_ []string,
 	command *exec.Cmd,
 	_ []string,
+	_ func(context.Context, string) error,
 ) error {
 	if err := command.Run(); err != nil {
 		if ctx.Err() != nil {

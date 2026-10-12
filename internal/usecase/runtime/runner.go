@@ -192,6 +192,7 @@ type RuntimeLaunchOptions struct {
 	PresidioEnabled     bool
 	PresidioRequired    bool
 	OverlayPrepare      func(string) error
+	nativeSessionID     string
 }
 
 func (runner *Runner) launchHome(
@@ -297,7 +298,16 @@ func (runner *Runner) launchHomeWithOptions(
 		return err
 	}
 	runner.warmupStartupProbes(ctx, provider.Kind, profiles, upstream, options.UpstreamNoProxy)
-	runErr = runner.runThroughRuntimeProxy(ctx, proxyRunner, home, proxy.Endpoint(), runtimeArguments, provider.Kind, options.SuperOverlay)
+	var releaseAffinity func(context.Context, string) error
+	if options.nativeSessionID != "" {
+		if releaser, ok := proxy.(sessionAffinityReleaser); ok {
+			releaseAffinity = releaser.ReleaseSessionAffinity
+		}
+	}
+	runErr = runner.runThroughRuntimeProxy(
+		ctx, proxyRunner, home, proxy.Endpoint(), runtimeArguments, provider.Kind,
+		options.SuperOverlay, options.nativeSessionID, releaseAffinity,
+	)
 	return closeRuntimeProxy(ctx, proxy, runErr)
 }
 
@@ -344,27 +354,6 @@ func runtimeProxyConfig(
 			return append([]proxyconfig.Account(nil), profiles...), nil
 		},
 	}
-}
-
-func (runner *Runner) runThroughRuntimeProxy(
-	ctx context.Context,
-	proxyRunner proxyCodex,
-	home, endpoint string,
-	arguments []string,
-	providerKind string,
-	sessionServer bool,
-) error {
-	if sessionServer {
-		if companion, ok := runner.process.(sessionProxyCodex); ok {
-			return companion.RunThroughProxyWithSessionServer(ctx, home, endpoint, arguments, providerKind)
-		}
-	}
-	if providerKind != "" {
-		if isolated, ok := runner.process.(providerProxyCodex); ok {
-			return isolated.RunThroughProxyProvider(ctx, home, endpoint, arguments, providerKind)
-		}
-	}
-	return proxyRunner.RunThroughProxy(ctx, home, endpoint, arguments)
 }
 
 func closeRuntimeProxy(ctx context.Context, proxy Proxy, runErr error) error {

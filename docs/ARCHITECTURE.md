@@ -65,6 +65,14 @@ The Codex gateway owns:
 
 Godex does not implement OAuth or refresh-token exchange.
 
+The Codex gateway's Unix app-server control path is private to the managed
+launch. Native recovery accepts only an owned socket whose initialized
+`codexHome`, exact thread/session IDs, persistent/direct-input flags, and
+canonical workspace all match the launch. It mutates only an idle or
+`systemError` thread, resumes an eligible goal with automatic provenance, or
+starts the bounded continuation prompt for a verified non-goal thread. Every
+RPC has one total deadline; an ambiguous mutation is never replayed.
+
 The Codex gateway keeps argument recognition and config scoping private to
 `gateway/codex`. Managed overrides enter the innermost exec command scope;
 routing and credential-store bypasses fail before process execution. A bounded

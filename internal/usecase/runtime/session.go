@@ -112,6 +112,9 @@ func (runner *Runner) RunSessionWithOptions(
 	if !homeFound || owner == nil {
 		return fmt.Errorf("session home or upstream owner is unavailable; continuity was preserved")
 	}
+	if options.SuperOverlay {
+		options.nativeSessionID = nativeResumeSessionID(args)
+	}
 	release, err := runner.pinProfiles(ctx, []string{homeID, ownerID})
 	if err != nil {
 		return err

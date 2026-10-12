@@ -6,14 +6,15 @@ import (
 )
 
 // sessionAppServerEligible limits the private companion to interactive
-// foreground launches. Exec/resume and an already remote child own their
-// session transport and must keep their native argument shape.
+// foreground launches. Exec and an already remote child own their session
+// transport and must keep their native argument shape. A TUI resume remains
+// attached to the managed frontend so its owned thread can be recovered.
 func sessionAppServerEligible(arguments []string) bool {
 	if len(arguments) == 0 || codexCommandServerSubcommand(arguments) || codexExecInvocation(arguments) {
 		return false
 	}
 	command := commandAfterOptions(arguments, 0)
-	if command >= 0 && (arguments[command] == "resume" || arguments[command] == "app-server") {
+	if command >= 0 && arguments[command] == "app-server" {
 		return false
 	}
 	for index := 0; index < len(arguments); index++ {

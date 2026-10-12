@@ -277,6 +277,12 @@ func TestSessionAppServerEligibilityDoesNotInspectOptionValuesAsCommands(t *test
 	if sessionAppServerEligible([]string{"app-server", "proxy"}) {
 		t.Fatal("explicit app-server launch unexpectedly received a private companion")
 	}
+	if !sessionAppServerEligible([]string{"resume", "00000000-0000-4000-8000-000000000001"}) {
+		t.Fatal("owned TUI resume did not receive a private companion")
+	}
+	if sessionAppServerEligible([]string{"exec", "resume", "00000000-0000-4000-8000-000000000001"}) {
+		t.Fatal("exec resume unexpectedly received a private companion")
+	}
 }
 
 func appendSessionCompanionMarker(path, value string) {
@@ -456,7 +462,7 @@ func TestRunThroughProxyWithLongSessionHomeReapsPrivateCompanion(t *testing.T) {
 	}
 }
 
-func TestRunThroughProxyWithSessionServerLeavesNativeResumeUnchanged(t *testing.T) {
+func TestRunThroughProxyWithSessionServerOwnsNativeResumeCompanion(t *testing.T) {
 	root := t.TempDir()
 	marker := filepath.Join(root, "events")
 	wrapper := sessionCompanionWrapper(t)
@@ -470,8 +476,8 @@ func TestRunThroughProxyWithSessionServerLeavesNativeResumeUnchanged(t *testing.
 	if err := process.RunThroughProxyWithSessionServer(t.Context(), home, "http://127.0.0.1:1234", []string{"resume", "session-id"}, ""); err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.TrimSpace(string(mustSessionCompanionFile(t, marker))); got != "direct" {
-		t.Fatalf("resume launch unexpectedly used companion: %q", got)
+	if got := strings.TrimSpace(string(mustSessionCompanionFile(t, marker))); got != "companion\nchild" {
+		t.Fatalf("resume launch did not use its owned companion: %q", got)
 	}
 }
 

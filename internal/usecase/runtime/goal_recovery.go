@@ -17,6 +17,13 @@ type GoalRecoveryStateReader interface {
 	ReadGoalRecoveryState(context.Context, string) (runtimemodel.GoalRecoveryState, bool)
 }
 
+// nativeSessionRecoveryProcess is implemented only by gateways that own a
+// private app-server companion. Keeping it optional leaves ordinary process
+// fakes and explicit remote launches on the existing relaunch path.
+type nativeSessionRecoveryProcess interface {
+	RecoverNativeSession(context.Context, string, bool) bool
+}
+
 type goalRecoveryProfiles interface {
 	SessionProfiles(context.Context) ([]sessionmodel.ProfileHome, error)
 	ResolveLaunch(context.Context, string) (profilemodel.LaunchTarget, error)
@@ -34,6 +41,17 @@ func (runner *Runner) RunWithGoalRecoveryMonitor(
 	if readState == nil {
 		return runner.RunWithOptions(ctx, selector, arguments, options), false
 	}
+	return runner.runWithGoalRecoveryMonitor(ctx, readState, false, func(childContext context.Context) error {
+		return runner.RunWithOptions(childContext, selector, arguments, options)
+	})
+}
+
+func (runner *Runner) runWithGoalRecoveryMonitor(
+	ctx context.Context,
+	readState func(context.Context) (runtimemodel.GoalRecoveryState, bool),
+	nativeOnly bool,
+	run func(context.Context) error,
+) (error, bool) {
 	startedAt := time.Now().UnixMilli()
 	sessionID, armed, suppressed := "", false, false
 	childContext, cancel := context.WithCancel(ctx)
@@ -49,6 +67,9 @@ func (runner *Runner) RunWithGoalRecoveryMonitor(
 			case <-childContext.Done():
 				return
 			case <-ticker.C:
+				if childContext.Err() != nil {
+					return
+				}
 				state, ok := readState(childContext)
 				if !ok || state.SessionID == "" {
 					continue
@@ -61,6 +82,16 @@ func (runner *Runner) RunWithGoalRecoveryMonitor(
 					armed, suppressed = true, false
 				case "usage_limited":
 					if !suppressed && (armed || state.UpdatedAt >= startedAt) {
+						if recovery, ok := runner.process.(nativeSessionRecoveryProcess); ok &&
+							recovery.RecoverNativeSession(childContext, state.SessionID, true) {
+							// The owned companion remains authoritative for deferred,
+							// accepted, and ambiguous native decisions. Its own retry
+							// interval controls repeated RPC attempts.
+							continue
+						}
+						if nativeOnly {
+							continue
+						}
 						triggered <- struct{}{}
 						cancel()
 						return
@@ -76,7 +107,7 @@ func (runner *Runner) RunWithGoalRecoveryMonitor(
 			}
 		}
 	}()
-	err := runner.RunWithOptions(childContext, selector, arguments, options)
+	err := run(childContext)
 	cancel()
 	<-done
 	select {
@@ -85,6 +116,24 @@ func (runner *Runner) RunWithGoalRecoveryMonitor(
 	default:
 		return err, false
 	}
+}
+
+// runSessionWithNativeRecovery keeps a TUI resume attached to the owned
+// companion. Exec resumes and explicit remote launches never provide a
+// session ID here, so they retain their existing process path.
+func (runner *Runner) runSessionWithNativeRecovery(
+	ctx context.Context, sessionID string, run func(context.Context) error,
+) error {
+	if runner == nil || strings.TrimSpace(sessionID) == "" || runner.goalRecoveryReader == nil {
+		return run(ctx)
+	}
+	if _, ok := runner.process.(nativeSessionRecoveryProcess); !ok {
+		return run(ctx)
+	}
+	err, _ := runner.runWithGoalRecoveryMonitor(ctx, func(readContext context.Context) (runtimemodel.GoalRecoveryState, bool) {
+		return runner.ReadGoalRecoveryState(readContext, sessionID)
+	}, true, run)
+	return err
 }
 
 // SharedCodexHome returns the isolated Codex state root used by runtime

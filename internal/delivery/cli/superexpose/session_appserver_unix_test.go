@@ -79,32 +79,25 @@ func TestAppServerRequestUsesOneDeadlineAcrossUnsolicitedMessages(t *testing.T) 
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		request, err := websocketframe.ReadHeader(server)
+		reader := bufio.NewReader(server)
+		request, err := websocketframe.ReadHeader(reader)
 		if err != nil {
 			return
 		}
 		if _, err := request.ReadPayload(server, appServerMaxMessageSize); err != nil {
 			return
 		}
-		ticker := time.NewTicker(100 * time.Millisecond)
-		defer ticker.Stop()
 		for {
-			select {
-			case <-ticker.C:
-				if err := websocketframe.WriteFrame(server, 1, []byte(`{"method":"notification"}`), false); err != nil {
-					return
-				}
+			if err := websocketframe.WriteFrame(server, 1, []byte(`{"method":"notification"}`), false); err != nil {
+				return
 			}
 		}
 	}()
 
 	started := time.Now()
-	outcome, _ := appServerRequest(socket, 1, "thread/read", map[string]any{"threadId": "thread"})
-	if outcome != appServerAmbiguous {
-		t.Fatalf("unsolicited-message outcome = %v, want ambiguous", outcome)
-	}
-	if elapsed := time.Since(started); elapsed > 4*time.Second {
-		t.Fatalf("request deadline reset by unsolicited messages: %s", elapsed)
+	outcome, _ := appServerRequestUntil(socket, 1, "thread/read", nil, time.Now().Add(120*time.Millisecond))
+	if outcome != appServerAmbiguous || time.Since(started) > time.Second {
+		t.Fatalf("outcome=%v elapsed=%s", outcome, time.Since(started))
 	}
 	_ = client.Close()
 	<-done

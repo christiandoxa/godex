@@ -26,6 +26,7 @@ func (process *CodexProcess) runWithSessionAppServer(
 	environment []string,
 	command *exec.Cmd,
 	arguments []string,
+	releaseAffinity func(context.Context, string) error,
 ) error {
 	socket, cleanup, err := privateSessionAppServerSocket(codexHome)
 	if err != nil {
@@ -59,6 +60,13 @@ func (process *CodexProcess) runWithSessionAppServer(
 	if err := waitForSessionAppServerSocket(ctx, socket, companionDone); err != nil {
 		return err
 	}
+	workspace, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("resolve native session workspace: %w", err)
+	}
+	recovery := newNativeSessionRecovery(socket, codexHome, workspace, releaseAffinity)
+	process.setNativeSessionRecovery(recovery)
+	defer process.clearNativeSessionRecovery(recovery)
 
 	privateChildGroup := configureCodexSessionChildProcess(command)
 	command.Args = append([]string{command.Path, "--remote", "unix://" + socket}, arguments...)

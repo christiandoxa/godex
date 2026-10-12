@@ -53,7 +53,7 @@ func (process *CodexProcess) CheckProxySupport(ctx context.Context) error {
 }
 
 func (process *CodexProcess) RunThroughProxy(ctx context.Context, codexHome, endpoint string, arguments []string) error {
-	return process.runThroughProxy(ctx, codexHome, endpoint, arguments, "", false)
+	return process.runThroughProxy(ctx, codexHome, endpoint, arguments, "", false, nil)
 }
 
 // RunThroughProxyWithSessionServer starts the managed child with a private
@@ -65,7 +65,20 @@ func (process *CodexProcess) RunThroughProxyWithSessionServer(
 	arguments []string,
 	provider string,
 ) error {
-	return process.runThroughProxy(ctx, codexHome, endpoint, arguments, provider, true)
+	return process.runThroughProxy(ctx, codexHome, endpoint, arguments, provider, true, nil)
+}
+
+// RunThroughProxyWithSessionServerAndRecovery keeps the optional affinity
+// release callback at the runtime boundary. The existing method remains for
+// callers that only need the private companion lifecycle.
+func (process *CodexProcess) RunThroughProxyWithSessionServerAndRecovery(
+	ctx context.Context,
+	codexHome, endpoint string,
+	arguments []string,
+	provider string,
+	releaseAffinity func(context.Context, string) error,
+) error {
+	return process.runThroughProxy(ctx, codexHome, endpoint, arguments, provider, true, releaseAffinity)
 }
 
 func (process *CodexProcess) RunThroughProxyProvider(
@@ -74,7 +87,7 @@ func (process *CodexProcess) RunThroughProxyProvider(
 	arguments []string,
 	provider string,
 ) error {
-	return process.runThroughProxy(ctx, codexHome, endpoint, arguments, provider, false)
+	return process.runThroughProxy(ctx, codexHome, endpoint, arguments, provider, false, nil)
 }
 
 func (process *CodexProcess) runThroughProxy(
@@ -83,6 +96,7 @@ func (process *CodexProcess) runThroughProxy(
 	arguments []string,
 	provider string,
 	withSessionServer bool,
+	releaseAffinity func(context.Context, string) error,
 ) error {
 	binary, err := process.resolveBinary()
 	if err != nil {
@@ -121,7 +135,7 @@ func (process *CodexProcess) runThroughProxy(
 	command.Stdout = process.terminal.Stdout
 	command.Stderr = process.terminal.Stderr
 	if companion {
-		return process.runWithSessionAppServer(ctx, binary, codexHome, command.Env, command, arguments)
+		return process.runWithSessionAppServer(ctx, binary, codexHome, command.Env, command, arguments, releaseAffinity)
 	}
 	if err := command.Run(); err != nil {
 		if ctx.Err() != nil {

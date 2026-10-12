@@ -14,10 +14,15 @@ import (
 )
 
 func appServerRequest(socket *appServerSocket, requestID uint64, method string, params map[string]any) (appServerOutcome, map[string]any) {
+	return appServerRequestUntil(socket, requestID, method, params, time.Now().Add(appServerRequestTimeout))
+}
+
+func appServerRequestUntil(
+	socket *appServerSocket, requestID uint64, method string, params map[string]any, deadline time.Time,
+) (appServerOutcome, map[string]any) {
 	content, err := json.Marshal(map[string]any{
 		"id": requestID, "method": method, "params": params,
 	})
-	deadline := time.Now().Add(appServerRequestTimeout)
 	if err != nil || socket.writeFrameUntil(0x1, []byte(content), deadline) != nil {
 		return appServerAmbiguous, nil
 	}

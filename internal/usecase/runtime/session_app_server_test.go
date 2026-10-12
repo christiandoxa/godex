@@ -14,6 +14,34 @@ type sessionProxyProcess struct {
 	used bool
 }
 
+type sessionRecoveryProxyProcess struct {
+	sessionProxyProcess
+	release func(context.Context, string) error
+}
+
+func (process *sessionRecoveryProxyProcess) RunThroughProxyWithSessionServerAndRecovery(
+	_ context.Context,
+	_ string,
+	_ string,
+	_ []string,
+	_ string,
+	release func(context.Context, string) error,
+) error {
+	process.used = true
+	process.release = release
+	return nil
+}
+
+type sessionAffinityProxy struct {
+	fakeProxy
+	released string
+}
+
+func (proxy *sessionAffinityProxy) ReleaseSessionAffinity(_ context.Context, sessionID string) error {
+	proxy.released = sessionID
+	return nil
+}
+
 func (process *sessionProxyProcess) RunThroughProxyWithSessionServer(
 	context.Context, string, string, []string, string,
 ) error {
@@ -40,6 +68,35 @@ func TestSuperOverlayUsesOptionalSessionServerProcessPort(t *testing.T) {
 	}
 	if !process.used {
 		t.Fatal("Super overlay bypassed the session-server process port")
+	}
+}
+
+func TestNativeRecoveryReceivesRuntimeProxyAffinityRelease(t *testing.T) {
+	base := filepath.Join(t.TempDir(), "base")
+	if err := createRuntimeHome(base); err != nil {
+		t.Fatal(err)
+	}
+	process := &sessionRecoveryProxyProcess{}
+	proxy := &sessionAffinityProxy{}
+	runner := NewRunner(nil, process, func(proxyconfig.Config) (Proxy, error) {
+		return proxy, nil
+	})
+	runner.SetManagedProfilesRoot(filepath.Join(t.TempDir(), "profiles"))
+	if err := runner.launchHomeWithOptions(
+		context.Background(), base, "profile", proxyconfig.Provider{}, nil,
+		[]proxyconfig.Account{{ID: "profile", Home: base, Enabled: true}}, nil,
+		RuntimeLaunchOptions{SuperOverlay: true, nativeSessionID: "native-session"},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if !process.used || process.release == nil {
+		t.Fatal("native recovery process did not receive affinity release callback")
+	}
+	if err := process.release(context.Background(), "native-session"); err != nil {
+		t.Fatal(err)
+	}
+	if proxy.released != "native-session" {
+		t.Fatalf("released session = %q", proxy.released)
 	}
 }
 
