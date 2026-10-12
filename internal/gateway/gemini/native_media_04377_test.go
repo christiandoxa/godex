@@ -44,8 +44,11 @@ func TestProdex04377GeminiDataURLRequiresBase64(t *testing.T) {
 	}
 }
 
-func TestProdex04377GeminiResponseDataURLAcceptsCaseInsensitiveBase64(t *testing.T) {
-	got := geminiMediaContentItem(map[string]any{"text": "data:image/png;BASE64,AAAA"})
+func TestProdex04377GeminiResponseDataURLRequiresLowercaseBase64(t *testing.T) {
+	if got := geminiMediaContentItem(map[string]any{"text": "data:image/png;BASE64,AAAA"}); got != nil {
+		t.Fatalf("uppercase response data URL accepted: %#v", got)
+	}
+	got := geminiMediaContentItem(map[string]any{"text": "data:image/png;base64,AAAA"})
 	if got == nil || got["type"] != "input_image" || got["image_url"] != "data:image/png;base64,AAAA" {
 		t.Fatalf("response data URL = %#v", got)
 	}
