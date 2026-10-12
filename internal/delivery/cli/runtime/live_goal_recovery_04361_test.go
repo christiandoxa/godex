@@ -454,7 +454,7 @@ func TestProdex04371LiveGoalRecoveryUsesNewRolloutEvidence(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = file.WriteString(`{"type":"response_item","payload":{"role":"user","content":"next turn"}}
-{"type":"error","error":{"code":"usage_limit_reached"}}
+{"type":"task_complete","error":{"codex_error_info":"usage_limit_exceeded"}}
 `)
 	if closeErr := file.Close(); err != nil || closeErr != nil {
 		t.Fatalf("append rollout evidence: write=%v close=%v", err, closeErr)

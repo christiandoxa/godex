@@ -11,6 +11,42 @@ import (
 // usage_limit_recovery/workflow.rs. Arbitrary stderr or a bare status 429
 // never authorizes relaunch.
 
+type recoveryObservationKind04360 uint8
+
+const (
+	recoveryObservationOther04360 recoveryObservationKind04360 = iota
+	recoveryObservationActivity04360
+	recoveryObservationTerminal04360
+)
+
+// Live recovery only trusts terminal completion envelopes. Native error
+// notifications can be intermediate retries; recognized activity also clears
+// an older terminal failure from the same bounded tail.
+func liveRecoveryObservationKind04360(record map[string]any) recoveryObservationKind04360 {
+	typ, _ := record["type"].(string)
+	kind := typ
+	if typ == "event_msg" {
+		payload, _ := record["payload"].(map[string]any)
+		kind, _ = payload["type"].(string)
+	}
+	switch kind {
+	case "task_complete", "turn_complete", "turn.completed", "turn_completed", "turn.failed", "turn_failed":
+		return recoveryObservationTerminal04360
+	case "task_started", "turn_started", "user_message", "agent_message",
+		"turn_aborted", "task_aborted", "turn_cancelled", "exec_command_end",
+		"patch_apply_end", "mcp_tool_call_end", "tool_completed", "compacted",
+		"context_compacted":
+		return recoveryObservationActivity04360
+	}
+	if record["method"] == "turn/completed" {
+		return recoveryObservationTerminal04360
+	}
+	if typ == "response_item" || typ == "message" || record["method"] == "turn/started" {
+		return recoveryObservationActivity04360
+	}
+	return recoveryObservationOther04360
+}
+
 func structuredWorkflowRecoveryClass04360(record map[string]any) string {
 	kind, _ := record["type"].(string)
 	var failure map[string]any

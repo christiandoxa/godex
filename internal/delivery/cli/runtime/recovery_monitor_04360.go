@@ -239,7 +239,13 @@ func recordTurnBoundary04360(record map[string]any) bool {
 	if typ == "event_msg" && (payload["type"] == "task_started" || payload["type"] == "turn_started") {
 		return true
 	}
+	if typ == "event_msg" && (payload["type"] == "turn_aborted" || payload["type"] == "task_aborted" || payload["type"] == "turn_cancelled") {
+		return true
+	}
 	if typ == "task_started" || typ == "turn_started" {
+		return true
+	}
+	if typ == "turn_aborted" || typ == "task_aborted" || typ == "turn_cancelled" {
 		return true
 	}
 	if typ == "event_msg" && (payload["type"] == "task_complete" || payload["type"] == "turn_complete") {

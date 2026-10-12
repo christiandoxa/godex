@@ -108,6 +108,7 @@ func readCompressedRecoverySince04360(checkpoint recoveryCheckpoint04360, consum
 func scanRecoveryClassSince04360(
 	ctx context.Context, sessionID string, fragment []byte, accepted bool,
 ) (string, int64, bool) {
+	var recovery string
 	var consumed int64
 	for consumed < int64(len(fragment)) {
 		if ctx.Err() != nil {
@@ -131,18 +132,23 @@ func scanRecoveryClassSince04360(
 		if json.Unmarshal(line, &value) != nil || !recordSession04360(value, sessionID) {
 			continue
 		}
+		switch liveRecoveryObservationKind04360(value) {
+		case recoveryObservationActivity04360:
+			recovery = ""
+		case recoveryObservationTerminal04360:
+			class := structuredWorkflowRecoveryClass04360(value)
+			if accepted && class != "" {
+				recovery = class
+			} else {
+				recovery = ""
+			}
+		}
 		if recordUserAccepted04360(value) {
 			accepted = true
-			continue
-		}
-		if accepted {
-			if class := structuredWorkflowRecoveryClass04360(value); class != "" {
-				return class, consumed, accepted
-			}
 		}
 		if recordTurnBoundary04360(value) {
 			accepted = false
 		}
 	}
-	return "", consumed, accepted
+	return recovery, consumed, accepted
 }
