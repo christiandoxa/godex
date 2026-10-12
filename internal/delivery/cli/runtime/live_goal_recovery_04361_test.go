@@ -547,7 +547,7 @@ func TestProdex04377LiveGoalRecoveryRetriesTransientTailRead(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err = file.WriteString(`{"type":"response_item","payload":{"role":"user"}}` + "\n" +
-		`{"type":"error","error":{"code":"usage_limit_reached"}}` + "\n"); err != nil {
+		`{"type":"task_complete","error":{"codex_error_info":"usage_limit_exceeded"}}` + "\n"); err != nil {
 		_ = file.Close()
 		t.Fatal(err)
 	}
@@ -677,7 +677,7 @@ func TestProdex04377LiveGoalRecoveryTailsLargeRegularRollout(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err = file.WriteString(`{"type":"response_item","payload":{"role":"user"}}
-{"type":"error","error":{"code":"usage_limit_reached"}}
+{"type":"task_complete","error":{"codex_error_info":"usage_limit_exceeded"}}
 `); err != nil {
 		_ = file.Close()
 		t.Fatal(err)
@@ -698,7 +698,7 @@ func TestProdex04377LiveGoalRecoveryRebasesCompactedRolloutWithoutReplay(t *test
 	meta := `{"type":"session_meta","payload":{"id":"` + id + `"}}
 `
 	oldTurn := `{"type":"response_item","payload":{"role":"user"}}
-{"type":"error","error":{"code":"usage_limit_reached"}}
+{"type":"task_complete","error":{"codex_error_info":"usage_limit_exceeded"}}
 `
 	if err := os.WriteFile(path, []byte(meta+oldTurn), 0o600); err != nil {
 		t.Fatal(err)
@@ -730,7 +730,7 @@ func TestProdex04377LiveGoalRecoveryRebasesCompactedRolloutWithoutReplay(t *test
 		t.Fatal(err)
 	}
 	if _, err = file.WriteString(`{"type":"response_item","payload":{"role":"user"}}
-{"type":"error","error":{"code":"usage_limit_reached"}}
+{"type":"task_complete","error":{"codex_error_info":"usage_limit_exceeded"}}
 `); err != nil {
 		_ = file.Close()
 		t.Fatal(err)
@@ -771,7 +771,7 @@ func TestProdex04377LiveGoalRecoverySeesCapacityAfterUnobservedCompaction(t *tes
 	compacted := meta +
 		`{"type":"event_msg","payload":{"type":"context_compacted"}}` + "\n" +
 		`{"type":"response_item","payload":{"role":"user"}}` + "\n" +
-		`{"type":"error","error":{"code":"usage_limit_reached"}}` + "\n"
+		`{"type":"task_complete","error":{"codex_error_info":"usage_limit_exceeded"}}` + "\n"
 	if err := os.WriteFile(path, []byte(compacted), 0o600); err != nil {
 		t.Fatal(err)
 	}
