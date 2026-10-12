@@ -515,9 +515,10 @@ sessions per client tunnel, reconnects after 60 seconds idle, and retries an
 explicit connection-limit error once on the same account. Realtime/live paths
 retain a raw tunnel. Responses WebSocket precommit quota failures use the
 configured auto-redeem retry path. Known-owner `previous_response_not_found`
-failures return the tagged 409 `stale_continuation` error. Prodex's cached
-pre-send quota gate and automatic cross-owner or turn-state recovery remain
-unsupported.
+failures return the tagged 409 `stale_continuation` error. Session-only and
+turn-only continuations release a failed owner before retrying the same request
+on the next account when one is available; unbound failures remain terminal.
+Prodex's cached pre-send quota gate remains outside this local routing contract.
 
 `godex ping openai` is intentionally cost-bearing: it submits the minimal `hello`
 turn through official Codex for each selected OpenAI profile. It uses a private

@@ -210,8 +210,10 @@ account persistence, and eligibility validation stays in the runtime use case.
   candidates exclude that account for the same response and route while its
   score remains active. The bounded snapshot and in-memory cache retain the
   4,096 newest records. This covers the HTTP
-  negative-cache threshold and release path; WebSocket retries remain pinned to
-  their owner, and same-request cross-owner retry remains open. Prodex's
+  negative-cache threshold and release path; response-ID WebSocket retries
+  remain pinned to their owner. Session-only and turn-only stale continuations
+  release the failed owner and retry the same request on the next account when
+  one is available; unbound failures remain terminal. Prodex's
   [negative-cache recording](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-app/src/runtime_proxy/continuation.rs#L467-L568)
   and [candidate exclusion](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-app/src/runtime_proxy/selection/previous_response/discovery.rs#L119-L140)
   plus the [score and decay limits](https://github.com/christiandoxa/prodex/blob/8000065c66381d876ca4b369ddcf01bf3d4506f0/crates/prodex-app/src/core_constants.rs#L108-L151)
@@ -281,8 +283,9 @@ account persistence, and eligibility validation stays in the runtime use case.
   owner with returned turn state. Response-ID-to-turn-state lookups survive router
   restarts for 30 minutes in a bounded sidecar under the owning private
   `CODEX_HOME`; filenames contain response-ID digests, and `routing.json` still
-  contains no raw response IDs or turn-state values. Same-request cross-owner
-  retry remains open.
+  contains no raw response IDs or turn-state values. Response-ID cross-owner
+  retry remains open; session-only and turn-only stale continuations recover on
+  the next account when one is available.
   Inbound binary messages receive the tagged error event and client pings
   receive local pong frames. Full 0.435.5 parity remains open. The 0.435.1
   provider-catalog and Codex-owned provider/history invariants remain historical
@@ -572,7 +575,7 @@ account persistence, and eligibility validation stays in the runtime use case.
   and retains affinity, so a later full-context replay stays on that owner.
   Durable WebSocket response-ID-to-turn-state lookup now survives
   router restarts through a bounded sidecar in the owning private `CODEX_HOME`;
-  same-request cross-owner retry remains open. Routing refreshes
+  response-ID same-request cross-owner retry remains open. Routing refreshes
   launch-excluded profiles with bounded request model/route context and a
   five-minute freshness interval. Warm snapshots provide model- and route-aware
   availability and quota pressure; routing reuses them without an additional
