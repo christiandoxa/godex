@@ -7,12 +7,13 @@ import (
 	"io"
 	"text/tabwriter"
 
+	usagecli "github.com/christiandoxa/godex/internal/delivery/cli/usage"
 	accountusecase "github.com/christiandoxa/godex/internal/usecase/account"
 )
 
 func List(ctx context.Context, accounts Commands, out io.Writer, arguments []string) error {
 	if len(arguments) != 0 {
-		return errors.New("accounts does not accept arguments")
+		return usagecli.Wrap(errors.New("accounts does not accept arguments"))
 	}
 	listed, err := accountusecase.List(ctx, accounts)
 	if err != nil {

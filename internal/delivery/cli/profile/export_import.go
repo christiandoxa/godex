@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	usagecli "github.com/christiandoxa/godex/internal/delivery/cli/usage"
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 	profileusecase "github.com/christiandoxa/godex/internal/usecase/profile"
 )
@@ -22,7 +23,7 @@ const (
 func exportProfiles(ctx context.Context, catalog *profileusecase.Catalog, out io.Writer, arguments []string) error {
 	request, err := parseExportWithContext(ctx, arguments)
 	if err != nil {
-		return err
+		return usagecli.Wrap(err)
 	}
 	result, err := catalog.Export(ctx, request)
 	if err != nil {
@@ -35,7 +36,7 @@ func exportProfiles(ctx context.Context, catalog *profileusecase.Catalog, out io
 func importProfiles(ctx context.Context, catalog *profileusecase.Catalog, out io.Writer, arguments []string) error {
 	options, err := parseImport(arguments)
 	if err != nil {
-		return err
+		return usagecli.Wrap(err)
 	}
 	if builtinImportSource(options.path) {
 		result, err := catalog.ImportBuiltin(ctx, profilemodel.BuiltinImportRequest{
@@ -47,7 +48,7 @@ func importProfiles(ctx context.Context, catalog *profileusecase.Catalog, out io
 		return writeBuiltinImportResult(out, result)
 	}
 	if options.name != "" || options.activate {
-		return errors.New("--name and --activate are only supported for built-in import sources such as `claude`, `copilot`, or `kiro`")
+		return usagecli.Wrap(errors.New("--name and --activate are only supported for built-in import sources such as `claude`, `copilot`, or `kiro`"))
 	}
 	request := profilemodel.ImportRequest{Path: options.path, Password: os.Getenv(importPasswordEnv)}
 	result, err := catalog.Import(ctx, request)

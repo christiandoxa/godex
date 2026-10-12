@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"io"
 
+	usagecli "github.com/christiandoxa/godex/internal/delivery/cli/usage"
 	accountusecase "github.com/christiandoxa/godex/internal/usecase/account"
 )
 
 func Current(ctx context.Context, accounts Commands, out io.Writer, arguments []string) error {
 	if len(arguments) != 0 {
-		return errors.New("current does not accept arguments")
+		return usagecli.Wrap(errors.New("current does not accept arguments"))
 	}
 	account, err := accountusecase.Current(ctx, accounts)
 	if err != nil {

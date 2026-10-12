@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	usagecli "github.com/christiandoxa/godex/internal/delivery/cli/usage"
 	runtimemodel "github.com/christiandoxa/godex/internal/model/runtime"
 	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
 )
@@ -22,7 +23,7 @@ type statusOptions struct {
 func Status(ctx context.Context, activity *runtimeusecase.Activity, out io.Writer, arguments []string) error {
 	options, err := parseStatusArguments(arguments)
 	if err != nil {
-		return err
+		return usagecli.Wrap(err)
 	}
 	if activity == nil {
 		return errors.New("runtime activity is not configured")

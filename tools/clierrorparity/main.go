@@ -160,6 +160,9 @@ func compareProbe(item probe, prodex, godex commandResult) []string {
 	if godex.Accepted != prodex.Accepted {
 		differences = append(differences, fmt.Sprintf("candidate acceptance=%t, canonical=%t", godex.Accepted, prodex.Accepted))
 	}
+	if godex.ExitCode != prodex.ExitCode {
+		differences = append(differences, fmt.Sprintf("candidate exit=%d, canonical=%d", godex.ExitCode, prodex.ExitCode))
+	}
 	if item.Rejects && strings.TrimSpace(prodex.Output) == "" {
 		differences = append(differences, "canonical rejection had no diagnostic")
 	}

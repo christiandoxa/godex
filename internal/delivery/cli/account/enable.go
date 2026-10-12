@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"io"
 
+	usagecli "github.com/christiandoxa/godex/internal/delivery/cli/usage"
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
 	accountusecase "github.com/christiandoxa/godex/internal/usecase/account"
 )
 
 func Enable(ctx context.Context, accounts Commands, out io.Writer, args []string, enabled bool) error {
 	if len(args) != 1 {
-		return errors.New("usage: godex account enable/disable SELECTOR")
+		return usagecli.Wrap(errors.New("usage: godex account enable/disable SELECTOR"))
 	}
 	store, ok := accounts.(interface {
 		SetEnabled(context.Context, string, bool) (accountentity.Account, error)

@@ -9,26 +9,27 @@ import (
 	"strconv"
 	"strings"
 
+	usagecli "github.com/christiandoxa/godex/internal/delivery/cli/usage"
 	sessionmodel "github.com/christiandoxa/godex/internal/model/session"
 	sessionusecase "github.com/christiandoxa/godex/internal/usecase/session"
 )
 
 func Run(ctx context.Context, catalog *sessionusecase.Catalog, out io.Writer, arguments []string) error {
 	if len(arguments) == 0 {
-		return errors.New("session requires list, current, or resume")
+		return usagecli.Wrap(errors.New("session requires list, current, or resume"))
 	}
 	if arguments[0] == "resume" {
 		if len(arguments) != 2 {
-			return errors.New("session resume requires one session id")
+			return usagecli.Wrap(errors.New("session resume requires one session id"))
 		}
 		return catalog.Resume(ctx, arguments[1])
 	}
 	if arguments[0] != "list" && arguments[0] != "current" {
-		return fmt.Errorf("unknown session command %q", arguments[0])
+		return usagecli.Wrap(fmt.Errorf("unknown session command %q", arguments[0]))
 	}
 	options, err := parseArguments(arguments[0] == "current", arguments[1:])
 	if err != nil {
-		return err
+		return usagecli.Wrap(err)
 	}
 	reports, err := catalog.List(ctx, options.query)
 	if err != nil {

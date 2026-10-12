@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/christiandoxa/godex/internal/config"
+	usagecli "github.com/christiandoxa/godex/internal/delivery/cli/usage"
 	proxyconfig "github.com/christiandoxa/godex/internal/model/proxy"
 	updaterepo "github.com/christiandoxa/godex/internal/repository/update"
 	quotausecase "github.com/christiandoxa/godex/internal/usecase/quota"
@@ -45,6 +47,12 @@ func TestExitCodePreservesChildStatus(t *testing.T) {
 	err := command.Run()
 	if got := exitCode(context.Background(), err); got != 23 {
 		t.Fatalf("exit code = %d, want 23", got)
+	}
+}
+
+func TestExitCodeUsesParserStatusForCLIUsageErrors(t *testing.T) {
+	if got := exitCode(context.Background(), usagecli.Wrap(errors.New("invalid arguments"))); got != 2 {
+		t.Fatalf("CLI usage exit code = %d, want 2", got)
 	}
 }
 
