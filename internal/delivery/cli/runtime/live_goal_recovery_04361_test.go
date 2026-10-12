@@ -503,6 +503,67 @@ func TestProdex04374LiveGoalRecoveryUsesNativeOverloadEvidence(t *testing.T) {
 	}
 }
 
+func TestProdex04377LiveGoalRecoveryRetriesTransientTailRead(t *testing.T) {
+	root := t.TempDir()
+	id := "019c9e3d-45a0-7ad0-a6ee-b194ac2d44f9"
+	path := filepath.Join(root, "rollout-2026-10-10T10-00-00-"+id+".jsonl")
+	if err := os.WriteFile(path, []byte(`{"type":"session_meta","payload":{"id":"`+id+`"}}`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	marker := &sessionStartMarker04360{directory: root, path: filepath.Join(root, "session.id")}
+	if err := os.WriteFile(marker.path, []byte(id+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	monitor := &liveGoalRecovery04361{
+		marker: marker,
+		read: func(context.Context, string) (runtimemodel.GoalRecoveryState, bool) {
+			return runtimemodel.GoalRecoveryState{SessionID: id, Status: "active"}, true
+		},
+		resolve: func(context.Context, string) (sessionmodel.Report, error) {
+			return sessionmodel.Report{ID: id, Path: path}, nil
+		},
+	}
+	if _, ok := monitor.readState(t.Context()); !ok {
+		t.Fatal("initial live goal state was unavailable")
+	}
+	hidden := filepath.Join(root, "hidden.jsonl")
+	if err := os.Rename(path, hidden); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(path, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := monitor.readState(t.Context()); !ok || monitor.scanRetryAt.IsZero() {
+		t.Fatalf("transient tail failure was not scheduled: ok=%t retry=%v", ok, monitor.scanRetryAt)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(hidden, path); err != nil {
+		t.Fatal(err)
+	}
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = file.WriteString(`{"type":"response_item","payload":{"role":"user"}}` + "\n" +
+		`{"type":"error","error":{"code":"usage_limit_reached"}}` + "\n"); err != nil {
+		_ = file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if state, ok := monitor.readState(t.Context()); !ok || state.Status != "active" {
+		t.Fatalf("retry backoff was bypassed: %#v, ok=%t", state, ok)
+	}
+	monitor.scanRetryAt = time.Time{}
+	state, ok := monitor.readState(t.Context())
+	if !ok || state.Status != "usage_limited" {
+		t.Fatalf("recovered tail after transient failure: %#v, ok=%t", state, ok)
+	}
+}
+
 func TestProdex04374LiveGoalMonitorConsumesTurnsAndFiltersForeignThreads(t *testing.T) {
 	root := t.TempDir()
 	id := "019c9e3d-45a0-7ad0-a6ee-b194ac2d44f9"
@@ -572,5 +633,222 @@ func TestProdex04374LiveGoalMonitorConsumesTurnsAndFiltersForeignThreads(t *test
 	state, ok := monitor.readState(t.Context())
 	if !ok || state.Status != "usage_limited" || state.SessionID != id {
 		t.Fatalf("accepted native terminal limit did not trigger recovery: %#v, ok=%t", state, ok)
+	}
+}
+
+func TestProdex04377LiveGoalRecoveryTailsLargeRegularRollout(t *testing.T) {
+	root := t.TempDir()
+	id := "019c9e3d-45a0-7ad0-a6ee-b194ac2d44f9"
+	path := filepath.Join(root, "rollout-2026-10-10T10-00-00-"+id+".jsonl")
+	if err := os.WriteFile(path, []byte(`{"type":"session_meta","payload":{"id":"`+id+`"}}
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	file, err := os.OpenFile(path, os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const largeOffset = int64(65 << 20)
+	if err := file.Truncate(largeOffset); err != nil {
+		_ = file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	marker := &sessionStartMarker04360{directory: root, path: filepath.Join(root, "session.id")}
+	if err := os.WriteFile(marker.path, []byte(id+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	monitor := &liveGoalRecovery04361{
+		marker: marker,
+		read: func(context.Context, string) (runtimemodel.GoalRecoveryState, bool) {
+			return runtimemodel.GoalRecoveryState{SessionID: id, Status: "active"}, true
+		},
+		resolve: func(context.Context, string) (sessionmodel.Report, error) {
+			return sessionmodel.Report{ID: id, Path: path}, nil
+		},
+	}
+	if _, ok := monitor.readState(t.Context()); !ok {
+		t.Fatal("large rollout checkpoint was not accepted")
+	}
+	file, err = os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = file.WriteString(`{"type":"response_item","payload":{"role":"user"}}
+{"type":"error","error":{"code":"usage_limit_reached"}}
+`); err != nil {
+		_ = file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	state, ok := monitor.readState(t.Context())
+	if !ok || state.Status != "usage_limited" {
+		t.Fatalf("large rollout tail did not trigger recovery: %#v, ok=%t", state, ok)
+	}
+}
+
+func TestProdex04377LiveGoalRecoveryRebasesCompactedRolloutWithoutReplay(t *testing.T) {
+	root := t.TempDir()
+	id := "019c9e3d-45a0-7ad0-a6ee-b194ac2d44f9"
+	path := filepath.Join(root, "rollout-2026-10-10T10-00-00-"+id+".jsonl")
+	meta := `{"type":"session_meta","payload":{"id":"` + id + `"}}
+`
+	oldTurn := `{"type":"response_item","payload":{"role":"user"}}
+{"type":"error","error":{"code":"usage_limit_reached"}}
+`
+	if err := os.WriteFile(path, []byte(meta+oldTurn), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	marker := &sessionStartMarker04360{directory: root, path: filepath.Join(root, "session.id")}
+	if err := os.WriteFile(marker.path, []byte(id+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	monitor := &liveGoalRecovery04361{
+		marker: marker,
+		read: func(context.Context, string) (runtimemodel.GoalRecoveryState, bool) {
+			return runtimemodel.GoalRecoveryState{SessionID: id, Status: "active"}, true
+		},
+		resolve: func(context.Context, string) (sessionmodel.Report, error) {
+			return sessionmodel.Report{ID: id, Path: path}, nil
+		},
+	}
+	if _, ok := monitor.readState(t.Context()); !ok {
+		t.Fatal("initial rollout state was unavailable")
+	}
+	if err := os.WriteFile(path, []byte(meta), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if state, ok := monitor.readState(t.Context()); !ok || state.Status != "active" {
+		t.Fatalf("compacted historical evidence was replayed: %#v, ok=%t", state, ok)
+	}
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = file.WriteString(`{"type":"response_item","payload":{"role":"user"}}
+{"type":"error","error":{"code":"usage_limit_reached"}}
+`); err != nil {
+		_ = file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	state, ok := monitor.readState(t.Context())
+	if !ok || state.Status != "usage_limited" {
+		t.Fatalf("new post-compaction evidence did not trigger recovery: %#v, ok=%t", state, ok)
+	}
+}
+
+func TestProdex04377LiveGoalRecoverySeesCapacityAfterUnobservedCompaction(t *testing.T) {
+	root := t.TempDir()
+	id := "019c9e3d-45a0-7ad0-a6ee-b194ac2d44f9"
+	path := filepath.Join(root, "rollout-2026-10-10T10-00-00-"+id+".jsonl")
+	meta := `{"type":"session_meta","payload":{"id":"` + id + `"}}` + "\n"
+	if err := os.WriteFile(path, []byte(meta+strings.Repeat("{}\n", 1024)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	marker := &sessionStartMarker04360{directory: root, path: filepath.Join(root, "session.id")}
+	if err := os.WriteFile(marker.path, []byte(id+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	monitor := &liveGoalRecovery04361{
+		marker: marker,
+		read: func(context.Context, string) (runtimemodel.GoalRecoveryState, bool) {
+			return runtimemodel.GoalRecoveryState{SessionID: id, Status: "active"}, true
+		},
+		resolve: func(context.Context, string) (sessionmodel.Report, error) {
+			return sessionmodel.Report{ID: id, Path: path}, nil
+		},
+	}
+	if _, ok := monitor.readState(t.Context()); !ok {
+		t.Fatal("initial live goal state was unavailable")
+	}
+	compacted := meta +
+		`{"type":"event_msg","payload":{"type":"context_compacted"}}` + "\n" +
+		`{"type":"response_item","payload":{"role":"user"}}` + "\n" +
+		`{"type":"error","error":{"code":"usage_limit_reached"}}` + "\n"
+	if err := os.WriteFile(path, []byte(compacted), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	state, ok := monitor.readState(t.Context())
+	if !ok || state.Status != "usage_limited" {
+		t.Fatalf("unobserved compaction lost capacity evidence: %#v, ok=%t", state, ok)
+	}
+}
+
+func TestProdex04377LiveGoalRecoveryRejectsSymlinkReplacementAndForeignSessionMeta(t *testing.T) {
+	root := t.TempDir()
+	id := "019c9e3d-45a0-7ad0-a6ee-b194ac2d44f9"
+	path := filepath.Join(root, "rollout-2026-10-10T10-00-00-"+id+".jsonl")
+	foreign := filepath.Join(root, "foreign.jsonl")
+	if err := os.WriteFile(path, []byte(`{"type":"session_meta","payload":{"id":"`+id+`"}}
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	marker := &sessionStartMarker04360{directory: root, path: filepath.Join(root, "session.id")}
+	if err := os.WriteFile(marker.path, []byte(id+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	monitor := &liveGoalRecovery04361{
+		marker: marker,
+		read: func(context.Context, string) (runtimemodel.GoalRecoveryState, bool) {
+			return runtimemodel.GoalRecoveryState{SessionID: id, Status: "active"}, true
+		},
+		resolve: func(context.Context, string) (sessionmodel.Report, error) {
+			return sessionmodel.Report{ID: id, Path: path}, nil
+		},
+	}
+	if _, ok := monitor.readState(t.Context()); !ok {
+		t.Fatal("initial rollout state was unavailable")
+	}
+	if err := os.Rename(path, foreign); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(foreign, path); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	if state, ok := monitor.readState(t.Context()); !ok || state.Status != "active" {
+		t.Fatalf("symlink replacement changed state: %#v, ok=%t", state, ok)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(`{"type":"session_meta","payload":{"id":"00000000-0000-4000-8000-000000000002"}}
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	foreignMonitor := &liveGoalRecovery04361{
+		marker: marker,
+		read: func(context.Context, string) (runtimemodel.GoalRecoveryState, bool) {
+			return runtimemodel.GoalRecoveryState{SessionID: id, Status: "active"}, true
+		},
+		resolve: func(context.Context, string) (sessionmodel.Report, error) {
+			return sessionmodel.Report{ID: id, Path: path}, nil
+		},
+	}
+	if _, ok := foreignMonitor.readState(t.Context()); !ok {
+		t.Fatal("foreign rollout checkpoint was unavailable")
+	}
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = file.WriteString(`{"type":"response_item","payload":{"role":"user"}}
+{"type":"error","error":{"code":"usage_limit_reached"}}
+`); err != nil {
+		_ = file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	state, ok := foreignMonitor.readState(t.Context())
+	if !ok || state.Status != "active" {
+		t.Fatalf("foreign session metadata changed state: %#v, ok=%t", state, ok)
 	}
 }

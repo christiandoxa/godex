@@ -145,6 +145,57 @@ func TestSessionThreadIDMatchesProdexPathPrecedenceAndTrim(t *testing.T) {
 	if got, ok := sessionThreadID("{\"thread_id\":7}"); ok || got != "" {
 		t.Fatalf("non-string thread id = %q, found=%t", got, ok)
 	}
+	content = "{\"type\":\"session_meta\",\"payload\":{\"id\":\" native-session \"}}"
+	if got, ok := sessionThreadID(content); !ok || got != "native-session" {
+		t.Fatalf("native session metadata id = %q, found=%t", got, ok)
+	}
+}
+
+func TestMaintainManagedSessionsRepairsNativeSessionGoalAttachment(t *testing.T) {
+	root := t.TempDir()
+	shared := filepath.Join(root, "shared")
+	cacheRoot := filepath.Join(root, "cache")
+	sessionID := "01900000-0000-7000-8000-000000000032"
+	session := filepath.Join(shared, "sessions", "2026", "10", "03", "rollout-"+sessionID+".jsonl")
+	if err := os.MkdirAll(filepath.Dir(session), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	oldRoot := filepath.Join(root, "deleted-overlay")
+	oldAttachment := filepath.Join(oldRoot, "attachments", sessionID, "pasted-text-1.txt")
+	if err := os.MkdirAll(filepath.Dir(oldAttachment), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(oldAttachment, []byte("native goal attachment"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	raw := `{"type":"event","payload":{"message":"read ` + oldAttachment + `"}}` + "\n" +
+		`{"type":"session_meta","payload":{"id":"` + sessionID + `"}}` + "\n"
+	if err := os.WriteFile(session, []byte(raw), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dbPath := filepath.Join(shared, "goals_1.sqlite")
+	db := createGoalDB(t, dbPath)
+	if _, err := db.Exec(
+		"INSERT INTO thread_goals (thread_id, objective) VALUES (?1, ?2)",
+		sessionID, "read "+oldAttachment,
+	); err != nil {
+		db.Close()
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := MaintainManagedSessions(shared, cacheRoot); err != nil {
+		t.Fatal(err)
+	}
+	stable := filepath.Join(shared, "attachments", sessionID, "pasted-text-1.txt")
+	if got, err := os.ReadFile(stable); err != nil || string(got) != "native goal attachment" {
+		t.Fatalf("stable native attachment = %q, err=%v", got, err)
+	}
+	objective := readGoalObjective(t, dbPath, sessionID)
+	if !strings.Contains(objective, stable) || strings.Contains(objective, oldRoot) {
+		t.Fatalf("native goal objective = %q", objective)
+	}
 }
 
 func createGoalDB(t *testing.T, path string) *sql.DB {

@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -152,4 +153,42 @@ func waitForSessionNativeGone(path string) bool {
 		time.Sleep(time.Millisecond)
 	}
 	return false
+}
+
+func TestInterruptCodexSessionChildProcessSignalsOwnedLauncherOnly(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix signal semantics are covered by the platform implementation")
+	}
+	root := t.TempDir()
+	marker := filepath.Join(root, "signal")
+	peer := exec.Command("sleep", "30")
+	if err := peer.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_ = peer.Process.Kill()
+		_ = peer.Wait()
+	}()
+	command := exec.Command(os.Args[0], "-test.run=^"+sessionCompanionHelperName+"$", "--", "signal")
+	command.Env = append(os.Environ(), sessionCompanionHelperEnv+"=1", sessionCompanionMarkerEnv+"="+marker)
+	if err := command.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_ = command.Process.Kill()
+		_ = command.Wait()
+	}()
+	if !waitForSessionForegroundFile(marker + ".ready") {
+		t.Fatal("owned launcher fixture did not become ready")
+	}
+	interruptCodexSessionChildProcess(command, false)
+	if err := command.Wait(); err != nil {
+		t.Fatalf("owned launcher wait = %v", err)
+	}
+	if got, err := os.ReadFile(marker); err != nil || string(got) != "term" {
+		t.Fatalf("owned launcher signal = %q, err=%v", got, err)
+	}
+	if err := syscall.Kill(peer.Process.Pid, 0); err != nil {
+		t.Fatalf("unrelated terminal peer was terminated: %v", err)
+	}
 }

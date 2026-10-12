@@ -104,6 +104,7 @@ func waitForSessionChild(ctx context.Context, command *exec.Cmd, privateProcessG
 	go func() { done <- command.Wait() }()
 	select {
 	case err := <-done:
+		terminateCodexSessionChildProcess(command, privateProcessGroup)
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
@@ -114,6 +115,7 @@ func waitForSessionChild(ctx context.Context, command *exec.Cmd, privateProcessG
 		defer timer.Stop()
 		select {
 		case <-done:
+			terminateCodexSessionChildProcess(command, privateProcessGroup)
 			return ctx.Err()
 		case <-timer.C:
 			terminateCodexSessionChildProcess(command, privateProcessGroup)
@@ -146,7 +148,9 @@ func interruptCodexSessionChildProcess(command *exec.Cmd, privateProcessGroup bo
 	if privateProcessGroup && syscall.Kill(-command.Process.Pid, syscall.SIGTERM) == nil {
 		return
 	}
-	_ = command.Process.Signal(os.Interrupt)
+	// Interactive launchers share the terminal's process group. Signal only
+	// the owned launcher so its handler can stop and reap its native child.
+	_ = syscall.Kill(command.Process.Pid, syscall.SIGTERM)
 }
 
 func terminateCodexSessionChildProcess(command *exec.Cmd, privateProcessGroup bool) {

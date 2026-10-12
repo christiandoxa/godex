@@ -25,6 +25,7 @@ type liveGoalRecovery04361 struct {
 	checkpointPath string
 	scanOffset     int64
 	accepted       bool
+	scanRetryAt    time.Time
 }
 
 func (monitor *liveGoalRecovery04361) readState(ctx context.Context) (runtimemodel.GoalRecoveryState, bool) {
@@ -41,6 +42,7 @@ func (monitor *liveGoalRecovery04361) readState(ctx context.Context) (runtimemod
 		monitor.checkpointPath = ""
 		monitor.scanOffset = 0
 		monitor.accepted = false
+		monitor.scanRetryAt = time.Time{}
 	}
 	state, ok := monitor.read(ctx, id)
 	if ok && state.SessionID != "" && state.SessionID != id {
@@ -53,13 +55,23 @@ func (monitor *liveGoalRecovery04361) readState(ctx context.Context) (runtimemod
 				monitor.checkpointPath = report.Path
 				monitor.scanOffset = 0
 				monitor.accepted = false
+				monitor.scanRetryAt = time.Time{}
 			}
-			class, nextOffset, accepted, scanned := monitor.checkpoint.scanAcceptedRecovery04360(
-				ctx, id, monitor.scanOffset, monitor.accepted,
-			)
-			if scanned {
-				monitor.scanOffset = nextOffset
-				monitor.accepted = accepted
+			var class string
+			if !monitor.scanRetryAt.After(time.Now()) {
+				var nextOffset int64
+				var accepted bool
+				var scanned bool
+				class, nextOffset, accepted, scanned = monitor.checkpoint.scanAcceptedRecovery04360(
+					ctx, id, monitor.scanOffset, monitor.accepted,
+				)
+				if scanned {
+					monitor.scanOffset = nextOffset
+					monitor.accepted = accepted
+					monitor.scanRetryAt = time.Time{}
+				} else if monitor.checkpoint.valid {
+					monitor.scanRetryAt = time.Now().Add(runtimeRecoveryRetryInterval04360)
+				}
 			}
 			if class != "" &&
 				(!ok || goalStatusResumable04361(state.Status)) {

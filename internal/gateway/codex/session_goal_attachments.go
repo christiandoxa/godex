@@ -203,6 +203,14 @@ func sessionThreadID(contents string) (string, bool) {
 				return text, true
 			}
 		}
+		if value["type"] == "session_meta" {
+			payload, _ := value["payload"].(map[string]any)
+			if text, ok := payload["id"].(string); ok {
+				if text = strings.TrimSpace(text); text != "" {
+					return text, true
+				}
+			}
+		}
 	}
 	return "", false
 }

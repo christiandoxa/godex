@@ -46,6 +46,23 @@ func TestCodexSessionCompanionHelper(t *testing.T) {
 		}
 	}
 	marker := os.Getenv(sessionCompanionMarkerEnv)
+	if len(arguments) >= 1 && arguments[0] == "signal" {
+		stopped := make(chan os.Signal, 1)
+		signal.Notify(stopped, syscall.SIGTERM, os.Interrupt)
+		defer signal.Stop(stopped)
+		if err := os.WriteFile(marker+".ready", []byte("ready"), sessionCompanionMarkerMode); err != nil {
+			os.Exit(16)
+		}
+		received := <-stopped
+		value := "int"
+		if received == syscall.SIGTERM {
+			value = "term"
+		}
+		if err := os.WriteFile(marker, []byte(value), sessionCompanionMarkerMode); err != nil {
+			os.Exit(17)
+		}
+		return
+	}
 	if len(arguments) >= 1 && arguments[0] == "native" {
 		runSessionCompanionNative(arguments, marker)
 		return

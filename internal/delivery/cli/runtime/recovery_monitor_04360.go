@@ -21,12 +21,14 @@ const recoveryCheckpointProbeBytes04360 int64 = 4096
 // A checkpoint starts at the current logical end. Historical errors never
 // authorize a new model turn. Prefix hashes also reject same-file rewrites.
 type recoveryCheckpoint04360 struct {
-	path        string
-	origin      os.FileInfo
-	offset      int64
-	valid       bool
-	compressed  bool
-	baselineSHA [32]byte
+	path         string
+	origin       os.FileInfo
+	offset       int64
+	valid        bool
+	compressed   bool
+	baselineSHA  [32]byte
+	metadataID   string
+	metadataSeen bool
 }
 
 func captureRecoveryCheckpoint04360(path string) recoveryCheckpoint04360 {
@@ -43,26 +45,26 @@ func captureRecoveryCheckpoint04360(path string) recoveryCheckpoint04360 {
 		if !ok || len(baseline) == 0 || !bytes.HasSuffix(baseline, []byte("\n")) {
 			return recoveryCheckpoint04360{}
 		}
+		metadataID, metadataSeen := recoverySessionMetaID04360(baseline)
 		return recoveryCheckpoint04360{
 			path: path, origin: info, offset: int64(len(baseline)), valid: true,
 			compressed: true, baselineSHA: sha256.Sum256(baseline),
+			metadataID: metadataID, metadataSeen: metadataSeen,
 		}
 	}
-	source, err := os.Open(path)
-	if err != nil {
+	source, opened, ok := openRecoveryRegularFile04360(path)
+	if !ok {
 		return recoveryCheckpoint04360{}
 	}
 	defer source.Close()
-	opened, err := source.Stat()
-	if err != nil || !opened.Mode().IsRegular() || !os.SameFile(info, opened) {
-		return recoveryCheckpoint04360{}
-	}
 	baselineSHA, ok := recoveryPrefixHash04360(source, opened.Size())
 	if !ok {
 		return recoveryCheckpoint04360{}
 	}
+	metadataID, metadataSeen := recoverySessionMetaIDFromFile04360(source, opened.Size())
 	return recoveryCheckpoint04360{
 		path: path, origin: info, offset: opened.Size(), valid: true, baselineSHA: baselineSHA,
+		metadataID: metadataID, metadataSeen: metadataSeen,
 	}
 }
 
@@ -71,7 +73,8 @@ func (checkpoint recoveryCheckpoint04360) newAcceptedUsageLimit04360(ctx context
 }
 
 func (checkpoint recoveryCheckpoint04360) newAcceptedRecoveryClass04360(ctx context.Context, sessionID string) string {
-	if !checkpoint.valid || ctx.Err() != nil || !sessionentity.ValidID(sessionID) {
+	if !checkpoint.valid || ctx.Err() != nil || !sessionentity.ValidID(sessionID) ||
+		!checkpoint.matchesSession04360(sessionID) {
 		return ""
 	}
 	if checkpoint.compressed {
@@ -84,8 +87,8 @@ func (checkpoint recoveryCheckpoint04360) newAcceptedRecoveryClass04360(ctx cont
 		}
 		return scanRecoveryClassFragment04360(ctx, sessionID, body[checkpoint.offset:])
 	}
-	source, err := os.Open(checkpoint.path)
-	if err != nil {
+	source, _, ok := openRecoveryRegularFile04360(checkpoint.path)
+	if !ok {
 		return ""
 	}
 	defer source.Close()
@@ -106,6 +109,61 @@ func (checkpoint recoveryCheckpoint04360) newAcceptedRecoveryClass04360(ctx cont
 		return ""
 	}
 	return scanRecoveryClassFragment04360(ctx, sessionID, fragment)
+}
+
+func (checkpoint recoveryCheckpoint04360) matchesSession04360(sessionID string) bool {
+	return !checkpoint.metadataSeen || strings.EqualFold(strings.TrimSpace(checkpoint.metadataID), strings.TrimSpace(sessionID))
+}
+
+func openRecoveryRegularFile04360(path string) (*os.File, os.FileInfo, bool) {
+	named, err := os.Lstat(path)
+	if err != nil || !named.Mode().IsRegular() {
+		return nil, nil, false
+	}
+	source, err := os.Open(path)
+	if err != nil {
+		return nil, nil, false
+	}
+	opened, err := source.Stat()
+	if err != nil || !opened.Mode().IsRegular() || !os.SameFile(named, opened) {
+		_ = source.Close()
+		return nil, nil, false
+	}
+	return source, named, true
+}
+
+func recoverySessionMetaIDFromFile04360(source *os.File, size int64) (string, bool) {
+	if size <= 0 {
+		return "", false
+	}
+	limit := size
+	if limit > recoveryScanCap04360 {
+		limit = recoveryScanCap04360
+	}
+	content, err := io.ReadAll(io.NewSectionReader(source, 0, limit))
+	if err != nil {
+		return "", false
+	}
+	return recoverySessionMetaID04360(content)
+}
+
+func recoverySessionMetaID04360(content []byte) (string, bool) {
+	for _, line := range bytes.Split(content, []byte("\n")) {
+		if len(line) == 0 || len(line) > recoveryLineCap04360 {
+			continue
+		}
+		var value map[string]any
+		if json.Unmarshal(line, &value) != nil || value["type"] != "session_meta" {
+			continue
+		}
+		payload, _ := value["payload"].(map[string]any)
+		for _, key := range []string{"id", "session_id"} {
+			if id, ok := payload[key].(string); ok && strings.TrimSpace(id) != "" {
+				return strings.TrimSpace(id), true
+			}
+		}
+	}
+	return "", false
 }
 
 func recoveryPrefixHash04360(source *os.File, size int64) ([32]byte, bool) {
@@ -197,6 +255,15 @@ func recordSession04360(record map[string]any, sessionID string) bool {
 func recordSessionObject04360(record map[string]any, sessionID string, depth int) bool {
 	if depth > 5 {
 		return true
+	}
+	if record["type"] == "session_meta" {
+		payload, _ := record["payload"].(map[string]any)
+		for _, key := range []string{"id", "session_id"} {
+			if value, ok := payload[key].(string); ok && strings.TrimSpace(value) != "" &&
+				!strings.EqualFold(strings.TrimSpace(value), strings.TrimSpace(sessionID)) {
+				return false
+			}
+		}
 	}
 	for _, key := range []string{"session_id", "sessionId", "thread_id", "threadId"} {
 		if value, ok := record[key].(string); ok && value != sessionID {
