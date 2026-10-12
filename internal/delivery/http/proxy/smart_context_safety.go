@@ -31,63 +31,121 @@ func smartContextCriticalSignalsPreserved(before, after []byte) bool {
 
 func smartContextCriticalSignalCounts(text string) smartContextSignalCounts {
 	counts := smartContextSignalCounts{}
-	for _, rawLine := range strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n") {
-		line := strings.TrimSpace(strings.TrimSuffix(rawLine, "\r"))
+	for _, rawLine := range strings.Split(strings.TrimRight(text, "\r\n"), "\n") {
+		line := smartContextSignalLine(rawLine)
 		if line == "" {
 			continue
 		}
 		lower := strings.ToLower(line)
-		if smartContextLineHasError(lower) {
+		if smartContextErrorLine(lower) {
 			counts.errors++
 		}
-		locations := len(smartContextFileLocationPattern.FindAllString(line, -1))
-		if locations == 0 && (strings.Contains(lower, "file \\") || strings.Contains(lower, "file '")) {
-			locations = 1
+		counts.fileLocations += len(smartContextFileLocationPattern.FindAllStringIndex(line, -1))
+		if strings.Contains(lower, `file "`) || strings.Contains(lower, "file '") {
+			counts.fileLocations++
 		}
-		counts.fileLocations += locations
-		if strings.Contains(line, "@@ -") || (strings.HasPrefix(line, "@@ ") && strings.Contains(line[3:], "@@")) {
+		if strings.HasPrefix(line, "@@ ") && strings.Contains(line[3:], "@@") {
 			counts.diffHunks++
 		}
-		if smartContextLineHasTestFailure(lower) {
+		if smartContextTestFailureLine(line) {
 			counts.testFailures++
 		}
-		if strings.Contains(lower, "exit code ") || strings.Contains(lower, "exit status ") || strings.Contains(lower, "exit_status") {
+		if strings.Contains(lower, "exit status") || strings.Contains(lower, "exit code") ||
+			strings.Contains(lower, "exit_status") {
 			counts.exitCodes++
 		}
-		if strings.Contains(lower, "stack backtrace:") || strings.Contains(lower, "traceback (most recent call last):") ||
-			strings.Contains(lower, "stack trace:") || strings.Contains(lower, "backtrace:") {
+		if smartContextStackLine(line) {
 			counts.stackMarkers++
 		}
-		counts.rustDiagnostics += smartContextRustDiagnosticCount(lower)
+		if smartContextDiagnosticLine(line) {
+			counts.rustDiagnostics++
+		}
 	}
 	return counts
 }
 
-func smartContextLineHasError(lower string) bool {
-	for _, marker := range []string{
-		"error[", "error:", "assertionerror:", "runtimeerror:", "syntaxerror:",
-		"typeerror:", "valueerror:", "exception:",
+func smartContextSignalLine(raw string) string {
+	line := strings.TrimSpace(strings.TrimSuffix(raw, "\r"))
+	if len(line) < 3 || line[0] != 'L' {
+		return line
+	}
+	index := 1
+	for index < len(line) && line[index] >= '0' && line[index] <= '9' {
+		index++
+	}
+	if index > 1 && index+1 < len(line) && line[index] == ':' && line[index+1] == ' ' {
+		return strings.TrimSpace(line[index+2:])
+	}
+	return line
+}
+
+func smartContextErrorLine(lower string) bool {
+	if smartContextZeroSummary(lower, "error:") || smartContextZeroSummary(lower, "errors:") {
+		return false
+	}
+	for _, prefix := range []string{
+		"error:", "error[", "error ", "error\t", "fatal:", "panic:",
+		"npm err!", "npm error", "pnpm error", "yarn error", "bun error",
+		"failed ", "fail ", "e   ", "assertionerror:", "runtimeerror:",
+		"syntaxerror:", "typeerror:", "valueerror:", "exception:",
 	} {
-		if strings.Contains(lower, marker) {
+		if strings.HasPrefix(lower, prefix) {
+			return true
+		}
+	}
+	return strings.Contains(lower, "panicked at") || strings.Contains(lower, `"error"`) ||
+		strings.Contains(lower, "status=error") || strings.Contains(lower, "level=error") ||
+		strings.Contains(lower, "exception")
+}
+
+func smartContextZeroSummary(lower, prefix string) bool {
+	if !strings.HasPrefix(lower, prefix) {
+		return false
+	}
+	index := len(prefix)
+	for index < len(lower) && strings.ContainsRune(" \t:=(", rune(lower[index])) {
+		index++
+	}
+	if index == len(lower) || lower[index] != '0' {
+		return false
+	}
+	for index < len(lower) && lower[index] == '0' {
+		index++
+	}
+	for index < len(lower) && strings.ContainsRune(" \t)", rune(lower[index])) {
+		index++
+	}
+	return index == len(lower)
+}
+
+func smartContextTestFailureLine(line string) bool {
+	return strings.HasPrefix(line, "test ") && strings.Contains(line, " ... FAILED") ||
+		strings.HasPrefix(line, "---- ") && strings.Contains(line, " ----") ||
+		strings.HasPrefix(line, "FAIL ") || strings.HasPrefix(line, "FAILED ") ||
+		strings.HasPrefix(line, "test result: FAILED") || strings.HasPrefix(line, "failures:") ||
+		strings.Contains(line, " ... FAILED")
+}
+
+func smartContextStackLine(line string) bool {
+	for _, prefix := range []string{
+		"stack backtrace:", "Traceback (most recent call last):", "Stack trace:",
+		"stack trace:", "Backtrace:", "Caused by:",
+	} {
+		if strings.HasPrefix(line, prefix) {
 			return true
 		}
 	}
 	return false
 }
 
-func smartContextLineHasTestFailure(lower string) bool {
-	return strings.Contains(lower, " failed") || strings.Contains(lower, "... failed") ||
-		strings.Contains(lower, "failures=") || strings.HasPrefix(lower, "fail ") ||
-		strings.HasPrefix(lower, "failed ")
-}
-
-func smartContextRustDiagnosticCount(lower string) int {
-	count := 0
-	for _, marker := range []string{
+func smartContextDiagnosticLine(line string) bool {
+	for _, prefix := range []string{
 		"error:", "error[", "warning:", "warning[", "--> ", "::: ",
-		"= note:", "= help:", "help:", "note:", "clippy::",
+		"= note:", "= help:", "help:", "note:",
 	} {
-		count += strings.Count(lower, marker)
+		if strings.HasPrefix(line, prefix) {
+			return true
+		}
 	}
-	return count
+	return strings.Contains(line, "clippy::")
 }

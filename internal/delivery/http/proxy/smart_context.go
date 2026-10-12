@@ -167,6 +167,7 @@ func prepareSmartContextBody(enabled bool, path string, headers http.Header, bod
 	}
 	if !smartContextCriticalSignalsPreserved(body, candidateBody) {
 		// Exact inline-reference round trips preserve the original payload semantically.
+		// Keep the conservative signal guard only when the expansion proof itself failed.
 		if !exactRoundTrip {
 			original.Decision = "self_check_passthrough"
 			original.SelfCheck = smartContextValidationReason(true, true, 1<<4, smartContextValidationStats{duplicateTexts: replacements})

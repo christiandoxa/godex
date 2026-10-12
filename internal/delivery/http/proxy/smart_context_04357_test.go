@@ -45,6 +45,52 @@ func TestProdex04357SmartContextExactRoundTripPreservesCriticalSignals(t *testin
 	}
 }
 
+func TestProdex04377CriticalSignalCountsMatchCanonicalPerLineTotals(t *testing.T) {
+	line := "error[E0308]: mismatch src/lib.rs:12:5"
+	text := strings.Join([]string{
+		line,
+		line,
+		"@@ -1,2 +1,3 @@",
+		"@@ -4,5 +4,6 @@",
+		"test parses ... FAILED",
+		"another test ... FAILED",
+		"exit code 1",
+		"exit status 2",
+		"stack backtrace:",
+		"Backtrace:",
+		"warning: unused variable",
+		"warning: unused import",
+	}, "\n")
+	got := smartContextCriticalSignalCounts(text)
+	want := smartContextSignalCounts{
+		errors: 2, fileLocations: 2, diffHunks: 2, testFailures: 2,
+		exitCodes: 2, stackMarkers: 2, rustDiagnostics: 4,
+	}
+	if got != want {
+		t.Fatalf("critical signal counts = %#v, want %#v", got, want)
+	}
+}
+
+func TestProdex04377CriticalSignalCountsKeepZeroSummaryOutOfErrors(t *testing.T) {
+	got := smartContextCriticalSignalCounts("error: 0\nerrors: 0\nnoise")
+	if got.errors != 0 || got.rustDiagnostics != 1 {
+		t.Fatalf("zero-summary critical signal counts = %#v", got)
+	}
+}
+
+func TestProdex04377CriticalSignalCaseSensitivityMatchesCanonical(t *testing.T) {
+	text := strings.Join([]string{
+		"test parses ... failed",
+		"backtrace:",
+		"Warning: unused variable",
+		"TRACEBACK (most recent call last):",
+	}, "\n")
+	got := smartContextCriticalSignalCounts(text)
+	if got.testFailures != 0 || got.stackMarkers != 0 || got.rustDiagnostics != 0 {
+		t.Fatalf("case-variant critical signal counts = %#v", got)
+	}
+}
+
 func TestProdex04357SmartContextPrepareFallbackEmitsTaggedReasonFields(t *testing.T) {
 	recorder := &recordingActivity{}
 	gateway := &smartContextCaptureGateway{}
