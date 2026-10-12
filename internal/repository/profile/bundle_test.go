@@ -112,6 +112,32 @@ func TestProfileBundleRejectsUnknownArgon2EnvelopeFields(t *testing.T) {
 	}
 }
 
+func TestProfileBundleRejectsLineBreaksInEncodedCryptoFields(t *testing.T) {
+	protected, err := EncodeProfileBundle(bundleFixture(), bundleTestPassword)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var envelope map[string]any
+	if err := json.Unmarshal(protected, &envelope); err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []string{"salt_base64", "nonce_base64", "ciphertext_base64"} {
+		value, ok := envelope[field].(string)
+		if !ok || value == "" {
+			t.Fatalf("%s = %#v", field, envelope[field])
+		}
+		envelope[field] = value[:len(value)/2] + "\n" + value[len(value)/2:]
+		mutated, err := json.Marshal(envelope)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := DecodeProfileBundle(mutated, bundleTestPassword); err == nil {
+			t.Fatalf("line break in %s was accepted", field)
+		}
+		envelope[field] = value
+	}
+}
+
 func TestProfileBundleRejectsUnsafeBoundsAndPrivateIO(t *testing.T) {
 	payload := bundleFixture()
 	payload.Profiles = make([]profilemodel.ExportedProfile, profileExportMaxProfiles+1)

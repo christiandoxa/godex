@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/agl/gcmsiv"
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
@@ -227,6 +228,9 @@ func decodeEncryptedV2(content []byte, password string) (profilemodel.BundlePayl
 }
 
 func decodeCryptoFields(saltText, nonceText, ciphertextText string) ([]byte, []byte, []byte, error) {
+	if strings.ContainsAny(saltText, "\r\n") || strings.ContainsAny(nonceText, "\r\n") || strings.ContainsAny(ciphertextText, "\r\n") {
+		return nil, nil, nil, errors.New(invalidProfileExportEnvelope)
+	}
 	salt, err := base64.StdEncoding.DecodeString(saltText)
 	if err != nil || len(salt) != profileExportSaltBytes {
 		return nil, nil, nil, errors.New(invalidProfileExportEnvelope)
