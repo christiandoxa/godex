@@ -88,6 +88,27 @@ func TestProdex04377LiveTailUsesLatestExactSessionRecoveryEvidence(t *testing.T)
 	}
 }
 
+func TestProdex04377IntermediateErrorNotificationNeverArmsRecovery(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "rollout-"+recoverySession04377+".jsonl")
+	if err := os.WriteFile(path,
+		[]byte(`{"type":"session_meta","payload":{"id":"`+recoverySession04377+`"}}`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	checkpoint := captureRecoveryCheckpoint04360(path)
+	appendRecoveryEvidence04377(t, path,
+		`{"type":"event_msg","payload":{"type":"user_message"}}`+"\n"+
+			`{"type":"event_msg","payload":{"type":"error","codex_error_info":"server_overloaded"}}`+"\n")
+	class, offset, _, _, scanned := checkpoint.scanAcceptedRecoveryWithActivity04377(
+		context.Background(), recoverySession04377, 0, false,
+	)
+	if !scanned || offset <= checkpoint.offset {
+		t.Fatalf("scan class=%q offset=%d checkpoint=%d scanned=%t", class, offset, checkpoint.offset, scanned)
+	}
+	if class != "" {
+		t.Fatalf("intermediate error armed recovery class=%q", class)
+	}
+}
+
 func TestProdex04377LiveRecoveryPendingEvidenceCannotCrossGoalRevision(t *testing.T) {
 	for _, nextStatus := range []string{"active", "paused"} {
 		t.Run(nextStatus, func(t *testing.T) {

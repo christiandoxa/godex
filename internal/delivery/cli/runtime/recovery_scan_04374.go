@@ -326,17 +326,9 @@ func recoveryObservationKind04377(record map[string]any) recoveryEventKind04377 
 	if typ == "event_msg" {
 		typ, _ = payload["type"].(string)
 	}
-	if typ == "error" {
-		if retry, _ := record["will_retry"].(bool); retry {
-			return recoveryObservationOther04377
-		}
-		if retry, _ := payload["will_retry"].(bool); retry {
-			return recoveryObservationOther04377
-		}
-	}
 	if record["method"] == "turn/completed" || typ == "turn.completed" ||
 		typ == "turn_completed" || typ == "turn.failed" || typ == "turn_failed" ||
-		typ == "task_complete" || typ == "turn_complete" || typ == "error" {
+		typ == "task_complete" || typ == "turn_complete" {
 		return recoveryObservationTerminal04377
 	}
 	if record["method"] == "turn/started" || typ == "response_item" || typ == "message" ||
