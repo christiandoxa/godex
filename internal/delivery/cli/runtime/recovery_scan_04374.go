@@ -36,6 +36,35 @@ func (checkpoint *recoveryCheckpoint04360) scanAcceptedRecovery04360(
 	return class, consumed + advanced, accepted, true
 }
 
+// scanAcceptedRecoveryWithActivity04377 is used by the live monitor. It keeps
+// the existing checkpoint and compaction safeguards while reporting whether
+// newer native activity superseded a terminal recovery signal in this tail.
+func (checkpoint *recoveryCheckpoint04360) scanAcceptedRecoveryWithActivity04377(
+	ctx context.Context, sessionID string, consumed int64, accepted bool,
+) (string, int64, bool, bool, bool) {
+	if checkpoint == nil || !checkpoint.valid || ctx.Err() != nil ||
+		!sessionentity.ValidID(sessionID) || consumed < 0 {
+		return "", consumed, accepted, false, false
+	}
+	if !checkpoint.matchesSession04360(sessionID) {
+		return "", consumed, false, false, true
+	}
+	fragment, ok, rebased := checkpoint.readAppendedRecovery04360(ctx, sessionID, consumed)
+	if !ok {
+		return "", consumed, accepted, false, false
+	}
+	if rebased {
+		class, _, accepted, activity := scanRecoveryClassSince04377(
+			ctx, sessionID, fragment, false,
+		)
+		return class, 0, accepted, activity, true
+	}
+	class, advanced, accepted, activity := scanRecoveryClassSince04377(
+		ctx, sessionID, fragment, accepted,
+	)
+	return class, consumed + advanced, accepted, activity, true
+}
+
 func (checkpoint *recoveryCheckpoint04360) readAppendedRecovery04360(
 	ctx context.Context, sessionID string, consumed int64,
 ) ([]byte, bool, bool) {
@@ -222,4 +251,101 @@ func scanRecoveryClassSince04360(
 		}
 	}
 	return recovery, consumed, accepted
+}
+
+// scanRecoveryClassSince04377 drains the complete bounded tail. Intermediate
+// retry notifications never arm recovery; a later activity or successful
+// terminal record clears an older failure before the final decision is read.
+func scanRecoveryClassSince04377(
+	ctx context.Context, sessionID string, fragment []byte, accepted bool,
+) (string, int64, bool, bool) {
+	var class string
+	var consumed int64
+	activity := false
+	for consumed < int64(len(fragment)) {
+		if ctx.Err() != nil {
+			return "", consumed, accepted, activity
+		}
+		relativeEnd := bytes.IndexByte(fragment[consumed:], '\n')
+		if relativeEnd < 0 {
+			break
+		}
+		end := consumed + int64(relativeEnd)
+		line := fragment[consumed:end]
+		consumed = end + 1
+		if len(line) == 0 {
+			continue
+		}
+		if len(line) > recoveryLineCap04360 {
+			accepted = false
+			continue
+		}
+		var value map[string]any
+		if json.Unmarshal(line, &value) != nil || !recordSession04360(value, sessionID) {
+			continue
+		}
+		kind := recoveryObservationKind04377(value)
+		switch kind {
+		case recoveryObservationActivity04377:
+			class = ""
+			activity = true
+		case recoveryObservationTerminal04377:
+			class = ""
+			activity = true
+		case recoveryObservationOther04377:
+			continue
+		}
+		if recordUserAccepted04360(value) {
+			accepted = true
+			continue
+		}
+		if kind == recoveryObservationTerminal04377 {
+			if accepted {
+				class = structuredWorkflowRecoveryClass04360(value)
+			}
+			accepted = false
+		}
+		if kind == recoveryObservationActivity04377 && recordTurnBoundary04360(value) {
+			accepted = false
+		}
+	}
+	return class, consumed, accepted, activity
+}
+
+type recoveryEventKind04377 uint8
+
+const (
+	recoveryObservationOther04377 recoveryEventKind04377 = iota
+	recoveryObservationActivity04377
+	recoveryObservationTerminal04377
+)
+
+func recoveryObservationKind04377(record map[string]any) recoveryEventKind04377 {
+	typ, _ := record["type"].(string)
+	payload, _ := record["payload"].(map[string]any)
+	if typ == "event_msg" {
+		typ, _ = payload["type"].(string)
+	}
+	if typ == "error" {
+		if retry, _ := record["will_retry"].(bool); retry {
+			return recoveryObservationOther04377
+		}
+		if retry, _ := payload["will_retry"].(bool); retry {
+			return recoveryObservationOther04377
+		}
+	}
+	if record["method"] == "turn/completed" || typ == "turn.completed" ||
+		typ == "turn_completed" || typ == "turn.failed" || typ == "turn_failed" ||
+		typ == "task_complete" || typ == "turn_complete" || typ == "error" {
+		return recoveryObservationTerminal04377
+	}
+	if record["method"] == "turn/started" || typ == "response_item" || typ == "message" ||
+		typ == "task_started" || typ == "turn_started" || typ == "user_message" ||
+		typ == "agent_message" || typ == "turn_aborted" || typ == "task_aborted" ||
+		typ == "turn_cancelled" || typ == "exec_command_end" || typ == "patch_apply_end" ||
+		typ == "mcp_tool_call_end" || typ == "tool_completed" || typ == "compacted" ||
+		typ == "context_compacted" {
+		return recoveryObservationActivity04377
+	}
+	return recoveryObservationOther04377
 }

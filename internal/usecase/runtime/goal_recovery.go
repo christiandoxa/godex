@@ -35,7 +35,7 @@ func (runner *Runner) RunWithGoalRecoveryMonitor(
 		return runner.RunWithOptions(ctx, selector, arguments, options), false
 	}
 	startedAt := time.Now().UnixMilli()
-	sessionID, armed := "", false
+	sessionID, armed, suppressed := "", false, false
 	childContext, cancel := context.WithCancel(ctx)
 	defer cancel()
 	triggered := make(chan struct{}, 1)
@@ -54,17 +54,24 @@ func (runner *Runner) RunWithGoalRecoveryMonitor(
 					continue
 				}
 				if state.SessionID != sessionID {
-					sessionID, armed = state.SessionID, false
+					sessionID, armed, suppressed = state.SessionID, false, false
 				}
 				switch strings.ToLower(strings.TrimSpace(state.Status)) {
 				case "active":
-					armed = true
+					armed, suppressed = true, false
 				case "usage_limited":
-					if armed || state.UpdatedAt >= startedAt {
+					if !suppressed && (armed || state.UpdatedAt >= startedAt) {
 						triggered <- struct{}{}
 						cancel()
 						return
 					}
+				case "paused", "complete", "completed", "stopped", "cancelled", "canceled", "budget_limited", "budgetlimited":
+					// A user stop invalidates a pending automatic recovery.
+					armed, suppressed = false, true
+				case "blocked":
+					// Blocked goals remain eligible for a fresh limit signal.
+				default:
+					armed = false
 				}
 			}
 		}
@@ -197,7 +204,7 @@ func (runner *Runner) goalRecoveryAccountReady(
 
 func goalStatusResumable(status string) bool {
 	switch strings.ToLower(strings.TrimSpace(status)) {
-	case "active", "paused", "blocked", "usage_limited":
+	case "active", "blocked", "usage_limited":
 		return true
 	default:
 		return false
