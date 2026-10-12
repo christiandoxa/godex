@@ -516,9 +516,9 @@ account persistence, and eligibility validation stays in the runtime use case.
   profile/model/base-URL/no-proxy/JSON options, 45-second timeout, four-worker
   cap, completion-order human rows, stable nullable JSON fields, failure taxonomy,
   private diagnostic CWD, provider-secret environment stripping, and bounded
-  redacted failure detail. It is never invoked implicitly. Large-model context
-  enrichment remains part of the wider provider/runtime parity work rather than
-  a ping-specific duplicate implementation.
+  redacted failure detail. It is never invoked implicitly. Context-window and
+  automatic-compaction defaults remain owned by the official Codex child; Godex
+  does not infer OpenAI values from its catalog or profile cache for ping.
 - Quota now matches Prodex's default five-second watch cadence, `--once`, raw,
   detail, profile selection, command-scoped base-URL override, aggregate
   `--auth`/`--provider` filtering, and the 0.435.1 provider-filter aliases.

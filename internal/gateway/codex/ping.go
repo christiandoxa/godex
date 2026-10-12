@@ -46,10 +46,7 @@ func (process *CodexProcess) PingOpenAI(ctx context.Context, target pingmodel.Ta
 	if err := secureCodexHomeWithShared(target.CodexHome, process.sharedCodexHome); err != nil {
 		return pingmodel.ProcessResult{}, err
 	}
-	arguments, err := pingModelContextArguments(target.CodexHome, pingArguments(options))
-	if err != nil {
-		return pingmodel.ProcessResult{}, err
-	}
+	arguments := pingArguments(options)
 	cwd, err := os.MkdirTemp("", "godex-ping-")
 	if err != nil {
 		return pingmodel.ProcessResult{}, fmt.Errorf("create ping diagnostic directory: %w", err)
