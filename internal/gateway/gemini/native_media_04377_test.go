@@ -13,6 +13,8 @@ func TestProdex04377GeminiImageMimeUsesPathSuffix(t *testing.T) {
 		{name: "query without path suffix is unknown", uri: "https://example.test/file?asset=.png", want: "application/octet-stream"},
 		{name: "pdf", uri: "https://example.test/report.pdf", want: "application/pdf"},
 		{name: "unknown", uri: "https://example.test/file.unknown", want: "application/octet-stream"},
+		{name: "encoded suffix stays encoded", uri: "https://example.test/photo%2Epng", want: "application/octet-stream"},
+		{name: "raw URI extension", uri: "https://example.png", want: "image/png"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			if got := geminiImageMime(test.uri); got != test.want {

@@ -2,8 +2,6 @@ package gemini
 
 import (
 	"encoding/json"
-	urlpkg "net/url"
-	"path"
 	"strings"
 )
 
@@ -106,16 +104,14 @@ func geminiImagePart(part map[string]any) map[string]any {
 }
 
 func geminiImageMime(url string) string {
-	pathValue := url
-	if parsed, err := urlpkg.Parse(url); err == nil {
-		pathValue = parsed.Path
-	} else if before, _, found := strings.Cut(url, "?"); found {
-		pathValue = before
+	if end := strings.IndexAny(url, "?#"); end >= 0 {
+		url = url[:end]
 	}
-	if before, _, found := strings.Cut(pathValue, "#"); found {
-		pathValue = before
+	dot := strings.LastIndexByte(url, '.')
+	if dot < 0 {
+		return "application/octet-stream"
 	}
-	switch strings.ToLower(path.Ext(pathValue)) {
+	switch strings.ToLower(url[dot:]) {
 	case ".png":
 		return "image/png"
 	case ".jpeg", ".jpg":
