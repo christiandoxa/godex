@@ -21,7 +21,7 @@
 471	internal/delivery/http/proxy/smart_context.go
 407	internal/gateway/deepseek/anthropic_stream_response.go
 492	internal/gateway/deepseek/stream_state.go
-514	internal/gateway/gemini/native_response.go
+487	internal/gateway/gemini/native_response.go
 558	internal/gateway/presidio/engine.go
 421	internal/usecase/routing/broker_metrics.go
 460	internal/usecase/runtime/activity.go
