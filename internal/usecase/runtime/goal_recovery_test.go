@@ -49,12 +49,12 @@ func (process *nativeRecoveryMonitorProcess) Run(ctx context.Context, _ string, 
 	return ctx.Err()
 }
 
-func (process *nativeRecoveryMonitorProcess) RecoverNativeSession(context.Context, string, bool) bool {
+func (process *nativeRecoveryMonitorProcess) RecoverNativeSession(context.Context, string, bool) runtimemodel.NativeRecoveryOutcome {
 	process.mu.Lock()
 	process.calls++
 	process.mu.Unlock()
 	process.once.Do(func() { close(process.recovered) })
-	return true
+	return runtimemodel.NativeRecoveryAccepted
 }
 
 type goalRecoveryProfilesFake struct {
@@ -159,6 +159,8 @@ func TestRunWithGoalRecoveryMonitorKeepsOwnedFrontendAndDoesNotReplayNativeRecov
 type retryingNativeRecoveryMonitorProcess struct {
 	started chan struct{}
 	calls   chan struct{}
+	mu      sync.Mutex
+	count   int
 }
 
 func (process *retryingNativeRecoveryMonitorProcess) Run(ctx context.Context, _ string, _ []string) error {
@@ -167,9 +169,16 @@ func (process *retryingNativeRecoveryMonitorProcess) Run(ctx context.Context, _ 
 	return ctx.Err()
 }
 
-func (process *retryingNativeRecoveryMonitorProcess) RecoverNativeSession(context.Context, string, bool) bool {
+func (process *retryingNativeRecoveryMonitorProcess) RecoverNativeSession(context.Context, string, bool) runtimemodel.NativeRecoveryOutcome {
+	process.mu.Lock()
+	process.count++
+	count := process.count
+	process.mu.Unlock()
 	process.calls <- struct{}{}
-	return true
+	if count == 1 {
+		return runtimemodel.NativeRecoveryDeferred
+	}
+	return runtimemodel.NativeRecoveryAccepted
 }
 
 func TestRunWithGoalRecoveryMonitorRetriesOwnedNativeRecoveryUntilItSettles(t *testing.T) {
@@ -211,6 +220,63 @@ func TestRunWithGoalRecoveryMonitorRetriesOwnedNativeRecoveryUntilItSettles(t *t
 	}
 	if received := <-observed; received < 2 {
 		t.Fatalf("owned native recovery calls=%d, want at least 2", received)
+	}
+}
+
+type generationNativeRecoveryMonitorProcess struct {
+	started chan struct{}
+	calls   chan struct{}
+	mu      sync.Mutex
+	count   int
+}
+
+func (process *generationNativeRecoveryMonitorProcess) Run(ctx context.Context, _ string, _ []string) error {
+	close(process.started)
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func (process *generationNativeRecoveryMonitorProcess) RecoverNativeSession(context.Context, string, bool) runtimemodel.NativeRecoveryOutcome {
+	process.mu.Lock()
+	process.count++
+	process.mu.Unlock()
+	process.calls <- struct{}{}
+	return runtimemodel.NativeRecoveryAccepted
+}
+
+func TestRunWithGoalRecoveryMonitorConsumesOnlyOneFailureGeneration(t *testing.T) {
+	process := &generationNativeRecoveryMonitorProcess{
+		started: make(chan struct{}), calls: make(chan struct{}, 4),
+	}
+	runner := cancellationMonitorRunner(process)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	go func() {
+		for range 2 {
+			<-process.calls
+		}
+		cancel()
+	}()
+	reads := 0
+	err, triggered := runner.RunWithGoalRecoveryMonitor(ctx, "", nil, RuntimeLaunchOptions{}, func(context.Context) (runtimemodel.GoalRecoveryState, bool) {
+		reads++
+		switch reads {
+		case 1:
+			return runtimemodel.GoalRecoveryState{SessionID: "session", Status: "active"}, true
+		case 2, 3:
+			return runtimemodel.GoalRecoveryState{SessionID: "session", Status: "usage_limited", UpdatedAt: 1}, true
+		default:
+			return runtimemodel.GoalRecoveryState{SessionID: "session", Status: "usage_limited", UpdatedAt: 2}, true
+		}
+	})
+	if triggered || !errors.Is(err, context.Canceled) {
+		t.Fatalf("native recovery generation handling changed launch: triggered=%t err=%v", triggered, err)
+	}
+	process.mu.Lock()
+	calls := process.count
+	process.mu.Unlock()
+	if calls != 2 {
+		t.Fatalf("native recovery calls=%d, want one call per failure generation", calls)
 	}
 }
 

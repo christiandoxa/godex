@@ -21,7 +21,7 @@ type GoalRecoveryStateReader interface {
 // private app-server companion. Keeping it optional leaves ordinary process
 // fakes and explicit remote launches on the existing relaunch path.
 type nativeSessionRecoveryProcess interface {
-	RecoverNativeSession(context.Context, string, bool) bool
+	RecoverNativeSession(context.Context, string, bool) runtimemodel.NativeRecoveryOutcome
 }
 
 type goalRecoveryProfiles interface {
@@ -53,7 +53,8 @@ func (runner *Runner) runWithGoalRecoveryMonitor(
 	run func(context.Context) error,
 ) (error, bool) {
 	startedAt := time.Now().UnixMilli()
-	sessionID, armed, suppressed := "", false, false
+	sessionID, armed, suppressed, suppressUntilActive := "", false, false, false
+	var suppressedGeneration int64
 	childContext, cancel := context.WithCancel(ctx)
 	defer cancel()
 	triggered := make(chan struct{}, 1)
@@ -75,19 +76,32 @@ func (runner *Runner) runWithGoalRecoveryMonitor(
 					continue
 				}
 				if state.SessionID != sessionID {
-					sessionID, armed, suppressed = state.SessionID, false, false
+					sessionID, armed, suppressed, suppressUntilActive = state.SessionID, false, false, false
+					suppressedGeneration = 0
 				}
 				switch strings.ToLower(strings.TrimSpace(state.Status)) {
 				case "active":
-					armed, suppressed = true, false
+					armed, suppressed, suppressUntilActive = true, false, false
 				case "usage_limited":
+					if !suppressUntilActive && suppressed && state.UpdatedAt > suppressedGeneration {
+						suppressed = false
+					}
 					if !suppressed && (armed || state.UpdatedAt >= startedAt) {
-						if recovery, ok := runner.process.(nativeSessionRecoveryProcess); ok &&
-							recovery.RecoverNativeSession(childContext, state.SessionID, true) {
-							// The owned companion remains authoritative for deferred,
-							// accepted, and ambiguous native decisions. Its own retry
-							// interval controls repeated RPC attempts.
-							continue
+						if recovery, ok := runner.process.(nativeSessionRecoveryProcess); ok {
+							switch recovery.RecoverNativeSession(childContext, state.SessionID, true) {
+							case runtimemodel.NativeRecoveryDeferred:
+								// The owned companion remains responsible for retrying
+								// this generation; do not fall back to frontend replay.
+								continue
+							case runtimemodel.NativeRecoveryAccepted,
+								runtimemodel.NativeRecoveryStopped,
+								runtimemodel.NativeRecoveryAmbiguous:
+								// Consume only this failure generation. A later
+								// UpdatedAt or active transition is eligible again.
+								suppressed = true
+								suppressedGeneration = state.UpdatedAt
+								continue
+							}
 						}
 						if nativeOnly {
 							continue
@@ -98,7 +112,7 @@ func (runner *Runner) runWithGoalRecoveryMonitor(
 					}
 				case "paused", "complete", "completed", "stopped", "cancelled", "canceled", "budget_limited", "budgetlimited":
 					// A user stop invalidates a pending automatic recovery.
-					armed, suppressed = false, true
+					armed, suppressed, suppressUntilActive = false, true, true
 				case "blocked":
 					// Blocked goals remain eligible for a fresh limit signal.
 				default:

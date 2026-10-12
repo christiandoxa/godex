@@ -11,6 +11,7 @@ import (
 	"time"
 
 	sessionentity "github.com/christiandoxa/godex/internal/entity/session"
+	runtimemodel "github.com/christiandoxa/godex/internal/model/runtime"
 )
 
 const (
@@ -27,19 +28,19 @@ type NativeSessionRecovery struct {
 	workspace  string
 	release    func(context.Context, string) error
 
-	mu           sync.Mutex
-	nextAttempt  time.Time
-	terminal     bool
-	lastTerminal NativeRecoveryOutcome
+	mu          sync.Mutex
+	nextAttempt time.Time
 }
 
-type NativeRecoveryOutcome uint8
+// Keep the gateway names available to its protocol fixtures while the typed
+// result itself is owned by the model boundary.
+type NativeRecoveryOutcome = runtimemodel.NativeRecoveryOutcome
 
 const (
-	NativeRecoveryDeferred NativeRecoveryOutcome = iota
-	NativeRecoveryStopped
-	NativeRecoveryAccepted
-	NativeRecoveryAmbiguous
+	NativeRecoveryDeferred  = runtimemodel.NativeRecoveryDeferred
+	NativeRecoveryStopped   = runtimemodel.NativeRecoveryStopped
+	NativeRecoveryAccepted  = runtimemodel.NativeRecoveryAccepted
+	NativeRecoveryAmbiguous = runtimemodel.NativeRecoveryAmbiguous
 )
 
 func newNativeSessionRecovery(
@@ -61,11 +62,6 @@ func (recovery *NativeSessionRecovery) recover(
 		return NativeRecoveryDeferred
 	}
 	recovery.mu.Lock()
-	if recovery.terminal {
-		outcome := recovery.lastTerminal
-		recovery.mu.Unlock()
-		return outcome
-	}
 	if time.Now().Before(recovery.nextAttempt) {
 		recovery.mu.Unlock()
 		return NativeRecoveryDeferred
@@ -89,32 +85,25 @@ func (recovery *NativeSessionRecovery) recover(
 			return recovery.release(ctx, sessionID)
 		},
 	)
-	if outcome != NativeRecoveryDeferred {
-		recovery.mu.Lock()
-		recovery.terminal = true
-		recovery.lastTerminal = outcome
-		recovery.mu.Unlock()
-	}
 	return outcome
 }
 
-// RecoverNativeSession is an optional runtime capability. A true result means
-// the owned companion reached a terminal decision, including an ambiguous
-// native mutation that must never be replayed. A false result keeps the event
-// eligible for a later bounded retry while preventing frontend fallback.
+// RecoverNativeSession is an optional runtime capability. The typed result
+// lets the usecase consume one failure generation while retaining deferred
+// attempts for the same owned companion.
 func (process *CodexProcess) RecoverNativeSession(
 	ctx context.Context, sessionID string, expectedGoal bool,
-) bool {
+) runtimemodel.NativeRecoveryOutcome {
 	if process == nil {
-		return false
+		return runtimemodel.NativeRecoveryDeferred
 	}
 	process.nativeRecoveryMu.RLock()
 	defer process.nativeRecoveryMu.RUnlock()
 	recovery, ok := process.nativeRecovery.(*NativeSessionRecovery)
 	if !ok || recovery == nil {
-		return false
+		return runtimemodel.NativeRecoveryDeferred
 	}
-	return recovery.recover(ctx, sessionID, expectedGoal) != NativeRecoveryDeferred
+	return recovery.recover(ctx, sessionID, expectedGoal)
 }
 
 func (process *CodexProcess) setNativeSessionRecovery(recovery *NativeSessionRecovery) {
