@@ -38,6 +38,9 @@ func (runner *Runner) RunWithGoalRecoveryMonitor(
 	options RuntimeLaunchOptions,
 	readState func(context.Context) (runtimemodel.GoalRecoveryState, bool),
 ) (error, bool) {
+	if options.AllowAutoRotate != nil && !*options.AllowAutoRotate {
+		return runner.RunWithOptions(ctx, selector, arguments, options), false
+	}
 	if readState == nil {
 		return runner.RunWithOptions(ctx, selector, arguments, options), false
 	}
@@ -136,9 +139,9 @@ func (runner *Runner) runWithGoalRecoveryMonitor(
 // companion. Exec resumes and explicit remote launches never provide a
 // session ID here, so they retain their existing process path.
 func (runner *Runner) runSessionWithNativeRecovery(
-	ctx context.Context, sessionID string, run func(context.Context) error,
+	ctx context.Context, sessionID string, allowAutoRotate bool, run func(context.Context) error,
 ) error {
-	if runner == nil || strings.TrimSpace(sessionID) == "" || runner.goalRecoveryReader == nil {
+	if !allowAutoRotate || runner == nil || strings.TrimSpace(sessionID) == "" || runner.goalRecoveryReader == nil {
 		return run(ctx)
 	}
 	if _, ok := runner.process.(nativeSessionRecoveryProcess); !ok {

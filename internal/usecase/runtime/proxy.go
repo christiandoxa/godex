@@ -34,6 +34,7 @@ func (runner *Runner) runThroughRuntimeProxy(
 	sessionServer bool,
 	sessionID string,
 	releaseAffinity func(context.Context, string) error,
+	allowAutoRotate bool,
 ) error {
 	run := func(runContext context.Context) error {
 		if sessionServer {
@@ -53,8 +54,8 @@ func (runner *Runner) runThroughRuntimeProxy(
 		}
 		return proxyRunner.RunThroughProxy(runContext, home, endpoint, arguments)
 	}
-	if sessionServer && sessionID != "" {
-		return runner.runSessionWithNativeRecovery(ctx, sessionID, run)
+	if sessionServer && sessionID != "" && allowAutoRotate {
+		return runner.runSessionWithNativeRecovery(ctx, sessionID, allowAutoRotate, run)
 	}
 	return run(ctx)
 }

@@ -307,6 +307,7 @@ func (runner *Runner) launchHomeWithOptions(
 	runErr = runner.runThroughRuntimeProxy(
 		ctx, proxyRunner, home, proxy.Endpoint(), runtimeArguments, provider.Kind,
 		options.SuperOverlay, options.nativeSessionID, releaseAffinity,
+		options.AllowAutoRotate == nil || *options.AllowAutoRotate,
 	)
 	return closeRuntimeProxy(ctx, proxy, runErr)
 }

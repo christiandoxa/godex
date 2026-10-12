@@ -18,6 +18,14 @@ type cancellationMonitorProcess struct {
 	err     error
 }
 
+type goalRecoveryStateReaderFunc func(context.Context, string) (runtimemodel.GoalRecoveryState, bool)
+
+func (reader goalRecoveryStateReaderFunc) ReadGoalRecoveryState(
+	ctx context.Context, sessionID string,
+) (runtimemodel.GoalRecoveryState, bool) {
+	return reader(ctx, sessionID)
+}
+
 func (process *cancellationMonitorProcess) Run(ctx context.Context, _ string, _ []string) error {
 	close(process.started)
 	if process.err != nil {
@@ -124,6 +132,34 @@ func TestRunWithGoalRecoveryMonitorParentCancellationStopsWatcher(t *testing.T) 
 	)
 	if triggered || !errors.Is(err, context.Canceled) {
 		t.Fatalf("parent cancellation changed: triggered=%t err=%v", triggered, err)
+	}
+}
+
+func TestRunSessionWithNativeRecoveryHonorsNoAutoRotate(t *testing.T) {
+	process := &nativeRecoveryMonitorProcess{
+		started: make(chan struct{}), recovered: make(chan struct{}),
+	}
+	runner := NewRunner(
+		&fakeLaunchAccounts{accounts: []accountentity.Account{{ID: "synthetic", Enabled: true}}},
+		process, nil,
+		goalRecoveryStateReaderFunc(func(context.Context, string) (runtimemodel.GoalRecoveryState, bool) {
+			return runtimemodel.GoalRecoveryState{SessionID: "session", Status: "usage_limited", UpdatedAt: 1}, true
+		}),
+	)
+	called := false
+	want := errors.New("child finished")
+	err := runner.runSessionWithNativeRecovery(t.Context(), "session", false, func(context.Context) error {
+		called = true
+		return want
+	})
+	if !called || !errors.Is(err, want) {
+		t.Fatalf("no-auto-rotate child run = called %t err %v", called, err)
+	}
+	process.mu.Lock()
+	calls := process.calls
+	process.mu.Unlock()
+	if calls != 0 {
+		t.Fatalf("no-auto-rotate native recovery calls=%d, want 0", calls)
 	}
 }
 
