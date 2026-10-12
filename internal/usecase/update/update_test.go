@@ -95,6 +95,17 @@ func TestUpdaterUsesCachedLatestAndAvoidsDowngrade(t *testing.T) {
 	}
 }
 
+func TestUpdaterTreatsInvalidCachedLatestAsUpToDate(t *testing.T) {
+	releases := &fakeReleaseSource{latest: "9.9.9"}
+	state := &fakeState{cached: "not-a-version", cachedOK: true}
+	installer := &fakeInstaller{path: "/bin/godex", version: "1.1.0"}
+	updater := NewUpdater(releases, state, installer, "1.1.0")
+	report, err := updater.Status(context.Background())
+	if err != nil || report.Status != updatemodel.UpToDate || report.Latest != "not-a-version" || releases.calls != 0 {
+		t.Fatalf("report=%+v calls=%d err=%v", report, releases.calls, err)
+	}
+}
+
 func TestUpdaterReprobesInstalledBinaryUnderLock(t *testing.T) {
 	releases := &fakeReleaseSource{latest: "1.1.0"}
 	state := &fakeState{}
@@ -154,6 +165,13 @@ func TestProdex04356UpdateRejectsEmptyBuildMetadata(t *testing.T) {
 	updater := NewUpdater(releases, state, installer, "1.0.0")
 	if _, err := updater.Status(t.Context()); err == nil {
 		t.Fatal("empty build metadata was accepted")
+	}
+}
+
+func TestProdex04377UpdateStatusTreatsInvalidTargetAsUpToDate(t *testing.T) {
+	decision, err := updateStatusDecision("1.0.0", "not-a-version")
+	if err != nil || decision != updatemodel.UpToDate {
+		t.Fatalf("status decision = %q, %v, want up-to-date", decision, err)
 	}
 }
 

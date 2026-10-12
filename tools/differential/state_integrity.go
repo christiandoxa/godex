@@ -181,7 +181,7 @@ func auditFixtureDurableState(root string) []string {
 	return violations
 }
 
-// Only files observed in the exact tagged Prodex 0.437.4 and Godex fixture
+// Only files observed in the exact tagged Prodex 0.437.7 and Godex fixture
 // may appear. New profile, secret, or session files require explicit review.
 func allowedFixtureStateFile(name string) bool {
 	switch name {

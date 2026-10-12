@@ -104,34 +104,7 @@ func geminiImagePart(part map[string]any) map[string]any {
 }
 
 func geminiImageMime(url string) string {
-	if end := strings.IndexAny(url, "?#"); end >= 0 {
-		url = url[:end]
-	}
-	dot := strings.LastIndexByte(url, '.')
-	if dot < 0 {
-		return "application/octet-stream"
-	}
-	switch strings.ToLower(url[dot:]) {
-	case ".png":
-		return "image/png"
-	case ".jpeg", ".jpg":
-		return "image/jpeg"
-	case ".webp":
-		return "image/webp"
-	case ".gif":
-		return "image/gif"
-	case ".pdf":
-		return "application/pdf"
-	case ".mp3", ".mpeg":
-		return "audio/mpeg"
-	case ".wav":
-		return "audio/wav"
-	case ".mp4":
-		return "video/mp4"
-	case ".mov":
-		return "video/quicktime"
-	}
-	return "application/octet-stream"
+	return geminiMIMEForURI(url)
 }
 
 func geminiDataURL(value string) (string, string, bool) {

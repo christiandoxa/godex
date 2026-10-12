@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	prodexCommit = "893597e911a8a2922578a09500d32b8d7c400593"
-	prodexSHA    = "6c45503762624f03dd010df258dcbff8ecd8d79312ed1627d034d95405e41efc"
+	prodexCommit = "7c774609cf9920d509539cf0e248872f53f6396e"
+	prodexSHA    = "1159ad3476e6e2ae1fd66cf407da23dfd1da0cdf02eb16c326dbce83440d2c13"
 )
 
 type attempt struct{ account, mode, body string }
@@ -141,9 +141,9 @@ type product struct {
 }
 
 func main() {
-	prodex := flag.String("prodex", "", "official Prodex 0.437.4 binary")
+	prodex := flag.String("prodex", "", "official Prodex 0.437.7 binary")
 	godex := flag.String("godex", "", "Godex binary")
-	prodexSource := flag.String("prodex-source", "", "tagged Prodex 0.437.4 source")
+	prodexSource := flag.String("prodex-source", "", "tagged Prodex 0.437.7 source")
 	flag.Parse()
 	if *prodex == "" || *godex == "" || *prodexSource == "" {
 		fatal("usage: continuationparity --prodex BIN --godex BIN --prodex-source DIR")
@@ -173,12 +173,12 @@ func verifyProdex(binary, source string) error {
 		return fmt.Errorf("Prodex binary digest %s, want %s", got, prodexSHA)
 	}
 	output, err := exec.Command(binary, "--version").CombinedOutput()
-	if err != nil || strings.TrimSpace(string(output)) != "prodex 0.437.4" {
+	if err != nil || strings.TrimSpace(string(output)) != "prodex 0.437.7" {
 		return fmt.Errorf("unexpected Prodex version %q: %v", output, err)
 	}
 	output, err = exec.Command("git", "-C", source, "rev-parse", "HEAD").Output()
 	if err != nil || strings.TrimSpace(string(output)) != prodexCommit {
-		return fmt.Errorf("Prodex source is not tag 0.437.4")
+		return fmt.Errorf("Prodex source is not tag 0.437.7")
 	}
 	return nil
 }

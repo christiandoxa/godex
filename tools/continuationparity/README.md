@@ -2,7 +2,7 @@
 
 This executable creates isolated two-account ChatGPT profile homes, starts one
 loopback upstream, and runs the same client sequence through the pinned Prodex
-0.437.4 binary and a Godex binary:
+0.437.7 binary and a Godex binary:
 
 - hard previous-response plus conflicting soft-session routing;
 - turn-state routing;

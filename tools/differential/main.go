@@ -28,8 +28,8 @@ import (
 )
 
 const (
-	prodexCommit         = "893597e911a8a2922578a09500d32b8d7c400593"
-	prodexBinarySHA256   = "6c45503762624f03dd010df258dcbff8ecd8d79312ed1627d034d95405e41efc"
+	prodexCommit         = "7c774609cf9920d509539cf0e248872f53f6396e"
+	prodexBinarySHA256   = "1159ad3476e6e2ae1fd66cf407da23dfd1da0cdf02eb16c326dbce83440d2c13"
 	apiKey               = "synthetic-provider-key"
 	bodyLimit            = 1 << 20
 	rotationPrimaryKey   = "synthetic-primary-credential"
@@ -148,9 +148,9 @@ func main() {
 
 func run() error {
 	flags := flag.NewFlagSet("differential", flag.ContinueOnError)
-	prodexBin := flags.String("prodex", "", "exact Prodex 0.437.4 product binary")
+	prodexBin := flags.String("prodex", "", "exact Prodex 0.437.7 product binary")
 	godexBin := flags.String("godex", "", "Godex candidate product binary")
-	prodexSource := flags.String("prodex-source", "", "exact Prodex 0.437.4 source checkout")
+	prodexSource := flags.String("prodex-source", "", "exact Prodex 0.437.7 source checkout")
 	godexSource := flags.String("godex-source", "", "Godex candidate source checkout")
 	expectedGodexCommit := flags.String("godex-commit", "", "expected Godex source HEAD commit SHA")
 	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, sse-stream, sse-rate-limit, retry, deepseek-sse-terminal, single-key-401, single-key-403, single-key-429, single-key-503, single-key-500, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
@@ -165,7 +165,7 @@ func run() error {
 		return fmt.Errorf("inspect Prodex source: %w", err)
 	}
 	if prodexSourceCommit != prodexCommit {
-		return fmt.Errorf("Prodex source commit %s, want exact 0.437.4 commit %s", prodexSourceCommit, prodexCommit)
+		return fmt.Errorf("Prodex source commit %s, want exact 0.437.7 commit %s", prodexSourceCommit, prodexCommit)
 	}
 	if err := requireCleanSource(*prodexSource); err != nil {
 		return fmt.Errorf("Prodex reference must be an unmodified canonical checkout: %w", err)
@@ -338,8 +338,8 @@ func verifyProdexArtifact(binary string) error {
 	if err != nil {
 		return fmt.Errorf("read version: %w", err)
 	}
-	if version != "prodex 0.437.4" {
-		return fmt.Errorf("version %q, want prodex 0.437.4", version)
+	if version != "prodex 0.437.7" {
+		return fmt.Errorf("version %q, want prodex 0.437.7", version)
 	}
 	return nil
 }
@@ -460,8 +460,8 @@ func runProduct(root string, mock *mockServer, name, binary, commit string, plan
 	if err != nil {
 		return productRun{}, err
 	}
-	if isProdex(name) && version != "prodex 0.437.4" {
-		return productRun{}, fmt.Errorf("binary %s reports %q, want prodex 0.437.4", resolved, version)
+	if isProdex(name) && version != "prodex 0.437.7" {
+		return productRun{}, fmt.Errorf("binary %s reports %q, want prodex 0.437.7", resolved, version)
 	}
 	digest, err := fileSHA256(resolved)
 	if err != nil {

@@ -66,9 +66,7 @@ func (updater *Updater) Status(ctx context.Context) (updatemodel.Report, error) 
 
 func (updater *Updater) latestVersion(ctx context.Context) (string, error) {
 	if latest, ok := updater.state.CachedLatest(updater.now()); ok {
-		if _, err := parseVersion(latest); err == nil {
-			return latest, nil
-		}
+		return latest, nil
 	}
 	release, err := updater.state.AcquireCheck(ctx)
 	if err != nil {
@@ -76,9 +74,7 @@ func (updater *Updater) latestVersion(ctx context.Context) (string, error) {
 	}
 	defer release()
 	if latest, ok := updater.state.CachedLatest(updater.now()); ok {
-		if _, err := parseVersion(latest); err == nil {
-			return latest, nil
-		}
+		return latest, nil
 	}
 	latest, err := updater.releases.LatestVersion(ctx)
 	if err != nil {
@@ -127,7 +123,7 @@ func updateStatusDecision(currentVersion, targetVersion string) (updatemodel.Dec
 	}
 	target, err := parseVersion(targetVersion)
 	if err != nil {
-		return "", fmt.Errorf("invalid target Godex version: %s", targetVersion)
+		return updatemodel.UpToDate, nil
 	}
 	switch compareVersionsTotal(current, target) {
 	case -1:

@@ -457,13 +457,12 @@ func geminiMediaContentItem(part map[string]any) map[string]any {
 		return map[string]any{"type": "output_text", "text": "Gemini returned " + mime + " media: " + uri}
 	}
 	if text, _ := part["text"].(string); strings.HasPrefix(text, "data:") {
-		meta, body, ok := strings.Cut(strings.TrimPrefix(text, "data:"), ",")
-		if !ok || !strings.HasSuffix(meta, ";base64") {
+		mime, body, ok := geminiDataURL(text)
+		if !ok {
 			return nil
 		}
-		mime := strings.TrimSuffix(meta, ";base64")
 		if strings.HasPrefix(mime, "image/") {
-			return map[string]any{"type": "input_image", "image_url": text}
+			return map[string]any{"type": "input_image", "image_url": "data:" + mime + ";base64," + body}
 		}
 		return map[string]any{"type": "output_text", "text": fmt.Sprintf("Gemini returned inline %s media (%d base64 characters).", mime, len(body))}
 	}
@@ -484,31 +483,5 @@ func geminiImageGenerationItem(responseID string, index int, part map[string]any
 		"type":   "image_generation_call",
 		"id":     fmt.Sprintf("ig_%s_%d", responseID, index),
 		"status": "completed", "result": data,
-	}
-}
-
-func geminiMIMEForURI(uri string) string {
-	lower := strings.ToLower(uri)
-	switch {
-	case strings.HasSuffix(lower, ".png"):
-		return "image/png"
-	case strings.HasSuffix(lower, ".jpg"), strings.HasSuffix(lower, ".jpeg"):
-		return "image/jpeg"
-	case strings.HasSuffix(lower, ".gif"):
-		return "image/gif"
-	case strings.HasSuffix(lower, ".webp"):
-		return "image/webp"
-	case strings.HasSuffix(lower, ".mp3"):
-		return "audio/mpeg"
-	case strings.HasSuffix(lower, ".wav"):
-		return "audio/wav"
-	case strings.HasSuffix(lower, ".mp4"):
-		return "video/mp4"
-	case strings.HasSuffix(lower, ".mov"):
-		return "video/quicktime"
-	case strings.HasSuffix(lower, ".pdf"):
-		return "application/pdf"
-	default:
-		return "application/octet-stream"
 	}
 }

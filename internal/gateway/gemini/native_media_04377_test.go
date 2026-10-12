@@ -43,3 +43,13 @@ func TestProdex04377GeminiDataURLRequiresBase64(t *testing.T) {
 		t.Fatalf("default data URL MIME = %#v", part)
 	}
 }
+
+func TestProdex04377GeminiResponseDataURLAcceptsCaseInsensitiveBase64(t *testing.T) {
+	got := geminiMediaContentItem(map[string]any{"text": "data:image/png;BASE64,AAAA"})
+	if got == nil || got["type"] != "input_image" || got["image_url"] != "data:image/png;base64,AAAA" {
+		t.Fatalf("response data URL = %#v", got)
+	}
+	if got := geminiMediaContentItem(map[string]any{"text": "data:image/png,AAAA"}); got != nil {
+		t.Fatalf("non-base64 response data URL accepted: %#v", got)
+	}
+}

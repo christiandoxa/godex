@@ -1,5 +1,5 @@
 // clierrorparity checks CLI argument rejection against the exact Prodex
-// 0.437.4 executable without touching user homes or credentials.
+// 0.437.7 executable without touching user homes or credentials.
 package main
 
 import (
@@ -20,8 +20,8 @@ import (
 )
 
 const (
-	canonicalProdexCommit       = "893597e911a8a2922578a09500d32b8d7c400593"
-	canonicalProdexBinarySHA256 = "6c45503762624f03dd010df258dcbff8ecd8d79312ed1627d034d95405e41efc"
+	canonicalProdexCommit       = "7c774609cf9920d509539cf0e248872f53f6396e"
+	canonicalProdexBinarySHA256 = "1159ad3476e6e2ae1fd66cf407da23dfd1da0cdf02eb16c326dbce83440d2c13"
 )
 
 type cliOptions struct {
@@ -124,7 +124,7 @@ func run() error {
 func parseOptions() (cliOptions, error) {
 	var options cliOptions
 	flags := flag.NewFlagSet("clierrorparity", flag.ContinueOnError)
-	flags.StringVar(&options.prodex, "prodex", "", "official Prodex 0.437.4 binary")
+	flags.StringVar(&options.prodex, "prodex", "", "official Prodex 0.437.7 binary")
 	flags.StringVar(&options.godex, "godex", "", "Godex candidate binary")
 	flags.StringVar(&options.prodexSource, "prodex-source", "", "exact tagged Prodex source")
 	flags.StringVar(&options.godexSource, "godex-source", "", "exact committed Godex source")
@@ -230,7 +230,7 @@ func verifyProdexBinary(path string) error {
 		return fmt.Errorf("Prodex binary digest mismatch: %s", digest)
 	}
 	output, err := exec.Command(path, "--version").CombinedOutput()
-	if err != nil || strings.TrimSpace(string(output)) != "prodex 0.437.4" {
+	if err != nil || strings.TrimSpace(string(output)) != "prodex 0.437.7" {
 		return fmt.Errorf("unexpected Prodex binary version: %q: %v", output, err)
 	}
 	return nil
