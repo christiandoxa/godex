@@ -57,6 +57,28 @@ func TestNativeRecoveryUsesOwnedThreadGoalMutation(t *testing.T) {
 	}
 }
 
+func TestNativeRecoveryPrefersIndexedWorkspace(t *testing.T) {
+	root := t.TempDir()
+	workspace := filepath.Join(root, "indexed-workspace")
+	if err := os.MkdirAll(workspace, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	database := openStateDBTest(t, filepath.Join(root, "state_5.sqlite"))
+	if _, err := database.Exec("CREATE TABLE threads (id TEXT PRIMARY KEY, cwd TEXT)"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.Exec("INSERT INTO threads (id, cwd) VALUES (?1, ?2)", "thread_"+nativeRecoveryTestThread, workspace); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.Close(); err != nil {
+		t.Fatal(err)
+	}
+	recovery := newNativeSessionRecovery("", root, root, filepath.Join(root, "launch-workspace"), nil)
+	if got := recovery.workspaceForSession(nativeRecoveryTestThread); got != workspace {
+		t.Fatalf("recovery workspace = %q, want indexed %q", got, workspace)
+	}
+}
+
 func TestNativeRecoveryDefersBusyAndUnloadedThreads(t *testing.T) {
 	for _, status := range []string{"active", "notLoaded", "unknown", "futureStatus"} {
 		scenario := defaultNativeRecoveryScenario()

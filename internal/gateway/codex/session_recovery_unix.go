@@ -73,10 +73,7 @@ func (recovery *NativeSessionRecovery) recover(
 	if !sessionentity.ValidID(strings.TrimSpace(sessionID)) || strings.TrimSpace(sessionID) != sessionID {
 		return NativeRecoveryStopped
 	}
-	workspace := recovery.workspace
-	if persisted := stateDBWorkspaceForSession(recovery.sqliteHome, sessionID); persisted != "" {
-		workspace = persisted
-	}
+	workspace := recovery.workspaceForSession(sessionID)
 	socket, err := connectNativeRecoverySocket(recovery.socketPath)
 	if err != nil {
 		return NativeRecoveryDeferred
@@ -92,6 +89,16 @@ func (recovery *NativeSessionRecovery) recover(
 		},
 	)
 	return outcome
+}
+
+func (recovery *NativeSessionRecovery) workspaceForSession(sessionID string) string {
+	if recovery == nil {
+		return ""
+	}
+	if persisted := stateDBWorkspaceForSession(recovery.sqliteHome, sessionID); persisted != "" {
+		return persisted
+	}
+	return recovery.workspace
 }
 
 // RecoverNativeSession is an optional runtime capability. The typed result
