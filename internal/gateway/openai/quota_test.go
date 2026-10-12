@@ -67,6 +67,20 @@ func TestDecodeQuotaUsageAcceptsIndexedCamelCase(t *testing.T) {
 	}
 }
 
+func TestProdex04377DecodeQuotaUsageReadsCodeReviewRateLimitAliases(t *testing.T) {
+	usage, err := decodeQuotaUsage([]byte(`{
+		"rate_limit":{"primary_window":{"used_percent":20}},
+		"codeReviewRateLimit":{"primaryWindow":{"usedPercent":100,"resetAt":200},"secondaryWindow":{"usedPercent":40}}
+	}`))
+	if err != nil || usage.CodeReviewRateLimit == nil || usage.CodeReviewRateLimit.Primary == nil ||
+		usage.CodeReviewRateLimit.Primary.UsedPercent == nil || *usage.CodeReviewRateLimit.Primary.UsedPercent != 100 ||
+		usage.CodeReviewRateLimit.Primary.ResetAt == nil || *usage.CodeReviewRateLimit.Primary.ResetAt != 200 ||
+		usage.CodeReviewRateLimit.Secondary == nil || usage.CodeReviewRateLimit.Secondary.UsedPercent == nil ||
+		*usage.CodeReviewRateLimit.Secondary.UsedPercent != 40 {
+		t.Fatalf("code review quota = %+v, err = %v", usage.CodeReviewRateLimit, err)
+	}
+}
+
 func TestQuotaClientDoesNotEchoErrorBody(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		writer.WriteHeader(http.StatusUnauthorized)

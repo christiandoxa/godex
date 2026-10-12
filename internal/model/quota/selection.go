@@ -10,6 +10,7 @@ const (
 )
 
 type Selection struct {
-	RouteKind      RouteKind
-	RequestedModel string
+	RouteKind         RouteKind
+	RequestedModel    string
+	IncludeCodeReview bool
 }

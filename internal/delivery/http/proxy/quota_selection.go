@@ -23,6 +23,12 @@ func quotaSelection(path string, websocket bool, body []byte) quotamodel.Selecti
 	return selection
 }
 
+func (proxy *Proxy) quotaSelection(path string, websocket bool, body []byte) quotamodel.Selection {
+	selection := quotaSelection(path, websocket, body)
+	selection.IncludeCodeReview = proxy != nil && proxy.broker != nil && proxy.broker.IncludeCodeReview
+	return selection
+}
+
 func requestModel(body []byte) string {
 	var object map[string]json.RawMessage
 	if json.Unmarshal(body, &object) != nil {

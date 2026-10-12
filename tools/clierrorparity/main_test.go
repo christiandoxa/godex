@@ -26,6 +26,15 @@ func TestCompareProbeAcceptsMatchingOutcomes(t *testing.T) {
 	}
 }
 
+func TestCompareProbeDetectsRejectedExitCodeDrift(t *testing.T) {
+	item := probe{Name: "current", Arguments: []string{"current", "extra"}, Rejects: true}
+	canonical := commandResult{ExitCode: 2, Output: "unexpected argument"}
+	candidate := commandResult{ExitCode: 1, Output: "unexpected argument"}
+	if differences := compareProbe(item, canonical, candidate); len(differences) == 0 {
+		t.Fatal("rejected exit-code drift escaped the oracle")
+	}
+}
+
 func TestNegativeControlPasses(t *testing.T) {
 	if err := checkNegativeControl(); err != nil {
 		t.Fatal(err)

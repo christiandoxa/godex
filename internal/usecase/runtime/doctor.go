@@ -7,6 +7,7 @@ import (
 	"time"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
+	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
 	accountmodel "github.com/christiandoxa/godex/internal/model/account"
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 	runtimemodel "github.com/christiandoxa/godex/internal/model/runtime"
@@ -41,6 +42,13 @@ type doctorActivity interface {
 	Events(context.Context, int) ([]runtimemodel.Event, error)
 }
 
+type doctorRouteHealthStateReader interface {
+	LoadRouteHealth(context.Context, time.Time) ([]routingentity.RouteHealthScore, error)
+	LoadRouteMemory(context.Context, time.Time) ([]routingentity.RouteMemoryScore, error)
+	LoadRouteCircuits(context.Context, time.Time, []routingentity.RouteHealthScore) ([]routingentity.RouteCircuit, error)
+	LoadTransportBackoffs(context.Context, time.Time) ([]routingentity.TransportBackoff, error)
+}
+
 type doctorQuota interface {
 	DoctorReports(context.Context) ([]quotamodel.Report, error)
 }
@@ -61,6 +69,7 @@ type Doctor struct {
 	activeHome      activeCodexHomeResolver
 	sharedCodexHome string
 	activity        doctorActivity
+	routeState      doctorRouteHealthStateReader
 	quota           doctorQuota
 	bundles         doctorBundleStore
 	imports         doctorImportJournalRepairer
@@ -72,6 +81,10 @@ func NewDoctor(accounts doctorAccounts, codex versionedCodex) *Doctor {
 }
 
 func (doctor *Doctor) SetActivity(activity doctorActivity) { doctor.activity = activity }
+
+func (doctor *Doctor) SetRouteHealthState(state doctorRouteHealthStateReader) {
+	doctor.routeState = state
+}
 
 func (doctor *Doctor) SetSessionIndexRepairer(repairer doctorSessionIndexRepairer) {
 	doctor.repairer = repairer
@@ -227,8 +240,29 @@ func (doctor *Doctor) runtimeDiagnostics(ctx context.Context, tailBytes int) (ru
 	if err != nil {
 		return runtimemodel.DoctorRuntime{}, err
 	}
+	var routeState *doctorRouteHealthState
+	if doctor.routeState != nil {
+		now := doctor.now()
+		health, err := doctor.routeState.LoadRouteHealth(ctx, now)
+		if err != nil {
+			return runtimemodel.DoctorRuntime{}, fmt.Errorf("load route health: %w", err)
+		}
+		memory, err := doctor.routeState.LoadRouteMemory(ctx, now)
+		if err != nil {
+			return runtimemodel.DoctorRuntime{}, fmt.Errorf("load route memory: %w", err)
+		}
+		circuits, err := doctor.routeState.LoadRouteCircuits(ctx, now, health)
+		if err != nil {
+			return runtimemodel.DoctorRuntime{}, fmt.Errorf("load route circuits: %w", err)
+		}
+		backoffs, err := doctor.routeState.LoadTransportBackoffs(ctx, now)
+		if err != nil {
+			return runtimemodel.DoctorRuntime{}, fmt.Errorf("load transport backoffs: %w", err)
+		}
+		routeState = &doctorRouteHealthState{now: now, health: health, memory: memory, circuits: circuits, backoffs: backoffs}
+	}
 	return runtimemodel.DoctorRuntime{
-		Overview: overview, Events: doctorTailEvents(events, tailBytes), TailBytes: tailBytes,
+		Overview: overview, Events: doctorTailEvents(events, tailBytes), RouteHealth: doctorRouteHealthWithState(events, routeState), TailBytes: tailBytes,
 	}, nil
 }
 

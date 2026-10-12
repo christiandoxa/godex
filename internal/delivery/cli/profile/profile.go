@@ -8,7 +8,6 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	usagecli "github.com/christiandoxa/godex/internal/delivery/cli/usage"
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
 	profileusecase "github.com/christiandoxa/godex/internal/usecase/profile"
 )
@@ -18,7 +17,7 @@ func Run(ctx context.Context, catalog *profileusecase.Catalog, out io.Writer, ar
 		return errors.New("profile support is not configured")
 	}
 	if len(arguments) == 0 {
-		return usagecli.Wrap(errors.New("profile requires add, export, import, list, current, use, remove, or import-current"))
+		return markArgumentError(errors.New("profile requires add, export, import, list, current, use, remove, or import-current"))
 	}
 	switch arguments[0] {
 	case "add":
@@ -36,14 +35,14 @@ func Run(ctx context.Context, catalog *profileusecase.Catalog, out io.Writer, ar
 	case "remove":
 		return remove(ctx, catalog, out, arguments[1:])
 	default:
-		return usagecli.Wrap(fmt.Errorf("unknown profile command %q", arguments[0]))
+		return fmt.Errorf("unknown profile command %q", arguments[0])
 	}
 }
 
 func add(ctx context.Context, catalog *profileusecase.Catalog, out io.Writer, arguments []string) error {
 	request, err := parseAdd(arguments)
 	if err != nil {
-		return usagecli.Wrap(err)
+		return markArgumentError(err)
 	}
 	report, err := catalog.Add(ctx, request)
 	if err != nil {
@@ -59,7 +58,7 @@ func add(ctx context.Context, catalog *profileusecase.Catalog, out io.Writer, ar
 
 func list(ctx context.Context, catalog *profileusecase.Catalog, out io.Writer, arguments []string) error {
 	if len(arguments) != 0 {
-		return usagecli.Wrap(errors.New("profile list does not accept arguments"))
+		return markArgumentError(errors.New("profile list does not accept arguments"))
 	}
 	reports, err := catalog.List(ctx)
 	if err != nil {
@@ -87,7 +86,7 @@ func list(ctx context.Context, catalog *profileusecase.Catalog, out io.Writer, a
 
 func current(ctx context.Context, catalog *profileusecase.Catalog, out io.Writer, arguments []string) error {
 	if len(arguments) != 0 {
-		return usagecli.Wrap(errors.New("current does not accept arguments"))
+		return markArgumentError(errors.New("current does not accept arguments"))
 	}
 	report, err := catalog.Current(ctx)
 	if err != nil {
@@ -122,7 +121,7 @@ func use(ctx context.Context, catalog *profileusecase.Catalog, out io.Writer, ar
 	}
 	name, err := parseProfileSelector(arguments)
 	if err != nil {
-		return usagecli.Wrap(err)
+		return markArgumentError(err)
 	}
 	report, err := catalog.Use(ctx, name)
 	if err != nil {
@@ -135,7 +134,7 @@ func use(ctx context.Context, catalog *profileusecase.Catalog, out io.Writer, ar
 func remove(ctx context.Context, catalog *profileusecase.Catalog, out io.Writer, arguments []string) error {
 	request, err := parseRemove(arguments)
 	if err != nil {
-		return usagecli.Wrap(err)
+		return markArgumentError(err)
 	}
 	removed, err := catalog.Remove(ctx, request)
 	if err != nil {

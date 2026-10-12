@@ -15,6 +15,8 @@ type rawQuotaUsage struct {
 	RateLimitsSnake           json.RawMessage            `json:"rate_limits"`
 	RateLimitsByID            map[string]json.RawMessage `json:"rateLimitsByLimitId"`
 	RateLimitsByIDSnake       map[string]json.RawMessage `json:"rate_limits_by_limit_id"`
+	CodeReviewRateLimit       json.RawMessage            `json:"code_review_rate_limit"`
+	CodeReviewRateLimitCamel  json.RawMessage            `json:"codeReviewRateLimit"`
 	AdditionalRateLimits      json.RawMessage            `json:"additional_rate_limits"`
 	AdditionalRateLimitsCamel json.RawMessage            `json:"additionalRateLimits"`
 	OrdinaryUsageAllowed      *bool                      `json:"ordinaryUsageAllowed"`
@@ -85,6 +87,11 @@ func decodeQuotaUsage(body []byte) (quotamodel.Usage, error) {
 		Allowed: pair.Allowed, LimitReached: pair.LimitReached,
 		Primary: pair.Primary, Secondary: pair.Secondary,
 	}
+	codeReview, err := decodeQuotaWindowPair(firstRaw(raw.CodeReviewRateLimit, raw.CodeReviewRateLimitCamel))
+	if err != nil {
+		return quotamodel.Usage{}, err
+	}
+	usage.CodeReviewRateLimit = codeReview
 	additional, err := decodeAdditionalQuotaLimits(
 		firstRaw(raw.AdditionalRateLimits, raw.AdditionalRateLimitsCamel), indexed,
 	)
@@ -105,6 +112,17 @@ func decodeQuotaUsage(body []byte) (quotamodel.Usage, error) {
 		usage.LimitReached = &blocked
 	}
 	return usage, nil
+}
+
+func decodeQuotaWindowPair(content json.RawMessage) (*quotamodel.WindowPair, error) {
+	if len(content) == 0 || string(content) == "null" {
+		return nil, nil
+	}
+	pair, err := decodeQuotaPair(content)
+	if err != nil {
+		return nil, err
+	}
+	return &quotamodel.WindowPair{Primary: pair.Primary, Secondary: pair.Secondary}, nil
 }
 
 func decodeQuotaPair(content json.RawMessage) (quotamodel.Usage, error) {

@@ -2,7 +2,9 @@ package session
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -10,6 +12,16 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	sessionmodel "github.com/christiandoxa/godex/internal/model/session"
 )
+
+func TestSessionArgumentErrorsUseCanonicalExitCode(t *testing.T) {
+	for _, arguments := range [][]string{{"list", "extra"}, {"current", "--unknown"}, {"resume"}} {
+		err := Run(context.Background(), nil, &bytes.Buffer{}, arguments)
+		var code interface{ ExitCode() int }
+		if err == nil || !errors.As(err, &code) || code.ExitCode() != 2 {
+			t.Fatalf("arguments %#v returned %v, want CLI exit 2", arguments, err)
+		}
+	}
+}
 
 func TestArgumentsValidateFiltersAndOutputModes(t *testing.T) {
 	for _, args := range [][]string{{"--json", "--id-only"}, {"--parent-only", "--include-subagents"}, {"--limit", "-1"}, {"extra"}, {"--cwd", "."}, {"--unknown"}} {

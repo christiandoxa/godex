@@ -2,6 +2,48 @@ package gemini
 
 import "strings"
 
+// geminiDataURL parses request media data URLs. The provider request contract
+// accepts a case-insensitive base64 metadata segment.
+func geminiDataURL(value string) (string, string, bool) {
+	if !strings.HasPrefix(value, "data:") {
+		return "", "", false
+	}
+	metadata, data, found := strings.Cut(strings.TrimPrefix(value, "data:"), ",")
+	if !found {
+		return "", "", false
+	}
+	segments := strings.Split(metadata, ";")
+	base64 := false
+	for _, segment := range segments {
+		if strings.EqualFold(segment, "base64") {
+			base64 = true
+			break
+		}
+	}
+	if !base64 {
+		return "", "", false
+	}
+	mime := segments[0]
+	if strings.TrimSpace(mime) == "" {
+		mime = "application/octet-stream"
+	}
+	return mime, data, true
+}
+
+// geminiResponseDataURL parses response text media. Prodex keeps this
+// response-side contract narrower: only an exact lowercase ;base64 suffix is
+// projected as inline media.
+func geminiResponseDataURL(value string) (string, string, bool) {
+	if !strings.HasPrefix(value, "data:") {
+		return "", "", false
+	}
+	metadata, data, found := strings.Cut(strings.TrimPrefix(value, "data:"), ",")
+	if !found || len(metadata) < len(";base64") || !strings.HasSuffix(metadata, ";base64") {
+		return "", "", false
+	}
+	return strings.TrimSuffix(metadata, ";base64"), data, true
+}
+
 func geminiMIMEForURI(uri string) string {
 	if cutoff := strings.IndexAny(uri, "?#"); cutoff >= 0 {
 		uri = uri[:cutoff]

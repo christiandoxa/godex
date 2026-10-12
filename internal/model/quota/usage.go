@@ -6,6 +6,11 @@ type Window struct {
 	LimitWindowSeconds *int64
 }
 
+type WindowPair struct {
+	Primary   *Window
+	Secondary *Window
+}
+
 type ResetCredits struct {
 	AvailableCount int64
 }
@@ -17,6 +22,7 @@ type Usage struct {
 	LimitReached         *bool
 	Primary              *Window
 	Secondary            *Window
+	CodeReviewRateLimit  *WindowPair
 	AdditionalRateLimits []AdditionalRateLimit
 	ResetCredits         *ResetCredits
 }

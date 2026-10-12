@@ -38,9 +38,30 @@ type DoctorCheck struct {
 type DoctorRuntime struct {
 	Overview              Overview                  `json:"overview"`
 	Events                []Event                   `json:"events"`
+	RouteHealth           []DoctorRouteHealth       `json:"route_health"`
 	TailBytes             int                       `json:"tail_bytes"`
 	PolicySuggestionCount *int                      `json:"policy_suggestion_count,omitempty"`
 	PolicySuggestions     *[]DoctorPolicySuggestion `json:"policy_suggestions,omitempty"`
+}
+
+type DoctorRouteHealth struct {
+	Profile                 string  `json:"profile"`
+	Route                   string  `json:"route"`
+	EventCount              int     `json:"event_count"`
+	LatestTimestamp         string  `json:"latest_timestamp,omitempty"`
+	LatestMarker            string  `json:"latest_marker,omitempty"`
+	LatestReason            string  `json:"latest_reason,omitempty"`
+	HealthScore             *uint32 `json:"health_score"`
+	HealthReason            string  `json:"health_reason,omitempty"`
+	BadPairingScore         *uint32 `json:"bad_pairing_score"`
+	BadPairingReason        string  `json:"bad_pairing_reason,omitempty"`
+	LatencyScore            *uint32 `json:"latency_score"`
+	LatencyReason           string  `json:"latency_reason,omitempty"`
+	CircuitState            string  `json:"circuit_state,omitempty"`
+	CircuitUntil            *int64  `json:"circuit_until"`
+	CircuitReason           string  `json:"circuit_reason,omitempty"`
+	TransportBackoffUntil   *int64  `json:"transport_backoff_until"`
+	TransportBackoffContext string  `json:"transport_backoff_context,omitempty"`
 }
 
 type DoctorPolicySettingSuggestion struct {

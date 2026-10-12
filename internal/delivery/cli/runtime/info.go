@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	usagecli "github.com/christiandoxa/godex/internal/delivery/cli/usage"
 	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
 	"github.com/christiandoxa/godex/internal/version"
 )
@@ -17,7 +16,7 @@ import (
 func Info(ctx context.Context, activity *runtimeusecase.Activity, out io.Writer, arguments []string) error {
 	jsonOutput, tokens, err := parseInfoArguments(arguments)
 	if err != nil {
-		return usagecli.Wrap(err)
+		return markCLIArgumentError(err)
 	}
 	if activity == nil {
 		return errors.New("runtime activity is not configured")

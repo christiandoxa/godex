@@ -140,6 +140,19 @@ func TestProfileCommandsRejectInvalidArguments(t *testing.T) {
 	}
 }
 
+func TestProfileArgumentErrorsUseCanonicalExitCode(t *testing.T) {
+	catalog, _ := newProfileCatalog(t)
+	for _, arguments := range [][]string{
+		{"current", "extra"}, {"list", "extra"}, {"add"}, {"remove"},
+	} {
+		err := Run(context.Background(), catalog, &bytes.Buffer{}, arguments)
+		var code interface{ ExitCode() int }
+		if err == nil || !errors.As(err, &code) || code.ExitCode() != 2 {
+			t.Fatalf("arguments %#v returned %v, want CLI exit 2", arguments, err)
+		}
+	}
+}
+
 func TestProfileExportArgumentParsing(t *testing.T) {
 	t.Setenv(exportPasswordEnv, "bundle-test-password")
 	request, err := parseExport([]string{"-p", "one", "--profile=two", "--password-protect", "bundle.json"})

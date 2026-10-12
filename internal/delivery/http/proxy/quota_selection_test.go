@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
 
@@ -34,5 +35,13 @@ func TestQuotaSelectionBoundsRequestedModel(t *testing.T) {
 	selection := quotaSelection("/backend-api/codex/responses", false, []byte(`{"model":"`+strings.Repeat("x", maxQuotaModelBytes+1)+`"}`))
 	if selection.RequestedModel != "" {
 		t.Fatalf("oversized requested model retained: %d bytes", len(selection.RequestedModel))
+	}
+}
+
+func TestProdex04377ProxyQuotaSelectionCarriesCodeReviewAdmission(t *testing.T) {
+	proxy := &Proxy{broker: &proxymodel.BrokerConfig{IncludeCodeReview: true}}
+	selection := proxy.quotaSelection("/backend-api/codex/responses", false, []byte(`{"model":"gpt-5.6-sol"}`))
+	if !selection.IncludeCodeReview || selection.RouteKind != quotamodel.RouteKindResponses {
+		t.Fatalf("quota selection = %+v", selection)
 	}
 }

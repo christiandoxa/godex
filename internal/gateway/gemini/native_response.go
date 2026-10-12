@@ -428,12 +428,13 @@ func geminiSpecialPartText(part map[string]any) string {
 func geminiMediaContentItem(part map[string]any) map[string]any {
 	inline, _ := firstPresentNative(part, "inlineData", "inline_data").(map[string]any)
 	if inline != nil {
-		mime := nativeString(firstPresentNative(inline, "mimeType", "mime_type"))
-		if mime == "" {
+		mimeValue := firstPresentNative(inline, "mimeType", "mime_type")
+		mime, mimeIsString := mimeValue.(string)
+		if !mimeIsString {
 			mime = "application/octet-stream"
 		}
-		data, _ := inline["data"].(string)
-		if data == "" {
+		data, dataIsString := inline["data"].(string)
+		if !dataIsString {
 			return nil
 		}
 		if strings.HasPrefix(mime, "image/") {
@@ -443,12 +444,13 @@ func geminiMediaContentItem(part map[string]any) map[string]any {
 	}
 	file, _ := firstPresentNative(part, "fileData", "file_data").(map[string]any)
 	if file != nil {
-		uri := nativeString(firstPresentNative(file, "fileUri", "file_uri"))
-		if uri == "" {
+		uri, uriIsString := firstPresentNative(file, "fileUri", "file_uri").(string)
+		if !uriIsString {
 			return nil
 		}
-		mime := nativeString(firstPresentNative(file, "mimeType", "mime_type"))
-		if mime == "" {
+		mimeValue := firstPresentNative(file, "mimeType", "mime_type")
+		mime, mimeIsString := mimeValue.(string)
+		if !mimeIsString {
 			mime = geminiMIMEForURI(uri)
 		}
 		if strings.HasPrefix(mime, "image/") {
@@ -457,7 +459,7 @@ func geminiMediaContentItem(part map[string]any) map[string]any {
 		return map[string]any{"type": "output_text", "text": "Gemini returned " + mime + " media: " + uri}
 	}
 	if text, _ := part["text"].(string); strings.HasPrefix(text, "data:") {
-		mime, body, ok := geminiDataURL(text)
+		mime, body, ok := geminiResponseDataURL(text)
 		if !ok {
 			return nil
 		}
@@ -475,8 +477,8 @@ func geminiImageGenerationItem(responseID string, index int, part map[string]any
 		return nil
 	}
 	mime := nativeString(firstPresentNative(inline, "mimeType", "mime_type"))
-	data, _ := inline["data"].(string)
-	if !strings.HasPrefix(mime, "image/") || data == "" {
+	data, dataIsString := inline["data"].(string)
+	if !strings.HasPrefix(mime, "image/") || !dataIsString {
 		return nil
 	}
 	return map[string]any{

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
+	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 	runtimemodel "github.com/christiandoxa/godex/internal/model/runtime"
 )
@@ -222,6 +223,61 @@ func TestDoctorTailEventsHonorsByteBudget(t *testing.T) {
 	}
 	if got := doctorTailEvents(events, 1); len(got) != 0 {
 		t.Fatalf("tiny tail returned %d events", len(got))
+	}
+}
+
+func TestProdex04377DoctorGroupsRouteHealthByProfileAndRoute(t *testing.T) {
+	events := []runtimemodel.Event{
+		{Kind: "profile_health", TimestampUnixMilli: 1_700_000_000_000, Fields: map[string]string{"profile": "beta", "route": "responses", "score": "4", "reason": "overload"}},
+		{Kind: "profile_latency", TimestampUnixMilli: 1_700_000_001_000, Fields: map[string]string{"profile": "alpha", "route": "responses", "score": "2", "reason": "ttfb"}},
+		{Kind: "selection_pick", Fields: map[string]string{"profile": "alpha", "route": "responses"}},
+		{Kind: "profile_circuit_open", Fields: map[string]string{"profile": "beta", "route": "responses", "until": "1700000100", "reason": "circuit"}},
+	}
+	got := doctorRouteHealth(events)
+	if len(got) != 2 || got[0].Profile != "alpha" || got[0].EventCount != 2 || got[1].Profile != "beta" || got[1].EventCount != 2 {
+		t.Fatalf("route health grouping = %#v", got)
+	}
+	if got[1].HealthScore == nil || *got[1].HealthScore != 4 || got[1].CircuitState != "open" || got[1].CircuitUntil == nil || *got[1].CircuitUntil != 1700000100 {
+		t.Fatalf("beta route health = %#v", got[1])
+	}
+	if got[0].LatencyScore == nil || *got[0].LatencyScore != 2 || got[0].LatestMarker != "selection_pick" {
+		t.Fatalf("alpha route health = %#v", got[0])
+	}
+}
+
+func TestProdex04377DoctorRouteHealthCapsEventsAndPreservesPriorReason(t *testing.T) {
+	events := []runtimemodel.Event{{Kind: "profile_transport_failure", Fields: map[string]string{
+		"profile": "alpha", "route": "responses",
+	}}, {Kind: "profile_health", Fields: map[string]string{
+		"profile": "alpha", "route": "responses", "reason": "first", "score": "1",
+	}}}
+	for range 19 {
+		events = append(events, runtimemodel.Event{Kind: "profile_transport_failure", Fields: map[string]string{
+			"profile": "alpha", "route": "responses",
+		}})
+	}
+	got := doctorRouteHealth(events)
+	if len(got) != 1 || got[0].EventCount != 20 || got[0].LatestMarker != "profile_transport_failure" || got[0].LatestReason != "first" {
+		t.Fatalf("route health = %#v", got)
+	}
+}
+
+func TestProdex04377DoctorRouteHealthIncludesPersistedState(t *testing.T) {
+	state := &doctorRouteHealthState{
+		health: []routingentity.RouteHealthScore{{AccountID: "alpha", Route: "responses", Score: 4}},
+		memory: []routingentity.RouteMemoryScore{
+			{AccountID: "alpha", Route: "responses", Kind: routingentity.RouteMemoryBadPairing, Score: 3},
+			{AccountID: "alpha", Route: "responses", Kind: routingentity.RouteMemoryPerformance, Score: 2},
+		},
+		circuits: []routingentity.RouteCircuit{{AccountID: "alpha", Route: "responses", UntilUnix: 1700000100}},
+		backoffs: []routingentity.TransportBackoff{{AccountID: "alpha", Route: "responses", UntilUnix: 1700000020}},
+	}
+	got := doctorRouteHealthWithState(nil, state)
+	if len(got) != 1 || got[0].EventCount != 0 || got[0].HealthScore == nil || *got[0].HealthScore != 4 ||
+		got[0].BadPairingScore == nil || *got[0].BadPairingScore != 3 || got[0].LatencyScore == nil || *got[0].LatencyScore != 2 ||
+		got[0].CircuitState != "open" || got[0].CircuitUntil == nil || *got[0].CircuitUntil != 1700000100 ||
+		got[0].TransportBackoffUntil == nil || *got[0].TransportBackoffUntil != 1700000020 {
+		t.Fatalf("persisted route health = %#v", got)
 	}
 }
 

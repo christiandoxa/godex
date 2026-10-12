@@ -127,7 +127,32 @@ func routeQuotaBlocked(usage quotamodel.Usage, selection quotamodel.Selection, n
 	}
 	primary, secondary, allowed, limitReached := quotaWindowsForModel(usage, selection, now)
 	windows := routeQuotaWindows(primary, secondary, selection.RouteKind)
-	return quotaPairBlocked(allowed, limitReached, windows, now)
+	blocked, retry := quotaPairBlocked(allowed, limitReached, windows, now)
+	if !blocked && selection.IncludeCodeReview {
+		blocked, retry = codeReviewQuotaBlocked(usage.CodeReviewRateLimit, now)
+	}
+	return blocked, retry
+}
+
+func codeReviewQuotaBlocked(pair *quotamodel.WindowPair, now time.Time) (bool, time.Time) {
+	if pair == nil {
+		return false, time.Time{}
+	}
+	blocked := false
+	var retry time.Time
+	for _, window := range []*quotamodel.Window{pair.Primary, pair.Secondary} {
+		if window == nil || window.UsedPercent == nil || *window.UsedPercent < 100 {
+			continue
+		}
+		blocked = true
+		if window.ResetAt != nil && time.Unix(*window.ResetAt, 0).After(now) {
+			reset := time.Unix(*window.ResetAt, 0)
+			if reset.After(retry) {
+				retry = reset
+			}
+		}
+	}
+	return blocked, retry
 }
 
 func quotaWindowsForModel(

@@ -49,3 +49,29 @@ func TestProdex04371GatewayMalformedArgumentsUseExitTwo(t *testing.T) {
 		t.Fatalf("runtime misconfiguration became parser exit: %v", err)
 	}
 }
+
+func TestProdex04377InfoAndStatusMalformedArgumentsUseExitTwo(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		run  func() error
+	}{
+		{name: "info", run: func() error {
+			return Info(context.Background(), nil, io.Discard, []string{"unexpected"})
+		}},
+		{name: "status", run: func() error {
+			return Status(context.Background(), nil, io.Discard, []string{"--json"})
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			err := test.run()
+			var coder interface{ ExitCode() int }
+			if err == nil || !errors.As(err, &coder) || coder.ExitCode() != 2 {
+				t.Fatalf("parser returned %v, want exit 2", err)
+			}
+			var printable interface{ CLIArgumentError() bool }
+			if !errors.As(err, &printable) || !printable.CLIArgumentError() {
+				t.Fatalf("parser error lost CLI reporting marker: %v", err)
+			}
+		})
+	}
+}

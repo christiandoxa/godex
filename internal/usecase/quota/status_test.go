@@ -201,6 +201,31 @@ func TestAvailabilityForResponsesIgnoresExhaustedWeeklyWindow(t *testing.T) {
 	}
 }
 
+func TestProdex04377AvailabilityHonorsCodeReviewWindowWhenRequested(t *testing.T) {
+	now := time.Unix(10, 0)
+	regularUsed, reviewUsed, reviewReset := int64(20), int64(100), int64(200)
+	account := accountentity.Account{ID: "one", Enabled: true}
+	status := NewStatus(fakeAccounts{}, fakeUsage{byHome: map[string]quotamodel.Usage{
+		"/managed/one": {
+			Primary: &quotamodel.Window{UsedPercent: &regularUsed},
+			CodeReviewRateLimit: &quotamodel.WindowPair{
+				Primary: &quotamodel.Window{UsedPercent: &reviewUsed, ResetAt: &reviewReset},
+			},
+		},
+	}})
+	status.now = func() time.Time { return now }
+	selection := quotamodel.Selection{RouteKind: quotamodel.RouteKindResponses, IncludeCodeReview: true}
+	availability, err := status.AvailabilityForRoute(context.Background(), account, selection)
+	if err != nil || availability.Ready || !availability.RetryAt.Equal(time.Unix(reviewReset, 0)) {
+		t.Fatalf("code-review availability = %+v, err = %v", availability, err)
+	}
+	selection.IncludeCodeReview = false
+	availability, err = status.AvailabilityForRoute(context.Background(), account, selection)
+	if err != nil || !availability.Ready {
+		t.Fatalf("regular availability = %+v, err = %v", availability, err)
+	}
+}
+
 func TestAvailabilityForRouteTreatsRetiredSparkAsUnavailable(t *testing.T) {
 	account := accountentity.Account{ID: "one", Enabled: true}
 	status := NewStatus(fakeAccounts{}, fakeUsage{byHome: map[string]quotamodel.Usage{

@@ -71,7 +71,7 @@ func (proxy *Proxy) forwardWebSocketMessages(
 			WebSocketSessionID: sessionID,
 			Method:             request.Method, Path: request.URL.Path, RawPath: request.URL.EscapedPath(),
 			RawQuery: request.URL.RawQuery, Header: request.Header.Clone(), Body: payload,
-			QuotaSelection: quotaSelection(request.URL.Path, true, payload), WebSocketMessage: true,
+			QuotaSelection: proxy.quotaSelection(request.URL.Path, true, payload), WebSocketMessage: true,
 		})
 		if err != nil {
 			if sessionContext.Err() != nil {

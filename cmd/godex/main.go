@@ -51,9 +51,7 @@ import (
 
 const errorPrefix = "godex:"
 
-func main() {
-	os.Exit(run())
-}
+func main() { os.Exit(run()) }
 
 func run() int {
 	_ = processresource.PrepareDescriptorHeadroom()
@@ -101,6 +99,7 @@ func run() int {
 	virtualQuota := quotagateway.NewVirtual(nil)
 	quotaStatus.SetVirtual(virtualQuota)
 	bindings := routingrepo.NewStore(settings.Home)
+	doctor.SetRouteHealthState(bindings)
 	copilotSource := copilotgateway.NewSource(nil)
 	claudeSource := claudegateway.NewSource()
 	kiroSource := kirogateway.NewSource()

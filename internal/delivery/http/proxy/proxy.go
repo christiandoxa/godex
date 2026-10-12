@@ -288,7 +288,7 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 		RequestID: activity.sequence, Method: request.Method, Path: request.URL.Path,
 		RawPath: request.URL.EscapedPath(), RawQuery: request.URL.RawQuery,
 		Header: request.Header.Clone(), Body: body,
-		QuotaSelection: quotaSelection(request.URL.Path, websocket, body),
+		QuotaSelection: proxy.quotaSelection(request.URL.Path, websocket, body),
 	})
 	if err != nil {
 		if requestContext.Err() != nil {

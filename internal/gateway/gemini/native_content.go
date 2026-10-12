@@ -90,6 +90,9 @@ func geminiImagePart(part map[string]any) map[string]any {
 	url, _ := part["image_url"].(string)
 	if object, ok := part["image_url"].(map[string]any); ok {
 		url, _ = object["url"].(string)
+		if url == "" {
+			url, _ = object["image_url"].(string)
+		}
 	}
 	if url == "" {
 		url, _ = part["url"].(string)
@@ -105,32 +108,6 @@ func geminiImagePart(part map[string]any) map[string]any {
 
 func geminiImageMime(url string) string {
 	return geminiMIMEForURI(url)
-}
-
-func geminiDataURL(value string) (string, string, bool) {
-	rest, ok := strings.CutPrefix(value, "data:")
-	if !ok {
-		return "", "", false
-	}
-	metadata, data, ok := strings.Cut(rest, ",")
-	if !ok {
-		return "", "", false
-	}
-	base64Encoded := false
-	for _, segment := range strings.Split(metadata, ";") {
-		if strings.EqualFold(segment, "base64") {
-			base64Encoded = true
-			break
-		}
-	}
-	if !base64Encoded {
-		return "", "", false
-	}
-	mime := strings.SplitN(metadata, ";", 2)[0]
-	if strings.TrimSpace(mime) == "" {
-		mime = "application/octet-stream"
-	}
-	return mime, data, true
 }
 
 func geminiJoinSystemParts(parts []any) string {
