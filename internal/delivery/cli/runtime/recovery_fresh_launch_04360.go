@@ -27,7 +27,7 @@ func runParsedWithOptionsWithRecovery(
 	liveGoalLaunch := liveGoalLaunch04361(args)
 	if runner == nil || sessions == nil || profiles == nil ||
 		strings.TrimSpace(selector) == "" ||
-		opts.NativeWithoutProxy || opts.SuperOverlay ||
+		opts.NativeWithoutProxy ||
 		opts.PresidioEnabled ||
 		(opts.AllowAutoRotate != nil && !*opts.AllowAutoRotate) ||
 		(!liveGoalLaunch || !fresh && strings.TrimSpace(runner.SharedCodexHome()) == "") {
