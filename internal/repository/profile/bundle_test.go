@@ -121,7 +121,15 @@ func TestProfileBundleRejectsLineBreaksInEncodedCryptoFields(t *testing.T) {
 	if err := json.Unmarshal(protected, &envelope); err != nil {
 		t.Fatal(err)
 	}
-	for _, field := range []string{"salt_base64", "nonce_base64", "ciphertext_base64"} {
+	for _, testCase := range []struct {
+		field string
+		want  string
+	}{
+		{field: "salt_base64", want: "invalid encrypted export salt encoding"},
+		{field: "nonce_base64", want: "invalid encrypted export nonce encoding"},
+		{field: "ciphertext_base64", want: "invalid encrypted export payload encoding"},
+	} {
+		field := testCase.field
 		value, ok := envelope[field].(string)
 		if !ok || value == "" {
 			t.Fatalf("%s = %#v", field, envelope[field])
@@ -131,8 +139,8 @@ func TestProfileBundleRejectsLineBreaksInEncodedCryptoFields(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, _, err := DecodeProfileBundle(mutated, bundleTestPassword); err == nil {
-			t.Fatalf("line break in %s was accepted", field)
+		if _, _, err := DecodeProfileBundle(mutated, bundleTestPassword); err == nil || err.Error() != testCase.want {
+			t.Fatalf("line break in %s error = %v, want %q", field, err, testCase.want)
 		}
 		envelope[field] = value
 	}

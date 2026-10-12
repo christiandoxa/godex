@@ -228,20 +228,35 @@ func decodeEncryptedV2(content []byte, password string) (profilemodel.BundlePayl
 }
 
 func decodeCryptoFields(saltText, nonceText, ciphertextText string) ([]byte, []byte, []byte, error) {
-	if strings.ContainsAny(saltText, "\r\n") || strings.ContainsAny(nonceText, "\r\n") || strings.ContainsAny(ciphertextText, "\r\n") {
-		return nil, nil, nil, errors.New(invalidProfileExportEnvelope)
+	if strings.ContainsAny(saltText, "\r\n") {
+		return nil, nil, nil, errors.New("invalid encrypted export salt encoding")
 	}
 	salt, err := base64.StdEncoding.DecodeString(saltText)
 	if err != nil || len(salt) != profileExportSaltBytes {
-		return nil, nil, nil, errors.New(invalidProfileExportEnvelope)
+		if err != nil {
+			return nil, nil, nil, errors.New("invalid encrypted export salt encoding")
+		}
+		return nil, nil, nil, errors.New("invalid encrypted export salt length")
+	}
+	if strings.ContainsAny(nonceText, "\r\n") {
+		return nil, nil, nil, errors.New("invalid encrypted export nonce encoding")
 	}
 	nonce, err := base64.StdEncoding.DecodeString(nonceText)
 	if err != nil || len(nonce) != profileExportNonceBytes {
-		return nil, nil, nil, errors.New(invalidProfileExportEnvelope)
+		if err != nil {
+			return nil, nil, nil, errors.New("invalid encrypted export nonce encoding")
+		}
+		return nil, nil, nil, errors.New("invalid encrypted export nonce length")
+	}
+	if strings.ContainsAny(ciphertextText, "\r\n") {
+		return nil, nil, nil, errors.New("invalid encrypted export payload encoding")
 	}
 	ciphertext, err := base64.StdEncoding.DecodeString(ciphertextText)
 	if err != nil || len(ciphertext) < profileExportAuthTagBytes || len(ciphertext) > profileExportPlaintextMaxBytes+profileExportAuthTagBytes {
-		return nil, nil, nil, errors.New(invalidProfileExportEnvelope)
+		if err != nil {
+			return nil, nil, nil, errors.New("invalid encrypted export payload encoding")
+		}
+		return nil, nil, nil, errors.New("invalid encrypted export payload length")
 	}
 	return salt, nonce, ciphertext, nil
 }
