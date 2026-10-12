@@ -42,11 +42,13 @@ type doctorRouteHealthState struct {
 
 func doctorRouteHealthWithState(events []runtimemodel.Event, state *doctorRouteHealthState) []runtimemodel.DoctorRouteHealth {
 	selected := make([]runtimemodel.Event, 0, doctorRouteProfileEventLimit)
+	markerFields := make(map[string]map[string]string)
 	for _, event := range events {
 		event = normalizeDoctorEvent04358(event)
 		if _, ok := doctorRouteProfileMarkers[event.Kind]; !ok {
 			continue
 		}
+		markerFields[event.Kind] = cloneDoctorRouteFields(event.Fields)
 		if event.Fields["profile"] == "" && event.Fields["route"] == "" {
 			continue
 		}
@@ -84,10 +86,10 @@ func doctorRouteHealthWithState(events []runtimemodel.Event, state *doctorRouteH
 		if event.TimestampUnixMilli > 0 {
 			entry.LatestTimestamp = time.UnixMilli(event.TimestampUnixMilli).UTC().Format(time.RFC3339Nano)
 		}
-		doctorApplyRouteHealthMarker(entry, event)
 	}
 	result := make([]runtimemodel.DoctorRouteHealth, 0, len(groups))
 	for _, entry := range groups {
+		doctorApplyRouteHealthMarkerFields(entry, markerFields)
 		result = append(result, *entry)
 	}
 	sort.Slice(result, func(left, right int) bool {
@@ -100,6 +102,17 @@ func doctorRouteHealthWithState(events []runtimemodel.Event, state *doctorRouteH
 		return result[left].Route < result[right].Route
 	})
 	return result
+}
+
+func cloneDoctorRouteFields(fields map[string]string) map[string]string {
+	if len(fields) == 0 {
+		return nil
+	}
+	cloned := make(map[string]string, len(fields))
+	for key, value := range fields {
+		cloned[key] = value
+	}
+	return cloned
 }
 
 func doctorApplyPersistedRouteHealth(
@@ -143,9 +156,35 @@ func doctorApplyPersistedRouteHealth(
 	}
 }
 
-func doctorApplyRouteHealthMarker(entry *runtimemodel.DoctorRouteHealth, event runtimemodel.Event) {
+func doctorApplyRouteHealthMarkerFields(
+	entry *runtimemodel.DoctorRouteHealth,
+	markerFields map[string]map[string]string,
+) {
+	for marker, fields := range markerFields {
+		if !doctorRouteMarkerMatches(fields, entry.Profile, entry.Route) {
+			continue
+		}
+		doctorApplyRouteHealthMarker(entry, marker, fields)
+	}
+}
+
+func doctorRouteMarkerMatches(fields map[string]string, profile, route string) bool {
+	if value, ok := fields["profile"]; ok && value != profile && value != "-" {
+		return false
+	}
+	if value, ok := fields["route"]; ok && value != route && value != "-" {
+		return false
+	}
+	return true
+}
+
+func doctorApplyRouteHealthMarker(
+	entry *runtimemodel.DoctorRouteHealth,
+	marker string,
+	fields map[string]string,
+) {
 	score := func() *uint32 {
-		value, err := strconv.ParseUint(event.Fields["score"], 10, 32)
+		value, err := strconv.ParseUint(fields["score"], 10, 32)
 		if err != nil {
 			return nil
 		}
@@ -153,49 +192,41 @@ func doctorApplyRouteHealthMarker(entry *runtimemodel.DoctorRouteHealth, event r
 		return &converted
 	}
 	until := func() *int64 {
-		value, err := strconv.ParseInt(event.Fields["until"], 10, 64)
+		value, err := strconv.ParseInt(fields["until"], 10, 64)
 		if err != nil {
 			return nil
 		}
 		return &value
 	}
-	switch event.Kind {
+	switch marker {
 	case "profile_health":
 		if value := score(); value != nil {
 			entry.HealthScore = value
 		}
-		if reason := event.Fields["reason"]; reason != "" {
-			entry.HealthReason = reason
-		}
+		entry.HealthReason = fields["reason"]
 	case "profile_bad_pairing":
 		if value := score(); value != nil {
 			entry.BadPairingScore = value
 		}
-		if reason := event.Fields["reason"]; reason != "" {
-			entry.BadPairingReason = reason
-		}
+		entry.BadPairingReason = fields["reason"]
 	case "profile_latency":
 		if value := score(); value != nil {
 			entry.LatencyScore = value
 		}
-		if reason := event.Fields["reason"]; reason != "" {
-			entry.LatencyReason = reason
-		}
+		entry.LatencyReason = fields["reason"]
 	case "profile_circuit_open":
 		entry.CircuitState = "open"
 		if value := until(); value != nil {
 			entry.CircuitUntil = value
 		}
-		if reason := event.Fields["reason"]; reason != "" {
-			entry.CircuitReason = reason
-		}
+		entry.CircuitReason = fields["reason"]
 	case "profile_transport_backoff":
 		if value := until(); value != nil {
 			entry.TransportBackoffUntil = value
 		}
-		if context := event.Fields["context"]; context != "" {
+		if context := fields["context"]; context != "" {
 			entry.TransportBackoffContext = context
-		} else if reason := event.Fields["reason"]; reason != "" {
+		} else if reason := fields["reason"]; reason != "" {
 			entry.TransportBackoffContext = reason
 		}
 	}

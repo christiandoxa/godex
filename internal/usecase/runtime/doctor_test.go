@@ -245,6 +245,30 @@ func TestProdex04377DoctorGroupsRouteHealthByProfileAndRoute(t *testing.T) {
 	}
 }
 
+func TestProdex04377DoctorRouteHealthUsesLatestFieldsPerMarker(t *testing.T) {
+	events := []runtimemodel.Event{
+		{Kind: "profile_health", Fields: map[string]string{
+			"profile": "beta", "route": "responses", "score": "4", "reason": "beta_old",
+		}},
+		{Kind: "profile_health", Fields: map[string]string{
+			"profile": "alpha", "route": "responses", "score": "2", "reason": "alpha_latest",
+		}},
+		{Kind: "selection_pick", Fields: map[string]string{
+			"profile": "beta", "route": "responses",
+		}},
+	}
+	got := doctorRouteHealth(events)
+	if len(got) != 2 {
+		t.Fatalf("route health groups = %#v", got)
+	}
+	if got[0].Profile != "beta" || got[0].HealthScore != nil || got[0].HealthReason != "" {
+		t.Fatalf("stale beta marker fields leaked = %#v", got[0])
+	}
+	if got[1].Profile != "alpha" || got[1].HealthScore == nil || *got[1].HealthScore != 2 || got[1].HealthReason != "alpha_latest" {
+		t.Fatalf("latest alpha marker fields = %#v", got[1])
+	}
+}
+
 func TestProdex04377DoctorRouteHealthCapsEventsAndPreservesPriorReason(t *testing.T) {
 	events := []runtimemodel.Event{{Kind: "profile_transport_failure", Fields: map[string]string{
 		"profile": "alpha", "route": "responses",
