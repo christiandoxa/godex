@@ -252,6 +252,39 @@ func stateDBThreadID(row stateDBThread) string {
 	return strings.ToLower(id)
 }
 
+func stateDBWorkspaceForSession(root, sessionID string) string {
+	if err := validateCodexHomePath(root); err != nil || !fullSessionID(sessionID) {
+		return ""
+	}
+	databases, err := stateDBFiles(root)
+	if err != nil {
+		return ""
+	}
+	threadID := "thread_" + sessionID
+	for _, path := range databases {
+		database, err := sql.Open("sqlite", stateDBReadOnlyURI(path))
+		if err != nil {
+			continue
+		}
+		database.SetMaxOpenConns(1)
+		var cwd sql.NullString
+		err = database.QueryRowContext(
+			context.Background(),
+			"SELECT cwd FROM threads WHERE id = ?1 OR id = ?2 LIMIT 1",
+			sessionID, threadID,
+		).Scan(&cwd)
+		_ = database.Close()
+		if err != nil || !cwd.Valid {
+			continue
+		}
+		value := strings.TrimSpace(cwd.String)
+		if filepath.IsAbs(value) {
+			return value
+		}
+	}
+	return ""
+}
+
 func sessionIDFromRollout(path string) string {
 	contents, found, err := readSessionAttachmentFile(path)
 	if err != nil || !found {

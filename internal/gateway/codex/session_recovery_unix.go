@@ -25,6 +25,7 @@ const (
 type NativeSessionRecovery struct {
 	socketPath string
 	codexHome  string
+	sqliteHome string
 	workspace  string
 	release    func(context.Context, string) error
 
@@ -44,12 +45,13 @@ const (
 )
 
 func newNativeSessionRecovery(
-	socketPath, codexHome, workspace string,
+	socketPath, codexHome, sqliteHome, workspace string,
 	release func(context.Context, string) error,
 ) *NativeSessionRecovery {
 	return &NativeSessionRecovery{
 		socketPath: socketPath,
 		codexHome:  codexHome,
+		sqliteHome: sqliteHome,
 		workspace:  workspace,
 		release:    release,
 	}
@@ -71,13 +73,17 @@ func (recovery *NativeSessionRecovery) recover(
 	if !sessionentity.ValidID(strings.TrimSpace(sessionID)) || strings.TrimSpace(sessionID) != sessionID {
 		return NativeRecoveryStopped
 	}
+	workspace := recovery.workspace
+	if persisted := stateDBWorkspaceForSession(recovery.sqliteHome, sessionID); persisted != "" {
+		workspace = persisted
+	}
 	socket, err := connectNativeRecoverySocket(recovery.socketPath)
 	if err != nil {
 		return NativeRecoveryDeferred
 	}
 	defer socket.close()
 	outcome := recoverNativeSessionOnSocket(
-		ctx, socket, recovery.codexHome, recovery.workspace, sessionID, expectedGoal,
+		ctx, socket, recovery.codexHome, workspace, sessionID, expectedGoal,
 		func() error {
 			if recovery.release == nil {
 				return nil

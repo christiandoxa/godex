@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -64,7 +65,15 @@ func (process *CodexProcess) runWithSessionAppServer(
 	if err != nil {
 		return fmt.Errorf("resolve native session workspace: %w", err)
 	}
-	recovery := newNativeSessionRecovery(socket, codexHome, workspace, releaseAffinity)
+	sqliteHome := codexHome
+	for _, entry := range environment {
+		key, value, found := strings.Cut(entry, "=")
+		if found && key == "CODEX_SQLITE_HOME" && strings.TrimSpace(value) != "" {
+			sqliteHome = value
+			break
+		}
+	}
+	recovery := newNativeSessionRecovery(socket, codexHome, sqliteHome, workspace, releaseAffinity)
 	process.setNativeSessionRecovery(recovery)
 	defer process.clearNativeSessionRecovery(recovery)
 

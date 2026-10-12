@@ -102,6 +102,28 @@ func TestStateDBRolloutRecoveryRepairsOnlyVerifiedOverlayRows(t *testing.T) {
 	}
 }
 
+func TestStateDBWorkspaceForSessionUsesIndexedCWD(t *testing.T) {
+	root := t.TempDir()
+	sessionID := "019ec6c3-28a4-79f0-91f9-74a2f34b0928"
+	workspace := filepath.Join(root, "workspace")
+	if err := os.MkdirAll(workspace, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	database := openStateDBTest(t, filepath.Join(root, "state_5.sqlite"))
+	if _, err := database.Exec("CREATE TABLE threads (id TEXT PRIMARY KEY, cwd TEXT)"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.Exec("INSERT INTO threads (id, cwd) VALUES (?1, ?2)", "thread_"+sessionID, workspace); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if got := stateDBWorkspaceForSession(root, sessionID); got != workspace {
+		t.Fatalf("indexed workspace = %q, want %q", got, workspace)
+	}
+}
+
 func TestStateDBMaintenanceSkipsAcrossProcessesWhileChildOwnsSessionLock(t *testing.T) {
 	if os.Getenv(stateDBMaintenanceHelperMode) != "" {
 		home := os.Getenv("GODEX_TEST_STATE_DB_HOME")
