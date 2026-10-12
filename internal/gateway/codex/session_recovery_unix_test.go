@@ -166,8 +166,7 @@ func TestNativeRecoverySystemErrorUsesSameOwnedThread(t *testing.T) {
 }
 
 func TestNativeRecoveryUsesOneDeadlineWithUnsolicitedMessages(t *testing.T) {
-	root := t.TempDir()
-	path := filepath.Join(root, "recovery.sock")
+	path := nativeRecoveryTestSocket(t)
 	listener, err := net.Listen("unix", path)
 	if err != nil {
 		t.Fatal(err)
@@ -220,13 +219,14 @@ func TestNativeRecoveryRejectsUnownedSocketPathForms(t *testing.T) {
 		t.Fatal("relative recovery socket path was accepted")
 	}
 	root := t.TempDir()
-	listener, err := net.Listen("unix", filepath.Join(root, "owned.sock"))
+	owned := nativeRecoveryTestSocket(t)
+	listener, err := net.Listen("unix", owned)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer listener.Close()
 	link := filepath.Join(root, "foreign.sock")
-	if err := os.Symlink(filepath.Join(root, "owned.sock"), link); err != nil {
+	if err := os.Symlink(owned, link); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := connectNativeRecoverySocket(link); err == nil {
@@ -246,7 +246,7 @@ func runNativeRecoveryFixture(t *testing.T, scenario nativeRecoveryScenario) (Na
 			t.Fatal(err)
 		}
 	}
-	path := filepath.Join(root, "recovery.sock")
+	path := nativeRecoveryTestSocket(t)
 	listener, err := net.Listen("unix", path)
 	if err != nil {
 		t.Fatal(err)
@@ -266,6 +266,17 @@ func runNativeRecoveryFixture(t *testing.T, scenario nativeRecoveryScenario) (Na
 	calls := <-serverDone
 	_ = listener.Close()
 	return outcome, calls, released.Load()
+}
+
+func nativeRecoveryTestSocket(t *testing.T) string {
+	t.Helper()
+	// Test names and macOS's temporary root can exceed sockaddr_un's path limit.
+	directory, err := os.MkdirTemp("/tmp", "gd-rpc-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(directory) })
+	return filepath.Join(directory, "rpc.sock")
 }
 
 func nativeRecoveryFixtureServer(
