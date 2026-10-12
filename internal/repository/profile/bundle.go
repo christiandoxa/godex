@@ -1,6 +1,7 @@
 package profile
 
 import (
+	"bytes"
 	"crypto/pbkdf2"
 	"crypto/rand"
 	"crypto/sha256"
@@ -192,6 +193,21 @@ func decodeEncryptedV1(content []byte, password string) (profilemodel.BundlePayl
 func decodeEncryptedV2(content []byte, password string) (profilemodel.BundlePayload, error) {
 	var envelope encryptedV2Envelope
 	if err := json.Unmarshal(content, &envelope); err != nil || envelope.Version != profileExportVersionV2 || envelope.Cipher != profileExportCipher {
+		return profilemodel.BundlePayload{}, errors.New(invalidProfileExportEnvelope)
+	}
+	var fields struct {
+		KDF json.RawMessage `json:"kdf"`
+	}
+	if err := json.Unmarshal(content, &fields); err != nil || len(fields.KDF) == 0 {
+		return profilemodel.BundlePayload{}, errors.New(invalidProfileExportEnvelope)
+	}
+	decoder := json.NewDecoder(bytes.NewReader(fields.KDF))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&envelope.KDF); err != nil {
+		return profilemodel.BundlePayload{}, errors.New(invalidProfileExportEnvelope)
+	}
+	var extra any
+	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
 		return profilemodel.BundlePayload{}, errors.New(invalidProfileExportEnvelope)
 	}
 	parameters := envelope.KDF

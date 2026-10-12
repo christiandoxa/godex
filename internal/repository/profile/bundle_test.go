@@ -89,6 +89,29 @@ func TestProfileBundleImportsLegacyPBKDF2Envelope(t *testing.T) {
 	}
 }
 
+func TestProfileBundleRejectsUnknownArgon2EnvelopeFields(t *testing.T) {
+	protected, err := EncodeProfileBundle(bundleFixture(), bundleTestPassword)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var envelope map[string]any
+	if err := json.Unmarshal(protected, &envelope); err != nil {
+		t.Fatal(err)
+	}
+	kdf, ok := envelope["kdf"].(map[string]any)
+	if !ok {
+		t.Fatalf("kdf = %#v", envelope["kdf"])
+	}
+	kdf["unexpected"] = "synthetic"
+	mutated, err := json.Marshal(envelope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := DecodeProfileBundle(mutated, bundleTestPassword); err == nil {
+		t.Fatal("unknown Argon2 envelope field was accepted")
+	}
+}
+
 func TestProfileBundleRejectsUnsafeBoundsAndPrivateIO(t *testing.T) {
 	payload := bundleFixture()
 	payload.Profiles = make([]profilemodel.ExportedProfile, profileExportMaxProfiles+1)
