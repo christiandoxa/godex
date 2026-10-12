@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -101,10 +102,17 @@ func (socket *appServerSocket) sendText(text string) error {
 }
 
 func (socket *appServerSocket) writeFrame(opcode byte, payload []byte) error {
+	return socket.writeFrameUntil(opcode, payload, time.Now().Add(appServerRequestTimeout))
+}
+
+func (socket *appServerSocket) writeFrameUntil(opcode byte, payload []byte, deadline time.Time) error {
 	if len(payload) > appServerMaxMessageSize {
 		return errors.New("app-server websocket payload is too large")
 	}
-	if err := socket.conn.SetWriteDeadline(time.Now().Add(appServerRequestTimeout)); err != nil {
+	if !deadline.After(time.Now()) {
+		return os.ErrDeadlineExceeded
+	}
+	if err := socket.conn.SetWriteDeadline(deadline); err != nil {
 		return err
 	}
 	mask := [4]byte{}
@@ -136,10 +144,17 @@ func (socket *appServerSocket) writeFrame(opcode byte, payload []byte) error {
 }
 
 func (socket *appServerSocket) readText() (string, error) {
+	return socket.readTextUntil(time.Now().Add(appServerRequestTimeout))
+}
+
+func (socket *appServerSocket) readTextUntil(deadline time.Time) (string, error) {
 	var message []byte
 	started := false
 	for {
-		if err := socket.conn.SetReadDeadline(time.Now().Add(appServerRequestTimeout)); err != nil {
+		if !deadline.After(time.Now()) {
+			return "", os.ErrDeadlineExceeded
+		}
+		if err := socket.conn.SetReadDeadline(deadline); err != nil {
 			return "", err
 		}
 		first, err := socket.reader.ReadByte()
@@ -199,7 +214,7 @@ func (socket *appServerSocket) readText() (string, error) {
 			if !fin || length > 125 {
 				return "", errors.New("invalid app-server websocket ping frame")
 			}
-			if err := socket.writeFrame(0xA, payload); err != nil {
+			if err := socket.writeFrameUntil(0xA, payload, deadline); err != nil {
 				return "", err
 			}
 			continue

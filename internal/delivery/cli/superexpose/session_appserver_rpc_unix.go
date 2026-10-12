@@ -7,6 +7,7 @@ import (
 	"errors"
 	"path/filepath"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/google/uuid"
@@ -16,11 +17,12 @@ func appServerRequest(socket *appServerSocket, requestID uint64, method string, 
 	content, err := json.Marshal(map[string]any{
 		"id": requestID, "method": method, "params": params,
 	})
-	if err != nil || socket.sendText(string(content)) != nil {
+	deadline := time.Now().Add(appServerRequestTimeout)
+	if err != nil || socket.writeFrameUntil(0x1, []byte(content), deadline) != nil {
 		return appServerAmbiguous, nil
 	}
 	for range appServerMaxMessages {
-		text, err := socket.readText()
+		text, err := socket.readTextUntil(deadline)
 		if err != nil {
 			return appServerAmbiguous, nil
 		}

@@ -9,6 +9,7 @@ import (
 	"net"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/christiandoxa/godex/internal/helper/websocketframe"
 )
@@ -67,6 +68,45 @@ func TestAppServerReadTextAnswersPing(t *testing.T) {
 	if err != nil || text != "ok" {
 		t.Fatalf("read text = %q err=%v", text, err)
 	}
+	<-done
+}
+
+func TestAppServerRequestUsesOneDeadlineAcrossUnsolicitedMessages(t *testing.T) {
+	server, client := net.Pipe()
+	defer server.Close()
+	defer client.Close()
+	socket := &appServerSocket{conn: client, reader: bufio.NewReader(client)}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		request, err := websocketframe.ReadHeader(server)
+		if err != nil {
+			return
+		}
+		if _, err := request.ReadPayload(server, appServerMaxMessageSize); err != nil {
+			return
+		}
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				if err := websocketframe.WriteFrame(server, 1, []byte(`{"method":"notification"}`), false); err != nil {
+					return
+				}
+			}
+		}
+	}()
+
+	started := time.Now()
+	outcome, _ := appServerRequest(socket, 1, "thread/read", map[string]any{"threadId": "thread"})
+	if outcome != appServerAmbiguous {
+		t.Fatalf("unsolicited-message outcome = %v, want ambiguous", outcome)
+	}
+	if elapsed := time.Since(started); elapsed > 4*time.Second {
+		t.Fatalf("request deadline reset by unsolicited messages: %s", elapsed)
+	}
+	_ = client.Close()
 	<-done
 }
 
