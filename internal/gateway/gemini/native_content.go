@@ -2,6 +2,8 @@ package gemini
 
 import (
 	"encoding/json"
+	urlpkg "net/url"
+	"path"
 	"strings"
 )
 
@@ -94,12 +96,8 @@ func geminiImagePart(part map[string]any) map[string]any {
 	if url == "" {
 		url, _ = part["url"].(string)
 	}
-	if strings.HasPrefix(url, "data:") {
-		meta, data, found := strings.Cut(url, ",")
-		if found {
-			mime := strings.TrimPrefix(strings.TrimSuffix(strings.TrimPrefix(meta, "data:"), ";base64"), ";")
-			return map[string]any{"inlineData": map[string]any{"mimeType": mime, "data": data}}
-		}
+	if mime, data, ok := geminiDataURL(url); ok {
+		return map[string]any{"inlineData": map[string]any{"mimeType": mime, "data": data}}
 	}
 	if url != "" {
 		return map[string]any{"fileData": map[string]any{"fileUri": url, "mimeType": geminiImageMime(url)}}
@@ -108,13 +106,62 @@ func geminiImagePart(part map[string]any) map[string]any {
 }
 
 func geminiImageMime(url string) string {
-	lower := strings.ToLower(url)
-	for suffix, mime := range map[string]string{".jpeg": "image/jpeg", ".jpg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif"} {
-		if strings.Contains(lower, suffix) {
-			return mime
+	pathValue := url
+	if parsed, err := urlpkg.Parse(url); err == nil {
+		pathValue = parsed.Path
+	} else if before, _, found := strings.Cut(url, "?"); found {
+		pathValue = before
+	}
+	if before, _, found := strings.Cut(pathValue, "#"); found {
+		pathValue = before
+	}
+	switch strings.ToLower(path.Ext(pathValue)) {
+	case ".png":
+		return "image/png"
+	case ".jpeg", ".jpg":
+		return "image/jpeg"
+	case ".webp":
+		return "image/webp"
+	case ".gif":
+		return "image/gif"
+	case ".pdf":
+		return "application/pdf"
+	case ".mp3", ".mpeg":
+		return "audio/mpeg"
+	case ".wav":
+		return "audio/wav"
+	case ".mp4":
+		return "video/mp4"
+	case ".mov":
+		return "video/quicktime"
+	}
+	return "application/octet-stream"
+}
+
+func geminiDataURL(value string) (string, string, bool) {
+	rest, ok := strings.CutPrefix(value, "data:")
+	if !ok {
+		return "", "", false
+	}
+	metadata, data, ok := strings.Cut(rest, ",")
+	if !ok {
+		return "", "", false
+	}
+	base64Encoded := false
+	for _, segment := range strings.Split(metadata, ";") {
+		if strings.EqualFold(segment, "base64") {
+			base64Encoded = true
+			break
 		}
 	}
-	return "image/png"
+	if !base64Encoded {
+		return "", "", false
+	}
+	mime := strings.SplitN(metadata, ";", 2)[0]
+	if strings.TrimSpace(mime) == "" {
+		mime = "application/octet-stream"
+	}
+	return mime, data, true
 }
 
 func geminiJoinSystemParts(parts []any) string {
