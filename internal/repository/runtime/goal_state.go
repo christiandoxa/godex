@@ -17,7 +17,6 @@ import (
 type GoalStateStore struct {
 	path string
 	mu   sync.Mutex
-	db   *sql.DB
 }
 
 func NewGoalStateStore(sharedHome string) *GoalStateStore {
@@ -37,20 +36,19 @@ func (store *GoalStateStore) ReadGoalRecoveryState(
 	}
 	store.mu.Lock()
 	defer store.mu.Unlock()
-	if store.db == nil {
-		info, err := os.Lstat(store.path)
-		if err != nil || !info.Mode().IsRegular() {
-			return runtimemodel.GoalRecoveryState{}, false
-		}
-		db, err := sql.Open("sqlite", goalReadOnlyDSN(store.path, goruntime.GOOS))
-		if err != nil {
-			return runtimemodel.GoalRecoveryState{}, false
-		}
-		db.SetMaxOpenConns(1)
-		store.db = db
+	info, err := os.Lstat(store.path)
+	if err != nil || !info.Mode().IsRegular() {
+		return runtimemodel.GoalRecoveryState{}, false
 	}
+	db, err := sql.Open("sqlite", goalReadOnlyDSN(store.path, goruntime.GOOS))
+	if err != nil {
+		return runtimemodel.GoalRecoveryState{}, false
+	}
+	defer db.Close()
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(0)
 	var state runtimemodel.GoalRecoveryState
-	err := store.db.QueryRowContext(ctx,
+	err = db.QueryRowContext(ctx,
 		"SELECT status,updated_at_ms FROM thread_goals WHERE thread_id = ? ORDER BY updated_at_ms DESC LIMIT 1", sessionID,
 	).Scan(&state.Status, &state.UpdatedAt)
 	if err != nil {
@@ -64,14 +62,7 @@ func (store *GoalStateStore) Close() error {
 	if store == nil {
 		return nil
 	}
-	store.mu.Lock()
-	defer store.mu.Unlock()
-	if store.db == nil {
-		return nil
-	}
-	err := store.db.Close()
-	store.db = nil
-	return err
+	return nil
 }
 
 func goalReadOnlyDSN(path, goos string) string {
