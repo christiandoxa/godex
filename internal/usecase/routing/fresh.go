@@ -45,14 +45,15 @@ func (router *Router) forwardFresh(
 	firstEventRetryUsed := request.FirstEventRetryUsed
 	autoRedeemAttempted := false
 
+	allowMultiEpochRecovery := requiresPrecommitWatchdog04378(request)
 	for recoverySweeps := 0; ; {
 		request.FirstEventRetryUsed = firstEventRetryUsed
 		current := freshRetryCandidates(router, candidates, retryable, request.QuotaSelection, router.now())
 		if len(current) == 0 {
-			// A transport failure that survives one recovery sweep has no
-			// response to replay. Prodex terminates that fresh request with 503
-			// instead of probing the same circuit forever.
-			if recoverySweeps > 0 && last != nil && last.transport {
+			// Without a request-scoped precommit watchdog, transport recovery
+			// stops after one wait epoch. Watchdog scopes can wait through a
+			// longer cooldown without retrying the account prematurely.
+			if recoverySweeps > 0 && last != nil && last.transport && !allowMultiEpochRecovery {
 				break
 			}
 			if lastChance, ok := router.websocketQuotaReplayLastChance(request, accounts); ok {
@@ -88,7 +89,8 @@ func (router *Router) forwardFresh(
 			accounts, candidates = freshAccounts, freshCandidates
 			continue
 		}
-		if recoverySweeps > 0 && last != nil && last.transport && len(current) == 1 &&
+		if recoverySweeps > 0 && last != nil && last.transport &&
+			!allowMultiEpochRecovery && len(current) == 1 &&
 			current[0].ID == last.accountID &&
 			router.routeHealthScore(last.accountID, request.QuotaSelection, router.now()) >= routingentity.RouteCircuitHealthThreshold {
 			break

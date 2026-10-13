@@ -23,20 +23,24 @@ func (gateway *freshTransportFailure04371Gateway) Execute(context.Context, proxy
 	}}
 }
 
-func TestProdex04371FreshTransportFailureReturnsBounded503(t *testing.T) {
-	now := time.Unix(100, 0)
+// The 0.437.1 finite transport fallback is superseded for Responses by the
+// 0.437.8 request-scoped recovery watchdog. A cooling, still-eligible account
+// does not exhaust the request after just one 30-second recovery epoch.
+func TestProdex04378FreshTransportFailureExpiresAsWatchdog504(t *testing.T) {
 	gateway := &freshTransportFailure04371Gateway{}
 	waits := 0
 	router, err := NewRouter(Config{
-		Gateway: gateway,
-		Now:     func() time.Time { return now },
+		Gateway: gateway, PrecommitWatchdogBudget: 40 * time.Millisecond,
 		Accounts: func(context.Context) ([]proxymodel.Account, error) {
 			return []proxymodel.Account{{ID: "account-a", Home: "/synthetic/a", Enabled: true}}, nil
 		},
-		Wait: func(_ context.Context, delay time.Duration) error {
+		Wait: func(ctx context.Context, delay time.Duration) error {
 			waits++
-			now = now.Add(delay)
-			return nil
+			if delay <= 0 || delay > maxFreshRecoveryWait {
+				t.Errorf("unbounded transport recovery delay %s", delay)
+			}
+			<-ctx.Done()
+			return ctx.Err()
 		},
 	})
 	if err != nil {
@@ -48,10 +52,10 @@ func TestProdex04371FreshTransportFailureReturnsBounded503(t *testing.T) {
 		Header: make(http.Header), QuotaSelection: quotamodel.Selection{RouteKind: quotamodel.RouteKindResponses},
 	})
 	var routeErr *proxymodel.Error
-	if !errors.As(err, &routeErr) || routeErr.StatusCode != http.StatusServiceUnavailable {
-		t.Fatalf("fresh transport error = %v, want bounded HTTP 503", err)
+	if !errors.As(err, &routeErr) || routeErr.StatusCode != http.StatusGatewayTimeout {
+		t.Fatalf("fresh transport error = %v, want watchdog HTTP 504", err)
 	}
 	if gateway.calls != 1 || waits != 1 {
-		t.Fatalf("fresh transport attempts/waits = %d/%d, want one attempt and one recovery wait", gateway.calls, waits)
+		t.Fatalf("fresh transport attempts/waits = %d/%d, want 1/1 before watchdog timeout", gateway.calls, waits)
 	}
 }
