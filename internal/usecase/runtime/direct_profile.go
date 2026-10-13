@@ -21,6 +21,9 @@ func (runner *Runner) RunDirectProfileWithOptions(
 	if runner == nil || runner.process == nil {
 		return errors.New("runtime process is not configured")
 	}
+	if err := runner.prepareSharedAccountHomes(ctx); err != nil {
+		return err
+	}
 	home, err := validateRuntimeHome(codexHome)
 	if err != nil {
 		return err
