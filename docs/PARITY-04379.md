@@ -476,3 +476,47 @@ An experimental HTTP SSE executable fixture was not admitted to the release
 gate because the official reference did not finish within the fixture's
 bounded observation window; no new HTTP executable-parity claim is made.
 No release tag was created.
+
+## Tagged 0.437.9 quota viewport and scroll pagination
+
+The 0.437.9 quota renderer delegates page planning to
+`prodex_quota_report_page_plan_v1` in compiled Mojo. Its policy clamps
+`requested_start` to the **last profile index**, not to the last index of
+a guessed number of visible profile sections. Godex's Bubble Tea quota TUI
+previously used `len(reports) - visibleReportCount()`, so the user could
+not select the last profile as the *start* of the viewport on a taller screen.
+
+Commit `75b5213` introduces a small quota-local page planner matching
+the tagged Mojo boundary cases: empty list and extreme scroll input,
+hidden-above / hidden-below counts, reservation of one line for a
+hidden-profile notice, insufficient height, and unlimited display height.
+The interactive quota view now budgets **actual rendered report lines**
+instead of treating each report as a fixed one-line profile section.
+Scrolling through seven synthetic profiles at height 19 previously stopped
+at offset 2; a failing-before regression now reaches the canonical
+last-profile offset 6. The Bubble Tea event-loop ownership and
+noninteractive table format are unchanged.
+
+Commit `ba50758` additionally clamps the finished Bubble Tea view
+to the terminal's available row count even when a tiny window cannot
+accommodate the fixed pool summary. The quit/footer controls stay visible
+when a row exists; zero-height output remains empty. Deterministic cases
+cover heights 0/1/6/8/12/19, visible-notice capacity, a multiline
+profile label, a blank list, and an extreme requested offset. These tests
+qualify the **pagination decision and height safety**, not pixel- or
+byte-identical TUI output across languages and terminal environments.
+
+`make verify` passed after the two commits, including the full Go
+shuffled race suite, vet, installation checks, and the six-target
+Linux/macOS/Windows cross-build matrix. Using a separately built **clean**
+Godex `ba50758d68009ccba94e8fa08c6822da5f6846a5` executable,
+the SHA-256-pinned official Prodex 0.437.9 **13-scenario WebSocket**
+differential still passed. The existing HTTP continuation loopback
+also passed its bounded checks, including hard-affinity, quota,
+cancellation and postcommit no-replay; its observed upstream attempt
+counts still differ between products and are not represented as full
+strict HTTP parity.
+
+A full interactive quota terminal binary-to-binary differential, all
+provider quota categories, upstream login, and the complete release
+gate remain unqualified. These checks do not authorize a tag or release.
