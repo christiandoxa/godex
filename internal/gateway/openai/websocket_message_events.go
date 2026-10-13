@@ -287,6 +287,13 @@ func websocketRetryFailureCode(payload []byte) string {
 		"server_is_overloaded":
 		return code
 	}
+	// A status-shaped field on a model output or heartbeat is not an
+	// upstream error. Only untyped or explicitly failing response events
+	// may fall back to a 5xx status in the absence of a retryable code.
+	kind, _, _ := websocketEventMetadata(payload)
+	if kind != "" && kind != "error" && kind != "response.failed" && kind != "response.incomplete" {
+		return ""
+	}
 	status := websocketPayloadStatus(payload)
 	if status >= 500 && status <= 599 {
 		return "server_is_overloaded"
