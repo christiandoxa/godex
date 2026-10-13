@@ -1,5 +1,7 @@
 package quota
 
+import "strings"
+
 // quotaPagePlan04379 mirrors the profile-window inclusion and hidden-profile
 // notice policy in tagged Prodex 0.437.9. All sizes are nonnegative and a nil
 // limit means an unbounded noninteractive report.
@@ -38,4 +40,18 @@ func planQuotaPage04379(total, requestedStart, shown, existingLines, sectionLine
 		plan.appendSection = sectionLines <= available && (!needNotice || sectionLines < available)
 	}
 	return plan, true
+}
+
+// A terminal can be shorter than the fixed quota summary itself. Keep the
+// user-visible quit controls on the final row, and never write past the
+// Bubble Tea viewport even at zero/very small terminal heights.
+func clipQuotaTUIView04379(view string, height int) string {
+	if height <= 0 {
+		return ""
+	}
+	lines := strings.Split(view, "\n")
+	if len(lines) <= height {
+		return view
+	}
+	return strings.Join(append(lines[:height-1], lines[len(lines)-1]), "\n")
 }

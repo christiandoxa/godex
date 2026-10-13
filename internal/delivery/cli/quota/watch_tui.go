@@ -143,7 +143,7 @@ func (model quotaTUIModel) View() string {
 	}
 	output.WriteString("\n")
 	output.WriteString(model.footer())
-	return output.String()
+	return clipQuotaTUIView04379(output.String(), model.height)
 }
 
 func (model quotaTUIModel) writePoolSummary(output *strings.Builder) {

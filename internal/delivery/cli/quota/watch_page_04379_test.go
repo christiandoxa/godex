@@ -142,3 +142,25 @@ func TestProdex04379QuotaTUIViewportReservesNoticeAndFooter(t *testing.T) {
 		t.Fatalf("long report expanded beyond quota viewport: %q", page)
 	}
 }
+
+func TestProdex04379QuotaTUITightHeightNeverDrawsPastViewport(t *testing.T) {
+	model := newQuotaTUIModel(t.Context(), &fakeStatus{},
+		showOptions{Options: quotausecase.Options{All: true}})
+	model.reports = []quotamodel.Report{{ProfileName: "only", Provider: "openai", State: "ready"}}
+	for _, height := range []int{0, 1, 6, 8, 12} {
+		model.height = height
+		view := model.View()
+		if height == 0 {
+			if view != "" {
+				t.Fatalf("zero-height quota viewport should be empty: %q", view)
+			}
+			continue
+		}
+		if rows := strings.Count(view, "\n") + 1; rows > height {
+			t.Fatalf("height=%d drew %d lines: %q", height, rows, view)
+		}
+		if !strings.HasSuffix(view, model.footer()) {
+			t.Fatalf("height=%d clipped interactive footer: %q", height, view)
+		}
+	}
+}
