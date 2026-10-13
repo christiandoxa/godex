@@ -657,3 +657,31 @@ regressions, malformed/symlink sidecar negative controls, true-path
 recovery, native Codex callback smoke, and shuffled Go race tests.
 This hardening **is not** proof of binary-to-binary parity for all
 native recovery, compaction, and filesystem permutations.
+
+## Combined DeepSeek provider oracle: all 18 scenarios in one run
+
+The previously time-limited `--scenario all` stage has now been
+requalified **as one complete executable comparison**, rather than as
+18 independent calls. On clean Godex commit
+`ac43de7f73cc949054234e8e4e0f24ef95745e03`, the fixture compared
+the exact official Linux Prodex 0.437.9 binary (SHA-256
+`58027b0d1825b47e60c35ce1082c4249ed2fa9629174cdf8805312d24562b37e`)
+and tagged source
+`0e321c92f4e580aa0b090085d5af13a8b856c3f1`.
+
+The **combined-mode result is PASS**: 18 included scenarios, zero
+comparison differences for every scenario and at the top level, and
+the status/header/event/durable-state/retry/cancellation/stdout mutation
+negative controls all PASS. Scenarios exercised normal DeepSeek requests,
+function calls, user identity, SSE streams and rate-limit headers,
+provider authentication/error variants (401/403/429/500/503), key
+rotation and persisted restart, cancellation, and recovery after
+429/503. Synthetic upstream credentials and loopback servers were used
+throughout, with no real provider inference.
+
+This result **supersedes** the earlier checkpoint's statement that the
+combined mode was unknown due to the short runner observation limit.
+It does not imply that the whole `scripts/verify-release-parity.sh`
+script has passed: the profile, CLI, provider and WebSocket release
+oracles must also complete together under the same exact clean commit.
+No tag or release has been created on the strength of this subgate.
