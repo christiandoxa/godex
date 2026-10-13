@@ -19,20 +19,21 @@ const (
 )
 
 func staleWebSocketContinuationResponse(response *proxymodel.Response) *proxymodel.Response {
-	return staleWebSocketContinuationResponseForOwner(response, true)
+	return staleWebSocketContinuationWithEnvelope(response, true)
 }
 
-// Prodex 0.437.9 exposes an unbound missing chain as a generic 409 error,
-// while a previously verified owner retains the response.failed envelope.
-func staleUnboundWebSocketContinuationResponse(response *proxymodel.Response) *proxymodel.Response {
-	return staleWebSocketContinuationResponseForOwner(response, false)
+// Prodex 0.437.9 sends a generic 409 error for a missing unbound chain
+// or for a locked tool-output continuation, even when the owner is known.
+// Ordinary verified response continuations retain their original envelope.
+func staleGenericWebSocketContinuationResponse(response *proxymodel.Response) *proxymodel.Response {
+	return staleWebSocketContinuationWithEnvelope(response, false)
 }
 
-func staleWebSocketContinuationResponseForOwner(response *proxymodel.Response, trustedOwner bool) *proxymodel.Response {
+func staleWebSocketContinuationWithEnvelope(response *proxymodel.Response, preserveEnvelope bool) *proxymodel.Response {
 	payload := readWebSocketPrecommitTextPayload(response)
 	closeWebSocketRoutingResponse(response)
 	translated := translateStaleWebSocketPayload(payload)
-	if !trustedOwner {
+	if !preserveEnvelope {
 		translated = marshalStaleWebSocketPayload(map[string]any{
 			"type":   "error",
 			"status": http.StatusConflict,

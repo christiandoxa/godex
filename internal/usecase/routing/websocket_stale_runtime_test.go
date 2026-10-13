@@ -235,3 +235,55 @@ func websocketPreviousFailureTestResponse(payload []byte, turnState string) *pro
 		PrecommitFailure:   &proxymodel.PrecommitFailure{Code: "previous_response_not_found"},
 	}
 }
+
+func TestProdex04379BoundToolOutputMissingChainUsesGenericStaleError(t *testing.T) {
+	failure := []byte(`{"type":"response.failed","status":400,"response":{"error":{"code":"previous_response_not_found","message":"missing"}}}`)
+	gateway := &websocketDispatchGateway{responses: []*proxymodel.Response{
+		websocketCommittedTestResponse("resp-tool-owner"),
+		websocketPreviousFailureTestResponse(failure, ""),
+		websocketPreviousFailureTestResponse(failure, ""),
+		websocketPreviousFailureTestResponse(failure, ""),
+		websocketPreviousFailureTestResponse(failure, ""),
+	}}
+	var waits []time.Duration
+	router := newWebSocketPreviousResponseRuntimeRouter(t, gateway, &waits)
+	first, err := router.Forward(t.Context(), websocketDispatchRequest(`{"type":"response.create"}`, 439))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := first.Close(); err != nil {
+		t.Fatal(err)
+	}
+	const tool = `{"type":"response.create","previous_response_id":"resp-tool-owner","input":[{"type":"function_call_output","call_id":"call-locked","output":"done"}]}`
+	continuation, err := router.Forward(t.Context(), websocketDispatchRequest(tool, 439))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer continuation.Close()
+	body, err := io.ReadAll(continuation.Result.Response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var event struct {
+		Type   string `json:"type"`
+		Status int    `json:"status"`
+		Error  struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(body, &event) != nil || event.Type != "error" ||
+		event.Status != http.StatusConflict || event.Error.Code != "stale_continuation" {
+		t.Fatalf("locked tool failure did not use native generic stale frame: %s", body)
+	}
+	if !reflect.DeepEqual(waits, []time.Duration{75 * time.Millisecond, 200 * time.Millisecond, 500 * time.Millisecond}) ||
+		len(gateway.requests) != 5 || len(gateway.accounts) != 5 {
+		t.Fatalf("locked affinity retries = %v requests=%d owners=%v", waits, len(gateway.requests), gateway.accounts)
+	}
+	for index := 1; index < len(gateway.requests); index++ {
+		if gateway.accounts[index] != "account-a" ||
+			string(gateway.requests[index].Body) != tool {
+			t.Fatalf("attempt %d changed owner or dropped tool context: owner=%s request=%s",
+				index, gateway.accounts[index], gateway.requests[index].Body)
+		}
+	}
+}
