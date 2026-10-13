@@ -140,3 +140,12 @@ GODEX_TEST_CODEX_01621_BIN=<native-codex-binary> \
 This qualifies the installed binary by reported version, not by an official
 SHA-256-pinned asset or a full Prodex-vs-Godex running-model differential.
 The release gate remains fail-closed.
+
+The same opt-in native fixture also exercises the complete local recovery path:
+after the real Codex 0.162.1 child exits, it appends synthetic accepted-user
+and terminal `server_overloaded` records to **that Codex-created rollout**
+before the Godex monitor's first read. The monitor then reports the exact
+native root as `usage_limited`. This establishes hook-to-marker-to-cursor-to-
+rollout observation with a real Codex-generated session layout; the terminal
+error is intentionally synthetic, not evidence of a real upstream outage or
+of Prodex/Godex equivalence for every live model turn.

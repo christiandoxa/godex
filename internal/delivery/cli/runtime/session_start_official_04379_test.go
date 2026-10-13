@@ -5,6 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	runtimemodel "github.com/christiandoxa/godex/internal/model/runtime"
+	sessionmodel "github.com/christiandoxa/godex/internal/model/session"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -134,4 +137,36 @@ func TestProdex04379OfficialCodex01621NativeSessionStartCursor(t *testing.T) {
 	}
 	cancel()
 	<-done
+
+	// This is still the isolated native rollout created by Codex 0.162.1.
+	// Inject the synthetic terminal failure only after the child is reaped,
+	// but before Godex's first monitor poll, to qualify that recovery boundary.
+	if strings.HasSuffix(event.TranscriptPath, ".zst") {
+		t.Skip("native compressed rollout is covered by the decoded fixture")
+	}
+	file, err := os.OpenFile(event.TranscriptPath, os.O_WRONLY|os.O_APPEND, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tail := `{"type":"event_msg","payload":{"type":"user_message"}}` + "\n" +
+		`{"type":"event_msg","payload":{"type":"task_complete","error":{"codex_error_info":"server_overloaded"}}}` + "\n"
+	_, writeErr := io.WriteString(file, tail)
+	closeErr := file.Close()
+	if writeErr != nil || closeErr != nil {
+		t.Fatalf("append isolated native recovery evidence: write=%v close=%v", writeErr, closeErr)
+	}
+	monitor := &liveGoalRecovery04361{
+		marker: marker,
+		read: func(context.Context, string) (runtimemodel.GoalRecoveryState, bool) {
+			return runtimemodel.GoalRecoveryState{SessionID: id, Status: "active"}, true
+		},
+		resolve: func(context.Context, string) (sessionmodel.Report, error) {
+			return sessionmodel.Report{ID: id, Path: event.TranscriptPath}, nil
+		},
+	}
+	state, available := monitor.readState(t.Context())
+	if !available || state.Status != "usage_limited" {
+		t.Fatalf("official native SessionStart cursor skipped synthetic pre-poll failure: state=%+v valid=%t",
+			state, available)
+	}
 }
