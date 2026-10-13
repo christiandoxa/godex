@@ -618,3 +618,42 @@ validated with deterministic session fixtures, **not** an official
 Prodex native-session binary differential. Full cross-process monitor
 restart, every same-UUID compaction/migration variant, all live
 provider states and the complete release gate remain unqualified.
+
+## Pinned 0.437.9 release-oracle follow-up and scope
+
+On clean Godex `8edb4431a8e96909665d4a43314cf3e0063f2fff`,
+the release-only source oracle remained the exact Prodex tag
+`0e321c92f4e580aa0b090085d5af13a8b856c3f1`, and the official
+Linux x86_64 executable reported `prodex 0.437.9` with SHA-256
+`58027b0d1825b47e60c35ce1082c4249ed2fa9629174cdf8805312d24562b37e`.
+The Godex binary's Go VCS metadata identified that clean commit.
+
+The official **13-scenario WebSocket** differential passed on both
+executables, including bounded same-owner missing-chain retry, hard
+previous-response/turn-state ownership, and ownership after restart.
+The strict **profile lifecycle oracle passed all 31 steps**, and the
+**CLI invalid-argument/acceptance oracle passed** against the same pinned
+binary. Each of the **18 DeepSeek provider differential scenarios**
+then passed **individually**, with separate clean synthetic homes and
+loopback-only upstreams: successful routing, tool calls, user identity,
+SSE streaming/rate limits, retries, authorization and provider failures,
+credential rotation, cancel/restart, and recovery after 429/503.
+No real provider credentials or model inference were used.
+
+**Unqualified gate:** `scripts/verify-release-parity.sh` reached successful
+profile and CLI oracles but exceeded this test runner's 110-second
+observation limit during its **combined** `--scenario all` DeepSeek stage.
+The 18 separately passing cases **do not replace** the combined-mode
+assertions or establish a completed release gate. This was a timeout,
+not an observed parity comparison failure; its combined outcome remains
+**unknown**. No release tag or package is authorized.
+
+The same turn also added a **Godex safety safeguard** beyond the
+tagged native cursor's minimal sidecar: matching a captured rollout
+path before applying an offset. It prevents historical capacity
+events in unrelated same-UUID regular/Zstandard files from being
+misclassified as new terminal failures. It passed failing-before
+regressions, malformed/symlink sidecar negative controls, true-path
+recovery, native Codex callback smoke, and shuffled Go race tests.
+This hardening **is not** proof of binary-to-binary parity for all
+native recovery, compaction, and filesystem permutations.
