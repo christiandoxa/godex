@@ -64,8 +64,20 @@ func (transport *Transport) ExecuteWebSocketMessage(
 	}
 	watchdog := newWebSocketReadWatchdog(connection, websocketPrecommitProgressTimeout)
 	connection = watchdog
+	// The idle timer cannot abort a blocked frame read when the logical
+	// request is cancelled. Disarm this hook before returning a committed
+	// stream so a later precommit deadline cannot close its connection.
+	stopCancellation := context.AfterFunc(ctx, func() { _ = watchdog.Close() })
+	defer stopCancellation()
+	if err := ctx.Err(); err != nil {
+		_ = watchdog.Close()
+		return nil, err
+	}
 	if err := writeWebSocketTextFrame(connection, input.Body); err != nil {
 		_ = connection.Close()
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		if reusedSession {
 			return websocketTransportFailure(
 				"", state.turnState, input.FirstEventRetryUsed, true, reuseIdle,
@@ -123,8 +135,16 @@ func (transport *Transport) readWebSocketMessage(
 	holdBytes := 0
 	firstTextSeen := false
 	for {
+		if err := ctx.Err(); err != nil {
+			_ = connection.Close()
+			return nil, err
+		}
 		event, readErr := readWebSocketEvent(connection)
 		if readErr != nil {
+			if ctx.Err() != nil {
+				_ = connection.Close()
+				return nil, ctx.Err()
+			}
 			if reusedSession || plan.transportRetryAllowed {
 				_ = connection.Close()
 				return websocketTransportFailure(
@@ -133,6 +153,10 @@ func (transport *Transport) readWebSocketMessage(
 			}
 			_ = connection.Close()
 			return nil, fmt.Errorf("runtime websocket upstream failed before response commitment: %w", readErr)
+		}
+		if err := ctx.Err(); err != nil {
+			_ = connection.Close()
+			return nil, err
 		}
 		if event.text && !firstTextSeen {
 			firstTextSeen = true
