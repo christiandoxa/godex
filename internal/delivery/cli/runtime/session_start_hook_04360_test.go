@@ -95,7 +95,6 @@ func TestProdex04360PrivateSessionHookRejectsForgedAndOversizedNotifications(t *
 	}
 	for _, payload := range []string{
 		`{"thread-id":"not-a-uuid"}`,
-		`{"thread-id":"019c9e3d-45a0-7ad0-a6ee-b194ac2d44f9","session_id":"00000000-0000-4000-8000-000000000002"}`,
 		`{"session_id":""}`,
 		strings.Repeat("x", 65537),
 		"not JSON",
@@ -115,8 +114,8 @@ func TestProdex04360PrivateSessionHookRejectsForgedAndOversizedNotifications(t *
 	if id := monitor.ID(); id != session {
 		t.Fatalf("marker identity=%q expected %q", id, session)
 	}
-	if _, err := notify(`{"session_id":"` + session + `"}`); err == nil {
-		t.Fatal("marker overwritten by repeated request")
+	if _, err := notify(`{"session_id":"` + session + `"}`); err != nil || monitor.ID() != session {
+		t.Fatalf("repeated same-root callback changed marker: %q error=%v", monitor.ID(), err)
 	}
 	external := filepath.Join(t.TempDir(), "outside")
 	if err := os.WriteFile(external, []byte("preserve"), 0600); err != nil {

@@ -241,26 +241,7 @@ func HandleSessionStartNotify04360(args []string, input io.Reader) (bool, error)
 	if err := json.Unmarshal(payload, &value); err != nil {
 		return true, err
 	}
-	id, _ := value["thread-id"].(string)
-	session, _ := value["session_id"].(string)
-	if id != "" && session != "" && id != session {
-		return true, errors.New("session callback contains conflicting UUIDs")
-	}
-	if id == "" {
-		id = session
-	}
-	if !sessionentity.ValidID(id) {
-		return true, errors.New("invalid callback session identity")
-	}
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
-	if err != nil {
-		return true, err
-	}
-	if _, err = file.WriteString(id + "\n"); err != nil {
-		_ = file.Close()
-		return true, err
-	}
-	return true, file.Close()
+	return true, writeSessionStartMarker04379(path, value)
 }
 
 // If a verified native hook identifies exactly one new UUID from this
