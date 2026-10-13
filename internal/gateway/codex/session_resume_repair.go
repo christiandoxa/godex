@@ -40,6 +40,9 @@ func codexResumeSessionID(arguments []string) string {
 			if argument == "--" {
 				return ""
 			}
+			if argument == "--last" {
+				return ""
+			}
 			if strings.HasPrefix(argument, "-") {
 				if strings.Contains(argument, "=") {
 					continue

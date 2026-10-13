@@ -130,3 +130,10 @@ func TestCodexResumeSessionIDSkipsAllValueOptions(t *testing.T) {
 		}
 	}
 }
+
+func TestCodexResumeSessionIDDoesNotTreatLastPromptAsSelector(t *testing.T) {
+	const promptLikeUUID = "01900000-0000-7000-8000-000000000443"
+	if got := codexResumeSessionID([]string{"resume", "--last", promptLikeUUID}); got != "" {
+		t.Fatalf("resume --last UUID-like prompt = %q, want no selector", got)
+	}
+}
