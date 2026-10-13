@@ -38,7 +38,7 @@ go build -trimpath -o "$tmp/continuationparity" ./tools/continuationparity
 # The 0.437.10 delta is goal attachment recovery during resume and shared-home
 # preparation. Keep its focused regression proof in the release gate alongside
 # the executable differentials.
-go test ./internal/gateway/codex -run 'Test(PersistSessionGoal|UpdateSessionGoal|MaintainManagedSessions.*Goal|PersistSessionGoalObjective)' -count=1 -timeout=30s
+go test ./internal/gateway/codex -run 'Test(PersistSessionGoal|UpdateSessionGoal|MaintainManagedSessions.*Goal|PersistSessionGoalObjective|RunRuntimeDirectRepairsSelectedGoalBeforeChildStarts|RepairResumeSessionBeforeLaunch|CodexResumeSessionID)' -count=1 -timeout=30s
 
 # Independent managed-profile persistence oracle. All 29 CLI actions run in
 # separate subprocesses with isolated credential-free homes; state projections
