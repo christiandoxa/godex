@@ -61,7 +61,9 @@ func (process *CodexProcess) PrepareSharedSessionHome(profileHome, sharedHome st
 		return fmt.Errorf("invalid shared Codex home: %w", err)
 	}
 	if sameCodexHome(profileHome, sharedHome) {
-		return nil
+		// Picker and exact resume can already target the shared root; still repair
+		// goal rows before native selection.
+		return persistSessionGoalAttachmentPaths(sharedHome)
 	}
 	if err := ensureRealCodexDirectory(profileHome); err != nil {
 		return fmt.Errorf("prepare managed Codex home: %w", err)

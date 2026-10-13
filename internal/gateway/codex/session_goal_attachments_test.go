@@ -327,3 +327,32 @@ func readGoalObjective(t *testing.T, path, threadID string) string {
 	}
 	return objective
 }
+
+func TestPrepareSharedSessionHomeRepairsGoalsWhenProfileIsSharedRoot(t *testing.T) {
+	root := t.TempDir()
+	oldRoot := filepath.Join(t.TempDir(), "deleted-overlay")
+	stale := filepath.Join(oldRoot, "attachments", "thread-picker", "pasted-text-1.txt")
+	if err := os.MkdirAll(filepath.Dir(stale), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(stale, []byte("picker goal"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dbPath := filepath.Join(root, "goals_1.sqlite")
+	db := createGoalDB(t, dbPath)
+	if _, err := db.Exec("INSERT INTO thread_goals (thread_id, objective) VALUES (?1, ?2)", "thread-picker", "read "+stale); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+
+	if err := NewCodexProcess("codex", Terminal{}).PrepareSharedSessionHome(root, root); err != nil {
+		t.Fatal(err)
+	}
+	stable := filepath.Join(root, "attachments", "thread-picker", "pasted-text-1.txt")
+	if got := readGoalObjective(t, dbPath, "thread-picker"); got != "read "+stable {
+		t.Fatalf("picker objective = %q, want stable attachment", got)
+	}
+	if got, err := os.ReadFile(stable); err != nil || string(got) != "picker goal" {
+		t.Fatalf("stable picker attachment = %q, err=%v", got, err)
+	}
+}
