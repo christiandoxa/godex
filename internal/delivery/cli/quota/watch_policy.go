@@ -301,9 +301,25 @@ func quotaReportPlan(report quotamodel.Report) string {
 }
 
 func compareQuotaText(left, right string) int {
-	left = strings.ToLower(strings.TrimSpace(left))
-	right = strings.ToLower(strings.TrimSpace(right))
-	return strings.Compare(left, right)
+	// Tagged Prodex trims Unicode whitespace but folds only ASCII bytes.
+	// Unicode case-folding changes label order (for example É versus é).
+	left, right = strings.TrimSpace(left), strings.TrimSpace(right)
+	for i := 0; i < min(len(left), len(right)); i++ {
+		a, b := left[i], right[i]
+		if a >= 'A' && a <= 'Z' {
+			a += 'a' - 'A'
+		}
+		if b >= 'A' && b <= 'Z' {
+			b += 'a' - 'A'
+		}
+		if a < b {
+			return -1
+		}
+		if a > b {
+			return 1
+		}
+	}
+	return compareInt(len(left), len(right))
 }
 
 func compareInt(left, right int) int {
