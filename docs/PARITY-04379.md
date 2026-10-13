@@ -149,3 +149,54 @@ native root as `usage_limited`. This establishes hook-to-marker-to-cursor-to-
 rollout observation with a real Codex-generated session layout; the terminal
 error is intentionally synthetic, not evidence of a real upstream outage or
 of Prodex/Godex equivalence for every live model turn.
+
+## WebSocket request-scoped precommit watchdog follow-up
+
+The tagged Prodex 0.437.9 WebSocket message boundary maps an expired
+request-scoped precommit deadline to an error frame with status `504`,
+code `request_timeout`, and message `request timed out`, while preserving
+the already-upgraded *local* WebSocket connection for later messages. Before
+this change, Godex's upstream WebSocket frame reader could remain blocked
+until its independent eight-second idle timer fired despite the logical
+request being cancelled. Separately, Godex exposed its internal 504 as
+`service_unavailable`, with a longer internal diagnostic, instead of the
+canonical WebSocket error code and message.
+
+The upstream OpenAI gateway now owns a cancellation hook for each
+precommit WebSocket message. Cancelling that context promptly closes the
+pending upstream socket and unblocks both frame reads and writes. The hook
+is disarmed as the message returns; a real committed response keeps its
+upstream connection readable after the request's precommit context ends.
+Cancellation does not trigger account rotation, quota penalty, or replay
+of committed output. Only the exact typed local watchdog failure maps to
+the native `request_timeout` frame. An unrelated upstream 504 keeps its
+own diagnostic instead of impersonating a local watchdog.
+
+Regressions first failed against the previous implementation and then
+passed after the two small patches:
+
+- `TestProdex04379WebSocketPrecommitCancelledReadReleasesUpstream`
+  uses a real duplex socket stalled before any output and proves cancellation
+  releases it promptly instead of waiting for the idle timer.
+- `TestProdex04379RealWebSocketMessagePrecommitWatchdogReturns504`
+  exercises the real gateway through the routing watchdog with a short
+  fixture deadline; it returns a typed 504 and closes the pending upstream.
+- `TestProdex04379CommittedWebSocketSurvivesRequestContextCancellation`
+  confirms real visible output and a later terminal event still arrive after
+  the precommit context is cancelled.
+- `TestProdex04379PublicWebSocketTimeoutKeepsSessionAlive` exercises two
+  logical requests over one locally upgraded WebSocket: two canonical 504
+  frames, or one canonical 504 followed by a committed successful response.
+  `TestProdex04379WebSocketLocalWatchdogErrorHasNativeCode` covers both
+  delivery mappings and rejects the unrelated-upstream-504 false positive.
+
+`go test -race -shuffle=on -count=1 ./internal/delivery/http/proxy
+./internal/gateway/openai ./internal/usecase/routing` and the full
+`make verify` gate passed after both patches (format/source-size, six
+cross-builds, installer smoke, vet, and shuffled race tests).
+
+These are synthetic local upstream and local client fixtures matched to
+the tagged Prodex source/test contract; they are not a full binary-to-binary
+WebSocket differential. Full hard-affinity owner recovery, native remote
+WebSocket handoff and live provider quota/capacity behavior remain
+release-blocking.
