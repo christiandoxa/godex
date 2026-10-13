@@ -174,6 +174,33 @@ func TestPersistSessionGoalObjectiveAttachmentsRepairsGeneratedWrapper(t *testin
 	}
 }
 
+func TestPersistSessionGoalObjectiveAttachmentsRejectsSymlinkedWrapper(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink behavior is covered on Unix")
+	}
+	root := filepath.Join(t.TempDir(), "shared-codex")
+	if err := os.MkdirAll(root, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	outside := filepath.Join(t.TempDir(), "outside-objective.md")
+	if err := os.WriteFile(outside, []byte("raw objective"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	wrapper := filepath.Join(root, "attachments", "thread-1", "goal-objective.md")
+	if err := os.MkdirAll(filepath.Dir(wrapper), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, wrapper); err != nil {
+		t.Fatal(err)
+	}
+	if err := persistSessionGoalObjectiveAttachments(root, "read "+wrapper); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := os.ReadFile(outside); err != nil || string(got) != "raw objective" {
+		t.Fatalf("symlink target changed = %q, err=%v", got, err)
+	}
+}
+
 func TestUpdateSessionGoalAttachmentReferencePreservesNewerObjective(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "goals_1.sqlite")
 	db := createGoalDB(t, dbPath)
