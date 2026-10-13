@@ -63,12 +63,15 @@ type Config struct {
 	Wait                     func(context.Context, time.Duration) error
 	ProfileInflightWait      profileInflightWaitFunc
 	ProfileInflightHardLimit int
-	SelectionSequenceSeed    uint64
-	MaxInspectBytes          int64
-	Gateway                  gateway
-	Bindings                 bindingRepository
-	AutoRedeem               bool
-	Redeemer                 AutoRedeemer
+	// PrecommitWatchdogBudget overrides the Prodex 0.437.8 five-minute
+	// request-scoped default, primarily for source-pinned fixture tests.
+	PrecommitWatchdogBudget time.Duration
+	SelectionSequenceSeed   uint64
+	MaxInspectBytes         int64
+	Gateway                 gateway
+	Bindings                bindingRepository
+	AutoRedeem              bool
+	Redeemer                AutoRedeemer
 }
 
 type Router struct {
@@ -98,6 +101,7 @@ type Router struct {
 	inflightChanged                       chan struct{}
 	profileInflightHardLimit              int
 	profileInflightWait                   profileInflightWaitFunc
+	precommitWatchdogBudget               time.Duration
 	profileInflightAdmissionsTotal        uint64
 	profileInflightReleasesTotal          uint64
 	profileInflightReleaseUnderflowsTotal uint64
@@ -171,6 +175,11 @@ func NewRouter(config Config) (*Router, error) {
 	if config.ProfileInflightWait == nil {
 		config.ProfileInflightWait = waitProfileInflightSignalOrEpoch
 	}
+	if config.PrecommitWatchdogBudget <= 0 {
+		// Reference 0.437.8: max(300_000-ms stream idle, 30_000-ms
+		// precommit recovery epoch), see recovery_deadline.rs.
+		config.PrecommitWatchdogBudget = 5 * time.Minute
+	}
 	if config.SelectionSequenceSeed == 0 {
 		config.SelectionSequenceSeed = newSelectionSequenceSeed()
 	}
@@ -185,7 +194,8 @@ func NewRouter(config Config) (*Router, error) {
 		ephemeralCredentialIDs: make(map[string]struct{}),
 		inflight:               make(map[string]int), inflightChanged: make(chan struct{}),
 		profileInflightHardLimit: config.ProfileInflightHardLimit, profileInflightWait: config.ProfileInflightWait,
-		quotaBlocked: make(map[string]bool), quotaChecks: make(map[quotaCheckKey]quotaCheck),
+		precommitWatchdogBudget: config.PrecommitWatchdogBudget,
+		quotaBlocked:            make(map[string]bool), quotaChecks: make(map[quotaCheckKey]quotaCheck),
 		routeHealth:              make(map[routeHealthKey]routingentity.RouteHealthScore),
 		routeMemory:              make(map[routeMemoryKey]routingentity.RouteMemoryScore),
 		routeCircuits:            make(map[routeHealthKey]routingentity.RouteCircuit),
@@ -259,7 +269,7 @@ func (exchange *Exchange) Close() error {
 	return exchange.Result.Response.Body.Close()
 }
 
-func (router *Router) Forward(ctx context.Context, request proxymodel.Request) (*Exchange, error) {
+func (router *Router) forwardWithoutWatchdog(ctx context.Context, request proxymodel.Request) (*Exchange, error) {
 	request.SelectionSequence = router.selection.sequence.Add(1)
 	request = router.scrubDeadTurnStateContext(ctx, request)
 	promptCacheKey := requestPromptCacheKey(request)

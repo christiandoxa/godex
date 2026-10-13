@@ -17,11 +17,28 @@ classifier tests, persisted post-child rollout and independently guarded live
 tail supersession tests. The event replay, tool effects and account selection
 algorithms were not changed.
 
+## Request-scoped precommit watchdog
+
+Tagged Prodex source runtime_proxy/recovery_deadline.rs, Mojo
+quota_pressure.mojo, and failure_response.rs require one monotonic
+precommit deadline per logical Responses/unary-compact/WebSocket-message
+request. Its default is max(stream idle 300,000ms, recovery epoch 30,000ms),
+or five minutes. Godex now scopes one timeout across routing, admission,
+profile waits and upstream attempts and returns typed 504 upon expiration.
+An expiring watchdog cancels transport work but is disarmed upon successful
+precommit: a committed streaming response is not cancelled just because its
+precommit budget expires. The optional routing constructor budget permits
+small fixture durations without changing production defaults.
+
+Regressions verify cancellation and 504 for both HTTP Responses and compact
+through the real local HTTP handler, plus a non-Responses route and stream
+survival after precommit. This does not yet prove complete official-binary
+parity of every timeout and WebSocket frame boundary.
+
 ## Outstanding 0.437.8 gaps
 
-This is a verified narrow classification fix, NOT evidence of full binary parity.
-The new absolute request-scoped precommit watchdog (HTTP Responses, unary
-compaction, WebSocket message), multi-epoch provider cooldown and local 504
-classification, full-history compaction/affinity boundary, provider surfaces,
-persistence and cross-process evidence still require source-pinned behavioral
-qualification. Do not tag `v0.2.1` based on the passing Go suite alone.
+This is NOT evidence of full binary parity. Multi-epoch provider cooldown,
+full-history compaction/affinity boundary, app-server and WebSocket message
+deadline qualification, provider surfaces, persistence and cross-process
+negative-control evidence still require source-pinned behavioral testing.
+Do not tag v0.2.1 based on the passing Go suite alone.
