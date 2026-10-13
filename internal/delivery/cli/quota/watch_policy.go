@@ -219,16 +219,54 @@ func quotaReportStatusRank(report quotamodel.Report) int {
 		}
 		return 1
 	}
+	if strings.EqualFold(report.Provider, "openai") || report.Provider == "" {
+		// Tagged Prodex sorts OpenAI reports by quota-capacity candidates,
+		// not by the separately rendered, possibly stale status label.
+		if quotaOpenAIHasReadyLimit04379(report.Usage) {
+			return 0
+		}
+		return 1
+	}
 	if strings.EqualFold(report.State, "ready") {
 		return 0
 	}
 	return 1
 }
 
+func quotaOpenAIHasReadyLimit04379(usage quotamodel.Usage) bool {
+	if usage.Allowed != nil && !*usage.Allowed ||
+		usage.LimitReached != nil && *usage.LimitReached {
+		return false
+	}
+	known := false
+	for _, window := range []*quotamodel.Window{usage.Primary, usage.Secondary} {
+		if window == nil || window.UsedPercent == nil {
+			continue
+		}
+		known = true
+		if *window.UsedPercent >= 100 {
+			return false
+		}
+	}
+	return known
+}
+
 func quotaReportResetEpoch(report quotamodel.Report) int64 {
 	result := int64(math.MaxInt64)
-	if report.External != nil && report.External.ResetAt != nil {
-		result = *report.External.ResetAt
+	if report.External != nil {
+		// In tagged Prodex generic external snapshots have no reset sort
+		// key. Copilot/Gemini own separate provider-specific reset data.
+		if (strings.EqualFold(report.Provider, "copilot") ||
+			strings.EqualFold(report.Provider, "gemini")) &&
+			report.External.ResetAt != nil {
+			return *report.External.ResetAt
+		}
+		return result
+	}
+	if report.Provider != "" && !strings.EqualFold(report.Provider, "openai") &&
+		!strings.EqualFold(report.Provider, "gemini") &&
+		!strings.EqualFold(report.Provider, "copilot") {
+		return result
 	}
 	for _, window := range []*quotamodel.Window{report.Usage.Primary, report.Usage.Secondary} {
 		if window != nil && window.ResetAt != nil && *window.ResetAt < result {
