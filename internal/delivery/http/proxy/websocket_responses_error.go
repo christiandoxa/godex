@@ -11,6 +11,9 @@ import (
 )
 
 func responsesWebSocketRouteError(err error) (int, string, string) {
+	if websocketPrecommitWatchdogTimeout(err) {
+		return http.StatusGatewayTimeout, "request_timeout", "request timed out"
+	}
 	status := http.StatusServiceUnavailable
 	code := "service_unavailable"
 	message := "upstream request failed"

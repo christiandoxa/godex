@@ -29,6 +29,9 @@ func (proxy *Proxy) forwardWebSocketHTTPError(response *proxymodel.Response, pre
 }
 
 func websocketRouteError(err error) (int, string, string) {
+	if websocketPrecommitWatchdogTimeout(err) {
+		return http.StatusGatewayTimeout, "request_timeout", "request timed out"
+	}
 	status, code, message := http.StatusServiceUnavailable, "service_unavailable", "upstream request failed"
 	var routeError *proxymodel.Error
 	if errors.As(err, &routeError) {
@@ -58,4 +61,12 @@ func websocketErrorPayload(status int, code, message string) []byte {
 		Message string `json:"message"`
 	}{Code: code, Message: message}})
 	return payload
+}
+
+// Match only the known request-scoped local deadline, not an upstream 504.
+func websocketPrecommitWatchdogTimeout(err error) bool {
+	var routeErr *proxymodel.Error
+	return errors.As(err, &routeErr) &&
+		routeErr.StatusCode == http.StatusGatewayTimeout &&
+		routeErr.Message == "request timed out while waiting for upstream recovery before output started"
 }
