@@ -187,7 +187,7 @@ func TestProdex04370BinaryProvenanceRejectsDirtyAndStaleCandidates(t *testing.T)
 		})
 	}
 	path := filepath.Join(t.TempDir(), "impostor")
-	if err := os.WriteFile(path, []byte("prodex 0.437.8"), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte("prodex 0.437.9"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	sum, err := sha256File(path)

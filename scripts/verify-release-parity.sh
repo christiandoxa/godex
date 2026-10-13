@@ -3,29 +3,29 @@ set -euo pipefail
 
 # Release-only proof: the public oracle is pinned by commit and binary digest.
 # No live provider accounts, real credentials, or external model calls.
-ref_commit='8c5c6f40fb4f864d1542f9c8fa48d15863316652'
-prodex_binary_sha256='49de897a147c1ab7ec7aebdcd6d8fd2075cb0b6de58487062eedc9be3da4eb1e'
+ref_commit='0e321c92f4e580aa0b090085d5af13a8b856c3f1'
+prodex_binary_sha256='58027b0d1825b47e60c35ce1082c4249ed2fa9629174cdf8805312d24562b37e'
 root="$(git rev-parse --show-toplevel)"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/godex-release-parity.XXXXXXXX")"
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
 cd "$root"
 
-git clone --quiet --depth 1 --branch 0.437.8 \
+git clone --quiet --depth 1 --branch 0.437.9 \
   https://github.com/christiandoxa/prodex.git "$tmp/prodex-source"
 test "$(git -C "$tmp/prodex-source" rev-parse HEAD)" = "$ref_commit" || {
-  echo "Prodex oracle source does not match 0.437.8" >&2
+  echo "Prodex oracle source does not match 0.437.9" >&2
   exit 1
 }
 
 curl --fail --location --silent --show-error --retry 3 \
   --output "$tmp/prodex" \
-  'https://github.com/christiandoxa/prodex/releases/download/0.437.8/prodex-x86_64-unknown-linux-gnu'
+  'https://github.com/christiandoxa/prodex/releases/download/0.437.9/prodex-x86_64-unknown-linux-gnu'
 echo "$prodex_binary_sha256  $tmp/prodex" | sha256sum --check --status || {
   echo "Prodex oracle executable SHA-256 mismatch" >&2
   exit 1
 }
 chmod +x "$tmp/prodex"
-test "$("$tmp/prodex" --version)" = "prodex 0.437.8"
+test "$("$tmp/prodex" --version)" = "prodex 0.437.9"
 
 # Go's build VCS metadata must identify the clean release commit, not WIP.
 go build -trimpath -o "$tmp/godex" ./cmd/godex
