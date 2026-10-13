@@ -54,3 +54,20 @@ Prodex tag 0.437.8 (commit
 The release verification script refuses substituted oracle binaries/sources.
 Its strict durable state inventory remains an explicit release blocker; do
 not treat domain-specific PASS as an overall FULL PARITY certificate.
+
+
+## Independent canonical 0.437.8 executable qualification
+
+Against clean candidate commit 6fd4871 and the exact official Linux binary:
+
+- Managed profile lifecycle: PASS, 31 of 31 subprocess stages, including
+  credential-free startup usage probes.
+- CLI rejection differential: PASS, all eight probes and negative control.
+- Native Codex context configuration: PASS, three explicit model/profile cases
+  and the cached-window negative control.
+- Strict DeepSeek success fixture: FAIL; the verifier reported an observable
+  stderr mismatch. This remains a release blocker pending root-cause
+  analysis, in addition to broader durable-state and provider qualification.
+
+Do not infer full parity or remove strict comparison dimensions from the
+independent differential merely because focused Go tests or CI pass.
