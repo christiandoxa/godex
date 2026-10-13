@@ -32,6 +32,7 @@ go build -trimpath -o "$tmp/godex" ./cmd/godex
 go build -trimpath -o "$tmp/differential" ./tools/differential
 go build -trimpath -o "$tmp/profileparity" ./tools/profileparity
 go build -trimpath -o "$tmp/clierrorparity" ./tools/clierrorparity
+go build -trimpath -o "$tmp/contextparity" ./tools/contextparity
 go build -trimpath -o "$tmp/continuationparity" ./tools/continuationparity
 
 # Independent managed-profile persistence oracle. All 29 CLI actions run in
@@ -48,6 +49,12 @@ go build -trimpath -o "$tmp/continuationparity" ./tools/continuationparity
   --prodex "$tmp/prodex" --godex "$tmp/godex" \
   --prodex-source "$tmp/prodex-source" \
   --godex-source "$root" --godex-commit "$(git rev-parse HEAD)"
+
+# Native Codex context forwarding must match the tagged executable. This
+# isolated fake-Codex fixture rejects cached maximum-window promotion and
+# checks the child argv rather than only the parent CLI's accepted options.
+"$tmp/contextparity" \
+  --prodex "$tmp/prodex" --godex "$tmp/godex"
 
 # Separate real-provider DeepSeek mock/oracle, still fail-closed on all material
 # mismatches including the private durable-file layout.
