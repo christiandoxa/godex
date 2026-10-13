@@ -71,3 +71,31 @@ Against clean candidate commit 6fd4871 and the exact official Linux binary:
 
 Do not infer full parity or remove strict comparison dimensions from the
 independent differential merely because focused Go tests or CI pass.
+
+## 2026-10-13 canonical DeepSeek stderr requalification
+
+The failure recorded above against candidate 6fd4871 was an obsolete
+reference-banner fixture, not a provider response mismatch. The SHA-256-pinned
+Prodex 0.437.8 executable prints 92 equals signs after the
+`[ Runtime Provider ]` prefix, whereas the prior comparator expected 89.
+Commit 22e09e3 corrects both one-key and two-key banner fixtures while keeping
+byte-exact startup diagnostics and all unexpected-warning negative controls.
+The revised width assertion failed before the correction and passed afterward.
+
+Against the exact official 0.437.8 binary and clean reference source at
+8c5c6f40fb4f864d1542f9c8fa48d15863316652, clean Godex commit 22e09e3
+passed each of the 18 strict differential scenarios when executed individually:
+success, tool-call, deepseek-user-id, sse-stream, sse-rate-limit, retry,
+single-key-429, single-key-401, single-key-403, single-key-503,
+single-key-500, key-rotation-429, deepseek-sse-terminal,
+key-rotation-restart, cancel, restart, recover-after-429, and
+recover-after-503. The independent scenario-level fixture invariants and
+negative controls remained active. `go test -shuffle=on -count=1 ./...` and
+`make verify` (including cross-builds and shuffled race tests) also passed.
+
+The combined `--scenario all` invocation was not executed in this follow-up;
+independent individual passes must not be reported as a combined-run result.
+This closes the recorded fixed-banner `success` mismatch only. Full parity,
+including all multi-epoch recovery, app-server, WebSocket and broader provider
+and durable-state behavior, remains unverified; the release gate is still
+fail-closed.
