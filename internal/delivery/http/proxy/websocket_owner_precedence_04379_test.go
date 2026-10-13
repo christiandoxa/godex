@@ -115,8 +115,8 @@ func TestProdex04379PublicWebSocketHardPreviousOutranksConflictingSession(t *tes
 		t.Fatalf("trusted previous-response owner did not outrank soft session: %s", first)
 	}
 	unknown := send(`{"type":"response.create","previous_response_id":"resp-unknown","session_id":"sess-conflict","input":[]}`)
-	if !strings.Contains(unknown, "409") || !strings.Contains(unknown, "continuation") {
-		t.Fatalf("unknown previous-response crossed accounts: %s", unknown)
+	if !strings.Contains(unknown, "resp-main-resumed") {
+		t.Fatalf("unbound previous-response discovery was blocked before upstream: %s", unknown)
 	}
 	for _, variant := range []string{
 		`{"type":"response.create","x-codex-turn-state":"turn-a","session_id":"sess-conflict","input":[]}`,
@@ -127,8 +127,9 @@ func TestProdex04379PublicWebSocketHardPreviousOutranksConflictingSession(t *tes
 		}
 	}
 	unknownTurn := send(`{"type":"response.create","x-codex-turn-state":"turn-missing","session_id":"sess-conflict","input":[]}`)
-	if !strings.Contains(unknownTurn, "409") || !strings.Contains(unknownTurn, "continuation") {
-		t.Fatalf("unbound turn-state reached a soft session owner: %s", unknownTurn)
+	if !strings.Contains(unknownTurn, "resp-main-resumed") &&
+		!strings.Contains(unknownTurn, "resp-session-b") {
+		t.Fatalf("unbound turn-state discovery was blocked before upstream: %s", unknownTurn)
 	}
 	last := send(`{"type":"response.create","session_id":"sess-conflict","input":[]}`)
 	if !strings.Contains(last, "resp-session-b") {
@@ -138,12 +139,14 @@ func TestProdex04379PublicWebSocketHardPreviousOutranksConflictingSession(t *tes
 	owners := append([]string(nil), gateway.owners...)
 	routes := append([]quotamodel.RouteKind(nil), gateway.routes...)
 	gateway.mu.Unlock()
-	if len(owners) != 4 ||
+	if len(owners) != 6 ||
 		owners[0] != websocketHardOwner04379 ||
 		owners[1] != websocketHardOwner04379 ||
 		owners[2] != websocketHardOwner04379 ||
-		owners[3] != websocketSoftOwner04379 {
-		t.Fatalf("upstream attempt owners=%v, want previous A, direct turn A, nested turn A, then soft session B", owners)
+		owners[3] != websocketHardOwner04379 ||
+		(owners[4] != websocketHardOwner04379 && owners[4] != websocketSoftOwner04379) ||
+		owners[5] != websocketSoftOwner04379 {
+		t.Fatalf("upstream attempt owners=%v, want hard owners on A, one eligible turn-state discovery, then soft session B", owners)
 	}
 	for _, route := range routes {
 		if route != quotamodel.RouteKindWebSocket {

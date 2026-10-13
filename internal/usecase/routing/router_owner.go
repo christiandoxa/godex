@@ -48,6 +48,7 @@ func (router *Router) resolveOwner(
 	}
 	if owner == "" && opaqueContinuation(keys, selection) &&
 		!allowsUnboundResponsesContinuation(keys, selection) &&
+		!allowsUnboundWebSocketDiscovery(keys, selection) &&
 		(keys.previous == "" || !router.hasPreviousResponseFailure(keys.previous, selection)) {
 		if durableRelease != nil {
 			_ = durableRelease()
@@ -55,6 +56,14 @@ func (router *Router) resolveOwner(
 		return "", nil, &proxymodel.Error{StatusCode: 409, Message: "continuation owner is unknown; continuity was preserved"}
 	}
 	return owner, durableRelease, nil
+}
+
+// Prodex 0.437.9 permits one selected owner for unbound
+// WebSocket previous-response/turn-state context. Bounded retries may target
+// that same owner, but must never cross profiles without the chain.
+func allowsUnboundWebSocketDiscovery(keys affinityKeys, selection quotamodel.Selection) bool {
+	return selection.RouteKind == quotamodel.RouteKindWebSocket &&
+		(keys.previous != "" || keys.turn != "")
 }
 
 func stableConversation(keys affinityKeys) bool {
@@ -88,6 +97,10 @@ func (router *Router) routeRequest(
 			return router.forwardFresh(ctx, request, accounts)
 		}
 		return router.forwardBound(ctx, request, accounts, owner, keys)
+	}
+	if request.WebSocketMessage && keys != nil &&
+		allowsUnboundWebSocketDiscovery(*keys, request.QuotaSelection) {
+		return router.forwardUnboundWebSocketDiscovery(ctx, request, accounts)
 	}
 	return router.forwardFresh(ctx, request, accounts)
 }
