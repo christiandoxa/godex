@@ -27,8 +27,11 @@ const (
 )
 
 type options struct {
-	prodex string
-	godex  string
+	prodex       string
+	godex        string
+	prodexSource string
+	godexSource  string
+	godexCommit  string
 }
 
 type probe struct {
@@ -56,6 +59,7 @@ type report struct {
 	Status          string       `json:"status"`
 	Oracle          string       `json:"oracle"`
 	OracleSource    string       `json:"oracle_source"`
+	CandidateSource string       `json:"candidate_source"`
 	Cases           []caseResult `json:"cases"`
 	NegativeControl string       `json:"negative_control"`
 }
@@ -76,6 +80,9 @@ func run() error {
 		return err
 	}
 	if err := verifyOracle(options.prodex); err != nil {
+		return err
+	}
+	if err := verifyContextProvenance(options); err != nil {
 		return err
 	}
 	root, err := os.MkdirTemp("", "godex-context-parity-")
@@ -127,7 +134,8 @@ func run() error {
 		return err
 	}
 	encoded, err := json.MarshalIndent(report{
-		Status: "PASS", Oracle: oracleVersion, OracleSource: oracleSourceCommit, Cases: results,
+		Status: "PASS", Oracle: oracleVersion, OracleSource: oracleSourceCommit,
+		CandidateSource: options.godexCommit, Cases: results,
 		NegativeControl: "PASS: cached maximum promotion is rejected",
 	}, "", "  ")
 	if err != nil {
@@ -140,13 +148,17 @@ func run() error {
 func parseOptions() (options, error) {
 	var result options
 	flags := flag.NewFlagSet("contextparity", flag.ContinueOnError)
-	flags.StringVar(&result.prodex, "prodex", "/home/doxa/.local/bin/prodex", "official Prodex 0.437.9 binary")
+	flags.StringVar(&result.prodex, "prodex", "", "official Prodex 0.437.9 binary")
 	flags.StringVar(&result.godex, "godex", "", "Godex candidate binary")
+	flags.StringVar(&result.prodexSource, "prodex-source", "", "tagged Prodex 0.437.9 clean source")
+	flags.StringVar(&result.godexSource, "godex-source", "", "clean Godex candidate source")
+	flags.StringVar(&result.godexCommit, "godex-commit", "", "full expected Godex commit SHA")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		return result, err
 	}
-	if strings.TrimSpace(result.prodex) == "" || strings.TrimSpace(result.godex) == "" {
-		return result, errors.New("usage: contextparity --prodex BIN --godex BIN")
+	if result.prodex == "" || result.godex == "" || result.prodexSource == "" ||
+		result.godexSource == "" || len(result.godexCommit) != 40 {
+		return result, errors.New("usage: contextparity --prodex BIN --godex BIN --prodex-source DIR --godex-source DIR --godex-commit FULL_SHA")
 	}
 	return result, nil
 }

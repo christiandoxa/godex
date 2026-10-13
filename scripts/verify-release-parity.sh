@@ -54,7 +54,9 @@ go build -trimpath -o "$tmp/continuationparity" ./tools/continuationparity
 # isolated fake-Codex fixture rejects cached maximum-window promotion and
 # checks the child argv rather than only the parent CLI's accepted options.
 "$tmp/contextparity" \
-  --prodex "$tmp/prodex" --godex "$tmp/godex"
+  --prodex "$tmp/prodex" --godex "$tmp/godex" \
+  --prodex-source "$tmp/prodex-source" \
+  --godex-source "$root" --godex-commit "$(git rev-parse HEAD)"
 
 # Separate real-provider DeepSeek mock/oracle, still fail-closed on all material
 # mismatches including the private durable-file layout.
