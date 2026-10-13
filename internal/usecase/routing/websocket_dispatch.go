@@ -129,6 +129,9 @@ func (router *Router) executeRouted(
 			continue
 		}
 		if plan.staleContinuation {
+			if metadata.previousResponseID != "" && !trustedPreviousAffinity {
+				return staleUnboundWebSocketContinuationResponse(response), nil
+			}
 			return staleWebSocketContinuationResponse(response), nil
 		}
 		return response, nil

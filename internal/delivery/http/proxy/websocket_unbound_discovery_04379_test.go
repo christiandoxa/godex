@@ -3,6 +3,7 @@ package proxy
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -94,8 +95,19 @@ func TestProdex04379UnboundWebSocketToolOutputNeverCrossProfileOnMissingPrevious
 	}
 	const tool = `{"type":"response.create","previous_response_id":"resp-tool-unknown","session_id":"sess-unbound","input":[{"type":"function_call_output","call_id":"call-42","output":"done"}]}`
 	signal := send(tool)
-	if !strings.Contains(signal, "stale_continuation") || strings.Contains(signal, "call-42") {
-		t.Fatalf("missing previous-response tool output was replayed or leaked: %s", signal)
+	var event struct {
+		Type   string `json:"type"`
+		Status int    `json:"status"`
+		Error  struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal([]byte(signal), &event); err != nil ||
+		event.Type != "error" || event.Status != http.StatusConflict ||
+		event.Error.Code != "stale_continuation" ||
+		strings.Contains(signal, "call-42") {
+		t.Fatalf("unbound missing chain did not surface tagged generic stale error: %s (parse=%v)", signal, err)
 	}
 	gateway.mu.Lock()
 	owners := append([]string(nil), gateway.accounts...)

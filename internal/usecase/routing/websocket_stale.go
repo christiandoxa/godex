@@ -19,9 +19,26 @@ const (
 )
 
 func staleWebSocketContinuationResponse(response *proxymodel.Response) *proxymodel.Response {
+	return staleWebSocketContinuationResponseForOwner(response, true)
+}
+
+// Prodex 0.437.9 exposes an unbound missing chain as a generic 409 error,
+// while a previously verified owner retains the response.failed envelope.
+func staleUnboundWebSocketContinuationResponse(response *proxymodel.Response) *proxymodel.Response {
+	return staleWebSocketContinuationResponseForOwner(response, false)
+}
+
+func staleWebSocketContinuationResponseForOwner(response *proxymodel.Response, trustedOwner bool) *proxymodel.Response {
 	payload := readWebSocketPrecommitTextPayload(response)
 	closeWebSocketRoutingResponse(response)
 	translated := translateStaleWebSocketPayload(payload)
+	if !trustedOwner {
+		translated = marshalStaleWebSocketPayload(map[string]any{
+			"type":   "error",
+			"status": http.StatusConflict,
+			"error":  staleWebSocketErrorObject(),
+		})
+	}
 	headers := make(http.Header)
 	headers.Set("Content-Type", "application/json")
 	return &proxymodel.Response{
