@@ -120,3 +120,13 @@ func TestCodexResumeSessionIDAcceptsExplicitExecResume(t *testing.T) {
 		t.Fatalf("exec resume session ID = %q, want %q", got, sessionID)
 	}
 }
+
+func TestCodexResumeSessionIDSkipsAllValueOptions(t *testing.T) {
+	const sessionID = "01900000-0000-7000-8000-000000000442"
+	for _, option := range []string{"--listen", "--code-mode-host", "--remote-auth-token-env", "--ws-auth"} {
+		args := []string{"resume", option, "value-that-is-not-a-session", sessionID}
+		if got := codexResumeSessionID(args); got != sessionID {
+			t.Errorf("%s session ID = %q, want %q", option, got, sessionID)
+		}
+	}
+}

@@ -61,7 +61,7 @@ func codexResumeSessionID(arguments []string) string {
 
 func codexResumeOptionTakesValue(argument string) bool {
 	switch argument {
-	case "-c", "--config", "-m", "--model", "-C", "--cd", "-i", "--image", "-p", "--profile", "-s", "--sandbox", "-a", "--ask-for-approval", "--enable", "--disable", "--add-dir", "--color", "-o", "--output-last-message", "--output-schema", "--thread-source", "--cyber-access-program", "--local-provider":
+	case "-c", "--config", "-m", "--model", "-C", "--cd", "-i", "--image", "-p", "--profile", "-s", "--sandbox", "-a", "--ask-for-approval", "--enable", "--disable", "--add-dir", "--color", "-o", "--output-last-message", "--output-schema", "--thread-source", "--cyber-access-program", "--local-provider", "--listen", "--code-mode-host", "--remote-auth-token-env", "--ws-auth", "--ws-token-file", "--ws-token-sha256", "--ws-shared-secret-file", "--ws-issuer", "--ws-audience", "--ws-max-clock-skew-seconds":
 		return true
 	default:
 		return false
