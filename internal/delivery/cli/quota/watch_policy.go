@@ -210,7 +210,9 @@ func compareQuotaReports(left, right quotamodel.Report, sortMode quotaReportSort
 }
 
 func quotaReportStatusRank(report quotamodel.Report) int {
-	if report.Err != nil || strings.EqualFold(report.State, "error") {
+	// The tagged Prodex sort uses the actual provider Result error, not
+	// the human-readable status text, which may lag valid quota evidence.
+	if report.Err != nil {
 		return 2
 	}
 	if report.External != nil {
