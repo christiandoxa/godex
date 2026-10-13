@@ -20,8 +20,11 @@ func repairResumeSessionBeforeLaunch(codexHome, sharedHome string, arguments []s
 func codexResumeSessionID(arguments []string) string {
 	for index := 0; index < len(arguments); index++ {
 		argument := arguments[index]
-		if argument == "--" || argument == "exec" || argument == "e" || argument == "--remote" || strings.HasPrefix(argument, "--remote=") {
+		if argument == "--" || argument == "--remote" || strings.HasPrefix(argument, "--remote=") {
 			return ""
+		}
+		if argument == "exec" || argument == "e" {
+			continue
 		}
 		if strings.HasPrefix(argument, "-") {
 			if codexResumeOptionTakesValue(argument) && !strings.Contains(argument, "=") {
@@ -32,8 +35,24 @@ func codexResumeSessionID(arguments []string) string {
 		if argument != "resume" {
 			return ""
 		}
-		if index+1 < len(arguments) && fullSessionID(arguments[index+1]) {
-			return arguments[index+1]
+		for next := index + 1; next < len(arguments); next++ {
+			argument = arguments[next]
+			if argument == "--" {
+				return ""
+			}
+			if strings.HasPrefix(argument, "-") {
+				if strings.Contains(argument, "=") {
+					continue
+				}
+				if codexResumeOptionTakesValue(argument) {
+					next++
+				}
+				continue
+			}
+			if fullSessionID(argument) {
+				return argument
+			}
+			return ""
 		}
 		return ""
 	}
