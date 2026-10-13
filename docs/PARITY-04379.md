@@ -278,3 +278,28 @@ upstream WebSocket connection handoff, arbitrary hard-affinity failure
 paths, or cross-platform execution. The complete networked
 `scripts/verify-release-parity.sh` was not executed in this follow-up,
 so its multi-oracle release gate remains unclaimed and fail-closed.
+
+## Durable WebSocket hard owner across a gateway restart
+
+An additional release-oracle WebSocket scenario now **terminates the running
+gateway process and starts a new one** between two independent local WebSocket
+connections. It replays the same synthetic conflict between a verified
+`previous_response_id` owned by account-a and an unrelated soft
+`session_id` owned by account-b. The upstream attempt must still go to
+account-a with exactly one committed `response.completed` event; the soft
+session's ownership must not override the harder continuation.
+
+Against the exact official Prodex 0.437.9 binary and clean Godex
+`d13fb9e3e4a23a6e302d760c7557e7fc7a5d7e04`, all **four**
+WebSocket fixture scenarios passed for each executable. Observed attempts:
+Prodex `2 + 1 + 1 + 1`; Godex `2 + 1 + 1 + 1`. In particular,
+`ws-bound-restart` routed to account-a for **both**, confirming persistence
+across a gateway **process** boundary rather than only WebSocket reuse. The
+two products continued to agree on precommit retry and postcommit no-replay.
+The scenario is now part of the pinned release-only differential.
+
+This strengthens evidence for durable **previous-response** ownership in
+one deterministic two-profile fixture. It does not certify every storage
+failure/recovery permutation, turn-state-only recovery, cross-platform
+WebSocket state durability, quota collapse, or real-provider execution.
+Full parity remains fail-closed.

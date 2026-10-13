@@ -90,7 +90,7 @@ func (b *backend) serveWebSocket(writer http.ResponseWriter, request *http.Reque
 				`{"type":"response.output_text.delta","delta":"visible"}`,
 				`{"type":"response.failed","response":{"error":{"code":"server_is_overloaded"}}}`,
 			}
-		case "ws-bound":
+		case "ws-bound", "ws-bound-restart":
 			payloads = []string{`{"type":"response.completed","response":{"id":"resp-bound"}}`}
 		default:
 			payloads = []string{`{"type":"response.completed","response":{"id":"resp-default"}}`}
@@ -156,7 +156,7 @@ func websocketProbe(endpoint, mode string) (wsProbe, error) {
 	defer connection.Close()
 	_ = connection.SetDeadline(time.Now().Add(28 * time.Second))
 	request := map[string]any{"type": "response.create", "mode": mode, "input": []any{}}
-	if mode == "ws-bound" {
+	if mode == "ws-bound" || mode == "ws-bound-restart" {
 		// The verified previous response belongs to the primary profile;
 		// the soft session key is deliberately bound to the other profile.
 		request["previous_response_id"] = "resp-main"
@@ -215,7 +215,7 @@ func runWebSocketProduct(root string, b *backend, p product) error {
 	if err != nil {
 		return err
 	}
-	defer stopGateway(cmd)
+	defer func() { stopGateway(cmd) }()
 	start := len(mustAttempts(b))
 	// Both products must discard precommit metadata/heartbeats on a
 	// retryable failure, and must never replay already-visible output. Prodex
@@ -231,13 +231,7 @@ func runWebSocketProduct(root string, b *backend, p product) error {
 		if err != nil {
 			return fmt.Errorf("%s: %w", probe.mode, err)
 		}
-		recorded := mustAttempts(b)[before:]
-		observed := make([]string, 0, len(recorded))
-		for _, a := range recorded {
-			if a.mode == probe.mode {
-				observed = append(observed, a.account)
-			}
-		}
+		observed := websocketAttemptsForMode(b, before, probe.mode)
 		if err := verifyWebsocketExpectation(probe, got, observed); err != nil {
 			return err
 		}
@@ -247,7 +241,32 @@ func runWebSocketProduct(root string, b *backend, p product) error {
 		fmt.Printf("%s %s: upstream=%s client=%s\n", p.name, probe.mode, strings.Join(observed, ","),
 			strings.Join(got.types, ","))
 	}
-	if len(mustAttempts(b)[start:]) < 4 {
+	// Restart only the local gateway process. The detached WS owner must
+	// come from persisted continuation state, not a retained TCP connection
+	// or a warm in-memory routing cache.
+	stopGateway(cmd)
+	endpoint, cmd, err = startGateway(p, b.server.URL+"/backend-api")
+	if err != nil {
+		return fmt.Errorf("restart WebSocket gateway: %w", err)
+	}
+	restart := websocketExpectation{
+		mode: "ws-bound-restart", want: []string{"response.completed"}, attempts: 1,
+	}
+	before := len(mustAttempts(b))
+	got, err := websocketProbe(endpoint, restart.mode)
+	if err != nil {
+		return fmt.Errorf("%s: %w", restart.mode, err)
+	}
+	observed := websocketAttemptsForMode(b, before, restart.mode)
+	if err := verifyWebsocketExpectation(restart, got, observed); err != nil {
+		return err
+	}
+	if observed[0] != "account-a" {
+		return fmt.Errorf("%s lost verified hard owner after process restart: %v", restart.mode, observed)
+	}
+	fmt.Printf("%s %s: upstream=%s client=%s\n", p.name, restart.mode,
+		strings.Join(observed, ","), strings.Join(got.types, ","))
+	if len(mustAttempts(b)[start:]) < 5 {
 		return errors.New("websocket fixture recorded insufficient upstream attempts")
 	}
 	return nil
@@ -285,4 +304,15 @@ func verifyWebsocketExpectation(probe websocketExpectation, got wsProbe, observe
 		}
 	}
 	return nil
+}
+
+func websocketAttemptsForMode(b *backend, from int, mode string) []string {
+	recorded := mustAttempts(b)[from:]
+	observed := make([]string, 0, len(recorded))
+	for _, item := range recorded {
+		if item.mode == mode {
+			observed = append(observed, item.account)
+		}
+	}
+	return observed
 }
