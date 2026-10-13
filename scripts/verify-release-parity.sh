@@ -20,6 +20,22 @@ test "$(git -C "$tmp/prodex-source" rev-parse HEAD)" = "$ref_commit" || {
 curl --fail --location --silent --show-error --retry 3 \
   --output "$tmp/prodex" \
   'https://github.com/christiandoxa/prodex/releases/download/0.437.10/prodex-x86_64-unknown-linux-gnu'
+curl --fail --location --silent --show-error --retry 3 \
+  --output "$tmp/SHA256SUMS" \
+  'https://github.com/christiandoxa/prodex/releases/download/0.437.10/SHA256SUMS'
+curl --fail --location --silent --show-error --retry 3 \
+  --output "$tmp/release-manifest.json" \
+  'https://github.com/christiandoxa/prodex/releases/download/0.437.10/release-manifest.json'
+grep -Fqx "$prodex_binary_sha256  prodex-x86_64-unknown-linux-gnu" "$tmp/SHA256SUMS" || {
+  echo "Prodex executable is absent or mismatched in published SHA256SUMS" >&2
+  exit 1
+}
+grep -Fq '"version": "0.437.10"' "$tmp/release-manifest.json" &&
+grep -Fq '"commit": "c047ec437bc87cc19d22064f9946db5d446d9a45"' "$tmp/release-manifest.json" &&
+grep -Fq '"asset": "prodex-x86_64-unknown-linux-gnu"' "$tmp/release-manifest.json" || {
+  echo "Prodex release manifest does not describe the pinned oracle" >&2
+  exit 1
+}
 echo "$prodex_binary_sha256  $tmp/prodex" | sha256sum --check --status || {
   echo "Prodex oracle executable SHA-256 mismatch" >&2
   exit 1
