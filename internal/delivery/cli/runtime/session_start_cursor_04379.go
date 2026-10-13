@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"os"
@@ -41,6 +42,14 @@ func sessionStartTranscriptOffset04379(fields map[string]any, sessionID string) 
 		if !ok {
 			return -1
 		}
+		// A compressed native rollout may be rewritten while the hook is
+		// delivered. Anchor the cursor to a complete JSONL record, not
+		// an unfinished trailing event.
+		complete := bytes.LastIndexByte(data, '\n') + 1
+		if complete == 0 {
+			return -1
+		}
+		data = data[:complete]
 		if metadataID, seen := recoverySessionMetaID04360(data); seen &&
 			!strings.EqualFold(metadataID, sessionID) {
 			return -1
@@ -59,11 +68,42 @@ func sessionStartTranscriptOffset04379(fields map[string]any, sessionID string) 
 	if err != nil {
 		return -1
 	}
-	if metadataID, seen := recoverySessionMetaIDFromFile04360(file, opened.Size()); seen &&
+	complete := sessionStartLastCompleteJSONLOffset04379(file, opened.Size())
+	if complete < 0 {
+		return -1
+	}
+	if metadataID, seen := recoverySessionMetaIDFromFile04360(file, complete); seen &&
 		!strings.EqualFold(metadataID, sessionID) {
 		return -1
 	}
-	return opened.Size()
+	return complete
+}
+
+// A partially written JSONL event must not poison the initial recovery
+// checkpoint. Cap backward inspection of the active tail; if no complete
+// record exists within that bound, decline the cursor instead of guessing.
+func sessionStartLastCompleteJSONLOffset04379(file *os.File, size int64) int64 {
+	if size <= 0 {
+		return -1
+	}
+	var last [1]byte
+	if _, err := file.ReadAt(last[:], size-1); err != nil {
+		return -1
+	}
+	if last[0] == '\n' {
+		return size
+	}
+	const lookback = int64(1 << 20)
+	start := max(int64(0), size-lookback)
+	tail := make([]byte, int(size-start))
+	if _, err := file.ReadAt(tail, start); err != nil {
+		return -1
+	}
+	end := bytes.LastIndexByte(tail, '\n')
+	if end < 0 {
+		return -1
+	}
+	return start + int64(end+1)
 }
 
 func sessionStartOffsetPath04379(marker string) string {
