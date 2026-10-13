@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -225,5 +227,53 @@ func TestProdex04379InvalidCursorFallsBackWithoutReplayingHistory(t *testing.T) 
 	}
 	if _, ok := sessionStartReadOffset04379(t.Context(), marker.path, "00000000-0000-4000-8000-000000000099"); ok {
 		t.Fatal("cursor accepted for a different root")
+	}
+}
+
+func TestProdex04379CodexRolloutModesPreserveSafeCursor(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX file mode contract")
+	}
+	initial := []byte(`{"type":"session_meta","payload":{"id":"` + markerRoot04379 + `"}}` + "\n")
+	for _, suffix := range []string{".jsonl", ".jsonl.zst"} {
+		for _, tc := range []struct {
+			mode os.FileMode
+			want bool
+		}{
+			{0o664, true},  // Codex-owned rollouts may be group writable.
+			{0o666, false}, // An untrusted world-writable rollout is rejected.
+		} {
+			t.Run(fmt.Sprintf("%s/%o", suffix, tc.mode), func(t *testing.T) {
+				path := filepath.Join(t.TempDir(), "rollout-2026-10-13-"+markerRoot04379+suffix)
+				data := initial
+				if suffix == ".jsonl.zst" {
+					encoder, err := zstd.NewWriter(nil)
+					if err != nil {
+						t.Fatal(err)
+					}
+					data = encoder.EncodeAll(initial, nil)
+					encoder.Close()
+				}
+				if err := os.WriteFile(path, data, tc.mode); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Chmod(path, tc.mode); err != nil {
+					t.Fatal(err)
+				}
+				marker, err := newSessionStartMarker04360()
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer marker.Close()
+				markerNotify04379(t, marker, map[string]any{
+					"session_id": markerRoot04379, "transcript_path": path,
+				})
+				offset, ok := sessionStartReadOffset04379(t.Context(), marker.path, markerRoot04379)
+				if ok != tc.want || ok && offset != int64(len(initial)) {
+					t.Fatalf("mode=%#o offset=%d valid=%t, want valid=%t decoded=%d",
+						tc.mode, offset, ok, tc.want, len(initial))
+				}
+			})
+		}
 	}
 }

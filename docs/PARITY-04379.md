@@ -87,7 +87,7 @@ Codex emitted `SessionStart`, then accepted user work and a terminal capacity
 error before Godex's live monitor first resolved the rollout. Previously the
 monitor captured the *current* file end and skipped that terminal error.
 The new callback snapshots the logical file position before atomically
-publishing a new root marker when a verified, private `transcript_path` is
+publishing a new root marker when a verified native `transcript_path` is
 available. Plain JSONL uses the regular file length; bounded `.jsonl.zst`
 decoding uses the *decoded* length. The monitor consumes a private offset
 sidecar under the marker writer lock and verifies the original prefix before
@@ -109,3 +109,34 @@ rather than scanning unknown historical state. The root marker remains
 launch-private and is cleaned up on exit. Independent cross-binary evidence
 for full state-index resolution, arbitrary monitor/process restarts, and
 every compressed-rollout transition remains open and release-blocking.
+
+## Native Codex 0.162.1 SessionStart qualification
+
+An opt-in, credential-free test now drives the actual installed Codex 0.162.1
+Linux native executable with a synthetic, loopback-only Responses provider.
+It disables Codex plugins, uses isolated `HOME` and `CODEX_HOME`, builds the
+Godex hook receiver from source, and relays the native `SessionStart` JSON
+through Godex's hidden callback. The test verifies the exact native event
+name, session ID, matching rollout path, and snapshot cursor. No external
+model or account request is made.
+
+The first real-native run exposed a regression the earlier fabricated rollout
+fixture missed: Codex creates legitimate group-writable rollout files
+(mode `0664`), so rejecting every group-writable file prevented the cursor
+from being recorded. Godex now accepts verified regular Codex rollouts that
+are group-writable, while continuing to reject world-writable files and
+symlinks. Deterministic positive and negative tests cover modes `0664`
+and `0666` for both JSONL and compressed rollouts. The native opt-in
+fixture failed before this permission adjustment and passed afterward.
+
+Opt-in validation:
+
+```sh
+GODEX_TEST_CODEX_01621_BIN=<native-codex-binary> \
+  go test ./internal/delivery/cli/runtime \
+    -run '^TestProdex04379OfficialCodex01621NativeSessionStartCursor$' -count=1 -v
+```
+
+This qualifies the installed binary by reported version, not by an official
+SHA-256-pinned asset or a full Prodex-vs-Godex running-model differential.
+The release gate remains fail-closed.
