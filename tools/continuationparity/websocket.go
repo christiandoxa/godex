@@ -92,6 +92,8 @@ func (b *backend) serveWebSocket(writer http.ResponseWriter, request *http.Reque
 			}
 		case "ws-bound", "ws-bound-restart", "ws-turn", "ws-turn-restart":
 			payloads = []string{`{"type":"response.completed","response":{"id":"resp-bound"}}`}
+		case "ws-unknown-missing":
+			payloads = []string{`{"type":"response.failed","status":400,"response":{"error":{"code":"previous_response_not_found","message":"synthetic missing chain"}}}`}
 		case "ws-session-seed", "ws-session", "ws-session-restart":
 			payloads = []string{`{"type":"response.completed","response":{"id":"resp-session"}}`}
 		default:
@@ -177,6 +179,13 @@ func websocketProbe(endpoint, mode string) (wsProbe, error) {
 		request["previous_response_id"] = "resp-absent"
 		request["session_id"] = "sess-conflict"
 	}
+	if mode == "ws-unknown-missing" {
+		request["previous_response_id"] = "resp-tool-missing"
+		request["session_id"] = "sess-conflict"
+		request["input"] = []any{map[string]any{
+			"type": "function_call_output", "call_id": "call-missing", "output": "done",
+		}}
+	}
 	if mode == "ws-unknown-turn" {
 		request["x-codex-turn-state"] = "turn-absent"
 		request["session_id"] = "sess-conflict"
@@ -247,6 +256,7 @@ func runWebSocketProduct(root string, b *backend, p product) error {
 		{mode: "ws-turn", want: []string{"response.completed"}, attempts: 1, owner: "account-a"},
 		{mode: "ws-unknown", want: []string{"response.completed"}, attempts: 1, owner: "account-a"},
 		{mode: "ws-unknown-turn", want: []string{"response.completed"}, attempts: 1, owner: "account-a"},
+		{mode: "ws-unknown-missing", want: []string{"error"}, attempts: 4, owner: "account-a", errorCode: "stale_continuation", errorStatus: http.StatusConflict},
 		{mode: "ws-session", want: []string{"response.completed"}, attempts: 1, owner: "account-a"},
 	}
 	if err := runWebSocketProbes(b, p.name, endpoint, probes); err != nil {
@@ -268,7 +278,7 @@ func runWebSocketProduct(root string, b *backend, p product) error {
 	if err := runWebSocketProbes(b, p.name, endpoint, restart); err != nil {
 		return err
 	}
-	if len(mustAttempts(b)[start:]) < 10 {
+	if len(mustAttempts(b)[start:]) < 14 {
 		return errors.New("websocket fixture recorded insufficient upstream attempts")
 	}
 	return nil
@@ -285,6 +295,9 @@ func runWebSocketProbes(b *backend, productName, endpoint string, probes []webso
 		if err := verifyWebsocketExpectation(probe, got, observed); err != nil {
 			return err
 		}
+		if err := verifyWebsocketOpaqueChain(b, before, probe.mode); err != nil {
+			return err
+		}
 		fmt.Printf("%s %s: upstream=%s client=%s\n", productName, probe.mode,
 			strings.Join(observed, ","), strings.Join(got.types, ","))
 	}
@@ -294,11 +307,13 @@ func runWebSocketProbes(b *backend, productName, endpoint string, probes []webso
 // Account selection is part of the pinned source/binary oracle. In this
 // deterministic fixture, Prodex retries the *same* owner on overload.
 type websocketExpectation struct {
-	mode     string
-	want     []string
-	delta    string
-	attempts int
-	owner    string
+	mode        string
+	want        []string
+	delta       string
+	attempts    int
+	owner       string
+	errorCode   string
+	errorStatus int
 }
 
 func verifyWebsocketExpectation(probe websocketExpectation, got wsProbe, observed []string) error {
@@ -325,6 +340,28 @@ func verifyWebsocketExpectation(probe websocketExpectation, got wsProbe, observe
 	}
 	if !strings.Contains(strings.Join(got.delta, ","), probe.delta) {
 		return fmt.Errorf("%s missing visible %q in %v", probe.mode, probe.delta, got.body)
+	}
+	if probe.errorCode != "" {
+		if len(got.body) == 0 {
+			return fmt.Errorf("%s missing expected error code %q", probe.mode, probe.errorCode)
+		}
+		var envelope struct {
+			Status int `json:"status"`
+			Error  struct {
+				Code string `json:"code"`
+			} `json:"error"`
+			Response struct {
+				Error struct {
+					Code string `json:"code"`
+				} `json:"error"`
+			} `json:"response"`
+		}
+		if err := json.Unmarshal([]byte(got.body[len(got.body)-1]), &envelope); err != nil ||
+			(envelope.Error.Code != probe.errorCode && envelope.Response.Error.Code != probe.errorCode) ||
+			(probe.errorStatus != 0 && envelope.Status != probe.errorStatus) {
+			return fmt.Errorf("%s terminal code/status does not match %q/%d: frames=%v err=%v",
+				probe.mode, probe.errorCode, probe.errorStatus, got.body, err)
+		}
 	}
 	for _, body := range got.body {
 		if strings.Contains(body, "discarded-response") {

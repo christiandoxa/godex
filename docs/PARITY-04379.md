@@ -361,3 +361,36 @@ parity pass when attempt counts agree but owners differ. This is still
 a subset of live provider/WebSocket and durability behavior. The full
 networked release verifier was **not** executed in this checkpoint; parity
 and release remain fail-closed.
+
+
+## Official unbound missing-chain error-frame parity
+
+The next exact-tagged differential case exposed a client-wire mismatch
+after the bounded retry sequence. Prodex `0.437.9` returned a **generic**
+WebSocket `error` frame with `status=409` and
+`error.code=stale_continuation` when an unbound
+`previous_response_id` carried a tool output and the selected upstream
+returned `previous_response_not_found`. Godex previously used a nested
+`response.failed` envelope despite matching the owner's four attempts.
+Commit `1b722ab` now emits the canonical generic error **only when the
+previous-response owner is unbound**. The previously verified owner's
+`response.failed` envelope remains unchanged; its public regression
+passed unchanged.
+
+Against official SHA-256-pinned Prodex 0.437.9 and clean Godex commit
+`1b722ab05e892bececba47dcd12842d02c169ff6`, the WebSocket
+differential passed **12 scenarios per executable**: the earlier eleven,
+plus the unbound missing-chain tool-output scenario. Both sides made
+**four same-owner attempts** for that case, returned exactly one
+`409 / stale_continuation` client-visible `error` frame, and left the
+original `previous_response_id`, session ID, tool-call ID, tool type,
+and output intact on each upstream request. In all, the synthetic
+fixture observed **33 upstream requests across the two executables**,
+including Prodex's background usage query.
+
+The oracle additionally rejects the wrong HTTP status, error code, event
+type, account identity, or altered opaque tool fields. Local race tests
+covering OpenAI gateway, HTTP proxy and routing passed after the runtime
+fix. This qualifies the tested path only: live-provider discovery,
+connection-limit recovery, alternate quota phases and cross-platform
+ownership remain open; no release tag has been issued.

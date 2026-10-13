@@ -103,3 +103,44 @@ func TestProdex04379WebSocketOracleRejectsDirtyOrStaleGoBuild(t *testing.T) {
 		})
 	}
 }
+
+func TestProdex04379WebSocketUnboundStaleOracleRejectsRewrites(t *testing.T) {
+	good := wsProbe{
+		types: []string{"error"},
+		body:  []string{`{"type":"error","status":409,"error":{"code":"stale_continuation"}}`},
+	}
+	probe := websocketExpectation{
+		mode: "ws-unknown-missing", want: []string{"error"}, attempts: 4,
+		owner: "account-a", errorCode: "stale_continuation", errorStatus: 409,
+	}
+	owners := []string{"account-a", "account-a", "account-a", "account-a"}
+	if err := verifyWebsocketExpectation(probe, good, owners); err != nil {
+		t.Fatal(err)
+	}
+	bad := good
+	bad.body = []string{`{"type":"error","status":503,"error":{"code":"stale_continuation"}}`}
+	if err := verifyWebsocketExpectation(probe, bad, owners); err == nil {
+		t.Fatal("mismatched stale HTTP status was accepted")
+	}
+	bad.body = []string{`{"type":"error","status":409,"error":{"code":"other_error"}}`}
+	if err := verifyWebsocketExpectation(probe, bad, owners); err == nil {
+		t.Fatal("mismatched stale error code was accepted")
+	}
+	body := `{"type":"response.create","mode":"ws-unknown-missing","previous_response_id":"resp-tool-missing","session_id":"sess-conflict","input":[{"type":"function_call_output","call_id":"call-missing","output":"done"}]}`
+	backend := &backend{attempts: []attempt{{mode: probe.mode, account: "account-a", body: body}}}
+	if err := verifyWebsocketOpaqueChain(backend, 0, probe.mode); err != nil {
+		t.Fatal(err)
+	}
+	for _, mutation := range []string{
+		strings.Replace(body, "resp-tool-missing", "resp-wrong", 1),
+		strings.Replace(body, "call-missing", "call-wrong", 1),
+		strings.Replace(body, `"output":"done"`, `"output":""`, 1),
+		strings.Replace(body, "function_call_output", "message", 1),
+		`{"input":[]}`,
+	} {
+		backend.attempts[0].body = mutation
+		if err := verifyWebsocketOpaqueChain(backend, 0, probe.mode); err == nil {
+			t.Fatalf("rewritten opaque continuation accepted: %s", mutation)
+		}
+	}
+}

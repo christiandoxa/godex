@@ -13,7 +13,7 @@ the fixture is not a full feature-parity certificate.
 
 ## Strict WebSocket differential
 
-Use `--websocket` to exercise **eleven** request paths against both
+Use `--websocket` to exercise **twelve** request paths against both
 executables (including three paths on a freshly restarted gateway):
 
 1. Seed a soft `session_id` preference and record its actual selected owner.
@@ -26,11 +26,14 @@ executables (including three paths on a freshly restarted gateway):
 5. A verified `x-codex-turn-state` must also outrank the soft session.
 6. An *unbound* `previous_response_id` may discover an upstream profile.
 7. An *unbound* `turn_state` may likewise discover a profile.
-   Discovery never authorizes cross-profile replay after a missing-chain
-   failure; that case is checked separately by public-proxy regressions.
-8. A soft-session-only request after hard-affinity activity must retain the
+8. An unbound `previous_response_id` with a tool-output continuation that
+   upstream does not recognize must perform four bounded **same-owner**
+   attempts, preserve the original tool call ID and output on each attempt,
+   then emit a generic `409 / stale_continuation` error frame—never replay
+   that tool output as a fresh request on another profile.
+9. A soft-session-only request after hard-affinity activity must retain the
    pinned reference's observed owner selection.
-9–11. Restart the gateway process and repeat hard previous-response,
+10–12. Restart the gateway process and repeat hard previous-response,
    hard turn-state, and soft-session-only requests. No local socket or
    in-memory router cache survives the restart.
 
@@ -62,7 +65,8 @@ different expected commit, or missing/modified Go executable VCS metadata.
 
 The harness fails on mismatched event order, missing visible output,
 extra upstream attempts, leaked precommit response IDs, wrong hard-affinity
-owner, and invalid framing. Unit negative controls intentionally mutate these
+owner, missing-chain error type/code/status, rewritten tool outputs,
+and invalid framing. Unit negative controls intentionally mutate these
 observations. See `scripts/verify-release-parity.sh` for the exact-tagged
 release-only invocation. That release script still blocks on *all* other
 oracle checks; local scenario passes do not authorize a tag or release.
