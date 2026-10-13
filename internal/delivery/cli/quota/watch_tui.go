@@ -131,7 +131,13 @@ func (model quotaTUIModel) View() string {
 		output.WriteByte('\n')
 	}
 	output.WriteByte('\n')
-	model.writeQuotaBody(&output)
+	// Reserve the footer and an optional refresh warning, then let the
+	// tagged 0.437.9 page policy fit complete profile sections.
+	bodyBudget := model.height - strings.Count(output.String(), "\n") - 2
+	if model.err != nil {
+		bodyBudget -= 2
+	}
+	model.writeQuotaBody(&output, max(0, bodyBudget))
 	if model.err != nil {
 		output.WriteString("\nQuota refresh failed; showing last successful snapshot when available.\n")
 	}
@@ -147,9 +153,9 @@ func (model quotaTUIModel) writePoolSummary(output *strings.Builder) {
 	}
 }
 
-func (model quotaTUIModel) writeQuotaBody(output *strings.Builder) {
+func (model quotaTUIModel) writeQuotaBody(output *strings.Builder, budget int) {
 	if len(model.reports) == 0 {
-		if model.loading {
+		if model.loading && budget > 0 {
 			output.WriteString("Loading quota data...\n")
 		}
 		return
@@ -158,13 +164,41 @@ func (model quotaTUIModel) writeQuotaBody(output *strings.Builder) {
 		_ = writeQuotaReports(output, model.reports, model.options.detail)
 		return
 	}
+	if budget < 1 {
+		return
+	}
 	reports := model.sortedReports()
-	visible := model.visibleReportCount()
-	start := min(model.scrollOffset, len(reports))
-	end := min(start+visible, len(reports))
-	_ = writeQuotaReports(output, reports[start:end], model.options.detail)
-	if len(reports) > visible {
-		_, _ = fmt.Fprintf(output, "Showing %d-%d of %d profiles\n", min(start+1, len(reports)), end, len(reports))
+	start := min(max(0, model.scrollOffset), len(reports)-1)
+	var header strings.Builder
+	_ = writeQuotaReports(&header, nil, model.options.detail)
+	text := header.String()
+	lines := strings.Count(text, "\n")
+	if lines > budget {
+		return
+	}
+	output.WriteString(text)
+	shown := 0
+	for _, report := range reports[start:] {
+		var section strings.Builder
+		_ = writeReport(&section, report, model.options.detail)
+		sectionLines := strings.Count(section.String(), "\n")
+		plan, ok := planQuotaPage04379(len(reports), start, shown, lines, sectionLines, &budget)
+		if !ok || !plan.appendSection {
+			break
+		}
+		output.WriteString(section.String())
+		lines += sectionLines
+		shown++
+	}
+	page, _ := planQuotaPage04379(len(reports), start, shown, lines, 0, &budget)
+	if page.showNotice {
+		if shown > 0 {
+			_, _ = fmt.Fprintf(output, "Showing %d-%d of %d profiles\n",
+				start+1, start+shown, len(reports))
+		} else {
+			_, _ = fmt.Fprintf(output, "No profile rows fit; %d above, %d below\n",
+				page.hiddenBefore, page.hiddenAfter)
+		}
 	}
 }
 
@@ -183,16 +217,10 @@ func (model quotaTUIModel) sortedReports() []quotamodel.Report {
 	return quotaSortedReports(model.reports, model.providerFilter, model.sortMode)
 }
 
-func (model quotaTUIModel) visibleReportCount() int {
-	reserved := 8
-	if model.options.All {
-		reserved += len(quotaPoolSummaryFields(model.reports, model.updated)) + 2
-	}
-	return max(1, model.height-reserved)
-}
-
 func (model quotaTUIModel) maxScrollOffset() int {
-	return max(0, len(model.sortedReports())-model.visibleReportCount())
+	// The tagged quota page plan permits starting at the final profile
+	// even when all other sections would fit in a taller viewport.
+	return max(0, len(model.sortedReports())-1)
 }
 
 func (model *quotaTUIModel) clampScroll() {
