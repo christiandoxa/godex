@@ -45,12 +45,24 @@ func writeSessionStartMarker04379(path string, fields map[string]any) error {
 		return nil
 	}
 	offsetPath := sessionStartOffsetPath04379(path)
-	if offset := sessionStartTranscriptOffset04379(fields, id); offset >= 0 {
+	rolloutPath := sessionStartRolloutSidecarPath04379(path)
+	transcript, _ := fields["transcript_path"].(string)
+	transcript = filepath.Clean(transcript)
+	offset := sessionStartTranscriptOffset04379(fields, id)
+	if offset >= 0 && len(transcript) <= sessionStartRolloutPathLimit04379 &&
+		!strings.ContainsAny(transcript, "\r\n") {
+		if _, err := fileutil.AtomicWrite(rolloutPath, []byte(transcript+"\n")); err != nil {
+			return fmt.Errorf("publish session callback rollout: %w", err)
+		}
 		if _, err := fileutil.AtomicWrite(offsetPath, []byte(fmt.Sprintf("%d\n", offset))); err != nil {
 			return fmt.Errorf("publish session callback offset: %w", err)
 		}
-	} else if err := os.Remove(offsetPath); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("clear stale session callback offset: %w", err)
+	} else {
+		for _, sidecar := range []string{offsetPath, rolloutPath} {
+			if err := os.Remove(sidecar); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return fmt.Errorf("clear stale session callback evidence: %w", err)
+			}
+		}
 	}
 	if _, err := fileutil.AtomicWrite(path, []byte(id+"\n")); err != nil {
 		return fmt.Errorf("publish session callback marker: %w", err)

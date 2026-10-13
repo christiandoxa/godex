@@ -110,9 +110,23 @@ func sessionStartOffsetPath04379(marker string) string {
 	return strings.TrimSuffix(marker, ".id") + ".offset"
 }
 
-// The marker and offset are read under the hook-writer lock so an in-flight
-// root change cannot pair the old identity with a new cursor.
+const sessionStartRolloutPathLimit04379 = 4095
+
+func sessionStartRolloutSidecarPath04379(marker string) string {
+	return strings.TrimSuffix(marker, ".id") + ".rollout"
+}
+
+// Read the two pieces of callback evidence under the same OS lock. The
+// parameterless variant is used by marker fixtures; live recovery requires
+// a matching native transcript, preventing a cursor from being replayed
+// against another rollout file with the same UUID.
 func sessionStartReadOffset04379(ctx context.Context, marker, sessionID string) (int64, bool) {
+	return sessionStartReadOffsetForRollout04379(ctx, marker, sessionID, "")
+}
+
+func sessionStartReadOffsetForRollout04379(
+	ctx context.Context, marker, sessionID, expectedRollout string,
+) (int64, bool) {
 	release, err := lockfile.Acquire(ctx, marker+".lock")
 	if err != nil {
 		return 0, false
@@ -121,6 +135,22 @@ func sessionStartReadOffset04379(ctx context.Context, marker, sessionID string) 
 	current, err := readSessionStartMarker04379(marker)
 	if err != nil || current != sessionID {
 		return 0, false
+	}
+	if expectedRollout != "" {
+		if !sessionStartRolloutPath04379(expectedRollout, sessionID) {
+			return 0, false
+		}
+		binding := sessionStartRolloutSidecarPath04379(marker)
+		info, err := os.Lstat(binding)
+		if err != nil || !info.Mode().IsRegular() ||
+			info.Size() < 2 || info.Size() > sessionStartRolloutPathLimit04379+1 {
+			return 0, false
+		}
+		body, err := os.ReadFile(binding)
+		if err != nil || len(body) < 2 || body[len(body)-1] != '\n' ||
+			strings.TrimSuffix(string(body), "\n") != filepath.Clean(expectedRollout) {
+			return 0, false
+		}
 	}
 	path := sessionStartOffsetPath04379(marker)
 	info, err := os.Lstat(path)
