@@ -432,3 +432,47 @@ These checks qualify bounded hard-affinity failure handling only.
 Live provider inference, all quota/circuit states, app-server handoff and
 cross-platform operation remain outside the demonstrated parity surface.
 No release tag is authorized by the new evidence.
+
+## Native SessionStart cursor at partial JSONL record boundaries
+
+A further deterministic regression exposed a gap in the pre-poll recovery
+cursor when native Codex invokes `SessionStart` **during an unfinished JSONL
+write**. The callback previously captured the physical / decoded file length
+even if the final record ended halfway through a line. The monitor rejects
+such a cursor as an invalid record boundary and falls back to the *current*
+file end, which can silently skip a terminal capacity failure completed
+before the first monitor poll.
+
+Commit `ca4d437` now snapshots the offset immediately after the **last
+fully written JSONL line**. Plain rollout files use a fast final-byte check
+and, only for incomplete tails, a bounded 1 MiB backward read; compressed
+`.jsonl.zst` rollouts use the last newline in their already-bounded decoded
+content. The recovered checkpoint still hashes and verifies the original
+prefix. The callback refuses to publish a cursor when no complete record
+exists within its bounded inspection, instead of inventing one.
+
+The regression failed against the previous implementation with cursor
+`124` instead of the last complete offset `80` on **both** regular and
+Zstandard rollouts. After the patch it passes: the next completed user
+record and a terminal `server_overloaded` event are observed at the first
+monitor poll. Negative controls check empty/incomplete metadata, bounded
+large partial tails, no replay of historical failures already preceding the
+cursor, and preservation across an inherited same-root compact callback.
+
+**Qualification:** focused regressions; shuffled race tests for CLI
+runtime, runtime use case and session repository; full `make verify`
+including cross-platform compilation, vet, installers, and repository-wide
+shuffled race tests; an opt-in native Codex 0.162.1 callback smoke; and
+the already-pinned **13-scenario Prodex 0.437.9 vs clean Godex
+`ca4d4379bc9bcfed24edbd414199b4efde78b2f7`** WebSocket executable
+differential all passed. The real-Codex smoke confirms the ordinary native
+hook, **not** an actual concurrent mid-record native write.
+
+The last-complete-line safeguard is bounded: a partially written line
+longer than 1 MiB without any complete record in the inspected suffix
+does not establish a cursor. Full native cross-binary recovery at arbitrary
+record boundaries and every restart/compaction transition remain open.
+An experimental HTTP SSE executable fixture was not admitted to the release
+gate because the official reference did not finish within the fixture's
+bounded observation window; no new HTTP executable-parity claim is made.
+No release tag was created.
