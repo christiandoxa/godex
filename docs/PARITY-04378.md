@@ -42,3 +42,15 @@ full-history compaction/affinity boundary, app-server and WebSocket message
 deadline qualification, provider surfaces, persistence and cross-process
 negative-control evidence still require source-pinned behavioral testing.
 Do not tag v0.2.1 based on the passing Go suite alone.
+
+
+## Release-gating oracle target
+
+The strict source/binary provenance pins in the independent profile, CLI
+error, context, continuation and DeepSeek differentials now reference official
+Prodex tag 0.437.8 (commit
+8c5c6f40fb4f864d1542f9c8fa48d15863316652, Linux x86_64 SHA-256
+49de897a147c1ab7ec7aebdcd6d8fd2075cb0b6de58487062eedc9be3da4eb1e).
+The release verification script refuses substituted oracle binaries/sources.
+Its strict durable state inventory remains an explicit release blocker; do
+not treat domain-specific PASS as an overall FULL PARITY certificate.

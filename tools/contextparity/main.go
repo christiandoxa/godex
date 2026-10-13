@@ -1,5 +1,5 @@
 // contextparity compares native context configuration forwarding with the
-// official Prodex 0.437.7 executable and a Godex candidate.
+// official Prodex 0.437.8 executable and a Godex candidate.
 package main
 
 import (
@@ -20,9 +20,9 @@ import (
 )
 
 const (
-	oracleVersion      = "prodex 0.437.7"
-	oracleSourceCommit = "7c774609cf9920d509539cf0e248872f53f6396e"
-	oracleSHA256       = "1159ad3476e6e2ae1fd66cf407da23dfd1da0cdf02eb16c326dbce83440d2c13"
+	oracleVersion      = "prodex 0.437.8"
+	oracleSourceCommit = "8c5c6f40fb4f864d1542f9c8fa48d15863316652"
+	oracleSHA256       = "49de897a147c1ab7ec7aebdcd6d8fd2075cb0b6de58487062eedc9be3da4eb1e"
 	probeProfileConfig = "model = \"gpt-6.1-sol\"\nmodel_context_window = 640000\nmodel_auto_compact_token_limit = 520000\n"
 )
 
@@ -140,7 +140,7 @@ func run() error {
 func parseOptions() (options, error) {
 	var result options
 	flags := flag.NewFlagSet("contextparity", flag.ContinueOnError)
-	flags.StringVar(&result.prodex, "prodex", "/home/doxa/.local/bin/prodex", "official Prodex 0.437.7 binary")
+	flags.StringVar(&result.prodex, "prodex", "/home/doxa/.local/bin/prodex", "official Prodex 0.437.8 binary")
 	flags.StringVar(&result.godex, "godex", "", "Godex candidate binary")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		return result, err

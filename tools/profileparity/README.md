@@ -1,4 +1,4 @@
-# Prodex 0.437.7 managed-profile lifecycle differential
+# Prodex 0.437.8 managed-profile lifecycle differential
 
 This tool compares real Prodex and Godex binaries, each operating in a
 separate fresh HOME/PRODEX_HOME/GODEX_HOME, over 29 sequential CLI operations.
@@ -7,9 +7,9 @@ or external model request is needed. The subprocess receives a minimal
 environment with nonfunctional outbound proxy settings.
 
 It pins the Prodex source to commit
-7c774609cf9920d509539cf0e248872f53f6396e and the official Linux
+8c5c6f40fb4f864d1542f9c8fa48d15863316652 and the official Linux
 artifact SHA-256 to
-1159ad3476e6e2ae1fd66cf407da23dfd1da0cdf02eb16c326dbce83440d2c13.
+49de897a147c1ab7ec7aebdcd6d8fd2075cb0b6de58487062eedc9be3da4eb1e.
 It checks that the Godex executable's embedded clean VCS revision equals the
 candidate source commit. Both source checkouts must be clean.
 
@@ -17,9 +17,9 @@ To run from a clean Godex checkout, build the two Go binaries and invoke:
 
     go build -trimpath -o /tmp/godex-candidate ./cmd/godex
     go build -trimpath -o /tmp/profileparity ./tools/profileparity
-    /tmp/profileparity --prodex /path/to/official/prodex-0.437.7 \
+    /tmp/profileparity --prodex /path/to/official/prodex-0.437.8 \
       --godex /tmp/godex-candidate \
-      --prodex-source /path/to/prodex-tag-0.437.7 \
+      --prodex-source /path/to/prodex-tag-0.437.8 \
       --godex-source "$PWD" --godex-commit "$(git rev-parse HEAD)"
 
 The tool returns exit 1 for *any* unexpected outcome and produces a JSON
@@ -66,7 +66,7 @@ path redirected under a managed profile home.
 
 The additional negative CLI case supplies a synthetic DeepSeek --api-key
 but deliberately configures no managed/active Codex-compatible profile.
-Prodex 0.437.7 requires compatible profile selection before starting the
+Prodex 0.437.8 requires compatible profile selection before starting the
 gateway, so both implementations must reject startup with exit 1 and
 leave all state unchanged. The separate Go regression proves a configured
 provider profile can still open and close the raw-key gateway successfully.
