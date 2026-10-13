@@ -92,6 +92,8 @@ func (b *backend) serveWebSocket(writer http.ResponseWriter, request *http.Reque
 			}
 		case "ws-bound", "ws-bound-restart", "ws-turn", "ws-turn-restart":
 			payloads = []string{`{"type":"response.completed","response":{"id":"resp-bound"}}`}
+		case "ws-session-seed", "ws-session", "ws-session-restart":
+			payloads = []string{`{"type":"response.completed","response":{"id":"resp-session"}}`}
 		default:
 			payloads = []string{`{"type":"response.completed","response":{"id":"resp-default"}}`}
 		}
@@ -168,6 +170,17 @@ func websocketProbe(endpoint, mode string) (wsProbe, error) {
 		request["x-codex-turn-state"] = "turn-a"
 		request["session_id"] = "sess-conflict"
 	}
+	if mode == "ws-session-seed" || mode == "ws-session" || mode == "ws-session-restart" {
+		request["session_id"] = "sess-conflict"
+	}
+	if mode == "ws-unknown" {
+		request["previous_response_id"] = "resp-absent"
+		request["session_id"] = "sess-conflict"
+	}
+	if mode == "ws-unknown-turn" {
+		request["x-codex-turn-state"] = "turn-absent"
+		request["session_id"] = "sess-conflict"
+	}
 	body, err := json.Marshal(request)
 	if err != nil {
 		return wsProbe{}, err
@@ -223,15 +236,45 @@ func runWebSocketProduct(root string, b *backend, p product) error {
 	}
 	defer func() { stopGateway(cmd) }()
 	start := len(mustAttempts(b))
-	// Both products must discard precommit metadata/heartbeats on a
-	// retryable failure, and must never replay already-visible output. Prodex
-	// may recover on the same credential instead of selecting a different one.
+	// All owner expectations were observed on the exact pinned Prodex binary.
+	// A failed precommit attempt retries account-a, not account-b; neither
+	// a response ID nor a soft session is sufficient evidence of rotation.
 	probes := []websocketExpectation{
-		{"ws-keepalive", []string{"response.output_text.delta", "response.completed"}, "recovered", 2},
-		{"ws-committed", []string{"keepalive", "response.output_text.delta", "response.failed"}, "visible", 1},
-		{"ws-bound", []string{"response.completed"}, "", 1},
-		{"ws-turn", []string{"response.completed"}, "", 1},
+		{mode: "ws-session-seed", want: []string{"response.completed"}, attempts: 1, owner: "account-a"},
+		{mode: "ws-keepalive", want: []string{"response.output_text.delta", "response.completed"}, delta: "recovered", attempts: 2, owner: "account-a"},
+		{mode: "ws-committed", want: []string{"keepalive", "response.output_text.delta", "response.failed"}, delta: "visible", attempts: 1, owner: "account-a"},
+		{mode: "ws-bound", want: []string{"response.completed"}, attempts: 1, owner: "account-a"},
+		{mode: "ws-turn", want: []string{"response.completed"}, attempts: 1, owner: "account-a"},
+		{mode: "ws-unknown", want: []string{"response.completed"}, attempts: 1, owner: "account-a"},
+		{mode: "ws-unknown-turn", want: []string{"response.completed"}, attempts: 1, owner: "account-a"},
+		{mode: "ws-session", want: []string{"response.completed"}, attempts: 1, owner: "account-a"},
 	}
+	if err := runWebSocketProbes(b, p.name, endpoint, probes); err != nil {
+		return err
+	}
+
+	// Discard the entire process and all of its local socket/cache state.
+	// Durable continuation owners must be recovered by the new gateway.
+	stopGateway(cmd)
+	endpoint, cmd, err = startGateway(p, b.server.URL+"/backend-api")
+	if err != nil {
+		return fmt.Errorf("restart WebSocket gateway: %w", err)
+	}
+	restart := []websocketExpectation{
+		{mode: "ws-bound-restart", want: []string{"response.completed"}, attempts: 1, owner: "account-a"},
+		{mode: "ws-turn-restart", want: []string{"response.completed"}, attempts: 1, owner: "account-a"},
+		{mode: "ws-session-restart", want: []string{"response.completed"}, attempts: 1, owner: "account-a"},
+	}
+	if err := runWebSocketProbes(b, p.name, endpoint, restart); err != nil {
+		return err
+	}
+	if len(mustAttempts(b)[start:]) < 10 {
+		return errors.New("websocket fixture recorded insufficient upstream attempts")
+	}
+	return nil
+}
+
+func runWebSocketProbes(b *backend, productName, endpoint string, probes []websocketExpectation) error {
 	for _, probe := range probes {
 		before := len(mustAttempts(b))
 		got, err := websocketProbe(endpoint, probe.mode)
@@ -242,73 +285,34 @@ func runWebSocketProduct(root string, b *backend, p product) error {
 		if err := verifyWebsocketExpectation(probe, got, observed); err != nil {
 			return err
 		}
-		if (probe.mode == "ws-bound" || probe.mode == "ws-turn") && observed[0] != "account-a" {
-			return fmt.Errorf("%s ignored trusted hard owner: %v", probe.mode, observed)
-		}
-		fmt.Printf("%s %s: upstream=%s client=%s\n", p.name, probe.mode, strings.Join(observed, ","),
-			strings.Join(got.types, ","))
-	}
-	// Restart only the local gateway process. The detached WS owner must
-	// come from persisted continuation state, not a retained TCP connection
-	// or a warm in-memory routing cache.
-	stopGateway(cmd)
-	endpoint, cmd, err = startGateway(p, b.server.URL+"/backend-api")
-	if err != nil {
-		return fmt.Errorf("restart WebSocket gateway: %w", err)
-	}
-	restart := websocketExpectation{
-		mode: "ws-bound-restart", want: []string{"response.completed"}, attempts: 1,
-	}
-	before := len(mustAttempts(b))
-	got, err := websocketProbe(endpoint, restart.mode)
-	if err != nil {
-		return fmt.Errorf("%s: %w", restart.mode, err)
-	}
-	observed := websocketAttemptsForMode(b, before, restart.mode)
-	if err := verifyWebsocketExpectation(restart, got, observed); err != nil {
-		return err
-	}
-	if observed[0] != "account-a" {
-		return fmt.Errorf("%s lost verified hard owner after process restart: %v", restart.mode, observed)
-	}
-	fmt.Printf("%s %s: upstream=%s client=%s\n", p.name, restart.mode,
-		strings.Join(observed, ","), strings.Join(got.types, ","))
-	turnRestart := websocketExpectation{
-		mode: "ws-turn-restart", want: []string{"response.completed"}, attempts: 1,
-	}
-	before = len(mustAttempts(b))
-	got, err = websocketProbe(endpoint, turnRestart.mode)
-	if err != nil {
-		return fmt.Errorf("%s: %w", turnRestart.mode, err)
-	}
-	observed = websocketAttemptsForMode(b, before, turnRestart.mode)
-	if err := verifyWebsocketExpectation(turnRestart, got, observed); err != nil {
-		return err
-	}
-	if observed[0] != "account-a" {
-		return fmt.Errorf("%s lost verified turn-state owner after restart: %v", turnRestart.mode, observed)
-	}
-	fmt.Printf("%s %s: upstream=%s client=%s\n", p.name, turnRestart.mode,
-		strings.Join(observed, ","), strings.Join(got.types, ","))
-	if len(mustAttempts(b)[start:]) < 7 {
-		return errors.New("websocket fixture recorded insufficient upstream attempts")
+		fmt.Printf("%s %s: upstream=%s client=%s\n", productName, probe.mode,
+			strings.Join(observed, ","), strings.Join(got.types, ","))
 	}
 	return nil
 }
 
-// websocketExpectation is independent of account name selection: Prodex
-// 0.437.9 may retry one transiently failed owner before considering rotation.
+// Account selection is part of the pinned source/binary oracle. In this
+// deterministic fixture, Prodex retries the *same* owner on overload.
 type websocketExpectation struct {
 	mode     string
 	want     []string
 	delta    string
 	attempts int
+	owner    string
 }
 
 func verifyWebsocketExpectation(probe websocketExpectation, got wsProbe, observed []string) error {
 	if len(observed) != probe.attempts {
 		return fmt.Errorf("%s upstream attempts=%v, want %d; client=%v",
 			probe.mode, observed, probe.attempts, got.body)
+	}
+	if probe.owner != "" {
+		for _, account := range observed {
+			if account != probe.owner {
+				return fmt.Errorf("%s routed to account %q, want canonical owner %q",
+					probe.mode, account, probe.owner)
+			}
+		}
 	}
 	if len(got.types) != len(probe.want) {
 		return fmt.Errorf("%s event kinds %v, want %v; frames=%v",

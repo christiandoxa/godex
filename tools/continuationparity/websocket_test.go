@@ -12,6 +12,7 @@ func TestProdex04379WebSocketDifferentialRejectsMaterialDrift(t *testing.T) {
 		want:     []string{"response.output_text.delta", "response.completed"},
 		delta:    "recovered",
 		attempts: 2,
+		owner:    "account-a",
 	}
 	success := wsProbe{
 		types: []string{"response.output_text.delta", "response.completed"},
@@ -32,6 +33,7 @@ func TestProdex04379WebSocketDifferentialRejectsMaterialDrift(t *testing.T) {
 		errorText string
 	}{
 		{"missing recovery attempt", success, []string{"account-a"}, "upstream attempts"},
+		{"wrong account without attempt drift", success, []string{"account-a", "account-b"}, "canonical owner"},
 		{"leaked heartbeat", wsProbe{
 			types: []string{"keepalive", "response.output_text.delta", "response.completed"},
 			delta: []string{"", "recovered", ""},
@@ -58,7 +60,7 @@ func TestProdex04379WebSocketDifferentialRejectsMaterialDrift(t *testing.T) {
 	committed := websocketExpectation{
 		mode:  "ws-committed",
 		want:  []string{"keepalive", "response.output_text.delta", "response.failed"},
-		delta: "visible", attempts: 1,
+		delta: "visible", attempts: 1, owner: "account-a",
 	}
 	committedResult := wsProbe{
 		types: committed.want,

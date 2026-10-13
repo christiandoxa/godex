@@ -241,9 +241,9 @@ A plus a conflicting soft `session_id` owned by account B could return a
 local `409 stale_continuation` before dispatch, while canonical Prodex
 routed the message to account A. Setting the proper WebSocket route on
 ingress fixed that disagreement without changing the HTTP Responses path.
-The independent public WebSocket regression also verifies that unknown
-previous-response owners remain fail-closed and session-only requests
-retain their own soft owner.
+The later 0.437.9 unbound-discovery checkpoint below supersedes the initial
+assumption that unknown previous-response IDs must be rejected *before*
+upstream. Missing-chain failures still remain fail-closed.
 
 With candidate commit `299ef5509a761a492fbe04c40b3b4dd42c073b79`,
 the exact official binaries agreed on these **three** behaviors:
@@ -320,9 +320,44 @@ Prodex quota/usage probe).
 
 The public proxy regression additionally checks a direct turn-state
 property, a `client_metadata` turn-state property, an unknown opaque
-turn-state (which must fail closed), and a soft-session-only request
-(which must continue using account-b). The hard turn-state owner and the
-soft session owner both remain intact; neither can be overwritten by
-the other. This confirms one deterministic durable routing contract,
+turn-state (which may be discovered on one selected owner), and a
+soft-session-only request (whose owner can depend on the request history).
+The hard turn-state owner and the soft session owner both remain intact;
+neither can be overwritten by the other. This confirms one deterministic durable routing contract,
 **not** all turn-state/protocol recovery paths. No live credentials,
 real provider inference, or release tags are involved.
+
+## Unbound WebSocket discovery: official executable requalification
+
+The tagged 0.437.9 binary permits a bounded upstream *discovery* attempt
+when a WebSocket request carries an opaque `previous_response_id` or
+`x-codex-turn-state` for which the durable store has no verified owner.
+Godex previously returned a local `409 stale_continuation` before reaching
+the provider. The change in commit `c88c89e` now selects one eligible
+candidate, leaving the original request intact. Discovery does **not**
+authorize cross-account replay of a missing conversation chain: when
+`previous_response_not_found` follows a tool-output continuation,
+same-owner retries remain bounded (the existing 75/200/500 ms policy),
+and then a stale-continuation error is returned.
+
+Against official Prodex 0.437.9 and clean Godex commit
+`c88c89eee3d84ea1f29cdebe878fd3f6c042e803`, an independent
+WebSocket differential passed **11 request cases per executable**:
+initial soft-session observation, heartbeat/precommit retry, postcommit
+no-replay, hard previous-response and hard turn-state precedence,
+unknown previous-response and unknown turn-state discovery, subsequent
+soft-session observation, and three follow-ups after full gateway restart.
+The fixture recorded **25 upstream attempts across the two binaries**
+(including Prodex's background usage request). All WebSocket requests
+went to account-a on *both* executables. This is the reference's observed
+ordering on these synthetic accounts, not a general guarantee about
+unbound or soft-session placement.
+
+Negative controls verify that a tool-output discovery attempt preserves
+the original body and a missing-chain precommit failure never causes a
+retry on a second account. The updated differential checks
+both upstream owner identities and client event order, rejecting a false
+parity pass when attempt counts agree but owners differ. This is still
+a subset of live provider/WebSocket and durability behavior. The full
+networked release verifier was **not** executed in this checkpoint; parity
+and release remain fail-closed.

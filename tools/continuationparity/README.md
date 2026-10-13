@@ -13,27 +13,32 @@ the fixture is not a full feature-parity certificate.
 
 ## Strict WebSocket differential
 
-Use `--websocket` to exercise six request/response paths against **both**
-executables:
+Use `--websocket` to exercise **eleven** request paths against both
+executables (including three paths on a freshly restarted gateway):
 
-1. An upstream `response.created` prelude and `keepalive` followed by a
-   `server_is_overloaded` failure. The prelude must be discarded; the
-   retry must complete with visible output and no leaked failed response ID.
-   Tagged Prodex 0.437.9 retries the same original account here, so a
-   second attempt **does not** prove cross-account rotation.
-2. A heartbeat and actual visible output followed by overload. The client
-   must receive the committed frames and there must be **no** second
-   upstream attempt or duplicate execution.
-3. A verified `previous_response_id` bound to the primary account and
-   a conflicting soft `session_id` bound to the secondary account.
-   The hard previous-response owner must receive exactly one attempt.
-4. A trusted `x-codex-turn-state` without a previous response similarly
-   takes precedence over a conflicting soft `session_id`.
-5. Restart the gateway, open a fresh WebSocket, and repeat the verified
-   previous-response conflict. The correct owner must persist.
-6. After the same gateway restart, repeat the trusted turn-state versus soft
-   session conflict, proving turn-state ownership survives without a
-   retained socket or in-memory routing cache.
+1. Seed a soft `session_id` preference and record its actual selected owner.
+2. `response.created` and `keepalive` followed by precommit overload:
+   the failed prelude must be discarded before the successful retry.
+   Prodex retries the *same* first profile in this deterministic fixture.
+3. A heartbeat and visible output followed by overload must not trigger a
+   second upstream attempt or duplicate model execution.
+4. A verified `previous_response_id` must outrank a conflicting soft session.
+5. A verified `x-codex-turn-state` must also outrank the soft session.
+6. An *unbound* `previous_response_id` may discover an upstream profile.
+7. An *unbound* `turn_state` may likewise discover a profile.
+   Discovery never authorizes cross-profile replay after a missing-chain
+   failure; that case is checked separately by public-proxy regressions.
+8. A soft-session-only request after hard-affinity activity must retain the
+   pinned reference's observed owner selection.
+9–11. Restart the gateway process and repeat hard previous-response,
+   hard turn-state, and soft-session-only requests. No local socket or
+   in-memory router cache survives the restart.
+
+The pinned Prodex executable selected account-a on all these synthetic
+requests; **this fixture does not prove that soft session IDs always select
+account-a**, or that a hard previous-response owner may be discarded.
+The harness now rejects mismatched selected owners even if attempt counts
+and client event types still match.
 
 Run from a **clean committed Godex checkout**, with a locally built candidate
 containing Go VCS metadata:
