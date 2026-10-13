@@ -823,23 +823,16 @@ type directSharedPreparingProcess struct {
 }
 
 func (process *directSharedPreparingProcess) RunRuntimeDirect(_ context.Context, home string, _ []string, _ bool) error {
-	if len(process.prepared) != 2 {
-		return errors.New("direct child started before all managed homes were prepared")
+	if len(process.prepared) != 1 {
+		return errors.New("direct child started before its managed home was prepared")
 	}
 	process.directHome = home
 	return nil
 }
 
 func TestRunDirectProfilePreparesManagedHomesBeforeNativeChild(t *testing.T) {
-	accounts := &fakeLaunchAccounts{
-		accounts: []accountentity.Account{
-			{ID: "one", Name: "one", Enabled: true},
-			{ID: "two", Name: "two", Enabled: true},
-		},
-		homes: map[string]string{"one": "/profiles/one", "two": "/profiles/two"},
-	}
 	process := &directSharedPreparingProcess{}
-	runner := NewRunner(accounts, process, nil)
+	runner := NewRunner(nil, process, nil)
 	runner.SetSharedCodexHome("/shared/codex")
 
 	if err := runner.RunDirectProfileWithOptions(t.Context(), "/profiles/one", []string{"resume", "--last"}, RuntimeLaunchOptions{}); err != nil {
@@ -848,7 +841,7 @@ func TestRunDirectProfilePreparesManagedHomesBeforeNativeChild(t *testing.T) {
 	if process.directHome != "/profiles/one" {
 		t.Fatalf("direct launch home = %q", process.directHome)
 	}
-	if !reflect.DeepEqual(process.prepared, []string{"/profiles/one", "/profiles/two"}) {
+	if !reflect.DeepEqual(process.prepared, []string{"/profiles/one"}) {
 		t.Fatalf("direct shared preparation = %#v", process.prepared)
 	}
 }

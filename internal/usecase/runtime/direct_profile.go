@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"errors"
+	"strings"
 )
 
 type directRuntimeProcess interface {
@@ -27,6 +28,11 @@ func (runner *Runner) RunDirectProfileWithOptions(
 	home, err := validateRuntimeHome(codexHome)
 	if err != nil {
 		return err
+	}
+	if preparer, ok := runner.process.(sharedSessionPreparer); ok && strings.TrimSpace(runner.sharedCodexHome) != "" {
+		if err := preparer.PrepareSharedSessionHome(home, runner.sharedCodexHome); err != nil {
+			return err
+		}
 	}
 	if process, ok := runner.process.(directRuntimeProcess); ok {
 		return process.RunRuntimeDirect(ctx, home, args, options.UpstreamNoProxy)
