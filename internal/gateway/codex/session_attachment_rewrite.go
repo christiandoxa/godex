@@ -1,6 +1,9 @@
 package codex
 
 import (
+	"errors"
+	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -106,6 +109,35 @@ func rewriteSessionInlineAttachmentPaths(codexHome, contents string) (string, er
 	return output.String(), nil
 }
 
+func sessionAttachmentDestinationSafe(root, destination string) (bool, error) {
+	if !sessionPathStartsWith(destination, root) {
+		return false, nil
+	}
+	relative, err := filepath.Rel(root, filepath.Dir(destination))
+	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return false, nil
+	}
+	// The shared attachment root may be a profile symlink; reject links below it.
+	current := root
+	for _, component := range strings.Split(relative, string(filepath.Separator)) {
+		if component == "" || component == "." {
+			continue
+		}
+		current = filepath.Join(current, component)
+		info, err := os.Lstat(current)
+		if errors.Is(err, os.ErrNotExist) {
+			return true, nil
+		}
+		if err != nil {
+			return false, fmt.Errorf("inspect attachment destination directory: %w", err)
+		}
+		if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
 func stableSessionImagePath(codexHome, rawPath string) (string, error) {
 	source := decodeSessionPath(rawPath)
 	if !filepath.IsAbs(source) {
@@ -116,6 +148,15 @@ func stableSessionImagePath(codexHome, rawPath string) (string, error) {
 		return "", nil
 	}
 	destination := filepath.Join(codexHome, sessionImageAttachmentDir, name)
+	safe, err := sessionAttachmentDestinationSafe(
+		filepath.Join(codexHome, sessionImageAttachmentDir), destination,
+	)
+	if err != nil {
+		return "", err
+	}
+	if !safe {
+		return "", nil
+	}
 	regular, err := sessionPathIsRegularFile(destination)
 	if err != nil {
 		return "", err
@@ -148,6 +189,15 @@ func stableSessionAttachmentPath(codexHome, rawPath string) (string, error) {
 		return "", nil
 	}
 	destination := filepath.Join(codexHome, sessionAttachmentDir, relative)
+	safe, err := sessionAttachmentDestinationSafe(
+		filepath.Join(codexHome, sessionAttachmentDir), destination,
+	)
+	if err != nil {
+		return "", err
+	}
+	if !safe {
+		return "", nil
+	}
 	regular, err := sessionPathIsRegularFile(destination)
 	if err != nil {
 		return "", err

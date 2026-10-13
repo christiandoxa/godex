@@ -118,6 +118,41 @@ func TestRewriteSessionAttachmentRejectsSymlinkSourceAndReplacesStableSymlink(t 
 	}
 }
 
+func TestRewriteSessionAttachmentRejectsSymlinkedAttachmentDirectory(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink behavior is covered on Unix")
+	}
+	home := t.TempDir()
+	outside := filepath.Join(t.TempDir(), "outside")
+	if err := os.MkdirAll(outside, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	source := filepath.Join(t.TempDir(), "overlay", "attachments", "id-a", "pasted-text-1.txt")
+	if err := os.MkdirAll(filepath.Dir(source), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(source, []byte("safe"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	alias := filepath.Join(home, "attachments", "id-a")
+	if err := os.MkdirAll(filepath.Dir(alias), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, alias); err != nil {
+		t.Fatal(err)
+	}
+	rewritten, err := rewriteSessionPersistedAttachmentPaths(home, source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rewritten != source {
+		t.Fatalf("symlinked attachment directory rewritten to %q", rewritten)
+	}
+	if _, err := os.Stat(filepath.Join(outside, "pasted-text-1.txt")); !os.IsNotExist(err) {
+		t.Fatalf("symlinked attachment directory received copied bytes: %v", err)
+	}
+}
+
 func TestSessionAttachmentPathSuffixMatchesTaggedAllowlist(t *testing.T) {
 	valid := filepath.Join(string(filepath.Separator), "tmp", "attachments", "thread-a", "image-1.png")
 	if got, ok := sessionAttachmentPathSuffix(valid); !ok || got != filepath.Join("thread-a", "image-1.png") {
