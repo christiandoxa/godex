@@ -200,9 +200,27 @@ func verifyProdex(binary, source string) error {
 	if err != nil || strings.TrimSpace(string(output)) != "prodex 0.437.10" {
 		return fmt.Errorf("unexpected Prodex version %q: %v", output, err)
 	}
-	output, err = exec.Command("git", "-C", source, "rev-parse", "HEAD").Output()
+	if err := verifyProdexSource(source); err != nil {
+		return err
+	}
+	return nil
+}
+
+func verifyProdexSource(source string) error {
+	output, err := exec.Command("git", "-C", source, "rev-parse", "HEAD").Output()
 	if err != nil || strings.TrimSpace(string(output)) != prodexCommit {
 		return fmt.Errorf("Prodex source is not tag 0.437.10")
+	}
+	return verifyProdexSourceClean(source)
+}
+
+func verifyProdexSourceClean(source string) error {
+	output, err := exec.Command("git", "-C", source, "status", "--porcelain=v1", "--untracked-files=all").Output()
+	if err != nil {
+		return fmt.Errorf("inspect Prodex source status: %w", err)
+	}
+	if strings.TrimSpace(string(output)) != "" {
+		return errors.New("Prodex source is modified or has untracked artifacts")
 	}
 	return nil
 }

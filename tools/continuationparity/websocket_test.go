@@ -1,6 +1,9 @@
 package main
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
 	"runtime/debug"
 	"strings"
 	"testing"
@@ -160,5 +163,27 @@ func TestProdex043710BoundMissingWebsocketOraclePreservesToolContext(t *testing.
 		if err := verifyWebsocketOpaqueChain(backend, 0, "ws-bound-missing"); err == nil {
 			t.Fatalf("bound tool-output rewrite accepted: %s", altered)
 		}
+	}
+}
+
+func TestProdex043710OracleRejectsDirtySource(t *testing.T) {
+	root := t.TempDir()
+	if out, err := exec.Command("git", "-C", root, "init", "--quiet").CombinedOutput(); err != nil {
+		t.Fatalf("init source fixture: %v: %s", err, out)
+	}
+	fixture := filepath.Join(root, "fixture.txt")
+	if err := os.WriteFile(fixture, []byte("synthetic"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{{"add", "fixture.txt"}, {"-c", "user.name=Parity Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "synthetic"}} {
+		if out, err := exec.Command("git", append([]string{"-C", root}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, out)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(root, "untracked.txt"), []byte("synthetic"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyProdexSourceClean(root); err == nil || !strings.Contains(err.Error(), "modified") {
+		t.Fatalf("dirty source was not rejected: %v", err)
 	}
 }
