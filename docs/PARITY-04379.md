@@ -520,3 +520,57 @@ strict HTTP parity.
 A full interactive quota terminal binary-to-binary differential, all
 provider quota categories, upstream login, and the complete release
 gate remain unqualified. These checks do not authorize a tag or release.
+
+## Quota report comparator parity: capacity rank and ASCII-only text (follow-up)
+
+Against **tagged Prodex 0.437.9** source commit
+`0e321c92f4e580aa0b090085d5af13a8b856c3f1`, the quota renderer's
+`quota_status_rank` uses the admission and window-capacity candidate
+decision, rather than the separately rendered status label. Before this
+patch, Godex used the string `State == "ready"`; an OpenAI report with
+no observed windows, a known 100%-used window, or explicit admission
+denial could incorrectly outrank a genuinely healthy quota report.
+The pinned comparator also assigns generic external-provider reports
+an **unset reset sort key**; only typed provider cases such as Copilot
+and Gemini use their own reset timestamps.
+
+Commit `efb9bca` introduces the matching capacity-based OpenAI display
+rank and ensures a generic external reset timestamp no longer reorders
+reports. Provider-specific reset ordering remains intact. The fixture
+`TestProdex04379QuotaSortUsesWindowCapacityInsteadOfStatusText`
+asserts ready/unknown/exhausted/admission-denied/error ranks, while
+`TestProdex04379QuotaSortOnlyUsesRelevantProviderResetEpoch` confirms
+the difference between generic external reports and Copilot. Both tests
+failed against the prior code, then passed after the fix.
+
+The same tagged Mojo comparator's `quota_report_compare_text`
+trims Unicode whitespace, then lowercases **ASCII A–Z bytes only**;
+it does not apply general Unicode lowercasing. Godex's previous
+`strings.ToLower` made non-ASCII labels like `É` and `é` appear
+equivalent, sometimes changing which auth/profile sorted first.
+Commit `0cc9216` preserves byte-wise non-ASCII identity while keeping
+Unicode whitespace trimming and ASCII-insensitive comparison.
+`TestProdex04379QuotaTextSortKeepsNonASCIIByteIdentity` first failed
+against the previous implementation, then passed with the correction.
+
+The tagged renderer treats `Result::Err` as a rank-2 provider failure.
+A stale human-readable `State="error"` label cannot change the rank of
+otherwise valid capacity evidence. Commit `60981a6` now uses the actual
+provider error only, keeping stale status text out of the comparator.
+`TestProdex04379QuotaSortIgnoresStaleErrorLabelWithValidEvidence` first
+failed on the stale-error-label case; it also covers an exhausted weekly
+window with a healthy five-hour window and a genuine fetch error.
+
+**Verification:** failure-before regressions, all package quota tests,
+and targeted shuffled race tests **PASS** for the three quota changes.
+The full `make verify` gate **PASS**ed after all three fixes
+on clean Godex commit `60981a6545b6183f277c2b76f092bb49ea258cef`.
+The full gate includes format/size/TUI guards, six Linux/macOS/Windows
+cross-builds, installer smoke checks, `go vet ./...`, shuffled
+repository-wide race tests, and binary build.
+
+These are **source-contract comparator regressions**, not an official
+quota-command executable-to-executable differential. Additional
+provider-specific display/routing decisions, all live quota sources,
+the interactive terminal's exact presentation, and the entire
+release gate remain unqualified. No tag or release was created.
