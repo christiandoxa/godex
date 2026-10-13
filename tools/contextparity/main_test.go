@@ -34,7 +34,7 @@ func TestParseChildArgsKeepsLastExplicitValues(t *testing.T) {
 	}
 }
 
-func TestProdex04379ContextParityRejectsDirtyAndStaleCandidate(t *testing.T) {
+func TestProdex043710ContextParityRejectsDirtyAndStaleCandidate(t *testing.T) {
 	const commit = "0123456789abcdef0123456789abcdef01234567"
 	good := []debug.BuildSetting{
 		{Key: "vcs.revision", Value: commit},
@@ -59,7 +59,7 @@ func TestProdex04379ContextParityRejectsDirtyAndStaleCandidate(t *testing.T) {
 	}
 }
 
-func TestProdex04379ContextParityRejectsDirtyAndWrongSource(t *testing.T) {
+func TestProdex043710ContextParityRejectsDirtyAndWrongSource(t *testing.T) {
 	root := t.TempDir()
 	git := func(arguments ...string) string {
 		t.Helper()

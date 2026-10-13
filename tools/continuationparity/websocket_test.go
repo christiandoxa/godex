@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestProdex04379WebSocketDifferentialRejectsMaterialDrift(t *testing.T) {
+func TestProdex043710WebSocketDifferentialRejectsMaterialDrift(t *testing.T) {
 	canonical := websocketExpectation{
 		mode:     "ws-keepalive",
 		want:     []string{"response.output_text.delta", "response.completed"},
@@ -79,7 +79,7 @@ func TestProdex04379WebSocketDifferentialRejectsMaterialDrift(t *testing.T) {
 	}
 }
 
-func TestProdex04379WebSocketOracleRejectsDirtyOrStaleGoBuild(t *testing.T) {
+func TestProdex043710WebSocketOracleRejectsDirtyOrStaleGoBuild(t *testing.T) {
 	const commit = "0123456789abcdef0123456789abcdef01234567"
 	good := []debug.BuildSetting{
 		{Key: "vcs.revision", Value: commit},
@@ -104,7 +104,7 @@ func TestProdex04379WebSocketOracleRejectsDirtyOrStaleGoBuild(t *testing.T) {
 	}
 }
 
-func TestProdex04379WebSocketUnboundStaleOracleRejectsRewrites(t *testing.T) {
+func TestProdex043710WebSocketUnboundStaleOracleRejectsRewrites(t *testing.T) {
 	good := wsProbe{
 		types: []string{"error"},
 		body:  []string{`{"type":"error","status":409,"error":{"code":"stale_continuation"}}`},
@@ -145,7 +145,7 @@ func TestProdex04379WebSocketUnboundStaleOracleRejectsRewrites(t *testing.T) {
 	}
 }
 
-func TestProdex04379BoundMissingWebsocketOraclePreservesToolContext(t *testing.T) {
+func TestProdex043710BoundMissingWebsocketOraclePreservesToolContext(t *testing.T) {
 	body := `{"type":"response.create","mode":"ws-bound-missing","previous_response_id":"resp-main","session_id":"sess-conflict","input":[{"type":"function_call_output","call_id":"call-bound","output":"done"}]}`
 	backend := &backend{attempts: []attempt{{mode: "ws-bound-missing", account: "account-a", body: body}}}
 	if err := verifyWebsocketOpaqueChain(backend, 0, "ws-bound-missing"); err != nil {

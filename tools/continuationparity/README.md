@@ -49,11 +49,11 @@ Run from a **clean committed Godex checkout**, with a locally built candidate
 containing Go VCS metadata:
 
 ```sh
-go build -trimpath -o /tmp/godex-04379-candidate ./cmd/godex
+go build -trimpath -o /tmp/godex-043710-candidate ./cmd/godex
 go run ./tools/continuationparity \
   --prodex /path/to/official/prodex-0.437.10 \
   --prodex-source /path/to/clean/prodex-tag-0.437.10 \
-  --godex /tmp/godex-04379-candidate \
+  --godex /tmp/godex-043710-candidate \
   --godex-source "$PWD" --godex-commit "$(git rev-parse HEAD)" \
   --websocket
 ```
