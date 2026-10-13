@@ -214,7 +214,7 @@ func jsonStringValue(value any) string {
 
 func isWebSocketPrecommitHold(kind string) bool {
 	switch kind {
-	case "codex.rate_limits", "codex.response.metadata", "response.metadata", "response.created",
+	case "keepalive", "codex.rate_limits", "codex.response.metadata", "response.metadata", "response.created",
 		"response.in_progress", "response.queued", "response.output_item.added",
 		"response.content_part.added", "response.reasoning_summary_part.added":
 		return true

@@ -89,6 +89,8 @@ func streamOutcome(data []byte, headers http.Header, now time.Time, providerKind
 	}
 	event.Type = strings.TrimSpace(event.Type)
 	switch event.Type {
+	case "keepalive":
+		return responseOutcome{}, true
 	case "codex.rate_limits",
 		"codex.response.metadata",
 		"response.metadata",
