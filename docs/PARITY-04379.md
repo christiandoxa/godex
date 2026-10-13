@@ -200,3 +200,27 @@ the tagged Prodex source/test contract; they are not a full binary-to-binary
 WebSocket differential. Full hard-affinity owner recovery, native remote
 WebSocket handoff and live provider quota/capacity behavior remain
 release-blocking.
+
+## Cross-process native marker arbitration
+
+A new Linux subprocess fixture invokes the **actual built Godex callback
+executable** from multiple overlapping processes rather than simulating
+concurrent notifications with goroutines in one process. It races canonical
+root SessionStart payloads (with a matching rollout transcript) against
+inherited legacy descendant thread notifications, then repeats both forms
+after a native-style terminal capacity error is appended but before the
+monitor reads its first tail. The root identity and original logical cursor
+remain unchanged, and the monitor observes the unread `server_overloaded`
+failure. This exercises OS-level lock ownership and atomic cursor/marker
+publication without real accounts or external requests.
+
+The following command passed:
+
+```sh
+go test -race -count=3 ./internal/delivery/cli/runtime \
+  -run '^TestProdex04379NativeMarkerConcurrentProcessesPreserveUnreadFailure$' -timeout=60s
+```
+
+This qualifies competing callback **processes**, not a persisted monitor
+restart or a cross-binary full native-session recovery flow; those release
+checks remain open.
