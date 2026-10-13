@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	prodexCommit = "0e321c92f4e580aa0b090085d5af13a8b856c3f1"
-	prodexSHA    = "58027b0d1825b47e60c35ce1082c4249ed2fa9629174cdf8805312d24562b37e"
+	prodexCommit = "c047ec437bc87cc19d22064f9946db5d446d9a45"
+	prodexSHA    = "daa8e4bf2527b68e3cf501e144551e438b0583e9da3c42b896cb1bf600817bb2"
 )
 
 type attempt struct{ account, mode, body string }
@@ -146,9 +146,9 @@ type product struct {
 }
 
 func main() {
-	prodex := flag.String("prodex", "", "official Prodex 0.437.9 binary")
+	prodex := flag.String("prodex", "", "official Prodex 0.437.10 binary")
 	godex := flag.String("godex", "", "Godex binary")
-	prodexSource := flag.String("prodex-source", "", "tagged Prodex 0.437.9 source")
+	prodexSource := flag.String("prodex-source", "", "tagged Prodex 0.437.10 source")
 	websocket := flag.Bool("websocket", false, "run the isolated WebSocket request/recovery differential")
 	godexSource := flag.String("godex-source", "", "clean Godex commit source (required with --websocket)")
 	godexCommit := flag.String("godex-commit", "", "exact 40-character Godex commit (required with --websocket)")
@@ -197,12 +197,12 @@ func verifyProdex(binary, source string) error {
 		return fmt.Errorf("Prodex binary digest %s, want %s", got, prodexSHA)
 	}
 	output, err := exec.Command(binary, "--version").CombinedOutput()
-	if err != nil || strings.TrimSpace(string(output)) != "prodex 0.437.9" {
+	if err != nil || strings.TrimSpace(string(output)) != "prodex 0.437.10" {
 		return fmt.Errorf("unexpected Prodex version %q: %v", output, err)
 	}
 	output, err = exec.Command("git", "-C", source, "rev-parse", "HEAD").Output()
 	if err != nil || strings.TrimSpace(string(output)) != prodexCommit {
-		return fmt.Errorf("Prodex source is not tag 0.437.9")
+		return fmt.Errorf("Prodex source is not tag 0.437.10")
 	}
 	return nil
 }

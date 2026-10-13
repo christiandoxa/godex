@@ -11,6 +11,11 @@ func MaintainManagedSessions(sharedCodexHome, cacheRoot string) error {
 	if err := validateCodexHomePath(sharedCodexHome); err != nil {
 		return err
 	}
+	// Goal rows and generated wrappers are independent of rollout writes. Repair them
+	// before taking the exclusive maintenance lock so a live child cannot suppress recovery.
+	if err := persistSessionGoalAttachmentPaths(sharedCodexHome); err != nil {
+		return err
+	}
 	release, acquired, err := (SessionLocker{}).TryLockCodexSessionsForMaintenance(sharedCodexHome)
 	if err != nil {
 		return err
@@ -51,9 +56,6 @@ func MaintainManagedSessions(sharedCodexHome, cacheRoot string) error {
 		if err := maintainManagedSessionFileWithSelector(sharedCodexHome, candidate.path, candidate.selector, &next); err != nil {
 			return err
 		}
-	}
-	if err := persistSessionGoalAttachmentPaths(sharedCodexHome); err != nil {
-		return err
 	}
 	if !reflect.DeepEqual(next, previous) {
 		_ = saveSessionMaintenanceCache(cachePath, next)

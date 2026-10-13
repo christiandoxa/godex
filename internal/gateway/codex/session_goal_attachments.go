@@ -54,6 +54,7 @@ func persistSessionGoalAttachmentPathsInDB(codexHome, dbPath string) error {
 	}
 	type update struct {
 		threadID  string
+		previous  string
 		objective string
 	}
 	var updates []update
@@ -67,18 +68,21 @@ func persistSessionGoalAttachmentPathsInDB(codexHome, dbPath string) error {
 			_ = rows.Close()
 			return err
 		}
+		if err := persistSessionGoalObjectiveAttachments(codexHome, rewritten); err != nil {
+			_ = rows.Close()
+			return err
+		}
 		if rewritten != objective {
-			updates = append(updates, update{threadID: threadID, objective: rewritten})
+			updates = append(updates, update{threadID: threadID, previous: objective, objective: rewritten})
 		}
 	}
 	_ = rows.Close()
 
 	for _, item := range updates {
-		if _, err := database.Exec(
-			"UPDATE thread_goals SET objective = ?1 WHERE thread_id = ?2",
-			item.objective, item.threadID,
+		if err := updateSessionGoalAttachmentReference(
+			database, dbPath, item.threadID, item.previous, item.objective,
 		); err != nil {
-			return fmt.Errorf("update goal attachments in %s: %w", dbPath, err)
+			return err
 		}
 	}
 	return nil
@@ -133,12 +137,24 @@ func persistSessionGoalAttachmentPathForThreadInDB(codexHome, dbPath, threadID s
 	if err != nil {
 		return err
 	}
+	if err := persistSessionGoalObjectiveAttachments(codexHome, rewritten); err != nil {
+		return err
+	}
 	if rewritten == objective {
 		return nil
 	}
+	if err := updateSessionGoalAttachmentReference(database, dbPath, threadID, objective, rewritten); err != nil {
+		return err
+	}
+	return nil
+}
+
+func updateSessionGoalAttachmentReference(
+	database *sql.DB, dbPath, threadID, previous, rewritten string,
+) error {
 	if _, err := database.Exec(
-		"UPDATE thread_goals SET objective = ?1 WHERE thread_id = ?2",
-		rewritten, threadID,
+		"UPDATE thread_goals SET objective = ?1 WHERE thread_id = ?2 AND objective = ?3",
+		rewritten, threadID, previous,
 	); err != nil {
 		return fmt.Errorf("update goal attachments in %s: %w", dbPath, err)
 	}

@@ -606,6 +606,8 @@ control, backups, bug reports, or fixtures.
   commitment, streaming, and forwarding rules.
 - [Prodex 0.437.4 oracle](docs/PARITY-04374.md) — pinned differential
   references and the session app-server process-tree fixture.
+- [Prodex 0.437.10 oracle](docs/PARITY-043710.md) — verified goal attachment
+  persistence and the current release-only oracle pins.
 - [Parity checkpoint](docs/PARITY-04361.md) — current Prodex 0.436.1 work,
   validation, and known limits.
 - [Historical parity audit](docs/PARITY.md) — the earlier Prodex 0.435.5

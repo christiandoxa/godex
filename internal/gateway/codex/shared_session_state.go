@@ -89,7 +89,9 @@ func (process *CodexProcess) PrepareSharedSessionHome(profileHome, sharedHome st
 			return err
 		}
 	}
-	return nil
+	// Fresh and picker launches do not run full rollout maintenance. Goal repair is
+	// independent of that lock and must still happen before native resume selection.
+	return persistSessionGoalAttachmentPaths(sharedHome)
 }
 
 func ensureRealCodexDirectory(path string) error {

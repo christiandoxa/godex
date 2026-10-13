@@ -1,6 +1,7 @@
 package codex
 
 import (
+	"context"
 	"database/sql"
 	"os"
 	"path/filepath"
@@ -126,6 +127,108 @@ func TestPersistSessionGoalAttachmentPathForThreadOnlyUpdatesRequestedThread(t *
 	}
 	if !strings.Contains(second, filepath.Join(oldRoot, "attachments", "thread-2", "pasted-text-1.txt")) {
 		t.Fatalf("thread-2 objective unexpectedly changed = %q", second)
+	}
+}
+
+func TestPersistSessionGoalObjectiveAttachmentsRepairsGeneratedWrapper(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "shared-codex")
+	if err := os.MkdirAll(root, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	oldRoot := filepath.Join(t.TempDir(), "deleted-overlay")
+	nested := filepath.Join(oldRoot, "attachments", "thread-1", "pasted-text-1.txt")
+	if err := os.MkdirAll(filepath.Dir(nested), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(nested, []byte("nested bytes"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	wrapper := filepath.Join(root, "attachments", "thread-1", "goal-objective.md")
+	if err := os.MkdirAll(filepath.Dir(wrapper), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(wrapper, []byte("read "+nested), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	raw := filepath.Join(root, "attachments", "thread-1", "pasted-text-2.txt")
+	if err := os.WriteFile(raw, []byte("raw "+nested), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := persistSessionGoalObjectiveAttachments(root, "read "+wrapper); err != nil {
+		t.Fatal(err)
+	}
+	stableNested := filepath.Join(root, "attachments", "thread-1", "pasted-text-1.txt")
+	got, err := os.ReadFile(wrapper)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "read "+stableNested {
+		t.Fatalf("generated wrapper = %q", got)
+	}
+	if nestedBytes, err := os.ReadFile(stableNested); err != nil || string(nestedBytes) != "nested bytes" {
+		t.Fatalf("stable nested attachment = %q, err=%v", nestedBytes, err)
+	}
+	if rawBytes, err := os.ReadFile(raw); err != nil || string(rawBytes) != "raw "+nested {
+		t.Fatalf("raw pasted attachment changed = %q, err=%v", rawBytes, err)
+	}
+}
+
+func TestUpdateSessionGoalAttachmentReferencePreservesNewerObjective(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "goals_1.sqlite")
+	db := createGoalDB(t, dbPath)
+	defer db.Close()
+	if _, err := db.Exec(
+		"INSERT INTO thread_goals (thread_id, objective) VALUES (?1, ?2)",
+		"thread-1", "new objective",
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := updateSessionGoalAttachmentReference(
+		db, dbPath, "thread-1", "old objective", "rewritten objective",
+	); err != nil {
+		t.Fatal(err)
+	}
+	if got := readGoalObjective(t, dbPath, "thread-1"); got != "new objective" {
+		t.Fatalf("newer objective was overwritten: %q", got)
+	}
+}
+
+func TestMaintainManagedSessionsRepairsGoalsBeforeContendedRolloutLock(t *testing.T) {
+	root := t.TempDir()
+	shared := filepath.Join(root, "shared")
+	if err := os.MkdirAll(shared, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	oldRoot := filepath.Join(root, "deleted-overlay")
+	oldPath := filepath.Join(oldRoot, "attachments", "thread-1", "pasted-text-1.txt")
+	if err := os.MkdirAll(filepath.Dir(oldPath), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(oldPath, []byte("goal bytes"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dbPath := filepath.Join(shared, "goals_1.sqlite")
+	db := createGoalDB(t, dbPath)
+	if _, err := db.Exec(
+		"INSERT INTO thread_goals (thread_id, objective) VALUES (?1, ?2)",
+		"thread-1", "read "+oldPath,
+	); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+
+	release, err := (SessionLocker{}).LockCodexSessionsForChild(context.Background(), shared)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	if err := MaintainManagedSessions(shared, filepath.Join(root, "cache")); err != nil {
+		t.Fatal(err)
+	}
+	stable := filepath.Join(shared, "attachments", "thread-1", "pasted-text-1.txt")
+	if got := readGoalObjective(t, dbPath, "thread-1"); got != "read "+stable {
+		t.Fatalf("contended maintenance did not repair goal: %q", got)
 	}
 }
 

@@ -1,7 +1,7 @@
 # Historical Prodex 0.435.5 parity audit
 
-The current parity checkpoint targets Prodex `0.437.9`; see
-[`PARITY-04379.md`](PARITY-04379.md). This document preserves the earlier
+The current parity checkpoint targets Prodex `0.437.10`; see
+[`PARITY-043710.md`](PARITY-043710.md). This document preserves the earlier
 0.435.5 audit and its historical evidence.
 
 Reference: exact Prodex tag `0.435.5`, commit
