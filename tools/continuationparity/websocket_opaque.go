@@ -9,8 +9,12 @@ import (
 // even across bounded same-owner retries. Never accept an upstream replay
 // that silently drops the user's completed tool or rewrites its call ID.
 func verifyWebsocketOpaqueChain(b *backend, from int, mode string) error {
-	if mode != "ws-unknown-missing" {
+	if mode != "ws-unknown-missing" && mode != "ws-bound-missing" {
 		return nil
+	}
+	previous, callID := "resp-tool-missing", "call-missing"
+	if mode == "ws-bound-missing" {
+		previous, callID = "resp-main", "call-bound"
 	}
 	for _, attempt := range mustAttempts(b)[from:] {
 		if attempt.mode != mode {
@@ -26,11 +30,11 @@ func verifyWebsocketOpaqueChain(b *backend, from int, mode string) error {
 			} `json:"input"`
 		}
 		if err := json.Unmarshal([]byte(attempt.body), &value); err != nil ||
-			value.Previous != "resp-tool-missing" ||
+			value.Previous != previous ||
 			value.Session != "sess-conflict" ||
 			len(value.Input) != 1 ||
 			value.Input[0].Type != "function_call_output" ||
-			value.Input[0].CallID != "call-missing" ||
+			value.Input[0].CallID != callID ||
 			value.Input[0].Output != "done" {
 			return fmt.Errorf("%s dropped or rewrote opaque tool/chain context: body=%q err=%v",
 				mode, attempt.body, err)

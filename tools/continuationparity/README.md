@@ -13,7 +13,7 @@ the fixture is not a full feature-parity certificate.
 
 ## Strict WebSocket differential
 
-Use `--websocket` to exercise **twelve** request paths against both
+Use `--websocket` to exercise **thirteen** request paths against both
 executables (including three paths on a freshly restarted gateway):
 
 1. Seed a soft `session_id` preference and record its actual selected owner.
@@ -26,14 +26,16 @@ executables (including three paths on a freshly restarted gateway):
 5. A verified `x-codex-turn-state` must also outrank the soft session.
 6. An *unbound* `previous_response_id` may discover an upstream profile.
 7. An *unbound* `turn_state` may likewise discover a profile.
-8. An unbound `previous_response_id` with a tool-output continuation that
-   upstream does not recognize must perform four bounded **same-owner**
-   attempts, preserve the original tool call ID and output on each attempt,
-   then emit a generic `409 / stale_continuation` error frame—never replay
-   that tool output as a fresh request on another profile.
-9. A soft-session-only request after hard-affinity activity must retain the
-   pinned reference's observed owner selection.
-10–12. Restart the gateway process and repeat hard previous-response,
+8. An *unbound* missing previous-response chain containing a completed
+   tool call must make four bounded **same-owner** attempts while preserving
+   every tool field, then surface `error / 409 / stale_continuation`.
+9. A *verified bound* previous-response chain with a missing completed tool
+   result must follow the same bounded retry and generic error frame contract.
+   Ordinary bound continuations without tool output retain their original
+   response envelope.
+10. A soft-session-only request after hard-affinity activity retains the
+    pinned reference's observed owner selection.
+11–13. Restart the gateway process and repeat hard previous-response,
    hard turn-state, and soft-session-only requests. No local socket or
    in-memory router cache survives the restart.
 

@@ -144,3 +144,21 @@ func TestProdex04379WebSocketUnboundStaleOracleRejectsRewrites(t *testing.T) {
 		}
 	}
 }
+
+func TestProdex04379BoundMissingWebsocketOraclePreservesToolContext(t *testing.T) {
+	body := `{"type":"response.create","mode":"ws-bound-missing","previous_response_id":"resp-main","session_id":"sess-conflict","input":[{"type":"function_call_output","call_id":"call-bound","output":"done"}]}`
+	backend := &backend{attempts: []attempt{{mode: "ws-bound-missing", account: "account-a", body: body}}}
+	if err := verifyWebsocketOpaqueChain(backend, 0, "ws-bound-missing"); err != nil {
+		t.Fatal(err)
+	}
+	for _, altered := range []string{
+		strings.Replace(body, "resp-main", "resp-different", 1),
+		strings.Replace(body, "call-bound", "call-other", 1),
+		strings.Replace(body, `"output":"done"`, `"output":null`, 1),
+	} {
+		backend.attempts[0].body = altered
+		if err := verifyWebsocketOpaqueChain(backend, 0, "ws-bound-missing"); err == nil {
+			t.Fatalf("bound tool-output rewrite accepted: %s", altered)
+		}
+	}
+}

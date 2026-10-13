@@ -394,3 +394,41 @@ covering OpenAI gateway, HTTP proxy and routing passed after the runtime
 fix. This qualifies the tested path only: live-provider discovery,
 connection-limit recovery, alternate quota phases and cross-platform
 ownership remain open; no release tag has been issued.
+
+
+## Verified-bound tool-output missing chain: native error envelope parity
+
+A thirteenth executable differential case revealed a second envelope
+difference. With a **verified** previous-response owner, a completed tool
+output, and an upstream `previous_response_not_found` response, tagged
+Prodex 0.437.9 performs the original owner attempt plus three short retries
+on that *same owner*. It then emits a **generic** WebSocket
+`error / 409 / stale_continuation` client frame. Before the fix, Godex
+retained the original nested `response.failed` envelope for this locked
+tool-output continuation, although attempt count and owner already matched.
+
+Commit `4c30360` now uses the generic stale frame when the request
+semantically **requires locked previous-response affinity**, regardless
+of whether a trusted binding exists. In contrast, ordinary verified
+previous-response continuations **without** that tool-output dependency
+still retain their original nested `response.failed` envelope; the
+existing known-owner regression continues to pass. A new routing
+regression verifies four same-owner attempts with unmodified tool-output
+payload, delays of 75/200/500 ms, status 409 and code
+`stale_continuation`.
+
+The extended pinned executable oracle **PASS**ed on **13/13 scenarios
+for both** official Prodex 0.437.9 and clean Godex
+`4c30360a0e9e515e25714c5d5ff2bf26d9f6c7ef`. All four upstream
+attempts in the verified-bound missing-chain case preserved
+`previous_response_id`, `session_id`, `call_id`, the
+`function_call_output` event type and its `output` content, with
+no cross-profile replay. The combined fixture recorded **41 upstream
+requests** (40 WebSocket message attempts across both executables plus
+Prodex's usage preflight query). The oracle now rejects mismatched client
+event type, status, error code, owner, attempt count, and mutated tool fields.
+
+These checks qualify bounded hard-affinity failure handling only.
+Live provider inference, all quota/circuit states, app-server handoff and
+cross-platform operation remain outside the demonstrated parity surface.
+No release tag is authorized by the new evidence.

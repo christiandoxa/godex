@@ -92,7 +92,7 @@ func (b *backend) serveWebSocket(writer http.ResponseWriter, request *http.Reque
 			}
 		case "ws-bound", "ws-bound-restart", "ws-turn", "ws-turn-restart":
 			payloads = []string{`{"type":"response.completed","response":{"id":"resp-bound"}}`}
-		case "ws-unknown-missing":
+		case "ws-unknown-missing", "ws-bound-missing":
 			payloads = []string{`{"type":"response.failed","status":400,"response":{"error":{"code":"previous_response_not_found","message":"synthetic missing chain"}}}`}
 		case "ws-session-seed", "ws-session", "ws-session-restart":
 			payloads = []string{`{"type":"response.completed","response":{"id":"resp-session"}}`}
@@ -160,7 +160,7 @@ func websocketProbe(endpoint, mode string) (wsProbe, error) {
 	defer connection.Close()
 	_ = connection.SetDeadline(time.Now().Add(28 * time.Second))
 	request := map[string]any{"type": "response.create", "mode": mode, "input": []any{}}
-	if mode == "ws-bound" || mode == "ws-bound-restart" {
+	if mode == "ws-bound" || mode == "ws-bound-restart" || mode == "ws-bound-missing" {
 		// The verified previous response belongs to the primary profile;
 		// the soft session key is deliberately bound to the other profile.
 		request["previous_response_id"] = "resp-main"
@@ -178,6 +178,11 @@ func websocketProbe(endpoint, mode string) (wsProbe, error) {
 	if mode == "ws-unknown" {
 		request["previous_response_id"] = "resp-absent"
 		request["session_id"] = "sess-conflict"
+	}
+	if mode == "ws-bound-missing" {
+		request["input"] = []any{map[string]any{
+			"type": "function_call_output", "call_id": "call-bound", "output": "done",
+		}}
 	}
 	if mode == "ws-unknown-missing" {
 		request["previous_response_id"] = "resp-tool-missing"
@@ -257,6 +262,7 @@ func runWebSocketProduct(root string, b *backend, p product) error {
 		{mode: "ws-unknown", want: []string{"response.completed"}, attempts: 1, owner: "account-a"},
 		{mode: "ws-unknown-turn", want: []string{"response.completed"}, attempts: 1, owner: "account-a"},
 		{mode: "ws-unknown-missing", want: []string{"error"}, attempts: 4, owner: "account-a", errorCode: "stale_continuation", errorStatus: http.StatusConflict},
+		{mode: "ws-bound-missing", want: []string{"error"}, attempts: 4, owner: "account-a", errorCode: "stale_continuation", errorStatus: http.StatusConflict},
 		{mode: "ws-session", want: []string{"response.completed"}, attempts: 1, owner: "account-a"},
 	}
 	if err := runWebSocketProbes(b, p.name, endpoint, probes); err != nil {
@@ -278,7 +284,7 @@ func runWebSocketProduct(root string, b *backend, p product) error {
 	if err := runWebSocketProbes(b, p.name, endpoint, restart); err != nil {
 		return err
 	}
-	if len(mustAttempts(b)[start:]) < 14 {
+	if len(mustAttempts(b)[start:]) < 18 {
 		return errors.New("websocket fixture recorded insufficient upstream attempts")
 	}
 	return nil
