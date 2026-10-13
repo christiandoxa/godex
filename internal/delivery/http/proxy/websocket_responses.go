@@ -120,6 +120,7 @@ func (proxy *Proxy) forwardResponsesWebSocket(
 			RawQuery:           request.URL.RawQuery,
 			Header:             request.Header.Clone(),
 			Body:               payload,
+			QuotaSelection:     proxy.quotaSelection(request.URL.Path, true, payload),
 			WebSocketMessage:   true,
 			WebSocketSessionID: sessionID,
 			WebSocketPolicy: proxymodel.WebSocketPolicy{
