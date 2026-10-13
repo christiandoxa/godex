@@ -137,8 +137,11 @@ func quotaResetAtFromText(message string, now time.Time) (int64, bool) {
 		return 0, false
 	}
 	candidate := strings.TrimSpace(message[index+len(marker):])
-	candidate = strings.TrimSpace(strings.TrimSuffix(candidate, "."))
-	parts := strings.Fields(candidate)
+	candidate = strings.TrimRight(candidate, ".")
+	if len(candidate) > 8192 {
+		return 0, false
+	}
+	parts := strings.FieldsFunc(candidate, quotaRetryASCIIWhitespace)
 	if len(parts) >= 2 {
 		if parsed, err := time.ParseInLocation("3:04 PM", strings.Join(parts[:2], " "), now.Location()); err == nil {
 			when := time.Date(now.Year(), now.Month(), now.Day(), parsed.Hour(), parsed.Minute(), 0, 0, now.Location())
@@ -166,6 +169,15 @@ func quotaResetAtFromText(message string, now time.Time) (int64, bool) {
 		return 0, false
 	}
 	return parsed.Unix(), true
+}
+
+func quotaRetryASCIIWhitespace(value rune) bool {
+	switch value {
+	case '\t', '\n', '\r', ' ':
+		return true
+	default:
+		return false
+	}
 }
 
 func (router *Router) quotaQuarantineDuration(accountID string, selection quotamodel.Selection, resetAt int64) time.Duration {

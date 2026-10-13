@@ -103,3 +103,24 @@ func TestProdex04357QuotaQuarantineFallsBackToKnownResetThenFiveMinutes(t *testi
 		t.Fatalf("fallback quarantine = %s, want 5m", got)
 	}
 }
+
+func TestProdex043710QuotaRetryTextUsesTaggedGrammarBounds(t *testing.T) {
+	now := time.Date(2026, time.January, 2, 10, 0, 0, 0, time.UTC)
+	want := time.Date(2026, time.January, 2, 17, 8, 0, 0, time.UTC).Unix()
+	for name, message := range map[string]string{
+		"all trailing periods": "Try again at 5:08 PM...",
+		"ascii whitespace":     "Try again at 5:08\tPM",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if got := quotaResetAtFromMessage([]byte(message), now); got != want {
+				t.Fatalf("reset = %d, want %d", got, want)
+			}
+		})
+	}
+	if got := quotaResetAtFromMessage([]byte("Try again at 5:08\u2003PM"), now); got != 0 {
+		t.Fatalf("unicode whitespace unexpectedly parsed as reset %d", got)
+	}
+	if got := quotaResetAtFromMessage([]byte("Try again at 5:08 PM"+strings.Repeat("x", 8_180)), now); got != 0 {
+		t.Fatalf("oversized retry candidate unexpectedly parsed as reset %d", got)
+	}
+}
