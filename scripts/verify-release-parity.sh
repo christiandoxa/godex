@@ -32,6 +32,7 @@ go build -trimpath -o "$tmp/godex" ./cmd/godex
 go build -trimpath -o "$tmp/differential" ./tools/differential
 go build -trimpath -o "$tmp/profileparity" ./tools/profileparity
 go build -trimpath -o "$tmp/clierrorparity" ./tools/clierrorparity
+go build -trimpath -o "$tmp/continuationparity" ./tools/continuationparity
 
 # Independent managed-profile persistence oracle. All 29 CLI actions run in
 # separate subprocesses with isolated credential-free homes; state projections
@@ -55,3 +56,13 @@ go build -trimpath -o "$tmp/clierrorparity" ./tools/clierrorparity
   --prodex-source "$tmp/prodex-source" \
   --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
   --scenario all
+
+# Exact-tagged Responses WebSocket executable differential. A synthetic
+# heartbeat followed by capacity error must remain precommit; actual output
+# must never be replayed; trusted previous_response_id outranks soft session.
+# The fixture verifies that Godex was built from this clean commit.
+"$tmp/continuationparity" \
+  --prodex "$tmp/prodex" --godex "$tmp/godex" \
+  --prodex-source "$tmp/prodex-source" \
+  --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
+  --websocket

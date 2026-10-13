@@ -33,11 +33,16 @@ type backend struct {
 	mu        sync.Mutex
 	attempts  []attempt
 	cancelled int
+	wsCounts  map[string]int
 }
 
 func newBackend() *backend {
-	b := &backend{}
+	b := &backend{wsCounts: make(map[string]int)}
 	b.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.EqualFold(r.Header.Get("Upgrade"), "websocket") {
+			b.serveWebSocket(w, r)
+			return
+		}
 		body, _ := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 		var value map[string]any
 		_ = json.Unmarshal(body, &value)
@@ -144,12 +149,20 @@ func main() {
 	prodex := flag.String("prodex", "", "official Prodex 0.437.9 binary")
 	godex := flag.String("godex", "", "Godex binary")
 	prodexSource := flag.String("prodex-source", "", "tagged Prodex 0.437.9 source")
+	websocket := flag.Bool("websocket", false, "run the isolated WebSocket request/recovery differential")
+	godexSource := flag.String("godex-source", "", "clean Godex commit source (required with --websocket)")
+	godexCommit := flag.String("godex-commit", "", "exact 40-character Godex commit (required with --websocket)")
 	flag.Parse()
 	if *prodex == "" || *godex == "" || *prodexSource == "" {
 		fatal("usage: continuationparity --prodex BIN --godex BIN --prodex-source DIR")
 	}
 	if err := verifyProdex(*prodex, *prodexSource); err != nil {
 		fatal(err.Error())
+	}
+	if *websocket {
+		if err := verifyWebSocketCandidate(*godex, *godexSource, *godexCommit); err != nil {
+			fatal(err.Error())
+		}
 	}
 	root, err := os.MkdirTemp("", "godex-continuation-parity-")
 	if err != nil {
@@ -161,9 +174,20 @@ func main() {
 	b := newBackend()
 	defer b.close()
 	for _, spec := range []struct{ name, binary string }{{"prodex", *prodex}, {"godex", *godex}} {
-		if err := runProduct(root, b, product{name: spec.name, binary: spec.binary}); err != nil {
+		p := product{name: spec.name, binary: spec.binary}
+		var err error
+		if *websocket {
+			err = runWebSocketProduct(root, b, p)
+		} else {
+			err = runProduct(root, b, p)
+		}
+		if err != nil {
 			fatal(spec.name + ": " + err.Error())
 		}
+	}
+	if *websocket {
+		fmt.Printf("PASS WebSocket continuation loopback: %d upstream attempts, strict precommit-retry, hard-owner and no-replay checks\n", len(mustAttempts(b)))
+		return
 	}
 	fmt.Printf("PASS continuation loopback: %d attempts; cancellation negative control recorded\n", len(mustAttempts(b)))
 }
@@ -194,10 +218,10 @@ func sha256File(path string) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func runProduct(root string, b *backend, p product) error {
+func prepareProduct(root string, p *product) error {
 	p.root = filepath.Join(root, p.name)
 	p.user, p.state = filepath.Join(p.root, "user"), filepath.Join(p.root, "state")
-	p.env = productEnv(p)
+	p.env = productEnv(*p)
 	if err := os.MkdirAll(filepath.Join(p.user, ".codex"), 0700); err != nil {
 		return err
 	}
@@ -219,7 +243,11 @@ func runProduct(root string, b *backend, p product) error {
 	if _, err := invoke(p.binary, p.env, "profile", "use", "--profile", "main"); err != nil {
 		return err
 	}
-	if err := seedProductState(p); err != nil {
+	return seedProductState(*p)
+}
+
+func runProduct(root string, b *backend, p product) error {
+	if err := prepareProduct(root, &p); err != nil {
 		return err
 	}
 	startIndex := len(mustAttempts(b))

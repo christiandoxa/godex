@@ -1,32 +1,56 @@
-# Continuation loopback fixture
+# Prodex 0.437.9 continuation and WebSocket executable differential
 
-This executable creates isolated two-account ChatGPT profile homes, starts one
-loopback upstream, and runs the same client sequence through the pinned Prodex
-0.437.9 binary and a Godex binary:
+This harness compares an official SHA-256-pinned Prodex `0.437.9` binary
+and Godex using isolated two-profile homes, synthetic credentials, and a
+loopback-only upstream. It does **not** send real model requests or use
+the caller's account credentials.
 
-- hard previous-response plus conflicting soft-session routing;
-- turn-state routing;
-- precommit overload/quota responses and full-context replay attempts;
-- a streamed response with visible output;
-- cancellation and a fresh process restart.
+The default mode checks HTTP Responses continuation ownership, turn-state
+affinity, overload/quota and full-context recovery, already-committed
+streaming output, cancellation, and process restart. Historical status
+and retry differences may remain within this bounded HTTP observation;
+the fixture is not a full feature-parity certificate.
 
-Run it from a committed candidate checkout:
+## Strict WebSocket differential
 
-```bash
-go build -trimpath -o /tmp/godex-candidate ./cmd/godex
+Use `--websocket` to exercise three request/response paths against **both**
+executables:
+
+1. An upstream `response.created` prelude and `keepalive` followed by a
+   `server_is_overloaded` failure. The prelude must be discarded; the
+   retry must complete with visible output and no leaked failed response ID.
+   Tagged Prodex 0.437.9 retries the same original account here, so a
+   second attempt **does not** prove cross-account rotation.
+2. A heartbeat and actual visible output followed by overload. The client
+   must receive the committed frames and there must be **no** second
+   upstream attempt or duplicate execution.
+3. A verified `previous_response_id` bound to the primary account and
+   a conflicting soft `session_id` bound to the secondary account.
+   The hard previous-response owner must receive exactly one attempt.
+
+Run from a **clean committed Godex checkout**, with a locally built candidate
+containing Go VCS metadata:
+
+```sh
+go build -trimpath -o /tmp/godex-04379-candidate ./cmd/godex
 go run ./tools/continuationparity \
-  --prodex /home/doxa/.local/bin/prodex \
-  --godex /tmp/godex-candidate \
-  --prodex-source /tmp/prodex-04373-timeout-20261010
+  --prodex /path/to/official/prodex-0.437.9 \
+  --prodex-source /path/to/clean/prodex-tag-0.437.9 \
+  --godex /tmp/godex-04379-candidate \
+  --godex-source "$PWD" --godex-commit "$(git rev-parse HEAD)" \
+  --websocket
 ```
 
-The backend records account IDs and synthetic request modes only; it never
-records bearer tokens. It answers the quota endpoint with a valid ready usage
-payload. The fixture preloads equivalent hashed lineage and quota state: Prodex
-uses profile names, while Godex uses managed account IDs. The output includes
-response status markers, per-mode attempt counts, and the account trace so a
-status difference can be diagnosed as a seed or routing difference. It is a
-bounded differential observation, not a certificate of identical recovery
-policy: the tagged runtime and Godex may return a terminal 503 or wait for a
-bounded recovery epoch where the other returns a full-context signal. Focused
-routing tests assert the hard-affinity contract directly.
+The official reference executable must report `prodex 0.437.9`, have
+SHA-256 `58027b0d1825b47e60c35ce1082c4249ed2fa9629174cdf8805312d24562b37e`,
+and correspond to source commit
+`0e321c92f4e580aa0b090085d5af13a8b856c3f1`.
+The WebSocket mode additionally rejects a dirty Godex source tree, a
+different expected commit, or missing/modified Go executable VCS metadata.
+
+The harness fails on mismatched event order, missing visible output,
+extra upstream attempts, leaked precommit response IDs, wrong hard-affinity
+owner, and invalid framing. Unit negative controls intentionally mutate these
+observations. See `scripts/verify-release-parity.sh` for the exact-tagged
+release-only invocation. That release script still blocks on *all* other
+oracle checks; local scenario passes do not authorize a tag or release.
