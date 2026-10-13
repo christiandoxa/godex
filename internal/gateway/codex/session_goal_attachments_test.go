@@ -201,6 +201,39 @@ func TestPersistSessionGoalObjectiveAttachmentsRejectsSymlinkedWrapper(t *testin
 	}
 }
 
+func TestPersistSessionGoalAttachmentsLeavesMissingMediaAndRepeatsSafely(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "shared-codex")
+	if err := os.MkdirAll(root, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	oldRoot := filepath.Join(t.TempDir(), "deleted-overlay")
+	objective := "read " + filepath.Join(oldRoot, "attachments", "thread-1", "pasted-text-1.txt") +
+		" image " + filepath.Join(oldRoot, "attachments", "thread-1", "image-1.png")
+	dbPath := filepath.Join(root, "goals_1.sqlite")
+	db := createGoalDB(t, dbPath)
+	if _, err := db.Exec("INSERT INTO thread_goals (thread_id, objective) VALUES (?1, ?2)", "thread-1", objective); err != nil {
+		db.Close()
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := persistSessionGoalAttachmentPaths(root); err != nil {
+		t.Fatal(err)
+	}
+	if got := readGoalObjective(t, dbPath, "thread-1"); got != objective {
+		t.Fatalf("missing media objective changed = %q", got)
+	}
+	for range 3 {
+		if err := persistSessionGoalAttachmentPathForThread(root, "thread-1"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := readGoalObjective(t, dbPath, "thread-1"); got != objective {
+		t.Fatalf("repeated missing-media repair changed objective = %q", got)
+	}
+}
+
 func TestUpdateSessionGoalAttachmentReferencePreservesNewerObjective(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "goals_1.sqlite")
 	db := createGoalDB(t, dbPath)
