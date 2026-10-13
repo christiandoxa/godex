@@ -13,7 +13,7 @@ the fixture is not a full feature-parity certificate.
 
 ## Strict WebSocket differential
 
-Use `--websocket` to exercise four request/response paths against **both**
+Use `--websocket` to exercise six request/response paths against **both**
 executables:
 
 1. An upstream `response.created` prelude and `keepalive` followed by a
@@ -27,10 +27,13 @@ executables:
 3. A verified `previous_response_id` bound to the primary account and
    a conflicting soft `session_id` bound to the secondary account.
    The hard previous-response owner must receive exactly one attempt.
-4. Restart the gateway process, open a fresh local WebSocket, and repeat
-   the hard-owner conflict. The original account must still own the request
-   after in-memory connection and routing caches are gone. This is a
-   persistence check, not merely a warm same-socket continuation.
+4. A trusted `x-codex-turn-state` without a previous response similarly
+   takes precedence over a conflicting soft `session_id`.
+5. Restart the gateway, open a fresh WebSocket, and repeat the verified
+   previous-response conflict. The correct owner must persist.
+6. After the same gateway restart, repeat the trusted turn-state versus soft
+   session conflict, proving turn-state ownership survives without a
+   retained socket or in-memory routing cache.
 
 Run from a **clean committed Godex checkout**, with a locally built candidate
 containing Go VCS metadata:

@@ -90,7 +90,7 @@ func (b *backend) serveWebSocket(writer http.ResponseWriter, request *http.Reque
 				`{"type":"response.output_text.delta","delta":"visible"}`,
 				`{"type":"response.failed","response":{"error":{"code":"server_is_overloaded"}}}`,
 			}
-		case "ws-bound", "ws-bound-restart":
+		case "ws-bound", "ws-bound-restart", "ws-turn", "ws-turn-restart":
 			payloads = []string{`{"type":"response.completed","response":{"id":"resp-bound"}}`}
 		default:
 			payloads = []string{`{"type":"response.completed","response":{"id":"resp-default"}}`}
@@ -162,6 +162,12 @@ func websocketProbe(endpoint, mode string) (wsProbe, error) {
 		request["previous_response_id"] = "resp-main"
 		request["session_id"] = "sess-conflict"
 	}
+	if mode == "ws-turn" || mode == "ws-turn-restart" {
+		// A hard opaque turn-state without a previous_response_id must
+		// also defeat the conflicting soft session preference.
+		request["x-codex-turn-state"] = "turn-a"
+		request["session_id"] = "sess-conflict"
+	}
 	body, err := json.Marshal(request)
 	if err != nil {
 		return wsProbe{}, err
@@ -224,6 +230,7 @@ func runWebSocketProduct(root string, b *backend, p product) error {
 		{"ws-keepalive", []string{"response.output_text.delta", "response.completed"}, "recovered", 2},
 		{"ws-committed", []string{"keepalive", "response.output_text.delta", "response.failed"}, "visible", 1},
 		{"ws-bound", []string{"response.completed"}, "", 1},
+		{"ws-turn", []string{"response.completed"}, "", 1},
 	}
 	for _, probe := range probes {
 		before := len(mustAttempts(b))
@@ -235,8 +242,8 @@ func runWebSocketProduct(root string, b *backend, p product) error {
 		if err := verifyWebsocketExpectation(probe, got, observed); err != nil {
 			return err
 		}
-		if probe.mode == "ws-bound" && observed[0] != "account-a" {
-			return fmt.Errorf("%s ignored trusted hard previous-response owner: %v", probe.mode, observed)
+		if (probe.mode == "ws-bound" || probe.mode == "ws-turn") && observed[0] != "account-a" {
+			return fmt.Errorf("%s ignored trusted hard owner: %v", probe.mode, observed)
 		}
 		fmt.Printf("%s %s: upstream=%s client=%s\n", p.name, probe.mode, strings.Join(observed, ","),
 			strings.Join(got.types, ","))
@@ -266,7 +273,24 @@ func runWebSocketProduct(root string, b *backend, p product) error {
 	}
 	fmt.Printf("%s %s: upstream=%s client=%s\n", p.name, restart.mode,
 		strings.Join(observed, ","), strings.Join(got.types, ","))
-	if len(mustAttempts(b)[start:]) < 5 {
+	turnRestart := websocketExpectation{
+		mode: "ws-turn-restart", want: []string{"response.completed"}, attempts: 1,
+	}
+	before = len(mustAttempts(b))
+	got, err = websocketProbe(endpoint, turnRestart.mode)
+	if err != nil {
+		return fmt.Errorf("%s: %w", turnRestart.mode, err)
+	}
+	observed = websocketAttemptsForMode(b, before, turnRestart.mode)
+	if err := verifyWebsocketExpectation(turnRestart, got, observed); err != nil {
+		return err
+	}
+	if observed[0] != "account-a" {
+		return fmt.Errorf("%s lost verified turn-state owner after restart: %v", turnRestart.mode, observed)
+	}
+	fmt.Printf("%s %s: upstream=%s client=%s\n", p.name, turnRestart.mode,
+		strings.Join(observed, ","), strings.Join(got.types, ","))
+	if len(mustAttempts(b)[start:]) < 7 {
 		return errors.New("websocket fixture recorded insufficient upstream attempts")
 	}
 	return nil

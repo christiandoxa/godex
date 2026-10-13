@@ -303,3 +303,26 @@ one deterministic two-profile fixture. It does not certify every storage
 failure/recovery permutation, turn-state-only recovery, cross-platform
 WebSocket state durability, quota collapse, or real-provider execution.
 Full parity remains fail-closed.
+
+## Durable turn-state WebSocket owner across gateway restart
+
+The strict pinned executable differential now checks **six** cases, adding
+a hard `x-codex-turn-state: turn-a` binding owned by account-a while the
+same request carries a conflicting soft `session_id: sess-conflict`
+owned by account-b. This is tested on a fresh local WebSocket before
+restart and again on a new WebSocket **after** the gateway process is
+stopped and restarted. Both the official SHA-256-pinned Prodex 0.437.9
+executable and the clean Godex `d13fb9e3e4a23a6e302d760c7557e7fc7a5d7e04`
+reference build made exactly one account-a attempt in each case and
+returned `response.completed`. The overall observation recorded 15
+backend attempts across both binaries (14 WebSocket requests plus one
+Prodex quota/usage probe).
+
+The public proxy regression additionally checks a direct turn-state
+property, a `client_metadata` turn-state property, an unknown opaque
+turn-state (which must fail closed), and a soft-session-only request
+(which must continue using account-b). The hard turn-state owner and the
+soft session owner both remain intact; neither can be overwritten by
+the other. This confirms one deterministic durable routing contract,
+**not** all turn-state/protocol recovery paths. No live credentials,
+real provider inference, or release tags are involved.

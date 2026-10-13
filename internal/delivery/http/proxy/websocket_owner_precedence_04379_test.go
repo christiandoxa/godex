@@ -71,6 +71,7 @@ func TestProdex04379PublicWebSocketHardPreviousOutranksConflictingSession(t *tes
 	now := time.Now().Unix()
 	if _, err := store.Merge(t.Context(), []routingentity.Binding{
 		{Kind: "previous", Key: key("previous", "resp-main"), AccountID: websocketHardOwner04379, UpdatedUnix: now},
+		{Kind: "turn", Key: key("turn", "turn-a"), AccountID: websocketHardOwner04379, UpdatedUnix: now},
 		{Kind: "session", Key: key("session", "sess-conflict"), AccountID: websocketSoftOwner04379, UpdatedUnix: now},
 	}); err != nil {
 		t.Fatal(err)
@@ -117,6 +118,18 @@ func TestProdex04379PublicWebSocketHardPreviousOutranksConflictingSession(t *tes
 	if !strings.Contains(unknown, "409") || !strings.Contains(unknown, "continuation") {
 		t.Fatalf("unknown previous-response crossed accounts: %s", unknown)
 	}
+	for _, variant := range []string{
+		`{"type":"response.create","x-codex-turn-state":"turn-a","session_id":"sess-conflict","input":[]}`,
+		`{"type":"response.create","client_metadata":{"x-codex-turn-state":"turn-a"},"session_id":"sess-conflict","input":[]}`,
+	} {
+		if response := send(variant); !strings.Contains(response, "resp-main-resumed") {
+			t.Fatalf("trusted turn-state owner did not outrank soft session: %s", response)
+		}
+	}
+	unknownTurn := send(`{"type":"response.create","x-codex-turn-state":"turn-missing","session_id":"sess-conflict","input":[]}`)
+	if !strings.Contains(unknownTurn, "409") || !strings.Contains(unknownTurn, "continuation") {
+		t.Fatalf("unbound turn-state reached a soft session owner: %s", unknownTurn)
+	}
 	last := send(`{"type":"response.create","session_id":"sess-conflict","input":[]}`)
 	if !strings.Contains(last, "resp-session-b") {
 		t.Fatalf("session-only continuation lost its rightful owner: %s", last)
@@ -125,8 +138,12 @@ func TestProdex04379PublicWebSocketHardPreviousOutranksConflictingSession(t *tes
 	owners := append([]string(nil), gateway.owners...)
 	routes := append([]quotamodel.RouteKind(nil), gateway.routes...)
 	gateway.mu.Unlock()
-	if len(owners) != 2 || owners[0] != websocketHardOwner04379 || owners[1] != websocketSoftOwner04379 {
-		t.Fatalf("upstream attempt owners=%v, want hard A then soft B", owners)
+	if len(owners) != 4 ||
+		owners[0] != websocketHardOwner04379 ||
+		owners[1] != websocketHardOwner04379 ||
+		owners[2] != websocketHardOwner04379 ||
+		owners[3] != websocketSoftOwner04379 {
+		t.Fatalf("upstream attempt owners=%v, want previous A, direct turn A, nested turn A, then soft session B", owners)
 	}
 	for _, route := range routes {
 		if route != quotamodel.RouteKindWebSocket {
