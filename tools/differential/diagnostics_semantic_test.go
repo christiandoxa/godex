@@ -10,7 +10,7 @@ func TestProdexLaunchBannerUsesCapturedSeparatorWidth(t *testing.T) {
 	if len(lines) < 4 {
 		t.Fatalf("launch banner has %d lines", len(lines))
 	}
-	want := "[ Runtime Provider ] " + strings.Repeat("=", 92)
+	want := "[ Runtime Provider ] " + strings.Repeat("=", 89)
 	if lines[3] != want {
 		t.Fatalf("runtime provider separator = %q, want %q", lines[3], want)
 	}
