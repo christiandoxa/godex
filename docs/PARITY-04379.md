@@ -685,3 +685,48 @@ It does not imply that the whole `scripts/verify-release-parity.sh`
 script has passed: the profile, CLI, provider and WebSocket release
 oracles must also complete together under the same exact clean commit.
 No tag or release has been created on the strength of this subgate.
+
+## Full release-only oracle PASS with strict native-context provenance
+
+The **complete** `scripts/verify-release-parity.sh` gate ran to
+completion with exit status **0** on clean Godex commit
+`49cc7fa02023c2bb26a3e769d485a18580b075da`. All of its included
+oracles used the exact source tag
+`0e321c92f4e580aa0b090085d5af13a8b856c3f1` and published
+Prodex 0.437.9 Linux x86_64 executable with SHA-256
+`58027b0d1825b47e60c35ce1082c4249ed2fa9629174cdf8805312d24562b37e`.
+Godex was built from the same **clean commit** identified by embedded
+Go VCS revision metadata with `vcs.modified=false`; source and binary
+identity guards remain fail-closed.
+
+The five release stages completed **together in their original order**:
+
+- Managed-profile lifecycle and restart: **31/31 steps PASS**
+- CLI acceptance and invalid-argument differential: **8/8 PASS**
+- Native Codex context forwarding: **3/3 PASS** with cached-maximum
+  promotion negative control
+- DeepSeek provider `--scenario all`: **18/18 PASS**, zero material
+  comparison differences, and status/header/event/state/retry/
+  cancellation/stdout mutation negative controls PASS
+- Responses WebSocket: **13/13 PASS**, including locked-affinity and
+  stale-continuation errors, with 41 synthetic upstream attempts
+  recorded across both binaries (including reference background probes)
+
+Commits `0d392a8` and `49cc7fa` strengthened the release gate by
+requiring the independently pinned native-context oracle. That tool now
+checks the Prodex source revision, the clean candidate worktree, and
+the candidate binary's VCS revision and dirty flag before running any
+child process. Dedicated negative tests reject stale/modified metadata,
+dirty source, and incorrect source revision. The separately executed
+strict context oracle also **PASS**ed 3/3 and rejected an intentionally
+wrong 40-character Godex commit. Full `make verify` on `49cc7fa`
+**PASS**ed, including six-target cross-builds, installer checks,
+`go vet ./...`, and repository-wide shuffled race tests.
+
+This evidence **supersedes the earlier checkpoint** where a short
+110-second observation window interrupted the combined release stage.
+It proves parity only for the finite synthetic scenarios in the
+release gate. It does **not** certify full 1:1 native-session recovery,
+app-server handoff, all real providers/quota phases, or
+cross-platform native execution. No real provider credentials or
+model requests were used, and no tag or release was created.
