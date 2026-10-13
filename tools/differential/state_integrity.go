@@ -125,6 +125,10 @@ func auditFixtureDurableState(root string) []string {
 			if !validEmptyProdexHealthScoreSnapshot(data) {
 				violations = append(violations, "nonempty_or_corrupt_prodex_health_scores")
 			}
+		case "state/runtime-backoffs.json", "state/runtime-backoffs.json.last-good":
+			if !validEmptyRuntimeBackoffSnapshot(data) {
+				violations = append(violations, "nonempty_or_corrupt_runtime_backoffs")
+			}
 		case "state/logs/runtime.jsonl":
 			for _, line := range bytes.Split(data, []byte("\n")) {
 				if len(bytes.TrimSpace(line)) != 0 && !json.Valid(line) {
@@ -137,6 +141,9 @@ func auditFixtureDurableState(root string) []string {
 			strings.HasSuffix(relative, ".tmp") && allowedFixtureStateFile(relative) &&
 			!validEmptyProdexHealthScoreSnapshot(data) {
 			violations = append(violations, "nonempty_or_corrupt_prodex_health_scores")
+		}
+		if runtimeBackoffsTempFile(relative) && !validEmptyRuntimeBackoffSnapshot(data) {
+			violations = append(violations, "nonempty_or_corrupt_runtime_backoffs")
 		}
 		if strings.HasPrefix(relative, "codex/sessions/") &&
 			!strings.HasSuffix(relative, ".lock") {
@@ -204,7 +211,12 @@ func allowedFixtureStateFile(name string) bool {
 		"state/previous-response-failures.json", "state/previous-response-failures.json.last-good",
 		"state/state.guard", "state/state.json.lock",
 		"state/runtime-scores.json", "state/runtime-scores.json.lock",
-		"state/runtime-scores.json.last-good":
+		"state/runtime-scores.json.last-good",
+		"state/runtime-backoffs.json", "state/runtime-backoffs.json.lock",
+		"state/runtime-backoffs.json.last-good":
+		return true
+	}
+	if runtimeBackoffsTempFile(name) {
 		return true
 	}
 	if strings.HasPrefix(name, "state/runtime-broker-live-runtime-") &&
@@ -234,6 +246,65 @@ func allowedFixtureStateFile(name string) bool {
 			if digit < '0' || digit > '9' {
 				return false
 			}
+		}
+	}
+	return true
+}
+
+func runtimeBackoffsTempFile(name string) bool {
+	const prefix, suffix = "state/runtime-backoffs.json.", ".tmp"
+	if !strings.HasPrefix(name, prefix) || !strings.HasSuffix(name, suffix) {
+		return false
+	}
+	parts := strings.Split(strings.TrimSuffix(strings.TrimPrefix(name, prefix), suffix), ".")
+	if len(parts) != 3 {
+		return false
+	}
+	for _, part := range parts {
+		if part == "" || len(part) > 20 {
+			return false
+		}
+		for _, digit := range part {
+			if digit < '0' || digit > '9' {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func validEmptyRuntimeBackoffSnapshot(data []byte) bool {
+	var envelope map[string]json.RawMessage
+	if json.Unmarshal(data, &envelope) != nil || envelope == nil {
+		return false
+	}
+	if _, hasGeneration := envelope["generation"]; hasGeneration {
+		if len(envelope) != 2 {
+			return false
+		}
+		var generation uint64
+		if json.Unmarshal(envelope["generation"], &generation) != nil || generation == 0 {
+			return false
+		}
+		var value map[string]json.RawMessage
+		if json.Unmarshal(envelope["value"], &value) != nil || value == nil {
+			return false
+		}
+		envelope = value
+	} else if _, hasValue := envelope["value"]; hasValue {
+		return false
+	}
+	for key, raw := range envelope {
+		if key != "retry_backoff_until" && key != "transport_backoff_until" &&
+			key != "route_circuit_open_until" && key != "updated_at" {
+			return false
+		}
+		var values map[string]int64
+		if json.Unmarshal(raw, &values) != nil {
+			return false
+		}
+		if key != "updated_at" && len(values) != 0 {
+			return false
 		}
 	}
 	return true

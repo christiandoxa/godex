@@ -48,6 +48,7 @@ func TestDurableStateIntegrityDetectsIndependentCorruption(t *testing.T) {
 		{"log_corruption", "state/logs/runtime.jsonl", "this is not json", "invalid_runtime_log_json"},
 
 		{"quarantine_after_recovery", "state/retry-backoff.json", `{"version":1,"backoffs":[{"account_id":"synthetic","until_unix":9999999999}]}`, "stale_provider_state:backoffs"},
+		{"runtime_backoff_pollution", "state/runtime-backoffs.json", `{"generation":1,"value":{"retry_backoff_until":{"synthetic":1},"transport_backoff_until":{},"route_circuit_open_until":{},"updated_at":{}}}`, "nonempty_or_corrupt_runtime_backoffs"},
 	}
 	for _, fixture := range fixtures {
 		t.Run(fixture.name, func(t *testing.T) {
@@ -71,6 +72,50 @@ func TestDurableStateIntegrityDetectsIndependentCorruption(t *testing.T) {
 				t.Fatalf("corrupted state escaped: %v", errors)
 			}
 		})
+	}
+}
+
+func TestRuntimeBackoffTempAllowlistRejectsFilenameSpoofing(t *testing.T) {
+	for _, name := range []string{
+		"state/runtime-backoffs.json.1234.5678.2.tmp",
+		"state/runtime-backoffs.json.999999999.1.0.tmp",
+	} {
+		if !allowedFixtureStateFile(name) {
+			t.Fatalf("known runtime backoff temp rejected: %s", name)
+		}
+	}
+	for _, name := range []string{
+		"state/runtime-backoffs.json.1.2.tmp",
+		"state/runtime-backoffs.json.evil.2.3.tmp",
+		"state/runtime-backoffs.json.1.2.3.tmp.more",
+	} {
+		if allowedFixtureStateFile(name) {
+			t.Fatalf("spoofed runtime backoff temp accepted: %s", name)
+		}
+	}
+}
+
+func TestEmptyRuntimeBackoffEnvelopeRejectsSelectionState(t *testing.T) {
+	for _, input := range []string{
+		`{"generation":1,"value":{"retry_backoff_until":{},"transport_backoff_until":{},"route_circuit_open_until":{},"updated_at":{}}}`,
+		`{}`,
+		`{"retry_backoff_until":{},"transport_backoff_until":{},"route_circuit_open_until":{},"updated_at":{"profile":10}}`,
+	} {
+		if !validEmptyRuntimeBackoffSnapshot([]byte(input)) {
+			t.Fatalf("valid empty runtime backoff rejected: %s", input)
+		}
+	}
+	for _, input := range []string{
+		`{"generation":1}`,
+		`{"value":{}}`,
+		`{"generation":0,"value":{}}`,
+		`{"generation":1,"value":{"retry_backoff_until":{"profile":10},"transport_backoff_until":{},"route_circuit_open_until":{},"updated_at":{}}}`,
+		`{"generation":1,"value":{"unknown":{}}}`,
+		`{"retry_backoff_until":"bad"}`,
+	} {
+		if validEmptyRuntimeBackoffSnapshot([]byte(input)) {
+			t.Fatalf("invalid runtime backoff accepted: %s", input)
+		}
 	}
 }
 

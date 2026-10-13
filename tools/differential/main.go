@@ -1109,7 +1109,7 @@ func fixtureDurableStateSignature(run productRun) string {
 			"state/profiles.guard", "state/routing-health.guard", "state/routing-memory.guard",
 			"state/routing-retry-backoff.guard", "state/routing-transport-backoff.guard",
 			"state/routing.guard", "state/state.guard", "state/state.json.lock",
-			"state/runtime-scores.json.lock":
+			"state/runtime-scores.json.lock", "state/runtime-backoffs.json.lock":
 			// Coordination and diagnostic artifacts have no durable routing
 			// semantics; their integrity is checked by the state auditor.
 		case "state/routing.json", "state/routing.json.last-good",
@@ -1120,7 +1120,8 @@ func fixtureDurableStateSignature(run productRun) string {
 			"state/route-circuits.json", "state/route-circuits.json.last-good",
 			"state/continuation-status.json", "state/continuation-status.json.last-good",
 			"state/previous-response-failures.json", "state/previous-response-failures.json.last-good",
-			"state/runtime-scores.json", "state/runtime-scores.json.last-good":
+			"state/runtime-scores.json", "state/runtime-scores.json.last-good",
+			"state/runtime-backoffs.json", "state/runtime-backoffs.json.last-good":
 			// These snapshots are semantically empty in this fixture; their
 			// contents and recovery invariants are checked independently.
 		default:
@@ -1130,6 +1131,9 @@ func fixtureDurableStateSignature(run productRun) string {
 			}
 			if strings.HasPrefix(file.Path, "state/runtime-scores.json.") &&
 				strings.HasSuffix(file.Path, ".tmp") {
+				continue
+			}
+			if runtimeBackoffsTempFile(file.Path) {
 				continue
 			}
 			if strings.HasPrefix(file.Path, "codex/sessions/") {
