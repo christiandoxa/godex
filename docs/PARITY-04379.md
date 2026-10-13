@@ -574,3 +574,47 @@ quota-command executable-to-executable differential. Additional
 provider-specific display/routing decisions, all live quota sources,
 the interactive terminal's exact presentation, and the entire
 release gate remain unqualified. No tag or release was created.
+
+## Native cursor rollout-path binding and cross-file replay rejection
+
+A deterministic regression exposed an unsafe fallback in the 0.437.9
+native-root recovery compatibility layer. The private SessionStart marker
+previously captured the root UUID and a **logical byte offset**, but not
+the path whose completed transcript supplied that offset. When the
+session resolver selected a *different* rollout file that happened to
+contain the **same UUID**, the valid offset could be applied to the
+wrong history. A historical terminal capacity failure in the other
+file was then incorrectly surfaced as a new `usage_limited` event.
+The new regression **failed against the previous implementation** with
+that false recovery.
+
+Commit `feca731` binds the callback's cursor to its source rollout path
+in a private, bounded `.rollout` sidecar. Identity and offset evidence
+are published and read under the existing marker lock. The live monitor
+only uses an offset when the resolver's absolute native rollout path
+matches the captured path. Mismatches, symlinks, malformed or oversized
+sidecar data, and missing path evidence fail closed to a fresh
+current-tail snapshot **without replaying historical terminal errors**.
+Repeated root/descendant notifications retain the original cursor;
+explicit root changes clear both offset and path sidecars.
+
+The regression now passes on both regular `.jsonl` and Zstandard
+`.jsonl.zst` Codex rollouts: a same-UUID unrelated transcript does not
+trigger recovery, while a newly appended terminal failure on the
+originally captured path remains observable. The symlink/forgery and
+root-switch negative controls passed. Full shuffled race tests for
+CLI runtime, runtime use cases, and session repository passed, as did
+the opt-in Codex 0.162.1 native SessionStart callback smoke and the
+full `make verify` gate (six cross-builds, installer checks, vet,
+and repository-wide shuffled race tests).
+
+For clean Godex build
+`feca731ed17d99929bba36c63a3f20e79c007ec9`, the
+**official SHA-256-pinned Prodex 0.437.9** binary-to-binary WebSocket
+differential still passed all **13 scenarios** (41 synthetic upstream
+attempts). This verifies no regression on that existing WebSocket
+surface; the new path-identity rule is a **Godex safety hardening**
+validated with deterministic session fixtures, **not** an official
+Prodex native-session binary differential. Full cross-process monitor
+restart, every same-UUID compaction/migration variant, all live
+provider states and the complete release gate remain unqualified.
