@@ -91,6 +91,9 @@ func (process *CodexProcess) run(ctx context.Context, codexHome string, argument
 	if err := secureCodexHomeWithShared(codexHome, process.sharedCodexHome); err != nil {
 		return err
 	}
+	if err := repairResumeSessionBeforeLaunch(codexHome, process.sharedCodexHome, arguments); err != nil {
+		return err
+	}
 	release, err := (SessionLocker{}).LockCodexSessionsForChild(ctx, codexHome)
 	if err != nil {
 		return err

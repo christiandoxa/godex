@@ -105,6 +105,9 @@ func (process *CodexProcess) runThroughProxy(
 	if err := secureCodexHomeWithShared(codexHome, process.sharedCodexHome); err != nil {
 		return err
 	}
+	if err := repairResumeSessionBeforeLaunch(codexHome, process.sharedCodexHome, arguments); err != nil {
+		return err
+	}
 	commandServer := codexCommandServerSubcommand(arguments)
 	companion := withSessionServer && sessionAppServerEligible(arguments)
 	switch provider {
