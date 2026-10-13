@@ -21,8 +21,8 @@ const prodexDeepSeekTwoKeyLaunchBanner = "Prodex launch: preparing runtime launc
 	"Prodex launch: local provider bridge requested.\n" +
 	"[ Runtime Provider ] ===========================================================\n" +
 	"Using provider 'deepseek' through the local compatibility proxy. Smart Context\n" +
-	"rewrites require a proven tokenizer. API-key rotation is enabled across 2\n" +
-	"keys; quota preflight stays disabled.\n" +
+	"rewrites require a proven tokenizer. API-key rotation is enabled across 2 keys;\n" +
+	"quota preflight stays disabled.\n" +
 	"Prodex launch: starting child process...\n"
 
 func expectedProdexLaunchBanner(command []string) string {
