@@ -224,3 +224,57 @@ go test -race -count=3 ./internal/delivery/cli/runtime \
 This qualifies competing callback **processes**, not a persisted monitor
 restart or a cross-binary full native-session recovery flow; those release
 checks remain open.
+
+## Pinned executable WebSocket differential (follow-up)
+
+The first isolated **binary-to-binary** WebSocket oracle now runs both the
+official SHA-256-pinned Prodex `0.437.9` executable and a clean committed
+Godex build against the same synthetic two-profile loopback backend.
+The release-only verifier registers the strict `--websocket` mode of
+`tools/continuationparity` after its existing profile, CLI, and DeepSeek
+oracles. No real credentials or model requests are used.
+
+This oracle exposed a production-path parity gap that simpler Go tests
+had missed: the public Responses WebSocket ingress left `QuotaSelection`
+unset. Therefore, a verified hard `previous_response_id` owned by account
+A plus a conflicting soft `session_id` owned by account B could return a
+local `409 stale_continuation` before dispatch, while canonical Prodex
+routed the message to account A. Setting the proper WebSocket route on
+ingress fixed that disagreement without changing the HTTP Responses path.
+The independent public WebSocket regression also verifies that unknown
+previous-response owners remain fail-closed and session-only requests
+retain their own soft owner.
+
+With candidate commit `299ef5509a761a492fbe04c40b3b4dd42c073b79`,
+the exact official binaries agreed on these **three** behaviors:
+
+| Synthetic scenario | Official Prodex attempts/events | Godex attempts/events |
+| --- | --- | --- |
+| `keepalive` then precommit overload | account-a twice; `response.output_text.delta`, `response.completed` | Same |
+| `keepalive`, visible output then overload | account-a once; `keepalive`, `response.output_text.delta`, `response.failed` | Same |
+| Hard previous-response A conflicting with soft session B | account-a once; `response.completed` | Same |
+
+The official reference retries the *same account* on the first scenario.
+Therefore two attempts demonstrate safe precommit retry, **not**
+cross-account rotation. The checks reject leaked precommit response IDs,
+heartbeat exposure after a failed attempt, event order drift, missing
+visible output, a second attempt after commitment, and loss of the
+verified hard-affinity owner. Negative-control tests deliberately
+introduce those defects and ensure the oracle rejects them.
+
+The oracle validates the Prodex source commit and executable SHA-256,
+and now requires a clean Godex source commit matching both the requested
+40-character Git SHA and the built binary's Go VCS metadata with
+`vcs.modified=false`. An intentionally wrong commit was rejected before
+starting either product. The original HTTP continuation mode still
+**PASS**es independently after the harness refactor; `make verify`
+also **PASS**es (format, source size, Linux/macOS/Windows cross-builds,
+installers, vet, shuffled race tests).
+
+This **does not** establish full WebSocket or project parity. In
+particular, the official executable comparison does not yet cover
+durable WebSocket restart ownership, all quota/circuit phases, live
+upstream WebSocket connection handoff, arbitrary hard-affinity failure
+paths, or cross-platform execution. The complete networked
+`scripts/verify-release-parity.sh` was not executed in this follow-up,
+so its multi-oracle release gate remains unclaimed and fail-closed.
