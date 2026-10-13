@@ -44,6 +44,14 @@ func writeSessionStartMarker04379(path string, fields map[string]any) error {
 	if current != "" && (!canonical || strings.EqualFold(current, id)) {
 		return nil
 	}
+	offsetPath := sessionStartOffsetPath04379(path)
+	if offset := sessionStartTranscriptOffset04379(fields, id); offset >= 0 {
+		if _, err := fileutil.AtomicWrite(offsetPath, []byte(fmt.Sprintf("%d\n", offset))); err != nil {
+			return fmt.Errorf("publish session callback offset: %w", err)
+		}
+	} else if err := os.Remove(offsetPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("clear stale session callback offset: %w", err)
+	}
 	if _, err := fileutil.AtomicWrite(path, []byte(id+"\n")); err != nil {
 		return fmt.Errorf("publish session callback marker: %w", err)
 	}

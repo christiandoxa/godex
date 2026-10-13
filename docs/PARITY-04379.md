@@ -31,10 +31,10 @@ historical checkpoint evidence remains in `PARITY-04378.md`.
    OS lock and atomically published as a private file. The Go monitor's
    in-memory unread scan offset is not reset by repeated callbacks. Synthetic
    regressions cover conflicting identifiers, malformed canonical identity,
-   explicit root changes, and simultaneous descendant callbacks. Unlike the
-   Rust implementation, Godex does not persist an independent rollout-offset
-   sidecar; equivalence of recovery across monitor restarts and compressed
-   rollouts is **not** established.
+   explicit root changes, and simultaneous descendant callbacks. A later
+   checkpoint also stores a private logical rollout offset when the trusted
+   SessionStart provides a verified transcript path; see the follow-up below.
+   Full cross-process monitor restart equivalence is not yet established.
 
 No user-visible feature, Codex model context window, compaction setting,
 credential handling, or postcommit retry policy was changed.
@@ -79,3 +79,33 @@ contracts is not equivalent to all material behavior.
 
 The `v0.2.1` release gate remains fail-closed. No release or tag is authorized
 by these tests, and CI success is not by itself a parity certificate.
+
+## SessionStart pre-poll rollout cursor follow-up
+
+A separate deterministic regression reproduced an unobserved native overload:
+Codex emitted `SessionStart`, then accepted user work and a terminal capacity
+error before Godex's live monitor first resolved the rollout. Previously the
+monitor captured the *current* file end and skipped that terminal error.
+The new callback snapshots the logical file position before atomically
+publishing a new root marker when a verified, private `transcript_path` is
+available. Plain JSONL uses the regular file length; bounded `.jsonl.zst`
+decoding uses the *decoded* length. The monitor consumes a private offset
+sidecar under the marker writer lock and verifies the original prefix before
+scanning subsequently appended records.
+
+The failing-before regression now passes for both plain and recompressed
+rollouts, with the error arriving before the first monitor poll. Negative
+controls reject foreign session metadata, a different rollout UUID, symlinks,
+negative/malformed/oversized offsets, offsets in the middle of a JSONL line,
+and offsets beyond the current logical file end. Historical failures preceding
+SessionStart remain ignored; repeated root/descendant notifications preserve
+the sidecar, and an explicit root switch with no verifiable rollout clears it.
+No event, original prompt, or completed tool is replayed by the callback.
+
+This closes the **verified-transcript startup cursor** gap only. If the
+canonical native hook omits its transcript path, or the path is unavailable
+during the callback, the monitor conservatively captures the current end
+rather than scanning unknown historical state. The root marker remains
+launch-private and is cleaned up on exit. Independent cross-binary evidence
+for full state-index resolution, arbitrary monitor/process restarts, and
+every compressed-rollout transition remains open and release-blocking.

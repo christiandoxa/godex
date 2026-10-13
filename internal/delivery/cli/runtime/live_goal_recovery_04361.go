@@ -80,7 +80,16 @@ func (monitor *liveGoalRecovery04361) readState(ctx context.Context) (runtimemod
 	if monitor.resolve != nil {
 		if report, err := monitor.resolve(ctx, id); err == nil && report.Path != "" {
 			if monitor.checkpointPath != report.Path {
-				monitor.checkpoint = captureRecoveryCheckpoint04360(report.Path)
+				if monitor.checkpointPath == "" {
+					if offset, ok := sessionStartReadOffset04379(ctx, monitor.marker.path, id); ok &&
+						sessionStartRolloutPath04379(report.Path, id) {
+						monitor.checkpoint = captureRecoveryCheckpointAt04379(report.Path, offset)
+					} else {
+						monitor.checkpoint = captureRecoveryCheckpoint04360(report.Path)
+					}
+				} else {
+					monitor.checkpoint = captureRecoveryCheckpoint04360(report.Path)
+				}
 				monitor.checkpointPath = report.Path
 				monitor.scanOffset = 0
 				monitor.accepted = false
