@@ -574,6 +574,9 @@ func productEnv(name, stateHome, codexHome, userHome, shim, childResult string, 
 			"PRODEX_RUNTIME_LOG_DIR="+filepath.Join(stateHome, "logs"),
 			"PRODEX_CODEX_BIN="+shim,
 			"PRODEX_PRESIDIO_AUTO_START=0",
+			// Keep the captured launch banner independent of whether the
+			// differential process has a controlling terminal.
+			"PRODEX_TERM_COLUMNS=80",
 		)
 	} else {
 		env = append(env,
