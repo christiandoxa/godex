@@ -271,7 +271,8 @@ func (doctor *Doctor) runtimeDiagnostics(ctx context.Context, tailBytes int) (ru
 		routeState = &doctorRouteHealthState{now: now, health: health, memory: memory, circuits: circuits, backoffs: backoffs}
 	}
 	return runtimemodel.DoctorRuntime{
-		Overview: overview, Events: doctorTailEvents(events, tailBytes), RouteHealth: doctorRouteHealthWithState(events, routeState), TailBytes: tailBytes,
+		Overview: overview, Events: doctorTailEvents(events, tailBytes), SelectionSummary: doctorSelectionSummary(events),
+		RouteHealth: doctorRouteHealthWithState(events, routeState), TailBytes: tailBytes,
 	}, nil
 }
 

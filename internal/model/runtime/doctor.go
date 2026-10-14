@@ -38,10 +38,24 @@ type DoctorCheck struct {
 type DoctorRuntime struct {
 	Overview              Overview                  `json:"overview"`
 	Events                []Event                   `json:"events"`
+	SelectionSummary      DoctorSelectionSummary    `json:"selection_summary"`
 	RouteHealth           []DoctorRouteHealth       `json:"route_health"`
 	TailBytes             int                       `json:"tail_bytes"`
 	PolicySuggestionCount *int                      `json:"policy_suggestion_count,omitempty"`
 	PolicySuggestions     *[]DoctorPolicySuggestion `json:"policy_suggestions,omitempty"`
+}
+
+type DoctorSelectionSummary struct {
+	Picked           int            `json:"picked"`
+	Kept             int            `json:"kept"`
+	Skipped          int            `json:"skipped"`
+	Blocked          int            `json:"blocked"`
+	SelectedProfiles map[string]int `json:"selected_profiles"`
+	SelectedRoutes   map[string]int `json:"selected_routes"`
+	RejectedProfiles map[string]int `json:"rejected_profiles"`
+	RejectedRoutes   map[string]int `json:"rejected_routes"`
+	RejectionReasons map[string]int `json:"rejection_reasons"`
+	LatestDecision   string         `json:"latest_decision,omitempty"`
 }
 
 type DoctorRouteHealth struct {
