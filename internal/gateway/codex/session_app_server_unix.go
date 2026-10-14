@@ -33,7 +33,11 @@ func (process *CodexProcess) runWithSessionAppServer(
 	if err != nil {
 		return err
 	}
-	defer cleanup()
+	// A successful interactive exit reports that this *session-owned*
+	// socket is gone. Make explicit teardown and deferred error cleanup
+	// idempotent, so no second deletion can race a newly launched session.
+	cleanupSocket := sync.OnceFunc(cleanup)
+	defer cleanupSocket()
 
 	companion := exec.Command(binary, sessionAppServerCompanionArguments(arguments, socket)...)
 	companion.Dir = codexHome
@@ -85,6 +89,9 @@ func (process *CodexProcess) runWithSessionAppServer(
 	if err := waitForSessionChild(ctx, command, privateChildGroup); err != nil {
 		return err
 	}
+	cleanCompanion()
+	cleanupSocket()
+	printOwnedCompanionResumeGuidance043711(process.terminal.Stderr)
 	return nil
 }
 
