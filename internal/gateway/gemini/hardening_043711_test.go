@@ -49,6 +49,12 @@ func TestProdex043711GeminiHardeningUsesPartSignatureNotNestedCall(t *testing.T)
 		{"part null signature is not valid", map[string]any{
 			"functionCall": map[string]any{"name": "signed"}, "thoughtSignature": nil,
 		}, 1},
+		{"part C0 record separator is Unicode space in Mojo", map[string]any{
+			"functionCall": map[string]any{"name": "signed"}, "thoughtSignature": "\u001c",
+		}, 1},
+		{"nonspace still counts after C0 separator", map[string]any{
+			"functionCall": map[string]any{"name": "signed"}, "thoughtSignature": "\u001cvalid",
+		}, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -62,7 +68,9 @@ func TestProdex043711GeminiHardeningUsesPartSignatureNotNestedCall(t *testing.T)
 			if tc.wantInjection == 1 && tc.part["thoughtSignature"] != "skip_thought_signature_validator" {
 				t.Fatalf("synthetic signature missing at model part: %+v", tc.part)
 			}
-			if tc.wantInjection == 0 && tc.part["thoughtSignature"] != "signed" {
+			if tc.wantInjection == 0 &&
+				(tc.part["thoughtSignature"] != "signed" &&
+					tc.part["thoughtSignature"] != "\u001cvalid") {
 				t.Fatalf("existing model part signature rewritten: %+v", tc.part)
 			}
 		})

@@ -92,7 +92,7 @@ func geminiModelPartHasThoughtSignature043711(part map[string]any) bool {
 	for _, key := range []string{"thoughtSignature", "thought_signature"} {
 		if value, exists := part[key]; exists {
 			text, ok := value.(string)
-			return ok && strings.TrimSpace(text) != ""
+			return ok && geminiSignatureHasMojoNonSpace043711(text)
 		}
 	}
 	return false
