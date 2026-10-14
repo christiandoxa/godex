@@ -56,6 +56,13 @@ go build -trimpath -o "$tmp/continuationparity" ./tools/continuationparity
 # and full-history rotation regressions are qualified separately.
 go test ./internal/gateway/codex -run 'Test(PersistSessionGoal|UpdateSessionGoal|MaintainManagedSessions.*Goal|PersistSessionGoalObjective|RunRuntimeDirectRepairsSelectedGoalBeforeChildStarts|RepairResumeSessionBeforeLaunch|CodexResumeSessionID)' -count=1 -timeout=30s
 
+# Tagged 0.437.11 native-session app-server shutdown must print saved-session
+# resume guidance only on a real interactive terminal after socket teardown.
+# The PTY regression fails closed when the release environment lacks a PTY.
+go test ./internal/gateway/codex \
+  -run '^TestProdex043711(SuccessfulSessionCompanionShowsResumeGuidanceAfterSocketClosed|SessionCompanionSuppressesGuidanceOnNonTTYAndFailure)$' \
+  -count=1 -timeout=60s
+
 # The tagged 0.437.11 release-fence delta must remain fail-closed under stale
 # snapshots, same-second rotation, seven-day retired-fence compaction, backup
 # recovery, and invalid inputs. Only self-contained full-history Responses

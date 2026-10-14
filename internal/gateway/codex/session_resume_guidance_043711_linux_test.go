@@ -22,7 +22,7 @@ func testSessionOwnedPTY043711(t *testing.T) (*os.File, *os.File) {
 	t.Helper()
 	master, err := os.OpenFile("/dev/ptmx", os.O_RDWR, 0)
 	if err != nil {
-		t.Skipf("PTY unavailable: %v", err)
+		t.Fatalf("a real PTY is required to qualify tagged session resume guidance: %v", err)
 	}
 	t.Cleanup(func() { _ = master.Close() })
 	if err := unix.IoctlSetPointerInt(int(master.Fd()), unix.TIOCSPTLCK, 0); err != nil {
