@@ -7,6 +7,9 @@ import (
 	"sort"
 	"strings"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+
 	sessionentity "github.com/christiandoxa/godex/internal/entity/session"
 	sessionmodel "github.com/christiandoxa/godex/internal/model/session"
 )
@@ -227,15 +230,21 @@ func matchesSessionQuery(report sessionmodel.Report, query sessionmodel.Query) b
 	if query.CurrentDir != "" && !sameSessionPath(report.CWD, query.CurrentDir) {
 		return false
 	}
-	text := strings.ToLower(strings.TrimSpace(query.Text))
+	// The public report filter trims a user query before invoking the
+	// tagged Prodex matcher. Inside that matcher, the Rust adapter applies
+	// full Unicode str::to_lowercase (including dotted-I expansion and
+	// contextual Greek final sigma) before the Mojo byte comparison.
+	text := strings.TrimSpace(query.Text)
 	if text == "" {
 		return true
 	}
+	lower := cases.Lower(language.Und)
+	text = lower.String(text)
 	for _, value := range []string{
 		report.ID, report.ThreadName, report.CWD, report.Profile,
 		report.ModelProvider, report.Path,
 	} {
-		if strings.Contains(strings.ToLower(value), text) {
+		if strings.Contains(lower.String(value), text) {
 			return true
 		}
 	}
