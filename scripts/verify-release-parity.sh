@@ -75,6 +75,13 @@ go test ./internal/gateway/codex \
 go test ./internal/repository/routing ./internal/usecase/routing ./internal/usecase/session ./internal/usecase/runtime \
   -run '^TestProdex043711' -count=1 -timeout=60s
 
+# The 0.437.11 Gemini bridge Mojo request kernel gives nested
+# request.contents priority over root contents, and only a signature on a
+# model part (not its nested functionCall) can suppress first-call hardening.
+# Its signature presence check also includes U+001C–U+001F as whitespace.
+go test ./internal/gateway/gemini \
+  -run '^TestProdex043711GeminiHardening' -count=1 -timeout=40s
+
 # Independent managed-profile persistence oracle. All 29 CLI actions run in
 # separate subprocesses with isolated credential-free homes; state projections
 # must match across creation, active switching, rejected writes and deletion.
