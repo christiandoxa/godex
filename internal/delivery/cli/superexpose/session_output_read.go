@@ -513,28 +513,6 @@ func visibleOutput(timestamp, kind string, name, status any, text string) (outpu
 	return outputEvent{Timestamp: timestamp, Kind: kind, Name: name, Status: status, Text: text}, true
 }
 
-func sanitizeOutputText(value string) string {
-	var builder strings.Builder
-	for _, current := range value {
-		if current < 0x20 && current != '\n' && current != '\r' && current != '\t' ||
-			(current >= 0x7f && current <= 0x9f) {
-			builder.WriteByte(' ')
-		} else {
-			builder.WriteRune(current)
-		}
-	}
-	text := builder.String()
-	if len(text) <= outputReadMaxTextBytes {
-		return text
-	}
-	const marker = " …[text_truncated]"
-	limit := outputReadMaxTextBytes - len(marker)
-	for limit > 0 && !utf8Boundary(text, limit) {
-		limit--
-	}
-	return text[:limit] + marker
-}
-
 func visibleUserMessage(payload map[string]any) bool {
 	meta, _ := payload["internal_chat_message_metadata_passthrough"].(map[string]any)
 	if meta == nil {
