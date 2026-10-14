@@ -793,7 +793,11 @@ func runCodexShim(arguments []string) int {
 		}
 	}
 	if os.Getenv("DIFFERENTIAL_STREAM") == "1" {
-		requestBody = []byte(`{"model":"deepseek-v4-pro","input":[{"role":"user","content":[{"type":"input_text","text":"same request"}]}],"stream":true}`)
+		model := "deepseek-v4-pro"
+		if os.Getenv("DIFFERENTIAL_PROVIDER") == "gemini" {
+			model = "gemini-3.1-pro-preview"
+		}
+		requestBody = []byte(fmt.Sprintf(`{"model":%q,"input":[{"role":"user","content":[{"type":"input_text","text":"same request"}]}],"stream":true}`, model))
 	}
 	if os.Getenv("DIFFERENTIAL_USER_ID") == "1" {
 		requestBody = []byte(`{"model":"deepseek-v4-pro","input":[{"role":"user","content":[{"type":"input_text","text":"same request"}]}],"stream":false,"user":"user_123"}`)

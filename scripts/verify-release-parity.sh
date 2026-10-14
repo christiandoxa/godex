@@ -115,8 +115,10 @@ go test ./internal/gateway/gemini \
 
 # Gemini API-key Super uses OpenAI-compatible Chat Completions transport,
 # but native GenerateContent response semantics. Qualify both the outbound
-# request and accepted/invalid native response with independent error,
-# route, auth, model, usage, and semantic-response mutation sentinels.
+# request and accepted/invalid native response, and require tagged native
+# SSE chunks on that Chat-compatible route not to become false text deltas.
+# Independent route, auth, model, usage, framing and semantic-response
+# mutation sentinels must fail closed.
 "$tmp/differential" \
   --prodex "$tmp/prodex" --godex "$tmp/godex" \
   --prodex-source "$tmp/prodex-source" \

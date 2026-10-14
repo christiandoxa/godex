@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 )
 
 // Reject equal-but-invalid fixture runs. Comparing two products alone can
@@ -70,5 +71,33 @@ func geminiNegativeControl() bool {
 		return false
 	}
 	second.Client.Body = string(wire)
-	return len(geminiCompare("chat-request", good, second)) != 0
+	if len(geminiCompare("chat-request", good, second)) == 0 {
+		return false
+	}
+	return geminiNativeSSESentinel043711()
+}
+
+// Ensure the executable oracle detects fabricated native Gemini SSE output
+// and incorrect sequence numbers, not only request/body mismatches.
+func geminiNativeSSESentinel043711() bool {
+	wire := "event: response.created\r\ndata: " +
+		"{\"created_at\":111,\"response\":{\"id\":\"resp-fixture\"},\"sequence_number\":0,\"type\":\"response.created\"}" +
+		"\r\n\r\nevent: response.completed\r\ndata: " +
+		"{\"created_at\":111,\"response\":{\"id\":\"resp-fixture\",\"output\":[]},\"sequence_number\":1,\"type\":\"response.completed\"}" +
+		"\r\n\r\n"
+	variant := strings.ReplaceAll(strings.ReplaceAll(wire, "resp-fixture", "resp-other"), "111", "999")
+	if !geminiNativeSSEEqual043711(wire, variant) {
+		return false
+	}
+	for _, modified := range []string{
+		strings.Replace(wire, "\"sequence_number\":1", "\"sequence_number\":2", 1),
+		strings.Replace(wire, "\"output\":[]", "\"output\":[{\"type\":\"message\"}]", 1),
+		strings.Replace(wire, "event: response.completed", "event: response.failed", 1),
+		strings.Split(wire, "event: response.completed")[0],
+	} {
+		if geminiNativeSSEEqual043711(wire, modified) {
+			return false
+		}
+	}
+	return true
 }
