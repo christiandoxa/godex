@@ -56,6 +56,13 @@ go build -trimpath -o "$tmp/continuationparity" ./tools/continuationparity
 # and full-history rotation regressions are qualified separately.
 go test ./internal/gateway/codex -run 'Test(PersistSessionGoal|UpdateSessionGoal|MaintainManagedSessions.*Goal|PersistSessionGoalObjective|RunRuntimeDirectRepairsSelectedGoalBeforeChildStarts|RepairResumeSessionBeforeLaunch|CodexResumeSessionID)' -count=1 -timeout=30s
 
+# The tagged 0.437.11 release-fence delta must remain fail-closed under stale
+# worker snapshot replay, same-second rotation, backup recovery and invalid
+# opaque-state inputs. Only self-contained full-history Responses requests may
+# repair a conflicting soft session; response and turn-state owners stay hard.
+go test ./internal/repository/routing ./internal/usecase/routing \
+  -run '^TestProdex043711' -count=1 -timeout=60s
+
 # Independent managed-profile persistence oracle. All 29 CLI actions run in
 # separate subprocesses with isolated credential-free homes; state projections
 # must match across creation, active switching, rejected writes and deletion.
