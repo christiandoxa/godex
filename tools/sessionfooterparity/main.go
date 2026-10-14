@@ -73,6 +73,7 @@ func run() error {
 		{name: "canonical_identity", tty: true, check: checkCanonicalFooter},
 		{name: "unknown_identity_picker", tty: true, extra: []string{"SESSION_FOOTER_EMIT_ID=0"}, check: checkUnknownFooter},
 		{name: "piped_output_suppressed", tty: false, check: checkNoFooter},
+		{name: "failed_child_status", tty: true, extra: []string{"SESSION_FOOTER_EXIT=23"}, check: checkFailedChild},
 	}
 	results := make([]caseResult, 0, len(cases))
 	for _, item := range cases {
@@ -228,6 +229,13 @@ func checkNoFooter(output string, code int, provider string) error {
 	}
 	if strings.Contains(strings.ToLower(output), strings.ToLower(providerTitle(provider))) {
 		return errors.New("non-TTY output emitted saved-session footer")
+	}
+	return nil
+}
+
+func checkFailedChild(_ string, code int, _ string) error {
+	if code != 23 {
+		return fmt.Errorf("child exit status changed to %d", code)
 	}
 	return nil
 }

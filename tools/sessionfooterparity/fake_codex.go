@@ -41,6 +41,9 @@ func runFakeCodex() int {
 		fmt.Fprintf(os.Stderr, "fake hook: %v\r\n", err)
 	}
 	fmt.Fprint(os.Stderr, "native stderr\r\n")
+	if value, err := strconv.Atoi(os.Getenv("SESSION_FOOTER_EXIT")); err == nil && value > 0 && value < 256 {
+		return value
+	}
 	return 0
 }
 

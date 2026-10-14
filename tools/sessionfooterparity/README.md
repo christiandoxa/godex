@@ -8,11 +8,9 @@ SessionStart callback.
 
 The helper never contacts a provider. The gate checks canonical identity,
 picker fallback, all-stream TTY suppression, append-only ordering, terminal
-control/socket leakage, and child exit-status preservation.
-
-The gate intentionally leaves child-failure cross-binary comparison to the
-existing gateway regression suite: the tagged Prodex binary appends its footer
-after a synthetic exit 23 while Godex preserves its tested failure suppression.
+control/socket leakage, and child exit-status preservation, including a
+synthetic non-zero child exit whose footer must still be appended after
+teardown.
 
 ```text
 sessionfooterparity \
