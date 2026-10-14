@@ -286,6 +286,28 @@ func TestProdex04377DoctorRouteHealthCapsEventsAndPreservesPriorReason(t *testin
 	}
 }
 
+func TestProdex043712DoctorRouteHealthUsesLatestUnicodeAndEmptyReasonTokens(t *testing.T) {
+	old := runtimemodel.Event{Kind: "unknown_marker", Message: "selection_pick profile=alpha route=responses reason=old"}
+	t.Run("unicode outcome", func(t *testing.T) {
+		got := doctorRouteHealth([]runtimemodel.Event{
+			old,
+			{Kind: "unknown_marker", Message: "selection_pick profile=alpha route=responses 🧭\u2003outcome=ล่าสุด"},
+		})
+		if len(got) != 1 || got[0].LatestReason != "ล่าสุด" {
+			t.Fatalf("latest Unicode outcome = %#v", got)
+		}
+	})
+	t.Run("empty reason", func(t *testing.T) {
+		got := doctorRouteHealth([]runtimemodel.Event{
+			old,
+			{Kind: "unknown_marker", Message: "selection_pick profile=alpha route=responses reason= outcome=ignored"},
+		})
+		if len(got) != 1 || got[0].LatestReason != "" {
+			t.Fatalf("latest empty reason = %#v", got)
+		}
+	})
+}
+
 func TestProdex04377DoctorRouteHealthIncludesPersistedState(t *testing.T) {
 	state := &doctorRouteHealthState{
 		health: []routingentity.RouteHealthScore{{AccountID: "alpha", Route: "responses", Score: 4}},

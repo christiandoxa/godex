@@ -80,15 +80,15 @@ func doctorRouteHealthWithState(events []runtimemodel.Event, state *doctorRouteH
 		}
 		entry.EventCount++
 		entry.LatestMarker = event.Kind
-		if reason := event.Fields["reason"]; reason != "" {
-			entry.LatestReason = reason
-		}
 		if event.TimestampUnixMilli > 0 {
 			entry.LatestTimestamp = time.UnixMilli(event.TimestampUnixMilli).UTC().Format(time.RFC3339Nano)
 		}
 	}
 	result := make([]runtimemodel.DoctorRouteHealth, 0, len(groups))
 	for _, entry := range groups {
+		if reason, ok := doctorLatestRouteReason(selected, entry.Profile, entry.Route); ok {
+			entry.LatestReason = reason
+		}
 		doctorApplyRouteHealthMarkerFields(entry, markerFields)
 		result = append(result, *entry)
 	}
@@ -102,6 +102,30 @@ func doctorRouteHealthWithState(events []runtimemodel.Event, state *doctorRouteH
 		return result[left].Route < result[right].Route
 	})
 	return result
+}
+
+func doctorLatestRouteReason(events []runtimemodel.Event, profile, route string) (string, bool) {
+	for index := len(events) - 1; index >= 0; index-- {
+		event := events[index]
+		eventProfile := event.Fields["profile"]
+		if eventProfile == "" {
+			eventProfile = "unknown"
+		}
+		eventRoute := event.Fields["route"]
+		if eventRoute == "" {
+			eventRoute = "unknown"
+		}
+		if eventProfile != profile || eventRoute != route {
+			continue
+		}
+		if reason, ok := event.Fields["reason"]; ok {
+			return reason, true
+		}
+		if outcome, ok := event.Fields["outcome"]; ok {
+			return outcome, true
+		}
+	}
+	return "", false
 }
 
 func cloneDoctorRouteFields(fields map[string]string) map[string]string {

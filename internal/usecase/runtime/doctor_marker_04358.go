@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/christiandoxa/godex/internal/helper/redact"
 	runtimemodel "github.com/christiandoxa/godex/internal/model/runtime"
@@ -267,7 +268,7 @@ func doctorMessageFields04358(message string) map[string]string {
 		key := message[keyStart:index]
 		valueStart := index + 1
 		valueEnd := skipDoctorValue04358(message, valueStart)
-		if valueEnd > valueStart {
+		if valueEnd > valueStart || key == "reason" || key == "outcome" {
 			raw := message[valueStart:valueEnd]
 			value := raw
 			if strings.HasPrefix(raw, "\"") {
@@ -301,30 +302,34 @@ func sanitizeDoctorField04358(key, value string) string {
 }
 
 func skipDoctorSpaces04358(message string, index int) int {
-	for index < len(message) && (message[index] == ' ' || message[index] == '\t' || message[index] == '\r' || message[index] == '\n') {
-		index++
+	for index < len(message) {
+		runeValue, width := utf8.DecodeRuneInString(message[index:])
+		if !unicode.IsSpace(runeValue) {
+			break
+		}
+		index += width
 	}
 	return index
 }
 
 func skipDoctorKeyOrToken04358(message string, index int) int {
 	for index < len(message) {
-		value := message[index]
-		if value == '=' || value == ' ' || value == '\t' || value == '\r' || value == '\n' {
+		runeValue, width := utf8.DecodeRuneInString(message[index:])
+		if runeValue == '=' || unicode.IsSpace(runeValue) {
 			break
 		}
-		index++
+		index += width
 	}
 	return index
 }
 
 func skipDoctorBareToken04358(message string, index int) int {
 	for index < len(message) {
-		value := message[index]
-		if value == ' ' || value == '\t' || value == '\r' || value == '\n' {
+		runeValue, width := utf8.DecodeRuneInString(message[index:])
+		if unicode.IsSpace(runeValue) {
 			break
 		}
-		index++
+		index += width
 	}
 	return index
 }
@@ -351,11 +356,11 @@ func skipDoctorValue04358(message string, index int) int {
 		return index
 	}
 	for index < len(message) {
-		value := message[index]
-		if value == ' ' || value == '\t' || value == '\r' || value == '\n' {
+		runeValue, width := utf8.DecodeRuneInString(message[index:])
+		if unicode.IsSpace(runeValue) {
 			break
 		}
-		index++
+		index += width
 	}
 	return index
 }
