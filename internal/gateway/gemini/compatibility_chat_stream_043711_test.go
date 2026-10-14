@@ -24,13 +24,14 @@ func TestProdex043711GeminiAPIKeyChatSSEKeepsTextAndExactlyOneTerminalEvent(t *t
 			wire: "data: " + `{"id":"chat-1","choices":[{"delta":{"content":"synthetic-"},"finish_reason":null}]}` + "\n\n" +
 				"data: " + `{"id":"chat-1","choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}` + "\n\n" +
 				"data: [DONE]\n\n",
-			events:   []string{"response.created", "response.output_text.delta", "response.output_text.delta", "response.completed"},
+			events: []string{"response.created", "response.output_item.added", "response.output_text.delta",
+				"response.output_text.delta", "response.output_item.done", "response.completed"},
 			wantText: "synthetic-ok",
 		},
 		{
 			name:     "unterminated upstream stream fails closed",
 			wire:     "data: " + `{"id":"chat-2","choices":[{"delta":{"content":"partial"},"finish_reason":null}]}` + "\n\n",
-			events:   []string{"response.created", "response.output_text.delta", "response.failed"},
+			events:   []string{"response.created", "response.output_item.added", "response.output_text.delta", "response.failed"},
 			wantText: "partial",
 		},
 	} {
