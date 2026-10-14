@@ -121,8 +121,12 @@ go test ./internal/gateway/gemini \
 # text delta, item-done and completed events with exact usage/finish metadata.
 # Multi-turn Gemini chat requests must reorder paired tool results ahead of
 # later user content and drop unanswered calls, never duplicating an output.
-# Independent route, auth, model, usage, framing, tool-call adjacency, item
-# IDs and response mutation sentinels must fail closed.
+# Gemini plaintext 429 must pass through without rotation (child exit 2),
+# while structured quota JSON must exhaust the exact five-model first-key
+# chain before the second key's successful initial-model response (exit 0).
+# The response UUIDv7 namespace and absent created_at are mandatory.
+# Independent route, auth, model, usage, framing, tool-call adjacency,
+# key-rotation, exit-code, item ID and response mutation sentinels fail closed.
 "$tmp/differential" \
   --prodex "$tmp/prodex" --godex "$tmp/godex" \
   --prodex-source "$tmp/prodex-source" \

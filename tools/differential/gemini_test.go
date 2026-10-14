@@ -62,3 +62,9 @@ func TestProdex043711GeminiMultiTurnToolOracleNegativeControls(t *testing.T) {
 		t.Fatal("Gemini multi-turn oracle accepted an unpaired, duplicate, reordered or changed tool call")
 	}
 }
+
+func TestProdex043711Gemini429RotationOracleNegativeControls(t *testing.T) {
+	if !geminiQuotaNegativeControl043711() {
+		t.Fatal("Gemini quota oracle accepted a changed key/model sequence, leaked output, missing retry or incorrect exit status")
+	}
+}

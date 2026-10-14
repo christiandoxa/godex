@@ -24,12 +24,14 @@ type geminiCapturedRequest struct {
 	Method string         `json:"method"`
 	Path   string         `json:"path"`
 	Auth   bool           `json:"synthetic_auth_present"`
+	Slot   string         `json:"credential_slot,omitempty"`
 	Body   map[string]any `json:"body"`
 }
 
 type geminiCandidateResult struct {
 	Name     string                  `json:"name"`
 	Version  string                  `json:"version"`
+	ExitCode int                     `json:"exit_code"`
 	Upstream []geminiCapturedRequest `json:"upstream"`
 	Client   exchange                `json:"client_exchange"`
 }
@@ -78,15 +80,28 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "fixture request invalid JSON", http.StatusBadRequest)
 		return
 	}
+	slot := geminiCredentialSlot043711(r)
 	record := geminiCapturedRequest{
 		Method: r.Method, Path: r.URL.RequestURI(), Body: decoded,
-		Auth: r.Header.Get("X-Goog-Api-Key") == apiKey ||
-			r.Header.Get("Authorization") == "Bearer "+apiKey ||
-			r.URL.Query().Get("key") == apiKey,
+		Auth: slot != "",
+		Slot: slot,
 	}
 	mock.mu.Lock()
 	mock.requests = append(mock.requests, record)
 	mock.mu.Unlock()
+	if geminiQuotaScenario043711(mock.scenario) && slot == "primary" {
+		w.Header().Set("X-Synthetic-Quota", "primary")
+		if mock.scenario == "quota-plain-429" {
+			w.Header().Set("Content-Type", "text/plain")
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = io.WriteString(w, "Quota exhausted for this account\n")
+		} else {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = io.WriteString(w, `{"error":{"code":"rate_limit_exceeded","message":"synthetic quota exceeded"}}`)
+		}
+		return
+	}
 	if mock.scenario == "stream-chat" {
 		w.Header().Set("Content-Type", "text/event-stream")
 		_, _ = io.WriteString(w, "data: "+`{"id":"chat-synthetic","model":"gemini-3.1-pro-preview","choices":[{"delta":{"content":"synthetic-"},"finish_reason":null}]}`+"\n\n")
@@ -143,7 +158,7 @@ func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit string
 	}
 	defer os.RemoveAll(root)
 	var results []geminiCaseResult
-	for _, scenario := range []string{"chat-request", "orphan-tool", "chat-response", "stream-native", "stream-chat", "multi-turn-tool"} {
+	for _, scenario := range []string{"chat-request", "orphan-tool", "chat-response", "stream-native", "stream-chat", "multi-turn-tool", "quota-plain-429", "quota-structured-429"} {
 		prodex, err := runGeminiProduct(root, scenario, "prodex", prodexBin)
 		if err != nil {
 			return fmt.Errorf("Prodex Gemini %s: %w", scenario, err)
@@ -173,7 +188,7 @@ func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit string
 	report := geminiDifferentialReport{
 		Status: status, ProdexSource: prodexCommit, GodexSource: godexCommit,
 		Cases: results, Differences: differences,
-		NegativeControl: "PASS: route, authentication, model, native/chat SSE, multi-turn tool adjacency, output, status, usage and error mutations detected",
+		NegativeControl: "PASS: route, auth, model fallback, credential rotation, child exit, native/chat SSE, multi-turn tool adjacency, output, status, usage and error mutations detected",
 	}
 	encoded, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
@@ -203,16 +218,22 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 		return geminiCandidateResult{}, err
 	}
 	childResult := filepath.Join(home, "gemini-child-exchange.json")
-	args := []string{
-		"super", "--provider", "gemini", "--api-key", apiKey,
-		"--model", "gemini-3.1-pro-preview", "--base-url", mock.server.URL + "/v1beta",
-		"--no-presidio", "--no-sub-agent", "exec", "synthetic Gemini differential",
+	args := []string{"super", "--provider", "gemini"}
+	if !geminiQuotaScenario043711(scenario) {
+		args = append(args, "--api-key", apiKey)
 	}
+	args = append(args,
+		"--model", "gemini-3.1-pro-preview", "--base-url", mock.server.URL+"/v1beta",
+		"--no-presidio", "--no-sub-agent", "exec", "synthetic Gemini differential",
+	)
 	ctx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, binary, args...)
 	env := productEnv(name, stateHome, codexHome, userHome, shim, childResult, runOptions{})
 	env = append(env, "DIFFERENTIAL_PROVIDER=gemini")
+	if geminiQuotaScenario043711(scenario) {
+		env = append(env, "GEMINI_API_KEYS="+rotationPrimaryKey+","+rotationSecondaryKey)
+	}
 	if scenario == "orphan-tool" {
 		env = append(env, "DIFFERENTIAL_GEMINI_TOOL=1")
 	}
@@ -226,9 +247,15 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
+	exitCode := 0
 	if err := cmd.Run(); err != nil {
-		return geminiCandidateResult{}, fmt.Errorf("child failed: %w stderr=%q upstream=%v",
-			err, redact(stderr.String()), mock.recorded())
+		var childExit *exec.ExitError
+		if !geminiQuotaScenario043711(scenario) ||
+			!errors.As(err, &childExit) || ctx.Err() != nil {
+			return geminiCandidateResult{}, fmt.Errorf("child failed: %w stderr=%q upstream=%v",
+				err, redact(stderr.String()), mock.recorded())
+		}
+		exitCode = childExit.ExitCode()
 	}
 	result, err := readExchange(childResult)
 	if err != nil {
@@ -240,7 +267,7 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 		return geminiCandidateResult{}, err
 	}
 	return geminiCandidateResult{
-		Name: name, Version: version, Upstream: mock.recorded(), Client: result,
+		Name: name, Version: version, ExitCode: exitCode, Upstream: mock.recorded(), Client: result,
 	}, nil
 }
 
@@ -253,6 +280,12 @@ func geminiCompare(scenario string, prodex, godex geminiCandidateResult) []strin
 	}
 	if prodex.Client.Status != godex.Client.Status {
 		differences = append(differences, "client HTTP status differs")
+	}
+	if prodex.ExitCode != godex.ExitCode {
+		differences = append(differences, "product child process exit status differs")
+	}
+	if geminiQuotaScenario043711(scenario) {
+		return geminiQuotaCompare043711(scenario, prodex, godex, differences)
 	}
 	if scenario == "stream-chat" {
 		left, leftErr := geminiChatSSEProjection043711(prodex.Client.Body)
@@ -300,6 +333,9 @@ func geminiSemanticEqual043711(left, right map[string]any) bool {
 }
 
 func geminiFixtureInvariant(scenario string, result geminiCandidateResult) error {
+	if geminiQuotaScenario043711(scenario) {
+		return geminiQuotaInvariant043711(scenario, result)
+	}
 	if result.Client.Status != http.StatusOK {
 		return fmt.Errorf("client HTTP status=%d, want 200", result.Client.Status)
 	}
@@ -357,12 +393,20 @@ func geminiFixtureInvariant(scenario string, result geminiCandidateResult) error
 	output, _ := body["output"].([]any)
 	if scenario == "chat-response" {
 		failure, _ := body["error"].(map[string]any)
+		metadata, metadataOK := body["metadata"].(map[string]any)
+		usage, usageOK := body["usage"].(map[string]any)
+		_, timestampPresent := body["created_at"]
 		if body["status"] != "failed" || failure["code"] != "gemini_empty_response" ||
 			failure["message"] != "Gemini returned no visible response content." ||
-			len(output) != 0 || body["model"] != "gemini-2.5-pro" {
+			len(output) != 0 || body["model"] != "gemini-2.5-pro" ||
+			body["id"] != "gemini_resp_prodex" || timestampPresent ||
+			!metadataOK || len(metadata) != 0 || !usageOK || len(usage) != 0 {
 			return fmt.Errorf("Chat Completion envelope incorrectly treated as valid native Gemini output: %+v", body)
 		}
 		return nil
+	}
+	if err := geminiBufferedIdentityInvariant043711(body); err != nil {
+		return err
 	}
 	if body["model"] != "gemini-3.1-pro-preview" || len(output) == 0 {
 		return fmt.Errorf("native Gemini model output mismatched: %+v", body)

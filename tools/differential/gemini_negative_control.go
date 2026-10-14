@@ -21,7 +21,7 @@ func geminiNegativeControl() bool {
 		}},
 		Client: exchange{
 			Status: http.StatusOK,
-			Body:   `{"id":"resp-one","created_at":1,"object":"response","model":"gemini-3.1-pro-preview","output":[{"content":[{"text":"synthetic-ok","type":"output_text"}],"role":"assistant","type":"message"}],"usage":{"input_tokens":2,"output_tokens":1,"total_tokens":3}}`,
+			Body:   `{"id":"resp_deepseek_01900000-0000-7000-8000-000000000001","object":"response","model":"gemini-3.1-pro-preview","output":[{"content":[{"text":"synthetic-ok","type":"output_text"}],"role":"assistant","type":"message"}],"usage":{"input_tokens":2,"output_tokens":1,"total_tokens":3}}`,
 		},
 	}
 	if err := geminiFixtureInvariant("chat-request", good); err != nil {
@@ -36,6 +36,13 @@ func geminiNegativeControl() bool {
 		func(run *geminiCandidateResult) { run.Client.Status = http.StatusInternalServerError },
 		func(run *geminiCandidateResult) {
 			run.Client.Body = `{"object":"response","model":"gemini-3.1-pro-preview","output":[]}`
+		},
+		func(run *geminiCandidateResult) {
+			run.Client.Body = strings.Replace(run.Client.Body, "resp_deepseek_", "resp_gemini_", 1)
+		},
+		func(run *geminiCandidateResult) {
+			run.Client.Body = strings.Replace(run.Client.Body, `"object":"response"`,
+				`"created_at":999,"object":"response"`, 1)
 		},
 	} {
 		mutated := good
@@ -54,10 +61,10 @@ func geminiNegativeControl() bool {
 	if err := geminiFixtureInvariant("chat-response", good); err == nil {
 		return false
 	}
-	// Response IDs and observed times are nondeterministic, whereas the
-	// visible text, failure classification, usage and metadata are material.
+	// Valid UUIDv7 values are nondeterministic, while the absence of
+	// created_at and the presence of material fields are strict contracts.
 	second := good
-	second.Client.Body = `{"created_at":999,"id":"resp-two","object":"response","model":"gemini-3.1-pro-preview","output":[{"content":[{"text":"synthetic-ok","type":"output_text"}],"role":"assistant","type":"message"}],"usage":{"input_tokens":2,"output_tokens":1,"total_tokens":3}}`
+	second.Client.Body = `{"id":"resp_deepseek_01900000-0000-7000-8000-000000000002","object":"response","model":"gemini-3.1-pro-preview","output":[{"content":[{"text":"synthetic-ok","type":"output_text"}],"role":"assistant","type":"message"}],"usage":{"input_tokens":2,"output_tokens":1,"total_tokens":3}}`
 	if len(geminiCompare("chat-request", good, second)) != 0 {
 		return false
 	}
@@ -74,7 +81,8 @@ func geminiNegativeControl() bool {
 	if len(geminiCompare("chat-request", good, second)) == 0 {
 		return false
 	}
-	return geminiNativeSSESentinel043711() && geminiChatSSESentinel043711() && geminiMultiTurnSentinel043711()
+	return geminiNativeSSESentinel043711() && geminiChatSSESentinel043711() &&
+		geminiMultiTurnSentinel043711() && geminiQuotaNegativeControl043711()
 }
 
 // Ensure the executable oracle detects fabricated native Gemini SSE output

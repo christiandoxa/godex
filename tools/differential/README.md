@@ -18,14 +18,14 @@ go build -trimpath -o /tmp/godex-candidate ./cmd/godex
 
 Use `--gemini` with the same `--prodex`, `--godex`,
 `--prodex-source`, `--godex-source`, and `--godex-commit` flags
-to run six **additional** cases against the published Prodex 0.437.11
+to run eight **additional** cases against the published Prodex 0.437.11
 binary, not against a guessed Gemini protocol. The reference was
 observed to send API-key Super requests as OpenAI-compatible
 `POST /v1beta/openai/chat/completions`, yet it decodes upstream
 **Gemini native GenerateContent** envelopes for the client response.
 
-The six cases require an exact single upstream request with synthetic
-credential authentication and translated model/message fields:
+The first six cases require an exact single upstream request with
+synthetic credential authentication and translated model/message fields:
 (1) a successful native GenerateContent result,
 (2) an unpaired tool call that must not leak into upstream context, and
 (3) an HTTP-200 Chat Completion-shaped response that must become
@@ -51,11 +51,31 @@ order, drop the unanswered call, and preserve both user messages.
 Oracle mutation controls reject reordered or missing results, duplicated
 tool calls, changed IDs, altered tool output, and lost user prose.
 
+Two additional fresh-request **dual-key** scenarios qualify tagged 0.437.11
+Gemini quota retry and rotation:
+(7) a plaintext HTTP 429 must pass through to the client **verbatim**
+after one attempt on the first key, without rotating; the synthetic
+child exits 2, and
+(8) a structured JSON `rate_limit_exceeded` 429 must try models
+`gemini-3.1-pro-preview`, `gemini-3.8-flash`,
+`gemini-3.7-flash`, `gemini-3.6-flash`, and
+`gemini-2.5-pro` **in order on the first key**, before retrying
+the initial model on the second key, producing one successful native
+Gemini Responses result with exit status 0. The mock records credential
+**slots**, not key bytes. Both products are checked for identical
+request payloads and attempt count/order, exact child exit codes,
+the presence and absence of a timestamp, UUIDv7
+`resp_deepseek_` response identity, finish metadata and usage.
+Negative controls reject changed credential slots, fallback model order,
+status/exit codes, truncated attempts, malformed response IDs and
+invented timestamps.
+
 Source tag, executable hash, clean worktrees and embedded Godex VCS
 metadata are verified **before** either executable runs. The comparator
 checks provider route, authorization validity, request body, HTTP
-status and full JSON response semantics; only nondeterministic response
-IDs and timestamps are normalized. The streaming oracle independently
+status, child exit status and full JSON response semantics. Randomized
+UUIDv7 suffixes are normalized only **after** checking the exact
+response ID namespace/version and whether `created_at` must be absent. The streaming oracle independently
 verifies event labels, ordering, sequence numbers, matching per-stream
 response and item IDs/timestamps, and absence of fabricated native
 output or missing Chat SSE text, item lifecycle, finish metadata and
