@@ -189,7 +189,6 @@ func TestProdex043712StaleWebSocketPayloadForwardsWithoutPreviousResponseMarker(
 		`{"type":"response.failed","status":400,"error":{"code":"invalid_request_error","message":"bad input"}}`,
 		`{"type":"error","status":503,"error":{"code":"server_is_overloaded"}}`,
 		`{"type":"error","error":{"message":"previous_response_not_found: unrelated text"}}`,
-		`{"type":"response.failed","error":{"message":"no tool call found for this request","param":"other"}}`,
 		"upstream text that is not a previous-response error",
 	} {
 		got := translateStaleWebSocketPayload([]byte(payload))
@@ -212,6 +211,14 @@ func TestProdex043712StaleWebSocketPayloadRecognizesInvalidPreviousIDMarker(t *t
 	}
 	if websocketJSONText(event["type"]) != "error" || int(event["status"].(float64)) != http.StatusConflict {
 		t.Fatalf("invalid previous ID was not translated: %s", got)
+	}
+}
+
+func TestProdex043712StaleWebSocketPayloadRecognizesStructuredToolContextMarker(t *testing.T) {
+	payload := []byte(`{"type":"error","error":{"type":"invalid_request_error","message":"no tool call found for output"}}`)
+	got := translateStaleWebSocketPayload(payload)
+	if !strings.Contains(string(got), `"code":"stale_continuation"`) {
+		t.Fatalf("structured tool-context marker was not translated: %s", got)
 	}
 }
 

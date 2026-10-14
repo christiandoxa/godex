@@ -146,7 +146,7 @@ func websocketPreviousResponseMarkerValue(value any) bool {
 				return true
 			}
 			errorType, _ := current["type"].(string)
-			invalidRequest := strings.EqualFold(strings.TrimSpace(errorType), "invalid_request_error")
+			invalidRequest := strings.EqualFold(errorType, "invalid_request_error")
 			message := ""
 			for _, key := range []string{"message", "detail", "error"} {
 				if candidate, ok := current[key].(string); ok {
@@ -183,21 +183,22 @@ func websocketPreviousResponseMarkerText(text string) bool {
 }
 
 func websocketPreviousResponseMarkerMessage(message string, param any, invalidRequest bool) bool {
-	trimmed := strings.TrimSpace(message)
+	trimmed := trimWebSocketASCIIWhitespace(message)
 	if strings.EqualFold(trimmed, "invalid `previous_response_id`.") {
 		return true
 	}
 	lower := strings.ToLower(message)
 	toolContext := strings.Contains(lower, "no tool call found") ||
 		strings.Contains(lower, "no function call found")
-	if !toolContext {
+	if !toolContext || (!invalidRequest && param == nil) {
 		return false
 	}
-	if invalidRequest {
-		return true
-	}
 	parameter, _ := param.(string)
-	return strings.EqualFold(strings.TrimSpace(parameter), "input")
+	return invalidRequest || strings.EqualFold(parameter, "input")
+}
+
+func trimWebSocketASCIIWhitespace(value string) string {
+	return strings.Trim(value, " \t\n\r")
 }
 
 func staleWebSocketErrorObject() map[string]any {
