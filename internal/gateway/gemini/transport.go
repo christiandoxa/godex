@@ -20,9 +20,10 @@ const (
 )
 
 type RuntimeTransport struct {
-	client   *http.Client
-	upstream *url.URL
-	apiKey   string
+	client         *http.Client
+	upstream       *url.URL
+	apiKey         string
+	chatCompatible bool
 }
 
 func NewRuntimeTransport(apiURL, apiKey string, client *http.Client) (*RuntimeTransport, error) {
@@ -51,6 +52,9 @@ func (transport *RuntimeTransport) Execute(ctx context.Context, input proxymodel
 	case routeCompact:
 		return transport.executeCompact(ctx, input)
 	case routeResponses:
+		if transport.chatCompatible {
+			return transport.executeChatCompatibleResponses(ctx, input, current)
+		}
 		return transport.executeResponses(ctx, input, current)
 	default:
 		response, err := transport.send(ctx, input, current, input.Body)

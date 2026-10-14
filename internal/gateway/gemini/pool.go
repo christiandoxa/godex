@@ -25,6 +25,10 @@ func NewRuntimePool(apiURL string, credentials []proxymodel.ProviderCredential, 
 			pool.Close()
 			return nil, err
 		}
+		// Tagged Prodex 0.437.11 Super API-key Gemini routes use the
+		// OpenAI-compatible chat bridge. Direct Gemini native transports
+		// retain generateContent for their separate provider surface.
+		transport.chatCompatible = true
 		if previous := pool.transports[credential.ID]; previous != nil {
 			previous.Close()
 		}
