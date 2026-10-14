@@ -65,8 +65,8 @@ func TestGeminiResponsesRequestHardensFirstUnsignedGemini3ToolCall(t *testing.T)
 	if call["thoughtSignature"] != "sig" {
 		t.Fatalf("signed Gemini 3 tool call = %#v", second)
 	}
-	if _, exists := second["thoughtSignature"]; exists {
-		t.Fatalf("nested signature was duplicated on Gemini part = %#v", second)
+	if second["thoughtSignature"] != "skip_thought_signature_validator" {
+		t.Fatalf("Gemini part signature must be present even when functionCall has a nested signature = %#v", second)
 	}
 }
 

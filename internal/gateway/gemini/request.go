@@ -54,7 +54,14 @@ func hardenGeminiToolCallThoughtSignatures(body map[string]any, model string) in
 	if !strings.Contains(model, "gemini-3") {
 		return 0
 	}
+	// Tagged Prodex 0.437.11 Mojo selects request.contents when it is
+	// an array, falling back to root contents otherwise.
 	contents, _ := body["contents"].([]any)
+	if nested, ok := body["request"].(map[string]any); ok {
+		if values, valid := nested["contents"].([]any); valid {
+			contents = values
+		}
+	}
 	injected := 0
 	for _, rawContent := range contents {
 		content, _ := rawContent.(map[string]any)
@@ -68,8 +75,7 @@ func hardenGeminiToolCallThoughtSignatures(body map[string]any, model string) in
 			if _, exists := part["functionCall"]; !exists {
 				continue
 			}
-			call, _ := part["functionCall"].(map[string]any)
-			if !foundFunctionCall && geminiNativeThoughtSignature(part, call) == "" {
+			if !foundFunctionCall && !geminiModelPartHasThoughtSignature043711(part) {
 				part["thoughtSignature"] = "skip_thought_signature_validator"
 				injected++
 			}
@@ -77,6 +83,19 @@ func hardenGeminiToolCallThoughtSignatures(body map[string]any, model string) in
 		}
 	}
 	return injected
+}
+
+// Only the signature of the *part* satisfies tagged Prodex's hardening
+// policy. A nested functionCall.thoughtSignature must be preserved but
+// cannot suppress the part's synthetic signature.
+func geminiModelPartHasThoughtSignature043711(part map[string]any) bool {
+	for _, key := range []string{"thoughtSignature", "thought_signature"} {
+		if value, exists := part[key]; exists {
+			text, ok := value.(string)
+			return ok && strings.TrimSpace(text) != ""
+		}
+	}
+	return false
 }
 
 func translateBaseRequest(request map[string]any, model string) (map[string]any, error) {
