@@ -61,7 +61,9 @@ go test ./internal/gateway/codex -run 'Test(PersistSessionGoal|UpdateSessionGoal
 # recovery, and invalid inputs. Only self-contained full-history Responses
 # requests can repair a conflicting soft session. Native session searching
 # must preserve Rust's Unicode lowercase semantics at the Mojo boundary.
-go test ./internal/repository/routing ./internal/usecase/routing ./internal/usecase/session \
+# Runtime doctor must observe half-open route circuits without consuming a
+# routing probe or mutating the persisted health snapshot.
+go test ./internal/repository/routing ./internal/usecase/routing ./internal/usecase/session ./internal/usecase/runtime \
   -run '^TestProdex043711' -count=1 -timeout=60s
 
 # Independent managed-profile persistence oracle. All 29 CLI actions run in
