@@ -150,10 +150,7 @@ func (router *Router) ReleaseSessionAffinity(ctx context.Context, sessionID stri
 	if sessionID == "" {
 		return nil
 	}
-	if err := router.affinity.forget(ctx, affinityKeys{session: sessionID}); err != nil {
-		return err
-	}
-	return router.affinity.forget(ctx, affinityKeys{session: "__compact_session__:" + sessionID})
+	return router.affinity.forgetSessionGroup043711(ctx, sessionID)
 }
 
 func NewRouter(config Config) (*Router, error) {
