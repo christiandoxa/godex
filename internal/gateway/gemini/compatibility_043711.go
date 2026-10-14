@@ -31,6 +31,10 @@ func (transport *RuntimeTransport) executeChatCompatibleResponses(
 	if err != nil {
 		return nil, &proxymodel.Error{StatusCode: http.StatusBadRequest, Message: err.Error()}
 	}
+	body, err = geminiChatStreamOptions043711(body)
+	if err != nil {
+		return nil, &proxymodel.Error{StatusCode: http.StatusBadRequest, Message: err.Error()}
+	}
 	response, err := transport.send(ctx, input, current, body)
 	if err != nil {
 		return nil, err
@@ -38,7 +42,29 @@ func (transport *RuntimeTransport) executeChatCompatibleResponses(
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		return proxyResponse(response), nil
 	}
+	if strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream") {
+		return translateGeminiChatCompatibleStream043711(response), nil
+	}
 	return translateGeminiChatOrNativeResponse043711(response)
+}
+
+// The tagged 0.437.11 Super Gemini chat-compatible provider asks the
+// upstream to return final token usage in all streaming requests.
+func geminiChatStreamOptions043711(body []byte) ([]byte, error) {
+	var request map[string]any
+	if err := json.Unmarshal(body, &request); err != nil {
+		return nil, errors.New("invalid Gemini chat-compatible stream request")
+	}
+	if stream, _ := request["stream"].(bool); !stream {
+		return body, nil
+	}
+	options, _ := request["stream_options"].(map[string]any)
+	if options == nil {
+		options = make(map[string]any)
+	}
+	options["include_usage"] = true
+	request["stream_options"] = options
+	return json.Marshal(request)
 }
 
 // Responses input entries may specify only a role and content, with no
