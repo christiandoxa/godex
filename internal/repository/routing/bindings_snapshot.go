@@ -16,12 +16,14 @@ import (
 const routingSnapshotMaxBytes = 2 << 20
 
 type snapshot struct {
-	Version  int                     `json:"version"`
-	Bindings []routingentity.Binding `json:"bindings"`
+	Version              int                     `json:"version"`
+	Bindings             []routingentity.Binding `json:"bindings"`
+	SessionReleaseEpochs map[string]int64        `json:"session_release_epochs,omitempty"`
 }
 
-func (store *Store) write(values []routingentity.Binding) error {
-	content, err := json.Marshal(snapshot{Version: 1, Bindings: values})
+func (store *Store) writeState(value snapshot) error {
+	value.Version = 1
+	content, err := json.Marshal(value)
 	if err != nil {
 		return err
 	}
@@ -55,6 +57,11 @@ func (store *Store) prepare() error {
 }
 
 func (store *Store) read() ([]routingentity.Binding, error) {
+	state, err := store.readState()
+	return state.Bindings, err
+}
+
+func (store *Store) readState() (snapshot, error) {
 	primary, found, primaryErr := readSnapshot(store.snapshotPath())
 	if primaryErr == nil && found {
 		return primary, nil
@@ -62,36 +69,41 @@ func (store *Store) read() ([]routingentity.Binding, error) {
 	backup, backupFound, backupErr := readSnapshot(store.backupPath())
 	if backupErr != nil {
 		if primaryErr != nil {
-			return nil, primaryErr
+			return snapshot{}, primaryErr
 		}
-		return nil, backupErr
+		return snapshot{}, backupErr
 	}
 	if backupFound {
-		content, err := json.Marshal(snapshot{Version: 1, Bindings: backup})
+		content, err := json.Marshal(backup)
 		if err == nil {
-			// Keep the validated backup usable even when primary repair fails.
+			// Restore the entire state, including release fences, not just
+			// session bindings. Old snapshots must not undo a rebind.
 			_, _ = fileutil.AtomicWrite(store.snapshotPath(), content)
 		}
 		return backup, nil
 	}
 	if primaryErr != nil {
-		return nil, primaryErr
+		return snapshot{}, primaryErr
 	}
-	return nil, nil
+	return snapshot{Version: 1}, nil
 }
 
-func readSnapshot(path string) ([]routingentity.Binding, bool, error) {
+func readSnapshot(path string) (snapshot, bool, error) {
 	file, found, err := openSnapshot(path)
 	if err != nil || !found {
-		return nil, found, err
+		return snapshot{}, found, err
 	}
 	defer file.Close()
 	value, err := decodeSnapshot(file)
 	if err != nil {
-		return nil, true, err
+		return snapshot{}, true, err
 	}
-	bindings, err := filterSnapshotBindings(value.Bindings)
-	return bindings, true, err
+	value.Bindings, err = filterSnapshotBindings(value.Bindings)
+	if err != nil {
+		return snapshot{}, true, err
+	}
+	value.Bindings = filterReleasedSessionBindings(value.Bindings, value.SessionReleaseEpochs)
+	return value, true, nil
 }
 
 func openSnapshot(path string) (*os.File, bool, error) {
@@ -123,8 +135,12 @@ func decodeSnapshot(file *os.File) (snapshot, error) {
 	if value.Version != 1 {
 		return snapshot{}, errors.New("unsupported routing snapshot version")
 	}
-	if len(value.Bindings) > routingentity.MaxBindings {
-		return snapshot{}, errors.New("routing snapshot exceeds binding limit")
+	if len(value.Bindings) > routingentity.MaxBindings ||
+		len(value.SessionReleaseEpochs) > routingentity.MaxBindings {
+		return snapshot{}, errors.New("routing snapshot exceeds binding or fence limit")
+	}
+	if err := validateSessionReleaseEpochs(value.SessionReleaseEpochs); err != nil {
+		return snapshot{}, err
 	}
 	return value, nil
 }

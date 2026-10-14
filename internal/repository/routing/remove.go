@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"time"
 
+	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
 	"github.com/christiandoxa/godex/internal/helper/lockfile"
 )
 
@@ -32,20 +34,30 @@ func (store *Store) Remove(ctx context.Context, keys []string) error {
 		return fmt.Errorf("lock routing store for removal: %w", err)
 	}
 	defer release()
-	current, err := store.read()
+	state, err := store.readState()
 	if err != nil {
 		return fmt.Errorf("read routing store for removal: %w", err)
 	}
-	values := current[:0]
-	for _, binding := range current {
+	values := make([]routingentity.Binding, 0, len(state.Bindings))
+	now := time.Now().Unix()
+	for _, binding := range state.Bindings {
 		if _, ok := remove[binding.Key]; !ok {
 			values = append(values, binding)
+			continue
+		}
+		if binding.Kind == "session" {
+			if state.SessionReleaseEpochs == nil {
+				state.SessionReleaseEpochs = make(map[string]int64)
+			}
+			epoch := max(now, binding.UpdatedUnix, state.SessionReleaseEpochs[binding.Key])
+			state.SessionReleaseEpochs[binding.Key] = epoch
 		}
 	}
-	if len(values) == len(current) {
+	if len(values) == len(state.Bindings) {
 		return nil
 	}
-	if err := store.write(values); err != nil {
+	state.Bindings = values
+	if err := store.writeState(state); err != nil {
 		return fmt.Errorf("write routing store after removal: %w", err)
 	}
 	return nil

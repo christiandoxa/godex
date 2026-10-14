@@ -46,22 +46,32 @@ func (store *Store) Merge(ctx context.Context, updates []routingentity.Binding) 
 		return nil, err
 	}
 	defer release()
-	current, err := store.read()
+	state, err := store.readState()
 	if err != nil {
 		return nil, err
 	}
-	values, err := mergeBindingValues(current, updates)
+	// Validate before applying a fence: even a stale invalid writer must
+	// not be silently accepted as if its malformed payload were safe.
+	for _, update := range updates {
+		if err := update.Validate(); err != nil {
+			return nil, err
+		}
+	}
+	// Old writers may replay snapshots captured before an explicit
+	// session release. Only newer session generations may re-enter.
+	updates = filterReleasedSessionBindings(updates, state.SessionReleaseEpochs)
+	state.Bindings, err = mergeBindingValues(state.Bindings, updates)
 	if err != nil {
 		return nil, err
 	}
-	values, err = normalizeBindingValues(values)
+	state.Bindings, err = normalizeBindingValues(state.Bindings)
 	if err != nil {
 		return nil, err
 	}
-	if err := store.write(values); err != nil {
+	if err := store.writeState(state); err != nil {
 		return nil, err
 	}
-	return values, nil
+	return state.Bindings, nil
 }
 
 func (store *Store) MergeVerified(ctx context.Context, updates []routingentity.Binding) ([]routingentity.Binding, error) {
@@ -73,22 +83,42 @@ func (store *Store) MergeVerified(ctx context.Context, updates []routingentity.B
 		return nil, err
 	}
 	defer release()
-	current, err := store.read()
+	state, err := store.readState()
 	if err != nil {
 		return nil, err
 	}
-	values, err := mergeVerifiedBindingValues(current, updates)
+	for _, update := range updates {
+		if err := update.Validate(); err != nil {
+			return nil, err
+		}
+	}
+	// Only MergeVerified represents a new verified owner observation.
+	// Advance its logical binding epoch past any release even if multiple
+	// releases, rebinds, and callbacks occur in one wall-clock second.
+	for index := range updates {
+		entry := &updates[index]
+		if entry.Kind == "session" && state.SessionReleaseEpochs != nil {
+			if at, ok := state.SessionReleaseEpochs[entry.Key]; ok &&
+				entry.UpdatedUnix <= at {
+				if at == int64(^uint64(0)>>1) {
+					return nil, errors.New("session release epoch exhausted")
+				}
+				entry.UpdatedUnix = at + 1
+			}
+		}
+	}
+	state.Bindings, err = mergeVerifiedBindingValues(state.Bindings, updates)
 	if err != nil {
 		return nil, err
 	}
-	values, err = normalizeBindingValues(values)
+	state.Bindings, err = normalizeBindingValues(state.Bindings)
 	if err != nil {
 		return nil, err
 	}
-	if err := store.write(values); err != nil {
+	if err := store.writeState(state); err != nil {
 		return nil, err
 	}
-	return values, nil
+	return state.Bindings, nil
 }
 
 func mergeVerifiedBindingValues(current, updates []routingentity.Binding) ([]routingentity.Binding, error) {
