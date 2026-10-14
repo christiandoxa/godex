@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/christiandoxa/godex/internal/helper/websocketframe"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
@@ -94,7 +95,7 @@ func readWebSocketPrecommitTextPayload(response *proxymodel.Response) []byte {
 func translateStaleWebSocketPayload(payload []byte) []byte {
 	var value any
 	if err := json.Unmarshal(payload, &value); err != nil {
-		if !websocketPreviousResponseMarkerText(string(payload)) {
+		if !utf8.Valid(payload) || !websocketPreviousResponseMarkerText(string(payload)) {
 			return payload
 		}
 		return marshalStaleWebSocketPayload(map[string]any{
@@ -189,13 +190,14 @@ func websocketPreviousResponseMarkerMessage(message string, param any, invalidRe
 	lower := strings.ToLower(message)
 	toolContext := strings.Contains(lower, "no tool call found") ||
 		strings.Contains(lower, "no function call found")
-	if !toolContext || (!invalidRequest && param == nil) {
+	if !toolContext {
 		return false
 	}
+	if invalidRequest {
+		return true
+	}
 	parameter, _ := param.(string)
-	return strings.EqualFold(strings.TrimSpace(parameter), "input") ||
-		strings.HasPrefix(strings.ToLower(strings.TrimSpace(message)), "no tool call found") ||
-		strings.HasPrefix(strings.ToLower(strings.TrimSpace(message)), "no function call found")
+	return strings.EqualFold(strings.TrimSpace(parameter), "input")
 }
 
 func staleWebSocketErrorObject() map[string]any {

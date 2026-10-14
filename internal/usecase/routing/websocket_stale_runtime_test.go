@@ -189,12 +189,17 @@ func TestProdex043712StaleWebSocketPayloadForwardsWithoutPreviousResponseMarker(
 		`{"type":"response.failed","status":400,"error":{"code":"invalid_request_error","message":"bad input"}}`,
 		`{"type":"error","status":503,"error":{"code":"server_is_overloaded"}}`,
 		`{"type":"error","error":{"message":"previous_response_not_found: unrelated text"}}`,
+		`{"type":"response.failed","error":{"message":"no tool call found for this request","param":"other"}}`,
 		"upstream text that is not a previous-response error",
 	} {
 		got := translateStaleWebSocketPayload([]byte(payload))
 		if string(got) != payload {
 			t.Fatalf("unrelated stale candidate changed payload: got %q, want %q", got, payload)
 		}
+	}
+	invalidUTF8 := []byte{0xff, 'p', 'r', 'e', 'v', 'i', 'o', 'u', 's', '_', 'r', 'e', 's', 'p', 'o', 'n', 's', 'e', '_', 'n', 'o', 't', '_', 'f', 'o', 'u', 'n', 'd'}
+	if got := translateStaleWebSocketPayload(invalidUTF8); len(got) == 0 || got[0] != 0xff {
+		t.Fatalf("invalid UTF-8 payload was rewritten: %q", got)
 	}
 }
 
