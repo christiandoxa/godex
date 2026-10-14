@@ -121,5 +121,5 @@ func commandExitCode(err error) int {
 }
 
 func commandContext() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), 45*time.Second)
+	return context.WithTimeout(context.Background(), 90*time.Second)
 }
