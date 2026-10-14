@@ -57,7 +57,7 @@ candidate executable's embedded Go VCS revision and requires `vcs.modified=false
 A stale binary, dirty build, or build without VCS metadata fails before execution.
 Both reference and candidate source trees must also have no tracked modifications
 or untracked files; a locally edited Prodex checkout cannot serve as the oracle.
-The resulting PASS is limited to the seventeen named synthetic scenarios and is
+The resulting PASS is limited to the eighteen named DeepSeek synthetic scenarios and is
 not equivalent to a global provider, live-TUI or transport parity certificate.
 
 Use `--scenario success|tool-call|deepseek-user-id|sse-stream|sse-rate-limit|retry|deepseek-sse-terminal|single-key-401|single-key-403|single-key-429|single-key-500|single-key-503|key-rotation-429|key-rotation-restart|cancel|restart|recover-after-429|recover-after-503` to rerun one case while
@@ -85,7 +85,7 @@ retry; all cases require the expected number of upstream requests.
 The negative controls alone never imply parity. Current header, durable state,
 stderr, and upstream metadata differences are intentionally still reported.
 
-Do not interpret this seventeen-scenario harness as proof of full 1:1 parity;
+Do not interpret this eighteen-scenario DeepSeek harness as proof of full 1:1 parity;
 additional transport, provider, and persistence contracts remain to verify.
 
 ### Strict fixture oracle and audited transport metadata
