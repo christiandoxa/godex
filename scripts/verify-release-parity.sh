@@ -57,10 +57,11 @@ go build -trimpath -o "$tmp/continuationparity" ./tools/continuationparity
 go test ./internal/gateway/codex -run 'Test(PersistSessionGoal|UpdateSessionGoal|MaintainManagedSessions.*Goal|PersistSessionGoalObjective|RunRuntimeDirectRepairsSelectedGoalBeforeChildStarts|RepairResumeSessionBeforeLaunch|CodexResumeSessionID)' -count=1 -timeout=30s
 
 # The tagged 0.437.11 release-fence delta must remain fail-closed under stale
-# worker snapshot replay, same-second rotation, backup recovery and invalid
-# opaque-state inputs. Only self-contained full-history Responses requests may
-# repair a conflicting soft session; response and turn-state owners stay hard.
-go test ./internal/repository/routing ./internal/usecase/routing \
+# snapshots, same-second rotation, seven-day retired-fence compaction, backup
+# recovery, and invalid inputs. Only self-contained full-history Responses
+# requests can repair a conflicting soft session. Native session searching
+# must preserve Rust's Unicode lowercase semantics at the Mojo boundary.
+go test ./internal/repository/routing ./internal/usecase/routing ./internal/usecase/session \
   -run '^TestProdex043711' -count=1 -timeout=60s
 
 # Independent managed-profile persistence oracle. All 29 CLI actions run in
