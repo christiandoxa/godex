@@ -56,3 +56,9 @@ func TestProdex043711GeminiFixtureRejectsWrongProtocolAndFakeSuccess(t *testing.
 		t.Fatalf("incorrect Gemini protocol bypassed oracle: %v", err)
 	}
 }
+
+func TestProdex043711GeminiMultiTurnToolOracleNegativeControls(t *testing.T) {
+	if !geminiMultiTurnSentinel043711() {
+		t.Fatal("Gemini multi-turn oracle accepted an unpaired, duplicate, reordered or changed tool call")
+	}
+}

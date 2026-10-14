@@ -143,7 +143,7 @@ func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit string
 	}
 	defer os.RemoveAll(root)
 	var results []geminiCaseResult
-	for _, scenario := range []string{"chat-request", "orphan-tool", "chat-response", "stream-native", "stream-chat"} {
+	for _, scenario := range []string{"chat-request", "orphan-tool", "chat-response", "stream-native", "stream-chat", "multi-turn-tool"} {
 		prodex, err := runGeminiProduct(root, scenario, "prodex", prodexBin)
 		if err != nil {
 			return fmt.Errorf("Prodex Gemini %s: %w", scenario, err)
@@ -173,7 +173,7 @@ func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit string
 	report := geminiDifferentialReport{
 		Status: status, ProdexSource: prodexCommit, GodexSource: godexCommit,
 		Cases: results, Differences: differences,
-		NegativeControl: "PASS: route, authentication, model, native/chat SSE sequences, item identities, output, status, usage and error mutations detected",
+		NegativeControl: "PASS: route, authentication, model, native/chat SSE, multi-turn tool adjacency, output, status, usage and error mutations detected",
 	}
 	encoded, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
@@ -215,6 +215,9 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	env = append(env, "DIFFERENTIAL_PROVIDER=gemini")
 	if scenario == "orphan-tool" {
 		env = append(env, "DIFFERENTIAL_GEMINI_TOOL=1")
+	}
+	if scenario == "multi-turn-tool" {
+		env = append(env, "DIFFERENTIAL_GEMINI_MULTITURN=1")
 	}
 	if scenario == "stream-native" || scenario == "stream-chat" {
 		env = append(env, "DIFFERENTIAL_STREAM=1")
@@ -315,7 +318,11 @@ func geminiFixtureInvariant(scenario string, result geminiCandidateResult) error
 		return fmt.Errorf("Gemini model or stream flag rewritten: %+v", attempt.Body)
 	}
 	messages, _ := attempt.Body["messages"].([]any)
-	if len(messages) != 1 {
+	if scenario == "multi-turn-tool" {
+		if err := geminiMultiTurnToolInvariant043711(messages); err != nil {
+			return err
+		}
+	} else if len(messages) != 1 {
 		return fmt.Errorf("canonical chat request expected one user message: %+v", attempt.Body)
 	}
 	first, _ := messages[0].(map[string]any)

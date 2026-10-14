@@ -18,13 +18,13 @@ go build -trimpath -o /tmp/godex-candidate ./cmd/godex
 
 Use `--gemini` with the same `--prodex`, `--godex`,
 `--prodex-source`, `--godex-source`, and `--godex-commit` flags
-to run five **additional** cases against the published Prodex 0.437.11
+to run six **additional** cases against the published Prodex 0.437.11
 binary, not against a guessed Gemini protocol. The reference was
 observed to send API-key Super requests as OpenAI-compatible
 `POST /v1beta/openai/chat/completions`, yet it decodes upstream
 **Gemini native GenerateContent** envelopes for the client response.
 
-The five cases require an exact single upstream request with synthetic
+The six cases require an exact single upstream request with synthetic
 credential authentication and translated model/message fields:
 (1) a successful native GenerateContent result,
 (2) an unpaired tool call that must not leak into upstream context, and
@@ -42,7 +42,14 @@ finish/usage chunk. It must produce the canonical six-event lifecycle:
 `response.output_text.delta` frames, `response.output_item.done`,
 and `response.completed`. The item and response IDs must remain
 consistent across frames, with the exact terminal model, finish reason,
-assembled content, and usage totals observed in tagged Prodex.
+assembled content, and usage totals observed in tagged Prodex, and
+(6) a complete multi-turn tool history with two assistant tool calls,
+two results delivered out of order, an intervening user message, and a
+third unanswered tool call. The outbound Chat Completions request must
+pair results immediately after their matching calls in original call
+order, drop the unanswered call, and preserve both user messages.
+Oracle mutation controls reject reordered or missing results, duplicated
+tool calls, changed IDs, altered tool output, and lost user prose.
 
 Source tag, executable hash, clean worktrees and embedded Godex VCS
 metadata are verified **before** either executable runs. The comparator

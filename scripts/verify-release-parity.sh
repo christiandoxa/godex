@@ -119,8 +119,10 @@ go test ./internal/gateway/gemini \
 # SSE chunks on that Chat-compatible route not to become false text deltas.
 # Genuine Chat Completions SSE chunks must preserve created, item-added,
 # text delta, item-done and completed events with exact usage/finish metadata.
-# Independent route, auth, model, usage, framing, item ID and response
-# mutation sentinels must fail closed.
+# Multi-turn Gemini chat requests must reorder paired tool results ahead of
+# later user content and drop unanswered calls, never duplicating an output.
+# Independent route, auth, model, usage, framing, tool-call adjacency, item
+# IDs and response mutation sentinels must fail closed.
 "$tmp/differential" \
   --prodex "$tmp/prodex" --godex "$tmp/godex" \
   --prodex-source "$tmp/prodex-source" \
