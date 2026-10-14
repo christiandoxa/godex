@@ -30,6 +30,14 @@ func requestAffinity(request proxymodel.Request, body []byte) affinityKeys {
 	if json.Unmarshal(body, &object) != nil {
 		return keys
 	}
+	if keys.turn == "" {
+		keys.turn = objectString(object, "x-codex-turn-state", "turn_state")
+		if keys.turn == "" {
+			if metadata, ok := object["client_metadata"].(map[string]any); ok {
+				keys.turn = objectString(metadata, "x-codex-turn-state", "turn_state")
+			}
+		}
+	}
 	keys.previous = objectString(object, "previous_response_id")
 	if keys.previous == "" {
 		if response, ok := nestedAffinityObject("response", object["response"]); ok {
