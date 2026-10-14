@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net/http"
 	"strings"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
@@ -44,9 +45,18 @@ func normalizeGeminiAPIKeyBufferedIdentity043711(
 	if err != nil {
 		return nil, errors.New("serialize Gemini API-key response")
 	}
+	headers := response.Header.Clone()
+	if headers == nil {
+		headers = make(http.Header)
+	}
+	// Tagged Prodex 0.437.11 writes a normalized UTF-8 JSON content
+	// type on the buffered API-key Responses envelope, not the native
+	// upstream Content-Type. Preserve other headers and the separate
+	// native/OAuth and non-2xx passthrough policies.
+	headers.Set("Content-Type", "application/json; charset=utf-8")
 	return &proxymodel.Response{
 		StatusCode: response.StatusCode,
-		Header:     response.Header,
+		Header:     headers,
 		Body:       io.NopCloser(bytes.NewReader(normalized)),
 		Trailer:    response.Trailer,
 	}, nil
