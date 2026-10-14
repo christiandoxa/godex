@@ -146,6 +146,9 @@ func doctorApplyPersistedRouteHealth(
 	for _, circuit := range state.circuits {
 		entry := entryFor(circuit.AccountID, circuit.Route)
 		entry.CircuitState = "open"
+		if !state.now.IsZero() && circuit.UntilUnix <= state.now.Unix() {
+			entry.CircuitState = "half-open"
+		}
 		until := circuit.UntilUnix
 		entry.CircuitUntil = &until
 	}

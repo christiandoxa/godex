@@ -251,9 +251,18 @@ func (doctor *Doctor) runtimeDiagnostics(ctx context.Context, tailBytes int) (ru
 		if err != nil {
 			return runtimemodel.DoctorRuntime{}, fmt.Errorf("load route memory: %w", err)
 		}
-		circuits, err := doctor.routeState.LoadRouteCircuits(ctx, now, health)
+		// A doctor read must not reset a timed-out circuit or reserve a
+		// probe. Prefer the non-mutating snapshot reader when available.
+		var circuits []routingentity.RouteCircuit
+		if inspector, ok := doctor.routeState.(interface {
+			InspectRouteCircuits(context.Context, time.Time) ([]routingentity.RouteCircuit, error)
+		}); ok {
+			circuits, err = inspector.InspectRouteCircuits(ctx, now)
+		} else {
+			circuits, err = doctor.routeState.LoadRouteCircuits(ctx, now, health)
+		}
 		if err != nil {
-			return runtimemodel.DoctorRuntime{}, fmt.Errorf("load route circuits: %w", err)
+			return runtimemodel.DoctorRuntime{}, fmt.Errorf("inspect route circuits: %w", err)
 		}
 		backoffs, err := doctor.routeState.LoadTransportBackoffs(ctx, now)
 		if err != nil {
