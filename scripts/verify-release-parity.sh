@@ -3,35 +3,35 @@ set -euo pipefail
 
 # Release-only proof: the public oracle is pinned by commit and binary digest.
 # No live provider accounts, real credentials, or external model calls.
-ref_commit='c047ec437bc87cc19d22064f9946db5d446d9a45'
-prodex_binary_sha256='daa8e4bf2527b68e3cf501e144551e438b0583e9da3c42b896cb1bf600817bb2'
+ref_commit='83ae4cb18ca8000de7cb563291539392c71444e0'
+prodex_binary_sha256='634f67882045afc4cc74b3046b784b33618ff8e14a1009fd9d1bc44d699746fa'
 root="$(git rev-parse --show-toplevel)"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/godex-release-parity.XXXXXXXX")"
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
 cd "$root"
 
-git clone --quiet --depth 1 --branch 0.437.10 \
+git clone --quiet --depth 1 --branch 0.437.11 \
   https://github.com/christiandoxa/prodex.git "$tmp/prodex-source"
 test "$(git -C "$tmp/prodex-source" rev-parse HEAD)" = "$ref_commit" || {
-  echo "Prodex oracle source does not match 0.437.10" >&2
+  echo "Prodex oracle source does not match 0.437.11" >&2
   exit 1
 }
 
 curl --fail --location --silent --show-error --retry 3 \
   --output "$tmp/prodex" \
-  'https://github.com/christiandoxa/prodex/releases/download/0.437.10/prodex-x86_64-unknown-linux-gnu'
+  'https://github.com/christiandoxa/prodex/releases/download/0.437.11/prodex-x86_64-unknown-linux-gnu'
 curl --fail --location --silent --show-error --retry 3 \
   --output "$tmp/SHA256SUMS" \
-  'https://github.com/christiandoxa/prodex/releases/download/0.437.10/SHA256SUMS'
+  'https://github.com/christiandoxa/prodex/releases/download/0.437.11/SHA256SUMS'
 curl --fail --location --silent --show-error --retry 3 \
   --output "$tmp/release-manifest.json" \
-  'https://github.com/christiandoxa/prodex/releases/download/0.437.10/release-manifest.json'
+  'https://github.com/christiandoxa/prodex/releases/download/0.437.11/release-manifest.json'
 grep -Fqx "$prodex_binary_sha256  prodex-x86_64-unknown-linux-gnu" "$tmp/SHA256SUMS" || {
   echo "Prodex executable is absent or mismatched in published SHA256SUMS" >&2
   exit 1
 }
-grep -Fq '"version": "0.437.10"' "$tmp/release-manifest.json" &&
-grep -Fq '"commit": "c047ec437bc87cc19d22064f9946db5d446d9a45"' "$tmp/release-manifest.json" &&
+grep -Fq '"version": "0.437.11"' "$tmp/release-manifest.json" &&
+grep -Fq '"commit": "83ae4cb18ca8000de7cb563291539392c71444e0"' "$tmp/release-manifest.json" &&
 grep -Fq '"asset": "prodex-x86_64-unknown-linux-gnu"' "$tmp/release-manifest.json" || {
   echo "Prodex release manifest does not describe the pinned oracle" >&2
   exit 1
@@ -41,7 +41,7 @@ echo "$prodex_binary_sha256  $tmp/prodex" | sha256sum --check --status || {
   exit 1
 }
 chmod +x "$tmp/prodex"
-test "$("$tmp/prodex" --version)" = "prodex 0.437.10"
+test "$("$tmp/prodex" --version)" = "prodex 0.437.11"
 
 # Go's build VCS metadata must identify the clean release commit, not WIP.
 go build -trimpath -o "$tmp/godex" ./cmd/godex
@@ -51,9 +51,9 @@ go build -trimpath -o "$tmp/clierrorparity" ./tools/clierrorparity
 go build -trimpath -o "$tmp/contextparity" ./tools/contextparity
 go build -trimpath -o "$tmp/continuationparity" ./tools/continuationparity
 
-# The 0.437.10 delta is goal attachment recovery during resume and shared-home
-# preparation. Keep its focused regression proof in the release gate alongside
-# the executable differentials.
+# Preserve the focused 0.437.10 goal-attachment recovery regressions while
+# migrating the executable oracles to 0.437.11. The 0.437.11 session-release
+# and full-history rotation regressions are qualified separately.
 go test ./internal/gateway/codex -run 'Test(PersistSessionGoal|UpdateSessionGoal|MaintainManagedSessions.*Goal|PersistSessionGoalObjective|RunRuntimeDirectRepairsSelectedGoalBeforeChildStarts|RepairResumeSessionBeforeLaunch|CodexResumeSessionID)' -count=1 -timeout=30s
 
 # Independent managed-profile persistence oracle. All 29 CLI actions run in
