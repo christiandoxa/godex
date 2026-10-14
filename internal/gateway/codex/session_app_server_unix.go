@@ -27,6 +27,7 @@ func (process *CodexProcess) runWithSessionAppServer(
 	environment []string,
 	command *exec.Cmd,
 	arguments []string,
+	markerPath string,
 	releaseAffinity func(context.Context, string) error,
 ) error {
 	restoreTerminal := captureOwnedChildTerminal043711(process.terminal.Stdin, process.terminal.Stdout)
@@ -96,7 +97,7 @@ func (process *CodexProcess) runWithSessionAppServer(
 	// Restore the TUI's inherited mode before writing a readable resume
 	// panel. This also prevents keyboard/mouse modes leaking to the shell.
 	restoreTerminal()
-	printOwnedCompanionResumeGuidance043711(process.terminal.Stderr)
+	printOwnedCompanionResumeGuidance043712(process, markerPath, arguments)
 	return nil
 }
 

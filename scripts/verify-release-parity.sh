@@ -3,35 +3,35 @@ set -euo pipefail
 
 # Release-only proof: the public oracle is pinned by commit and binary digest.
 # No live provider accounts, real credentials, or external model calls.
-ref_commit='83ae4cb18ca8000de7cb563291539392c71444e0'
-prodex_binary_sha256='634f67882045afc4cc74b3046b784b33618ff8e14a1009fd9d1bc44d699746fa'
+ref_commit='e9d5a16f9abec6976cd670021c1e7f0b04a67b69'
+prodex_binary_sha256='ecab17893af7142304072c74c7af723347712a4fa5d055142e7c5035727d9d63'
 root="$(git rev-parse --show-toplevel)"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/godex-release-parity.XXXXXXXX")"
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
 cd "$root"
 
-git clone --quiet --depth 1 --branch 0.437.11 \
+git clone --quiet --depth 1 --branch 0.437.12 \
   https://github.com/christiandoxa/prodex.git "$tmp/prodex-source"
 test "$(git -C "$tmp/prodex-source" rev-parse HEAD)" = "$ref_commit" || {
-  echo "Prodex oracle source does not match 0.437.11" >&2
+  echo "Prodex oracle source does not match 0.437.12" >&2
   exit 1
 }
 
 curl --fail --location --silent --show-error --retry 3 \
   --output "$tmp/prodex" \
-  'https://github.com/christiandoxa/prodex/releases/download/0.437.11/prodex-x86_64-unknown-linux-gnu'
+  'https://github.com/christiandoxa/prodex/releases/download/0.437.12/prodex-x86_64-unknown-linux-gnu'
 curl --fail --location --silent --show-error --retry 3 \
   --output "$tmp/SHA256SUMS" \
-  'https://github.com/christiandoxa/prodex/releases/download/0.437.11/SHA256SUMS'
+  'https://github.com/christiandoxa/prodex/releases/download/0.437.12/SHA256SUMS'
 curl --fail --location --silent --show-error --retry 3 \
   --output "$tmp/release-manifest.json" \
-  'https://github.com/christiandoxa/prodex/releases/download/0.437.11/release-manifest.json'
+  'https://github.com/christiandoxa/prodex/releases/download/0.437.12/release-manifest.json'
 grep -Fqx "$prodex_binary_sha256  prodex-x86_64-unknown-linux-gnu" "$tmp/SHA256SUMS" || {
   echo "Prodex executable is absent or mismatched in published SHA256SUMS" >&2
   exit 1
 }
-grep -Fq '"version": "0.437.11"' "$tmp/release-manifest.json" &&
-grep -Fq '"commit": "83ae4cb18ca8000de7cb563291539392c71444e0"' "$tmp/release-manifest.json" &&
+grep -Fq '"version": "0.437.12"' "$tmp/release-manifest.json" &&
+grep -Fq '"commit": "e9d5a16f9abec6976cd670021c1e7f0b04a67b69"' "$tmp/release-manifest.json" &&
 grep -Fq '"asset": "prodex-x86_64-unknown-linux-gnu"' "$tmp/release-manifest.json" || {
   echo "Prodex release manifest does not describe the pinned oracle" >&2
   exit 1
@@ -41,7 +41,7 @@ echo "$prodex_binary_sha256  $tmp/prodex" | sha256sum --check --status || {
   exit 1
 }
 chmod +x "$tmp/prodex"
-test "$("$tmp/prodex" --version)" = "prodex 0.437.11"
+test "$("$tmp/prodex" --version)" = "prodex 0.437.12"
 
 # Go's build VCS metadata must identify the clean release commit, not WIP.
 go build -trimpath -o "$tmp/godex" ./cmd/godex
@@ -64,6 +64,13 @@ go test ./internal/gateway/codex -run 'Test(PersistSessionGoal|UpdateSessionGoal
 go test ./internal/gateway/codex \
   -run '^TestProdex043711(SuccessfulSessionCompanionShowsResumeGuidanceAfterSocketClosed|SessionCompanionSuppressesGuidanceOnNonTTYAndFailure|ChildTerminalHandoffPreservesQueuedInputAndProtocols|NativeTUIRestoresTerminalAfterSuccessAndFailure|NonInteractiveChildNeverEmitsTerminalProtocols|OwnedCompanionRestoresTTYBeforeResumeGuidance)$' \
   -count=1 -timeout=75s
+
+# Prodex 0.437.12 saved-session output must carry the launch-owned identity,
+# preserve CRLF append-only boundaries, offer a picker when unknown, and only
+# allocate identity hooks for interactive companion launches.
+go test ./internal/gateway/codex \
+  -run '^TestProdex043712' \
+  -count=1 -timeout=30s
 
 # The tagged 0.437.11 release-fence delta must remain fail-closed under stale
 # snapshots, same-second rotation, seven-day retired-fence compaction, backup

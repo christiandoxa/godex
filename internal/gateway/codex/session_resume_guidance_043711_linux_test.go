@@ -77,7 +77,7 @@ func TestProdex043711SuccessfulSessionCompanionShowsResumeGuidanceAfterSocketClo
 	}
 	master, slave := testSessionOwnedPTY043711(t)
 	process := NewCodexProcess(sessionCompanionWrapper(t), Terminal{
-		Stdin: strings.NewReader(""), Stdout: io.Discard, Stderr: slave,
+		Stdin: slave, Stdout: slave, Stderr: slave,
 	})
 	if err := process.RunThroughProxyWithSessionServer(t.Context(), home,
 		"http://127.0.0.1:1234", []string{"--model", "synthetic"}, ""); err != nil {
@@ -90,7 +90,7 @@ func TestProdex043711SuccessfulSessionCompanionShowsResumeGuidanceAfterSocketClo
 	for _, wanted := range []string{
 		"Godex saved session",
 		"This session's temporary app-server has stopped",
-		"Resume with: godex session resume <ID>",
+		"Resume: godex s resume",
 		"Do not reuse the temporary codex --remote socket",
 		"Paused goals stay paused until /goal resume.",
 	} {
@@ -98,7 +98,7 @@ func TestProdex043711SuccessfulSessionCompanionShowsResumeGuidanceAfterSocketClo
 			t.Fatalf("missing %q in interactive exit guidance: %q", wanted, output)
 		}
 	}
-	if strings.Count(output, "Resume with:") != 1 {
+	if strings.Count(output, "Resume: godex s") != 1 {
 		t.Fatalf("duplicate or missing session resume guidance: %q", output)
 	}
 }

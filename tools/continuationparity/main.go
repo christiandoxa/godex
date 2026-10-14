@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	prodexCommit = "83ae4cb18ca8000de7cb563291539392c71444e0"
-	prodexSHA    = "634f67882045afc4cc74b3046b784b33618ff8e14a1009fd9d1bc44d699746fa"
+	prodexCommit = "e9d5a16f9abec6976cd670021c1e7f0b04a67b69"
+	prodexSHA    = "ecab17893af7142304072c74c7af723347712a4fa5d055142e7c5035727d9d63"
 )
 
 type attempt struct{ account, mode, body string }
@@ -146,9 +146,9 @@ type product struct {
 }
 
 func main() {
-	prodex := flag.String("prodex", "", "official Prodex 0.437.11 binary")
+	prodex := flag.String("prodex", "", "official Prodex 0.437.12 binary")
 	godex := flag.String("godex", "", "Godex binary")
-	prodexSource := flag.String("prodex-source", "", "tagged Prodex 0.437.11 source")
+	prodexSource := flag.String("prodex-source", "", "tagged Prodex 0.437.12 source")
 	websocket := flag.Bool("websocket", false, "run the isolated WebSocket request/recovery differential")
 	godexSource := flag.String("godex-source", "", "clean Godex commit source (required with --websocket)")
 	godexCommit := flag.String("godex-commit", "", "exact 40-character Godex commit (required with --websocket)")
@@ -197,7 +197,7 @@ func verifyProdex(binary, source string) error {
 		return fmt.Errorf("Prodex binary digest %s, want %s", got, prodexSHA)
 	}
 	output, err := exec.Command(binary, "--version").CombinedOutput()
-	if err != nil || strings.TrimSpace(string(output)) != "prodex 0.437.11" {
+	if err != nil || strings.TrimSpace(string(output)) != "prodex 0.437.12" {
 		return fmt.Errorf("unexpected Prodex version %q: %v", output, err)
 	}
 	if err := verifyProdexSource(source); err != nil {
@@ -209,7 +209,7 @@ func verifyProdex(binary, source string) error {
 func verifyProdexSource(source string) error {
 	output, err := exec.Command("git", "-C", source, "rev-parse", "HEAD").Output()
 	if err != nil || strings.TrimSpace(string(output)) != prodexCommit {
-		return fmt.Errorf("Prodex source is not tag 0.437.11")
+		return fmt.Errorf("Prodex source is not tag 0.437.12")
 	}
 	return verifyProdexSourceClean(source)
 }

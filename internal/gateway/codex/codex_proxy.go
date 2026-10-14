@@ -110,6 +110,12 @@ func (process *CodexProcess) runThroughProxy(
 	}
 	commandServer := codexCommandServerSubcommand(arguments)
 	companion := withSessionServer && sessionAppServerEligible(arguments)
+	markerPath := ""
+	if companion {
+		var cleanupMarker func()
+		markerPath, cleanupMarker, arguments = prepareSessionIdentity(codexHome, arguments)
+		defer cleanupMarker()
+	}
 	switch provider {
 	case "local":
 		arguments, err = localProxyArguments(endpoint, arguments)
@@ -142,7 +148,7 @@ func (process *CodexProcess) runThroughProxy(
 	command.Stdout = process.terminal.Stdout
 	command.Stderr = process.terminal.Stderr
 	if companion {
-		return process.runWithSessionAppServer(ctx, binary, codexHome, command.Env, command, arguments, releaseAffinity)
+		return process.runWithSessionAppServer(ctx, binary, codexHome, command.Env, command, arguments, markerPath, releaseAffinity)
 	}
 	if err := command.Run(); err != nil {
 		if ctx.Err() != nil {

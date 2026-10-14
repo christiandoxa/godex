@@ -13,14 +13,19 @@ func (process *CodexProcess) runWithSessionAppServer(
 	_ string,
 	_ []string,
 	command *exec.Cmd,
-	_ []string,
+	arguments []string,
+	markerPath string,
 	_ func(context.Context, string) error,
 ) error {
+	restoreTerminal := captureOwnedChildTerminal043711(process.terminal.Stdin, process.terminal.Stdout)
+	defer restoreTerminal()
 	if err := command.Run(); err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
 		return err
 	}
+	restoreTerminal()
+	printOwnedCompanionResumeGuidance043712(process, markerPath, arguments)
 	return nil
 }

@@ -7,9 +7,9 @@ go test ./tools/differential
 go build -trimpath -o /tmp/differential ./tools/differential
 go build -trimpath -o /tmp/godex-candidate ./cmd/godex
 /tmp/differential \
-  --prodex /absolute/path/to/prodex-0.437.11 \
+  --prodex /absolute/path/to/prodex-0.437.12 \
   --godex /tmp/godex-candidate \
-  --prodex-source /absolute/path/to/prodex-0.437.11-source \
+  --prodex-source /absolute/path/to/prodex-0.437.12-source \
   --godex-source "$PWD" \
   --godex-commit "$(git rev-parse HEAD)"
 ```
@@ -18,7 +18,7 @@ go build -trimpath -o /tmp/godex-candidate ./cmd/godex
 
 Use `--gemini` with the same `--prodex`, `--godex`,
 `--prodex-source`, `--godex-source`, and `--godex-commit` flags
-to run eight **additional** cases against the published Prodex 0.437.11
+to run eight **additional** cases against the published Prodex 0.437.12
 binary, not against a guessed Gemini protocol. The reference was
 observed to send API-key Super requests as OpenAI-compatible
 `POST /v1beta/openai/chat/completions`, yet it decodes upstream
@@ -51,7 +51,7 @@ order, drop the unanswered call, and preserve both user messages.
 Oracle mutation controls reject reordered or missing results, duplicated
 tool calls, changed IDs, altered tool output, and lost user prose.
 
-Two additional fresh-request **dual-key** scenarios qualify tagged 0.437.11
+Two additional fresh-request **dual-key** scenarios qualify tagged 0.437.12
 Gemini quota retry and rotation:
 (7) a plaintext HTTP 429 must pass through to the client **verbatim**
 after one attempt on the first key, without rotating; the synthetic
@@ -109,14 +109,14 @@ investigating a mismatch; the default is `--scenario all`.
 
 The `deepseek-user-id` fixture sends the Responses `user` alias through the
 real Codex shim and requires the upstream DeepSeek request to contain the
-canonical `user_id` field from the 0.437.11 provider conformance fixture.
+canonical `user_id` field from the 0.437.12 provider conformance fixture.
 
 
 Run only from a committed, clean candidate checkout; build the Godex binary
 from that exact source. The supplied --godex-commit pin must match HEAD **and the binary's embedded
 Go VCS build revision**. The harness refuses binaries built from dirty or
 uncommitted source.
-The canonical reference is Prodex tag 0.437.11, not an arbitrary binary release.
+The canonical reference is Prodex tag 0.437.12, not an arbitrary binary release.
 
 **Fail-closed behavior:** the harness prints a structured JSON comparison and
 returns a nonzero process exit for any mismatch, missing child/upstream evidence,
