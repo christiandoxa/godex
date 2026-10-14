@@ -184,6 +184,32 @@ func TestStaleWebSocketPayloadPreservesTaggedResponseFailedShapes(t *testing.T) 
 	}
 }
 
+func TestProdex043712StaleWebSocketPayloadForwardsWithoutPreviousResponseMarker(t *testing.T) {
+	for _, payload := range []string{
+		`{"type":"response.failed","status":400,"error":{"code":"invalid_request_error","message":"bad input"}}`,
+		`{"type":"error","status":503,"error":{"code":"server_is_overloaded"}}`,
+		`{"type":"error","error":{"message":"previous_response_not_found: unrelated text"}}`,
+		"upstream text that is not a previous-response error",
+	} {
+		got := translateStaleWebSocketPayload([]byte(payload))
+		if string(got) != payload {
+			t.Fatalf("unrelated stale candidate changed payload: got %q, want %q", got, payload)
+		}
+	}
+}
+
+func TestProdex043712StaleWebSocketPayloadRecognizesInvalidPreviousIDMarker(t *testing.T) {
+	payload := []byte(`{"type":"error","error":{"type":"invalid_request_error","message":"Invalid ` + "`previous_response_id`." + `"}}`)
+	got := translateStaleWebSocketPayload(payload)
+	var event map[string]any
+	if err := json.Unmarshal(got, &event); err != nil {
+		t.Fatal(err)
+	}
+	if websocketJSONText(event["type"]) != "error" || int(event["status"].(float64)) != http.StatusConflict {
+		t.Fatalf("invalid previous ID was not translated: %s", got)
+	}
+}
+
 func newWebSocketPreviousResponseRuntimeRouter(
 	t *testing.T,
 	gateway *websocketDispatchGateway,

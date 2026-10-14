@@ -13,9 +13,10 @@ import (
 )
 
 const (
-	staleContinuationMessage          = "Upstream no longer recognizes this conversation chain before output started. Retry from the last user message or restart the Codex turn; Prodex will not send a fresh request without the missing context."
-	websocketStaleContinuationMessage = staleContinuationMessage
-	websocketFailureMessageMaxBytes   = 64 << 20
+	staleContinuationMessage           = "Upstream no longer recognizes this conversation chain before output started. Retry from the last user message or restart the Codex turn; Prodex will not send a fresh request without the missing context."
+	websocketStaleContinuationMessage  = staleContinuationMessage
+	websocketFailureMessageMaxBytes    = 64 << 20
+	websocketPreviousResponseScanLimit = 2048
 )
 
 func staleWebSocketContinuationResponse(response *proxymodel.Response) *proxymodel.Response {
@@ -91,9 +92,22 @@ func readWebSocketPrecommitTextPayload(response *proxymodel.Response) []byte {
 }
 
 func translateStaleWebSocketPayload(payload []byte) []byte {
-	var event map[string]any
-	if json.Unmarshal(payload, &event) == nil &&
-		strings.EqualFold(strings.TrimSpace(websocketJSONText(event["type"])), "response.failed") {
+	var value any
+	if err := json.Unmarshal(payload, &value); err != nil {
+		if !websocketPreviousResponseMarkerText(string(payload)) {
+			return payload
+		}
+		return marshalStaleWebSocketPayload(map[string]any{
+			"type":   "error",
+			"status": http.StatusConflict,
+			"error":  staleWebSocketErrorObject(),
+		})
+	}
+	if !websocketPreviousResponseMarkerValue(value) {
+		return payload
+	}
+	event, _ := value.(map[string]any)
+	if strings.EqualFold(strings.TrimSpace(websocketJSONText(event["type"])), "response.failed") {
 		if _, nested := event["response"]; nested {
 			return marshalStaleWebSocketPayload(map[string]any{
 				"type":   "response.failed",
@@ -114,6 +128,74 @@ func translateStaleWebSocketPayload(payload []byte) []byte {
 		"status": http.StatusConflict,
 		"error":  staleWebSocketErrorObject(),
 	})
+}
+
+// Prodex only rewrites a pre-commit frame after its payload identifies a
+// missing previous response. Forward unrelated upstream errors byte-for-byte.
+func websocketPreviousResponseMarkerValue(value any) bool {
+	stack := []any{value}
+	for visited := 0; len(stack) > 0 && visited < websocketPreviousResponseScanLimit; visited++ {
+		index := len(stack) - 1
+		current := stack[index]
+		stack = stack[:index]
+		switch current := current.(type) {
+		case map[string]any:
+			if code, ok := current["code"].(string); ok &&
+				strings.EqualFold(code, "previous_response_not_found") {
+				return true
+			}
+			errorType, _ := current["type"].(string)
+			invalidRequest := strings.EqualFold(strings.TrimSpace(errorType), "invalid_request_error")
+			message := ""
+			for _, key := range []string{"message", "detail", "error"} {
+				if candidate, ok := current[key].(string); ok {
+					message = candidate
+					break
+				}
+			}
+			if websocketPreviousResponseMarkerMessage(message, current["param"], invalidRequest) {
+				return true
+			}
+			for _, child := range current {
+				stack = append(stack, child)
+			}
+		case []any:
+			stack = append(stack, current...)
+		}
+	}
+	return false
+}
+
+func websocketPreviousResponseMarkerText(text string) bool {
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" {
+		return false
+	}
+	lower := strings.ToLower(trimmed)
+	return strings.HasPrefix(lower, "previous_response_not_found") ||
+		(strings.HasPrefix(lower, "previous response") && strings.Contains(lower, "not found")) ||
+		strings.EqualFold(trimmed, "invalid `previous_response_id`.") ||
+		(strings.Contains(lower, "no tool call found") &&
+			(strings.HasPrefix(lower, "invalid_request_error:") || strings.HasPrefix(lower, "no tool call found"))) ||
+		(strings.Contains(lower, "no function call found") &&
+			(strings.HasPrefix(lower, "invalid_request_error:") || strings.HasPrefix(lower, "no function call found")))
+}
+
+func websocketPreviousResponseMarkerMessage(message string, param any, invalidRequest bool) bool {
+	trimmed := strings.TrimSpace(message)
+	if strings.EqualFold(trimmed, "invalid `previous_response_id`.") {
+		return true
+	}
+	lower := strings.ToLower(message)
+	toolContext := strings.Contains(lower, "no tool call found") ||
+		strings.Contains(lower, "no function call found")
+	if !toolContext || (!invalidRequest && param == nil) {
+		return false
+	}
+	parameter, _ := param.(string)
+	return strings.EqualFold(strings.TrimSpace(parameter), "input") ||
+		strings.HasPrefix(strings.ToLower(strings.TrimSpace(message)), "no tool call found") ||
+		strings.HasPrefix(strings.ToLower(strings.TrimSpace(message)), "no function call found")
 }
 
 func staleWebSocketErrorObject() map[string]any {
