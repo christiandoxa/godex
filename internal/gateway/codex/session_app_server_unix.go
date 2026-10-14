@@ -89,16 +89,17 @@ func (process *CodexProcess) runWithSessionAppServer(
 	if err := command.Start(); err != nil {
 		return fmt.Errorf("start Codex child with app-server companion: %w", err)
 	}
-	if err := waitForSessionChild(ctx, command, privateChildGroup); err != nil {
-		return err
-	}
+	childErr := waitForSessionChild(ctx, command, privateChildGroup)
 	cleanCompanion()
 	cleanupSocket()
 	// Restore the TUI's inherited mode before writing a readable resume
 	// panel. This also prevents keyboard/mouse modes leaking to the shell.
 	restoreTerminal()
-	printOwnedCompanionResumeGuidance043712(process, markerPath, arguments)
-	return nil
+	var exitErr *exec.ExitError
+	if ctx.Err() == nil && (childErr == nil || errors.As(childErr, &exitErr)) {
+		printOwnedCompanionResumeGuidance043712(process, markerPath, arguments)
+	}
+	return childErr
 }
 
 // privateSessionAppServerSocket keeps the usual profile-owned socket when

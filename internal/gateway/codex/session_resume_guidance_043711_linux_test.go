@@ -103,7 +103,7 @@ func TestProdex043711SuccessfulSessionCompanionShowsResumeGuidanceAfterSocketClo
 	}
 }
 
-func TestProdex043711SessionCompanionSuppressesGuidanceOnNonTTYAndFailure(t *testing.T) {
+func TestProdex043711SessionCompanionSuppressesGuidanceOnNonTTYAndShowsItOnFailure(t *testing.T) {
 	root := t.TempDir()
 	marker := filepath.Join(root, "events")
 	t.Setenv(sessionCompanionHelperEnv, "1")
@@ -127,7 +127,7 @@ func TestProdex043711SessionCompanionSuppressesGuidanceOnNonTTYAndFailure(t *tes
 	master, slave := testSessionOwnedPTY043711(t)
 	t.Setenv(sessionCompanionExitCodeEnv, "23")
 	process = NewCodexProcess(sessionCompanionWrapper(t), Terminal{
-		Stdin: strings.NewReader(""), Stdout: io.Discard, Stderr: slave,
+		Stdin: slave, Stdout: slave, Stderr: slave,
 	})
 	err := process.RunThroughProxyWithSessionServer(t.Context(), home,
 		"http://127.0.0.1:1234", []string{"--model", "synthetic"}, "")
@@ -135,7 +135,11 @@ func TestProdex043711SessionCompanionSuppressesGuidanceOnNonTTYAndFailure(t *tes
 	if !errors.As(err, &exitErr) || exitErr.ExitCode() != 23 {
 		t.Fatalf("child exit status not preserved: %v", err)
 	}
-	if output := sessionOwnedPTYContents043711(t, master, slave); strings.TrimSpace(output) != "" {
-		t.Fatalf("failed child falsely advertised saved session: %q", output)
+	output := sessionOwnedPTYContents043711(t, master, slave)
+	if !strings.Contains(output, "Godex saved session") {
+		t.Fatalf("failed child did not advertise saved session: %q", output)
+	}
+	if strings.Count(output, "Godex saved session") != 1 {
+		t.Fatalf("failed child emitted duplicate saved-session guidance: %q", output)
 	}
 }

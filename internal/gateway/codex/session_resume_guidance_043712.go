@@ -9,9 +9,9 @@ import (
 	"golang.org/x/term"
 )
 
-// printOwnedCompanionResumeGuidance043712 appends plain text only after a
-// successful, final interactive child exit. The three terminal checks keep
-// diagnostics, pipes, and JSON protocols free of user-facing guidance.
+// printOwnedCompanionResumeGuidance043712 appends plain text after a final
+// interactive child exit, including a non-zero child status. The three
+// terminal checks keep diagnostics, pipes, and JSON protocols free of guidance.
 func printOwnedCompanionResumeGuidance043712(process *CodexProcess, markerPath string, arguments []string) {
 	if process == nil || !sessionTerminalTTY043712(process.terminal) {
 		return
