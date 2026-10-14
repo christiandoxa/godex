@@ -125,6 +125,10 @@ func (process *CodexProcess) runThroughProxy(
 	}
 	if !commandServer {
 		arguments = codexTUIArguments(arguments)
+		if !companion {
+			restoreTerminal := captureOwnedChildTerminal043711(process.terminal.Stdin, process.terminal.Stdout)
+			defer restoreTerminal()
+		}
 		resetTerminalKeyboardEnhancementBestEffort(process.terminal.Stdout)
 	}
 	release, err := (SessionLocker{}).LockCodexSessionsForChild(ctx, codexHome)

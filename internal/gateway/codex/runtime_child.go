@@ -7,6 +7,8 @@ import "context"
 // primitive for non-runtime callers and tests.
 func (process *CodexProcess) RunRuntime(ctx context.Context, codexHome string, arguments []string) error {
 	if !codexCommandServerSubcommand(arguments) {
+		restoreTerminal := captureOwnedChildTerminal043711(process.terminal.Stdin, process.terminal.Stdout)
+		defer restoreTerminal()
 		arguments = codexTUIArguments(arguments)
 		resetTerminalKeyboardEnhancementBestEffort(process.terminal.Stdout)
 	}
