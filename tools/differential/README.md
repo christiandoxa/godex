@@ -18,13 +18,13 @@ go build -trimpath -o /tmp/godex-candidate ./cmd/godex
 
 Use `--gemini` with the same `--prodex`, `--godex`,
 `--prodex-source`, `--godex-source`, and `--godex-commit` flags
-to run four **additional** cases against the published Prodex 0.437.11
+to run five **additional** cases against the published Prodex 0.437.11
 binary, not against a guessed Gemini protocol. The reference was
 observed to send API-key Super requests as OpenAI-compatible
 `POST /v1beta/openai/chat/completions`, yet it decodes upstream
 **Gemini native GenerateContent** envelopes for the client response.
 
-The four cases require an exact single upstream request with synthetic
+The five cases require an exact single upstream request with synthetic
 credential authentication and translated model/message fields:
 (1) a successful native GenerateContent result,
 (2) an unpaired tool call that must not leak into upstream context, and
@@ -35,7 +35,14 @@ than being treated as successful content, and
 which emits native GenerateContent SSE chunks. The tagged Prodex must
 send `stream_options.include_usage=true`, emit exactly
 `response.created` then `response.completed` with empty output,
-and never surface native Gemini text as Chat Completion delta events.
+and never surface native Gemini text as Chat Completion delta events, and
+(5) a genuine Chat Completions SSE stream with two text chunks and a
+finish/usage chunk. It must produce the canonical six-event lifecycle:
+`response.created`, `response.output_item.added`, two
+`response.output_text.delta` frames, `response.output_item.done`,
+and `response.completed`. The item and response IDs must remain
+consistent across frames, with the exact terminal model, finish reason,
+assembled content, and usage totals observed in tagged Prodex.
 
 Source tag, executable hash, clean worktrees and embedded Godex VCS
 metadata are verified **before** either executable runs. The comparator
@@ -43,7 +50,9 @@ checks provider route, authorization validity, request body, HTTP
 status and full JSON response semantics; only nondeterministic response
 IDs and timestamps are normalized. The streaming oracle independently
 verifies event labels, ordering, sequence numbers, matching per-stream
-response IDs/timestamps, and absence of fabricated output.
+response and item IDs/timestamps, and absence of fabricated native
+output or missing Chat SSE text, item lifecycle, finish metadata and
+token usage.
 Mutation sentinels must detect
 altered route, authorization, model, status, content, quota usage and
 metadata. These checks use a loopback fake upstream with no live

@@ -33,3 +33,9 @@ func TestProdex043711GeminiNativeSSEStrictOracleRejectsFalseParity(t *testing.T)
 		})
 	}
 }
+
+func TestProdex043711GeminiChatSSEItemAndUsageNegativeControls(t *testing.T) {
+	if !geminiChatSSESentinel043711() {
+		t.Fatal("Gemini Chat SSE oracle missed identity, sequence, usage, metadata or output mutations")
+	}
+}

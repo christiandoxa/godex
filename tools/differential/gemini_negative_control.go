@@ -74,7 +74,7 @@ func geminiNegativeControl() bool {
 	if len(geminiCompare("chat-request", good, second)) == 0 {
 		return false
 	}
-	return geminiNativeSSESentinel043711()
+	return geminiNativeSSESentinel043711() && geminiChatSSESentinel043711()
 }
 
 // Ensure the executable oracle detects fabricated native Gemini SSE output

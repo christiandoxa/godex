@@ -117,7 +117,9 @@ go test ./internal/gateway/gemini \
 # but native GenerateContent response semantics. Qualify both the outbound
 # request and accepted/invalid native response, and require tagged native
 # SSE chunks on that Chat-compatible route not to become false text deltas.
-# Independent route, auth, model, usage, framing and semantic-response
+# Genuine Chat Completions SSE chunks must preserve created, item-added,
+# text delta, item-done and completed events with exact usage/finish metadata.
+# Independent route, auth, model, usage, framing, item ID and response
 # mutation sentinels must fail closed.
 "$tmp/differential" \
   --prodex "$tmp/prodex" --godex "$tmp/godex" \
