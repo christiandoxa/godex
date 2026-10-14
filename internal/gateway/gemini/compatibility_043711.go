@@ -1,18 +1,14 @@
 package gemini
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
-	"github.com/google/uuid"
 )
 
 // The tagged Prodex 0.437.11 API-key Super path is the Gemini
@@ -120,56 +116,12 @@ func filterGeminiOrphanToolMessages043711(body []byte) ([]byte, error) {
 	return json.Marshal(request)
 }
 
+// Tagged Prodex 0.437.11 uses the Gemini *native* response normalizer even
+// for API-key requests sent over the OpenAI-compatible chat endpoint. A
+// Chat Completion-shaped upstream body has no visible Gemini candidates and
+// must become gemini_empty_response, not a fabricated successful answer.
 func translateGeminiChatOrNativeResponse043711(
 	response *http.Response,
 ) (*proxymodel.Response, error) {
-	if strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream") {
-		return &proxymodel.Response{
-			StatusCode: response.StatusCode,
-			Header:     translatedHeaders(response.Header, "text/event-stream"),
-			Body:       chatcompat.ChatSSEWithMetadata(response.Body, "gemini", nil),
-			Trailer:    response.Trailer,
-		}, nil
-	}
-	defer response.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(response.Body, bodyMaxBytes+1))
-	if err != nil {
-		return nil, errors.New("failed to read Gemini chat-compatible response")
-	}
-	if len(body) > bodyMaxBytes {
-		return nil, errors.New("Gemini chat-compatible response exceeded its read limit")
-	}
-	var shape struct {
-		Candidates json.RawMessage `json:"candidates"`
-		Choices    json.RawMessage `json:"choices"`
-	}
-	if err := json.Unmarshal(body, &shape); err != nil {
-		return nil, errors.New("failed to parse Gemini chat-compatible response")
-	}
-	if len(shape.Candidates) > 0 {
-		// The native response adapter is also used by the reference for
-		// accepted generateContent envelopes on its chat-compatible URL.
-		native := *response
-		native.Body = io.NopCloser(bytes.NewReader(body))
-		return translateResponse(&native, nil)
-	}
-	if len(shape.Choices) == 0 {
-		return nil, errors.New("Gemini chat-compatible response has no choices or candidates")
-	}
-	translated, err := chatcompat.ChatResponseWithOptions(body, time.Now(),
-		chatcompat.ResponseOptions{
-			ProviderKey:        "gemini",
-			AdapterLabel:       "Gemini",
-			DefaultModel:       "gemini-3.1-pro-preview",
-			FallbackResponseID: func() string { return "resp_gemini_" + uuid.NewString() },
-		})
-	if err != nil {
-		return nil, err
-	}
-	return &proxymodel.Response{
-		StatusCode: response.StatusCode,
-		Header:     translatedHeaders(response.Header, "application/json"),
-		Body:       io.NopCloser(bytes.NewReader(translated)),
-		Trailer:    response.Trailer,
-	}, nil
+	return translateResponse(response, nil)
 }

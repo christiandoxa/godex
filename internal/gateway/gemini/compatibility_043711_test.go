@@ -21,7 +21,14 @@ func TestProdex043711GeminiAPIKeyPoolUsesOpenAICompatibleChatWire(t *testing.T) 
 			t.Errorf("decode native Gemini API-key fixture: %v", err)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(w, "{\"id\":\"chatcmpl-gemini\",\"object\":\"chat.completion\",\"model\":\"gemini-3.1-pro-preview\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"synthetic-ok\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":2,\"completion_tokens\":1,\"total_tokens\":3}}")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"candidates": []any{map[string]any{
+				"content":      map[string]any{"role": "model", "parts": []any{map[string]any{"text": "synthetic-ok"}}},
+				"finishReason": "STOP",
+			}},
+			"modelVersion":  "gemini-3.1-pro-preview",
+			"usageMetadata": map[string]any{"promptTokenCount": 2, "candidatesTokenCount": 1, "totalTokenCount": 3},
+		})
 	}))
 	defer server.Close()
 	pool, err := NewRuntimePool(server.URL+"/v1beta", []proxymodel.ProviderCredential{
@@ -83,5 +90,48 @@ func TestProdex043711GeminiAPIKeyPoolDropsDanglingToolCallWithoutOutput(t *testi
 	messages, _ := captured["messages"].([]any)
 	if len(messages) != 1 || messages[0].(map[string]any)["role"] != "user" {
 		t.Fatalf("canonical Gemini chat request includes orphan tool call: %+v", captured)
+	}
+}
+
+func TestProdex043711GeminiAPIKeyPoolChatCompletionBodyFailsLikeOfficialBinary(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1beta/openai/chat/completions" {
+			t.Errorf("wrong Gemini route: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id": "chatcmpl-gemini", "object": "chat.completion",
+			"model": "gemini-3.1-pro-preview",
+			"choices": []any{map[string]any{
+				"message":       map[string]any{"role": "assistant", "content": "synthetic-ok"},
+				"finish_reason": "stop",
+			}},
+			"usage": map[string]any{"prompt_tokens": 2, "completion_tokens": 1, "total_tokens": 3},
+		})
+	}))
+	defer server.Close()
+	pool, err := NewRuntimePool(server.URL+"/v1beta",
+		[]proxymodel.ProviderCredential{{ID: "key-a", Secret: "synthetic-credential"}}, server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	result, err := pool.Execute(t.Context(), proxymodel.Request{
+		Method: http.MethodPost, Path: "/backend-api/prodex/responses",
+		Body: []byte(`{"model":"gemini-3.1-pro-preview","input":"same request","stream":false}`),
+	}, proxymodel.Account{ID: "key-a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer result.Body.Close()
+	var received map[string]any
+	if err := json.NewDecoder(result.Body).Decode(&received); err != nil {
+		t.Fatal(err)
+	}
+	details, _ := received["error"].(map[string]any)
+	output, _ := received["output"].([]any)
+	if result.StatusCode != http.StatusOK || received["status"] != "failed" ||
+		details["code"] != "gemini_empty_response" || len(output) != 0 {
+		t.Fatalf("tagged Prodex requires an empty-content Gemini failure, got %+v", received)
 	}
 }
