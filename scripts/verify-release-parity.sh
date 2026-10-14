@@ -56,12 +56,14 @@ go build -trimpath -o "$tmp/continuationparity" ./tools/continuationparity
 # and full-history rotation regressions are qualified separately.
 go test ./internal/gateway/codex -run 'Test(PersistSessionGoal|UpdateSessionGoal|MaintainManagedSessions.*Goal|PersistSessionGoalObjective|RunRuntimeDirectRepairsSelectedGoalBeforeChildStarts|RepairResumeSessionBeforeLaunch|CodexResumeSessionID)' -count=1 -timeout=30s
 
-# Tagged 0.437.11 native-session app-server shutdown must print saved-session
-# resume guidance only on a real interactive terminal after socket teardown.
-# The PTY regression fails closed when the release environment lacks a PTY.
+# Tagged 0.437.11 native-session shutdown must print saved-session resume
+# guidance only after the owned socket closes, and restore inherited termios,
+# alt-screen, keyboard, mouse, focus and bracketed-paste modes on every exit.
+# These real PTY regressions fail closed when no PTY is available and verify
+# queued input is never flushed during restoration.
 go test ./internal/gateway/codex \
-  -run '^TestProdex043711(SuccessfulSessionCompanionShowsResumeGuidanceAfterSocketClosed|SessionCompanionSuppressesGuidanceOnNonTTYAndFailure)$' \
-  -count=1 -timeout=60s
+  -run '^TestProdex043711(SuccessfulSessionCompanionShowsResumeGuidanceAfterSocketClosed|SessionCompanionSuppressesGuidanceOnNonTTYAndFailure|ChildTerminalHandoffPreservesQueuedInputAndProtocols|NativeTUIRestoresTerminalAfterSuccessAndFailure|NonInteractiveChildNeverEmitsTerminalProtocols|OwnedCompanionRestoresTTYBeforeResumeGuidance)$' \
+  -count=1 -timeout=75s
 
 # The tagged 0.437.11 release-fence delta must remain fail-closed under stale
 # snapshots, same-second rotation, seven-day retired-fence compaction, backup
