@@ -50,6 +50,7 @@ go build -trimpath -o "$tmp/profileparity" ./tools/profileparity
 go build -trimpath -o "$tmp/clierrorparity" ./tools/clierrorparity
 go build -trimpath -o "$tmp/contextparity" ./tools/contextparity
 go build -trimpath -o "$tmp/continuationparity" ./tools/continuationparity
+go build -trimpath -o "$tmp/sessionfooterparity" ./tools/sessionfooterparity
 
 # Preserve the focused 0.437.10 goal-attachment recovery regressions while
 # migrating the executable oracles to 0.437.11. The 0.437.11 session-release
@@ -88,6 +89,14 @@ go test ./internal/repository/routing ./internal/usecase/routing ./internal/usec
 # Its signature presence check also includes U+001C–U+001F as whitespace.
 go test ./internal/gateway/gemini \
   -run '^TestProdex043711GeminiHardening' -count=1 -timeout=40s
+
+# Independent Linux PTY footer oracle. It uses one synthetic Codex helper for
+# both exact binaries and checks launch-owned identity, picker fallback, and
+# all-stream TTY suppression without credentials or provider calls.
+"$tmp/sessionfooterparity" \
+  --prodex "$tmp/prodex" --godex "$tmp/godex" \
+  --prodex-source "$tmp/prodex-source" \
+  --godex-source "$root" --godex-commit "$(git rev-parse HEAD)"
 
 # Independent managed-profile persistence oracle. All 29 CLI actions run in
 # separate subprocesses with isolated credential-free homes; state projections
