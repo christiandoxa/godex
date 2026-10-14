@@ -140,5 +140,9 @@ func translateGeminiChatOrNativeResponse043711(
 	}
 	native := *response
 	native.Body = io.NopCloser(bytes.NewReader(payload))
-	return translateResponse(&native, nil)
+	translated, err := translateResponse(&native, nil)
+	if err != nil {
+		return nil, err
+	}
+	return normalizeGeminiAPIKeyBufferedIdentity043711(translated)
 }
