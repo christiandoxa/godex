@@ -91,59 +91,6 @@ func normalizeGeminiChatInput043711(body []byte) ([]byte, error) {
 	return json.Marshal(root)
 }
 
-// The tagged chat-compatible adapter repairs tool-call adjacency before
-// sending Gemini's OpenAI wire body. Standalone assistant tool calls lacking
-// any corresponding tool output cannot be replayed as continuation context.
-// Keep complete call/output pairs and ordinary assistant prose.
-func filterGeminiOrphanToolMessages043711(body []byte) ([]byte, error) {
-	var request map[string]any
-	if err := json.Unmarshal(body, &request); err != nil {
-		return nil, errors.New("invalid Gemini chat-compatible request")
-	}
-	messages, _ := request["messages"].([]any)
-	outputIDs := make(map[string]bool)
-	for _, raw := range messages {
-		message, _ := raw.(map[string]any)
-		if message["role"] == "tool" {
-			if callID, _ := message["tool_call_id"].(string); callID != "" {
-				outputIDs[callID] = true
-			}
-		}
-	}
-	filtered := make([]any, 0, len(messages))
-	for _, raw := range messages {
-		message, _ := raw.(map[string]any)
-		if message["role"] != "assistant" {
-			filtered = append(filtered, raw)
-			continue
-		}
-		calls, _ := message["tool_calls"].([]any)
-		if len(calls) == 0 {
-			filtered = append(filtered, raw)
-			continue
-		}
-		kept := make([]any, 0, len(calls))
-		for _, candidate := range calls {
-			call, _ := candidate.(map[string]any)
-			id, _ := call["id"].(string)
-			if outputIDs[id] {
-				kept = append(kept, candidate)
-			}
-		}
-		if len(kept) == 0 {
-			delete(message, "tool_calls")
-			if text, _ := message["content"].(string); strings.TrimSpace(text) == "" {
-				continue
-			}
-		} else {
-			message["tool_calls"] = kept
-		}
-		filtered = append(filtered, message)
-	}
-	request["messages"] = filtered
-	return json.Marshal(request)
-}
-
 // Tagged Prodex 0.437.11 uses the Gemini *native* response normalizer
 // even for API-key requests sent to the OpenAI-compatible chat endpoint.
 // A Chat Completion-shaped JSON response has no Gemini candidates. The
