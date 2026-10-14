@@ -130,8 +130,15 @@ func TestProdex043711GeminiAPIKeyPoolChatCompletionBodyFailsLikeOfficialBinary(t
 	}
 	details, _ := received["error"].(map[string]any)
 	output, _ := received["output"].([]any)
+	metadata, metadataOK := received["metadata"].(map[string]any)
+	usage, usageOK := received["usage"].(map[string]any)
+	_, timestampPresent := received["created_at"]
 	if result.StatusCode != http.StatusOK || received["status"] != "failed" ||
-		details["code"] != "gemini_empty_response" || len(output) != 0 {
-		t.Fatalf("tagged Prodex requires an empty-content Gemini failure, got %+v", received)
+		details["code"] != "gemini_empty_response" ||
+		details["message"] != "Gemini returned no visible response content." ||
+		len(output) != 0 || received["id"] != "gemini_resp_prodex" ||
+		received["model"] != "gemini-2.5-pro" || timestampPresent ||
+		!metadataOK || len(metadata) != 0 || !usageOK || len(usage) != 0 {
+		t.Fatalf("tagged Prodex requires its complete Gemini failure envelope, got %+v", received)
 	}
 }
