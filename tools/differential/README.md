@@ -14,6 +14,34 @@ go build -trimpath -o /tmp/godex-candidate ./cmd/godex
   --godex-commit "$(git rev-parse HEAD)"
 ```
 
+### Pinned Gemini API-key Super executable differential
+
+Use `--gemini` with the same `--prodex`, `--godex`,
+`--prodex-source`, `--godex-source`, and `--godex-commit` flags
+to run three **additional** cases against the published Prodex 0.437.11
+binary, not against a guessed Gemini protocol. The reference was
+observed to send API-key Super requests as OpenAI-compatible
+`POST /v1beta/openai/chat/completions`, yet it decodes upstream
+**Gemini native GenerateContent** envelopes for the client response.
+
+The three cases require an exact single upstream request with synthetic
+credential authentication and translated model/message fields:
+(1) a successful native GenerateContent result,
+(2) an unpaired tool call that must not leak into upstream context, and
+(3) an HTTP-200 Chat Completion-shaped response that must become
+`gemini_empty_response` with Prodex's exact failed envelope, rather
+than being treated as successful content.
+
+Source tag, executable hash, clean worktrees and embedded Godex VCS
+metadata are verified **before** either executable runs. The comparator
+checks provider route, authorization validity, request body, HTTP
+status and full JSON response semantics; only nondeterministic response
+IDs and timestamps are normalized. Mutation sentinels must detect
+altered route, authorization, model, status, content, quota usage and
+metadata. These checks use a loopback fake upstream with no live
+credential. They are automatically required by
+`scripts/verify-release-parity.sh`.
+
 The harness creates separate temporary homes, starts one loopback mock upstream,
 and runs both products independently through eighteen bounded scenarios: a successful request; a
 synthetic 429 followed by a retry owned by the **Codex shim**; a single-key

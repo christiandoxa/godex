@@ -113,6 +113,16 @@ go test ./internal/gateway/gemini \
   --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
   --scenario all
 
+# Gemini API-key Super uses OpenAI-compatible Chat Completions transport,
+# but native GenerateContent response semantics. Qualify both the outbound
+# request and accepted/invalid native response with independent error,
+# route, auth, model, usage, and semantic-response mutation sentinels.
+"$tmp/differential" \
+  --prodex "$tmp/prodex" --godex "$tmp/godex" \
+  --prodex-source "$tmp/prodex-source" \
+  --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
+  --gemini
+
 # Exact-tagged Responses WebSocket executable differential. A synthetic
 # heartbeat followed by capacity error must remain precommit; actual output
 # must never be replayed; trusted previous_response_id outranks soft session.

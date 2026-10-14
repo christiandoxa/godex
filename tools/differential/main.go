@@ -153,6 +153,7 @@ func run() error {
 	prodexSource := flags.String("prodex-source", "", "exact Prodex 0.437.11 source checkout")
 	godexSource := flags.String("godex-source", "", "Godex candidate source checkout")
 	expectedGodexCommit := flags.String("godex-commit", "", "expected Godex source HEAD commit SHA")
+	gemini := flags.Bool("gemini", false, "run isolated Gemini generateContent executable differential")
 	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, sse-stream, sse-rate-limit, retry, deepseek-sse-terminal, single-key-401, single-key-403, single-key-429, single-key-503, single-key-500, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		return err
@@ -187,6 +188,12 @@ func run() error {
 	// Read its embedded Go VCS metadata and reject stale or dirty builds.
 	if err := verifyGodexBinaryProvenance(*godexBin, godexSourceCommit); err != nil {
 		return fmt.Errorf("verify Godex executable provenance: %w", err)
+	}
+	if *gemini {
+		if *scenarioName != "all" {
+			return errors.New("--gemini must run its entire scenario set")
+		}
+		return runGeminiDifferential(*prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit)
 	}
 	root, err := os.MkdirTemp("", "godex-differential-")
 	if err != nil {
@@ -779,6 +786,12 @@ func runCodexShim(arguments []string) int {
 	}
 	endpoint.Path = strings.TrimRight(endpoint.Path, "/") + "/responses"
 	requestBody := []byte(`{"model":"deepseek-v4-pro","input":[{"role":"user","content":[{"type":"input_text","text":"same request"}]}],"stream":false}`)
+	if os.Getenv("DIFFERENTIAL_PROVIDER") == "gemini" {
+		requestBody = []byte(`{"model":"gemini-3.1-pro-preview","input":[{"role":"user","content":[{"type":"input_text","text":"same request"}]}],"stream":false}`)
+		if os.Getenv("DIFFERENTIAL_GEMINI_TOOL") == "1" {
+			requestBody = []byte(`{"model":"gemini-3.1-pro-preview","input":[{"role":"user","content":[{"type":"input_text","text":"same request"}]},{"type":"function_call","call_id":"call-fixture","name":"lookup","arguments":"{}"}],"stream":false}`)
+		}
+	}
 	if os.Getenv("DIFFERENTIAL_STREAM") == "1" {
 		requestBody = []byte(`{"model":"deepseek-v4-pro","input":[{"role":"user","content":[{"type":"input_text","text":"same request"}]}],"stream":true}`)
 	}
