@@ -45,18 +45,8 @@ func (store *Store) ReleaseSessions(ctx context.Context, keys []string) error {
 	if err != nil {
 		return err
 	}
-	if len(state.SessionReleaseEpochs)+len(unique) > routingentity.MaxBindings {
-		// Avoid a false overflow for keys which already exist in the map.
-		newKeys := 0
-		for key := range unique {
-			if _, exists := state.SessionReleaseEpochs[key]; !exists {
-				newKeys++
-			}
-		}
-		if len(state.SessionReleaseEpochs)+newKeys > routingentity.MaxBindings {
-			return errors.New("routing session release fence storage is full")
-		}
-	}
+	// Capacity is checked after the seven-day retired-fence compaction,
+	// so old barriers do not permanently prevent an explicit release.
 	if state.SessionReleaseEpochs == nil {
 		state.SessionReleaseEpochs = make(map[string]int64, len(unique))
 	}

@@ -23,6 +23,11 @@ type snapshot struct {
 
 func (store *Store) writeState(value snapshot) error {
 	value.Version = 1
+	// Every durable mutation is the checkpoint for the exact 0.437.11
+	// retention policy. Prune before encoding both primary and backup.
+	if err := compactSessionReleaseFences043711(&value, time.Now().Unix(), routingentity.MaxBindings); err != nil {
+		return err
+	}
 	content, err := json.Marshal(value)
 	if err != nil {
 		return err
