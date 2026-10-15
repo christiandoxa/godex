@@ -129,6 +129,13 @@ go test -race ./internal/usecase/quota ./internal/usecase/routing \
   -run '^TestProdex043714(QuotaObservationInvalidates|AcceptedUsageAdvances|ThreeProfileQuotaReset)' \
   -count=1 -timeout=65s
 
+# Prodex 0.437.14 restart rehydrates authenticated 401/403 penalties even
+# with a fresh quota DTO. A new receipt must retire only the exact old auth
+# generation, preserving newer 401 and independent generic/transport leases.
+# Invalid or public auth-backoff sidecars never silently authorize selection.
+go test -race ./internal/repository/routing ./internal/usecase/routing \
+  -run '^TestProdex043714Restart' -count=1 -timeout=65s
+
 # The tagged 0.437.11 release-fence delta must remain fail-closed under stale
 # snapshots, same-second rotation, seven-day retired-fence compaction, backup
 # recovery, and invalid inputs. Only self-contained full-history Responses

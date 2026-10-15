@@ -87,6 +87,7 @@ type Router struct {
 	affinity                              *affinityStore
 	mu                                    sync.Mutex
 	retryBackoffMu                        sync.Mutex
+	authBackoffMu                         sync.Mutex
 	transportMu                           sync.Mutex
 	routeHealthMu                         sync.Mutex
 	routeMemoryMu                         sync.Mutex
@@ -239,6 +240,9 @@ func NewRouter(config Config) (*Router, error) {
 		}
 		for _, backoff := range backoffs {
 			router.setQuarantine(backoff.AccountID, backoff.Remaining(now), false)
+		}
+		if err := router.loadAuthBackoffs043714(ctx, now); err != nil {
+			return nil, fmt.Errorf("load historical profile auth failures: %w", err)
 		}
 		transportBackoffs, err := config.RoutingState.LoadTransportBackoffs(ctx, now)
 		if err != nil {

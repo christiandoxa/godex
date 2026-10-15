@@ -21,9 +21,16 @@ func (router *Router) recordAuthFailureEvidence043714(accountID string, response
 		return
 	}
 	now := router.now()
+	// Tagged Prodex 0.437.14 production auth-health decay: score 12 for
+	// 401, score 2 for 403; each unit decays over 300 seconds. Ordinary
+	// retry/transport quarantine still has independent deadlines.
+	authDuration := 10 * time.Minute
+	if response.StatusCode == 401 {
+		authDuration = time.Hour
+	}
 	// Create the standard bounded auth quarantine first; a missing/untrusted
 	// request fingerprint still blocks normal selection as it did previously.
-	router.quarantineAuthFailure(accountID, time.Minute)
+	router.quarantineAuthFailure(accountID, authDuration)
 	router.mu.Lock()
 	state := router.quarantine[accountID]
 	state.authFailedAt = now
@@ -36,6 +43,7 @@ func (router *Router) recordAuthFailureEvidence043714(accountID string, response
 	}
 	router.quarantine[accountID] = state
 	router.mu.Unlock()
+	router.persistAuthBackoff043714(accountID, state)
 }
 
 const authRecoveryProbeRetryInterval043714 = 2 * time.Second
@@ -117,6 +125,31 @@ func (router *Router) recoverConfirmedAuthQuarantines043714(accounts []proxymode
 			router.mu.Unlock()
 			continue
 		}
+		router.mu.Unlock()
+		router.authBackoffMu.Lock()
+		router.mu.Lock()
+		current, stillPresent := router.quarantine[account.ID]
+		if !stillPresent || !current.authFailure || current.authFailedAt != state.authFailedAt ||
+			current.authUntil != state.authUntil {
+			router.mu.Unlock()
+			router.authBackoffMu.Unlock()
+			continue
+		}
+		state = current
+		router.mu.Unlock()
+		if !router.clearInheritedAuthBackoff043714(account.ID, state, now) {
+			router.authBackoffMu.Unlock()
+			continue
+		}
+		router.mu.Lock()
+		current, stillPresent = router.quarantine[account.ID]
+		if !stillPresent || !current.authFailure || current.authFailedAt != state.authFailedAt ||
+			current.authUntil != state.authUntil {
+			router.mu.Unlock()
+			router.authBackoffMu.Unlock()
+			continue
+		}
+		state = current
 		if state.otherUntil.After(now) {
 			state.authFailure = false
 			state.authKnown = false
@@ -129,6 +162,7 @@ func (router *Router) recoverConfirmedAuthQuarantines043714(accounts []proxymode
 			delete(router.quarantine, account.ID)
 		}
 		router.mu.Unlock()
+		router.authBackoffMu.Unlock()
 		router.notifySelectionChange()
 	}
 }
