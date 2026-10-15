@@ -17,9 +17,9 @@ import (
 )
 
 const (
-	oracleVersion = "prodex 0.437.13"
-	oracleCommit  = "f5694b42a749c61f272e7bf378c376816fb6b1e8"
-	oracleSHA256  = "027dfcb094fab7c7fab7487dee3e2b22eabf93aab4bec5150e982391eccad874"
+	oracleVersion = "prodex 0.437.14"
+	oracleCommit  = "ef7a965ed8a4996eb8288b1918533d395f65a132"
+	oracleSHA256  = "94acc49aadd1be65c1578f2d2a7ca6288b87758106f245d7684a65dfef1f3d12"
 )
 
 type options struct {
@@ -33,7 +33,7 @@ type options struct {
 func parseOptions() (options, error) {
 	var result options
 	flags := flag.NewFlagSet("sessionfooterparity", flag.ContinueOnError)
-	flags.StringVar(&result.prodex, "prodex", "", "official Prodex 0.437.13 binary")
+	flags.StringVar(&result.prodex, "prodex", "", "official Prodex 0.437.14 binary")
 	flags.StringVar(&result.godex, "godex", "", "Godex candidate binary")
 	flags.StringVar(&result.prodexSource, "prodex-source", "", "clean tagged Prodex source")
 	flags.StringVar(&result.godexSource, "godex-source", "", "clean Godex source")

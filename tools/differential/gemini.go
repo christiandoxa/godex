@@ -143,7 +143,7 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 	if mock.scenario == "wrapped-response-trace" || mock.scenario == "wrapped-response-no-trace" {
-		// Prodex 0.437.13 unwraps the nested GenerateContent response even
+		// Prodex 0.437.14 unwraps the nested GenerateContent response even
 		// if the optional outer traceId was absent. A present string traceId
 		// has precedence over any stale nested responseId.
 		response["responseId"] = "stale-nested-id"

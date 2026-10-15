@@ -1,6 +1,6 @@
-# Prodex 0.437.13 continuation and WebSocket executable differential
+# Prodex 0.437.14 continuation and WebSocket executable differential
 
-This harness compares an official SHA-256-pinned Prodex `0.437.13` binary
+This harness compares an official SHA-256-pinned Prodex `0.437.14` binary
 and Godex using isolated two-profile homes, synthetic credentials, and a
 loopback-only upstream. It does **not** send real model requests or use
 the caller's account credentials.
@@ -51,17 +51,17 @@ containing Go VCS metadata:
 ```sh
 go build -trimpath -o /tmp/godex-043710-candidate ./cmd/godex
 go run ./tools/continuationparity \
-  --prodex /path/to/official/prodex-0.437.13 \
-  --prodex-source /path/to/clean/prodex-tag-0.437.13 \
+  --prodex /path/to/official/prodex-0.437.14 \
+  --prodex-source /path/to/clean/prodex-tag-0.437.14 \
   --godex /tmp/godex-043710-candidate \
   --godex-source "$PWD" --godex-commit "$(git rev-parse HEAD)" \
   --websocket
 ```
 
-The official reference executable must report `prodex 0.437.13`, have
-SHA-256 `027dfcb094fab7c7fab7487dee3e2b22eabf93aab4bec5150e982391eccad874`,
+The official reference executable must report `prodex 0.437.14`, have
+SHA-256 `94acc49aadd1be65c1578f2d2a7ca6288b87758106f245d7684a65dfef1f3d12`,
 and correspond to source commit
-`f5694b42a749c61f272e7bf378c376816fb6b1e8`.
+`ef7a965ed8a4996eb8288b1918533d395f65a132`.
 The WebSocket mode additionally rejects a dirty Godex source tree, a
 different expected commit, or missing/modified Go executable VCS metadata.
 

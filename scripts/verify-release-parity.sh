@@ -19,35 +19,35 @@ fi
 
 # Release-only proof: the public oracle is pinned by commit and binary digest.
 # No live provider accounts, real credentials, or external model calls.
-ref_commit='f5694b42a749c61f272e7bf378c376816fb6b1e8'
-prodex_binary_sha256='027dfcb094fab7c7fab7487dee3e2b22eabf93aab4bec5150e982391eccad874'
+ref_commit='ef7a965ed8a4996eb8288b1918533d395f65a132'
+prodex_binary_sha256='94acc49aadd1be65c1578f2d2a7ca6288b87758106f245d7684a65dfef1f3d12'
 root="$(git rev-parse --show-toplevel)"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/godex-release-parity.XXXXXXXX")"
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
 cd "$root"
 
-git clone --quiet --depth 1 --branch 0.437.13 \
+git clone --quiet --depth 1 --branch 0.437.14 \
   https://github.com/christiandoxa/prodex.git "$tmp/prodex-source"
 test "$(git -C "$tmp/prodex-source" rev-parse HEAD)" = "$ref_commit" || {
-  echo "Prodex oracle source does not match 0.437.13" >&2
+  echo "Prodex oracle source does not match 0.437.14" >&2
   exit 1
 }
 
 curl --fail --location --silent --show-error --retry 3 \
   --output "$tmp/prodex" \
-  'https://github.com/christiandoxa/prodex/releases/download/0.437.13/prodex-x86_64-unknown-linux-gnu'
+  'https://github.com/christiandoxa/prodex/releases/download/0.437.14/prodex-x86_64-unknown-linux-gnu'
 curl --fail --location --silent --show-error --retry 3 \
   --output "$tmp/SHA256SUMS" \
-  'https://github.com/christiandoxa/prodex/releases/download/0.437.13/SHA256SUMS'
+  'https://github.com/christiandoxa/prodex/releases/download/0.437.14/SHA256SUMS'
 curl --fail --location --silent --show-error --retry 3 \
   --output "$tmp/release-manifest.json" \
-  'https://github.com/christiandoxa/prodex/releases/download/0.437.13/release-manifest.json'
+  'https://github.com/christiandoxa/prodex/releases/download/0.437.14/release-manifest.json'
 grep -Fqx "$prodex_binary_sha256  prodex-x86_64-unknown-linux-gnu" "$tmp/SHA256SUMS" || {
   echo "Prodex executable is absent or mismatched in published SHA256SUMS" >&2
   exit 1
 }
-grep -Fq '"version": "0.437.13"' "$tmp/release-manifest.json" &&
-grep -Fq '"commit": "f5694b42a749c61f272e7bf378c376816fb6b1e8"' "$tmp/release-manifest.json" &&
+grep -Fq '"version": "0.437.14"' "$tmp/release-manifest.json" &&
+grep -Fq '"commit": "ef7a965ed8a4996eb8288b1918533d395f65a132"' "$tmp/release-manifest.json" &&
 grep -Fq '"asset": "prodex-x86_64-unknown-linux-gnu"' "$tmp/release-manifest.json" || {
   echo "Prodex release manifest does not describe the pinned oracle" >&2
   exit 1
@@ -57,7 +57,7 @@ echo "$prodex_binary_sha256  $tmp/prodex" | sha256sum --check --status || {
   exit 1
 }
 chmod +x "$tmp/prodex"
-test "$("$tmp/prodex" --version)" = "prodex 0.437.13"
+test "$("$tmp/prodex" --version)" = "prodex 0.437.14"
 
 # Go's build VCS metadata must identify the clean release commit, not WIP.
 go build -trimpath -o "$tmp/godex" ./cmd/godex
@@ -83,20 +83,24 @@ go test ./internal/gateway/codex \
   -run '^TestProdex043711(SuccessfulSessionCompanionShowsResumeGuidanceAfterSocketClosed|SessionCompanionSuppressesGuidanceOnNonTTYAndFailure|ChildTerminalHandoffPreservesQueuedInputAndProtocols|NativeTUIRestoresTerminalAfterSuccessAndFailure|NonInteractiveChildNeverEmitsTerminalProtocols|OwnedCompanionRestoresTTYBeforeResumeGuidance)$' \
   -count=1 -timeout=75s
 
-# Prodex 0.437.13 saved-session output must carry the launch-owned identity,
+# Prodex 0.437.14 saved-session output must carry the launch-owned identity,
 # preserve CRLF append-only boundaries, offer a picker when unknown, and only
 # allocate identity hooks for interactive companion launches.
 go test ./internal/gateway/codex \
   -run '^TestProdex043712' \
   -count=1 -timeout=30s
 
-# Prodex 0.437.13 resets DEC 1047 (no DECRC) after native TUI exit,
+# Prodex 0.437.14 resets DEC 1047 (no DECRC) after native TUI exit,
 # and the live runtime only accepts the exact terminal WebSocket idle timeout.
 # Both fail-before regressions protect native output and recovery boundaries.
 go test ./internal/gateway/codex \
   -run '^TestProdex043713TerminalHandoff' -count=1 -timeout=45s
 go test ./internal/delivery/cli/runtime \
   -run '^TestProdex043713WebSocketIdle' -count=1 -timeout=45s
+
+# Prodex 0.437.14 Retry-After text parser uses UInt128 bounds, rejects
+# zero/signed values, rounds fractional millis, and caps at five minutes.
+go test ./internal/usecase/routing -run '^TestProdex043714RetryAfter' -count=1 -timeout=30s
 
 # The live observer must distinguish an absent goal from an unavailable DB,
 # preserve unread failure evidence under EMFILE, and recover after resources
@@ -122,13 +126,13 @@ go test ./internal/repository/routing ./internal/usecase/routing ./internal/usec
 go test ./internal/gateway/gemini \
   -run '^TestProdex043711GeminiHardening' -count=1 -timeout=40s
 
-# Prodex 0.437.13 DeepSeek streamed tool arguments use tagged serde_json
+# Prodex 0.437.14 DeepSeek streamed tool arguments use tagged serde_json
 # surrogate, depth and finite-number boundaries, independent of Go's more
 # permissive escape and recursion handling. Verify real SSE terminal frames.
 go test ./internal/gateway/deepseek \
   -run '^TestProdex043713DeepSeek' -count=1 -timeout=45s
 
-# The 0.437.13 streamed-argument differential compares four exact-tagged
+# The 0.437.14 streamed-argument differential compares four exact-tagged
 # real SSE tool-call envelopes. Reject extra empty arguments in item.added,
 # unstable invalid-JSON diagnostics, bad Unicode/numeric/depth validation,
 # failed completion ordering, and any extra/missing stream event.
@@ -201,7 +205,7 @@ if [ "$phase" = 'all' ] || [ "$phase" = 'gemini' ]; then
   --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
   --gemini
 
-# The 0.437.13 Gemini native envelope must unwrap `response` with or
+# The 0.437.14 Gemini native envelope must unwrap `response` with or
 # without traceId. The API-key buffered bridge must generate its own UUIDv7
 # and must not expose stale native/trace IDs. These cases are mandatory parts
 # of the full --gemini differential above.
@@ -225,4 +229,4 @@ fi
 
 # Printed only after all stages *selected for this invocation* succeeded.
 # --phase=... must never be mistaken for the default complete release gate.
-printf 'PASS: Prodex 0.437.13 parity phase %s (Godex %s)\n' "$phase" "$(git rev-parse HEAD)"
+printf 'PASS: Prodex 0.437.14 parity phase %s (Godex %s)\n' "$phase" "$(git rev-parse HEAD)"
