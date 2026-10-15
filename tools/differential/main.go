@@ -1145,6 +1145,7 @@ func fixtureDurableStateSignature(run productRun) string {
 			"state/logs/runtime.guard", "state/logs/runtime.jsonl",
 			"state/previous-response-failures.guard", "state/profile-import-lifecycle.guard",
 			"state/profiles.guard", "state/routing-health.guard", "state/routing-memory.guard",
+			"state/routing-auth-backoff.guard",
 			"state/routing-retry-backoff.guard", "state/routing-transport-backoff.guard",
 			"state/routing.guard", "state/state.guard", "state/state.json.lock",
 			"state/runtime-scores.json.lock", "state/runtime-backoffs.json.lock":

@@ -136,6 +136,12 @@ go test -race ./internal/usecase/quota ./internal/usecase/routing \
 go test -race ./internal/repository/routing ./internal/usecase/routing \
   -run '^TestProdex043714Restart' -count=1 -timeout=65s
 
+# A new restart-safe auth store creates only a private empty lock in these
+# credential-free external-provider fixtures. Reject data, public modes and
+# any unexpected auth sidecar rather than weakening state-integrity checks.
+go test ./tools/differential -run '^TestProdex043714DifferentialAuthGuard' \
+  -count=1 -timeout=30s
+
 # The tagged 0.437.11 release-fence delta must remain fail-closed under stale
 # snapshots, same-second rotation, seven-day retired-fence compaction, backup
 # recovery, and invalid inputs. Only self-contained full-history Responses

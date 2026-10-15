@@ -52,6 +52,13 @@ func auditFixtureDurableState(root string) []string {
 		if !allowedFixtureStateFile(relative) {
 			violations = append(violations, "unknown_persistent_file:"+relative)
 		}
+		// The 0.437.14 restart-safe auth store owns a private, empty lock.
+		// It is not an excuse to accept an auth state file in an ephemeral
+		// DeepSeek API-key fixture where no managed 401 could have occurred.
+		if relative == "state/routing-auth-backoff.guard" &&
+			(info.Size() != 0 || runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0) {
+			violations = append(violations, "auth_guard_invalid")
+		}
 		// Go file mode bits do not describe Windows ACL permissions.
 		// Apply POSIX permission assertions only where their semantics hold;
 		// Windows still gets type, bounds, content, path, and secret checks.
@@ -200,7 +207,7 @@ func allowedFixtureStateFile(name string) bool {
 		"state/previous-response-failures.guard", "state/profile-import-lifecycle.guard",
 		"state/profiles.guard", "state/retry-backoff.json",
 		"state/route-memory.json", "state/routing-health.guard",
-		"state/routing-memory.guard", "state/routing-retry-backoff.guard",
+		"state/routing-memory.guard", "state/routing-auth-backoff.guard", "state/routing-retry-backoff.guard",
 		"state/routing-transport-backoff.guard", "state/routing.guard",
 		"state/routing.json", "state/routing.json.last-good",
 		"state/route-health.json", "state/route-health.json.last-good",
