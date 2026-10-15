@@ -17,6 +17,13 @@ type GoalRecoveryStateReader interface {
 	ReadGoalRecoveryState(context.Context, string) (runtimemodel.GoalRecoveryState, bool)
 }
 
+// An available observation with no row is distinct from an unavailable
+// observer (e.g. EMFILE or SQLite busy). This optional interface preserves
+// existing lightweight readers while enabling fail-closed monitoring.
+type goalRecoveryAvailabilityReader interface {
+	ObserveGoalRecoveryState(context.Context, string) (runtimemodel.GoalRecoveryState, bool, bool)
+}
+
 // nativeSessionRecoveryProcess is implemented only by gateways that own a
 // private app-server companion. Keeping it optional leaves ordinary process
 // fakes and explicit remote launches on the existing relaunch path.
@@ -169,6 +176,22 @@ func (runner *Runner) ReadGoalRecoveryState(
 		return runtimemodel.GoalRecoveryState{}, false
 	}
 	return runner.goalRecoveryReader.ReadGoalRecoveryState(ctx, sessionID)
+}
+
+// ObserveGoalRecoveryState returns found and observer-available independently.
+// Existing readers without the optional availability capability retain their
+// original found-only behavior.
+func (runner *Runner) ObserveGoalRecoveryState(
+	ctx context.Context, sessionID string,
+) (runtimemodel.GoalRecoveryState, bool, bool) {
+	if runner == nil || runner.goalRecoveryReader == nil || ctx.Err() != nil {
+		return runtimemodel.GoalRecoveryState{}, false, false
+	}
+	if reader, ok := runner.goalRecoveryReader.(goalRecoveryAvailabilityReader); ok {
+		return reader.ObserveGoalRecoveryState(ctx, sessionID)
+	}
+	state, found := runner.ReadGoalRecoveryState(ctx, sessionID)
+	return state, found, true
 }
 
 // WaitForGoalRecoveryProfile owns profile eligibility, quota readiness and

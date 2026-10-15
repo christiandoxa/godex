@@ -63,6 +63,7 @@ func runParsedWithOptionsWithRecovery(
 	if marker != nil && strings.TrimSpace(runner.SharedCodexHome()) != "" {
 		monitor := &liveGoalRecovery04361{
 			marker: marker, read: runner.ReadGoalRecoveryState,
+			observe: runner.ObserveGoalRecoveryState,
 			resolve: func(resolveCtx context.Context, id string) (sessionmodel.Report, error) {
 				return sessions.Resolve(resolveCtx, id)
 			},

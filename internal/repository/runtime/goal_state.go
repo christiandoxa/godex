@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -30,19 +31,33 @@ func NewGoalStateStore(sharedHome string) *GoalStateStore {
 func (store *GoalStateStore) ReadGoalRecoveryState(
 	ctx context.Context, sessionID string,
 ) (runtimemodel.GoalRecoveryState, bool) {
+	state, found, _ := store.ObserveGoalRecoveryState(ctx, sessionID)
+	return state, found
+}
+
+// ObserveGoalRecoveryState distinguishes a legitimately absent goal row from
+// an unavailable/invalid SQLite observer. A failed observation never grants
+// the live recovery monitor permission to consume unread rollout evidence.
+func (store *GoalStateStore) ObserveGoalRecoveryState(
+	ctx context.Context, sessionID string,
+) (runtimemodel.GoalRecoveryState, bool, bool) {
 	if store == nil || store.path == "" || !filepath.IsAbs(store.path) ||
 		strings.TrimSpace(sessionID) == "" || ctx.Err() != nil {
-		return runtimemodel.GoalRecoveryState{}, false
+		return runtimemodel.GoalRecoveryState{}, false, false
 	}
 	store.mu.Lock()
 	defer store.mu.Unlock()
 	info, err := os.Lstat(store.path)
+	if errors.Is(err, os.ErrNotExist) {
+		// Codex has not yet created an optional goal store.
+		return runtimemodel.GoalRecoveryState{}, false, true
+	}
 	if err != nil || !info.Mode().IsRegular() {
-		return runtimemodel.GoalRecoveryState{}, false
+		return runtimemodel.GoalRecoveryState{}, false, false
 	}
 	db, err := sql.Open("sqlite", goalReadOnlyDSN(store.path, goruntime.GOOS))
 	if err != nil {
-		return runtimemodel.GoalRecoveryState{}, false
+		return runtimemodel.GoalRecoveryState{}, false, false
 	}
 	defer db.Close()
 	db.SetMaxOpenConns(1)
@@ -51,11 +66,14 @@ func (store *GoalStateStore) ReadGoalRecoveryState(
 	err = db.QueryRowContext(ctx,
 		"SELECT status,updated_at_ms FROM thread_goals WHERE thread_id = ? ORDER BY updated_at_ms DESC LIMIT 1", sessionID,
 	).Scan(&state.Status, &state.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return runtimemodel.GoalRecoveryState{}, false, true
+	}
 	if err != nil {
-		return runtimemodel.GoalRecoveryState{}, false
+		return runtimemodel.GoalRecoveryState{}, false, false
 	}
 	state.SessionID = sessionID
-	return state, true
+	return state, true, true
 }
 
 func (store *GoalStateStore) Close() error {

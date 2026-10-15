@@ -81,6 +81,13 @@ go test ./internal/gateway/codex \
 go test ./internal/delivery/cli/runtime \
   -run '^TestProdex043713WebSocketIdle' -count=1 -timeout=45s
 
+# The live observer must distinguish an absent goal from an unavailable DB,
+# preserve unread failure evidence under EMFILE, and recover after resources
+# return. The Linux low-RLIMIT case runs inside a dedicated child process.
+go test ./internal/repository/runtime ./internal/delivery/cli/runtime \
+  -run '^TestProdex043713(GoalStoreDistinguishes|UnavailableGoalDatabase|LiveObserverDescriptor)' \
+  -count=1 -timeout=65s
+
 # The tagged 0.437.11 release-fence delta must remain fail-closed under stale
 # snapshots, same-second rotation, seven-day retired-fence compaction, backup
 # recovery, and invalid inputs. Only self-contained full-history Responses

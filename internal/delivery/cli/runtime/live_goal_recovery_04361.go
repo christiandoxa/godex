@@ -20,6 +20,8 @@ type liveGoalRecovery04361 struct {
 	marker             *sessionStartMarker04360
 	sessionID          string
 	read               func(context.Context, string) (runtimemodel.GoalRecoveryState, bool)
+	observe            func(context.Context, string) (runtimemodel.GoalRecoveryState, bool, bool)
+	observerRetryAt    time.Time
 	resolve            func(context.Context, string) (sessionmodel.Report, error)
 	checkpoint         recoveryCheckpoint04360
 	checkpointPath     string
@@ -34,7 +36,8 @@ type liveGoalRecovery04361 struct {
 }
 
 func (monitor *liveGoalRecovery04361) readState(ctx context.Context) (runtimemodel.GoalRecoveryState, bool) {
-	if monitor == nil || monitor.marker == nil || monitor.read == nil {
+	if monitor == nil || monitor.marker == nil || (monitor.read == nil && monitor.observe == nil) ||
+		monitor.observerRetryAt.After(time.Now()) {
 		return runtimemodel.GoalRecoveryState{}, false
 	}
 	id := monitor.marker.ID()
@@ -48,13 +51,28 @@ func (monitor *liveGoalRecovery04361) readState(ctx context.Context) (runtimemod
 		monitor.scanOffset = 0
 		monitor.accepted = false
 		monitor.scanRetryAt = time.Time{}
+		monitor.observerRetryAt = time.Time{}
 		monitor.pendingClass = ""
 		monitor.goalRevision = 0
 		monitor.pendingRevision = 0
 		monitor.suppressedRevision = 0
 		monitor.activitySeen = false
 	}
-	state, ok := monitor.read(ctx, id)
+	var state runtimemodel.GoalRecoveryState
+	var ok bool
+	if monitor.observe != nil {
+		var available bool
+		state, ok, available = monitor.observe(ctx, id)
+		if !available {
+			// Preserve the session, accepted work and unread scan cursor.
+			// Unknown observation cannot authorize relaunch or rotation.
+			monitor.observerRetryAt = time.Now().Add(runtimeRecoveryRetryInterval04360)
+			return runtimemodel.GoalRecoveryState{}, false
+		}
+		monitor.observerRetryAt = time.Time{}
+	} else {
+		state, ok = monitor.read(ctx, id)
+	}
 	if ok && state.SessionID != "" && state.SessionID != id {
 		return runtimemodel.GoalRecoveryState{}, false
 	}
