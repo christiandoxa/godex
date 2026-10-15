@@ -18,7 +18,7 @@ go build -trimpath -o /tmp/godex-candidate ./cmd/godex
 
 Use `--gemini` with the same `--prodex`, `--godex`,
 `--prodex-source`, `--godex-source`, and `--godex-commit` flags
-to run eight **additional** cases against the published Prodex 0.437.13
+to run ten **additional** cases against the published Prodex 0.437.13
 binary, not against a guessed Gemini protocol. The reference was
 observed to send API-key Super requests as OpenAI-compatible
 `POST /v1beta/openai/chat/completions`, yet it decodes upstream
@@ -368,3 +368,24 @@ model, usage, no arbitrary outer fields, and a generated API-key Responses
 identity in the `resp_deepseek_` UUIDv7 namespace. Direct native Gemini
 transport is not changed by this identity contract. The source-pinned binary
 oracle now exercises ten Gemini cases, including all earlier eight fixtures.
+
+### Bounded full DeepSeek oracle
+
+`--scenario all --scenario-workers 3` runs every scenario inside a separate
+loopback mock and private HOME, with up to three scenario pairs in flight.
+Product comparisons remain sequential within each scenario (Prodex then
+Godex), and the report restores the canonical declaration order. Any worker
+failure fails the entire run; no partial report is accepted. The default
+`--scenario all` uses one worker and preserves sequential execution. Source,
+SHA-256, Go build VCS revision, synthetic credentials, error envelopes,
+headers, durable state, and negative controls are checked in both modes.
+Parallel workers are allowed only for the complete DeepSeek scenario set.
+
+`./scripts/verify-release-parity.sh` remains the full release gate. When an
+external shell has a short synchronous execution deadline, execute each
+explicit phase on the **same clean Git commit**: `--phase=preflight`,
+`--phase=deepseek`, `--phase=gemini`, and `--phase=websocket`. Each phase
+independently clones/verifies the exact tagged Prodex source and public
+release SHA-256 plus manifest, and builds/validates the Godex candidate.
+A successful subset is not a complete gate. Never skip an unverified phase
+or treat partial-phase PASS as general production readiness.

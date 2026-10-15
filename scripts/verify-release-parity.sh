@@ -1,6 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# A release without explicit phase flags still executes the *entire* gate.
+# Phases make the same clean-commit, source-verified binary comparisons runnable
+# under synchronous tool deadlines. One phase is never a release certificate.
+case "${1:-}" in
+  '') phase='all' ;;
+  --phase=preflight) phase='preflight' ;;
+  --phase=deepseek) phase='deepseek' ;;
+  --phase=gemini) phase='gemini' ;;
+  --phase=websocket) phase='websocket' ;;
+  *) echo 'usage: verify-release-parity.sh [--phase=preflight|deepseek|gemini|websocket]' >&2; exit 2 ;;
+esac
+if [ "$#" -gt 1 ]; then
+  echo 'release parity accepts at most one phase option' >&2
+  exit 2
+fi
+
 # Release-only proof: the public oracle is pinned by commit and binary digest.
 # No live provider accounts, real credentials, or external model calls.
 ref_commit='f5694b42a749c61f272e7bf378c376816fb6b1e8'
@@ -52,6 +68,7 @@ go build -trimpath -o "$tmp/contextparity" ./tools/contextparity
 go build -trimpath -o "$tmp/continuationparity" ./tools/continuationparity
 go build -trimpath -o "$tmp/sessionfooterparity" ./tools/sessionfooterparity
 
+if [ "$phase" = 'all' ] || [ "$phase" = 'preflight' ]; then
 # Preserve the focused 0.437.10 goal-attachment recovery regressions while
 # migrating the executable oracles to 0.437.11. The 0.437.11 session-release
 # and full-history rotation regressions are qualified separately.
@@ -150,14 +167,20 @@ go test ./tools/differential \
   --prodex-source "$tmp/prodex-source" \
   --godex-source "$root" --godex-commit "$(git rev-parse HEAD)"
 
+fi
+
+if [ "$phase" = 'all' ] || [ "$phase" = 'deepseek' ]; then
 # Separate real-provider DeepSeek mock/oracle, still fail-closed on all material
 # mismatches including the private durable-file layout.
 "$tmp/differential" \
   --prodex "$tmp/prodex" --godex "$tmp/godex" \
   --prodex-source "$tmp/prodex-source" \
   --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
-  --scenario all
+  --scenario all --scenario-workers 3
 
+fi
+
+if [ "$phase" = 'all' ] || [ "$phase" = 'gemini' ]; then
 # Gemini API-key Super uses OpenAI-compatible Chat Completions transport,
 # but native GenerateContent response semantics. Qualify both the outbound
 # request and accepted/invalid native response, and require tagged native
@@ -185,6 +208,9 @@ go test ./tools/differential \
 go test ./internal/gateway/gemini ./tools/differential \
   -run '^TestProdex043713Gemini' -count=1 -timeout=50s
 
+fi
+
+if [ "$phase" = 'all' ] || [ "$phase" = 'websocket' ]; then
 # Exact-tagged Responses WebSocket executable differential. A synthetic
 # heartbeat followed by capacity error must remain precommit; actual output
 # must never be replayed; trusted previous_response_id outranks soft session.
@@ -194,3 +220,9 @@ go test ./internal/gateway/gemini ./tools/differential \
   --prodex-source "$tmp/prodex-source" \
   --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
   --websocket
+
+fi
+
+# Printed only after all stages *selected for this invocation* succeeded.
+# --phase=... must never be mistaken for the default complete release gate.
+printf 'PASS: Prodex 0.437.13 parity phase %s (Godex %s)\n' "$phase" "$(git rev-parse HEAD)"
