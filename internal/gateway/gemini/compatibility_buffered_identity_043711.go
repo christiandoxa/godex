@@ -6,16 +6,15 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"strings"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	"github.com/google/uuid"
 )
 
-// The pinned Prodex 0.437.11 API-key chat-compatible bridge generates its
-// own UUIDv7 Responses identity for an otherwise anonymous native Gemini
-// buffered response and omits created_at. Direct Gemini GenerateContent
-// transport still retains its separate native response policy.
+// The pinned Prodex 0.437.13 API-key chat-compatible bridge generates a new
+// UUIDv7 Responses identity regardless of the upstream native responseId or
+// traceId, and omits created_at. Direct native/OAuth Gemini GenerateContent
+// retains its separate identity policy.
 func normalizeGeminiAPIKeyBufferedIdentity043711(
 	response *proxymodel.Response,
 ) (*proxymodel.Response, error) {
@@ -32,15 +31,13 @@ func normalizeGeminiAPIKeyBufferedIdentity043711(
 		return nil, errors.New("invalid Gemini API-key translated response")
 	}
 	delete(object, "created_at")
-	var id string
-	if err := json.Unmarshal(object["id"], &id); err == nil &&
-		strings.HasPrefix(id, "resp_gemini_") {
-		generated, err := uuid.NewV7()
-		if err != nil {
-			return nil, errors.New("generate tagged Gemini Responses identity")
-		}
-		object["id"], _ = json.Marshal("resp_deepseek_" + generated.String())
+	// The API-key bridge owns the client-visible Responses identity. Its
+	// buffered output must not reuse a provider-supplied response or trace ID.
+	generated, err := uuid.NewV7()
+	if err != nil {
+		return nil, errors.New("generate tagged Gemini Responses identity")
 	}
+	object["id"], _ = json.Marshal("resp_deepseek_" + generated.String())
 	normalized, err := json.Marshal(object)
 	if err != nil {
 		return nil, errors.New("serialize Gemini API-key response")
