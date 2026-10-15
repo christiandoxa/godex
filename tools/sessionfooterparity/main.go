@@ -71,6 +71,9 @@ func run() error {
 		check func(string, int, string) error
 	}{
 		{name: "canonical_identity", tty: true, check: checkCanonicalFooter},
+		{name: "native_normal_screen_preserved", tty: true,
+			extra: []string{"SESSION_FOOTER_NATIVE_NORMAL_SCREEN=1"},
+			check: checkNativeNormalScreen},
 		{name: "unknown_identity_picker", tty: true, extra: []string{"SESSION_FOOTER_EMIT_ID=0"}, check: checkUnknownFooter},
 		{name: "piped_output_suppressed", tty: false, check: checkNoFooter},
 		{name: "failed_child_status", tty: true, extra: []string{"SESSION_FOOTER_EXIT=23"}, check: checkFailedChild},
@@ -204,6 +207,41 @@ func checkCanonicalFooter(output string, code int, provider string) error {
 	}
 	if strings.Contains(footer, "unix://") || strings.Contains(footer, "\x1b") {
 		return errors.New("footer contains socket or terminal control data")
+	}
+	return nil
+}
+
+// The 0.437.13 VTE regression: the child exits its alternate screen before
+// printing its native usage line. Only DEC 1047 is safe afterwards; DEC 1049
+// would restore a previously saved cursor and overwrite the native footer.
+func checkNativeNormalScreen(output string, code int, provider string) error {
+	if err := checkCanonicalFooter(output, code, provider); err != nil {
+		return err
+	}
+	native := strings.Index(output, "Native usage summary")
+	footer := strings.Index(output, providerTitle(provider))
+	if native < 0 || footer < native {
+		return errors.New("native summary or saved-session footer was removed")
+	}
+	before := output[:native]
+	if !strings.Contains(before, "\x1b[?1049h\x1b[?1049l") {
+		return errors.New("synthetic Codex did not leave the alternate screen")
+	}
+	// These bytes come exclusively from the parent handoff or footer, not
+	// from the child. The native output is already on the normal screen.
+	trailing := output[native:]
+	if strings.Count(trailing, "\x1b[?1047l") != 1 {
+		return fmt.Errorf("parent did not select the normal buffer safely: %q", diagnosticOutput(trailing))
+	}
+	for _, forbidden := range []string{"\x1b[?1049l", "\x1b[?1048l", "\x1b8", "\x1b[u", "\x1b[2J", "\x1b[3J"} {
+		if strings.Contains(trailing, forbidden) {
+			return fmt.Errorf("parent restored cursor or erased native usage: %q", forbidden)
+		}
+	}
+	if strings.Count(trailing, "Native usage summary") != 1 ||
+		strings.Count(trailing, "Native session summary") != 1 ||
+		strings.Count(trailing, "Resume: "+provider+" s "+fakeSessionID) != 1 {
+		return errors.New("native output or resume command was lost/duplicated")
 	}
 	return nil
 }

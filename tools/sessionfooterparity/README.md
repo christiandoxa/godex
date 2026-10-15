@@ -12,6 +12,13 @@ control/socket leakage, and child exit-status preservation, including a
 synthetic non-zero child exit whose footer must still be appended after
 teardown.
 
+Prodex 0.437.13 also gets a dedicated normal-buffer handoff case: the fake
+Codex first enters/exits its alternate screen, prints native usage, then exits.
+The cross-binary fixture requires the parent to append `DEC 1047` only (no
+second `DEC 1049`, cursor restore, clear, or duplicate/truncated resume line).
+The negative-control unit test rejects stale cursor restoration and missing
+buffer selection independently of parity between the two executables.
+
 ```text
 sessionfooterparity \
   --prodex /path/to/prodex-0.437.13 \

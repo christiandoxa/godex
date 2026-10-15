@@ -36,6 +36,11 @@ func runFakeCodex() int {
 		}
 		return 2
 	}
+	if os.Getenv("SESSION_FOOTER_NATIVE_NORMAL_SCREEN") == "1" {
+		// Codex has already left the alternate screen. A second 1049 reset
+		// by the parent would restore an obsolete saved cursor on VTE/xterm.
+		fmt.Fprint(os.Stdout, "\x1b[?1049h\x1b[?1049l")
+	}
 	fmt.Fprint(os.Stdout, "Native usage summary\r\nNative session summary\r\n")
 	if err := invokeSessionHook(arguments); err != nil && os.Getenv("SESSION_FOOTER_DEBUG") == "1" {
 		fmt.Fprintf(os.Stderr, "fake hook: %v\r\n", err)
