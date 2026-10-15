@@ -135,13 +135,13 @@ func structuredWorkflowRecoveryClass04360(record map[string]any) string {
 				return "transport"
 			}
 		case "other":
-			// Prodex 0.437.8 (Mojo workflow_recovery_class_v2):
-			// only the exact native request timeout, with no explicit
+			// Prodex 0.437.13 (Mojo workflow_recovery_class_v2):
+			// only the exact native timeout/idle WebSocket messages, with no explicit
 			// HTTP status or a timeout status (408/504), is recoverable.
 			// This must not promote quoted prose or a 400/401/429
 			// client failure into a session restart.
 			if (!hasStatus || status == 408 || status == 504) &&
-				workflowNativeRequestTimeout04378(scope) {
+				workflowNativeRecoverableTransport043713(scope) {
 				return "transport"
 			}
 			return classifyUnexpectedWorkflowStatus04360(scope)
@@ -203,13 +203,14 @@ func transientWorkflowStatus04360(status int) bool {
 
 const httpStatusUnauthorized04360 = 401
 
-func workflowNativeRequestTimeout04378(failure map[string]any) bool {
+func workflowNativeRecoverableTransport043713(failure map[string]any) bool {
 	message, ok := failure["message"].(string)
 	if !ok {
 		return false
 	}
 	return message == "request timed out" ||
-		message == "Error running remote compact task: request timed out"
+		message == "Error running remote compact task: request timed out" ||
+		message == "stream disconnected before completion: idle timeout waiting for websocket"
 }
 
 func classifyUnexpectedWorkflowStatus04360(failure map[string]any) string {
