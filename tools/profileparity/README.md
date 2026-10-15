@@ -1,4 +1,4 @@
-# Prodex 0.437.12 managed-profile lifecycle differential
+# Prodex 0.437.13 managed-profile lifecycle differential
 
 This tool compares real Prodex and Godex binaries, each operating in a
 separate fresh HOME/PRODEX_HOME/GODEX_HOME, over 29 sequential CLI operations.
@@ -7,9 +7,9 @@ or external model request is needed. The subprocess receives a minimal
 environment with nonfunctional outbound proxy settings.
 
 It pins the Prodex source to commit
-e9d5a16f9abec6976cd670021c1e7f0b04a67b69 and the official Linux
+f5694b42a749c61f272e7bf378c376816fb6b1e8 and the official Linux
 artifact SHA-256 to
-ecab17893af7142304072c74c7af723347712a4fa5d055142e7c5035727d9d63.
+027dfcb094fab7c7fab7487dee3e2b22eabf93aab4bec5150e982391eccad874.
 It checks that the Godex executable's embedded clean VCS revision equals the
 candidate source commit. Both source checkouts must be clean.
 
@@ -17,9 +17,9 @@ To run from a clean Godex checkout, build the two Go binaries and invoke:
 
     go build -trimpath -o /tmp/godex-candidate ./cmd/godex
     go build -trimpath -o /tmp/profileparity ./tools/profileparity
-    /tmp/profileparity --prodex /path/to/official/prodex-0.437.12 \
+    /tmp/profileparity --prodex /path/to/official/prodex-0.437.13 \
       --godex /tmp/godex-candidate \
-      --prodex-source /path/to/prodex-tag-0.437.12 \
+      --prodex-source /path/to/prodex-tag-0.437.13 \
       --godex-source "$PWD" --godex-commit "$(git rev-parse HEAD)"
 
 The tool returns exit 1 for *any* unexpected outcome and produces a JSON
@@ -66,7 +66,7 @@ path redirected under a managed profile home.
 
 The additional negative CLI case supplies a synthetic DeepSeek --api-key
 but deliberately configures no managed/active Codex-compatible profile.
-Prodex 0.437.12 requires compatible profile selection before starting the
+Prodex 0.437.13 requires compatible profile selection before starting the
 gateway, so both implementations must reject startup with exit 1 and
 leave all state unchanged. The separate Go regression proves a configured
 provider profile can still open and close the raw-key gateway successfully.

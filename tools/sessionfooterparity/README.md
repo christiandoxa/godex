@@ -1,7 +1,7 @@
 # sessionfooterparity
 
 `sessionfooterparity` compares the saved-session footer contract in the exact
-Prodex `0.437.12` executable and a clean Godex executable. It runs both under a
+Prodex `0.437.13` executable and a clean Godex executable. It runs both under a
 real Linux PTY and with ordinary pipes, using one credential-free synthetic
 Codex helper for version probes, app-server readiness, and a launch-owned
 SessionStart callback.
@@ -14,7 +14,7 @@ teardown.
 
 ```text
 sessionfooterparity \
-  --prodex /path/to/prodex-0.437.12 \
+  --prodex /path/to/prodex-0.437.13 \
   --godex /path/to/godex \
   --prodex-source /path/to/prodex-source \
   --godex-source /path/to/godex-source \

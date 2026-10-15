@@ -3,35 +3,35 @@ set -euo pipefail
 
 # Release-only proof: the public oracle is pinned by commit and binary digest.
 # No live provider accounts, real credentials, or external model calls.
-ref_commit='e9d5a16f9abec6976cd670021c1e7f0b04a67b69'
-prodex_binary_sha256='ecab17893af7142304072c74c7af723347712a4fa5d055142e7c5035727d9d63'
+ref_commit='f5694b42a749c61f272e7bf378c376816fb6b1e8'
+prodex_binary_sha256='027dfcb094fab7c7fab7487dee3e2b22eabf93aab4bec5150e982391eccad874'
 root="$(git rev-parse --show-toplevel)"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/godex-release-parity.XXXXXXXX")"
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
 cd "$root"
 
-git clone --quiet --depth 1 --branch 0.437.12 \
+git clone --quiet --depth 1 --branch 0.437.13 \
   https://github.com/christiandoxa/prodex.git "$tmp/prodex-source"
 test "$(git -C "$tmp/prodex-source" rev-parse HEAD)" = "$ref_commit" || {
-  echo "Prodex oracle source does not match 0.437.12" >&2
+  echo "Prodex oracle source does not match 0.437.13" >&2
   exit 1
 }
 
 curl --fail --location --silent --show-error --retry 3 \
   --output "$tmp/prodex" \
-  'https://github.com/christiandoxa/prodex/releases/download/0.437.12/prodex-x86_64-unknown-linux-gnu'
+  'https://github.com/christiandoxa/prodex/releases/download/0.437.13/prodex-x86_64-unknown-linux-gnu'
 curl --fail --location --silent --show-error --retry 3 \
   --output "$tmp/SHA256SUMS" \
-  'https://github.com/christiandoxa/prodex/releases/download/0.437.12/SHA256SUMS'
+  'https://github.com/christiandoxa/prodex/releases/download/0.437.13/SHA256SUMS'
 curl --fail --location --silent --show-error --retry 3 \
   --output "$tmp/release-manifest.json" \
-  'https://github.com/christiandoxa/prodex/releases/download/0.437.12/release-manifest.json'
+  'https://github.com/christiandoxa/prodex/releases/download/0.437.13/release-manifest.json'
 grep -Fqx "$prodex_binary_sha256  prodex-x86_64-unknown-linux-gnu" "$tmp/SHA256SUMS" || {
   echo "Prodex executable is absent or mismatched in published SHA256SUMS" >&2
   exit 1
 }
-grep -Fq '"version": "0.437.12"' "$tmp/release-manifest.json" &&
-grep -Fq '"commit": "e9d5a16f9abec6976cd670021c1e7f0b04a67b69"' "$tmp/release-manifest.json" &&
+grep -Fq '"version": "0.437.13"' "$tmp/release-manifest.json" &&
+grep -Fq '"commit": "f5694b42a749c61f272e7bf378c376816fb6b1e8"' "$tmp/release-manifest.json" &&
 grep -Fq '"asset": "prodex-x86_64-unknown-linux-gnu"' "$tmp/release-manifest.json" || {
   echo "Prodex release manifest does not describe the pinned oracle" >&2
   exit 1
@@ -41,7 +41,7 @@ echo "$prodex_binary_sha256  $tmp/prodex" | sha256sum --check --status || {
   exit 1
 }
 chmod +x "$tmp/prodex"
-test "$("$tmp/prodex" --version)" = "prodex 0.437.12"
+test "$("$tmp/prodex" --version)" = "prodex 0.437.13"
 
 # Go's build VCS metadata must identify the clean release commit, not WIP.
 go build -trimpath -o "$tmp/godex" ./cmd/godex
@@ -66,12 +66,20 @@ go test ./internal/gateway/codex \
   -run '^TestProdex043711(SuccessfulSessionCompanionShowsResumeGuidanceAfterSocketClosed|SessionCompanionSuppressesGuidanceOnNonTTYAndFailure|ChildTerminalHandoffPreservesQueuedInputAndProtocols|NativeTUIRestoresTerminalAfterSuccessAndFailure|NonInteractiveChildNeverEmitsTerminalProtocols|OwnedCompanionRestoresTTYBeforeResumeGuidance)$' \
   -count=1 -timeout=75s
 
-# Prodex 0.437.12 saved-session output must carry the launch-owned identity,
+# Prodex 0.437.13 saved-session output must carry the launch-owned identity,
 # preserve CRLF append-only boundaries, offer a picker when unknown, and only
 # allocate identity hooks for interactive companion launches.
 go test ./internal/gateway/codex \
   -run '^TestProdex043712' \
   -count=1 -timeout=30s
+
+# Prodex 0.437.13 resets DEC 1047 (no DECRC) after native TUI exit,
+# and the live runtime only accepts the exact terminal WebSocket idle timeout.
+# Both fail-before regressions protect native output and recovery boundaries.
+go test ./internal/gateway/codex \
+  -run '^TestProdex043713TerminalHandoff' -count=1 -timeout=45s
+go test ./internal/delivery/cli/runtime \
+  -run '^TestProdex043713WebSocketIdle' -count=1 -timeout=45s
 
 # The tagged 0.437.11 release-fence delta must remain fail-closed under stale
 # snapshots, same-second rotation, seven-day retired-fence compaction, backup
