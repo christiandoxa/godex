@@ -42,6 +42,7 @@ func (router *Router) requestCandidatesModeWithRank(
 ) []proxymodel.Account {
 	router.refreshCachedQuotaChecks(accounts, selection, now)
 	router.recoverConfirmedAuthQuarantines043714(accounts, selection, now)
+	router.scheduleBlockedAuthRecoveryProbes043714(accounts, selection)
 	candidates := router.candidates(accounts, now)
 	order := func(values []proxymodel.Account) []proxymodel.Account {
 		return router.orderCandidatesModeWithRank(values, selection, now, consumeRotation, rank)

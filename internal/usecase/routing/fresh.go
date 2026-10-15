@@ -15,7 +15,12 @@ func (router *Router) forwardFresh(
 	request proxymodel.Request,
 	accounts []proxymodel.Account,
 ) (proxymodel.Forwarded, error) {
+	observedAuthProgress, authProgressAvailable := router.authRecoveryProgressRevision043714()
 	candidates := router.requestCandidatesForRequest(accounts, request, router.now())
+	if len(candidates) == 0 && authProgressAvailable &&
+		router.waitForAuthRecoveryProgress043714(ctx, accounts, observedAuthProgress) {
+		candidates = router.requestCandidatesForRequest(accounts, request, router.now())
+	}
 	quotaRefreshAttempted := false
 	if len(candidates) == 0 {
 		refreshed, checked, err := router.refreshQuotaExcluded(ctx, accounts, request.QuotaSelection, router.now())

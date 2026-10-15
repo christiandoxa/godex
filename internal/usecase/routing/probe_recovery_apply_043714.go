@@ -28,6 +28,7 @@ func (router *Router) recordAuthFailureEvidence043714(accountID string, response
 	router.mu.Lock()
 	state := router.quarantine[accountID]
 	state.authFailedAt = now
+	state.authProbeScheduledAt = time.Time{}
 	state.authKnown = response.AuthCredentialKnown && response.AuthCredentialDigest != ([32]byte{}) &&
 		!response.AuthRequestStartedAt.IsZero() && !response.AuthRequestStartedAt.After(now)
 	state.authDigest = [32]byte{}
@@ -38,8 +39,10 @@ func (router *Router) recordAuthFailureEvidence043714(accountID string, response
 	router.mu.Unlock()
 }
 
+const authRecoveryProbeRetryInterval043714 = 2 * time.Second
+
 func (router *Router) scheduleAuthRecoveryProbe043714(ctx context.Context, account proxymodel.Account, selection quotamodel.Selection) {
-	if router == nil || account.EphemeralAPIKey || !account.Enabled || account.Home == "" ||
+	if router == nil || ctx == nil || account.EphemeralAPIKey || !account.Enabled || account.Home == "" ||
 		externalProviderKind(account.Provider.Kind) || ctx.Err() != nil {
 		return
 	}
@@ -47,9 +50,29 @@ func (router *Router) scheduleAuthRecoveryProbe043714(ctx context.Context, accou
 	if !ok {
 		return
 	}
-	// Scheduling is bounded and non-blocking; no network I/O enters the
-	// provider request hotpath, and a failed probe never unlocks a profile.
+	now := router.now()
+	router.mu.Lock()
+	state, found := router.quarantine[account.ID]
+	if !found || !state.authFailure || !state.authKnown || !state.until.After(now) ||
+		!state.authProbeScheduledAt.IsZero() && now.Sub(state.authProbeScheduledAt) < authRecoveryProbeRetryInterval043714 {
+		router.mu.Unlock()
+		return
+	}
+	// Retry scheduling is bounded across requests; a cached quota-ready DTO
+	// is not authenticated evidence, and a queue job never runs inline here.
+	state.authProbeScheduledAt = now
+	router.quarantine[account.ID] = state
+	router.mu.Unlock()
 	_ = probe.ScheduleAuthenticatedRecoveryProbe(ctx, accountentity.Account{ID: account.ID, Enabled: true}, selection)
+}
+
+func (router *Router) scheduleBlockedAuthRecoveryProbes043714(accounts []proxymodel.Account, selection quotamodel.Selection) {
+	if router == nil {
+		return
+	}
+	for _, account := range accounts {
+		router.scheduleAuthRecoveryProbe043714(context.Background(), account, selection)
+	}
 }
 
 func (router *Router) recoverConfirmedAuthQuarantines043714(accounts []proxymodel.Account, selection quotamodel.Selection, now time.Time) {
@@ -106,4 +129,51 @@ func (router *Router) recoverConfirmedAuthQuarantines043714(accounts []proxymode
 		router.mu.Unlock()
 		router.notifySelectionChange()
 	}
+}
+
+// The child request can briefly wait for a previously queued, bounded quota
+// probe to release its reservation. This does not issue network I/O inline or
+// grant eligibility from progress alone: reranking still requires the exact
+// authenticated credential receipt and the causal Mojo policy above.
+type authRecoveryProgress043714 interface {
+	ProbeRefreshRevision() uint64
+	WaitProbeRefresh(context.Context, uint64) bool
+}
+
+func (router *Router) authRecoveryProgressRevision043714() (uint64, bool) {
+	if router == nil {
+		return 0, false
+	}
+	progress, ok := router.quota.(authRecoveryProgress043714)
+	if !ok {
+		return 0, false
+	}
+	return progress.ProbeRefreshRevision(), true
+}
+
+func (router *Router) waitForAuthRecoveryProgress043714(ctx context.Context, accounts []proxymodel.Account, observed uint64) bool {
+	if router == nil || ctx == nil || ctx.Err() != nil {
+		return false
+	}
+	progress, ok := router.quota.(authRecoveryProgress043714)
+	if !ok {
+		return false
+	}
+	now := router.now()
+	router.mu.Lock()
+	blocked := false
+	for _, account := range accounts {
+		state, found := router.quarantine[account.ID]
+		if found && account.Enabled && state.authFailure && state.authKnown && state.until.After(now) {
+			blocked = true
+			break
+		}
+	}
+	router.mu.Unlock()
+	if !blocked {
+		return false
+	}
+	bounded, cancel := context.WithTimeout(ctx, 850*time.Millisecond)
+	defer cancel()
+	return progress.WaitProbeRefresh(bounded, observed)
 }

@@ -9,11 +9,12 @@ type quarantineState struct {
 	authFailure bool
 	// Auth provenance is private to the active router. An unrelated retry
 	// lease never becomes removable by an authenticated quota receipt.
-	authUntil    time.Time
-	otherUntil   time.Time
-	authFailedAt time.Time
-	authDigest   [32]byte
-	authKnown    bool
+	authUntil            time.Time
+	otherUntil           time.Time
+	authFailedAt         time.Time
+	authProbeScheduledAt time.Time
+	authDigest           [32]byte
+	authKnown            bool
 }
 
 func (proxy *Router) isQuarantined(accountID string, now time.Time) bool {

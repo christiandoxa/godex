@@ -118,7 +118,7 @@ go test -race ./internal/usecase/quota \
 # qualifies to clear an older auth failure. Rotated credentials, newer 401s,
 # unknown quota cache, stale observations and unrelated retry leases stay blocked.
 go test -race ./internal/gateway/openai ./internal/usecase/quota ./internal/usecase/routing \
-  -run '^TestProdex043714(QuotaReceipt|FailedUpstreamResponse|AuthenticatedProbe|AuthenticatedQuotaRecovery|NewerQuotaObservation)' \
+  -run '^TestProdex043714(QuotaReceipt|FailedUpstreamResponse|AuthenticatedProbe|AuthenticatedQuotaRecovery|NewerQuotaObservation|BlockedAuthRecovery|EmptyAuthPoolWaits)' \
   -count=1 -timeout=65s
 
 # The tagged 0.437.11 release-fence delta must remain fail-closed under stale
