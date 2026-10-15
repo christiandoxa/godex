@@ -43,22 +43,33 @@ func (marker *sessionStartMarker04360) Close() error {
 }
 
 func (marker *sessionStartMarker04360) ID() string {
+	id, _ := marker.observedID043713()
+	return id
+}
+
+// observedID043713 distinguishes an absent/invalid marker from temporary
+// observer resource exhaustion. Keep ID()'s existing string-only semantics
+// for non-monitor callers; only live recovery needs availability evidence.
+func (marker *sessionStartMarker04360) observedID043713() (string, bool) {
 	if marker == nil {
-		return ""
+		return "", true
 	}
 	info, err := os.Lstat(marker.path)
-	if err != nil || !info.Mode().IsRegular() || info.Size() > 64 || info.Size() < 36 {
-		return ""
+	if err != nil {
+		return "", !sessionMarkerObserverTransient043713(err)
+	}
+	if !info.Mode().IsRegular() || info.Size() > 64 || info.Size() < 36 {
+		return "", true
 	}
 	payload, err := os.ReadFile(marker.path)
 	if err != nil {
-		return ""
+		return "", !sessionMarkerObserverTransient043713(err)
 	}
 	id := strings.TrimSpace(string(payload))
 	if !sessionentity.ValidID(id) {
-		return ""
+		return "", true
 	}
-	return id
+	return id, true
 }
 
 func sessionStartHookCommand04360(args []string, goos string) string {

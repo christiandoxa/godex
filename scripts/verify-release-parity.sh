@@ -85,7 +85,7 @@ go test ./internal/delivery/cli/runtime \
 # preserve unread failure evidence under EMFILE, and recover after resources
 # return. The Linux low-RLIMIT case runs inside a dedicated child process.
 go test ./internal/repository/runtime ./internal/delivery/cli/runtime \
-  -run '^TestProdex043713(GoalStoreDistinguishes|UnavailableGoalDatabase|LiveObserverDescriptor)' \
+  -run '^TestProdex043713(GoalStoreDistinguishes|UnavailableGoalDatabase|LiveObserverDescriptor|ObserverMarker)' \
   -count=1 -timeout=65s
 
 # The tagged 0.437.11 release-fence delta must remain fail-closed under stale

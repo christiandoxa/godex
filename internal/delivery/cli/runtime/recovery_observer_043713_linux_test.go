@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"syscall"
 	"testing"
+	"time"
 
 	sessionmodel "github.com/christiandoxa/godex/internal/model/session"
 	runtimerepo "github.com/christiandoxa/godex/internal/repository/runtime"
@@ -98,8 +99,10 @@ func TestProdex043713LiveObserverDescriptorPressurePreservesUnreadCursor(t *test
 		}
 		held = append(held, file)
 	}
-	if _, ok := monitor.readState(t.Context()); ok || monitor.scanOffset != offset || monitor.sessionID != session {
-		t.Fatalf("descriptor pressure consumed terminal event or changed identity: ok=%t offset=%d session=%s", ok, monitor.scanOffset, monitor.sessionID)
+	if _, ok := monitor.readState(t.Context()); ok || monitor.scanOffset != offset || monitor.sessionID != session ||
+		!monitor.observerRetryAt.After(time.Now()) {
+		t.Fatalf("descriptor pressure consumed terminal event or failed to schedule bounded retry: ok=%t offset=%d session=%s retry=%v",
+			ok, monitor.scanOffset, monitor.sessionID, monitor.observerRetryAt)
 	}
 	for _, file := range held {
 		if err := file.Close(); err != nil {
@@ -109,6 +112,10 @@ func TestProdex043713LiveObserverDescriptorPressurePreservesUnreadCursor(t *test
 	if err := syscall.Setrlimit(syscall.RLIMIT_NOFILE, &original); err != nil {
 		t.Fatal(err)
 	}
+	if _, found := monitor.readState(t.Context()); found {
+		t.Fatal("observer bypassed bounded retry backoff after EMFILE")
+	}
+	monitor.observerRetryAt = time.Now().Add(-time.Second)
 	state, found := monitor.readState(t.Context())
 	if !found || state.Status != "usage_limited" || monitor.scanOffset <= offset {
 		t.Fatalf("unread failure not recovered after FD pressure: %+v found=%t offset=%d", state, found, monitor.scanOffset)

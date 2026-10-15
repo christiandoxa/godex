@@ -40,7 +40,14 @@ func (monitor *liveGoalRecovery04361) readState(ctx context.Context) (runtimemod
 		monitor.observerRetryAt.After(time.Now()) {
 		return runtimemodel.GoalRecoveryState{}, false
 	}
-	id := monitor.marker.ID()
+	id, available := monitor.marker.observedID043713()
+	if !available {
+		// Descriptor pressure while reading the launch-owned marker is
+		// unknown observation, not a missing session. Preserve all unread
+		// evidence and throttle retries without terminating the child.
+		monitor.observerRetryAt = time.Now().Add(runtimeRecoveryRetryInterval04360)
+		return runtimemodel.GoalRecoveryState{}, false
+	}
 	if id == "" {
 		return runtimemodel.GoalRecoveryState{}, false
 	}
