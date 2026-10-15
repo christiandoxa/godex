@@ -2,6 +2,7 @@ package openai
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
 
@@ -60,6 +62,36 @@ func (client *QuotaClient) FetchAtPolicy(ctx context.Context, codexHome, upstrea
 	return usage, nil
 }
 
+// FetchAuthenticatedAtPolicy observes quota over the actual request-bound
+// credential, not over an in-memory/persisted quota snapshot. Re-read after
+// success rejects a profile reauthenticated concurrently with the request.
+// No raw credential is returned or persisted.
+func (client *QuotaClient) FetchAuthenticatedAtPolicy(
+	ctx context.Context, codexHome, upstream string, noProxy bool,
+) (quotamodel.Usage, quotamodel.AuthenticatedReceipt, error) {
+	body, requestAuth, startedAt, err := client.fetchBodyWithIdentity043714(ctx, codexHome, upstream, noProxy)
+	if err != nil {
+		return quotamodel.Usage{}, quotamodel.AuthenticatedReceipt{}, err
+	}
+	usage, err := decodeQuotaUsage(body)
+	if err != nil {
+		return quotamodel.Usage{}, quotamodel.AuthenticatedReceipt{}, err
+	}
+	original, ok := openAIAuthDigest043714(requestAuth)
+	if !ok {
+		return quotamodel.Usage{}, quotamodel.AuthenticatedReceipt{}, errors.New("quota credential unavailable")
+	}
+	currentAuth, err := client.auth.ReadAuth(ctx, codexHome)
+	if err != nil {
+		return quotamodel.Usage{}, quotamodel.AuthenticatedReceipt{}, err
+	}
+	current, currentOK := openAIAuthDigest043714(currentAuth)
+	if !currentOK || subtle.ConstantTimeCompare(original[:], current[:]) != 1 {
+		return quotamodel.Usage{}, quotamodel.AuthenticatedReceipt{}, errors.New("quota credentials changed during authenticated observation")
+	}
+	return usage, quotamodel.AuthenticatedReceipt{CredentialDigest: original, StartedAt: startedAt, Confirmed: true}, nil
+}
+
 func (client *QuotaClient) FetchRaw(ctx context.Context, codexHome string) ([]byte, error) {
 	return client.FetchRawAt(ctx, codexHome, "")
 }
@@ -80,17 +112,24 @@ func (client *QuotaClient) fetchBodyAt(ctx context.Context, codexHome, upstream 
 }
 
 func (client *QuotaClient) fetchBodyAtPolicy(ctx context.Context, codexHome, upstream string, noProxy bool) ([]byte, error) {
+	body, _, _, err := client.fetchBodyWithIdentity043714(ctx, codexHome, upstream, noProxy)
+	return body, err
+}
+
+func (client *QuotaClient) fetchBodyWithIdentity043714(
+	ctx context.Context, codexHome, upstream string, noProxy bool,
+) ([]byte, proxymodel.Auth, time.Time, error) {
 	auth, err := client.auth.ReadAuth(ctx, codexHome)
 	if err != nil {
-		return nil, err
+		return nil, proxymodel.Auth{}, time.Time{}, err
 	}
 	usageURL, err := client.usageURL(upstream)
 	if err != nil {
-		return nil, err
+		return nil, proxymodel.Auth{}, time.Time{}, err
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, usageURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("create quota request: %w", err)
+		return nil, proxymodel.Auth{}, time.Time{}, fmt.Errorf("create quota request: %w", err)
 	}
 	request.Header.Set("Authorization", "Bearer "+auth.AccessToken)
 	request.Header.Set("Accept", "application/json")
@@ -102,24 +141,25 @@ func (client *QuotaClient) fetchBodyAtPolicy(ctx context.Context, codexHome, ups
 
 	httpClient, err := client.clientForPolicy(noProxy)
 	if err != nil {
-		return nil, err
+		return nil, proxymodel.Auth{}, time.Time{}, err
 	}
+	startedAt := time.Now()
 	response, err := client.doWithClient(httpClient, request)
 	if err != nil {
-		return nil, err
+		return nil, proxymodel.Auth{}, time.Time{}, err
 	}
 	defer response.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(response.Body, maxQuotaResponseBytes+1))
 	if err != nil {
-		return nil, fmt.Errorf("read quota response: %w", err)
+		return nil, proxymodel.Auth{}, time.Time{}, fmt.Errorf("read quota response: %w", err)
 	}
 	if len(body) > maxQuotaResponseBytes {
-		return nil, errors.New("quota response exceeded safe size limit")
+		return nil, proxymodel.Auth{}, time.Time{}, errors.New("quota response exceeded safe size limit")
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return nil, fmt.Errorf("quota endpoint returned HTTP %d", response.StatusCode)
+		return nil, proxymodel.Auth{}, time.Time{}, fmt.Errorf("quota endpoint returned HTTP %d", response.StatusCode)
 	}
-	return body, nil
+	return body, auth, startedAt, nil
 }
 
 func (client *QuotaClient) do(request *http.Request) (*http.Response, error) {

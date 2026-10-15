@@ -187,7 +187,9 @@ func (router *Router) legacyBoundResponse(
 ) proxymodel.Forwarded {
 	router.recordRouteOutcome(ctx, account.ID, request.QuotaSelection, response, responseOutcome{kind: responsePass, failed: failed})
 	if response.StatusCode == http.StatusUnauthorized {
+		router.recordAuthFailureEvidence043714(account.ID, response)
 		router.quarantineAuthFailure(account.ID, time.Minute)
+		router.scheduleAuthRecoveryProbe043714(ctx, account, request.QuotaSelection)
 	}
 	return proxymodel.Forwarded{Response: response, AccountID: account.ID, Failed: failed}
 }

@@ -30,6 +30,11 @@ type Request struct {
 	FirstEventRetryUsed             bool
 }
 type Response struct {
+	// Auth evidence is internal-only: never serialize a fingerprint or a
+	// request timestamp to clients, persisted conversations or proxy logs.
+	AuthCredentialDigest    [32]byte  `json:"-"`
+	AuthCredentialKnown     bool      `json:"-"`
+	AuthRequestStartedAt    time.Time `json:"-"`
 	StatusCode              int
 	Header                  http.Header
 	Body                    io.ReadCloser

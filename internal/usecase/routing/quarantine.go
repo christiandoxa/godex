@@ -7,6 +7,13 @@ const maxQuarantinedAccounts = 4096
 type quarantineState struct {
 	until       time.Time
 	authFailure bool
+	// Auth provenance is private to the active router. An unrelated retry
+	// lease never becomes removable by an authenticated quota receipt.
+	authUntil    time.Time
+	otherUntil   time.Time
+	authFailedAt time.Time
+	authDigest   [32]byte
+	authKnown    bool
 }
 
 func (proxy *Router) isQuarantined(accountID string, now time.Time) bool {
@@ -65,10 +72,19 @@ func (proxy *Router) setQuarantine(accountID string, duration time.Duration, aut
 		}
 		delete(proxy.quarantine, oldestID)
 	}
-	proxy.quarantine[accountID] = quarantineState{
-		until:       until,
-		authFailure: authFailure || (current.authFailure && current.until.After(now)),
+	current.until = until
+	if authFailure {
+		current.authFailure = true
+		if now.Add(duration).After(current.authUntil) {
+			current.authUntil = now.Add(duration)
+		}
+		if current.authFailedAt.IsZero() {
+			current.authFailedAt = now
+		}
+	} else if now.Add(duration).After(current.otherUntil) {
+		current.otherUntil = now.Add(duration)
 	}
+	proxy.quarantine[accountID] = current
 	proxy.mu.Unlock()
 	proxy.notifySelectionChange()
 }

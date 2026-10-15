@@ -34,5 +34,14 @@ func (status *Status) applySuccessfulUsageProbe043714(
 		status.storeUsage(home, usage, now)
 	}
 	status.storeUsageSnapshot(ctx, accountID, usage, now)
+	// A newer ordinary quota observation invalidates an older authenticated
+	// ready receipt, even if the old proof has not reached its TTL yet.
+	status.authProofMu.Lock()
+	for key, proof := range status.authProofs {
+		if key.accountID == accountID && proof.generation < generation {
+			delete(status.authProofs, key)
+		}
+	}
+	status.authProofMu.Unlock()
 	return true
 }

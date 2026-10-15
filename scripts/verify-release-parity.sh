@@ -114,6 +114,13 @@ go test ./internal/repository/runtime ./internal/delivery/cli/runtime \
 go test -race ./internal/usecase/quota \
   -run '^TestProdex043714LateSuccessfulProbe' -count=1 -timeout=60s
 
+# Prodex 0.437.14: only the exact successful HTTP request credential
+# qualifies to clear an older auth failure. Rotated credentials, newer 401s,
+# unknown quota cache, stale observations and unrelated retry leases stay blocked.
+go test -race ./internal/gateway/openai ./internal/usecase/quota ./internal/usecase/routing \
+  -run '^TestProdex043714(QuotaReceipt|FailedUpstreamResponse|AuthenticatedProbe|AuthenticatedQuotaRecovery|NewerQuotaObservation)' \
+  -count=1 -timeout=65s
+
 # The tagged 0.437.11 release-fence delta must remain fail-closed under stale
 # snapshots, same-second rotation, seven-day retired-fence compaction, backup
 # recovery, and invalid inputs. Only self-contained full-history Responses

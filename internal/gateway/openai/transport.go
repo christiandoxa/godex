@@ -179,6 +179,7 @@ func (transport *Transport) executeWithAuth(
 		copy.Jar = nil
 		client = &copy
 	}
+	startedAt := time.Now()
 	response, err := client.Do(request)
 	if err != nil {
 		if websocket {
@@ -217,7 +218,11 @@ func (transport *Transport) executeWithAuth(
 	} else if websocket {
 		response.Body = &websocketHandshakeBody{ReadCloser: response.Body, cancel: connectCancel}
 	}
-	return &proxymodel.Response{StatusCode: response.StatusCode, Header: response.Header, Body: response.Body, Trailer: response.Trailer}, nil
+	digest, known := openAIAuthDigest043714(auth)
+	return &proxymodel.Response{
+		AuthCredentialDigest: digest, AuthCredentialKnown: known, AuthRequestStartedAt: startedAt,
+		StatusCode: response.StatusCode, Header: response.Header, Body: response.Body, Trailer: response.Trailer,
+	}, nil
 }
 
 func newWebSocketKey() (string, error) {

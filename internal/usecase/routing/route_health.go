@@ -105,6 +105,9 @@ func (router *Router) recordRouteOutcome(
 		router.persistTransportBackoff(ctx, accountID, selection)
 		router.recordRouteLatencyFailure(context.Background(), accountID, selection, "transport")
 	}
+	if outcome.kind == responseAuthFailure {
+		router.recordAuthFailureEvidence043714(accountID, response)
+	}
 	if outcome.kind == responsePass {
 		if outcome.healthPenalty > 0 {
 			router.recordRouteFailurePenalty(ctx, accountID, selection, outcome.healthPenalty)

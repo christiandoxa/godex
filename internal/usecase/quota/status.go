@@ -85,6 +85,8 @@ type Status struct {
 	probeApplyMu  sync.Mutex
 	probeSequence atomic.Uint64
 	probeApplied  map[string]uint64
+	authProofMu   sync.Mutex
+	authProofs    map[quotaAuthProofKey043714]quotaAuthProof043714
 	usageCache    map[string]usageSnapshot
 	snapshotCache map[string]quotamodel.UsageSnapshot
 	snapshots     usageSnapshotStore

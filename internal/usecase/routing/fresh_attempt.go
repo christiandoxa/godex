@@ -284,6 +284,9 @@ func (router *Router) applyRetryOutcome(ctx context.Context, accountID string, s
 
 func (router *Router) applyRetryOutcomeForAccount(ctx context.Context, account proxymodel.Account, selection quotamodel.Selection, outcome responseOutcome) {
 	router.applyRetryOutcomeWithPersistence(ctx, account.ID, selection, outcome, !account.EphemeralAPIKey)
+	if outcome.kind == responseAuthFailure {
+		router.scheduleAuthRecoveryProbe043714(ctx, account, selection)
+	}
 }
 
 func (router *Router) applyRetryOutcomeWithPersistence(ctx context.Context, accountID string, selection quotamodel.Selection, outcome responseOutcome, persist bool) {
