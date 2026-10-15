@@ -27,7 +27,9 @@ func normalizeGeminiAPIKeyBufferedIdentity043711(
 		return nil, errors.New("Gemini API-key translated response is too large")
 	}
 	var object map[string]json.RawMessage
-	if err := json.Unmarshal(payload, &object); err != nil {
+	if err := json.Unmarshal(payload, &object); err != nil || object == nil {
+		// JSON null decodes successfully into a nil map, but cannot own a
+		// client-visible Responses ID. Fail closed instead of panicking.
 		return nil, errors.New("invalid Gemini API-key translated response")
 	}
 	delete(object, "created_at")
