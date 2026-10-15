@@ -55,6 +55,13 @@ func (s *transitionUsage043714) FetchAuthenticatedAtPolicy(ctx context.Context, 
 	}, nil
 }
 
+// This synthetic gateway's configured credential is the same one used in
+// its authenticated HTTP receipt. Unlike a cache-only quota fake, it meets
+// the production adapter's current-identity verification contract.
+func (s *transitionUsage043714) CurrentCredentialDigest(context.Context, string) ([32]byte, error) {
+	return [32]byte{7, 1, 4}, nil
+}
+
 func (s *transitionUsage043714) set(home string, usage quotamodel.Usage) {
 	s.mu.Lock()
 	s.data[home] = usage

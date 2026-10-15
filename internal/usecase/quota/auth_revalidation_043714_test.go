@@ -20,6 +20,10 @@ type authenticatedQuotaStub043714 struct {
 func (s *authenticatedQuotaStub043714) Fetch(context.Context, string) (quotamodel.Usage, error) {
 	return quotamodel.Usage{}, errors.New("ordinary quota cache is not authenticated evidence")
 }
+func (s *authenticatedQuotaStub043714) CurrentCredentialDigest(context.Context, string) ([32]byte, error) {
+	return s.receipt.CredentialDigest, nil
+}
+
 func (s *authenticatedQuotaStub043714) FetchAuthenticatedAtPolicy(
 	_ context.Context, _ string, _ string, _ bool,
 ) (quotamodel.Usage, quotamodel.AuthenticatedReceipt, error) {

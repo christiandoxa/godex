@@ -2,7 +2,6 @@ package routing
 
 import (
 	"context"
-	"crypto/subtle"
 	"time"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
@@ -97,11 +96,14 @@ func (router *Router) recoverConfirmedAuthQuarantines043714(accounts []proxymode
 		state, found := router.quarantine[account.ID]
 		if !found || !state.until.After(now) || !state.authFailure || !state.authKnown ||
 			state.authFailedAt.IsZero() || !receipt.StartedAt.After(state.authFailedAt) ||
-			subtle.ConstantTimeCompare(state.authDigest[:], receipt.CredentialDigest[:]) != 1 ||
 			router.quotaBlocked[account.ID] {
 			router.mu.Unlock()
 			continue
 		}
+		// The successful receipt is tied to the profile's CURRENT credential
+		// by quota.Status, not necessarily the obsolete bearer that received
+		// the earlier 401. A rotated-and-verified token may retire the older
+		// auth penalty; new failures and separate retry/transport leases stay.
 		// The 0.437.14 compiler-owned planner retires only causally older
 		// auth failure evidence. We keep other leases and all transport and
 		// previous-response ownership state entirely untouched.

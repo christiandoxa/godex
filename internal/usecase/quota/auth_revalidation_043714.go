@@ -2,6 +2,7 @@ package quota
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 // this evidence or cause an auth backoff to be retired.
 type quotaAuthenticatedGateway043714 interface {
 	FetchAuthenticatedAtPolicy(context.Context, string, string, bool) (quotamodel.Usage, quotamodel.AuthenticatedReceipt, error)
+	CurrentCredentialDigest(context.Context, string) ([32]byte, error)
 }
 
 type quotaAuthProofKey043714 struct {
@@ -118,6 +120,24 @@ func (status *Status) AuthenticatedRecoveryReceipt(accountID string, selection q
 	now := status.now()
 	if !found || now.Before(proof.observedAt) || now.Before(proof.receipt.StartedAt) || now.Sub(proof.observedAt) > usageCacheFreshness ||
 		!proof.receipt.Confirmed || proof.receipt.CredentialDigest == ([32]byte{}) {
+		return quotamodel.Availability{}, quotamodel.AuthenticatedReceipt{}, false
+	}
+	// The probe's final accepted identity was verified when it returned.
+	// Repeat the local check before selecting a previously quarantined route;
+	// a later auth.json update cannot resurrect old proof by age alone.
+	reader, ok := status.usage.(quotaAuthenticatedGateway043714)
+	if !ok || status.accounts == nil {
+		return quotamodel.Availability{}, quotamodel.AuthenticatedReceipt{}, false
+	}
+	home := status.accounts.CodexHome(accountID)
+	current, err := reader.CurrentCredentialDigest(context.Background(), home)
+	if err != nil || subtle.ConstantTimeCompare(current[:], proof.receipt.CredentialDigest[:]) != 1 {
+		status.authProofMu.Lock()
+		key := quotaAuthProofKey043714{accountID: accountID, selection: selection}
+		if latest, exists := status.authProofs[key]; exists && latest.generation == proof.generation {
+			delete(status.authProofs, key)
+		}
+		status.authProofMu.Unlock()
 		return quotamodel.Availability{}, quotamodel.AuthenticatedReceipt{}, false
 	}
 	return proof.availability, proof.receipt, true

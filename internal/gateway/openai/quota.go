@@ -92,6 +92,21 @@ func (client *QuotaClient) FetchAuthenticatedAtPolicy(
 	return usage, quotamodel.AuthenticatedReceipt{CredentialDigest: original, StartedAt: startedAt, Confirmed: true}, nil
 }
 
+// CurrentCredentialDigest verifies the *currently configured* managed
+// credential without contacting the provider. It lets a previously confirmed
+// probe receipt be revoked if local credentials change before route selection.
+func (client *QuotaClient) CurrentCredentialDigest(ctx context.Context, codexHome string) ([32]byte, error) {
+	auth, err := client.auth.ReadAuth(ctx, codexHome)
+	if err != nil {
+		return [32]byte{}, err
+	}
+	digest, ok := openAIAuthDigest043714(auth)
+	if !ok {
+		return [32]byte{}, errors.New("quota credential unavailable")
+	}
+	return digest, nil
+}
+
 func (client *QuotaClient) FetchRaw(ctx context.Context, codexHome string) ([]byte, error) {
 	return client.FetchRawAt(ctx, codexHome, "")
 }

@@ -49,7 +49,7 @@ func TestProdex043714AuthenticatedQuotaRecoveryOnlyRetiresOlderMatchingAuthQuara
 	}{
 		{name: "confirmed same-credential", proofValid: true, ready: true, receiptDigest: digest, receiptStart: base.Add(3 * time.Second), expectedCandidate: true},
 		{name: "unknown cached quota", ready: true, receiptDigest: digest, receiptStart: base.Add(3 * time.Second), expectAuth: true},
-		{name: "different credentials", proofValid: true, ready: true, receiptDigest: [32]byte{9}, receiptStart: base.Add(3 * time.Second), expectAuth: true},
+		{name: "rotated credentials authenticated by quota", proofValid: true, ready: true, receiptDigest: [32]byte{9}, receiptStart: base.Add(3 * time.Second), expectedCandidate: true},
 		{name: "quota still exhausted", proofValid: true, receiptDigest: digest, receiptStart: base.Add(3 * time.Second), expectAuth: true},
 		{name: "proof older than auth failure", proofValid: true, ready: true, receiptDigest: digest, receiptStart: base.Add(-time.Second), expectAuth: true},
 		{name: "unrelated quarantine protected", proofValid: true, ready: true, receiptDigest: digest, receiptStart: base.Add(3 * time.Second), extraPenalty: true},
