@@ -142,6 +142,18 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 			"promptTokenCount": 2, "candidatesTokenCount": 1, "totalTokenCount": 3,
 		},
 	}
+	if mock.scenario == "wrapped-response-trace" || mock.scenario == "wrapped-response-no-trace" {
+		// Prodex 0.437.13 unwraps the nested GenerateContent response even
+		// if the optional outer traceId was absent. A present string traceId
+		// has precedence over any stale nested responseId.
+		response["responseId"] = "stale-nested-id"
+		envelope := map[string]any{"response": response, "outerDecoy": "must-not-leak"}
+		if mock.scenario == "wrapped-response-trace" {
+			envelope["traceId"] = "synthetic-trace-id"
+		}
+		_ = json.NewEncoder(w).Encode(envelope)
+		return
+	}
 	_ = json.NewEncoder(w).Encode(response)
 }
 
@@ -158,7 +170,7 @@ func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit string
 	}
 	defer os.RemoveAll(root)
 	var results []geminiCaseResult
-	for _, scenario := range []string{"chat-request", "orphan-tool", "chat-response", "stream-native", "stream-chat", "multi-turn-tool", "quota-plain-429", "quota-structured-429"} {
+	for _, scenario := range []string{"chat-request", "orphan-tool", "chat-response", "wrapped-response-no-trace", "wrapped-response-trace", "stream-native", "stream-chat", "multi-turn-tool", "quota-plain-429", "quota-structured-429"} {
 		prodex, err := runGeminiProduct(root, scenario, "prodex", prodexBin)
 		if err != nil {
 			return fmt.Errorf("Prodex Gemini %s: %w", scenario, err)
