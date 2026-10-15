@@ -34,6 +34,12 @@ func (status *Status) applySuccessfulUsageProbe043714(
 		status.storeUsage(home, usage, now)
 	}
 	status.storeUsageSnapshot(ctx, accountID, usage, now)
+	status.usageMu.Lock()
+	if status.accountObservation == nil {
+		status.accountObservation = make(map[string]uint64)
+	}
+	status.accountObservation[accountID] = generation
+	status.usageMu.Unlock()
 	// A newer ordinary quota observation invalidates an older authenticated
 	// ready receipt, even if the old proof has not reached its TTL yet.
 	status.authProofMu.Lock()
@@ -44,4 +50,16 @@ func (status *Status) applySuccessfulUsageProbe043714(
 	}
 	status.authProofMu.Unlock()
 	return true
+}
+
+// QuotaObservationRevision is a per-profile generation fence. A router may
+// invalidate only that profile's cached quota result after a newer successful
+// probe, preserving unrelated quota/retry decisions and prior owners.
+func (status *Status) QuotaObservationRevision(accountID string) uint64 {
+	if status == nil || accountID == "" {
+		return 0
+	}
+	status.usageMu.Lock()
+	defer status.usageMu.Unlock()
+	return status.accountObservation[accountID]
 }

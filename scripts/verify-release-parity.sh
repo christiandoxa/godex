@@ -121,6 +121,14 @@ go test -race ./internal/gateway/openai ./internal/usecase/quota ./internal/usec
   -run '^TestProdex043714(QuotaReceipt|FailedUpstreamResponse|AuthenticatedProbe|AuthenticatedQuotaRecovery|NewerQuotaObservation|BlockedAuthRecovery|EmptyAuthPoolWaits)' \
   -count=1 -timeout=65s
 
+# Prodex 0.437.14: newer accepted quota observations refresh the target
+# account's routing cache without poisoning other profiles or retry leases.
+# Exercise the original three-profile five-hour/weekly and Pro Lite transition
+# with a previously auth-quarantined profile, plus exactly-once dispatch.
+go test -race ./internal/usecase/quota ./internal/usecase/routing \
+  -run '^TestProdex043714(QuotaObservationInvalidates|AcceptedUsageAdvances|ThreeProfileQuotaReset)' \
+  -count=1 -timeout=65s
+
 # The tagged 0.437.11 release-fence delta must remain fail-closed under stale
 # snapshots, same-second rotation, seven-day retired-fence compaction, backup
 # recovery, and invalid inputs. Only self-contained full-history Responses

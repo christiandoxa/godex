@@ -15,12 +15,13 @@ const (
 )
 
 type quotaCheck struct {
-	checkedAt          time.Time
-	retryAt            time.Time
-	ready              bool
-	pressure           quotamodel.Pressure
-	source             quotamodel.Source
-	keepLaunchDeadline bool
+	observationRevision uint64
+	checkedAt           time.Time
+	retryAt             time.Time
+	ready               bool
+	pressure            quotamodel.Pressure
+	source              quotamodel.Source
+	keepLaunchDeadline  bool
 }
 
 type quotaCheckKey struct {
@@ -101,6 +102,9 @@ func (router *Router) cacheQuotaFailure(accountID string, selection quotamodel.S
 }
 
 func (router *Router) storeQuotaCheck(key quotaCheckKey, state quotaCheck) {
+	if source, ok := router.quota.(quotaObservationVersion043714); ok {
+		state.observationRevision = source.QuotaObservationRevision(key.accountID)
+	}
 	router.mu.Lock()
 	if router.quotaChecks == nil {
 		router.quotaChecks = make(map[quotaCheckKey]quotaCheck)

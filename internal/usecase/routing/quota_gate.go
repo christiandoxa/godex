@@ -101,13 +101,25 @@ func (router *Router) refreshCachedQuotaChecks(
 	}
 }
 
+// An accepted probe invalidates only the account's cached quota decision.
+// Failed attempts and cached/persisted DTOs do not advance this revision.
+type quotaObservationVersion043714 interface {
+	QuotaObservationRevision(string) uint64
+}
+
 func (router *Router) cachedQuotaCheck(
 	accountID string,
 	selection quotamodel.Selection,
 	now time.Time,
 ) (quotaCheck, bool) {
+	var current uint64
+	source, versioned := router.quota.(quotaObservationVersion043714)
+	if versioned {
+		current = source.QuotaObservationRevision(accountID)
+	}
 	router.mu.Lock()
 	defer router.mu.Unlock()
 	state, ok := router.quotaChecks[quotaCheckKey{accountID: accountID, selection: selection}]
-	return state, ok && now.Sub(state.checkedAt) >= 0 && now.Sub(state.checkedAt) < quotaCheckFreshness
+	return state, ok && now.Sub(state.checkedAt) >= 0 && now.Sub(state.checkedAt) < quotaCheckFreshness &&
+		(!versioned || state.observationRevision == current)
 }
