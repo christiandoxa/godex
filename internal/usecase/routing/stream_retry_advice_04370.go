@@ -130,7 +130,10 @@ func parseStreamRetryHeader(raw string, now time.Time) (time.Duration, bool) {
 	}
 	if allDigits {
 		seconds, err := strconv.ParseUint(value, 10, 64)
-		if err != nil || seconds > uint64(maxRetryAfter/time.Second) {
+		if err != nil {
+			return 0, false
+		}
+		if seconds > uint64(maxRetryAfter/time.Second) {
 			return maxRetryAfter, true
 		}
 		return time.Duration(seconds) * time.Second, true
