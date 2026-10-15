@@ -67,21 +67,25 @@ func (status *Status) warmupStartupProbeTargets(
 		return
 	}
 	baseURL = strings.TrimSpace(baseURL)
-	refresh := make([]startupProbeTarget, 0, startupProbeWarmLimit)
+	authTargets, authCount := status.startupInheritedAuthProbes043714(ctx, targets, baseURL, noProxy)
+	refresh := make([]startupProbeTarget, 0, startupProbeWarmLimit-authCount)
 	for _, target := range targets {
 		if ctx.Err() != nil {
 			return
 		}
+		if len(refresh)+authCount >= startupProbeWarmLimit {
+			break
+		}
 		if !target.enabled || strings.TrimSpace(target.id) == "" || strings.TrimSpace(target.home) == "" {
+			continue
+		}
+		if authTargets[target.id] {
 			continue
 		}
 		if _, _, ok := status.cachedUsageWithSource(ctx, target.id, target.home, status.now(), nil); ok {
 			continue
 		}
 		refresh = append(refresh, target)
-		if len(refresh) == startupProbeWarmLimit {
-			break
-		}
 	}
 	for index, target := range refresh {
 		if ctx.Err() != nil {

@@ -19,12 +19,15 @@ type quotaAuthenticatedGateway043714 interface {
 }
 
 type quotaAuthProofKey043714 struct {
-	accountID string
-	selection quotamodel.Selection
+	accountID    string
+	selection    quotamodel.Selection
+	anySelection bool
 }
 type quotaAuthProof043714 struct {
 	receipt      quotamodel.AuthenticatedReceipt
 	availability quotamodel.Availability
+	usage        quotamodel.Usage
+	home         string
 	observedAt   time.Time
 	generation   uint64
 }
@@ -41,24 +44,41 @@ func (status *Status) ScheduleAuthenticatedRecoveryProbe(
 	if status == nil || status.accounts == nil || !account.Enabled || account.ID == "" {
 		return errors.New("authenticated quota probe requires an enabled profile")
 	}
-	gateway, ok := status.usage.(quotaAuthenticatedGateway043714)
+	home := status.accounts.CodexHome(account.ID)
+	return status.scheduleAuthenticatedRecoveryProbeAtHome043714(ctx, account.ID, home, selection, "", false, false)
+}
+
+// The startup profile's home is authoritative when a managed profile does
+// not share the legacy account-store path. Keep exact path resolution scoped
+// to the caller; do not infer a home from another user's profile.
+func (status *Status) scheduleAuthenticatedRecoveryProbeAtHome043714(
+	ctx context.Context, accountID, home string, selection quotamodel.Selection,
+	baseURL string, noProxy, anySelection bool,
+) error {
+	if status == nil || accountID == "" || home == "" {
+		return errors.New("authenticated quota probe requires a profile home")
+	}
+	_, ok := status.usage.(quotaAuthenticatedGateway043714)
 	if !ok {
 		return errors.New("authenticated quota probe is unavailable")
 	}
-	home := status.accounts.CodexHome(account.ID)
-	if home == "" {
-		return errors.New("authenticated quota probe requires a profile home")
-	}
-	key := quotaAuthProofKey043714{accountID: account.ID, selection: selection}
+	gateway := status.usage.(quotaAuthenticatedGateway043714)
+
+	key := quotaAuthProofKey043714{accountID: accountID, selection: selection, anySelection: anySelection}
 	// Use a distinct prefix so a regular snapshot refresh cannot suppress
 	// revalidation merely because the quota cache is already fresh.
-	queueKey := "auth-quota-recovery\x00" + account.ID + "\x00" + home + "\x00" + string(selection.RouteKind) + "\x00" + selection.RequestedModel
+	queueKey := "auth-quota-recovery\x00" + accountID + "\x00" + home + "\x00"
+	if anySelection {
+		queueKey += "any"
+	} else {
+		queueKey += string(selection.RouteKind) + "\x00" + selection.RequestedModel
+	}
 	return status.ensureProbeRefreshQueue().Schedule(ctx, queueKey, func(runCtx context.Context) error {
 		generation := status.probeSequence.Add(1)
 		if err := status.probes.acquire(runCtx); err != nil {
 			return err
 		}
-		usage, receipt, err := gateway.FetchAuthenticatedAtPolicy(runCtx, home, "", false)
+		usage, receipt, err := gateway.FetchAuthenticatedAtPolicy(runCtx, home, baseURL, noProxy)
 		status.probes.release()
 		if err != nil {
 			return err
@@ -69,7 +89,7 @@ func (status *Status) ScheduleAuthenticatedRecoveryProbe(
 			return errors.New("authenticated quota receipt contains no validated quota windows")
 		}
 		// A late authenticated probe may not override a later status result.
-		if !status.applySuccessfulUsageProbe043714(runCtx, account.ID, home, usage, now, generation, true) {
+		if !status.applySuccessfulUsageProbe043714(runCtx, accountID, home, usage, now, generation, true) {
 			return nil
 		}
 		availability := routeAvailability(usage, selection, now)
@@ -97,7 +117,8 @@ func (status *Status) ScheduleAuthenticatedRecoveryProbe(
 				}
 			}
 			status.authProofs[key] = quotaAuthProof043714{
-				receipt: receipt, availability: availability, observedAt: now, generation: generation,
+				receipt: receipt, availability: availability, usage: usage, home: home,
+				observedAt: now, generation: generation,
 			}
 		}
 		status.authProofMu.Unlock()
@@ -114,8 +135,13 @@ func (status *Status) AuthenticatedRecoveryReceipt(accountID string, selection q
 	if status == nil || accountID == "" {
 		return quotamodel.Availability{}, quotamodel.AuthenticatedReceipt{}, false
 	}
+	key := quotaAuthProofKey043714{accountID: accountID, selection: selection}
 	status.authProofMu.Lock()
-	proof, found := status.authProofs[quotaAuthProofKey043714{accountID: accountID, selection: selection}]
+	proof, found := status.authProofs[key]
+	if !found {
+		key = quotaAuthProofKey043714{accountID: accountID, anySelection: true}
+		proof, found = status.authProofs[key]
+	}
 	status.authProofMu.Unlock()
 	now := status.now()
 	if !found || now.Before(proof.observedAt) || now.Before(proof.receipt.StartedAt) || now.Sub(proof.observedAt) > usageCacheFreshness ||
@@ -126,19 +152,29 @@ func (status *Status) AuthenticatedRecoveryReceipt(accountID string, selection q
 	// Repeat the local check before selecting a previously quarantined route;
 	// a later auth.json update cannot resurrect old proof by age alone.
 	reader, ok := status.usage.(quotaAuthenticatedGateway043714)
-	if !ok || status.accounts == nil {
+	if !ok {
 		return quotamodel.Availability{}, quotamodel.AuthenticatedReceipt{}, false
 	}
-	home := status.accounts.CodexHome(accountID)
+	home := proof.home
+	if home == "" && status.accounts != nil {
+		home = status.accounts.CodexHome(accountID)
+	}
+	if home == "" {
+		return quotamodel.Availability{}, quotamodel.AuthenticatedReceipt{}, false
+	}
 	current, err := reader.CurrentCredentialDigest(context.Background(), home)
 	if err != nil || subtle.ConstantTimeCompare(current[:], proof.receipt.CredentialDigest[:]) != 1 {
 		status.authProofMu.Lock()
-		key := quotaAuthProofKey043714{accountID: accountID, selection: selection}
 		if latest, exists := status.authProofs[key]; exists && latest.generation == proof.generation {
 			delete(status.authProofs, key)
 		}
 		status.authProofMu.Unlock()
 		return quotamodel.Availability{}, quotamodel.AuthenticatedReceipt{}, false
 	}
-	return proof.availability, proof.receipt, true
+	availability := proof.availability
+	if key.anySelection {
+		availability = routeAvailability(proof.usage, selection, now)
+		availability.Source = quotamodel.SourceLive
+	}
+	return availability, proof.receipt, true
 }

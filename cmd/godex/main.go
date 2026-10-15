@@ -99,6 +99,7 @@ func run() int {
 	virtualQuota := quotagateway.NewVirtual(nil)
 	quotaStatus.SetVirtual(virtualQuota)
 	bindings := routingrepo.NewStore(settings.Home)
+	quotaStatus.SetInheritedAuthPenaltySource043714(bindings)
 	doctor.SetRouteHealthState(bindings)
 	copilotSource := copilotgateway.NewSource(nil)
 	claudeSource := claudegateway.NewSource()

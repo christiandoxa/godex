@@ -74,27 +74,28 @@ type Options struct {
 }
 
 type Status struct {
-	accounts           accountStore
-	profiles           profileSource
-	usage              usageGateway
-	virtual            virtualGateway
-	external           map[string]externalProfileGateway
-	modelProvider      modelProviderInspector
-	now                func() time.Time
-	usageMu            sync.Mutex
-	probeApplyMu       sync.Mutex
-	probeSequence      atomic.Uint64
-	probeApplied       map[string]uint64
-	accountObservation map[string]uint64
-	authProofMu        sync.Mutex
-	authProofs         map[quotaAuthProofKey043714]quotaAuthProof043714
-	usageCache         map[string]usageSnapshot
-	snapshotCache      map[string]quotamodel.UsageSnapshot
-	snapshots          usageSnapshotStore
-	snapshotQueue      *queuedUsageSnapshotStore
-	probes             probeRefreshGate
-	probeQueueMu       sync.Mutex
-	probeQueue         *ProbeRefreshQueue
+	accounts             accountStore
+	profiles             profileSource
+	usage                usageGateway
+	inheritedAuthPenalty inheritedAuthPenaltySource043714
+	virtual              virtualGateway
+	external             map[string]externalProfileGateway
+	modelProvider        modelProviderInspector
+	now                  func() time.Time
+	usageMu              sync.Mutex
+	probeApplyMu         sync.Mutex
+	probeSequence        atomic.Uint64
+	probeApplied         map[string]uint64
+	accountObservation   map[string]uint64
+	authProofMu          sync.Mutex
+	authProofs           map[quotaAuthProofKey043714]quotaAuthProof043714
+	usageCache           map[string]usageSnapshot
+	snapshotCache        map[string]quotamodel.UsageSnapshot
+	snapshots            usageSnapshotStore
+	snapshotQueue        *queuedUsageSnapshotStore
+	probes               probeRefreshGate
+	probeQueueMu         sync.Mutex
+	probeQueue           *ProbeRefreshQueue
 }
 
 func NewStatus(accounts accountStore, usage usageGateway) *Status {
