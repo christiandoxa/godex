@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 )
@@ -20,10 +21,11 @@ import (
 const startupUsagePath = "/backend-api/wham/usage"
 
 type startupProbeCase struct {
-	name      string
-	status    int
-	wantState bool
-	response  string
+	name        string
+	status      int
+	wantState   bool
+	response    string
+	reloadOn401 bool
 }
 
 type startupProbeResult struct {
@@ -63,6 +65,8 @@ func checkStartupWarmup(root string, opts cliOptions) ([]stepResult, error) {
 			response: `{"plan_type":"plus","rate_limit":{"primary_window":{"used_percent":20,"reset_at":4102444800,"limit_window_seconds":18000},"secondary_window":{"used_percent":40,"reset_at":4102444800,"limit_window_seconds":604800}}}`},
 		{name: "startup_usage_failure", status: http.StatusServiceUnavailable, wantState: false,
 			response: `{"error":{"code":"synthetic_unavailable"}}`},
+		{name: "startup_usage_401_credential_reload", status: http.StatusOK, wantState: true, reloadOn401: true,
+			response: `{"plan_type":"plus","rate_limit":{"primary_window":{"used_percent":20,"reset_at":4102444800,"limit_window_seconds":18000},"secondary_window":{"used_percent":40,"reset_at":4102444800,"limit_window_seconds":604800}}}`},
 	}
 	results := make([]stepResult, 0, len(cases))
 	for _, probeCase := range cases {
@@ -74,7 +78,7 @@ func checkStartupWarmup(root string, opts cliOptions) ([]stepResult, error) {
 		if err != nil {
 			return nil, fmt.Errorf("Godex %s: %w", probeCase.name, err)
 		}
-		if !sameStartupProbeResult(prodex, godex, probeCase.wantState) {
+		if !sameStartupProbeResult(prodex, godex, probeCase) {
 			return nil, fmt.Errorf("%s diverged: Prodex=%+v Godex=%+v", probeCase.name, prodex, godex)
 		}
 		results = append(results, stepResult{
@@ -85,14 +89,22 @@ func checkStartupWarmup(root string, opts cliOptions) ([]stepResult, error) {
 	return results, nil
 }
 
-func sameStartupProbeResult(left, right startupProbeResult, wantSnapshot bool) bool {
+func sameStartupProbeResult(left, right startupProbeResult, probeCase startupProbeCase) bool {
+	wantRequests := 1
+	if probeCase.reloadOn401 {
+		wantRequests = 2
+	}
 	if left.exitCode != right.exitCode || len(left.requests) != len(right.requests) ||
-		len(left.requests) != 1 || left.snapshot != right.snapshot || left.snapshot != wantSnapshot {
+		len(left.requests) != wantRequests || left.snapshot != right.snapshot || left.snapshot != probeCase.wantState {
 		return false
 	}
-	return left.requests[0] == startupProbeRequest{
-		method: http.MethodGet, path: startupUsagePath, authValid: true,
-	} && left.requests[0] == right.requests[0]
+	canonical := startupProbeRequest{method: http.MethodGet, path: startupUsagePath, authValid: true}
+	for index := 0; index < wantRequests; index++ {
+		if left.requests[index] != canonical || right.requests[index] != canonical {
+			return false
+		}
+	}
+	return true
 }
 
 func runStartupProbeCase(root, binary, product string, probeCase startupProbeCase) (startupProbeResult, error) {
@@ -118,10 +130,19 @@ func runStartupProbeCase(root, binary, product string, probeCase startupProbeCas
 		return startupProbeResult{}, fmt.Errorf("import-current exit=%d output=%q", code, output)
 	}
 	usage := newUsageServer(probeCase.status, probeCase.response)
+	if probeCase.reloadOn401 {
+		importedAuth, locateErr := startupManagedAuthFile043714(configHome)
+		if locateErr != nil {
+			usage.Close()
+			return startupProbeResult{}, locateErr
+		}
+		usage.Close()
+		usage = newRotatingUsageServer043714(importedAuth, probeCase.response)
+	}
 	defer usage.Close()
 	result, err := runStartupGateway(fixture, usage.server.URL+"/backend-api", probeCase.wantState)
 	if err != nil {
-		return startupProbeResult{}, err
+		return startupProbeResult{}, fmt.Errorf("%w; observed quota requests=%+v", err, usage.requests())
 	}
 	result.requests = usage.requests()
 	result.snapshot, err = validateUsageSnapshot(configHome, probeCase.wantState)
@@ -159,6 +180,56 @@ func newUsageServer(status int, body string) *usageServer {
 		writer.Header().Set("Content-Type", "application/json")
 		writer.WriteHeader(usage.status)
 		_, _ = writer.Write([]byte(usage.body))
+	}))
+	return usage
+}
+
+// The official tagged quota client reloads an auth.json changed after the
+// first HTTP 401, not blindly resending the original bearer. Keep the
+// mutation inside the loopback fixture and never use real provider tokens.
+func newRotatingUsageServer043714(authPath, successBody string) *usageServer {
+	usage := &usageServer{status: http.StatusOK, body: successBody}
+	initialBearer := ""
+	usage.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		usage.mu.Lock()
+		index := len(usage.requestLog)
+		bearer := r.Header.Get("Authorization")
+		validEnvelope := r.Method == http.MethodGet && r.URL.Path == startupUsagePath &&
+			r.Header.Get("ChatGPT-Account-Id") == "synthetic-account" &&
+			r.Header.Get("originator") == "codex_cli_rs" &&
+			r.Header.Get("x-openai-codex-luna-reserve") == "1"
+		valid := validEnvelope && ((index == 0 && strings.HasPrefix(bearer, "Bearer ") && len(bearer) > len("Bearer ")) ||
+			(index > 0 && bearer == "Bearer synthetic-rotated" && bearer != initialBearer))
+		if index == 0 && valid {
+			initialBearer = bearer
+		}
+		usage.requestLog = append(usage.requestLog, startupProbeRequest{
+			method: r.Method, path: r.URL.Path, authValid: valid,
+		})
+		usage.mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		if index == 0 {
+			if valid {
+				next := []byte(`{"auth_mode":"chatgpt","tokens":{"access_token":"synthetic-rotated","account_id":"synthetic-account"}}`)
+				temp := authPath + ".next"
+				if err := os.WriteFile(temp, next, 0600); err != nil {
+					w.WriteHeader(500)
+					return
+				}
+				if err := os.Rename(temp, authPath); err != nil {
+					w.WriteHeader(500)
+					return
+				}
+			}
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		if !valid {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(successBody))
 	}))
 	return usage
 }

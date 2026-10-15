@@ -93,3 +93,17 @@ base-url/api-key arguments, unexpected positional input, and conflicting
 executable CLIs without changing the credential-free persisted state.
 A separate Go test ensures a valid argument set that fails during
 runtime initialization is **not** misclassified as a usage error.
+
+### Prodex 0.437.14 startup quota 401 reload
+
+The isolated `startup_usage_401_credential_reload` scenario rotates a
+synthetic managed-profile credential after a rejected HTTP quota request. Both
+executables must make two correctly authenticated GET requests and persist one
+valid quota snapshot. An unchanged second authorization header, an unexpected
+third attempt, or a missing snapshot fails the oracle.
+
+The fixture resolves each product's independently managed profile home rather
+than assuming identical internal directory layouts. It rejects ambiguous or
+symlinked paths, operates only inside test-specific temporary roots, and never
+uses personal accounts. This does not certify recovery of inherited auth
+penalties across a process restart.

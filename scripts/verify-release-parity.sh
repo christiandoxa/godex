@@ -175,6 +175,7 @@ go test ./tools/differential \
   --prodex "$tmp/prodex" --godex "$tmp/godex" \
   --prodex-source "$tmp/prodex-source" \
   --godex-source "$root" --godex-commit "$(git rev-parse HEAD)"
+go test ./tools/profileparity -run '^TestProdex043714Startup' -count=1 -timeout=30s
 
 # CLI argument rejection oracle. This catches delivery paths that accidentally
 # discard user arguments before reaching their owning command parser.

@@ -149,7 +149,7 @@ func TestStartupProbeOracleRejectsMutatedRequestContract(t *testing.T) {
 		}},
 		snapshot: true,
 	}
-	if !sameStartupProbeResult(valid, valid, true) {
+	if !sameStartupProbeResult(valid, valid, startupProbeCase{wantState: true}) {
 		t.Fatal("canonical startup usage request was rejected")
 	}
 	for _, mutate := range []func(*startupProbeResult){
@@ -160,7 +160,7 @@ func TestStartupProbeOracleRejectsMutatedRequestContract(t *testing.T) {
 		mutated := valid
 		mutated.requests = append([]startupProbeRequest(nil), valid.requests...)
 		mutate(&mutated)
-		if sameStartupProbeResult(valid, mutated, true) {
+		if sameStartupProbeResult(valid, mutated, startupProbeCase{wantState: true}) {
 			t.Fatalf("mutated startup probe request escaped the oracle: %+v", mutated.requests[0])
 		}
 	}
@@ -264,5 +264,32 @@ func TestProdex04370ExternalProfileMetadataAndHomeProtection(t *testing.T) {
 	}
 	if err := checkExternalHome(profileFixture{externalHome: home}); err == nil {
 		t.Fatal("foreign CODEX_HOME mutation escaped oracle")
+	}
+}
+
+// Prodex 0.437.14 source-pinned two-stage HTTP 401 quota receipt fixture.
+// Both attempts must be authenticated by their *respective* credentials;
+// comparing only final 200 or a saved snapshot can miss a blind token replay.
+func TestProdex043714StartupQuotaReloadOracleRejectsWrongRequestIdentity(t *testing.T) {
+	good := startupProbeRequest{method: http.MethodGet, path: startupUsagePath, authValid: true}
+	baseline := startupProbeResult{exitCode: 0, requests: []startupProbeRequest{good, good}, snapshot: true}
+	phase := startupProbeCase{name: "startup_usage_401_credential_reload", wantState: true, reloadOn401: true}
+	if !sameStartupProbeResult(baseline, baseline, phase) {
+		t.Fatal("canonical two-credential attempt rejected")
+	}
+	bad := baseline
+	bad.requests = append([]startupProbeRequest(nil), baseline.requests...)
+	bad.requests[1].authValid = false
+	if sameStartupProbeResult(baseline, bad, phase) {
+		t.Fatal("stale bearer replay evaded oracle")
+	}
+	bad = baseline
+	bad.requests = append([]startupProbeRequest(nil), baseline.requests...)
+	bad.requests = append(bad.requests, good)
+	if sameStartupProbeResult(baseline, bad, phase) {
+		t.Fatal("excess retry after accepted quota request evaded oracle")
+	}
+	if sameStartupProbeResult(baseline, baseline, startupProbeCase{wantState: true}) {
+		t.Fatal("two HTTP requests escaped ordinary one-shot quota contract")
 	}
 }
