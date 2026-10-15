@@ -114,9 +114,26 @@ func sessionLineResumeIDMatches(line, selector string) bool {
 	return id != "" && sessionIDMatchesSelector(id, selector)
 }
 
+// The tagged Prodex 0.437.13 selector matches UTF-8 bytes while folding
+// ASCII A-Z only. Unicode casefolding can otherwise treat a foreign session
+// marker as its requested ID (e.g. Kelvin sign U+212A versus ASCII k).
 func sessionIDMatchesSelector(id, selector string) bool {
-	return strings.EqualFold(id, selector) ||
-		strings.HasPrefix(strings.ToLower(id), strings.ToLower(selector))
+	if len(selector) > len(id) {
+		return false
+	}
+	for index := 0; index < len(selector); index++ {
+		a, b := id[index], selector[index]
+		if a >= 'A' && a <= 'Z' {
+			a += 'a' - 'A'
+		}
+		if b >= 'A' && b <= 'Z' {
+			b += 'a' - 'A'
+		}
+		if a != b {
+			return false
+		}
+	}
+	return true
 }
 
 func sessionLineStartsCodexRolloutMetadata(line string) bool {
