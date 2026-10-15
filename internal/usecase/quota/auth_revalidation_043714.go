@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/subtle"
 	"errors"
+	"strings"
 	"time"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
@@ -89,7 +90,8 @@ func (status *Status) scheduleAuthenticatedRecoveryProbeAtHome043714(
 			return errors.New("authenticated quota receipt contains no validated quota windows")
 		}
 		// A late authenticated probe may not override a later status result.
-		if !status.applySuccessfulUsageProbe043714(runCtx, accountID, home, usage, now, generation, true) {
+		liveCache := strings.TrimSpace(baseURL) == "" && !noProxy
+		if !status.applySuccessfulUsageProbe043714(runCtx, accountID, home, usage, now, generation, liveCache) {
 			return nil
 		}
 		availability := routeAvailability(usage, selection, now)

@@ -119,6 +119,45 @@ func TestProdex043714StartupInheritedAuthReceiptCoversRouteAndModelSelections(t 
 	}
 }
 
+func TestProdex043714StartupInheritedAuthPolicyDoesNotOverwriteDefaultLiveCache(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		baseURL string
+		noProxy bool
+	}{
+		{name: "custom base URL", baseURL: "http://127.0.0.1:49151/backend-api"},
+		{name: "no proxy", noProxy: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			now := time.Unix(1700000000, 0)
+			account := accountentity.Account{ID: "one", Enabled: true}
+			oldUsed, probeUsed := int64(22), int64(11)
+			stub := &inheritedAuthPolicyProbe043714{authenticatedQuotaStub043714: authenticatedQuotaStub043714{
+				usage:   quotamodel.Usage{Primary: &quotamodel.Window{UsedPercent: &probeUsed}},
+				receipt: quotamodel.AuthenticatedReceipt{Confirmed: true, CredentialDigest: [32]byte{3}, StartedAt: now.Add(-time.Second)},
+			}}
+			status := NewStatus(fakeAccounts{accounts: []accountentity.Account{account}, current: account}, stub)
+			status.now = func() time.Time { return now }
+			defer status.Close()
+			status.storeUsage("/managed/one", quotamodel.Usage{Primary: &quotamodel.Window{UsedPercent: &oldUsed}}, now)
+			status.SetInheritedAuthPenaltySource043714(&syntheticInheritedAuthState043714{entries: []routingentity.AuthBackoff{{
+				AccountID: account.ID, FailedAtMillis: now.Add(-time.Minute).UnixMilli(), UntilMillis: now.Add(time.Hour).UnixMilli(),
+			}}})
+			before := status.ProbeRefreshRevision()
+			status.WarmupStartupProfiles(t.Context(), []proxymodel.Account{{ID: account.ID, Home: "/managed/one", Enabled: true}}, tc.baseURL, tc.noProxy)
+			ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+			defer cancel()
+			if !status.WaitProbeRefresh(ctx, before) {
+				t.Fatal("inherited auth probe not executed")
+			}
+			cached, ok := status.cachedLiveUsage("/managed/one", now)
+			if !ok || cached.Primary == nil || cached.Primary.UsedPercent == nil || *cached.Primary.UsedPercent != oldUsed {
+				t.Fatalf("policy-specific startup probe overwrote default live cache: ok=%t cached=%+v", ok, cached)
+			}
+		})
+	}
+}
+
 type inheritedAuthPolicyProbe043714 struct {
 	authenticatedQuotaStub043714
 	capturedHome    string
