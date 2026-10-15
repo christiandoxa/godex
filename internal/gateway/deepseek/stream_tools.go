@@ -21,7 +21,9 @@ func deepSeekStreamAddedToolItem(callID, name string) map[string]any {
 	namespace, shortName := deepSeekStreamSplitToolName(name)
 	item := map[string]any{
 		"type": "function_call", "call_id": callID,
-		"name": shortName, "arguments": "",
+		// Prodex 0.437.13 introduces arguments only in the subsequent
+		// function_call_arguments.delta and completed tool item.
+		"name": shortName,
 	}
 	if namespace != "" {
 		item["namespace"] = namespace
@@ -74,12 +76,17 @@ func deepSeekValidateStreamToolCall(index uint64, call *deepSeekChatStreamToolCa
 	if strings.TrimSpace(arguments) == "" {
 		return nil
 	}
-	if err := deepSeekStreamJSONBoundary043713(arguments); err != nil {
-		return fmt.Errorf("DeepSeek streamed malformed JSON arguments for tool call `%s` at index %d: %w", call.name, index, err)
+	// The tagged Prodex Mojo/serde_json boundary deliberately exposes one
+	// stable provider error, not Go-specific decoder/Unicode diagnostics.
+	invalid := func() error {
+		return fmt.Errorf("DeepSeek streamed malformed JSON arguments for tool call `%s` at index %d: invalid JSON", call.name, index)
+	}
+	if deepSeekStreamJSONBoundary043713(arguments) != nil {
+		return invalid()
 	}
 	var value any
-	if err := json.Unmarshal([]byte(arguments), &value); err != nil {
-		return fmt.Errorf("DeepSeek streamed malformed JSON arguments for tool call `%s` at index %d: %w", call.name, index, err)
+	if json.Unmarshal([]byte(arguments), &value) != nil {
+		return invalid()
 	}
 	return nil
 }
