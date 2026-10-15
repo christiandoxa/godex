@@ -116,6 +116,10 @@ func (client *QuotaClient) fetchBodyAtPolicy(ctx context.Context, codexHome, ups
 	return body, err
 }
 
+// fetchBodyWithIdentity043714 keeps the credential used for the final HTTP
+// attempt alongside its reply. Prodex 0.437.14 retries an unauthorized quota
+// request only after a changed on-disk credential or an explicit auth refresh.
+// A failed attempt cannot become authenticated recovery evidence.
 func (client *QuotaClient) fetchBodyWithIdentity043714(
 	ctx context.Context, codexHome, upstream string, noProxy bool,
 ) ([]byte, proxymodel.Auth, time.Time, error) {
@@ -127,37 +131,67 @@ func (client *QuotaClient) fetchBodyWithIdentity043714(
 	if err != nil {
 		return nil, proxymodel.Auth{}, time.Time{}, err
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, usageURL, nil)
-	if err != nil {
-		return nil, proxymodel.Auth{}, time.Time{}, fmt.Errorf("create quota request: %w", err)
-	}
-	request.Header.Set("Authorization", "Bearer "+auth.AccessToken)
-	request.Header.Set("Accept", "application/json")
-	request.Header.Set("originator", "codex_cli_rs")
-	request.Header.Set("x-openai-codex-luna-reserve", "1")
-	if auth.AccountID != "" {
-		request.Header.Set("ChatGPT-Account-Id", auth.AccountID)
-	}
-
 	httpClient, err := client.clientForPolicy(noProxy)
 	if err != nil {
 		return nil, proxymodel.Auth{}, time.Time{}, err
 	}
-	startedAt := time.Now()
-	response, err := client.doWithClient(httpClient, request)
+	send := func(identity proxymodel.Auth) (int, []byte, time.Time, error) {
+		request, requestErr := http.NewRequestWithContext(ctx, http.MethodGet, usageURL, nil)
+		if requestErr != nil {
+			return 0, nil, time.Time{}, fmt.Errorf("create quota request: %w", requestErr)
+		}
+		request.Header.Set("Authorization", "Bearer "+identity.AccessToken)
+		request.Header.Set("Accept", "application/json")
+		request.Header.Set("originator", "codex_cli_rs")
+		request.Header.Set("x-openai-codex-luna-reserve", "1")
+		if identity.AccountID != "" {
+			request.Header.Set("ChatGPT-Account-Id", identity.AccountID)
+		}
+		startedAt := time.Now()
+		response, sendErr := client.doWithClient(httpClient, request)
+		if sendErr != nil {
+			return 0, nil, time.Time{}, sendErr
+		}
+		defer response.Body.Close()
+		body, readErr := io.ReadAll(io.LimitReader(response.Body, maxQuotaResponseBytes+1))
+		if readErr != nil {
+			return 0, nil, time.Time{}, fmt.Errorf("read quota response: %w", readErr)
+		}
+		if len(body) > maxQuotaResponseBytes {
+			return 0, nil, time.Time{}, errors.New("quota response exceeded safe size limit")
+		}
+		return response.StatusCode, body, startedAt, nil
+	}
+	status, body, startedAt, err := send(auth)
 	if err != nil {
 		return nil, proxymodel.Auth{}, time.Time{}, err
 	}
-	defer response.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(response.Body, maxQuotaResponseBytes+1))
-	if err != nil {
-		return nil, proxymodel.Auth{}, time.Time{}, fmt.Errorf("read quota response: %w", err)
+	if status == http.StatusUnauthorized {
+		// ReadAuth is the authoritative fresh on-disk identity; never replay
+		// an identical bearer token without a real refresh result.
+		if reloaded, reloadErr := client.auth.ReadAuth(ctx, codexHome); reloadErr == nil &&
+			runtimeAuthChanged(auth, reloaded) && reloaded.AccessToken != "" {
+			auth = reloaded
+			status, body, startedAt, err = send(auth)
+			if err != nil {
+				return nil, proxymodel.Auth{}, time.Time{}, err
+			}
+		}
+		if status == http.StatusUnauthorized {
+			if refresher, ok := client.auth.(unauthorizedAuthRefresher); ok {
+				if refreshed, refreshErr := refresher.RefreshUnauthorizedAuth(ctx, codexHome, auth); refreshErr == nil &&
+					refreshed.AccessToken != "" {
+					auth = refreshed
+					status, body, startedAt, err = send(auth)
+					if err != nil {
+						return nil, proxymodel.Auth{}, time.Time{}, err
+					}
+				}
+			}
+		}
 	}
-	if len(body) > maxQuotaResponseBytes {
-		return nil, proxymodel.Auth{}, time.Time{}, errors.New("quota response exceeded safe size limit")
-	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return nil, proxymodel.Auth{}, time.Time{}, fmt.Errorf("quota endpoint returned HTTP %d", response.StatusCode)
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return nil, proxymodel.Auth{}, time.Time{}, fmt.Errorf("quota endpoint returned HTTP %d", status)
 	}
 	return body, auth, startedAt, nil
 }
