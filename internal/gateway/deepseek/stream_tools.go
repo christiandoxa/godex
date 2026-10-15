@@ -74,6 +74,9 @@ func deepSeekValidateStreamToolCall(index uint64, call *deepSeekChatStreamToolCa
 	if strings.TrimSpace(arguments) == "" {
 		return nil
 	}
+	if err := deepSeekStreamJSONBoundary043713(arguments); err != nil {
+		return fmt.Errorf("DeepSeek streamed malformed JSON arguments for tool call `%s` at index %d: %w", call.name, index, err)
+	}
 	var value any
 	if err := json.Unmarshal([]byte(arguments), &value); err != nil {
 		return fmt.Errorf("DeepSeek streamed malformed JSON arguments for tool call `%s` at index %d: %w", call.name, index, err)

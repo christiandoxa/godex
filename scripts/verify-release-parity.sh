@@ -105,6 +105,12 @@ go test ./internal/repository/routing ./internal/usecase/routing ./internal/usec
 go test ./internal/gateway/gemini \
   -run '^TestProdex043711GeminiHardening' -count=1 -timeout=40s
 
+# Prodex 0.437.13 DeepSeek streamed tool arguments use tagged serde_json
+# surrogate, depth and finite-number boundaries, independent of Go's more
+# permissive escape and recursion handling. Verify real SSE terminal frames.
+go test ./internal/gateway/deepseek \
+  -run '^TestProdex043713DeepSeek' -count=1 -timeout=45s
+
 # Independent Linux PTY footer oracle. It uses one synthetic Codex helper for
 # both exact binaries and checks launch-owned identity, picker fallback, and
 # all-stream TTY suppression without credentials or provider calls.
