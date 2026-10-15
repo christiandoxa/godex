@@ -997,6 +997,11 @@ func scenarioInvariants(scenario scenarioResult) []string {
 			if run.Client.Status != http.StatusOK || !validFixtureToolCallResponse(run.Client.Body) {
 				failures = append(failures, prefix+".tool_call_semantics")
 			}
+		case "sse-tool-surrogate", "sse-tool-depth", "sse-tool-overflow", "sse-tool-paired":
+			if run.Client.Status != http.StatusOK || !validFixtureToolArgumentsSSE043713(run.Client.Body, phase) ||
+				run.Client.Headers.Get("Content-Type") != "text/event-stream; charset=utf-8" {
+				failures = append(failures, prefix+".stream_tool_argument_contract")
+			}
 		case "sse-stream", "sse-rate-limit":
 			if run.Client.Status != http.StatusOK || !validFixtureSSE(run.Client.Body) {
 				failures = append(failures, prefix+".stream_semantics")
@@ -1061,7 +1066,7 @@ func scenarioInvariants(scenario scenarioResult) []string {
 				failures = append(failures, prefix+".wrong_credential_slot")
 			}
 			validRequest := validFixtureRequest(upstream.Body)
-			if phase == "sse-stream" || phase == "sse-rate-limit" {
+			if phase == "sse-stream" || phase == "sse-rate-limit" || strings.HasPrefix(phase, "sse-tool-") {
 				validRequest = validFixtureStreamingRequest(upstream.Body)
 			}
 			if phase == "deepseek-user-id" {
@@ -1084,7 +1089,7 @@ func compare(left, right productRun) []string {
 		strings.Contains(strings.ToLower(right.Client.Headers.Get("Content-Type")), "text/event-stream")
 	if stream {
 		a, b := strings.TrimSuffix(left.Stdout, "\n"), strings.TrimSuffix(right.Stdout, "\n")
-		if !equivalentFixtureSSE(a, b) && !equivalentFixtureFailedSSE(a, b) {
+		if !equivalentFixtureSSE(a, b) && !equivalentFixtureFailedSSE(a, b) && !equivalentFixtureToolArgumentsSSE043713(a, b) {
 			differences = append(differences, "stdout")
 		}
 	} else if left.Stdout != right.Stdout {
@@ -1101,7 +1106,8 @@ func compare(left, right productRun) []string {
 	}
 	if stream {
 		if !equivalentFixtureSSE(left.Client.Body, right.Client.Body) &&
-			!equivalentFixtureFailedSSE(left.Client.Body, right.Client.Body) {
+			!equivalentFixtureFailedSSE(left.Client.Body, right.Client.Body) &&
+			!equivalentFixtureToolArgumentsSSE043713(left.Client.Body, right.Client.Body) {
 			differences = append(differences, "client.body")
 		}
 	} else if left.Client.Body != right.Client.Body {
