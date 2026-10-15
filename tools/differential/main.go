@@ -155,6 +155,7 @@ func run() error {
 	godexSource := flags.String("godex-source", "", "Godex candidate source checkout")
 	expectedGodexCommit := flags.String("godex-commit", "", "expected Godex source HEAD commit SHA")
 	gemini := flags.Bool("gemini", false, "run isolated Gemini generateContent executable differential")
+	scenarioWorkers := flags.Int("scenario-workers", 1, "isolated DeepSeek scenario workers, 1-4 (parallel only for --scenario all)")
 	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, sse-stream, sse-rate-limit, sse-tool-surrogate, sse-tool-depth, sse-tool-overflow, sse-tool-paired, retry, deepseek-sse-terminal, single-key-401, single-key-403, single-key-429, single-key-503, single-key-500, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		return err
@@ -191,8 +192,8 @@ func run() error {
 		return fmt.Errorf("verify Godex executable provenance: %w", err)
 	}
 	if *gemini {
-		if *scenarioName != "all" {
-			return errors.New("--gemini must run its entire scenario set")
+		if *scenarioName != "all" || *scenarioWorkers != 1 {
+			return errors.New("--gemini runs its entire scenario set without DeepSeek scenario workers")
 		}
 		return runGeminiDifferential(*prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit)
 	}
@@ -201,81 +202,72 @@ func run() error {
 		return fmt.Errorf("create isolated homes: %w", err)
 	}
 	defer os.RemoveAll(root)
-	mock, err := startMock()
-	if err != nil {
-		return err
-	}
-	defer mock.close()
-
-	specs := []struct {
-		name string
-		run  func() (scenarioResult, error)
-	}{
-		{"success", func() (scenarioResult, error) {
+	specs := []differentialScenario043713{
+		{"success", func(mock *mockServer) (scenarioResult, error) {
 			return runPair(root, mock, "success", mockPlan{}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{})
 		}},
-		{"tool-call", func() (scenarioResult, error) {
+		{"tool-call", func(mock *mockServer) (scenarioResult, error) {
 			// A real function call must preserve its ID, name and JSON
 			// arguments when bridging Chat Completions to Responses.
 			return runPair(root, mock, "tool-call", mockPlan{ToolCall: true}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{})
 		}},
-		{"deepseek-user-id", func() (scenarioResult, error) {
+		{"deepseek-user-id", func(mock *mockServer) (scenarioResult, error) {
 			// The canonical DeepSeek adapter accepts Responses' user alias but
 			// forwards it as the provider's user_id field.
 			return runPair(root, mock, "deepseek-user-id", mockPlan{}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{userID: true})
 		}},
-		{"sse-stream", func() (scenarioResult, error) {
+		{"sse-stream", func(mock *mockServer) (scenarioResult, error) {
 			// Exercise a real streaming Responses request through both
 			// independent proxy processes, not a buffered JSON response.
 			return runPair(root, mock, "sse-stream", mockPlan{Stream: true}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{stream: true})
 		}},
-		{"sse-rate-limit", func() (scenarioResult, error) {
+		{"sse-rate-limit", func(mock *mockServer) (scenarioResult, error) {
 			// Deterministic future reset timestamps and consumption ratios
 			// prove the provider quota headers are projected to Codex format.
 			return runPair(root, mock, "sse-rate-limit", mockPlan{Stream: true, StreamQuota: true}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{stream: true})
 		}},
-		{"sse-tool-surrogate", func() (scenarioResult, error) {
+		{"sse-tool-surrogate", func(mock *mockServer) (scenarioResult, error) {
 			return runPair(root, mock, "sse-tool-surrogate", mockPlan{Stream: true, StreamToolArgs: `{"cmd":"\uD800"}`}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{stream: true})
 		}},
-		{"sse-tool-depth", func() (scenarioResult, error) {
+		{"sse-tool-depth", func(mock *mockServer) (scenarioResult, error) {
 			return runPair(root, mock, "sse-tool-depth", mockPlan{Stream: true, StreamToolArgs: strings.Repeat("[", 128) + "0" + strings.Repeat("]", 128)}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{stream: true})
 		}},
-		{"sse-tool-overflow", func() (scenarioResult, error) {
+		{"sse-tool-overflow", func(mock *mockServer) (scenarioResult, error) {
 			return runPair(root, mock, "sse-tool-overflow", mockPlan{Stream: true, StreamToolArgs: `{"value":1e309}`}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{stream: true})
 		}},
-		{"sse-tool-paired", func() (scenarioResult, error) {
+		{"sse-tool-paired", func(mock *mockServer) (scenarioResult, error) {
 			return runPair(root, mock, "sse-tool-paired", mockPlan{Stream: true, StreamToolArgs: `{"cmd":"\uD83D\uDE00"}`}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{stream: true})
 		}},
-		{"retry", func() (scenarioResult, error) {
+		{"retry", func(mock *mockServer) (scenarioResult, error) {
 			return runPair(root, mock, "retry", mockPlan{FirstStatus: http.StatusTooManyRequests}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{retry: true})
 		}},
-		{"single-key-429", func() (scenarioResult, error) {
+		{"single-key-429", func(mock *mockServer) (scenarioResult, error) {
 			// The shim sends exactly one request; an upstream 429 must reach
 			// Codex without retry when no alternate model/key exists.
 			return runPair(root, mock, "single-key-429", mockPlan{FirstStatus: http.StatusTooManyRequests}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{})
 		}},
-		{"single-key-401", func() (scenarioResult, error) {
+		{"single-key-401", func(mock *mockServer) (scenarioResult, error) {
 			return runPair(root, mock, "single-key-401", mockPlan{FirstStatus: http.StatusUnauthorized}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{})
 		}},
-		{"single-key-403", func() (scenarioResult, error) {
+		{"single-key-403", func(mock *mockServer) (scenarioResult, error) {
 			return runPair(root, mock, "single-key-403", mockPlan{FirstStatus: http.StatusForbidden}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{})
 		}},
-		{"single-key-503", func() (scenarioResult, error) {
+		{"single-key-503", func(mock *mockServer) (scenarioResult, error) {
 			// An upstream service outage is terminal without another eligible
 			// model or credential; no same-key loop may swallow the failure.
 			return runPair(root, mock, "single-key-503", mockPlan{FirstStatus: http.StatusServiceUnavailable}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{})
 		}},
-		{"single-key-500", func() (scenarioResult, error) {
+		{"single-key-500", func(mock *mockServer) (scenarioResult, error) {
 			// A generic provider failure must preserve status and body when there
 			// is no alternate credential to select.
 			return runPair(root, mock, "single-key-500", mockPlan{FirstStatus: http.StatusInternalServerError}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{})
 		}},
-		{"key-rotation-429", func() (scenarioResult, error) {
+		{"key-rotation-429", func(mock *mockServer) (scenarioResult, error) {
 			// The first API key always fails. A second independent credential
 			// must be selected *by the proxy*, with just one client request.
 			return runPair(root, mock, "key-rotation-429", mockPlan{RotateKeys: true}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{rotate: true})
 		}},
-		{"deepseek-sse-terminal", func() (scenarioResult, error) {
+		{"deepseek-sse-terminal", func(mock *mockServer) (scenarioResult, error) {
 			// Prodex commits the DeepSeek translation stream. An embedded
 			// upstream error must remain client-visible without a second
 			// API-key attempt even if the configured pool has two keys.
@@ -283,36 +275,27 @@ func run() error {
 				mockPlan{DeepSeekEmbeddedError: true}, *prodexBin, *godexBin,
 				prodexSourceCommit, godexSourceCommit, runOptions{rotate: true})
 		}},
-		{"key-rotation-restart", func() (scenarioResult, error) {
+		{"key-rotation-restart", func(mock *mockServer) (scenarioResult, error) {
 			return runRotationRestart(root, mock, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit)
 		}},
-		{"cancel", func() (scenarioResult, error) {
+		{"cancel", func(mock *mockServer) (scenarioResult, error) {
 			return runPair(root, mock, "cancel", mockPlan{Delay: 2 * time.Second}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{cancel: true})
 		}},
-		{"restart", func() (scenarioResult, error) {
+		{"restart", func(mock *mockServer) (scenarioResult, error) {
 			return runRestartScenario(root, mock, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit)
 		}},
-		{"recover-after-429", func() (scenarioResult, error) {
+		{"recover-after-429", func(mock *mockServer) (scenarioResult, error) {
 			return runRecoverAfter429(root, mock, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit)
 		}},
-		{"recover-after-503", func() (scenarioResult, error) {
+		{"recover-after-503", func(mock *mockServer) (scenarioResult, error) {
 			return runRecoverAfter503(root, mock, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit)
 		}},
 	}
-	var scenarios []scenarioResult
-	for _, spec := range specs {
-		if *scenarioName != "all" && *scenarioName != spec.name {
-			continue
-		}
-		result, err := spec.run()
-		if err != nil {
-			return fmt.Errorf("%s scenario: %w", spec.name, err)
-		}
-		scenarios = append(scenarios, result)
+	scenarios, err := executeDifferentialScenarios043713(specs, *scenarioName, *scenarioWorkers)
+	if err != nil {
+		return err
 	}
-	if len(scenarios) == 0 {
-		return fmt.Errorf("unknown scenario %q", *scenarioName)
-	}
+
 	var differences []string
 	for _, scenario := range scenarios {
 		differences = append(differences, scenario.Comparison...)
@@ -331,7 +314,7 @@ func run() error {
 	}
 	result := report{
 		Status: status, ProdexSource: prodexSourceCommit, GodexSource: godexSourceCommit,
-		MockURL: mock.listener.Addr().String(), Comparison: differences,
+		MockURL: "isolated loopback server per scenario", Comparison: differences,
 		NegativeControl: "PASS: status, headers, events, state, retry, cancellation, and stdout mutations are detected",
 		Scenarios:       scenarios,
 	}
