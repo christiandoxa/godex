@@ -142,9 +142,12 @@ func TestProdex043714ThreeProfileQuotaResetAndProLiteWeeklyOnlySelection(t *test
 		}
 		ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 		defer cancel()
-		for status.ProbeRefreshRevision()-before < uint64(len(names)) {
-			old := status.ProbeRefreshRevision()
-			if !status.WaitProbeRefresh(ctx, old) {
+		for {
+			observed := status.ProbeRefreshRevision()
+			if observed-before >= uint64(len(names)) {
+				break
+			}
+			if !status.WaitProbeRefresh(ctx, observed) {
 				t.Fatalf("probe revalidation stalled: revision=%d before=%d", status.ProbeRefreshRevision(), before)
 			}
 		}
