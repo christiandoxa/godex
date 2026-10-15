@@ -108,6 +108,7 @@ type mockPlan struct {
 	Stream                bool
 	StreamQuota           bool
 	DeepSeekEmbeddedError bool
+	StreamToolArgs        string
 }
 
 type runOptions struct {
@@ -232,6 +233,18 @@ func run() error {
 			// Deterministic future reset timestamps and consumption ratios
 			// prove the provider quota headers are projected to Codex format.
 			return runPair(root, mock, "sse-rate-limit", mockPlan{Stream: true, StreamQuota: true}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{stream: true})
+		}},
+		{"sse-tool-surrogate", func() (scenarioResult, error) {
+			return runPair(root, mock, "sse-tool-surrogate", mockPlan{Stream: true, StreamToolArgs: `{"cmd":"\uD800"}`}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{stream: true})
+		}},
+		{"sse-tool-depth", func() (scenarioResult, error) {
+			return runPair(root, mock, "sse-tool-depth", mockPlan{Stream: true, StreamToolArgs: strings.Repeat("[", 128) + "0" + strings.Repeat("]", 128)}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{stream: true})
+		}},
+		{"sse-tool-overflow", func() (scenarioResult, error) {
+			return runPair(root, mock, "sse-tool-overflow", mockPlan{Stream: true, StreamToolArgs: `{"value":1e309}`}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{stream: true})
+		}},
+		{"sse-tool-paired", func() (scenarioResult, error) {
+			return runPair(root, mock, "sse-tool-paired", mockPlan{Stream: true, StreamToolArgs: `{"cmd":"\uD83D\uDE00"}`}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{stream: true})
 		}},
 		{"retry", func() (scenarioResult, error) {
 			return runPair(root, mock, "retry", mockPlan{FirstStatus: http.StatusTooManyRequests}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{retry: true})
@@ -730,7 +743,20 @@ func (mock *mockServer) serveHTTP(writer http.ResponseWriter, request *http.Requ
 		writer.Header().Set("X-Ratelimit-Remaining-Tokens", "0")
 		writer.Header().Set("X-Ratelimit-Reset-Tokens", "1893456000000")
 	}
-	if plan.Stream && status == http.StatusOK {
+	if plan.StreamToolArgs != "" && status == http.StatusOK {
+		delta, _ := json.Marshal(map[string]any{
+			"id": "chatcmpl-toolargs", "object": "chat.completion.chunk", "model": "deepseek-v4-pro", "created": 1,
+			"choices": []any{map[string]any{
+				"index": 0, "delta": map[string]any{"tool_calls": []any{map[string]any{
+					"index": 0, "id": "call-toolargs", "type": "function",
+					"function": map[string]any{"name": "shell", "arguments": plan.StreamToolArgs},
+				}}}, "finish_reason": "tool_calls",
+			}},
+		})
+		responseBody = "data: " + string(delta) + "\n\n" + "data: [DONE]\n\n"
+		writer.Header().Set("Content-Type", "text/event-stream")
+	} else if plan.Stream && status == http.StatusOK {
+
 		responseBody = "data: {\"id\":\"chatcmpl-differential-stream\",\"model\":\"deepseek-v4-pro\",\"created\":1,\"choices\":[{\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\n" +
 			"data: {\"id\":\"chatcmpl-differential-stream\",\"model\":\"deepseek-v4-pro\",\"created\":1,\"choices\":[{\"delta\":{\"content\":\"synthetic-ok\"},\"finish_reason\":null}]}\n\n" +
 			"data: {\"id\":\"chatcmpl-differential-stream\",\"model\":\"deepseek-v4-pro\",\"created\":1,\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":2,\"completion_tokens\":1,\"total_tokens\":3}}\n\n" +
