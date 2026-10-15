@@ -358,3 +358,13 @@ and terminal completion/failure behavior. Mutation tests reject altered SSE
 fields even when both clients return HTTP 200; each execution independently
 checks the official pinned executable, source tag and clean candidate VCS
 metadata. These scenarios are included in `--scenario all`.
+
+## Gemini wrapped native response oracle (0.437.13)
+
+The full `--gemini` differential includes two additional buffered native
+GenerateContent cases with a nested `response` envelope: with a string
+`traceId` and with no `traceId`. Both independently require visible text,
+model, usage, no arbitrary outer fields, and a generated API-key Responses
+identity in the `resp_deepseek_` UUIDv7 namespace. Direct native Gemini
+transport is not changed by this identity contract. The source-pinned binary
+oracle now exercises ten Gemini cases, including all earlier eight fixtures.

@@ -178,6 +178,13 @@ go test ./tools/differential \
   --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
   --gemini
 
+# The 0.437.13 Gemini native envelope must unwrap `response` with or
+# without traceId. The API-key buffered bridge must generate its own UUIDv7
+# and must not expose stale native/trace IDs. These cases are mandatory parts
+# of the full --gemini differential above.
+go test ./internal/gateway/gemini ./tools/differential \
+  -run '^TestProdex043713Gemini' -count=1 -timeout=50s
+
 # Exact-tagged Responses WebSocket executable differential. A synthetic
 # heartbeat followed by capacity error must remain precommit; actual output
 # must never be replayed; trusted previous_response_id outranks soft session.
