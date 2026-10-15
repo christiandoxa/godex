@@ -111,6 +111,14 @@ go test ./internal/gateway/gemini \
 go test ./internal/gateway/deepseek \
   -run '^TestProdex043713DeepSeek' -count=1 -timeout=45s
 
+# The 0.437.13 streamed-argument differential compares four exact-tagged
+# real SSE tool-call envelopes. Reject extra empty arguments in item.added,
+# unstable invalid-JSON diagnostics, bad Unicode/numeric/depth validation,
+# failed completion ordering, and any extra/missing stream event.
+go test ./tools/differential \
+  -run '^TestProdex043713StreamToolDifferentialFixtureRejectsMutations$' \
+  -count=1 -timeout=30s
+
 # Independent Linux PTY footer oracle. It uses one synthetic Codex helper for
 # both exact binaries and checks launch-owned identity, picker fallback, and
 # all-stream TTY suppression without credentials or provider calls.

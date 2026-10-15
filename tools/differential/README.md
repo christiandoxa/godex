@@ -340,3 +340,21 @@ verified by source-audited routing and HTTP wire regressions.
 The DeepSeek binary harness does not claim to exercise every
 OpenAI-compatible Responses or WebSocket provider policy.
 The release gate remains fail-closed on durable file discrepancies.
+
+## Prodex 0.437.13 streamed tool-argument oracle
+
+Four additional credential-free differential scenarios exercise actual
+DeepSeek Chat Completions SSE `tool_calls` envelopes and their downstream
+Responses translations, rather than calling only an internal JSON validator:
+
+- `--scenario sse-tool-surrogate` rejects lone escaped high-surrogate Unicode.
+- `--scenario sse-tool-depth` rejects JSON nesting above 127 containers.
+- `--scenario sse-tool-overflow` rejects an overflowing JSON exponent.
+- `--scenario sse-tool-paired` accepts a valid escaped surrogate pair.
+
+Each requires exact event types, sequence numbers, tool-call identity, no
+premature `arguments` in `response.output_item.added`, canonical error text,
+and terminal completion/failure behavior. Mutation tests reject altered SSE
+fields even when both clients return HTTP 200; each execution independently
+checks the official pinned executable, source tag and clean candidate VCS
+metadata. These scenarios are included in `--scenario all`.

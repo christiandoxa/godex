@@ -155,7 +155,7 @@ func run() error {
 	godexSource := flags.String("godex-source", "", "Godex candidate source checkout")
 	expectedGodexCommit := flags.String("godex-commit", "", "expected Godex source HEAD commit SHA")
 	gemini := flags.Bool("gemini", false, "run isolated Gemini generateContent executable differential")
-	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, sse-stream, sse-rate-limit, retry, deepseek-sse-terminal, single-key-401, single-key-403, single-key-429, single-key-503, single-key-500, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
+	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, sse-stream, sse-rate-limit, sse-tool-surrogate, sse-tool-depth, sse-tool-overflow, sse-tool-paired, retry, deepseek-sse-terminal, single-key-401, single-key-403, single-key-429, single-key-503, single-key-500, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		return err
 	}
