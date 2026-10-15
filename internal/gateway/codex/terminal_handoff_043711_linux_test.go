@@ -58,7 +58,7 @@ func TestProdex043711ChildTerminalHandoffPreservesQueuedInputAndProtocols(t *tes
 	}
 	output := sessionOwnedPTYContents043711(t, master, slave)
 	for _, control := range []string{
-		"\x1b[?1049l",
+		"\x1b[?1047l",
 		"\x1b[?1000l", "\x1b[?1006l",
 		"\x1b[?2004l", "\x1b[?1004l", "\x1b[?25h",
 		"\x1b[<1u",
@@ -101,7 +101,7 @@ func TestProdex043711NativeTUIRestoresTerminalAfterSuccessAndFailure(t *testing.
 				t.Fatalf("native TUI leaked raw mode: before=%+v after=%+v", original, got)
 			}
 			output := sessionOwnedPTYContents043711(t, master, slave)
-			for _, code := range []string{"\x1b[?1049l", "\x1b[?2004l", "\x1b[?1004l", "\x1b[?25h"} {
+			for _, code := range []string{"\x1b[?1047l", "\x1b[?2004l", "\x1b[?1004l", "\x1b[?25h"} {
 				if !strings.Contains(output, code) {
 					t.Fatalf("TUI exit did not reset terminal mode %q: %q", code, output)
 				}

@@ -10,7 +10,7 @@ import (
 // that the handoff preserves an actual queued input stream.
 func TestProdex043711CrossPlatformChildTerminalCleanupProtocols(t *testing.T) {
 	for _, code := range []string{
-		"\x1b[?1049l",
+		"\x1b[?1047l",
 		"\x1b[?1000l",
 		"\x1b[?1002l",
 		"\x1b[?1003l",
