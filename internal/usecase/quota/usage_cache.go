@@ -39,6 +39,9 @@ func (status *Status) cachedAvailabilityUsageAtPolicy(
 			return usage, quotamodel.SourceLive, nil
 		}
 	}
+	// A generation is issued when a real observation starts, not when its
+	// network response finishes. A slower previous probe cannot be newer.
+	generation := status.probeSequence.Add(1)
 	// Cache hits stay local.
 	// Only misses consume the bounded probe gate.
 	// Provider errors still release it.
@@ -67,14 +70,13 @@ func (status *Status) cachedAvailabilityUsageAtPolicy(
 		})
 	}
 	if err == nil {
-		if baseURL == "" {
-			status.storeUsage(home, usage, now)
+		if !status.applySuccessfulUsageProbe043714(ctx, accountID, home, usage, now, generation, baseURL == "") {
+			// The late observation has no authority to overwrite a newer
+			// successful one, and must not report stale quota as authoritative.
+			if cached, found := status.cachedLiveUsage(home, status.now()); found {
+				return cached, quotamodel.SourceLive, nil
+			}
 		}
-		// Prodex persists a successful startup probe even when the caller
-		// supplied a loopback or test upstream override. Keep that durable
-		// snapshot separate from the default live cache so an override cannot
-		// silently become the next request's transport.
-		status.storeUsageSnapshot(ctx, accountID, usage, now)
 		return usage, quotamodel.SourceLive, nil
 	}
 	if snapshot, ok := status.cachedPersistedSnapshot(ctx, accountID, now); ok {

@@ -109,6 +109,11 @@ go test ./internal/repository/runtime ./internal/delivery/cli/runtime \
   -run '^TestProdex043713(GoalStoreDistinguishes|UnavailableGoalDatabase|LiveObserverDescriptor|ObserverMarker)' \
   -count=1 -timeout=65s
 
+# Prodex 0.437.14 does not allow delayed older successful quota probes
+# to overwrite later confirmed observations and durable quota snapshots.
+go test -race ./internal/usecase/quota \
+  -run '^TestProdex043714LateSuccessfulProbe' -count=1 -timeout=60s
+
 # The tagged 0.437.11 release-fence delta must remain fail-closed under stale
 # snapshots, same-second rotation, seven-day retired-fence compaction, backup
 # recovery, and invalid inputs. Only self-contained full-history Responses

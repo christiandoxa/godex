@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	accountentity "github.com/christiandoxa/godex/internal/entity/account"
@@ -81,6 +82,9 @@ type Status struct {
 	modelProvider modelProviderInspector
 	now           func() time.Time
 	usageMu       sync.Mutex
+	probeApplyMu  sync.Mutex
+	probeSequence atomic.Uint64
+	probeApplied  map[string]uint64
 	usageCache    map[string]usageSnapshot
 	snapshotCache map[string]quotamodel.UsageSnapshot
 	snapshots     usageSnapshotStore

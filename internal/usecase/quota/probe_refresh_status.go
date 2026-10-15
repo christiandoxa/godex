@@ -51,15 +51,13 @@ func (status *Status) scheduleProbeRefresh(ctx context.Context, accountID, home,
 	}
 	key := accountID + "\x00" + home + "\x00" + strings.TrimSpace(baseURL) + "\x00" + strconv.FormatBool(noProxy)
 	return status.ensureProbeRefreshQueue().Schedule(ctx, key, func(runCtx context.Context) error {
+		generation := status.probeSequence.Add(1)
 		usage, err := status.fetchHomeUsageAtPolicy(runCtx, home, baseURL, noProxy)
 		if err != nil {
 			return err
 		}
 		now := status.now()
-		if strings.TrimSpace(baseURL) == "" {
-			status.storeUsage(home, usage, now)
-		}
-		status.storeUsageSnapshot(runCtx, accountID, usage, now)
+		status.applySuccessfulUsageProbe043714(runCtx, accountID, home, usage, now, generation, strings.TrimSpace(baseURL) == "")
 		return nil
 	})
 }
