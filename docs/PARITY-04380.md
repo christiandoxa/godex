@@ -16,7 +16,7 @@ transfer 0.437.14 differential PASS claims to the new 0.438.0 target.
 | Windows SessionStart callback cursors | VERIFIED for native CI regression scope | Native Windows run `38921361347` failed six callback/recovery tests and an absolute-path fixture on `3c41bc0d`. On corrected `e02445aa`, the native Windows and macOS portable test/build jobs in run `38923328140` passed. Plain/compressed rollouts, partial lines, root ownership and binding checks execute in this scope; physical TUI and signed child interruption remain PARTIAL. |
 | Windows signed process exit and Unix cancellation | PARTIAL | A source-derived signed-i32 policy detects Windows Ctrl-C NTSTATUS. The native Unix cancellation boundary now sends SIGTERM through the owned process-group/reap path, preserves the first interactive SIGINT for Codex, and escalates after the bounded deadline. Non-TTY child, descendant and PTY regressions PASS on Linux; Windows runtime signal execution and broader native TUI matrices remain unverified. |
 | Local proxy under accept and accepted-socket resource pressure | PARTIAL (Linux cross-binary recovery VERIFIED) | Actual official Prodex 0.438.0 and clean Godex gateway both reached RLIMIT_NOFILE=80 under 120 partially written TCP connections; each retained the original port, held a newly queued GET while saturated, served it exactly once after release, served a subsequent independent GET, and exited cleanly. The new source/SHA-pinned `profileparity` stage and mutation controls cover 3 exact upstream GETs. Go's stdlib has no Rust tiny_http accepted-clone step, so an isolated cross-executable clone-specific failure and native Windows/macOS behavior remain unverified. |
-| Official Codex 0.163.0 compatibility | PARTIAL | Official `rust-v0.163.0` asset metadata and SHA-256 verified; the real isolated app-server handshake, foreground compaction, `response.incomplete` usage/reason, `turn/interrupt`, and async background remote-compaction request loopback proofs PASS on Linux x86_64. Candidate adoption on a later turn, native retry and Windows MCP environments remain outside the proof. |
+| Official Codex 0.163.0 compatibility | PARTIAL | Official `rust-v0.163.0` asset metadata and SHA-256 verified; the real isolated app-server handshake, foreground compaction, `response.incomplete` usage/reason, `turn/interrupt`, async background remote-compaction request, and later-turn candidate adoption loopback proofs PASS on Linux x86_64. Native retry and Windows MCP environments remain outside the proof. |
 | 0.438.0 pinned release differential | VERIFIED (finite gate only) | On clean Godex `c68ba481`, both independently pinned preflight partitions PASS (34 profile stages, 14 CLI probes), DeepSeek **22/22**, Gemini **13/13**, and WebSocket **58 attempts** PASS with active negative controls and zero reported comparison differences. Official Codex 0.163.0 app-server also PASS on this commit. The 15 compiled-source Gemini compound native fixtures PASS; native OAuth executable proof remains PARTIAL. Six Linux/Darwin/Windows cross-build and targeted cross-test compilation targets PASS through `make verify`. Every phase verifies tagged Prodex source, manifest, official binary SHA and the same clean Go source. Production-wide 1:1 remains PARTIAL. |
 | Copilot logged-in candidate input bounds | VERIFIED for local source-derived import fixture | Tagged 0.438.0 `prodex_profile_export_copilot_candidate_users_v1` and Rust adapter cap raw `(host, login)` views at 256 including one preferred last user, **before deduplication**. Godex formerly accepted 257 duplicates and reached account HTTP; failing synthetic loopback tests now PASS after bounding `Source.Load`, with exact-pair priority/dedup preserved. Real multi-user Copilot/keychain import remains PARTIAL. |
 | OpenAI retired-model catalog filter | VERIFIED for tagged predicate / local cache | Prodex 0.438.0 `catalog_openai_model_is_retired` trims Unicode whitespace then performs ASCII-only case-insensitive exact matches for `spark`, `gpt-5.3-codex-spark`, `gpt-5.3-spark`. Go previously used Unicode `strings.ToLower`, which incorrectly retired lookalikes such as `sparK`. Failing source-derived negative tests and a real synthetic `models_cache.json` picker regression now PASS using `asciiEqualFold` after `TrimSpace`; interactive PTY model-picker screenshot not yet directly compared. |
@@ -101,10 +101,11 @@ upstream call. A native `response.incomplete` carries usage `17/5/22` and its
 `max_output_tokens` reason to `turn/completed` without replay. Native
 `turn/interrupt` closes a held stream and returns to idle with one upstream
 call. The async background case drives the configured 50% context threshold,
-observes the second Responses request, and verifies that it carries exactly
-the remote `compaction_trigger` shape without an extra replay. These cases pass
-on Linux amd64; later-turn candidate adoption, live OAuth/model inference, and
-Windows/macOS execution remain outside the proof.
+observes the second Responses request, verifies that it carries exactly
+the remote `compaction_trigger` shape, then starts a follow-up turn and checks
+that the adopted compaction summary is retained in its request history without
+an extra replay. These cases pass on Linux amd64; live OAuth/model inference
+and Windows/macOS execution remain outside the proof.
 
 The opt-in `TestProdex04380OfficialCodex0163LoopbackAutoCompactionLifecycle`
 case now covers automatic foreground-turn compaction with the same verified
@@ -112,8 +113,7 @@ binary. Three turns drive a 200,000-token configured threshold; the provider
 observes exactly four Responses calls, a `contextCompaction` lifecycle item,
 and the checkpoint prompt before the summary and final turn. This proves the
 bounded local auto-compaction lifecycle and no extra replay on Linux amd64.
-Background candidate adoption, live model inference, OAuth and native
-Windows/macOS execution remain PARTIAL.
+Live model inference, OAuth and native Windows/macOS execution remain PARTIAL.
 
 ## Codex 0.163.0 incomplete-response wire checkpoint
 
@@ -1316,23 +1316,22 @@ phases then verified the committed source. Native Windows/macOS runtime,
 live OAuth/quotas and full compaction/cancellation remain PARTIAL/OPEN.
 
 
-## Complete five-phase gate — async Codex request `cb59720f`
+## Complete five-phase gate — async Codex adoption `ba8c53b6`
 
 All five independent Prodex 0.438.0 release phases passed on clean Godex
-commit `cb59720fcebdbc022c994c086d25bda534c54f7e`, with the canonical source
+commit `ba8c53b6f824073c01785a37c66d26a1c1984b8e`, with the canonical source
 `8cab9794b0e08b2cb8507df8321a8e38ebd6492f` and published binary SHA pinned:
 
 - `--phase=preflight-tests`: **PASS**, including the official Codex 0.163.0
-  async background remote-compaction request proof.
+  async background request and later-turn candidate adoption proof.
 - `--phase=preflight-oracles`: **PASS**, including 34 profile stages and 14
   CLI probes.
 - `--phase=deepseek`: **PASS 22/22**, no comparison differences.
 - `--phase=gemini`: **PASS 13/13**, no comparison differences.
 - `--phase=websocket`: **PASS**, 58 upstream attempts with no postcommit replay.
 
-The gate is finite synthetic/loopback evidence. Later-turn background-candidate
-adoption, live OAuth or quota behavior, and native Windows/macOS execution stay
-PARTIAL.
+The gate is finite synthetic/loopback evidence. Live OAuth or quota behavior,
+native retry, and native Windows/macOS execution stay PARTIAL.
 
 ## DeepSeek explicit message roles — typed validation and untyped fallback
 
