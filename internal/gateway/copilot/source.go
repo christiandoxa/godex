@@ -29,6 +29,14 @@ func (source *Source) Load(ctx context.Context) (profilemodel.BuiltinCredential,
 	if err != nil {
 		return profilemodel.BuiltinCredential{}, err
 	}
+	// Tagged Prodex 0.438.0 Copilot candidate Mojo ABI accepts at most
+	// 256 raw input views BEFORE duplicate elimination (lastLoggedInUser
+	// consumes one slot). Reject malformed oversized account lists before
+	// reading a credential or contacting the user-info endpoint.
+	if len(config.LoggedInUsers) > 256 ||
+		(config.LastLoggedInUser != nil && len(config.LoggedInUsers) >= 256) {
+		return profilemodel.BuiltinCredential{}, errors.New("Copilot candidate count exceeds the 256-user limit")
+	}
 	users := candidateUsers(config)
 	if len(users) == 0 {
 		return profilemodel.BuiltinCredential{}, errors.New("no logged-in Copilot user found in config.json")

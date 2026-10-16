@@ -94,6 +94,12 @@ if [ -n "${GODEX_TEST_CODEX_0163_APP_SERVER_BIN:-}" ]; then
     -count=1 -timeout=40s
 fi
 
+# Prodex 0.438.0's compiled Copilot candidate policy caps the raw logged-
+# in user list plus preferred lastLoggedInUser at 256 BEFORE deduplication.
+# Oversized synthetic imports must not attempt token resolution or HTTP IO.
+go test -race ./internal/gateway/copilot \
+  -run '^TestProdex04380CopilotCandidate' -count=1 -timeout=35s
+
 # Tagged rich_catalog.mojo retires only three exact OpenAI models with an
 # ASCII-case-only comparison after Unicode trim. A Unicode Kelvin `K` must
 # never become ASCII k and falsely hide a distinct catalog model ID.
