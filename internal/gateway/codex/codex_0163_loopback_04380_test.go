@@ -28,6 +28,7 @@ const (
 	codex0163LoopbackComplete codex0163LoopbackMode = iota + 1
 	codex0163LoopbackIncomplete
 	codex0163LoopbackHold
+	codex0163LoopbackAutoCompaction
 )
 
 type codex0163LoopbackCall struct {
@@ -102,10 +103,24 @@ func (provider *codex0163LoopbackProvider) handle(writer http.ResponseWriter, re
 		_, _ = io.WriteString(writer, "data: [DONE]\n\n")
 		return
 	}
+	callNumber := provider.callCount()
+	messageText, totalTokens := "synthetic answer", 9
+	if provider.mode == codex0163LoopbackAutoCompaction {
+		switch callNumber {
+		case 1:
+			totalTokens = 70_000
+		case 2:
+			totalTokens = 330_000
+		case 3:
+			messageText, totalTokens = "LOCAL_SUMMARY", 200
+		case 4:
+			totalTokens = 120
+		}
+	}
 	messageID := fmt.Sprintf("msg-fixture-%d", provider.callCount())
 	item := map[string]any{
 		"type": "message", "id": messageID, "role": "assistant",
-		"content": []any{map[string]any{"type": "output_text", "text": "synthetic answer", "annotations": []any{}}},
+		"content": []any{map[string]any{"type": "output_text", "text": messageText, "annotations": []any{}}},
 	}
 	responseID := fmt.Sprintf("resp-fixture-%d", provider.callCount())
 	writeCodex0163SSE(writer, flusher, "response.created", map[string]any{
@@ -121,7 +136,7 @@ func (provider *codex0163LoopbackProvider) handle(writer http.ResponseWriter, re
 		"type": "response.completed",
 		"response": map[string]any{
 			"id": responseID, "status": "completed", "output": []any{item},
-			"usage": map[string]any{"input_tokens": 7, "output_tokens": 2, "total_tokens": 9},
+			"usage": map[string]any{"input_tokens": totalTokens, "output_tokens": 0, "total_tokens": totalTokens},
 		},
 	})
 	_, _ = io.WriteString(writer, "data: [DONE]\n\n")
@@ -197,6 +212,9 @@ func newCodex0163AppServer(t *testing.T, mode codex0163LoopbackMode) (*codex0163
 		t.Fatal(err)
 	}
 	config := fmt.Sprintf("model_provider = %q\n[model_providers.loopback]\nname = %q\nbase_url = %q\nwire_api = %q\nrequires_openai_auth = false\n", "loopback", "loopback", provider.server.URL+"/v1", "responses")
+	if mode == codex0163LoopbackAutoCompaction {
+		config += "model_auto_compact_token_limit = 200000\ncompact_prompt = \"compact this\"\n"
+	}
 	if err := os.WriteFile(filepath.Join(codexHome, "config.toml"), []byte(config), 0o600); err != nil {
 		t.Fatal(err)
 	}

@@ -70,6 +70,47 @@ func TestProdex04380OfficialCodex0163LoopbackForegroundCompactionRetainsHistory(
 	}
 }
 
+func TestProdex04380OfficialCodex0163LoopbackAutoCompactionLifecycle(t *testing.T) {
+	app, provider := newCodex0163AppServer(t, codex0163LoopbackAutoCompaction)
+	initializeCodex0163AppServer(t, app)
+	threadID := startCodex0163Thread(t, app)
+	for _, prompt := range []string{"first", "second", "third"} {
+		app.beginOperation()
+		if _, err := app.request(3, "turn/start", map[string]any{
+			"threadId": threadID,
+			"input":    []any{map[string]any{"type": "text", "text": prompt}},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if err := app.waitIdle(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	app.mu.Lock()
+	compacted := app.compacted
+	app.mu.Unlock()
+	if !compacted {
+		t.Fatal("automatic compaction did not emit a contextCompaction item")
+	}
+	if provider.callCount() != 4 {
+		t.Fatalf("automatic compaction upstream calls = %d, want 4", provider.callCount())
+	}
+	var compactionCall codex0163LoopbackCall
+	for index := 0; index < 4; index++ {
+		call, err := provider.waitCall(app.ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if index == 2 {
+			compactionCall = call
+		}
+	}
+	if !strings.Contains(string(compactionCall.body), "CONTEXT CHECKPOINT COMPACTION") {
+		t.Fatalf("automatic compaction request omitted checkpoint prompt: %s", compactionCall.body)
+	}
+	provider.assertNoCall(t, 250*time.Millisecond)
+}
+
 func TestProdex04380OfficialCodex0163LoopbackIncompleteUsageDoesNotReplay(t *testing.T) {
 	app, provider := newCodex0163AppServer(t, codex0163LoopbackIncomplete)
 	initializeCodex0163AppServer(t, app)

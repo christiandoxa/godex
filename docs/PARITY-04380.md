@@ -103,6 +103,15 @@ upstream call. A native `response.incomplete` carries usage `17/5/22` and its
 call. The three cases pass on Linux amd64; they do not claim automatic
 background compaction, live OAuth/model inference, or Windows/macOS execution.
 
+The opt-in `TestProdex04380OfficialCodex0163LoopbackAutoCompactionLifecycle`
+case now covers automatic foreground-turn compaction with the same verified
+binary. Three turns drive a 200,000-token configured threshold; the provider
+observes exactly four Responses calls, a `contextCompaction` lifecycle item,
+and the checkpoint prompt before the summary and final turn. This proves the
+bounded local auto-compaction lifecycle and no extra replay on Linux amd64.
+Background preparation, live model inference, OAuth and native Windows/macOS
+execution remain PARTIAL.
+
 ## Codex 0.163.0 incomplete-response wire checkpoint
 
 `TestProdex04380NativeResponseIncompletePreservesReasonAndUsageWithoutRotation`
