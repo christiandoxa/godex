@@ -150,7 +150,7 @@ func (process *CodexProcess) runThroughProxy(
 	if companion {
 		return process.runWithSessionAppServer(ctx, binary, codexHome, command.Env, command, arguments, markerPath, releaseAffinity)
 	}
-	if err := command.Run(); err != nil {
+	if err := runTerminalCommand(ctx, command); err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}

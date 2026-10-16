@@ -48,7 +48,7 @@ func (process *CodexProcess) RunRuntimeDirect(
 	command.Stdin = process.terminal.Stdin
 	command.Stdout = process.terminal.Stdout
 	command.Stderr = process.terminal.Stderr
-	if err := command.Run(); err != nil {
+	if err := runTerminalCommand(ctx, command); err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}

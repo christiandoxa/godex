@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	entity "github.com/christiandoxa/godex/internal/entity/account"
 )
@@ -62,7 +61,7 @@ func (process *CodexProcess) Login(
 	command.Stdin = process.terminal.Stdin
 	command.Stdout = process.terminal.Stdout
 	command.Stderr = process.terminal.Stderr
-	if err := command.Run(); err != nil {
+	if err := runTerminalCommand(ctx, command); err != nil {
 		if ctx.Err() != nil {
 			return entity.Identity{}, ctx.Err()
 		}
@@ -104,7 +103,7 @@ func (process *CodexProcess) run(ctx context.Context, codexHome string, argument
 	command.Stdin = process.terminal.Stdin
 	command.Stdout = process.terminal.Stdout
 	command.Stderr = process.terminal.Stderr
-	if err := command.Run(); err != nil {
+	if err := runTerminalCommand(ctx, command); err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
@@ -114,10 +113,7 @@ func (process *CodexProcess) run(ctx context.Context, codexHome string, argument
 }
 
 func terminalCommand(ctx context.Context, binary string, arguments []string) *exec.Cmd {
-	command := exec.CommandContext(ctx, binary, arguments...)
-	command.Cancel = func() error { return nil }
-	command.WaitDelay = 2 * time.Second
-	return command
+	return exec.CommandContext(ctx, binary, arguments...)
 }
 
 func (process *CodexProcess) Version(ctx context.Context) (string, error) {

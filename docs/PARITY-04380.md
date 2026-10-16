@@ -14,9 +14,9 @@ transfer 0.437.14 differential PASS claims to the new 0.438.0 target.
 | Surface | Status | Evidence / next proof |
 | --- | --- | --- |
 | Windows SessionStart callback cursors | VERIFIED for native CI regression scope | Native Windows run `38921361347` failed six callback/recovery tests and an absolute-path fixture on `3c41bc0d`. On corrected `e02445aa`, the native Windows and macOS portable test/build jobs in run `38923328140` passed. Plain/compressed rollouts, partial lines, root ownership and binding checks execute in this scope; physical TUI and signed child interruption remain PARTIAL. |
-| Windows signed process exit and Unix cancellation | PARTIAL | A source-derived signed-i32 policy now detects Windows Ctrl-C NTSTATUS and real Unix SIGINT; original Go logic detected only exit 130. Tagged negative controls and native Linux child-signal tests PASS; Windows cross-compiled test binary, but Windows runtime execution has not been observed. |
+| Windows signed process exit and Unix cancellation | PARTIAL | A source-derived signed-i32 policy detects Windows Ctrl-C NTSTATUS. The native Unix cancellation boundary now sends SIGTERM through the owned process-group/reap path, preserves the first interactive SIGINT for Codex, and escalates after the bounded deadline. Non-TTY child, descendant and PTY regressions PASS on Linux; Windows runtime signal execution and broader native TUI matrices remain unverified. |
 | Local proxy under accept and accepted-socket resource pressure | PARTIAL (Linux cross-binary recovery VERIFIED) | Actual official Prodex 0.438.0 and clean Godex gateway both reached RLIMIT_NOFILE=80 under 120 partially written TCP connections; each retained the original port, held a newly queued GET while saturated, served it exactly once after release, served a subsequent independent GET, and exited cleanly. The new source/SHA-pinned `profileparity` stage and mutation controls cover 3 exact upstream GETs. Go's stdlib has no Rust tiny_http accepted-clone step, so an isolated cross-executable clone-specific failure and native Windows/macOS behavior remain unverified. |
-| Official Codex 0.163.0 compatibility | PARTIAL | Official `rust-v0.163.0` asset metadata and SHA-256 verified; extracted binary `codex-cli 0.163.0` successfully completed real isolated app-server `initialize`, `thread/list` active and archived through the Godex protocol on Linux x86_64. `TestProdex04380OfficialCodex0163AppServerInitializeAndThreadList` PASS. `response.incomplete`, compaction, native retry/interrupt and Windows MCP environments still need separate executable evidence. |
+| Official Codex 0.163.0 compatibility | PARTIAL | Official `rust-v0.163.0` asset metadata and SHA-256 verified; the real isolated app-server handshake, foreground compaction, `response.incomplete` usage/reason and `turn/interrupt` loopback proofs PASS on Linux x86_64. Background compaction, native retry and Windows MCP environments remain outside the proof. |
 | 0.438.0 pinned release differential | VERIFIED (finite gate only) | On clean Godex `c68ba481`, both independently pinned preflight partitions PASS (34 profile stages, 14 CLI probes), DeepSeek **22/22**, Gemini **13/13**, and WebSocket **58 attempts** PASS with active negative controls and zero reported comparison differences. Official Codex 0.163.0 app-server also PASS on this commit. The 15 compiled-source Gemini compound native fixtures PASS; native OAuth executable proof remains PARTIAL. Six Linux/Darwin/Windows cross-build and targeted cross-test compilation targets PASS through `make verify`. Every phase verifies tagged Prodex source, manifest, official binary SHA and the same clean Go source. Production-wide 1:1 remains PARTIAL. |
 | Copilot logged-in candidate input bounds | VERIFIED for local source-derived import fixture | Tagged 0.438.0 `prodex_profile_export_copilot_candidate_users_v1` and Rust adapter cap raw `(host, login)` views at 256 including one preferred last user, **before deduplication**. Godex formerly accepted 257 duplicates and reached account HTTP; failing synthetic loopback tests now PASS after bounding `Source.Load`, with exact-pair priority/dedup preserved. Real multi-user Copilot/keychain import remains PARTIAL. |
 | OpenAI retired-model catalog filter | VERIFIED for tagged predicate / local cache | Prodex 0.438.0 `catalog_openai_model_is_retired` trims Unicode whitespace then performs ASCII-only case-insensitive exact matches for `spark`, `gpt-5.3-codex-spark`, `gpt-5.3-spark`. Go previously used Unicode `strings.ToLower`, which incorrectly retired lookalikes such as `sparK`. Failing source-derived negative tests and a real synthetic `models_cache.json` picker regression now PASS using `asciiEqualFold` after `TrimSpace`; interactive PTY model-picker screenshot not yet directly compared. |
@@ -120,6 +120,28 @@ executable source-pinned incomplete-response differential at the time of this
 local-only checkpoint. A subsequent cross-binary fixture is recorded below. Other foreground/
 background Responses-v2 compaction and native interruption features remain
 open pending scenario-specific proof.
+
+## Codex native child cancellation boundary
+
+Canonical Prodex uses SIGTERM for intentional child shutdown, waits up to two
+seconds, then force-kills the owned process tree. Interactive children keep the
+first terminal SIGINT for the native TUI; the second interrupt requests Godex
+teardown. Godex previously disabled `exec.Cmd` cancellation and left a
+`WaitDelay` kill path, so non-TTY cancellation could kill a child without its
+handler and interactive TUI children could be force-killed after the first
+interrupt.
+
+The shared Unix terminal runner now uses the existing `waitForSessionChild`
+boundary, private process groups for non-TTY commands, and
+`prepareTerminalCommandWait` to disable the competing `exec.Cmd` cancellation.
+This applies to login, runtime, proxy and capability commands; Windows keeps
+the native `CommandContext` behavior. The regression set covers a SIGTERM-aware
+non-TTY child, owned descendants without touching an unrelated process, a PTY
+first SIGINT/second-interrupt sequence, capability-probe non-interactivity and
+session-server companion cleanup. The focused package and race suite pass
+(335 tests each). This is VERIFIED for the Linux ownership/cancellation
+boundary; native Windows signal semantics, macOS execution and full Codex TUI
+behavior remain PARTIAL.
 
 ## Shutdown during unresolved Linux descriptor exhaustion
 

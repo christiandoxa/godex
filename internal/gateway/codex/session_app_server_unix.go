@@ -87,6 +87,7 @@ func (process *CodexProcess) runWithSessionAppServer(
 
 	privateChildGroup := configureCodexSessionChildProcess(command)
 	command.Args = append([]string{command.Path, "--remote", "unix://" + socket}, arguments...)
+	prepareTerminalCommandWait(command)
 	if err := command.Start(); err != nil {
 		return fmt.Errorf("start Codex child with app-server companion: %w", err)
 	}

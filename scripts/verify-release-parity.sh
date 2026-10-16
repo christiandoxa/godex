@@ -85,6 +85,12 @@ go test ./internal/gateway/codex \
   -run '^TestProdex043711(SuccessfulSessionCompanionShowsResumeGuidanceAfterSocketClosed|SessionCompanionSuppressesGuidanceOnNonTTYAndFailure|ChildTerminalHandoffPreservesQueuedInputAndProtocols|NativeTUIRestoresTerminalAfterSuccessAndFailure|NonInteractiveChildNeverEmitsTerminalProtocols|OwnedCompanionRestoresTTYBeforeResumeGuidance)$' \
   -count=1 -timeout=75s
 
+# Canonical intentional shutdown uses SIGTERM with bounded tree reaping;
+# interactive TTY children keep the first SIGINT for native Codex.
+go test ./internal/gateway/codex \
+  -run '^Test(TerminalCommandCancelsNonTTYChildWithTermination|RunCancellationSendsTermination|RunTerminalCommandPreservesInteractiveFirstInterrupt|RunCancellationReapsNonTTYDescendants)$' \
+  -count=1 -timeout=45s
+
 # Optional independently verified official Codex rust-v0.163.0 app-server
 # handshake. This does not alter the user's installed codex or start turns.
 # Supply the verified test-only executable through the opt-in environment.
