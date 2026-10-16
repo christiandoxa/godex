@@ -236,6 +236,13 @@ go test ./internal/gateway/gemini \
 go test ./internal/gateway/deepseek \
   -run '^TestProdex043713DeepSeek' -count=1 -timeout=45s
 
+# Prodex 0.438.0 Anthropic ResponseOutput planner caps content at exactly
+# 65536 elements, even for no-visible-text thinking blocks whose bounded
+# source JSON still fits inside the 4 MiB native response limit.
+go test ./internal/gateway/deepseek \
+  -run '^TestProdex04380AnthropicResponsePlanRejectsTooManyContentBlocks$' \
+  -count=1 -timeout=40s
+
 # The 0.438.0 streamed-argument differential compares four exact-tagged
 # real SSE tool-call envelopes. Reject extra empty arguments in item.added,
 # unstable invalid-JSON diagnostics, bad Unicode/numeric/depth validation,

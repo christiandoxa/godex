@@ -57,7 +57,15 @@ func deepSeekAnthropicResponse(body []byte, now time.Time) ([]byte, error) {
 	return json.Marshal(result)
 }
 
+// Tagged Prodex 0.438.0 Mojo response planner rejects inputs above
+// ANTHROPIC_RESPONSE_PLAN_MAX_BLOCKS before classifying or materializing a
+// single item. The source body may be below the 4 MiB read limit while
+// containing >65536 invisible thinking blocks; never silently accept it.
 func anthropicResponseOutput(content []any) ([]any, error) {
+	const maxAnthropicResponseBlocks04380 = 65536
+	if len(content) > maxAnthropicResponseBlocks04380 {
+		return nil, errors.New("Anthropic Messages response plan failed: InvalidInput")
+	}
 	output := make([]any, 0, len(content))
 	var textBlocks []any
 	flushText := func() {

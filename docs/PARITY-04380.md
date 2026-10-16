@@ -875,3 +875,25 @@ last-user priority and strict bytewise host/login identity with duplicate
 removal, distinguishing case, slash and whitespace variants without leaking
 real identity or credentials. Local functional and race tests PASS. This is
 not an end-to-end two-executable real Copilot/keychain import certificate.
+
+
+## Anthropic Responses output block cardinality — 0.438.0
+
+The tagged Prodex 0.438.0 source
+`crates/prodex-mojo-core/src/rich/anthropic_messages.rs` checks
+`ANTHROPIC_RESPONSE_PLAN_MAX_BLOCKS = 65_536` **before** classifying content
+or planning output. Its Mojo `ResponseOutput` operation independently caps
+JSON array materialization at 65,536 items. Godex previously accepted a
+native Messages response containing **65,537** invisible thinking blocks,
+even though the complete response body was smaller than the separate 4 MiB
+read limit. That mismatch could create a false successful empty Responses
+output instead of a deterministic invalid-plan error.
+
+`TestProdex04380AnthropicResponsePlanRejectsTooManyContentBlocks` explicitly
+reproduced acceptance before the fix and now verifies the maximum legal
+65,536-block response is accepted while one additional block fails closed
+with the tagged `Anthropic Messages response plan failed: InvalidInput`
+classification. The quota and auth/profile selectors are unaffected, and no
+real provider account is used. This is **source-derived local translator
+parity**, not yet a full two-executable native Anthropic Messages
+cardinality differential; the test is included in the release preflight.
