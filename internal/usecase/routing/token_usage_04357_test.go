@@ -37,6 +37,31 @@ func TestProdex04357ObserveRecordsTerminalResponsesTokenUsage(t *testing.T) {
 	}
 }
 
+func TestProdex04380ObserveRecordsNativeIncompleteTokenUsage(t *testing.T) {
+	recorder := &routingMarkerRecorder{}
+	router, err := NewRouter(Config{
+		Activity: recorder,
+		Accounts: func(context.Context) ([]proxymodel.Account, error) {
+			return []proxymodel.Account{{ID: "main", Enabled: true}}, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := []byte("{\"type\":\"response.incomplete\",\"response\":{\"id\":\"resp-incomplete\",\"status\":\"incomplete\",\"incomplete_details\":{\"reason\":\"max_output_tokens\"},\"usage\":{\"input_tokens\":17,\"output_tokens\":8,\"total_tokens\":25,\"input_tokens_details\":{\"cached_tokens\":4}}}}")
+	if err := router.Observe(t.Context(), "main", make(http.Header), payload, false); err != nil {
+		t.Fatal(err)
+	}
+	if len(recorder.events) != 1 {
+		t.Fatalf("native incomplete token events = %#v", recorder.events)
+	}
+	event := recorder.events[0]
+	if event.Kind != "token_usage" || event.Fields["input_tokens"] != "17" ||
+		event.Fields["cached_input_tokens"] != "4" || event.Fields["output_tokens"] != "8" {
+		t.Fatalf("native incomplete token event = %#v", event)
+	}
+}
+
 func TestProdex04357ObserveIgnoresNonterminalUsageProgressButAcceptsChatAliases(t *testing.T) {
 	recorder := &routingMarkerRecorder{}
 	router, err := NewRouter(Config{

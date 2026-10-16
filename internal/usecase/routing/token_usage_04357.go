@@ -46,7 +46,8 @@ func terminalTokenUsage(payload []byte) (runtimemodel.TokenUsageCounts, bool) {
 	if eventType != "" &&
 		eventType != "response.completed" &&
 		eventType != "response.done" &&
-		eventType != "response.failed" {
+		eventType != "response.failed" &&
+		eventType != "response.incomplete" {
 		return runtimemodel.TokenUsageCounts{}, false
 	}
 
