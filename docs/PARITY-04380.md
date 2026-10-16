@@ -19,7 +19,8 @@ transfer 0.437.14 differential PASS claims to the new 0.438.0 target.
 | 0.438.0 pinned release differential | VERIFIED (finite gate only) | On one clean Godex `154833a3`, both independently pinned preflight partitions PASS (combined full preflight, official Codex 0.163.0 app-server, 34/34 executable profile stages); DeepSeek 22/22, Gemini 10/10 and WebSocket **58 upstream attempts** PASS with strict negative controls. Cross-build for six Linux/Darwin/Windows targets and cross-test compilation PASS on the same SHA. Prodex 0.438.0 source commit, published binary checksum and release manifest verified in each phase. Production-wide 1:1 remains PARTIAL. |
 | WebSocket terminal-frame Mojo classification | VERIFIED for tested status-wire cases; PARTIAL overall | Source-derived regressions reproduced actual Godex mismatches in `status`/`status_code` precedence, strict u16 bounds and nested/top-level connection-limit matching. Fixed in `4aac2592`; real pinned Prodex/Godex `--websocket` comparison confirms continuation after invalid/fractional/overflow primary status and **terminal error** for valid `65535` (one upstream attempt per mode; total 50). Status-frame mutation tests PASS. A newer **clean, exact-tagged two-binary** differential on `ab219e07` additionally verified top-level and nested connection-limit precommit recovery on a fresh WebSocket: one same-owner retry per case, neither precommit error leaks, total **58** upstream attempts. Persistent limits and already-retried budgets are bounded in in-process TCP tests, with no postcommit replay; broader future field permutations remain OPEN. |
 | Usage-limit native session candidate fallback after transient pool retry | PARTIAL | Tagged 0.438.0 compiled Mojo `usage_limit_recovery_candidate` allows the originally failed profile as the **last** candidate only after a transient wait and verified eligibility/quota. Godex formerly always excluded the original owner and could relaunch a previously exhausted backup. `TestProdex04380SessionRecoveryFailedProfileFallbackAfterPoolRetry` reproduced these failures and now passes with three profiles, model-aware ready claims, backup precedence, cancellation, owner/credential negative controls and prompt-no-replay. Legacy no-quota adapter backup retries remain unchanged. Independent exact-binary three-profile session recovery differential still OPEN. |
-| Super CLI required-provider usage exit | PARTIAL | Exact Prodex 0.438.0 CLI reports exit 2 for `super --api-key <value> --dry-run` without required `--provider`, while prior Godex reported exit 1 despite correct error text. Updated Godex's syntax-error classification and added source/binary-pinned CLI differential for both `super` and alias `s`, with negative controls rejecting exit 0/1/130 and no runtime execution. Focused tests PASS; direct clean-commit two-executable comparison to be run before marking VERIFIED. |
+| Super CLI required-provider usage exit | VERIFIED for tested cases | The exact Prodex 0.438.0 CLI and clean Godex `27d850b6` both exit 2 for missing `--provider` under `super` and `s`; all 14 exact-source/published-SHA pinned CLI probes PASS with negative controls. Uncovered malformed-option combinations remain outside the finite fixture. |
+| Super CLI positioned Gemini/DeepSeek provider alias | VERIFIED for tested cases | Prodex 0.438.0 `rewrite_positioned_super_alias` chooses a provider after leading options, but preserves literal `--`/explicit provider/local URL. Godex formerly treated `s --dry-run gemini` and `s --dry-run deepseek` as OpenAI Codex-input tails; `TestProdex04380SuperPositionedProviderAliasAfterOptions` failed before the fix, passed after. Clean `27d850b6` exact-binary CLI differential PASS 14/14 including four new dry-run semantic-provider probes. Source-size baseline reduced from 901 to 889 lines with helper extraction. More opaque-argument and platform-specific parsing is still OPEN. |
 | Three-profile quota/auth restart | PARTIAL | Prior Godex 0.437.14 synthetic and multi-process tests PASS. Independent two-executable multi-profile restart differential is still needed. |
 
 **Status is PARTIAL, not certified 1:1 production parity.** Only a fully
@@ -517,3 +518,41 @@ real live OAuth and three-profile model-specific quota/relaunch, actual
 Codex 0.163.0 compaction, and isolated tiny_http accepted-socket clone faults
 are still **PARTIAL/OPEN**. The complete finite release gate is VERIFIED;
 no unqualified production behavioral parity certificate is asserted.
+
+
+## Super positioned provider alias — exact Prodex 0.438.0
+
+Prodex 0.438.0 implements its provider shorthand in two stages: an immediate
+compatibility rewrite at CLI entry, then a **positioned provider** selection
+after parsing leading `super/s` options. A direct isolated official-binary
+experiment showed `prodex s --dry-run gemini` and
+`prodex s --dry-run deepseek` selected `prodex-gemini` and `prodex-deepseek`,
+while the pre-fix Godex executable selected OpenAI and passed `gemini` or
+`deepseek` as a native Codex argument. The new code promotes the first
+leftover native argument only when it is an exact Gemini/DeepSeek alias,
+there is no literal `--` boundary, and neither `--provider` nor `--url`
+explicitly claims the provider. Prefix shorthand before options retains
+its previous behavior. The typed provider, quota-preflight choice and
+remaining native Codex argument order are source-derived and guarded by
+`TestProdex04380SuperPositionedProviderAliasAfterOptions`, including
+nonprovider first positional text, explicit overrides, literal boundaries,
+and shorthand followed by genuine Codex input.
+
+Clean candidate `27d850b6953700446d7e69032fbc047af3c79b6c` was compared
+to the SHA/source-pinned Prodex 0.438.0 binary by the extended
+`tools/clierrorparity` executable harness. All **14 CLI probes PASS**,
+including four semantic provider-selection cases under `super`/`s` plus
+the existing exit-2 required-provider checks. The fixture recognizes the
+canonical Prodex `prodex-<provider>` internal dry-run name and the public
+Godex `<provider>` name as equivalent **only** for these explicitly typed
+providers; mismatched names, missing provider output, leaked native
+argument markers and wrong exits still fail the independent negative
+controls. No live provider login or model turn is involved.
+
+The source-size regression detected `super.go` over its 901-line legacy
+limit. The policy was extracted into a dedicated helper in the same package,
+shrinking `super.go` to **889** lines and lowering its committed baseline
+accordingly. `make verify`, source-size, format and focused race tests PASS.
+This verifies the bounded named-option alias behavior; opaque OS arguments,
+all future CLI parser versions and actual runtime provider startup are not
+certified by this synthetic dry-run fixture.
