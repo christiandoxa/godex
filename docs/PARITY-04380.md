@@ -1477,3 +1477,22 @@ cross-build/test-compile, installers, vet and full race tests. The independent
 unsupported-role differential reports `comparison_differences: []` and
 negative controls PASS. This is the first executable proof for this local
 translation error; no live DeepSeek request is made.
+
+## Final five-phase gate after DeepSeek terminal-error correction
+
+All five independent release phases pass on clean commit
+`d59343ccbdf89e4d1a1d104258f4da8ba5179a21`, which is accepted by remote
+`main`:
+
+- preflight-tests: **PASS**, including the exact DeepSeek unsupported-role
+  executable fixture;
+- preflight-oracles: **PASS**, 34 stages;
+- DeepSeek: **PASS**, 22/22;
+- Gemini: **PASS**, 13/13;
+- WebSocket: **PASS**, 58 upstream attempts.
+
+DeepSeek and Gemini differential reports contain no comparison differences and
+mutation controls pass. `make verify` also passes on this candidate. Overall
+parity remains **PARTIAL** because native OAuth, live quota/restart matrices,
+full compaction/inference behavior, and native Windows/macOS execution are not
+proved by this finite gate.
