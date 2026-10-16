@@ -1081,3 +1081,33 @@ preflight protect these behaviors. Native tool-pairing still uses a separately
 preserved adapter path until a two-executable OAuth/native protocol oracle
 qualifies the complete operations 1, 2 and 4; this is a bounded source-
 derived FIX, **not** a production-wide 1:1 certificate.
+
+
+## Native Gemini tool result pairing — isolated operations 1/2
+
+The tagged Prodex 0.438.0 compiled Gemini content-hardening kernel performs
+operation 1 (`gemini_provider_core_pair_tool_calls`) and operation 2
+(`gemini_provider_core_repair_orphan_tool_responses`) after content coalescing.
+Its matching key is **both** function `id` and `name`; it does **not**
+deduplicate identical missing calls. A call without a matching result
+receives an explicit synthetic `functionResponse` saying that tool execution
+output is unavailable. A response with no matching call receives a synthetic
+`functionCall` with `args:{}` and
+`thoughtSignature:skip_thought_signature_validator`. These are metadata
+repairs only: the adapter does **not** execute the missing tool or invent a
+successful tool result. Null/malformed function objects use tagged fallback
+identity `id:""`, `name:"unknown"`.
+
+The four source-transcribed regressions in `native_tool_pairs_04380_test.go`
+check missing results with repeated identical calls, wrong names with the
+same IDs, a malformed intermediate user row, null functionCall and
+functionResponse entries, synthetic orphan calls and repeated standalone
+orphans. `native_tool_pair_integration_04380_test.go` also exercises the
+actual native request builder for a lone missing result, standalone orphan
+and existing matched pair. These tests demonstrate **source-derived local
+behavior only**. The integration intentionally avoids applying isolated
+operations 1/2 to adjacent same-role tool-bearing entries: tagged Prodex
+coalesces those rows before pairing and subsequently performs operation 4
+response sorting. Reproducing only part of that compound pipeline would
+silently reorder existing client tool histories, so it remains explicitly
+**PARTIAL**, pending a proper native two-executable OAuth/provider oracle.

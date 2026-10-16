@@ -44,7 +44,21 @@ func geminiShapePlainContents04380(contents []any) []any {
 	// pipeline pairs and orders tools between coalescing and role shaping.
 	// Until operations 1/2/4 are parity-tested, preserve tool-bearing turns.
 	if geminiContentsContainToolParts04380(contents) {
-		return contents
+		// The complete tagged pipeline coalesces adjacent same-role tool
+		// rows BEFORE applying operations 1/2 and operation 4 ordering.
+		// Preserve compound histories until that pipeline is verified.
+		// Single model/user pairs, isolated missing calls and orphan results
+		// can use the tagged bounded pairing policy without reordering.
+		for index := 1; index < len(contents); index++ {
+			previous, okPrevious := contents[index-1].(map[string]any)
+			current, okCurrent := contents[index].(map[string]any)
+			if okPrevious && okCurrent && previous["role"] == current["role"] {
+				return contents
+			}
+		}
+		return geminiRepairOrphanToolResponses04380(
+			geminiRepairMissingToolResults04380(contents),
+		)
 	}
 
 	// Prodex's operation 3 makes lead/tail decisions from the RAW first and

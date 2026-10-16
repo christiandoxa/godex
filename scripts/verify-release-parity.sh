@@ -359,6 +359,11 @@ go test -race ./internal/gateway/gemini ./tools/differential \
 # Tagged 0.438.0 operation-3 role decisions happen on RAW first/last rows
 # before rejecting invalid contents. Guard null/empty/model edge cases,
 # metadata ownership, custom roles and output ordering before API-key tests.
+# Tagged Gemini Mojo operations 1 and 2 synthesize unavailable results for
+# unanswered function calls and signature-bearing calls for orphan results.
+# ID *and* name must match; duplicates and null values must remain bounded.
+# Do not apply the separate operation-4 reordering to unqualified compound
+# adjacent-model histories without native two-executable evidence.
 # Source-tagged 0.438.0 Gemini native generateContent role normalization:
 # coalesce plain adjacent role entries and repair model-only boundaries, but
 # preserve the separate tool-call/result pairing until a native OAuth oracle
