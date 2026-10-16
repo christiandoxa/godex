@@ -1407,12 +1407,12 @@ formatting, source-size, Bubble Tea, cross-build, installer, vet, full race and
 build checks. Focused package and race commands also pass for Gemini, DeepSeek,
 Codex, quota, repository/quota, proxy and differential tooling.
 
-The five independent release phases previously passed together on `c68ba481`:
-preflight-tests, preflight-oracles (34 stages), DeepSeek 22/22, Gemini 13/13
-and WebSocket 58 attempts. They must be rerun on the current clean commit after
-this follow-up before calling the new source set a complete finite gate. The
-parallel unsupported-role executable scenario remains pending: its source
-fixture is valid, but the existing child-exchange harness times out before
-materializing a local 400 response, so it was not integrated or claimed as
-PASS. Native OAuth, live quota restart, Windows/macOS execution and full
-production 1:1 parity remain PARTIAL/OPEN.
+The five independent release phases were rerun on clean `221c7d17` and all
+passed: preflight-tests, preflight-oracles (34 stages), DeepSeek 22/22, Gemini
+13/13 and WebSocket 58 attempts. DeepSeek and Gemini reports contain zero
+comparison differences and all mutation controls pass. The parallel
+unsupported-role executable scenario remains pending: its source fixture is
+valid, but the existing child-exchange harness times out before materializing a
+local 400 response, so it was not integrated or claimed as PASS. Native OAuth,
+live quota restart, Windows/macOS execution and full production 1:1 parity
+remain PARTIAL/OPEN.
