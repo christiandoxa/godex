@@ -16,7 +16,7 @@ transfer 0.437.14 differential PASS claims to the new 0.438.0 target.
 | Windows signed process exit and Unix cancellation | PARTIAL | A source-derived signed-i32 policy now detects Windows Ctrl-C NTSTATUS and real Unix SIGINT; original Go logic detected only exit 130. Tagged negative controls and native Linux child-signal tests PASS; Windows cross-compiled test binary, but Windows runtime execution has not been observed. |
 | Local proxy under accept and accepted-socket resource pressure | PARTIAL (Linux cross-binary recovery VERIFIED) | Actual official Prodex 0.438.0 and clean Godex gateway both reached RLIMIT_NOFILE=80 under 120 partially written TCP connections; each retained the original port, held a newly queued GET while saturated, served it exactly once after release, served a subsequent independent GET, and exited cleanly. The new source/SHA-pinned `profileparity` stage and mutation controls cover 3 exact upstream GETs. Go's stdlib has no Rust tiny_http accepted-clone step, so an isolated cross-executable clone-specific failure and native Windows/macOS behavior remain unverified. |
 | Official Codex 0.163.0 compatibility | PARTIAL | Official `rust-v0.163.0` asset metadata and SHA-256 verified; extracted binary `codex-cli 0.163.0` successfully completed real isolated app-server `initialize`, `thread/list` active and archived through the Godex protocol on Linux x86_64. `TestProdex04380OfficialCodex0163AppServerInitializeAndThreadList` PASS. `response.incomplete`, compaction, native retry/interrupt and Windows MCP environments still need separate executable evidence. |
-| 0.438.0 pinned release differential | VERIFIED (finite gate only) | On clean Godex `f63e1111`, **both pinned preflight partitions PASS** (34 profile stages, 14 CLI probes, official Codex 0.163.0 app-server), DeepSeek **22/22**, Gemini **13/13** and WebSocket **58 attempts** PASS with strict negative controls and zero reported comparison differences. Includes tagged Unicode/ASCII model-catalog and bounded input regressions. Six Linux/Darwin/Windows cross-build targets and cross-test compilation PASS. Each phase verified tagged Prodex source, manifest, published binary SHA and clean Go commit. Production-wide 1:1 remains PARTIAL. |
+| 0.438.0 pinned release differential | VERIFIED (finite gate only) | On exact clean Godex `3f821649`, **both pinned preflight partitions PASS** (34 profile stages, 14 CLI probes, official Codex 0.163.0 app-server), DeepSeek **22/22**, Gemini **13/13**, and WebSocket **58 attempts** PASS; negative controls retained and zero comparison differences reported. New tagged Copilot raw-candidate count and Anthropic response-block cardinality regressions pass locally. Six Linux/Darwin/Windows cross-build targets and cross-test compilation PASS. Each phase verifies official Prodex tag, release manifest, binary SHA and clean Go commit. Production-wide 1:1 remains PARTIAL. |
 | Copilot logged-in candidate input bounds | VERIFIED for local source-derived import fixture | Tagged 0.438.0 `prodex_profile_export_copilot_candidate_users_v1` and Rust adapter cap raw `(host, login)` views at 256 including one preferred last user, **before deduplication**. Godex formerly accepted 257 duplicates and reached account HTTP; failing synthetic loopback tests now PASS after bounding `Source.Load`, with exact-pair priority/dedup preserved. Real multi-user Copilot/keychain import remains PARTIAL. |
 | OpenAI retired-model catalog filter | VERIFIED for tagged predicate / local cache | Prodex 0.438.0 `catalog_openai_model_is_retired` trims Unicode whitespace then performs ASCII-only case-insensitive exact matches for `spark`, `gpt-5.3-codex-spark`, `gpt-5.3-spark`. Go previously used Unicode `strings.ToLower`, which incorrectly retired lookalikes such as `sparK`. Failing source-derived negative tests and a real synthetic `models_cache.json` picker regression now PASS using `asciiEqualFold` after `TrimSpace`; interactive PTY model-picker screenshot not yet directly compared. |
 | Gemini Chat-compatible null `functionCall` output | VERIFIED for one exact synthetic wire fixture | Tagged Rust source has two distinct buffered entry points with different text policies. Direct two-executable Prodex 0.438.0/Godex candidate `83fa59d5` comparison established the *public* Chat-compatible path keeps adjacent text and emits deterministic fallback `call_1` for `functionCall:null`. The separate internal buffering helper suppresses text. Focused Go tests failed before correction; full pinned Gemini differential **PASS 13/13**, zero diffs, mutation sentinels; broader function-call permutations remain PARTIAL. |
@@ -897,3 +897,40 @@ classification. The quota and auth/profile selectors are unaffected, and no
 real provider account is used. This is **source-derived local translator
 parity**, not yet a full two-executable native Anthropic Messages
 cardinality differential; the test is included in the release preflight.
+
+
+## Complete pinned 0.438.0 gate — Copilot and Anthropic bounds
+
+The source-equivalent clean Godex commit
+`3f821649b9707628fa484b8767b8148e93aff70c` was verified against the
+exact official Prodex 0.438.0 tagged source
+`8cab9794b0e08b2cb8507df8321a8e38ebd6492f`, published Linux x86_64
+binary SHA-256
+`9ec1702c58983a8e3bd7f2e7f49c34a2d656f766fd535bbe34d08c94d436ac2a`,
+and its release manifest. Every phase checks these pins independently:
+
+- `--phase=preflight-tests`: **PASS**, including new **256 raw candidate**
+  Copilot pre-auth bound and **65,536 block** Anthropic response-output
+  planner guard, official Codex 0.163.0 app-server handshake, and all earlier
+  local auth/routing/provider and state-integrity sentinels.
+- `--phase=preflight-oracles`: **PASS**, 34/34 profile/FD/incomplete-
+  response executable stages, 14/14 CLI probes, Linux PTY and context.
+- `--phase=deepseek`: **PASS 22/22**, `comparison_differences: []`,
+  negative mutation controls PASS.
+- `--phase=gemini`: **PASS 13/13**, `comparison_differences: []`,
+  negative mutation controls PASS.
+- `--phase=websocket`: **PASS 58 upstream attempts**, precommit same-owner
+  connection-limit retry, hard owner and no-postcommit-replay guards.
+- `scripts/check-cross-build.sh`: **PASS**, Linux AMD64/ARM64, Darwin
+  AMD64/ARM64, Windows AMD64/ARM64 builds plus Darwin ARM64 and Windows AMD64
+  runtime/superexpose/Codex test compilation on the **same** candidate.
+
+`make verify` independently PASS on that clean production source before
+this documentation-only checkpoint: formatting, source size, Go vet, shuffled
+race tests and executable build. The Copilot and Anthropic additions are
+**source-derived local regression coverage**, not proofs from two independent
+native-provider account sessions. The finite synthetic release gate is
+VERIFIED for those bounded scenarios; full production parity remains PARTIAL
+because native Windows/macOS execution, live OAuth/three-profile quota and
+relaunch, actual Codex 0.163.0 foreground/background compaction and isolated
+Rust accepted-socket-clone failure have not been independently certified.
