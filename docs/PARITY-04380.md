@@ -98,3 +98,19 @@ no-replay; it is **not** a live Codex inference run or an independent two-
 executable source-pinned incomplete-response differential. Other foreground/
 background Responses-v2 compaction and native interruption features remain
 open pending scenario-specific proof.
+
+## Shutdown during unresolved Linux descriptor exhaustion
+
+`TestProdex04380ProxyShutdownStopsAcceptRetryDuringEMFILE` starts the real
+Godex TCP proxy in a separate low-RLIMIT process, verifies the listener
+reports an actual EMFILE after its descriptors are exhausted, and queues a
+request from the parent. Instead of releasing descriptor pressure, the parent
+orders the proxy to shut down. The HTTP accept retry must terminate within a
+bounded interval; the queued, **unaccepted** request must generate no upstream
+model turn, and the original endpoint must stop accepting new connections.
+The integration regression passed without any permanent process-local
+resource limit change. Combined with the queued-request recovery test, this
+locally verifies both the temporary EMFILE recovery and intentional shutdown
+paths on Linux. The separate Rust accepted-socket clone path is not present
+in Go's standard HTTP server; cross-executable physical pressure parity and
+Windows/macOS listener behavior remain outside this proof.

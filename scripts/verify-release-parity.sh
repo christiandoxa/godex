@@ -126,7 +126,7 @@ go test ./internal/delivery/http/proxy \
 # exhaustion and handles a queued request exactly once after FD release.
 # Go's standard net/http accept loop has bounded retry; do not copy tiny_http.
 go test ./internal/delivery/http/proxy \
-  -run '^TestProdex04380ProxyListenerSurvivesActualEMFILEAndQueuedRequest$' \
+  -run '^TestProdex04380Proxy(ListenerSurvivesActualEMFILEAndQueuedRequest|ShutdownStopsAcceptRetryDuringEMFILE)$' \
   -count=1 -timeout=45s
 
 # The live observer must distinguish an absent goal from an unavailable DB,
