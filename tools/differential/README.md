@@ -18,7 +18,7 @@ go build -trimpath -o /tmp/godex-candidate ./cmd/godex
 
 Use `--gemini` with the same `--prodex`, `--godex`,
 `--prodex-source`, `--godex-source`, and `--godex-commit` flags
-to run ten **additional** cases against the published Prodex 0.438.0
+to run twelve **additional** cases against the published Prodex 0.438.0
 binary, not against a guessed Gemini protocol. The reference was
 observed to send API-key Super requests as OpenAI-compatible
 `POST /v1beta/openai/chat/completions`, yet it decodes upstream
@@ -367,7 +367,7 @@ GenerateContent cases with a nested `response` envelope: with a string
 model, usage, no arbitrary outer fields, and a generated API-key Responses
 identity in the `resp_deepseek_` UUIDv7 namespace. Direct native Gemini
 transport is not changed by this identity contract. The source-pinned binary
-oracle now exercises ten Gemini cases, including all earlier eight fixtures.
+oracle now exercises twelve Gemini cases, including all earlier eight fixtures and two invalid function-tool request rejections.
 
 ### Bounded full DeepSeek oracle
 
@@ -389,3 +389,22 @@ independently clones/verifies the exact tagged Prodex source and public
 release SHA-256 plus manifest, and builds/validates the Godex candidate.
 A successful subset is not a complete gate. Never skip an unverified phase
 or treat partial-phase PASS as general production readiness.
+
+### Tagged 0.438.0 Gemini function-tool rejection parity
+
+Two additional **source/binary-pinned** cases, `invalid-wrapped-tool-parameters`
+and `invalid-flat-tool-parameters`, assert that malformed API-key Gemini
+function declarations are rejected *before* the provider sees a request.
+The exact official Prodex 0.438.0 and clean Godex binaries must both return
+HTTP **400** and child exit **2**, with the **identical** structured JSON
+`error.code=invalid_request_error` and an indexed diagnostic at
+`tools[0].function.parameters`, including the distinction between wrong
+object type and missing required field. The mock must record **zero upstream
+POSTs**; local validation is never permission for another credential,
+model or HTTP transport retry. Any difference in status, request counts,
+error code, indexed field, message bytes or child exit fails the comparison.
+Focused Go regressions check that valid flat/wrapped tools still reach the
+provider and that malformed requests do not become deferred Router retries
+or plaintext HTTP errors. Existing successful Gemini cases and mutation
+negative controls remain mandatory. These tests use synthetic credentials
+and never make real Gemini model requests.

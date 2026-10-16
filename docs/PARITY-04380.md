@@ -17,6 +17,7 @@ transfer 0.437.14 differential PASS claims to the new 0.438.0 target.
 | Local proxy under accept and accepted-socket resource pressure | PARTIAL (Linux cross-binary recovery VERIFIED) | Actual official Prodex 0.438.0 and clean Godex gateway both reached RLIMIT_NOFILE=80 under 120 partially written TCP connections; each retained the original port, held a newly queued GET while saturated, served it exactly once after release, served a subsequent independent GET, and exited cleanly. The new source/SHA-pinned `profileparity` stage and mutation controls cover 3 exact upstream GETs. Go's stdlib has no Rust tiny_http accepted-clone step, so an isolated cross-executable clone-specific failure and native Windows/macOS behavior remain unverified. |
 | Official Codex 0.163.0 compatibility | PARTIAL | Official `rust-v0.163.0` asset metadata and SHA-256 verified; extracted binary `codex-cli 0.163.0` successfully completed real isolated app-server `initialize`, `thread/list` active and archived through the Godex protocol on Linux x86_64. `TestProdex04380OfficialCodex0163AppServerInitializeAndThreadList` PASS. `response.incomplete`, compaction, native retry/interrupt and Windows MCP environments still need separate executable evidence. |
 | 0.438.0 pinned release differential | VERIFIED (finite gate only) | On clean Godex `f54886eb`, both independently pinned preflight partitions PASS (34/34 profile stages, **14/14 CLI probes**, official Codex 0.163.0 app-server); DeepSeek 22/22, Gemini 10/10 and WebSocket **58 attempts** PASS with negative controls and zero reported semantic differences. Six-target Linux/Darwin/Windows cross-build plus test compilation PASS on the same SHA. Each phase verified official Prodex tag, manifest and binary SHA. Production-wide 1:1 remains PARTIAL. |
+| Gemini API-key invalid function-tool validation | VERIFIED for tagged malformed cases; PARTIAL for all tools | Full 0.438.0 tagged two-executable Gemini differential extended from 10 to **12** cases. Prodex rejects flat/wrapped invalid `tools[0].function.parameters` locally with HTTP 400, exit 2, indexed `invalid_request_error` JSON and zero upstream attempts; Godex initially forwarded the requests (false 200), then retried local 400s as transient, then emitted plaintext. Corrected adapter, Router and HTTP error shaping in local checkpoints. Clean exact-source/binary-pinned 12/12 differential PASS, `comparison_differences: []`; broader schema permutations remain untested. |
 | WebSocket terminal-frame Mojo classification | VERIFIED for tested status-wire cases; PARTIAL overall | Source-derived regressions reproduced actual Godex mismatches in `status`/`status_code` precedence, strict u16 bounds and nested/top-level connection-limit matching. Fixed in `4aac2592`; real pinned Prodex/Godex `--websocket` comparison confirms continuation after invalid/fractional/overflow primary status and **terminal error** for valid `65535` (one upstream attempt per mode; total 50). Status-frame mutation tests PASS. A newer **clean, exact-tagged two-binary** differential on `ab219e07` additionally verified top-level and nested connection-limit precommit recovery on a fresh WebSocket: one same-owner retry per case, neither precommit error leaks, total **58** upstream attempts. Persistent limits and already-retried budgets are bounded in in-process TCP tests, with no postcommit replay; broader future field permutations remain OPEN. |
 | Usage-limit native session candidate fallback after transient pool retry | PARTIAL | Tagged 0.438.0 compiled Mojo `usage_limit_recovery_candidate` allows the originally failed profile as the **last** candidate only after a transient wait and verified eligibility/quota. Godex formerly always excluded the original owner and could relaunch a previously exhausted backup. `TestProdex04380SessionRecoveryFailedProfileFallbackAfterPoolRetry` reproduced these failures and now passes with three profiles, model-aware ready claims, backup precedence, cancellation, owner/credential negative controls and prompt-no-replay. Legacy no-quota adapter backup retries remain unchanged. Independent exact-binary three-profile session recovery differential still OPEN. |
 | Super CLI required-provider usage exit | VERIFIED for tested cases | The exact Prodex 0.438.0 CLI and clean Godex `27d850b6` both exit 2 for missing `--provider` under `super` and `s`; all 14 exact-source/published-SHA pinned CLI probes PASS with negative controls. Uncovered malformed-option combinations remain outside the finite fixture. |
@@ -594,3 +595,32 @@ model-specific quota and relaunch, native Codex 0.163.0 compaction, and
 isolated Rust accepted-socket clone pressure remain PARTIAL/OPEN. Neither
 CI status nor an externally published tag is a prerequisite for these
 ordinary non-force development pushes; release/tag publication is separate.
+
+
+## Gemini API-key function tools — indexed 0.438.0 rejection wire
+
+A new **failing** exact Prodex 0.438.0 vs Godex differential exposed an
+uncovered request-hardening gap. Prodex's tagged request validation refuses a
+wrapped function tool with non-object `parameters`, and a flat function tool
+with missing `parameters`, before dispatch to Gemini. Both return HTTP 400,
+child exit 2 and structured `error.code=invalid_request_error`, with the
+canonical indexed `tools[0].function.parameters` message. Previously Godex
+sent both malformed requests to the Chat-compatible provider mock, which
+returned HTTP 200. After local validation was added, its Router incorrectly
+retried that terminal HTTP 400 until a timeout. After Router classification
+was fixed, its proxy still emitted plaintext rather than Prodex's JSON error
+envelope. Three separate fail-before witnesses led to scoped fixes in the
+Gemini API-key bridge, the local-validation error path in Router, and the
+Responses HTTP error serializer. Native Gemini/OAuth paths, ordinary upstream
+400 errors and transport retry classification are intentionally unchanged.
+
+The full official-source/binary-pinned Gemini differential **PASS 12/12** on
+clean Go source after all three corrections, with
+`comparison_differences: []`. Both new cases show exact JSON errors, HTTP
+400, exit 2 and **zero** upstream requests; old ten response/stream/quota/
+rotation cases also PASS. Source-derived regression tests additionally
+verify malformed name/description, successful valid flat/wrapped function
+tools (not suppressed), no repeated account/routing attempts, and negative
+controls that reject wrong status, exit, error field, missing provider check
+or leaked upstream POST. This is a finite simulated request-validation oracle,
+not a certification of live Gemini/OAuth or all possible tool schemas.

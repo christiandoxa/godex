@@ -313,6 +313,14 @@ if [ "$phase" = 'all' ] || [ "$phase" = 'gemini' ]; then
   --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
   --gemini
 
+# Tagged 0.438.0 rejects invalid wrapped/flat Gemini function tools
+# *locally*, before any API-key upstream request. Both products must
+# return HTTP 400 with the same indexed invalid_request_error JSON envelope,
+# exit 2, and zero upstream POSTs; cache/retry/rotation cannot mask 400.
+go test -race ./internal/gateway/gemini ./internal/usecase/routing ./internal/delivery/http/proxy ./tools/differential \
+  -run '^TestProdex04380(GeminiAPIKeyChat|LocalGeminiTool|GeminiInvalidFunctionTool|GeminiInvalidTool)' \
+  -count=1 -timeout=55s
+
 # The 0.438.0 Gemini native envelope must unwrap `response` with or
 # without traceId. The API-key buffered bridge must generate its own UUIDv7
 # and must not expose stale native/trace IDs. These cases are mandatory parts
