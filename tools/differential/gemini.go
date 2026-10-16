@@ -118,6 +118,10 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	if mock.scenario == "buffered-null-tool-text" {
+		_, _ = io.WriteString(w, `{"candidates":[{"content":{"role":"model","parts":[{"text":"hidden before"},{"functionCall":null},{"text":"hidden after"}]},"finishReason":"STOP"}],"modelVersion":"gemini-3.1-pro-preview","usageMetadata":{"promptTokenCount":2,"candidatesTokenCount":1,"totalTokenCount":3}}`)
+		return
+	}
 	if mock.scenario == "chat-response" {
 		response := map[string]any{
 			"id": "chatcmpl-gemini-fixture", "object": "chat.completion",
@@ -170,7 +174,7 @@ func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit string
 	}
 	defer os.RemoveAll(root)
 	var results []geminiCaseResult
-	for _, scenario := range []string{"chat-request", "orphan-tool", "chat-response", "wrapped-response-no-trace", "wrapped-response-trace", "stream-native", "stream-chat", "multi-turn-tool", "quota-plain-429", "quota-structured-429", "invalid-wrapped-tool-parameters", "invalid-flat-tool-parameters"} {
+	for _, scenario := range []string{"chat-request", "orphan-tool", "chat-response", "wrapped-response-no-trace", "wrapped-response-trace", "stream-native", "stream-chat", "multi-turn-tool", "quota-plain-429", "quota-structured-429", "invalid-wrapped-tool-parameters", "invalid-flat-tool-parameters", "buffered-null-tool-text"} {
 		prodex, err := runGeminiProduct(root, scenario, "prodex", prodexBin)
 		if err != nil {
 			return fmt.Errorf("Prodex Gemini %s: %w", scenario, err)
@@ -305,6 +309,18 @@ func geminiCompare(scenario string, prodex, godex geminiCandidateResult) []strin
 	if geminiQuotaScenario043711(scenario) {
 		return geminiQuotaCompare043711(scenario, prodex, godex, differences)
 	}
+	if scenario == "buffered-null-tool-text" {
+		left, leftErr := geminiBufferedNullToolProjection04380(prodex.Client.Body)
+		right, rightErr := geminiBufferedNullToolProjection04380(godex.Client.Body)
+		if leftErr != nil || rightErr != nil || !reflect.DeepEqual(left, right) {
+			differences = append(differences, "buffered null functionCall tool/text suppression or metadata differs")
+		}
+		if len(prodex.Upstream) != 1 || len(godex.Upstream) != 1 ||
+			len(prodex.Upstream) == 1 && len(godex.Upstream) == 1 && !reflect.DeepEqual(prodex.Upstream[0].Body, godex.Upstream[0].Body) {
+			differences = append(differences, "null functionCall upstream request count/body differs")
+		}
+		return differences
+	}
 	if geminiInvalidToolScenario04380(scenario) {
 		if !geminiInvalidToolWireEqual04380(prodex.Client.Body, godex.Client.Body) {
 			differences = append(differences, "Gemini invalid-tool rejection error envelope or reason differs")
@@ -360,6 +376,13 @@ func geminiSemanticEqual043711(left, right map[string]any) bool {
 }
 
 func geminiFixtureInvariant(scenario string, result geminiCandidateResult) error {
+	if scenario == "buffered-null-tool-text" {
+		if result.Client.Status != http.StatusOK || result.ExitCode != 0 || len(result.Upstream) != 1 {
+			return fmt.Errorf("buffered tool/visible text request status/exit/upstream incorrect: %d/%d/%d", result.Client.Status, result.ExitCode, len(result.Upstream))
+		}
+		_, err := geminiBufferedNullToolProjection04380(result.Client.Body)
+		return err
+	}
 	if geminiInvalidToolScenario04380(scenario) {
 		return geminiInvalidToolInvariant04380(scenario, result)
 	}

@@ -10,6 +10,16 @@ import (
 )
 
 func geminiNativeResponsesValue(root map[string]any, requestMetadata map[string]any, createdAt int64) map[string]any {
+	return geminiNativeResponsesValueWithFallback04380(root, requestMetadata, createdAt, false)
+}
+
+// The public API-key Chat-compatible path has a deterministic fallback
+// `call_1` for absent function-call IDs. The direct Gemini GenerateContent
+// route keeps its separate synthetic ID behavior; both preserve visible
+// text and `functionCall` key presence, including a null value.
+func geminiNativeResponsesValueWithFallback04380(
+	root map[string]any, requestMetadata map[string]any, createdAt int64, chatCompatible bool,
+) map[string]any {
 	responseID := nativeString(root["responseId"])
 	if responseID == "" {
 		responseID = nativeString(root["id"])
@@ -51,10 +61,13 @@ func geminiNativeResponsesValue(root map[string]any, requestMetadata map[string]
 		if image := geminiImageGenerationItem(responseID, index, part); image != nil {
 			imageItems = append(imageItems, image)
 		}
-		if call, ok := part["functionCall"].(map[string]any); ok {
-			toolItems = append(toolItems, geminiNativeToolCallItem(
-				part, call, "call_gemini_"+uuid.NewString(),
-			))
+		if rawCall, exists := part["functionCall"]; exists {
+			call, _ := rawCall.(map[string]any)
+			fallback := "call_gemini_" + uuid.NewString()
+			if chatCompatible {
+				fallback = "call_1"
+			}
+			toolItems = append(toolItems, geminiNativeToolCallItem(part, call, fallback))
 		}
 	}
 	if visible.Len() > 0 {
@@ -92,48 +105,6 @@ func geminiNativeResponsesValue(root map[string]any, requestMetadata map[string]
 	}
 	geminiApplyNativeStatus(result, root, candidate, len(output) > 0)
 	return result
-}
-
-func firstNativeCandidate(root map[string]any) map[string]any {
-	candidates, _ := root["candidates"].([]any)
-	if len(candidates) == 0 {
-		return nil
-	}
-	candidate, _ := candidates[0].(map[string]any)
-	return candidate
-}
-
-func nativeCandidateParts(candidate map[string]any) []any {
-	if candidate == nil {
-		return nil
-	}
-	content, _ := candidate["content"].(map[string]any)
-	parts, _ := content["parts"].([]any)
-	return parts
-}
-
-func nativeString(value any) string {
-	text, _ := value.(string)
-	return text
-}
-
-func nativeNonblank(value any) string {
-	text := nativeString(value)
-	if strings.TrimSpace(text) == "" {
-		return ""
-	}
-	return text
-}
-
-func firstPresentNative(object map[string]any, keys ...string) any {
-	for _, key := range keys {
-		if object != nil {
-			if value, ok := object[key]; ok {
-				return value
-			}
-		}
-	}
-	return nil
 }
 
 func geminiNativeUsage(usage map[string]any) map[string]any {

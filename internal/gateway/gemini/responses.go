@@ -29,6 +29,12 @@ func (transport *RuntimeTransport) executeResponses(ctx context.Context, input p
 }
 
 func translateResponse(response *http.Response, requestMetadata map[string]any) (*proxymodel.Response, error) {
+	return translateResponseWithCallFallback04380(response, requestMetadata, false)
+}
+
+func translateResponseWithCallFallback04380(
+	response *http.Response, requestMetadata map[string]any, chatCompatible bool,
+) (*proxymodel.Response, error) {
 	contentType := strings.ToLower(response.Header.Get("Content-Type"))
 	if strings.Contains(contentType, "text/event-stream") {
 		return translateGeminiNativeStream(response, requestMetadata), nil
@@ -51,7 +57,7 @@ func translateResponse(response *http.Response, requestMetadata map[string]any) 
 		return nil, errors.New("failed to parse Gemini response JSON")
 	}
 	native = normalizedGeminiResponse(native)
-	translated, err := json.Marshal(geminiNativeResponsesValue(native, requestMetadata, time.Now().Unix()))
+	translated, err := json.Marshal(geminiNativeResponsesValueWithFallback04380(native, requestMetadata, time.Now().Unix(), chatCompatible))
 	if err != nil {
 		return nil, errors.New("failed to serialize Gemini Responses JSON")
 	}

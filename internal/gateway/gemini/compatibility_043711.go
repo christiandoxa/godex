@@ -143,7 +143,7 @@ func translateGeminiChatOrNativeResponse043711(
 	}
 	native := *response
 	native.Body = io.NopCloser(bytes.NewReader(payload))
-	translated, err := translateResponse(&native, nil)
+	translated, err := translateResponseWithCallFallback04380(&native, nil, true)
 	if err != nil {
 		return nil, err
 	}
