@@ -17,6 +17,7 @@ transfer 0.437.14 differential PASS claims to the new 0.438.0 target.
 | Local proxy under accept and accepted-socket resource pressure | PARTIAL (Linux cross-binary recovery VERIFIED) | Actual official Prodex 0.438.0 and clean Godex gateway both reached RLIMIT_NOFILE=80 under 120 partially written TCP connections; each retained the original port, held a newly queued GET while saturated, served it exactly once after release, served a subsequent independent GET, and exited cleanly. The new source/SHA-pinned `profileparity` stage and mutation controls cover 3 exact upstream GETs. Go's stdlib has no Rust tiny_http accepted-clone step, so an isolated cross-executable clone-specific failure and native Windows/macOS behavior remain unverified. |
 | Official Codex 0.163.0 compatibility | PARTIAL | Official `rust-v0.163.0` asset metadata and SHA-256 verified; extracted binary `codex-cli 0.163.0` successfully completed real isolated app-server `initialize`, `thread/list` active and archived through the Godex protocol on Linux x86_64. `TestProdex04380OfficialCodex0163AppServerInitializeAndThreadList` PASS. `response.incomplete`, compaction, native retry/interrupt and Windows MCP environments still need separate executable evidence. |
 | 0.438.0 pinned release differential | VERIFIED (finite gate only) | Clean Godex `37246b8b`: independently source/SHA-pinned `--phase=preflight-tests` and `--phase=preflight-oracles` both PASS (together full preflight, including official Codex 0.163.0 handshake and 34/34 profile stages with cross-binary FD recovery and 6 incomplete reason/frame cases). DeepSeek 22/22, Gemini 10/10, WebSocket 42 upstream attempts all PASS with negative controls, zero reported comparison differences. Six-target cross-build/test compilation PASS. Not production-wide 1:1 certification. |
+| WebSocket terminal-frame Mojo classification | PARTIAL | Tagged 0.438.0 source-derived regression reproduced Go mismatches for invalid/missing `status` primary precedence, valid u16 statuses up to 65535, nested/top-level independent connection-limit detection and strict ASCII casefold. Corrected Go event parsing and status-to-retry classification; actual WebSocket frame decoder, retry negative controls and `-race` pass locally. Full cross-binary adversarial status-frame oracle pending. |
 | Three-profile quota/auth restart | PARTIAL | Prior Godex 0.437.14 synthetic and multi-process tests PASS. Independent two-executable multi-profile restart differential is still needed. |
 
 **Status is PARTIAL, not certified 1:1 production parity.** Only a fully
@@ -281,3 +282,31 @@ isolated from general FD exhaustion, real live multi-profile OAuth/quota
 restart behavior, and native Codex 0.163.0 foreground/background model
 compaction are outside the verified fixture coverage. Never claim
 unqualified 1:1 on the basis of finite synthetic runs alone.
+
+## WebSocket terminal status and code precedence — tagged 0.438.0
+
+The tagged `crates/prodex-runtime-proxy/src/websocket_message.rs` and Mojo
+`prodex_runtime_websocket_terminal_frame_plan_v1` require `status` to take
+precedence over `status_code` based on **presence**, not whether Go can parse
+it: an invalid, fractional, null, negative or out-of-u16 primary status may
+not fall back to a secondary `400`/`503` and invent a terminal frame,
+overload retry, account rotation or request replay. A valid unsigned u16
+status of `1000` or `65535` is terminal for `type:error`, unlike the previous
+Go HTTP-only 999 cap. Connection-limit detection checks nested `error.code`
+**and** top-level `code` independently, folds only ASCII A–Z, and does not
+trim whitespace or accept Unicode lookalikes. A malformed nested field cannot
+mask a valid top-level code.
+
+`TestProdex04380WebSocketTerminalFrameStatusPriorityAndBounds`,
+`TestProdex04380WebSocketTerminalFrameConnectionLimitFromEitherCodeField`,
+`TestProdex04380WebSocketDecodedFrameRetainsTaggedTerminality`, and
+`TestProdex04380WebSocketStatusPrecedenceCannotInventTransportRetry` initially
+reproduced multiple classification failures and now PASS after aligning the
+parse/selection policy. A local unmasked server WebSocket frame fixture
+verifies byte-identical forwarding and the resulting terminal/retry decision;
+negative controls cover `status:399,status_code:400`, invalid primary with
+secondary 503, top-level connection-limit with unrelated nested error,
+malformed nested JSON types, Unicode/whitespace false positives and u16
+bounds. The focused race test and complete OpenAI package suite PASS. This
+is a tagged-source/local-wire checkpoint, **not** yet a cross-binary
+adversarial-frame certification of the full runtime WebSocket retry behavior.

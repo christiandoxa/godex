@@ -117,6 +117,13 @@ go test ./internal/delivery/cli/runtime \
 # zero/signed values, rounds fractional millis, and caps at five minutes.
 go test ./internal/usecase/routing -run '^TestProdex043714RetryAfter' -count=1 -timeout=30s
 
+# Prodex 0.438.0 WebSocket terminal Mojo policy checks nested and top-level
+# connection-limit codes independently (ASCII casefold only), gives explicit
+# `status` priority over `status_code` even if malformed, and accepts only
+# integer u16 statuses. A mistaken fallback can authorize unsafe rotation.
+go test ./internal/gateway/openai \
+  -run '^TestProdex04380WebSocket' -count=1 -timeout=40s
+
 # Native Codex 0.163.0 response.incomplete is an incomplete model result,
 # not a 429, fake completion, or entitlement to replay. Preserve all wire
 # fields and SSE ordering for both buffered and streaming responses.

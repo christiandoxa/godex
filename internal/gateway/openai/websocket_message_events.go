@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -245,27 +246,35 @@ func websocketPayloadTerminal(kind string, payload []byte) bool {
 	return websocketPayloadStatus(payload) >= 400
 }
 
+// Tagged Prodex 0.438.0 uses serde_json::Value::as_u64 followed by u16
+// conversion. A *present but invalid* `status` must mask `status_code`; a
+// fractional/string/negative/out-of-u16 value must not become an HTTP error
+// or authorize an otherwise forbidden WebSocket retry.
 func websocketPayloadStatus(payload []byte) int {
-	var value map[string]any
+	var value map[string]json.RawMessage
 	if json.Unmarshal(payload, &value) != nil {
 		return 0
 	}
-	for _, key := range []string{"status", "status_code"} {
-		switch raw := value[key].(type) {
-		case float64:
-			if raw >= 0 && raw <= 999 {
-				return int(raw)
-			}
-		case json.Number:
-			if parsed, err := raw.Int64(); err == nil && parsed >= 0 && parsed <= 999 {
-				return int(parsed)
-			}
-		}
+	raw, present := value["status"]
+	if !present {
+		raw = value["status_code"]
 	}
-	return 0
+	if len(raw) == 0 {
+		return 0
+	}
+	// ParseUint rejects fractional/exponential, quoted, signed and null
+	// values rather than truncating a Go JSON float.
+	status, err := strconv.ParseUint(string(raw), 10, 16)
+	if err != nil {
+		return 0
+	}
+	return int(status)
 }
 
 func websocketRetryFailureCode(payload []byte) string {
+	if isWebSocketConnectionLimit(payload) {
+		return "websocket_connection_limit_reached"
+	}
 	code := strings.ToLower(strings.TrimSpace(websocketFailureCode(payload)))
 	switch code {
 	case "websocket_connection_limit_reached",
@@ -326,9 +335,42 @@ func websocketFailureCode(payload []byte) string {
 	return ""
 }
 
+// The tagged Mojo kernel checks nested error.code AND top-level code
+// independently, without whitespace normalization and with ASCII-only byte
+// case folding. A malformed Unicode lookalike is never a real limit code.
 func isWebSocketConnectionLimit(payload []byte) bool {
-	return strings.EqualFold(
-		strings.TrimSpace(websocketFailureCode(payload)),
-		"websocket_connection_limit_reached",
-	)
+	var value map[string]json.RawMessage
+	if json.Unmarshal(payload, &value) != nil {
+		return false
+	}
+	const limit = "websocket_connection_limit_reached"
+	var top string
+	if json.Unmarshal(value["code"], &top) == nil && websocketASCIIEqualFold04380(top, limit) {
+		return true
+	}
+	// Other fields can carry arbitrary JSON. In particular, a non-object
+	// error or an error.code with the wrong type cannot suppress a valid
+	// top-level code. Match tagged serde_json::Value::as_str semantics.
+	var nested map[string]json.RawMessage
+	if json.Unmarshal(value["error"], &nested) != nil {
+		return false
+	}
+	var code string
+	return json.Unmarshal(nested["code"], &code) == nil && websocketASCIIEqualFold04380(code, limit)
+}
+
+func websocketASCIIEqualFold04380(value, expected string) bool {
+	if len(value) != len(expected) {
+		return false
+	}
+	for index := 0; index < len(value); index++ {
+		ch := value[index]
+		if ch >= 'A' && ch <= 'Z' {
+			ch += 'a' - 'A'
+		}
+		if ch != expected[index] {
+			return false
+		}
+	}
+	return true
 }
