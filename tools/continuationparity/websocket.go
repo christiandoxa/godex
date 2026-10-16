@@ -84,6 +84,20 @@ func (b *backend) serveWebSocket(writer http.ResponseWriter, request *http.Reque
 					`{"type":"response.completed","response":{"id":"resp-recovered"}}`,
 				}
 			}
+		case "ws-limit-top":
+			// The compiled Mojo terminal policy considers the top-level
+			// connection limit even when the nested code is unrelated.
+			if seen == 1 {
+				payloads = []string{`{"type":"error","error":{"code":"unrelated_failure"},"code":"WEBSOCKET_CONNECTION_LIMIT_REACHED"}`}
+			} else {
+				payloads = []string{`{"type":"response.completed","response":{"id":"resp-limit-top-recovered"}}`}
+			}
+		case "ws-limit-nested":
+			if seen == 1 {
+				payloads = []string{`{"type":"error","error":{"code":"WEBSOCKET_CONNECTION_LIMIT_REACHED"},"code":"unrelated_failure"}`}
+			} else {
+				payloads = []string{`{"type":"response.completed","response":{"id":"resp-limit-nested-recovered"}}`}
+			}
 		case "ws-status-fraction":
 			payloads = []string{
 				`{"type":"error","status":400.5,"status_code":400}`,
@@ -295,6 +309,10 @@ func runWebSocketProduct(root string, b *backend, p product) error {
 		{mode: "ws-session-seed", want: []string{"response.completed"}, attempts: 1, owner: "account-a"},
 		{mode: "ws-keepalive", want: []string{"response.output_text.delta", "response.completed"}, delta: "recovered", attempts: 2, owner: "account-a"},
 		{mode: "ws-committed", want: []string{"keepalive", "response.output_text.delta", "response.failed"}, delta: "visible", attempts: 1, owner: "account-a"},
+		{mode: "ws-limit-top", want: []string{"response.completed"}, attempts: 2, owner: "account-a",
+			rawFrames: []string{`{"type":"response.completed","response":{"id":"resp-limit-top-recovered"}}`}},
+		{mode: "ws-limit-nested", want: []string{"response.completed"}, attempts: 2, owner: "account-a",
+			rawFrames: []string{`{"type":"response.completed","response":{"id":"resp-limit-nested-recovered"}}`}},
 		{mode: "ws-status-priority", want: []string{"error", "response.completed"}, attempts: 1, owner: "account-a",
 			rawFrames: []string{`{"type":"error","status":"invalid","status_code":400}`,
 				`{"type":"response.completed","response":{"id":"resp-status-priority"}}`}},
