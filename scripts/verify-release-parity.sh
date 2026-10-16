@@ -362,6 +362,8 @@ go test -race ./internal/gateway/gemini ./tools/differential \
 # Tagged Gemini Mojo operations 1 and 2 synthesize unavailable results for
 # unanswered function calls and signature-bearing calls for orphan results.
 # ID *and* name must match; duplicates and null values must remain bounded.
+# Operation 4 orders immediate tool responses by call ID, ahead of plain
+# text/media, without reordering duplicate IDs or synthesizing execution.
 # Do not apply the separate operation-4 reordering to unqualified compound
 # adjacent-model histories without native two-executable evidence.
 # Source-tagged 0.438.0 Gemini native generateContent role normalization:

@@ -1111,3 +1111,36 @@ coalesces those rows before pairing and subsequently performs operation 4
 response sorting. Reproducing only part of that compound pipeline would
 silently reorder existing client tool histories, so it remains explicitly
 **PARTIAL**, pending a proper native two-executable OAuth/provider oracle.
+
+
+## Native Gemini immediate response ordering — compiled operation 4
+
+The tagged 0.438.0 provider applies
+`gemini_provider_core_refine_tool_response_order` (Mojo operation 4) **after**
+missing/orphan pairing, but only when an adjacent `model` row contains one or
+more `functionCall` parts and is followed by a `user` row. In that eligible
+user row, all `functionResponse` parts are sorted ahead of text/media; those
+whose IDs match preceding calls use the **first** call index as their rank,
+unmatched responses follow, and stable arrival order is preserved within
+equal ranks and among ordinary parts. This sorting key is the ID alone;
+missing-result matching in operations 1 and 2 uses ID **and** name.
+
+`TestProdex04380GeminiNativeResponseOrderMatchesTaggedSorter` uses the
+source's full reversed/duplicate/unmatched/media example. Additional exact
+source regressions exercise `functionCall:null`, `functionResponse:null`,
+custom non-user rows, same-ID/different-name stability, idempotence and
+unchanged rows with zero preceding tool IDs. The actual Go
+`geminiGenerateContentRequest` now orders two consecutive tool results
+received as `call-b`, `call-a` into their original `call-a`, `call-b` request
+order without changing names, arguments or output. Tests pass for complete
+matched pairs, synthetic missing outputs and isolated orphan inputs; the
+fully sourced local Gemini package and race suite pass.
+
+**Scope:** The tool-bearing adapter applies compiled operations **1 → 2 → 4**
+only when there are no adjacent equal-role rows needing prior coalescing.
+The tagged complete native pipeline additionally coalesces those compound
+rows before matching and then enforces final role shape. Since native OAuth
+response-order permutation across all compound histories has not yet been
+checked against an official executable, the compound branch stays on its
+existing safe ordering path. This checkpoint closes source-derived **isolated
+native pair/order behavior**, not all native OAuth tool-history parity.

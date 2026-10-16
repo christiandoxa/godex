@@ -56,8 +56,10 @@ func geminiShapePlainContents04380(contents []any) []any {
 				return contents
 			}
 		}
-		return geminiRepairOrphanToolResponses04380(
-			geminiRepairMissingToolResults04380(contents),
+		return geminiRefineToolResponseOrder04380(
+			geminiRepairOrphanToolResponses04380(
+				geminiRepairMissingToolResults04380(contents),
+			),
 		)
 	}
 
