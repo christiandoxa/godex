@@ -34,7 +34,8 @@ func geminiInvalidToolInvariant04380(scenario string, result geminiCandidateResu
 	expectedField := "tools[0].function.parameters"
 	expectedDetail := "must be an object"
 	if scenario == "invalid-flat-tool-parameters" {
-		expectedField = "tools[0].parameters"
+		// The tagged Responses-to-Chat adapter normalizes flat function
+		// tools into a wrapped `function` shape before native validation.
 		expectedDetail = "is required"
 	}
 	var body map[string]any
@@ -44,6 +45,9 @@ func geminiInvalidToolInvariant04380(scenario string, result geminiCandidateResu
 	errorObj, ok := body["error"].(map[string]any)
 	if !ok {
 		return errors.New("Gemini invalid-tool response lacked structured error")
+	}
+	if errorObj["code"] != "invalid_request_error" {
+		return fmt.Errorf("Gemini invalid tool error code=%v", errorObj["code"])
 	}
 	message, _ := errorObj["message"].(string)
 	if !strings.Contains(message, "invalid_tool_declaration") || !strings.Contains(message, expectedField) ||

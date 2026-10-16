@@ -9,10 +9,10 @@ func TestProdex04380GeminiInvalidToolDifferentialRequiresIndexedError(t *testing
 		}
 		field, detail := "tools[0].function.parameters", "must be an object"
 		if scenario == "invalid-flat-tool-parameters" {
-			field, detail = "tools[0].parameters", "is required"
+			detail = "is required"
 		}
 		canonical := geminiCandidateResult{Name: "prodex", ExitCode: 2,
-			Client: exchange{Status: 400, Body: `{"error":{"message":"invalid_tool_declaration: Gemini request field ` + "`" + field + "`" + ` ` + detail + `","type":"invalid_request_error"}}`},
+			Client: exchange{Status: 400, Body: `{"error":{"message":"invalid_tool_declaration: Gemini request field ` + "`" + field + "`" + ` ` + detail + `","code":"invalid_request_error"}}`},
 		}
 		if err := geminiInvalidToolInvariant04380(scenario, canonical); err != nil {
 			t.Fatal(err)

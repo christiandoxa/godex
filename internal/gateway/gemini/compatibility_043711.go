@@ -27,6 +27,9 @@ func (transport *RuntimeTransport) executeChatCompatibleResponses(
 	if err != nil {
 		return nil, &proxymodel.Error{StatusCode: http.StatusBadRequest, Message: err.Error()}
 	}
+	if err := validateGeminiChatCompatibleTools04380(body); err != nil {
+		return nil, &proxymodel.Error{StatusCode: http.StatusBadRequest, Message: err.Error()}
+	}
 	body, err = filterGeminiOrphanToolMessages043711(body)
 	if err != nil {
 		return nil, &proxymodel.Error{StatusCode: http.StatusBadRequest, Message: err.Error()}
