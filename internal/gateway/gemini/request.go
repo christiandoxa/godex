@@ -267,7 +267,7 @@ func geminiThoughtSignature(object map[string]any) (string, bool, bool) {
 			continue
 		}
 		text, ok := value.(string)
-		return text, true, ok && strings.TrimSpace(text) != ""
+		return text, true, ok && geminiSignatureHasMojoNonSpace043711(text)
 	}
 	return "", false, false
 }
