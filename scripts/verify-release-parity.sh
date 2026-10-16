@@ -200,6 +200,19 @@ go test -race ./internal/usecase/quota ./internal/usecase/routing \
   -run '^TestProdex043714(QuotaObservationInvalidates|AcceptedUsageAdvances|ThreeProfileQuotaReset)' \
   -count=1 -timeout=65s
 
+# A successful authenticated result from a credential rotated before apply
+# cannot update quota caches, durable snapshots or recovery observations.
+go test -race ./internal/usecase/quota \
+  -run '^TestProdex043714CredentialRotationBeforeApplyDoesNotStoreStaleQuota$' \
+  -count=1 -timeout=35s
+
+# Complete closing requests survive delayed read EOF without a timing guess.
+# Ordinary cancellation and incomplete bodies remain negative controls;
+# permanent listener failures must retry and still terminate on shutdown.
+go test -race ./internal/delivery/http/proxy \
+  -run '^Test(Prodex04380CapturedClosingRequestIgnoresDelayedReadEOF|ProxyListenerRetriesPermanentAcceptFailureUntilShutdown|ProxyForwardsCapturedBodyAfterClientHalfClose|ProxyDoesNotForwardIncompleteBodyAfterClientHalfClose|ProxyCancellationStopsUpstream)$' \
+  -count=1 -timeout=45s
+
 # Prodex 0.438.0 restart rehydrates authenticated 401/403 penalties even
 # with a fresh quota DTO. A new receipt must retire only the exact old auth
 # generation, preserving newer 401 and independent generic/transport leases.
@@ -241,6 +254,10 @@ go test -race ./internal/gateway/gemini \
 # permissive escape and recursion handling. Verify real SSE terminal frames.
 go test ./internal/gateway/deepseek \
   -run '^TestProdex043713DeepSeek' -count=1 -timeout=45s
+
+go test ./internal/gateway/deepseek \
+  -run '^TestProdex04380DeepSeekResponses(RejectsUnsupportedMessageRole|UntypedRoleRetainsChatFallback)$' \
+  -count=1 -timeout=35s
 
 # Prodex 0.438.0 Anthropic ResponseOutput planner caps content at exactly
 # 65536 elements, even for no-visible-text thinking blocks whose bounded

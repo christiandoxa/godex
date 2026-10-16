@@ -79,10 +79,13 @@ def row(role, *parts, **metadata):
     return dict(role=role, parts=list(parts), **metadata)
 def call(identity='a', name='lookup', **metadata):
     return dict(functionCall=dict(id=identity, name=name, args={'q': identity}), **metadata)
-def response(identity='a', name='lookup', result=None):
-    return dict(functionResponse=dict(id=identity, name=name, response=result or {'value': identity}))
+UNSET = object()
+def response(identity='a', name='lookup', result=UNSET):
+    return dict(functionResponse=dict(id=identity, name=name, response={'value': identity} if result is UNSET else result))
 text = {'text': 'retain text'}
 media = {'inlineData': {'mimeType': 'image/png', 'data': 'c3ludGhldGlj'}}
+falsy = [False, 0, '', {}, [], None]
+assert all(response(result=value)['functionResponse']['response'] is value for value in falsy)
 cases = [
     ('consecutive-model-reversed-results', [row('model', call('a', thoughtSignature='fixture-signature'), first={'keep': True}), row('model', call('b'), later='discard'), row('user', response('b'), response('a'), user_metadata=[1, 2])]),
     ('consecutive-user-responses-and-media', [row('user', text), row('model', call('a'), call('b')), row('user', text, response('b'), media, first='keep'), row('user', response('a'), text, later='discard')]),
@@ -98,6 +101,7 @@ cases = [
     ('duplicate-missing-calls-remain-explicit', [row('model', call('a')), row('model', call('a')), row('user', text)]),
     ('duplicate-responses-preserve-errors-and-signatures', [row('model', call('a', thoughtSignature='fixture-signature')), row('user', response('a', result={'error': 'fixture failure'})), row('user', response('a', result={'value': 2}), media)]),
     ('orphan-after-non-tool-model', [row('model', text), row('model', media), row('user', response('orphan'))]),
+    ('falsy-and-null-response-payloads', [row('model', *(call(str(index)) for index in range(3))), row('model', *(call(str(index)) for index in range(3, 6))), row('user', *(response(str(index), result=falsy[index]) for index in [5, 4, 3])), row('user', *(response(str(index), result=falsy[index]) for index in [2, 1, 0]))]),
 ]
 fixture = {'source_commit': REF, 'operation_order': [0, 1, 2, 4, 3], 'cases': []}
 for name, value in cases:

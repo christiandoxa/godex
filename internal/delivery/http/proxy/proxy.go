@@ -116,9 +116,10 @@ func (proxy *Proxy) Start() error {
 			listener.Addr().String(), proxy.broker.CurrentProfile,
 		))
 	}
-	go func() { _ = proxy.server.Serve(listener); close(proxy.done) }()
+	go func() { _ = serveProxyListener(proxy.server, listener); close(proxy.done) }()
 	return nil
 }
+
 func (proxy *Proxy) SetPersistenceEnabled(enabled bool) {
 	if proxy == nil || proxy.router == nil {
 		return
@@ -249,16 +250,11 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 			writeTextResponse(writer, status, message)
 			return
 		}
-		// net/http cancels a server request context when a client half-closes
-		// its connection. Once the complete body is captured, the request can
-		// still be forwarded safely; retain cancellation while the body is
-		// being read so incomplete requests never reach an upstream.
-		var stopRequestContext context.CancelFunc
-		if requestContext.Err() != nil {
+		// A closing server connection can report read EOF at any point after
+		// capture. Finish its complete request like the reference runtime;
+		// body-read failures and ordinary request cancellation still stop work.
+		if requestContext.Err() != nil || request.RequestURI != "" && request.Close {
 			requestContext = context.WithoutCancel(requestContext)
-		} else if request.RequestURI != "" && request.Close {
-			requestContext, stopRequestContext = requestContextAfterBody(requestContext)
-			defer stopRequestContext()
 		}
 		if proxy.redactor != nil && len(body) > 0 {
 			redacted, err := proxy.redactor.Redact(requestContext, body)
@@ -342,28 +338,4 @@ func readLimited(reader io.ReadCloser, limit int64) ([]byte, error) {
 		return nil, errRequestBodyTooLarge
 	}
 	return data, nil
-}
-
-const requestContextCancellationGrace = time.Millisecond
-
-func requestContextAfterBody(ctx context.Context) (context.Context, context.CancelFunc) {
-	forwardContext, cancel := context.WithCancel(context.WithoutCancel(ctx))
-	go func() {
-		timer := time.NewTimer(requestContextCancellationGrace)
-		defer timer.Stop()
-		select {
-		case <-ctx.Done():
-			// A server connection that closes immediately after sending a
-			// complete body is safe to finish, just like the captured request
-			// path in the reference runtime.
-			return
-		case <-timer.C:
-		}
-		select {
-		case <-ctx.Done():
-			cancel()
-		case <-forwardContext.Done():
-		}
-	}()
-	return forwardContext, cancel
 }

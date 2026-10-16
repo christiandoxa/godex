@@ -146,7 +146,7 @@ func TestDeepSeekResponsesRequestTranslatesHistoryAndRoles(t *testing.T) {
 	translated, err := ResponsesRequest([]byte(`{
 		"input":[
 			{"type":"message","role":"developer","content":"dev rules"},
-			{"type":"message","role":"critic","content":"critic note"},
+			{"type":"message","role":"user","content":"user note"},
 			{"type":"function_call","call_id":"call_1","name":"exec","arguments":{"cmd":"ls"}},
 			{"type":"function_call_output","call_id":"call_1","output":{"ok":true}},
 			{"type":"local_shell_call","call_id":"call_2","action":{"command":["pwd"]}}
@@ -340,7 +340,7 @@ func TestProdex04373DeepSeekResponsesToolHistoryShape(t *testing.T) {
 			name: "assistant tool history",
 			input: `{"input":[
 				{"type":"message","role":"assistant","content":[{"type":"output_text","text":""}],"tool_calls":[{"id":"call_1","type":"function","function":{"name":"grep","arguments":"{\"pattern\":\"ProviderTranslator\"}"}}]},
-				{"type":"message","role":"tool","tool_call_id":"call_1","content":[{"type":"output_text","text":"{\"match_count\":1}"}]}
+				{"type":"function_call_output","call_id":"call_1","output":"{\"match_count\":1}"}
 			]}`,
 			want: `[{"role":"assistant","content":"","tool_calls":[{"id":"call_1","type":"function","function":{"name":"grep","arguments":"{\"pattern\":\"ProviderTranslator\"}"}}]},{"role":"tool","tool_call_id":"call_1","content":"{\"match_count\":1}"}]`,
 		},

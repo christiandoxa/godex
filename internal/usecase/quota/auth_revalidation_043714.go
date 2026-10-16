@@ -89,6 +89,13 @@ func (status *Status) scheduleAuthenticatedRecoveryProbeAtHome043714(
 			!hasQuotaWindow(usage.Primary) && !hasQuotaWindow(usage.Secondary) {
 			return errors.New("authenticated quota receipt contains no validated quota windows")
 		}
+		currentDigest, err := gateway.CurrentCredentialDigest(runCtx, home)
+		if err != nil {
+			return err
+		}
+		if subtle.ConstantTimeCompare(currentDigest[:], receipt.CredentialDigest[:]) != 1 {
+			return errors.New("quota credentials changed during authenticated observation")
+		}
 		// A late authenticated probe may not override a later status result.
 		liveCache := strings.TrimSpace(baseURL) == "" && !noProxy
 		if !status.applySuccessfulUsageProbe043714(runCtx, accountID, home, usage, now, generation, liveCache) {

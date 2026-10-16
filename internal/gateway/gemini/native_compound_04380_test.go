@@ -27,7 +27,7 @@ func TestProdex04380GeminiNativeCompoundHistoryMatchesCompiledSource(t *testing.
 		t.Fatal(err)
 	}
 	if fixture.SourceCommit != "8cab9794b0e08b2cb8507df8321a8e38ebd6492f" ||
-		!reflect.DeepEqual(fixture.OperationOrder, []int{0, 1, 2, 4, 3}) || len(fixture.Cases) != 14 {
+		!reflect.DeepEqual(fixture.OperationOrder, []int{0, 1, 2, 4, 3}) || len(fixture.Cases) != 15 {
 		t.Fatal("native Gemini oracle provenance or coverage changed")
 	}
 	for _, tc := range fixture.Cases {

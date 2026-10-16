@@ -79,13 +79,14 @@ func deepSeekMessageItem(item map[string]any) (map[string]any, error) {
 		if !valid {
 			return nil, errors.New("DeepSeek message role must be a string")
 		}
+		if item["type"] == "message" && text != "user" && text != "assistant" && text != "system" && text != "developer" {
+			return nil, fmt.Errorf("DeepSeek message role `%s` is not supported by this Responses adapter", text)
+		}
 		switch text {
-		case "assistant", "system", "tool":
+		case "assistant", "system", "tool", "user":
 			role = text
 		case "developer":
 			role = "system"
-		default:
-			role = "user"
 		}
 	}
 	content, err := deepSeekTextContent(item[deepSeekContentKey])

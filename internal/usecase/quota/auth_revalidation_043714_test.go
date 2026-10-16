@@ -109,3 +109,62 @@ func TestProdex043714NewerQuotaObservationInvalidatesPreviousAuthProof(t *testin
 		t.Fatal("stale ready quota credential receipt survived newer exhausted observation")
 	}
 }
+
+type rotatingDuringApplyQuota043714 struct {
+	authenticatedQuotaStub043714
+	current [32]byte
+	reads   int
+}
+
+func (gateway *rotatingDuringApplyQuota043714) FetchAuthenticatedAtPolicy(
+	ctx context.Context, home, upstream string, noProxy bool,
+) (quotamodel.Usage, quotamodel.AuthenticatedReceipt, error) {
+	usage, receipt, err := gateway.authenticatedQuotaStub043714.FetchAuthenticatedAtPolicy(ctx, home, upstream, noProxy)
+	gateway.current = [32]byte{9, 8, 7}
+	return usage, receipt, err
+}
+
+func (gateway *rotatingDuringApplyQuota043714) CurrentCredentialDigest(context.Context, string) ([32]byte, error) {
+	gateway.reads++
+	return gateway.current, nil
+}
+
+func TestProdex043714CredentialRotationBeforeApplyDoesNotStoreStaleQuota(t *testing.T) {
+	now := time.Unix(6000, 0)
+	used := int64(10)
+	account := accountentity.Account{ID: "account-a", Enabled: true}
+	reader := &rotatingDuringApplyQuota043714{
+		authenticatedQuotaStub043714: authenticatedQuotaStub043714{
+			usage:   quotamodel.Usage{Primary: &quotamodel.Window{UsedPercent: &used}},
+			receipt: quotamodel.AuthenticatedReceipt{Confirmed: true, CredentialDigest: [32]byte{1, 2, 3}, StartedAt: now.Add(-time.Second)},
+		},
+		current: [32]byte{1, 2, 3},
+	}
+	status := NewStatus(fakeAccounts{accounts: []accountentity.Account{account}, current: account}, reader)
+	status.now = func() time.Time { return now }
+	defer status.Close()
+	store := &memoryUsageSnapshotStore{}
+	status.SetUsageSnapshotStore(store)
+	selection := quotamodel.Selection{RouteKind: quotamodel.RouteKindResponses}
+	revision := status.ProbeRefreshRevision()
+	if err := status.ScheduleAuthenticatedRecoveryProbe(t.Context(), account, selection); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	if !status.WaitProbeRefresh(ctx, revision) {
+		t.Fatal("quota probe did not complete")
+	}
+	if reader.reads != 1 {
+		t.Fatalf("credential identity checks = %d, want 1 before applying the probe", reader.reads)
+	}
+	if _, ok := store.values[account.ID]; ok {
+		t.Fatal("quota result from a rotated credential was persisted")
+	}
+	if status.QuotaObservationRevision(account.ID) != 0 {
+		t.Fatal("quota result from a rotated credential advanced the observation revision")
+	}
+	if _, _, ok := status.AuthenticatedRecoveryReceipt(account.ID, selection); ok {
+		t.Fatal("quota result from a rotated credential authorized recovery")
+	}
+}

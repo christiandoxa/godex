@@ -207,7 +207,7 @@ func TestProdex043714StartupInheritedAuthRespectsProfileHomeAndTransportPolicy(t
 	}); !ok {
 		t.Fatal("startup proof did not survive route/model lookup")
 	}
-	if len(stub.currentHomes) != 1 || stub.currentHomes[0] != "/external/isolated-home" {
+	if len(stub.currentHomes) != 2 || stub.currentHomes[0] != "/external/isolated-home" || stub.currentHomes[1] != "/external/isolated-home" {
 		t.Fatalf("credential recheck used the wrong profile home: %#v", stub.currentHomes)
 	}
 }
