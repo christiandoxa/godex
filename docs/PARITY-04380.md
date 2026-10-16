@@ -1563,3 +1563,21 @@ metadata is checked explicitly. Mutation tests reject false positives, lost
 context, missing seeds, and owner changes. This fixture is now wired into
 `--phase=preflight-oracles`. It is synthetic two-executable protocol evidence,
 not a live Codex compaction run.
+
+## Native Gemini signature whitespace barrier
+
+Canonical `gemini_bridge_request_signature_choice` and its Unicode classifier
+in `mojo/prodex_core/provider_constraints.mojo` treat U+001C through U+001F as
+whitespace. A present blank signature also suppresses lower-precedence aliases.
+Godex already applied that classifier when hardening model parts, but the
+Responses-to-native signature extraction path still used Go `TrimSpace`, which
+accepted U+001C as a signature and copied it into function-call content.
+
+`TestProdex04380GeminiNativeRejectsRecordSeparatorThoughtSignature` failed
+before the fix with `thoughtSignature` containing U+001C. The extraction path
+now reuses its existing private canonical classifier and the regression passes.
+`go test ./internal/gateway/gemini ./tools/differential -count=1` and its race
+variant pass. The compiled native pipeline oracle still matches all 15 cases
+and rejects all five omitted-pass mutations. The existing preflight native
+Gemini test pattern includes this regression. This is VERIFIED for the narrow
+source-derived signature boundary; native OAuth executable proof remains PARTIAL.
