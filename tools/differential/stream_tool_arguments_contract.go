@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// Prodex 0.437.14: streamed tool arguments are introduced as a delta, not
+// Prodex 0.438.0: streamed tool arguments are introduced as a delta, not
 // as empty arguments in item.added. Both invalid Unicode/numeric/depth and
 // valid paired-surrogate cases require exact frames, not a loose code match.
 const toolArgumentsResponseID043713 = "chatcmpl-toolargs"
@@ -93,7 +93,7 @@ func canonicalFixtureToolArgumentsSSE043713(body string) (string, string, error)
 		})
 	}
 	if !reflect.DeepEqual(parsed, want) {
-		return "", "", errors.New("streamed tool events differ from the exact 0.437.14 fixture")
+		return "", "", errors.New("streamed tool events differ from the exact 0.438.0 fixture")
 	}
 	encoded, err := json.Marshal(parsed)
 	if err != nil {

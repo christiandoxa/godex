@@ -211,7 +211,7 @@ func checkCanonicalFooter(output string, code int, provider string) error {
 	return nil
 }
 
-// The 0.437.14 VTE regression: the child exits its alternate screen before
+// The 0.438.0 VTE regression: the child exits its alternate screen before
 // printing its native usage line. Only DEC 1047 is safe afterwards; DEC 1049
 // would restore a previously saved cursor and overwrite the native footer.
 func checkNativeNormalScreen(output string, code int, provider string) error {

@@ -52,7 +52,7 @@ func auditFixtureDurableState(root string) []string {
 		if !allowedFixtureStateFile(relative) {
 			violations = append(violations, "unknown_persistent_file:"+relative)
 		}
-		// The 0.437.14 restart-safe auth store owns a private, empty lock.
+		// The 0.438.0 restart-safe auth store owns a private, empty lock.
 		// It is not an excuse to accept an auth state file in an ephemeral
 		// DeepSeek API-key fixture where no managed 401 could have occurred.
 		if relative == "state/routing-auth-backoff.guard" &&

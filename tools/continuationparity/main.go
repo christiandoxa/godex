@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	prodexCommit = "ef7a965ed8a4996eb8288b1918533d395f65a132"
-	prodexSHA    = "94acc49aadd1be65c1578f2d2a7ca6288b87758106f245d7684a65dfef1f3d12"
+	prodexCommit = "8cab9794b0e08b2cb8507df8321a8e38ebd6492f"
+	prodexSHA    = "9ec1702c58983a8e3bd7f2e7f49c34a2d656f766fd535bbe34d08c94d436ac2a"
 )
 
 type attempt struct{ account, mode, body string }
@@ -146,9 +146,9 @@ type product struct {
 }
 
 func main() {
-	prodex := flag.String("prodex", "", "official Prodex 0.437.14 binary")
+	prodex := flag.String("prodex", "", "official Prodex 0.438.0 binary")
 	godex := flag.String("godex", "", "Godex binary")
-	prodexSource := flag.String("prodex-source", "", "tagged Prodex 0.437.14 source")
+	prodexSource := flag.String("prodex-source", "", "tagged Prodex 0.438.0 source")
 	websocket := flag.Bool("websocket", false, "run the isolated WebSocket request/recovery differential")
 	godexSource := flag.String("godex-source", "", "clean Godex commit source (required with --websocket)")
 	godexCommit := flag.String("godex-commit", "", "exact 40-character Godex commit (required with --websocket)")
@@ -197,7 +197,7 @@ func verifyProdex(binary, source string) error {
 		return fmt.Errorf("Prodex binary digest %s, want %s", got, prodexSHA)
 	}
 	output, err := exec.Command(binary, "--version").CombinedOutput()
-	if err != nil || strings.TrimSpace(string(output)) != "prodex 0.437.14" {
+	if err != nil || strings.TrimSpace(string(output)) != "prodex 0.438.0" {
 		return fmt.Errorf("unexpected Prodex version %q: %v", output, err)
 	}
 	if err := verifyProdexSource(source); err != nil {
@@ -209,7 +209,7 @@ func verifyProdex(binary, source string) error {
 func verifyProdexSource(source string) error {
 	output, err := exec.Command("git", "-C", source, "rev-parse", "HEAD").Output()
 	if err != nil || strings.TrimSpace(string(output)) != prodexCommit {
-		return fmt.Errorf("Prodex source is not tag 0.437.14")
+		return fmt.Errorf("Prodex source is not tag 0.438.0")
 	}
 	return verifyProdexSourceClean(source)
 }
