@@ -165,6 +165,17 @@ go test ./internal/gateway/openai \
 go test ./internal/delivery/http/proxy \
   -run '^TestProdex04380NativeResponseIncompletePreservesReasonAndUsageWithoutRotation$' \
   -count=1 -timeout=35s
+# The same terminal event must feed the existing runtime usage marker. A
+# missing marker would silently discard native Codex 0.163.0 usage metadata.
+go test ./internal/usecase/routing \
+  -run '^TestProdex04380ObserveRecordsNativeIncompleteTokenUsage$' \
+  -count=1 -timeout=35s
+
+# Prodex 0.438.0 classifies compaction_trigger as context-dependent, but not
+# reconstructable full history after an invalid previous_response_id.
+go test -race ./internal/usecase/routing \
+  -run '^Test(ResponsesInvalidPreviousIDDoesNotReplayCompactionTriggerHistory|ReconstructableFullHistoryMatchesCodexRequestShapes)$' \
+  -count=1 -timeout=35s
 
 # Prodex 0.438.0 loopback proxy listener survives real Linux RLIMIT_NOFILE
 # exhaustion and handles a queued request exactly once after FD release.

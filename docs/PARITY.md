@@ -133,7 +133,9 @@ and closed these gaps:
   dispatch. Session intent now crosses delivery into the use case through
   `model/session.Launch`, without reparsing CLI placement in the use case.
 - Responses HTTP now recovers an exact invalid previous-response ID once on its
-  bound owner when session metadata and reconstructable full history are present.
+  bound owner when session metadata and reconstructable full history are present;
+  a `compaction_trigger` item remains context-dependent but is not itself
+  reconstructable history.
   It removes that stale response binding and its profile turn-state sidecar;
   incomplete follow-ups keep the original response. Tests cover JSON and SSE
   failures, ownership, near-match errors, and the one-retry limit. Tagged source:

@@ -168,6 +168,27 @@ func TestResponsesInvalidPreviousIDDoesNotReplayMessageFollowup(t *testing.T) {
 	}
 }
 
+func TestResponsesInvalidPreviousIDDoesNotReplayCompactionTriggerHistory(t *testing.T) {
+	const invalid = `{"type":"error","status":400,"error":{"type":"invalid_request_error","message":"Invalid ` + "`previous_response_id`" + `.","param":"previous_response_id"}}`
+	const body = `{"previous_response_id":"resp-dead","session_id":"sess-hard","input":[{"type":"compaction_trigger"},{"type":"message","role":"user","content":"after compaction"}]}`
+	gateway := &responseRecoveryGateway{replies: []responseRecoveryReply{
+		{http.StatusBadRequest, "application/json", invalid},
+	}}
+	router := newResponseRecoveryRouter(t, gateway, true)
+	exchange, err := router.Forward(context.Background(), responsesRecoveryRequest(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer exchange.Close()
+	replayed, err := io.ReadAll(exchange.Result.Response.Body)
+	if err != nil || exchange.Result.Response.StatusCode != http.StatusBadRequest || string(replayed) != invalid {
+		t.Fatalf("compaction trigger invalid response = status:%d body:%q err:%v", exchange.Result.Response.StatusCode, replayed, err)
+	}
+	if len(gateway.requests) != 1 || !strings.Contains(string(gateway.requests[0].Body), "previous_response_id") {
+		t.Fatalf("compaction trigger attempts/body = %d / %s", len(gateway.requests), gateway.requests[0].Body)
+	}
+}
+
 func TestResponsesInvalidPreviousIDSSERecoversOnSameOwnerOnce(t *testing.T) {
 	const body = `{"previous_response_id":"resp-dead","input":[{"type":"message","role":"user","content":"turn one"},{"type":"message","role":"assistant","content":"answer one"},{"type":"message","role":"user","content":"turn two"}],"client_metadata":{"session_id":"session-a"}}`
 	const invalid = "event: error\ndata: {\"type\":\"error\",\"status\":400,\"error\":{\"type\":\"invalid_request_error\",\"message\":\"Invalid `previous_response_id`.\"}}\n\n"
@@ -309,6 +330,14 @@ func TestReconstructableFullHistoryMatchesCodexRequestShapes(t *testing.T) {
 				json.RawMessage(`{"role":"user"}`),
 			},
 			want: true,
+		},
+		{
+			name: "compaction trigger is context-dependent only",
+			input: []json.RawMessage{
+				json.RawMessage(`{"type":"compaction_trigger"}`),
+				json.RawMessage(`{"role":"user"}`),
+			},
+			want: false,
 		},
 		{
 			name: "message followup has no replayable history",

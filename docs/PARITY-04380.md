@@ -1475,3 +1475,40 @@ mutation controls pass. `make verify` also passes on this candidate. Overall
 parity remains **PARTIAL** because native OAuth, live quota/restart matrices,
 full compaction/inference behavior, and native Windows/macOS execution are not
 proved by this finite gate.
+
+## Codex 0.163.0 incomplete usage marker
+
+The tagged Prodex runtime treats `response.incomplete` as a terminal Responses
+event and keeps its token usage for runtime activity reporting. Godex already
+forwarded the event bytes unchanged, but its terminal usage classifier omitted
+that event type, so native incomplete turns silently lost their usage marker.
+
+`TestProdex04380ObserveRecordsNativeIncompleteTokenUsage` failed before the
+fix because `Observe` recorded no token event for a source-shaped
+`response.incomplete` payload. The classifier now accepts that terminal type
+alongside `response.completed`, `response.done`, and `response.failed`, while
+non-terminal progress events remain ignored. Focused routing tests and the
+release preflight check pass; the fix does not alter response wire bytes,
+retry, quota, or profile selection behavior.
+
+This is VERIFIED for the synthetic source-derived usage marker contract. Live
+Codex inference and the wider native compaction matrix remain PARTIAL.
+
+## Codex compaction v2 trigger boundary
+
+The exact Prodex 0.438.0 executable keeps a `compaction_trigger` request in the
+context-dependent fallback shape, but does not classify it as reconstructable
+full history for invalid `previous_response_id` recovery. With a synthetic
+upstream 400, Prodex makes one attempt and returns the original 400 with the
+previous response ID intact. The earlier Godex recovery branch made a second
+same-owner attempt after deleting that ID, which could turn the same request
+into a false 200.
+
+The correction restores the tagged Mojo predicate: only the older
+`compaction` item establishes reconstructable history. The new negative
+regression `TestResponsesInvalidPreviousIDDoesNotReplayCompactionTriggerHistory`
+asserts one attempt, the original 400 body, and the retained previous ID;
+`TestReconstructableFullHistoryMatchesCodexRequestShapes` covers the
+context-dependent negative shape. A manual exact source/binary probe matched
+after the correction. This is VERIFIED for the bounded synthetic recovery
+boundary; live Codex compaction remains PARTIAL.
