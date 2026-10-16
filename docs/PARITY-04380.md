@@ -1316,6 +1316,24 @@ phases then verified the committed source. Native Windows/macOS runtime,
 live OAuth/quotas and full compaction/cancellation remain PARTIAL/OPEN.
 
 
+## Complete five-phase gate — async Codex request `cb59720f`
+
+All five independent Prodex 0.438.0 release phases passed on clean Godex
+commit `cb59720fcebdbc022c994c086d25bda534c54f7e`, with the canonical source
+`8cab9794b0e08b2cb8507df8321a8e38ebd6492f` and published binary SHA pinned:
+
+- `--phase=preflight-tests`: **PASS**, including the official Codex 0.163.0
+  async background remote-compaction request proof.
+- `--phase=preflight-oracles`: **PASS**, including 34 profile stages and 14
+  CLI probes.
+- `--phase=deepseek`: **PASS 22/22**, no comparison differences.
+- `--phase=gemini`: **PASS 13/13**, no comparison differences.
+- `--phase=websocket`: **PASS**, 58 upstream attempts with no postcommit replay.
+
+The gate is finite synthetic/loopback evidence. Later-turn background-candidate
+adoption, live OAuth or quota behavior, and native Windows/macOS execution stay
+PARTIAL.
+
 ## DeepSeek explicit message roles — typed validation and untyped fallback
 
 Parallel source review found that Godex silently accepted an explicit
