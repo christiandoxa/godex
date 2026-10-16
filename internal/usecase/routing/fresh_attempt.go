@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
@@ -270,9 +271,20 @@ func (router *Router) freshAttempt(
 
 func isProxyPreparationError(err error) bool {
 	var presentation *proxymodel.Error
-	return errors.As(err, &presentation) &&
-		presentation.StatusCode == http.StatusBadGateway &&
-		presentation.Message == "proxied request could not be prepared"
+	if !errors.As(err, &presentation) {
+		return false
+	}
+	if presentation.StatusCode == http.StatusBadGateway &&
+		presentation.Message == "proxied request could not be prepared" {
+		return true
+	}
+	// An invalid Gemini API-key function tool is rejected by the *local*
+	// tagged 0.438.0 bridge before upstream HTTP. Waiting or selecting a new
+	// provider credential cannot repair the submitted request, and could
+	// falsely turn its exact 400 into a 503/timeout. Preserve local invalid-
+	// tool error semantics for both fresh and hard-affinity routing paths.
+	return presentation.StatusCode == http.StatusBadRequest &&
+		strings.HasPrefix(presentation.Message, "invalid_tool_declaration: Gemini request field `tools[")
 }
 
 // applyRetryOutcome preserves historical durable retry backoff for managed
