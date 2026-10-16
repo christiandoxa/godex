@@ -243,6 +243,13 @@ go test ./internal/gateway/deepseek \
   -run '^TestProdex04380AnthropicResponsePlanRejectsTooManyContentBlocks$' \
   -count=1 -timeout=40s
 
+# Tagged Prodex 0.438.0 Mojo Anthropic RequestKernel enforces JSON recursion
+# depth <= 128 for the projected content-block array (not outer metadata).
+# Deep tool-use input must fail before producing a synthetic Responses output.
+go test ./internal/gateway/deepseek \
+  -run '^TestProdex04380Anthropic(ResponseToolInputDepthMustStayBounded|JSONDepthIgnoresEscapedBraces|ResponseDepthIgnoresOuterExtensions)$' \
+  -count=1 -timeout=40s
+
 # The 0.438.0 streamed-argument differential compares four exact-tagged
 # real SSE tool-call envelopes. Reject extra empty arguments in item.added,
 # unstable invalid-JSON diagnostics, bad Unicode/numeric/depth validation,

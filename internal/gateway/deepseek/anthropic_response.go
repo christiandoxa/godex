@@ -66,6 +66,9 @@ func anthropicResponseOutput(content []any) ([]any, error) {
 	if len(content) > maxAnthropicResponseBlocks04380 {
 		return nil, errors.New("Anthropic Messages response plan failed: InvalidInput")
 	}
+	if !validAnthropicResponseJSONDepth04380(content, 0) {
+		return nil, errors.New("Anthropic request kernel failed: InvalidInput")
+	}
 	output := make([]any, 0, len(content))
 	var textBlocks []any
 	flushText := func() {

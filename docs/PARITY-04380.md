@@ -934,3 +934,23 @@ VERIFIED for those bounded scenarios; full production parity remains PARTIAL
 because native Windows/macOS execution, live OAuth/three-profile quota and
 relaunch, actual Codex 0.163.0 foreground/background compaction and isolated
 Rust accepted-socket-clone failure have not been independently certified.
+
+
+## Anthropic response JSON recursion depth — tagged 0.438.0
+
+The production Mojo `anthropic_request_value_end` bounds recursive JSON
+parsing to `ANTHROPIC_REQUEST_KERNEL_MAX_DEPTH = 128`. Its
+`ResponseOutput` operation validates the projected **content-block array**,
+not arbitrary unprojected outer provider metadata. Godex originally accepted
+a synthetically valid, under-4-MiB Anthropic Messages response with
+`tool_use.input` nested 140 levels deep and returned a Responses
+`function_call` instead of the tagged kernel's invalid-input error.
+`TestProdex04380AnthropicResponseToolInputDepthMustStayBounded` demonstrated
+the acceptance before the fix. The new bounded in-memory value-tree check
+rejects a depth-129 leaf and depth-140 tool input while allowing a depth-128
+leaf, shallow tool calls and literal escaped braces in text. A separate
+negative control confirms a deeply nested **outer extension** does not
+accidentally invoke the content validator. The request body and emitted
+metadata are otherwise unchanged. Local tests and race checks PASS; this is
+source-derived native-translation protection, not yet an independent
+Prodex/Godex two-executable deep JSON Messages differential.
