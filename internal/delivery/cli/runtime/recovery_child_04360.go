@@ -2,7 +2,6 @@ package runtime
 
 import (
 	"context"
-	"errors"
 	"strings"
 
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
@@ -127,10 +126,4 @@ func (launcher runSessionLauncher) recoveryCandidateExcluding04360(
 		}
 	}
 	return profilemodel.LaunchTarget{}, false
-}
-
-func recoveryExitCancelled04360(err error) bool {
-	type exitCoder interface{ ExitCode() int }
-	var status exitCoder
-	return errors.As(err, &status) && status.ExitCode() == 130
 }
