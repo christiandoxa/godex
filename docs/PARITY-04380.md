@@ -162,13 +162,14 @@ fixture proof into a production-wide claim without executing those cases.
 The new `gateway_native_incomplete_04380` profileparity stage runs official
 Prodex 0.438.0 and a Godex candidate in independent synthetic managed homes,
 pointing each at a private loopback Responses mock. For each executable the
-same fixture issues a buffered native `response.incomplete` and a streamed
-terminal `response.incomplete` and requires the **exact** original JSON/SSE
-payloads, original response ID, `max_output_tokens` reason plus opaque
-unknown details, original nested token usage, HTTP 200 and correct JSON/SSE
-content types. The upstream must receive **exactly two** well-authenticated
-requests with the correct model/input; no third attempt, invented completion,
-quota classification or escaped string substitution can pass. Positive
+same fixture exercises the three distinct Codex 0.163.0 incomplete reasons
+(`max_output_tokens`, `content_filter`, `interrupted`), each in buffered JSON
+and terminal SSE. The **six** responses must retain the exact original
+JSON/SSE bytes, response ID, reason plus opaque unknown fields, detailed token
+usage, HTTP 200 and correct native content types. The upstream must receive
+**exactly six** well-authenticated requests with the correct model/input;
+no extra attempt, invented completion, quota classification or escaped string
+substitution can pass. Positive
 cross-binary and mutation-negative-control runs PASS. Neither real accounts
 nor model inference are used. This closes the two-executable synthetic
 incomplete **wire** parity gap, not Codex-native inference, actual model
@@ -205,3 +206,16 @@ user login. This closes the **shared Linux observable recovery** gap, but
 does not prove a separately forced accepted-socket clone failure in the Rust
 transport or runtime behavior on macOS/Windows. Full 1:1 parity remains
 PARTIAL until those and the other stated native cases are tested.
+
+### All three Codex 0.163.0 incomplete reasons
+
+The same two-executable `gateway_native_incomplete_04380` fixture was expanded
+from 2 to 6 upstream requests: `max_output_tokens`, `content_filter`, and
+`interrupted` are each delivered as a buffered native Responses JSON result
+and a streaming `response.incomplete` SSE terminal frame. For both official
+Prodex 0.438.0 and the Godex candidate, every response must preserve exactly
+the original status, reason, response identity, token usage, unknown fields,
+content type and event bytes. A synthetic upstream counts each dispatch and
+rejects mismatched model, input, account or bearer. Focused live-binary smoke
+and mutation negative controls PASS. This is a **synthetic wire** oracle, not
+evidence of actual interrupted live inference or native compaction behavior.

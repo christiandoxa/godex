@@ -6,10 +6,14 @@ import (
 )
 
 func TestProdex04380IncompleteGatewayOracleRejectsResponseAndReplayMutations(t *testing.T) {
-	canonical := incompleteGatewayResult04380{calls: 2, statuses: []int{200, 200},
-		contentTypes:          []string{"application/json", "text/event-stream"},
-		bodies:                []string{incompleteResponse04380, incompleteSSE04380},
+	canonical := incompleteGatewayResult04380{calls: 2 * len(incompleteReasons04380),
 		upstreamAuthenticated: true, exited: true}
+	for _, reason := range incompleteReasons04380 {
+		body, stream := incompleteWireForReason04380(reason)
+		canonical.statuses = append(canonical.statuses, 200, 200)
+		canonical.contentTypes = append(canonical.contentTypes, "application/json", "text/event-stream")
+		canonical.bodies = append(canonical.bodies, body, stream)
+	}
 	if !sameGatewayIncomplete04380(canonical, canonical) {
 		t.Fatal("reference incomplete fixture rejected")
 	}
@@ -22,12 +26,12 @@ func TestProdex04380IncompleteGatewayOracleRejectsResponseAndReplayMutations(t *
 		edit(&candidate)
 		mutated = append(mutated, candidate)
 	}
-	change(func(v *incompleteGatewayResult04380) { v.calls = 3 })
+	change(func(v *incompleteGatewayResult04380) { v.calls++ })
 	change(func(v *incompleteGatewayResult04380) { v.statuses[1] = 500 })
 	change(func(v *incompleteGatewayResult04380) { v.contentTypes[1] = "application/json" })
 	change(func(v *incompleteGatewayResult04380) { v.bodies[0] = `{"status":"completed"}` })
 	change(func(v *incompleteGatewayResult04380) { v.bodies[0] += "\n" })
-	change(func(v *incompleteGatewayResult04380) { v.bodies[1] = v.bodies[1][:len(v.bodies[1])-2] })
+	change(func(v *incompleteGatewayResult04380) { v.bodies[5] = v.bodies[5][:len(v.bodies[5])-2] })
 	change(func(v *incompleteGatewayResult04380) { v.upstreamAuthenticated = false })
 	change(func(v *incompleteGatewayResult04380) { v.exited = false })
 	for i, v := range mutated {
@@ -46,7 +50,7 @@ func TestProdex04380IncompleteGatewayRealExecutables(t *testing.T) {
 		t.Skip("set exact source-verified binary paths to run direct wire fixture")
 	}
 	phases, err := checkGatewayIncomplete04380(t.TempDir(), cliOptions{prodex: prodex, godex: godex})
-	if err != nil || len(phases) != 1 || phases[0].Requests != 2 {
+	if err != nil || len(phases) != 1 || phases[0].Requests != 2*len(incompleteReasons04380) {
 		t.Fatalf("real native incomplete parity diverged: result=%+v err=%v", phases, err)
 	}
 }

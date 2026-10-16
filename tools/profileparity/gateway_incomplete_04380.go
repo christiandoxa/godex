@@ -24,6 +24,15 @@ const incompleteResponse04380 = `{"id":"resp_incomplete_native","object":"respon
 const incompleteSSE04380 = "event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_incomplete_native\"}}\n\n" +
 	"event: response.incomplete\ndata: {\"type\":\"response.incomplete\",\"response\":" + incompleteResponse04380 + "}\n\n"
 
+// Official Codex 0.163.0 differentiates the three terminal incomplete
+// reasons; the proxy must never promote any of them to response.completed.
+var incompleteReasons04380 = []string{"max_output_tokens", "content_filter", "interrupted"}
+
+func incompleteWireForReason04380(reason string) (string, string) {
+	return strings.Replace(incompleteResponse04380, "max_output_tokens", reason, 1),
+		strings.Replace(incompleteSSE04380, "max_output_tokens", reason, 1)
+}
+
 type incompleteGatewayResult04380 struct {
 	calls                 int
 	statuses              []int
@@ -53,19 +62,28 @@ func checkGatewayIncomplete04380(_ string, opts cliOptions) ([]stepResult, error
 	if !sameGatewayIncomplete04380(outcomes[0], outcomes[1]) {
 		return nil, fmt.Errorf("incomplete Responses wire diverged: Prodex=%+v Godex=%+v", outcomes[0], outcomes[1])
 	}
-	return []stepResult{{Name: "gateway_native_incomplete_04380", ProdexExit: 0, GodexExit: 0, Requests: 2}}, nil
+	return []stepResult{{Name: "gateway_native_incomplete_04380", ProdexExit: 0, GodexExit: 0, Requests: 2 * len(incompleteReasons04380)}}, nil
 }
 
 func sameGatewayIncomplete04380(a, b incompleteGatewayResult04380) bool {
 	valid := func(item incompleteGatewayResult04380) bool {
-		if item.calls != 2 || !item.exited || !item.upstreamAuthenticated || len(item.statuses) != 2 ||
-			len(item.bodies) != 2 || len(item.contentTypes) != 2 {
+		required := 2 * len(incompleteReasons04380)
+		if item.calls != required || !item.exited || !item.upstreamAuthenticated ||
+			len(item.statuses) != required || len(item.bodies) != required ||
+			len(item.contentTypes) != required {
 			return false
 		}
-		return item.statuses[0] == 200 && item.statuses[1] == 200 &&
-			strings.HasPrefix(strings.ToLower(item.contentTypes[0]), "application/json") &&
-			strings.HasPrefix(strings.ToLower(item.contentTypes[1]), "text/event-stream") &&
-			item.bodies[0] == incompleteResponse04380 && item.bodies[1] == incompleteSSE04380
+		for index, reason := range incompleteReasons04380 {
+			buffered, stream := incompleteWireForReason04380(reason)
+			pos := index * 2
+			if item.statuses[pos] != 200 || item.statuses[pos+1] != 200 ||
+				!strings.HasPrefix(strings.ToLower(item.contentTypes[pos]), "application/json") ||
+				!strings.HasPrefix(strings.ToLower(item.contentTypes[pos+1]), "text/event-stream") ||
+				item.bodies[pos] != buffered || item.bodies[pos+1] != stream {
+				return false
+			}
+		}
+		return true
 	}
 	return valid(a) && valid(b)
 }
@@ -106,15 +124,29 @@ func runGatewayIncomplete04380(root, product, binary string) (incompleteGatewayR
 			r.URL.Path != "/backend-api/codex/responses" ||
 			r.Header.Get("Authorization") != "Bearer synthetic-incomplete" ||
 			r.Header.Get("ChatGPT-Account-Id") != "synthetic-owner" ||
-			request.Model != "gpt-6" || request.Input != "synthetic incomplete" {
+			request.Model != "gpt-6" || !strings.HasPrefix(request.Input, "synthetic incomplete ") {
+			invalid.Store(true)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		reason := strings.TrimPrefix(request.Input, "synthetic incomplete ")
+		validReason := false
+		for _, known := range incompleteReasons04380 {
+			if known == reason {
+				validReason = true
+				break
+			}
+		}
+		if !validReason {
 			invalid.Store(true)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 		sent.Add(1)
-		body, mime := incompleteResponse04380, "application/json"
+		buffered, streamed := incompleteWireForReason04380(reason)
+		body, mime := buffered, "application/json"
 		if request.Stream {
-			body, mime = incompleteSSE04380, "text/event-stream"
+			body, mime = streamed, "text/event-stream"
 		}
 		w.Header().Set("Content-Type", mime)
 		w.WriteHeader(http.StatusOK)
@@ -153,23 +185,25 @@ func runGatewayIncomplete04380(root, product, binary string) (incompleteGatewayR
 		return outcome, fmt.Errorf("invalid isolated endpoint %q: %w", address, err)
 	}
 	client := &http.Client{Transport: &http.Transport{Proxy: nil, DisableKeepAlives: true}, Timeout: 6 * time.Second}
-	for _, stream := range []bool{false, true} {
-		payload, encodeErr := json.Marshal(map[string]any{"model": "gpt-6", "input": "synthetic incomplete", "stream": stream})
-		if encodeErr != nil {
-			return outcome, encodeErr
+	for _, reason := range incompleteReasons04380 {
+		for _, stream := range []bool{false, true} {
+			payload, encodeErr := json.Marshal(map[string]any{"model": "gpt-6", "input": "synthetic incomplete " + reason, "stream": stream})
+			if encodeErr != nil {
+				return outcome, encodeErr
+			}
+			response, requestErr := client.Post("http://"+parsed.Host+"/backend-api/codex/responses", "application/json", bytes.NewReader(payload))
+			if requestErr != nil {
+				return outcome, requestErr
+			}
+			data, readErr := io.ReadAll(io.LimitReader(response.Body, 64<<10))
+			_ = response.Body.Close()
+			if readErr != nil {
+				return outcome, readErr
+			}
+			outcome.statuses = append(outcome.statuses, response.StatusCode)
+			outcome.contentTypes = append(outcome.contentTypes, response.Header.Get("Content-Type"))
+			outcome.bodies = append(outcome.bodies, string(data))
 		}
-		response, requestErr := client.Post("http://"+parsed.Host+"/backend-api/codex/responses", "application/json", bytes.NewReader(payload))
-		if requestErr != nil {
-			return outcome, requestErr
-		}
-		data, readErr := io.ReadAll(io.LimitReader(response.Body, 64<<10))
-		_ = response.Body.Close()
-		if readErr != nil {
-			return outcome, readErr
-		}
-		outcome.statuses = append(outcome.statuses, response.StatusCode)
-		outcome.contentTypes = append(outcome.contentTypes, response.Header.Get("Content-Type"))
-		outcome.bodies = append(outcome.bodies, string(data))
 	}
 	outcome.calls = int(sent.Load())
 	outcome.upstreamAuthenticated = !invalid.Load()

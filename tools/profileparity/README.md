@@ -134,11 +134,13 @@ behaviors are distinct from this Linux shared observable contract.
 The `gateway_native_incomplete_04380` scenario invokes both real gateway
 binaries with separate synthetic imported ChatGPT profiles and one loopback
 Responses upstream per candidate. Buffered JSON and streamed SSE terminal
-`response.incomplete` results must retain byte-identical bodies, response ID,
-reason, unknown extension fields and detailed token usage. The two HTTP 200
-responses keep their exact native content types. The server must observe
-exactly two authenticated POSTs to `/backend-api/codex/responses`, preserving
-model and input; extra attempts or fabricated completion fail. Mutation
+`response.incomplete` results cover each of `max_output_tokens`,
+`content_filter`, and `interrupted` in both buffered and SSE variants. All
+six HTTP 200 responses must retain byte-identical bodies, response ID, reason,
+unknown extension fields, token usage and exact native content types. The
+server must observe exactly six authenticated POSTs to
+`/backend-api/codex/responses`, preserving model and input; any extra attempt
+or fabricated completion fails. Mutation
 sentinels reject wrong status/type, missing SSE frame, changed bytes,
 credential violations, duplicate dispatch or unclean exit. This is a
 cross-executable synthetic wire fixture, not live native inference or
