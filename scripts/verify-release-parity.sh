@@ -356,6 +356,9 @@ go test -race ./internal/gateway/gemini ./tools/differential \
   -run '^TestProdex04380Gemini(Buffered|APIKeyBuffered|NativeGenerateContent)' \
   -count=1 -timeout=55s
 
+# Tagged 0.438.0 operation-3 role decisions happen on RAW first/last rows
+# before rejecting invalid contents. Guard null/empty/model edge cases,
+# metadata ownership, custom roles and output ordering before API-key tests.
 # Source-tagged 0.438.0 Gemini native generateContent role normalization:
 # coalesce plain adjacent role entries and repair model-only boundaries, but
 # preserve the separate tool-call/result pairing until a native OAuth oracle

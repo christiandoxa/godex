@@ -1054,3 +1054,30 @@ is still PARTIAL**. In particular, native Gemini OAuth tool-response pairing
 and reordering, real Codex foreground/background compaction, native
 macOS/Windows runtime execution, live multi-profile quota/relaunch and an
 isolated Rust accepted-stream clone failure are not proven by these tests.
+
+
+## Gemini native raw-boundary precedence — tagged source regression
+
+In the 0.438.0 Mojo `gch_coalesce(..., shape=true)` operation, the decision
+to create a leading/trailing synthetic user prompt depends on the **raw**
+first/last content row before invalid rows or empty `parts` arrays are
+filtered. Godex previously decided from the first/last *retained* content,
+causing two source-proven semantic differences: a raw `null` followed by
+`model` incorrectly gained a leading user prompt, and an invalid lone
+`model` content with `parts:false` produced no prompt at all rather than a
+single user content combining both synthetic lead and tail parts. Its tool
+part-inspection helper also panicked on a null content row.
+
+`TestProdex04380GeminiNativeRawBoundaryPrecedesInvalidRowFiltering`
+reproduced the panic before the fix and exercises four exact tagged source
+cases, including metadata loss when a synthetic leading prompt merges with a
+later valid user content. The updated content normalizer evaluates raw role
+boundaries, drops invalid rows only during the retained-content pass,
+coalesces synthetic boundary text with the adjacent user group and preserves
+primitive part ordering without mutating caller-owned slices. A separate
+regression checks empty/custom/Unicode roles and their distinct bytewise
+identities. Full Gemini local package and race tests and the finite release
+preflight protect these behaviors. Native tool-pairing still uses a separately
+preserved adapter path until a two-executable OAuth/native protocol oracle
+qualifies the complete operations 1, 2 and 4; this is a bounded source-
+derived FIX, **not** a production-wide 1:1 certificate.

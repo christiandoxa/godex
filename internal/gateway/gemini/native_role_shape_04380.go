@@ -41,33 +41,81 @@ func geminiCoalesceContents04380(contents []any) []any {
 // result pairing: do NOT manufacture a text prompt for a tool-only request.
 func geminiShapePlainContents04380(contents []any) []any {
 	// The tagged operation 0 coalesces all roles, but the full production
-	// pipeline pairs and orders tool calls/results between coalescing and
-	// role shaping. The Go native adapter has its own existing tool-order
-	// contract; do not partially apply operation 0 to tool-bearing turns
-	// without also reproducing the separate pairing operations 1, 2 and 4.
+	// pipeline pairs and orders tools between coalescing and role shaping.
+	// Until operations 1/2/4 are parity-tested, preserve tool-bearing turns.
 	if geminiContentsContainToolParts04380(contents) {
 		return contents
 	}
+
+	// Prodex's operation 3 makes lead/tail decisions from the RAW first and
+	// last rows, *before* discarding invalid rows with no parts. A null row
+	// at the front prevents a synthetic lead; an invalid trailing model row
+	// still requires a synthetic final user turn.
+	lead := len(contents) > 0 && geminiRawModelRole04380(contents[0])
+	tail := len(contents) > 0 && geminiRawModelRole04380(contents[len(contents)-1])
 	grouped := geminiCoalesceContents04380(contents)
-	if len(grouped) == 0 {
-		return grouped
-	}
-	makeUser := func(text string) any {
+	makeUser := func(text string) map[string]any {
 		return map[string]any{"role": "user", "parts": []any{map[string]any{"text": text}}}
 	}
-	if grouped[0].(map[string]any)["role"] == "model" {
-		grouped = append([]any{makeUser("[Continuing from previous Codex context.]")}, grouped...)
+	if len(grouped) == 0 {
+		if !lead && !tail {
+			return grouped
+		}
+		user := map[string]any{"role": "user", "parts": []any{}}
+		if lead {
+			user["parts"] = append(user["parts"].([]any), map[string]any{"text": "[Continuing from previous Codex context.]"})
+		}
+		if tail {
+			user["parts"] = append(user["parts"].([]any), map[string]any{"text": "Please continue."})
+		}
+		return []any{user}
 	}
-	if grouped[len(grouped)-1].(map[string]any)["role"] == "model" {
-		grouped = append(grouped, makeUser("Please continue."))
+	if lead {
+		first := grouped[0].(map[string]any)
+		if first["role"] == "user" {
+			// gch_write_group(lead=true) replaces the retained metadata with
+			// synthetic-leading metadata rather than copying the first row.
+			grouped[0] = map[string]any{"role": "user", "parts": append(
+				[]any{map[string]any{"text": "[Continuing from previous Codex context.]"}},
+				first["parts"].([]any)...,
+			)}
+		} else {
+			grouped = append([]any{makeUser("[Continuing from previous Codex context.]")}, grouped...)
+		}
+	}
+	if tail {
+		last := grouped[len(grouped)-1].(map[string]any)
+		if last["role"] == "user" {
+			// Last raw model entry was filtered: the synthetic trailing
+			// prompt merges into the already retained user group.
+			last["parts"] = append(last["parts"].([]any), map[string]any{"text": "Please continue."})
+		} else {
+			grouped = append(grouped, makeUser("Please continue."))
+		}
 	}
 	return grouped
 }
 
+func geminiRawModelRole04380(raw any) bool {
+	object, ok := raw.(map[string]any)
+	if !ok {
+		return false
+	}
+	role, ok := object["role"].(string)
+	return ok && role == "model"
+}
+
 func geminiContentsContainToolParts04380(contents []any) bool {
 	for _, raw := range contents {
-		content := raw.(map[string]any)
-		for _, part := range content["parts"].([]any) {
+		content, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		parts, ok := content["parts"].([]any)
+		if !ok {
+			continue
+		}
+		for _, part := range parts {
 			object, ok := part.(map[string]any)
 			if !ok {
 				continue
