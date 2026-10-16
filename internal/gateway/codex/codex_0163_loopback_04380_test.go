@@ -29,6 +29,7 @@ const (
 	codex0163LoopbackIncomplete
 	codex0163LoopbackHold
 	codex0163LoopbackAutoCompaction
+	codex0163LoopbackAsyncCompaction
 )
 
 type codex0163LoopbackCall struct {
@@ -104,7 +105,13 @@ func (provider *codex0163LoopbackProvider) handle(writer http.ResponseWriter, re
 		return
 	}
 	callNumber := provider.callCount()
+	if provider.mode == codex0163LoopbackAsyncCompaction && provider.handleAsyncCompaction(writer, flusher, callNumber) {
+		return
+	}
 	messageText, totalTokens := "synthetic answer", 9
+	if provider.mode == codex0163LoopbackAsyncCompaction && callNumber == 1 {
+		totalTokens = 70_000
+	}
 	if provider.mode == codex0163LoopbackAutoCompaction {
 		switch callNumber {
 		case 1:
@@ -211,9 +218,16 @@ func newCodex0163AppServer(t *testing.T, mode codex0163LoopbackMode) (*codex0163
 	if err := os.Mkdir(codexHome, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	config := fmt.Sprintf("model_provider = %q\n[model_providers.loopback]\nname = %q\nbase_url = %q\nwire_api = %q\nrequires_openai_auth = false\n", "loopback", "loopback", provider.server.URL+"/v1", "responses")
+	config := fmt.Sprintf("model_provider = %q\n", "loopback")
 	if mode == codex0163LoopbackAutoCompaction {
-		config += "model_auto_compact_token_limit = 200000\ncompact_prompt = \"compact this\"\n"
+		config += "model_auto_compact_token_limit = 200000\n"
+	}
+	if mode == codex0163LoopbackAsyncCompaction {
+		config += "model_context_window = 100000\nmodel_auto_compact_token_limit = 90000\n[features.async_compaction]\nenabled = true\nmodel_async_compact_threshold_percent = 50\n"
+	}
+	config += fmt.Sprintf("[model_providers.loopback]\nname = %q\nbase_url = %q\nwire_api = %q\nrequires_openai_auth = false\n", "loopback", provider.server.URL+"/v1", "responses")
+	if mode == codex0163LoopbackAsyncCompaction {
+		config += "[model_providers.loopback.capabilities]\nremote_compaction = \"v2\"\n"
 	}
 	if err := os.WriteFile(filepath.Join(codexHome, "config.toml"), []byte(config), 0o600); err != nil {
 		t.Fatal(err)
