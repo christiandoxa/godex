@@ -21,7 +21,7 @@ transfer 0.437.14 differential PASS claims to the new 0.438.0 target.
 | OpenAI retired-model catalog filter | VERIFIED for tagged predicate / local cache | Prodex 0.438.0 `catalog_openai_model_is_retired` trims Unicode whitespace then performs ASCII-only case-insensitive exact matches for `spark`, `gpt-5.3-codex-spark`, `gpt-5.3-spark`. Go previously used Unicode `strings.ToLower`, which incorrectly retired lookalikes such as `sparK`. Failing source-derived negative tests and a real synthetic `models_cache.json` picker regression now PASS using `asciiEqualFold` after `TrimSpace`; interactive PTY model-picker screenshot not yet directly compared. |
 | Gemini Chat-compatible null `functionCall` output | VERIFIED for one exact synthetic wire fixture | Tagged Rust source has two distinct buffered entry points with different text policies. Direct two-executable Prodex 0.438.0/Godex candidate `83fa59d5` comparison established the *public* Chat-compatible path keeps adjacent text and emits deterministic fallback `call_1` for `functionCall:null`. The separate internal buffering helper suppresses text. Focused Go tests failed before correction; full pinned Gemini differential **PASS 13/13**, zero diffs, mutation sentinels; broader function-call permutations remain PARTIAL. |
 | Native Gemini compound tool-history pipeline | VERIFIED for 15 compiled-source synthetic cases; native OAuth executable proof remains PARTIAL | The complete tagged order **0/1/2/4/3** now coalesces repeated model/user rows before ID-and-name pairing, stable ID ordering and role shaping. Every case failed before the fix and now matches outputs executed by the Mojo kernel archived from the canonical source commit. Fixtures preserve signatures, first-row metadata, existing errors, null-key presence and duplicate-ID order; missing results remain explicit errors. All five missing-pass negative controls fail closed. Regeneration is credential-free via `tools/gemini-content-oracle.py`; it is not a two-executable OAuth test. |
-| DeepSeek explicit message-role validation | VERIFIED for source-derived local request cases; executable rejection wire remains PARTIAL | Tagged `deepseek_input_item_validation` accepts only user/assistant/system/developer on explicit message items. Godex previously converted critic to user and accepted explicit tool messages. Regressions now reject critic/tool/empty/uppercase roles while preserving untyped chat-role fallback and generated function-call outputs. Independent public rejection-wire proof is being added separately; broader input-shape parity remains PARTIAL. |
+| DeepSeek explicit message-role validation | VERIFIED for source and exact two-executable rejection fixture | Tagged `deepseek_input_item_validation` accepts only user/assistant/system/developer on explicit message items. Godex previously converted critic to user and accepted explicit tool messages. Regressions now reject critic/tool/empty/uppercase roles while preserving untyped chat-role fallback and generated function-call outputs. Exact Prodex 0.438.0/Godex differential now matches terminal HTTP 502 `upstream request failed`, exit 2, zero upstream attempts and zero retries; mutation controls pass. Broader input-shape parity remains PARTIAL. |
 | Gemini API-key invalid function-tool validation | VERIFIED for tagged malformed cases; PARTIAL for all tools | Full 0.438.0 tagged two-executable Gemini differential extended from 10 to **12** cases. Prodex rejects flat/wrapped invalid `tools[0].function.parameters` locally with HTTP 400, exit 2, indexed `invalid_request_error` JSON and zero upstream attempts; Godex initially forwarded the requests (false 200), then retried local 400s as transient, then emitted plaintext. Corrected adapter, Router and HTTP error shaping in local checkpoints. Clean exact-source/binary-pinned 12/12 differential PASS, `comparison_differences: []`; broader schema permutations remain untested. |
 | WebSocket terminal-frame Mojo classification | VERIFIED for tested status-wire cases; PARTIAL overall | Source-derived regressions reproduced actual Godex mismatches in `status`/`status_code` precedence, strict u16 bounds and nested/top-level connection-limit matching. Fixed in `4aac2592`; real pinned Prodex/Godex `--websocket` comparison confirms continuation after invalid/fractional/overflow primary status and **terminal error** for valid `65535` (one upstream attempt per mode; total 50). Status-frame mutation tests PASS. A newer **clean, exact-tagged two-binary** differential on `ab219e07` additionally verified top-level and nested connection-limit precommit recovery on a fresh WebSocket: one same-owner retry per case, neither precommit error leaks, total **58** upstream attempts. Persistent limits and already-retried budgets are bounded in in-process TCP tests, with no postcommit replay; broader future field permutations remain OPEN. |
 | Usage-limit native session candidate fallback after transient pool retry | PARTIAL | Tagged 0.438.0 compiled Mojo `usage_limit_recovery_candidate` allows the originally failed profile as the **last** candidate only after a transient wait and verified eligibility/quota. Godex formerly always excluded the original owner and could relaunch a previously exhausted backup. `TestProdex04380SessionRecoveryFailedProfileFallbackAfterPoolRetry` reproduced these failures and now passes with three profiles, model-aware ready claims, backup precedence, cancellation, owner/credential negative controls and prompt-no-replay. Legacy no-quota adapter backup retries remain unchanged. Independent exact-binary three-profile session recovery differential still OPEN. |
@@ -1437,3 +1437,33 @@ The correction is a one-condition change in `usecase/routing` and uses the
 existing full-history recovery path. It does not execute tools, change owner
 after commitment, or alter persisted formats. Live Codex compaction execution
 and native platform behavior remain PARTIAL.
+
+## DeepSeek unsupported typed role — exact executable terminal error
+
+The canonical source validates explicit DeepSeek Responses message items before
+provider dispatch, but Prodex's runtime local-rewrite boundary presents this
+translation failure as a generic terminal `502 upstream request failed`. It
+must not expose a retryable 400 translator error or wait for another profile.
+
+Before the correction, the source-derived request regression rejected
+`critic`, but the exact executable scenario timed out: Godex made zero upstream
+requests and emitted no child exchange because routing did not classify its
+400 preparation error as terminal. The gateway now carries this specific local
+validation failure through an existing typed error and maps it to the same
+terminal 502. Routing recognizes that existing preparation shape and performs
+no retry or rotation. Direct request validation remains explicit and safe.
+
+Exact source/SHA-pinned executable evidence on candidate `05f98bbe`:
+
+- official Prodex source `8cab9794b0e08b2cb8507df8321a8e38ebd6492f`;
+- official binary SHA-256 `9ec1702c58983a8e3bd7f2e7f49c34a2d656f766fd535bbe34d08c94d436ac2a`;
+- both products exit 2 and return HTTP 502;
+- both body `upstream request failed` with text/plain content type;
+- both make zero upstream attempts and zero retries;
+- differential comparison is empty and mutation negative controls pass.
+
+The fixture is now part of `scripts/verify-release-parity.sh --phase=preflight-tests`.
+It uses synthetic credentials and loopback only; no provider request or live
+account is involved. The local source and exact executable behavior are
+VERIFIED for this typed-role case. Other malformed DeepSeek shapes and live
+provider behavior remain PARTIAL.

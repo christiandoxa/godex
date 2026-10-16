@@ -265,6 +265,14 @@ go test ./internal/gateway/deepseek \
   -run '^TestProdex04380DeepSeekResponses(RejectsUnsupportedMessageRole|UntypedRoleRetainsChatFallback)$' \
   -count=1 -timeout=35s
 
+# The exact pinned executable oracle rejects unsupported typed DeepSeek message
+# roles locally with a terminal 502, zero upstream attempts and no retry.
+"$tmp/differential" \
+  --prodex "$tmp/prodex" --godex "$tmp/godex" \
+  --prodex-source "$tmp/prodex-source" \
+  --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
+  --scenario deepseek-unsupported-message-role
+
 # Prodex 0.438.0 Anthropic ResponseOutput planner caps content at exactly
 # 65536 elements, even for no-visible-text thinking blocks whose bounded
 # source JSON still fits inside the 4 MiB native response limit.
