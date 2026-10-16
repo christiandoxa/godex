@@ -106,6 +106,13 @@ go test ./internal/delivery/cli/runtime \
 # zero/signed values, rounds fractional millis, and caps at five minutes.
 go test ./internal/usecase/routing -run '^TestProdex043714RetryAfter' -count=1 -timeout=30s
 
+# Prodex 0.438.0 loopback proxy listener survives real Linux RLIMIT_NOFILE
+# exhaustion and handles a queued request exactly once after FD release.
+# Go's standard net/http accept loop has bounded retry; do not copy tiny_http.
+go test ./internal/delivery/http/proxy \
+  -run '^TestProdex04380ProxyListenerSurvivesActualEMFILEAndQueuedRequest$' \
+  -count=1 -timeout=45s
+
 # The live observer must distinguish an absent goal from an unavailable DB,
 # preserve unread failure evidence under EMFILE, and recover after resources
 # return. The Linux low-RLIMIT case runs inside a dedicated child process.
