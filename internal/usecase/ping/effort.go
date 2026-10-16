@@ -132,13 +132,14 @@ func pingDynamicModels() []pingModelCatalog {
 	var document struct {
 		Models []map[string]json.RawMessage `json:"models"`
 	}
-	if json.Unmarshal(content, &document) != nil || len(document.Models) == 0 {
+	if json.Unmarshal(content, &document) != nil || len(document.Models) == 0 ||
+		!pingCatalogInputValid04380(document.Models) {
 		return nil
 	}
 	models := make([]pingModelCatalog, 0, len(document.Models))
 	seen := make(map[string]struct{}, len(document.Models))
 	for _, raw := range document.Models {
-		id := dynamicString(raw, "slug", "id")
+		id := catalogFirstString04380(raw, "slug", "id")
 		if id == "" || len(id) > 4096 || pingRetiredModel(id) {
 			continue
 		}
@@ -157,7 +158,7 @@ func pingDynamicModels() []pingModelCatalog {
 			!asciiEqualFold(*visibility, "list") {
 			continue
 		}
-		label := dynamicString(raw, "display_name", "displayName")
+		label := catalogFirstString04380(raw, "display_name", "displayName")
 		if label == "" {
 			label = id
 		}
@@ -217,14 +218,18 @@ func rawPriority(values map[string]json.RawMessage) uint64 {
 }
 
 func rawEfforts(values map[string]json.RawMessage) []string {
-	var levels []map[string]json.RawMessage
+	var levels []json.RawMessage
 	if json.Unmarshal(values["supported_reasoning_levels"], &levels) != nil {
 		return nil
 	}
 	result := make([]string, 0, len(levels))
-	for _, level := range levels {
+	for _, rawLevel := range levels {
+		var level map[string]json.RawMessage
+		if json.Unmarshal(rawLevel, &level) != nil {
+			continue
+		}
 		effort := dynamicString(level, "effort")
-		if effort == "" || len(effort) > 4096 {
+		if effort == "" || len(effort) > pingCatalogMaxTextBytes04380 {
 			continue
 		}
 		duplicate := false

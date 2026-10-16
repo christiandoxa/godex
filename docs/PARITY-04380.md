@@ -736,6 +736,30 @@ Rust accepted-stream-clone exhaustion. No live secret or real model turn
 was used for these local oracle cases.
 
 
+## OpenAI dynamic model-cache input bounds and fail-closed fallback
+
+Prodex 0.438.0 `prodex_mojo_rich_catalog_choices_v2` rejects more than **1,024**
+model records, identifiers longer than **4,096 UTF-8 bytes**, labels/efforts
+longer than **65,536 bytes**, and aliases longer than **4,096 bytes** before
+filtering or selecting eligible models. Godex previously accepted 1,025
+choices, silently skipped an oversized ID/effort/alias while preserving
+other entries, and discarded a valid 5,000-byte effort due to its old
+4,096-byte threshold. Source-derived regressions failed first and now pass
+using `pingCatalogInputValid04380` before any model selection. A malformed
+single batch is rejected and bundled models remain available; a valid longer
+(5,000-byte) effort is preserved. The validator examines **every typed**
+entry in heterogeneous JSON arrays; invalid-type entries themselves are
+skipped as in Rust but may not mask a later overlong string. The tagged
+Rust parser also selects the *first string-valued* `slug`/`id` and
+`display_name`/`displayName` key (even if that selected text is empty),
+instead of falling back to a second key merely because the first string is
+blank. Null and wrong-type keys still allow fallback to the next typed
+key. `TestProdex04380DynamicModelCache*` and
+`TestProdex04380DynamicCatalog*` exercise cardinality, ID/alias/label,
+reasoning-effort bounds, heterogeneous types and first-key precedence.
+All local ping package and race tests pass. This is a tagged-source/model-
+cache regression, not a two-executable PTY interactive picker differential.
+
 ## OpenAI dynamic catalog identity — bytewise ASCII-only equality
 
 The same tagged `rich_catalog.mojo` model-identity comparisons fold ASCII
