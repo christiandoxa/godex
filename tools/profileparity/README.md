@@ -107,3 +107,24 @@ than assuming identical internal directory layouts. It rejects ambiguous or
 symlinked paths, operates only inside test-specific temporary roots, and never
 uses personal accounts. This does not certify recovery of inherited auth
 penalties across a process restart.
+
+### Exact Prodex 0.438.0 Linux socket exhaustion differential
+
+In addition to synthetic profile lifecycle and HTTP 401 reload checks,
+`profileparity` runs `gateway_fd_pressure_recovery` on Linux against the
+published SHA-pinned Prodex binary and the clean Go candidate. Each CLI uses
+its own synthetic managed ChatGPT credential and temporary HOME, an inherited
+`RLIMIT_NOFILE=80`, and a loopback-only HTTP upstream. The tool opens 120
+partial-header TCP connections, confirms the real child owns 80/80 file
+descriptors via `/proc/PID/fd`, then queues a fully formed GET while the
+listener has no descriptors. Neither gateway may exit or handle that GET
+before capacity returns. Closing the held connections must release exactly
+one queued GET and allow one new GET on the unchanged port. The upstream
+must observe exactly three model-list requests overall.
+
+The fixture allocates a short private temporary directory because the Rust
+product limits capability-secret path length; this does not weaken socket or
+credential checks. Every failure aborts the whole differential, and negative
+controls reject missing FD saturation, wrong counts, lost listener/queue, and
+unclean shutdown. Internal Rust socket-clone failure and native Windows/macOS
+behaviors are distinct from this Linux shared observable contract.

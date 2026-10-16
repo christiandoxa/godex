@@ -14,7 +14,7 @@ transfer 0.437.14 differential PASS claims to the new 0.438.0 target.
 | Surface | Status | Evidence / next proof |
 | --- | --- | --- |
 | Windows signed process exit and Unix cancellation | PARTIAL | A source-derived signed-i32 policy now detects Windows Ctrl-C NTSTATUS and real Unix SIGINT; original Go logic detected only exit 130. Tagged negative controls and native Linux child-signal tests PASS; Windows cross-compiled test binary, but Windows runtime execution has not been observed. |
-| Local proxy under accept and accepted-socket resource pressure | PARTIAL | Real isolated Linux `RLIMIT_NOFILE=96` subprocess exhausted file descriptors to EMFILE against the actual Godex proxy listener. HTTP request queued through real TCP during pressure succeeded exactly once after release, and next request succeeded on the same port; native Go `net/http.Server.Serve` supplies bounded temporary-accept retry. Go has no equivalent tiny_http accepted-socket clone step. `TestProdex04380ProxyListenerSurvivesActualEMFILEAndQueuedRequest` PASS; actual Prodex two-executable descriptor-pressure oracle and indefinite-exhaustion/shutdown proof remain open. |
+| Local proxy under accept and accepted-socket resource pressure | PARTIAL (Linux cross-binary recovery VERIFIED) | Actual official Prodex 0.438.0 and clean Godex gateway both reached RLIMIT_NOFILE=80 under 120 partially written TCP connections; each retained the original port, held a newly queued GET while saturated, served it exactly once after release, served a subsequent independent GET, and exited cleanly. The new source/SHA-pinned `profileparity` stage and mutation controls cover 3 exact upstream GETs. Go's stdlib has no Rust tiny_http accepted-clone step, so an isolated cross-executable clone-specific failure and native Windows/macOS behavior remain unverified. |
 | Official Codex 0.163.0 compatibility | PARTIAL | Official `rust-v0.163.0` asset metadata and SHA-256 verified; extracted binary `codex-cli 0.163.0` successfully completed real isolated app-server `initialize`, `thread/list` active and archived through the Godex protocol on Linux x86_64. `TestProdex04380OfficialCodex0163AppServerInitializeAndThreadList` PASS. `response.incomplete`, compaction, native retry/interrupt and Windows MCP environments still need separate executable evidence. |
 | 0.438.0 pinned release differential | VERIFIED (finite gate only) | All six independent binary harnesses use official 0.438.0 tagged source, manifest, binary version and SHA. On clean `c4cc8e0f` all four release phases PASS: preflight (including verified native Codex 0.163.0 app-server handshake, real EMFILE and shutdown), DeepSeek 22/22, Gemini 10/10, WebSocket 42 upstream attempts; negative controls retained, no reported material comparison differences. This is not a production-wide 1:1 certification. |
 | Three-profile quota/auth restart | PARTIAL | Prior Godex 0.437.14 synthetic and multi-process tests PASS. Independent two-executable multi-profile restart differential is still needed. |
@@ -58,8 +58,8 @@ do not qualify. The success path requires all these facts.
 
 This provides **verified real Linux accept-pressure recovery** on Godex.
 It does not certify the Rust accepted-socket-clone path (which Go does not
-use), nor an equivalent two-executable actual-descriptor-pressure fixture,
-Windows listener behavior or indefinitely persistent resource exhaustion.
+use), Windows listener behavior or indefinitely persistent resource exhaustion.
+The next checkpoint below adds the independent two-executable Linux fixture.
 
 ## Official Codex 0.163.0 native app-server handshake
 
@@ -112,8 +112,9 @@ The integration regression passed without any permanent process-local
 resource limit change. Combined with the queued-request recovery test, this
 locally verifies both the temporary EMFILE recovery and intentional shutdown
 paths on Linux. The separate Rust accepted-socket clone path is not present
-in Go's standard HTTP server; cross-executable physical pressure parity and
-Windows/macOS listener behavior remain outside this proof.
+in Go's standard HTTP server; an independent Linux two-executable fixture
+covers shared TCP recovery semantics, not the internal clone-failure phase
+or Windows/macOS listener behavior.
 
 ## Complete pinned finite synthetic gate — clean candidate c4cc8e0f
 
@@ -150,7 +151,39 @@ native Windows or macOS runtime execution.
 **Current overall parity status: PARTIAL.** The finite synthetic release
 oracle is verified, but full behavioral 1:1 parity still requires
 additional evidence for native Windows/macOS process and TUI behavior,
-actual two-executable descriptor-pressure scenarios, the separate native
+the Rust-specific accepted-stream-clone fault and the separate native
 0.163.0 compaction and incomplete-result error cases, and a complete
 live multi-profile OAuth/quota restart matrix. Never upgrade this finite
 fixture proof into a production-wide claim without executing those cases.
+
+## Independent official-Prodex and Godex Linux FD-pressure differential
+
+`tools/profileparity` now runs a **third startup scenario** named
+`gateway_fd_pressure_recovery` in addition to its managed-profile lifecycle
+and quota HTTP 401 reload cases. It verifies both source-pinned Linux
+executables with separately imported synthetic managed credentials, a
+loopback-only upstream, and shell-inherited `RLIMIT_NOFILE=80`. The harness:
+
+1. Issues one baseline `GET /backend-api/codex/models`, checking the exact
+   synthetic JSON response and authenticated upstream identity.
+2. Opens 120 incomplete TCP-header connections and directly inspects each
+   gateway subprocess's `/proc/PID/fd` to establish **80 of 80 FDs in use**.
+3. Confirms the gateway PID survives, and a separately connected complete
+   GET remains queued for at least 220 ms with zero premature upstream
+   dispatch or status response.
+4. Closes the partial sockets and requires the original queued GET to
+   complete exactly once, with a third fresh GET succeeding on the **same**
+   port. It then stops the process and validates the exact three-request
+   upstream count and clean child exit.
+
+The real HTTP pressure fixture passed against the SHA-verified Prodex 0.438.0
+binary and the matching Godex candidate, in separate synthetic homes.
+Mutation sentinels independently reject wrong request count, absence of
+actual FD saturation, listener loss, lost queued request, failed next
+connection, or failed shutdown. The fixture uses a short private temporary
+path because Prodex's own capability-secret store rejects excessively long
+runtime paths; it does not modify either product's real installation or
+user login. This closes the **shared Linux observable recovery** gap, but
+does not prove a separately forced accepted-socket clone failure in the Rust
+transport or runtime behavior on macOS/Windows. Full 1:1 parity remains
+PARTIAL until those and the other stated native cases are tested.

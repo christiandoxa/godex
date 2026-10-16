@@ -215,6 +215,11 @@ go test ./tools/differential \
   --prodex "$tmp/prodex" --godex "$tmp/godex" \
   --prodex-source "$tmp/prodex-source" \
   --godex-source "$root" --godex-commit "$(git rev-parse HEAD)"
+# Real Linux two-executable RLIMIT_NOFILE/queued TCP recovery is now an
+# additional profileparity stage; mutation sentinels must remain fail-closed.
+go test ./tools/profileparity \
+  -run '^TestProdex04380GatewayDescriptorPressureRequiresActualFDAndQueuedRecovery$' \
+  -count=1 -timeout=30s
 go test ./tools/profileparity -run '^TestProdex043714Startup' -count=1 -timeout=30s
 
 # CLI argument rejection oracle. This catches delivery paths that accidentally

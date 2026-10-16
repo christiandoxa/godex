@@ -105,6 +105,11 @@ func run() error {
 		return fmt.Errorf("startup probe parity failed closed: %w", err)
 	}
 	stages = append(stages, startupStages...)
+	pressureStages, err := checkGatewayFDPressure(work, options)
+	if err != nil {
+		return fmt.Errorf("real TCP gateway descriptor-pressure parity failed closed: %w", err)
+	}
+	stages = append(stages, pressureStages...)
 	encoded, err := json.MarshalIndent(resultReport{
 		Status: "PASS", CanonicalSource: canonicalProdexCommit,
 		CandidateSource: options.godexCommit, Steps: stages,
