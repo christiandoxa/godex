@@ -797,6 +797,13 @@ func runCodexShim(arguments []string) int {
 	requestBody := []byte(`{"model":"deepseek-v4-pro","input":[{"role":"user","content":[{"type":"input_text","text":"same request"}]}],"stream":false}`)
 	if os.Getenv("DIFFERENTIAL_PROVIDER") == "gemini" {
 		requestBody = []byte(`{"model":"gemini-3.1-pro-preview","input":[{"role":"user","content":[{"type":"input_text","text":"same request"}]}],"stream":false}`)
+		if os.Getenv("DIFFERENTIAL_GEMINI_INVALID_TOOL") == "1" {
+			requestBody = []byte(`{"model":"gemini-3.1-pro-preview","input":[{"role":"user","content":[{"type":"input_text","text":"same request"}]}],"stream":false,"tools":[{"type":"function","function":{"name":"synthetic_lookup","parameters":false}}]}`)
+		}
+		if os.Getenv("DIFFERENTIAL_GEMINI_INVALID_TOOL") == "2" {
+			requestBody = []byte(`{"model":"gemini-3.1-pro-preview","input":[{"role":"user","content":[{"type":"input_text","text":"same request"}]}],"stream":false,"tools":[{"type":"function","name":"synthetic_lookup"}]}`)
+		}
+
 		if os.Getenv("DIFFERENTIAL_GEMINI_MULTITURN") == "1" {
 			requestBody = []byte("{\"model\":\"gemini-3.1-pro-preview\",\"input\":[{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"same request\"}]},{\"type\":\"function_call\",\"call_id\":\"call-a\",\"name\":\"lookup\",\"arguments\":\"{}\"},{\"type\":\"function_call\",\"call_id\":\"call-b\",\"name\":\"lookup\",\"arguments\":\"{}\"},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"follow-up\"}]},{\"type\":\"function_call_output\",\"call_id\":\"call-b\",\"output\":\"second\"},{\"type\":\"function_call_output\",\"call_id\":\"call-a\",\"output\":\"first\"},{\"type\":\"function_call\",\"call_id\":\"call-orphan\",\"name\":\"lookup\",\"arguments\":\"{}\"}],\"stream\":false}")
 		}

@@ -170,7 +170,7 @@ func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit string
 	}
 	defer os.RemoveAll(root)
 	var results []geminiCaseResult
-	for _, scenario := range []string{"chat-request", "orphan-tool", "chat-response", "wrapped-response-no-trace", "wrapped-response-trace", "stream-native", "stream-chat", "multi-turn-tool", "quota-plain-429", "quota-structured-429"} {
+	for _, scenario := range []string{"chat-request", "orphan-tool", "chat-response", "wrapped-response-no-trace", "wrapped-response-trace", "stream-native", "stream-chat", "multi-turn-tool", "quota-plain-429", "quota-structured-429", "invalid-wrapped-tool-parameters", "invalid-flat-tool-parameters"} {
 		prodex, err := runGeminiProduct(root, scenario, "prodex", prodexBin)
 		if err != nil {
 			return fmt.Errorf("Prodex Gemini %s: %w", scenario, err)
@@ -246,6 +246,12 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	if geminiQuotaScenario043711(scenario) {
 		env = append(env, "GEMINI_API_KEYS="+rotationPrimaryKey+","+rotationSecondaryKey)
 	}
+	if scenario == "invalid-wrapped-tool-parameters" {
+		env = append(env, "DIFFERENTIAL_GEMINI_INVALID_TOOL=1")
+	}
+	if scenario == "invalid-flat-tool-parameters" {
+		env = append(env, "DIFFERENTIAL_GEMINI_INVALID_TOOL=2")
+	}
 	if scenario == "orphan-tool" {
 		env = append(env, "DIFFERENTIAL_GEMINI_TOOL=1")
 	}
@@ -262,7 +268,7 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	exitCode := 0
 	if err := cmd.Run(); err != nil {
 		var childExit *exec.ExitError
-		if !geminiQuotaScenario043711(scenario) ||
+		if !geminiQuotaScenario043711(scenario) && !geminiInvalidToolScenario04380(scenario) ||
 			!errors.As(err, &childExit) || ctx.Err() != nil {
 			return geminiCandidateResult{}, fmt.Errorf("child failed: %w stderr=%q upstream=%v",
 				err, redact(stderr.String()), mock.recorded())
@@ -298,6 +304,15 @@ func geminiCompare(scenario string, prodex, godex geminiCandidateResult) []strin
 	}
 	if geminiQuotaScenario043711(scenario) {
 		return geminiQuotaCompare043711(scenario, prodex, godex, differences)
+	}
+	if geminiInvalidToolScenario04380(scenario) {
+		if !geminiInvalidToolWireEqual04380(prodex.Client.Body, godex.Client.Body) {
+			differences = append(differences, "Gemini invalid-tool rejection error envelope or reason differs")
+		}
+		if len(prodex.Upstream) != 0 || len(godex.Upstream) != 0 {
+			differences = append(differences, "invalid Gemini tool was forwarded to provider")
+		}
+		return differences
 	}
 	if scenario == "stream-chat" {
 		left, leftErr := geminiChatSSEProjection043711(prodex.Client.Body)
@@ -345,6 +360,9 @@ func geminiSemanticEqual043711(left, right map[string]any) bool {
 }
 
 func geminiFixtureInvariant(scenario string, result geminiCandidateResult) error {
+	if geminiInvalidToolScenario04380(scenario) {
+		return geminiInvalidToolInvariant04380(scenario, result)
+	}
 	if geminiQuotaScenario043711(scenario) {
 		return geminiQuotaInvariant043711(scenario, result)
 	}
