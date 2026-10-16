@@ -1512,3 +1512,21 @@ asserts one attempt, the original 400 body, and the retained previous ID;
 context-dependent negative shape. A manual exact source/binary probe matched
 after the correction. This is VERIFIED for the bounded synthetic recovery
 boundary; live Codex compaction remains PARTIAL.
+
+## Complete five-phase gate on `6f4c544e`
+
+After the `response.incomplete` usage fix and the `compaction_trigger`
+recovery correction, all five independent release phases passed on the same
+clean Godex commit `6f4c544ec146e950c2ced9670d24c27d3a363458`, with remote
+`main` at that SHA:
+
+- `preflight-tests`: **PASS**, including the exact DeepSeek typed-role
+  terminal-error differential and the two new routing regressions;
+- `preflight-oracles`: **PASS**, 34 profile/startup/pressure/incomplete stages;
+- `deepseek`: **PASS**, 22/22 with no comparison differences;
+- `gemini`: **PASS**, 13/13 with no comparison differences;
+- `websocket`: **PASS**, 58 upstream attempts with no postcommit replay.
+
+`make verify` also passes on this commit. The gate is finite synthetic and
+loopback evidence; native OAuth, live quota/restart behavior, live Codex
+compaction, and native Windows/macOS execution remain PARTIAL.
