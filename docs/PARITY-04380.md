@@ -388,3 +388,48 @@ remains mandatory and passes without weakening its assertions. These are
 local Go behavioral tests; **cross-executable real native three-profile
 fallback equivalence** and every variant of provider-specific quota/compaction
 remain PARTIAL/OPEN until independently executed against both binaries.
+
+## Complete pinned 0.438.0 finite gate after failed-profile recovery fix
+
+On exact clean Godex source commit
+`83b8c987a7c1fe356bfcdf1c7704363ee54d16bb`, all mandatory independently
+pinned release phases exited successfully. Each independently rechecked the
+official Prodex 0.438.0 tagged source
+`8cab9794b0e08b2cb8507df8321a8e38ebd6492f`, public release manifest,
+Linux binary SHA-256
+`9ec1702c58983a8e3bd7f2e7f49c34a2d656f766fd535bbe34d08c94d436ac2a`,
+and the clean Godex candidate's embedded build revision:
+
+- `--phase=preflight-tests` **PASS**, including source-derived native A→B→C
+  exhausted-pool recovery with A last-resort ready fallback, model-aware
+  quota checks, cancellation/owner/credential/no-replay negative controls,
+  existing five-second transient backup recycling regressions and the actual
+  official Codex 0.163.0 app-server handshake fixture.
+- `--phase=preflight-oracles` **PASS**, Linux PTY, CLI argument/context and
+  **34/34 profileparity stages**, including the real two-executable FD
+  saturation test and six terminal-incomplete variants.
+- `--phase=deepseek` **PASS 22/22**, `comparison_differences: []`, negative
+  controls PASS.
+- `--phase=gemini` **PASS 10/10**, `comparison_differences: []`, negative
+  controls PASS.
+- `--phase=websocket` **PASS 50 upstream attempts**, including the four
+  adversarial status precedence streams, opaque continuation affinity and
+  strict no-postcommit-replay checks.
+
+`make verify` PASS on the production source at `83b8c987`; the source-level
+focused race regressions and cross-compilation of runtime test binaries for
+Windows AMD64 and Darwin ARM64 also PASS. Full
+`scripts/check-cross-build.sh` matrix PASS on the same exact clean source
+for Linux AMD64/ARM64, macOS AMD64/ARM64, Windows AMD64/ARM64 plus the
+Windows AMD64/macOS ARM64 test-compile matrix. Native execution on
+Windows/macOS was not performed.
+
+This verifies the bounded synthetic gate, **not** comprehensive parity in
+live user accounts or the physical native terminal on every platform.
+Native three-profile relaunch using authenticated quota after a real Prodex
+and Godex process remains **PARTIAL**: source-derived Go planner tests show
+correct candidate precedence, but the model-aware quota adapter may use a
+valid recent snapshot under its source-specific grace period; live credentials
+and model-specific quota transitions have not been matched across two
+independent native session executables. Never infer a production-wide 1:1
+certificate from the finite suite alone.
