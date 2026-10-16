@@ -96,6 +96,7 @@ func (launcher runSessionLauncher) recoverPersistedSessionThroughPoolLoop04360(
 		produced a fresh structured failure.
 	*/
 	triedThisRound := 0
+	allowFailedAfterWait := false
 	for {
 		if failureClass == "" || recoveryExitCancelled04360(failed) {
 			return failed
@@ -106,7 +107,10 @@ func (launcher runSessionLauncher) recoverPersistedSessionThroughPoolLoop04360(
 		if !goalAllowsRecovery04360(ctx, report.CodexHome, report.ID) {
 			return failed
 		}
-		candidate, ok := launcher.recoveryCandidateExcluding04360(ctx, report, attempted)
+		candidate, ok := launcher.recoveryCandidateWithQuotaProof04380(ctx, report, attempted, allowFailedAfterWait)
+		if !ok && allowFailedAfterWait {
+			candidate, ok = launcher.recoveryFailedProfileAfterRound04380(ctx, report, attempted)
+		}
 		if !ok || triedThisRound >= maxVerifiedRecoveryProfiles04360 {
 			// Do not wait forever without a single qualified backup.
 			// A completed quota-limit or auth error does not recycle.
@@ -125,11 +129,12 @@ func (launcher runSessionLauncher) recoverPersistedSessionThroughPoolLoop04360(
 				}
 				return failed
 			}
-			attempted = map[string]bool{
-				report.AccountID:         true,
-				report.UpstreamAccountID: true,
-			}
+			// Start the next round with fresh quota evidence, then allow the
+			// originally failed profile only after eligible candidates. The
+			// old failure itself does not count as this new round's attempt.
+			attempted = map[string]bool{}
 			triedThisRound = 0
+			allowFailedAfterWait = true
 			continue
 		}
 		// A new verified checkpoint is mandatory before every subsequent

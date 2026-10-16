@@ -95,6 +95,13 @@ func (launcher runSessionLauncher) recoveryCandidate04360(
 func (launcher runSessionLauncher) recoveryCandidateExcluding04360(
 	ctx context.Context, report sessionmodel.Report, attempted map[string]bool,
 ) (profilemodel.LaunchTarget, bool) {
+	return launcher.recoveryCandidateWithQuotaProof04380(ctx, report, attempted, false)
+}
+
+func (launcher runSessionLauncher) recoveryCandidateWithQuotaProof04380(
+	ctx context.Context, report sessionmodel.Report, attempted map[string]bool,
+	requireReady bool,
+) (profilemodel.LaunchTarget, bool) {
 	source, ok := launcher.profiles.(recoveryProfileSource04360)
 	if !ok {
 		return profilemodel.LaunchTarget{}, false
@@ -122,6 +129,13 @@ func (launcher runSessionLauncher) recoveryCandidateExcluding04360(
 		}
 		if target.AccountID == home.AccountID && target.Provider == "openai" &&
 			strings.EqualFold(strings.TrimSpace(target.Auth), "chatgpt") {
+			// After a transient pool retry, tagged 0.438.0 requires a fresh
+			// ready candidate rather than blindly relaunching an exhausted
+			// backup. A missing quota adapter cannot authorize any replay.
+			if requireReady && launcher.runner != nil && launcher.runner.RecoveryQuotaPreflightConfigured() &&
+				!launcher.recoveryQuotaReady04380(ctx, home.AccountID, report.LastModel) {
+				continue
+			}
 			return target, true
 		}
 	}

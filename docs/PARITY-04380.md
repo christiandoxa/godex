@@ -18,6 +18,7 @@ transfer 0.437.14 differential PASS claims to the new 0.438.0 target.
 | Official Codex 0.163.0 compatibility | PARTIAL | Official `rust-v0.163.0` asset metadata and SHA-256 verified; extracted binary `codex-cli 0.163.0` successfully completed real isolated app-server `initialize`, `thread/list` active and archived through the Godex protocol on Linux x86_64. `TestProdex04380OfficialCodex0163AppServerInitializeAndThreadList` PASS. `response.incomplete`, compaction, native retry/interrupt and Windows MCP environments still need separate executable evidence. |
 | 0.438.0 pinned release differential | VERIFIED (finite gate only) | Clean Godex `b0d0dc7f`: independently source/SHA-pinned `--phase=preflight-tests` and `--phase=preflight-oracles` both PASS (full preflight, including official Codex 0.163.0 handshake and 34/34 profile cases). DeepSeek 22/22, Gemini 10/10, WebSocket **50 upstream attempts** including status-field wire precedence PASS, negative controls retained; zero reported semantic differences. Six-target cross-build/test compilation PASS. Not a production-wide 1:1 certification. |
 | WebSocket terminal-frame Mojo classification | VERIFIED for tested status-wire cases; PARTIAL overall | Source-derived regressions reproduced actual Godex mismatches in `status`/`status_code` precedence, strict u16 bounds and nested/top-level connection-limit matching. Fixed in `4aac2592`; real pinned Prodex/Godex `--websocket` comparison confirms continuation after invalid/fractional/overflow primary status and **terminal error** for valid `65535` (one upstream attempt per mode; total 50). Status-frame mutation tests PASS. Broader native connection-limit and every future JSON field permutation remain open. |
+| Usage-limit native session candidate fallback after transient pool retry | PARTIAL | Tagged 0.438.0 compiled Mojo `usage_limit_recovery_candidate` allows the originally failed profile as the **last** candidate only after a transient wait and verified eligibility/quota. Godex formerly always excluded the original owner and could relaunch a previously exhausted backup. `TestProdex04380SessionRecoveryFailedProfileFallbackAfterPoolRetry` reproduced these failures and now passes with three profiles, model-aware ready claims, backup precedence, cancellation, owner/credential negative controls and prompt-no-replay. Legacy no-quota adapter backup retries remain unchanged. Independent exact-binary three-profile session recovery differential still OPEN. |
 | Three-profile quota/auth restart | PARTIAL | Prior Godex 0.437.14 synthetic and multi-process tests PASS. Independent two-executable multi-profile restart differential is still needed. |
 
 **Status is PARTIAL, not certified 1:1 production parity.** Only a fully
@@ -350,3 +351,40 @@ six-platform `scripts/check-cross-build.sh` matrix also PASS on `b0d0dc7f`.
 The split preflight partitions are mandatory together, never substitutes
 for each other. Full production behavioral parity remains **PARTIAL** for
 native platform, live OAuth and compaction differences outside these tests.
+
+## Native failed-profile fallback after a completed retry round
+
+Source derived from tagged Prodex 0.438.0
+`crates/prodex-app/src/app_commands/runtime_launch/usage_limit_recovery/plan.rs`,
+`run_command_strategy.rs` and compiled Mojo
+`prodex_launch_usage_limit_recovery_candidate_v1`. The bounded policy first
+chooses an unattempted, authenticated/eligible, quota-ready backup. Only if no
+backup qualifies and `allow_failed_profile` is enabled **after a successful
+transient pool wait**, the original failed profile may become the last-choice
+candidate, provided its own eligible authenticated identity is intact and
+its quota is ready (or the user explicitly opted out of quota checks).
+
+Godex previously permanently excluded original A after it failed, even after
+B and C were attempted and a new quota observation found only A ready. It
+also could retry a backup previously exhausted in the next round without
+checking readiness. The new recovery planner preserves the old one-round
+backup selection, marks the fallback gate only after a successful five-second
+transient retry wait, re-evaluates verified candidate readiness for the
+requested session model and attempts A only as the **last** authenticated
+quota-ready candidate. A previously committed prompt/tool result is never
+replayed; the original session affinity is released only immediately before
+a newly verified relaunch checkpoint. Missing quota adapters retain legacy
+backup-only transient retry, **never** an unverified A fallback. A rejected
+quota observation, disabled/unknown account, non-ChatGPT credential, foreign
+upstream owner, attempted profile or cancelled context cannot release A.
+
+`TestProdex04380SessionRecoveryFailedProfileFallbackAfterPoolRetry`,
+`TestProdex04380FailedProfileFallbackRequiresExactOwnerAndFreshEligibility`
+and `TestProdex04380NativeRecoveryRequiresModelSpecificQuotaEvidence`
+include fail-before witnesses, explicitly source-provided candidate order,
+model-specific Responses route eligibility, local negative controls and
+cancellation. Existing `TestProdex04360TransientPoolRecyclesOnlyWithFreshEvidence`
+remains mandatory and passes without weakening its assertions. These are
+local Go behavioral tests; **cross-executable real native three-profile
+fallback equivalence** and every variant of provider-specific quota/compaction
+remain PARTIAL/OPEN until independently executed against both binaries.

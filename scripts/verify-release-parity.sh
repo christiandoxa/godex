@@ -94,6 +94,15 @@ if [ -n "${GODEX_TEST_CODEX_0163_APP_SERVER_BIN:-}" ]; then
     -count=1 -timeout=40s
 fi
 
+# Prodex 0.438.0 can select a previously failed authenticated profile
+# only after an exhausted transient pool and a successful bounded retry
+# wait, preserving eligible backup order and model-specific quota checks.
+# Cancellation, absent quota evidence, foreign owner and any original prompt
+# replay must not become a new session launch.
+go test -race ./internal/delivery/cli/runtime ./internal/usecase/runtime \
+  -run '^TestProdex04380(SessionRecoveryFailedProfileFallback|FailedProfileFallbackRequires|NativeRecoveryRequiresModelSpecificQuota)' \
+  -count=1 -timeout=65s
+
 # Prodex 0.438.0: no recovery on native Unix SIGINT or Windows
 # signed NTSTATUS CONTROL_C_EXIT. Keep the existing 130 policy too.
 go test ./internal/delivery/cli/runtime -run '^TestProdex04380' -count=1 -timeout=45s
