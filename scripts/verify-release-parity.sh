@@ -94,6 +94,13 @@ if [ -n "${GODEX_TEST_CODEX_0163_APP_SERVER_BIN:-}" ]; then
     -count=1 -timeout=40s
 fi
 
+# Tagged rich_catalog.mojo retires only three exact OpenAI models with an
+# ASCII-case-only comparison after Unicode trim. A Unicode Kelvin `K` must
+# never become ASCII k and falsely hide a distinct catalog model ID.
+go test -race ./internal/usecase/ping \
+  -run '^TestProdex04380(RetiredOpenAIModelOnlyFoldsASCII|ModelPickerRetainsNonASCIILookalikesButHidesRetired)$' \
+  -count=1 -timeout=35s
+
 # Prodex 0.438.0 clap rejects Super --api-key without --provider as a
 # usage error (exit 2), not a runtime error (exit 1). Keep both normal and
 # `s` alias paths inside the source-pinned executable CLI differential.

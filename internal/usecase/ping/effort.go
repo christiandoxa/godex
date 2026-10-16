@@ -241,13 +241,14 @@ func rawEfforts(values map[string]json.RawMessage) []string {
 	return result
 }
 
+// Prodex 0.438.0 rich_catalog.mojo trims Unicode whitespace but only folds
+// ASCII A-Z for the three retired OpenAI model IDs. strings.ToLower would
+// incorrectly turn Unicode Kelvin K into ASCII k and hide a distinct model.
 func pingRetiredModel(model string) bool {
-	switch strings.ToLower(strings.TrimSpace(model)) {
-	case "spark", "gpt-5.3-codex-spark", "gpt-5.3-spark":
-		return true
-	default:
-		return false
-	}
+	trimmed := strings.TrimSpace(model)
+	return asciiEqualFold(trimmed, "spark") ||
+		asciiEqualFold(trimmed, "gpt-5.3-codex-spark") ||
+		asciiEqualFold(trimmed, "gpt-5.3-spark")
 }
 
 func asciiEqualFold(left, right string) bool {
