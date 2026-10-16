@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -141,6 +142,10 @@ func waitForSessionChild(ctx context.Context, command *exec.Cmd, privateProcessG
 		}
 		return err
 	case <-ctx.Done():
+		cause := context.Cause(ctx)
+		if !privateProcessGroup && cause != nil && cause.Error() == os.Interrupt.String()+" signal received" {
+			return waitForInteractiveSessionChild(ctx, command, done)
+		}
 		interruptCodexSessionChildProcess(command, privateProcessGroup)
 		timer := time.NewTimer(2 * time.Second)
 		defer timer.Stop()
@@ -150,6 +155,36 @@ func waitForSessionChild(ctx context.Context, command *exec.Cmd, privateProcessG
 			return ctx.Err()
 		case <-timer.C:
 			terminateCodexSessionChildProcess(command, privateProcessGroup)
+			<-done
+			return ctx.Err()
+		}
+	}
+}
+
+// An interactive Codex process owns the first SIGINT. The parent context is
+// already canceled by signal.NotifyContext, so only a later signal reaches
+// this guard and requests launcher teardown.
+func waitForInteractiveSessionChild(ctx context.Context, command *exec.Cmd, done <-chan error) error {
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(signals)
+	select {
+	case <-done:
+		return ctx.Err()
+	case <-signals:
+		select {
+		case <-done:
+			return ctx.Err()
+		default:
+		}
+		interruptCodexSessionChildProcess(command, false)
+		timer := time.NewTimer(2 * time.Second)
+		defer timer.Stop()
+		select {
+		case <-done:
+			return ctx.Err()
+		case <-timer.C:
+			terminateCodexSessionChildProcess(command, false)
 			<-done
 			return ctx.Err()
 		}

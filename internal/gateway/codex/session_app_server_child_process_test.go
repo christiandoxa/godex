@@ -3,11 +3,13 @@
 package codex
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -16,6 +18,58 @@ import (
 	"testing"
 	"time"
 )
+
+func TestWaitForSessionChildPreservesInteractiveChildAfterSIGINT(t *testing.T) {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reader.Close()
+	defer writer.Close()
+	marker := filepath.Join(t.TempDir(), "handled")
+	command := exec.Command(os.Args[0], "-test.run=^TestCodexSignalChildHelper$", "--")
+	command.Env = append(os.Environ(), codexSignalHelperEnv+"=1", codexSignalMarkerEnv+"="+marker)
+	command.Stdout = writer
+	command.Stderr = io.Discard
+	if err := command.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_ = command.Process.Kill()
+		_ = command.Wait()
+	}()
+
+	output := bufio.NewReader(reader)
+	ready, err := output.ReadString('\n')
+	if err != nil || ready != "ready "+strconv.Itoa(command.Process.Pid)+"\n" {
+		t.Fatalf("child readiness = %q, err=%v", ready, err)
+	}
+	finished := make(chan error, 1)
+	go func() { finished <- waitForSessionChild(ctx, command, false) }()
+	if err := syscall.Kill(os.Getpid(), syscall.SIGINT); err != nil {
+		t.Fatalf("send parent SIGINT: %v", err)
+	}
+	select {
+	case err := <-finished:
+		t.Fatalf("interactive child stopped after parent SIGINT: %v", err)
+	case <-time.After(100 * time.Millisecond):
+	}
+	if err := command.Process.Signal(os.Interrupt); err != nil {
+		t.Fatalf("send child SIGINT: %v", err)
+	}
+	if received, err := output.ReadString('\n'); err != nil || received != "received\n" {
+		t.Fatalf("child interrupt acknowledgement = %q, err=%v", received, err)
+	}
+	if err := syscall.Kill(os.Getpid(), syscall.SIGINT); err != nil {
+		t.Fatalf("send parent follow-up SIGINT: %v", err)
+	}
+	if err := <-finished; !errors.Is(err, context.Canceled) {
+		t.Fatalf("wait error = %v, want context canceled", err)
+	}
+}
 
 func TestRunThroughProxyWithSessionServerCancellationReapsForegroundTree(t *testing.T) {
 	root := t.TempDir()
