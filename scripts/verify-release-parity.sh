@@ -115,6 +115,13 @@ go test ./internal/delivery/cli/runtime \
 # zero/signed values, rounds fractional millis, and caps at five minutes.
 go test ./internal/usecase/routing -run '^TestProdex043714RetryAfter' -count=1 -timeout=30s
 
+# Native Codex 0.163.0 response.incomplete is an incomplete model result,
+# not a 429, fake completion, or entitlement to replay. Preserve all wire
+# fields and SSE ordering for both buffered and streaming responses.
+go test ./internal/delivery/http/proxy \
+  -run '^TestProdex04380NativeResponseIncompletePreservesReasonAndUsageWithoutRotation$' \
+  -count=1 -timeout=35s
+
 # Prodex 0.438.0 loopback proxy listener survives real Linux RLIMIT_NOFILE
 # exhaustion and handles a queued request exactly once after FD release.
 # Go's standard net/http accept loop has bounded retry; do not copy tiny_http.

@@ -81,3 +81,20 @@ the optional release-gate check. The ordinary release gate does not download
 or replace the user's Codex executable. This is VERIFIED for the narrow native
 app-server handshake on Linux x86_64 only; the other native Codex 0.163.0
 changes documented by Prodex remain PARTIAL/OPEN pending targeted tests.
+
+## Codex 0.163.0 incomplete-response wire checkpoint
+
+`TestProdex04380NativeResponseIncompletePreservesReasonAndUsageWithoutRotation`
+exercises Godex's real HTTP forwarding stack with a mock upstream returning a
+native Responses result with `status: incomplete`. The buffered and streamed
+SSE variants contain a nonstandard future field, an opaque incomplete reason
+subfield, a stable upstream response ID and nested token usage details. Both
+forms returned the exact original body/framing and content type with HTTP 200.
+Two consecutive client requests generated **exactly two** upstream calls,
+without a hidden retry, quota classification or credential rotation.
+
+This is local deterministic HTTP evidence for 0.163.0 native passthrough and
+no-replay; it is **not** a live Codex inference run or an independent two-
+executable source-pinned incomplete-response differential. Other foreground/
+background Responses-v2 compaction and native interruption features remain
+open pending scenario-specific proof.
