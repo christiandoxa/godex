@@ -46,7 +46,7 @@ func TestProdex04380GeminiNativeRawBoundaryPrecedesInvalidRowFiltering(t *testin
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := geminiShapePlainContents04380(tc.original)
+			got := geminiEnforceContentRoleShape04380(tc.original)
 			if !reflect.DeepEqual(got, tc.want) {
 				t.Fatalf("tagged source raw-boundary policy diverged: got=%+v want=%+v", got, tc.want)
 			}

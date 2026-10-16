@@ -17,11 +17,11 @@ func TestProdex04380GeminiNativeMissingToolResultDoesNotExecuteOrInventSuccess(t
 		t.Fatal(err)
 	}
 	contents, ok := payload["contents"].([]any)
-	if !ok || len(contents) != 2 {
+	if !ok || len(contents) != 3 {
 		t.Fatalf("missing result was not inserted after single model call: %+v", payload)
 	}
-	first := contents[0].(map[string]any)
-	last := contents[1].(map[string]any)
+	first := contents[1].(map[string]any)
+	last := contents[2].(map[string]any)
 	call := first["parts"].([]any)[0].(map[string]any)["functionCall"].(map[string]any)
 	missing := last["parts"].([]any)[0].(map[string]any)["functionResponse"].(map[string]any)
 	if first["role"] != "model" || last["role"] != "user" || call["name"] != "lookup" ||
@@ -40,11 +40,11 @@ func TestProdex04380GeminiNativeOrphanResultReceivesSyntheticNonExecutingCall(t 
 		t.Fatal(err)
 	}
 	contents, ok := payload["contents"].([]any)
-	if !ok || len(contents) != 2 {
+	if !ok || len(contents) != 3 {
 		t.Fatalf("unanswered native tool result was not repaired: %+v", payload)
 	}
-	synthesized := contents[0].(map[string]any)
-	user := contents[1].(map[string]any)
+	synthesized := contents[1].(map[string]any)
+	user := contents[2].(map[string]any)
 	callPart := synthesized["parts"].([]any)[0].(map[string]any)
 	call := callPart["functionCall"].(map[string]any)
 	result := user["parts"].([]any)[0].(map[string]any)["functionResponse"].(map[string]any)
@@ -69,11 +69,11 @@ func TestProdex04380GeminiNativeMatchedToolPairDoesNotGetSyntheticDuplicate(t *t
 		t.Fatal(err)
 	}
 	contents, ok := payload["contents"].([]any)
-	if !ok || len(contents) != 2 {
+	if !ok || len(contents) != 3 {
 		t.Fatalf("matched native tool pairing was duplicated: %+v", payload)
 	}
-	model := contents[0].(map[string]any)
-	user := contents[1].(map[string]any)
+	model := contents[1].(map[string]any)
+	user := contents[2].(map[string]any)
 	if len(model["parts"].([]any)) != 1 || len(user["parts"].([]any)) != 1 {
 		t.Fatalf("paired native tool call or response was duplicated: %+v", contents)
 	}
@@ -93,11 +93,11 @@ func TestProdex04380GeminiNativeReordersReversedToolResultsWithoutChangingIDs(t 
 		t.Fatal(err)
 	}
 	contents, ok := body["contents"].([]any)
-	if !ok || len(contents) != 2 {
+	if !ok || len(contents) != 3 {
 		t.Fatalf("reversed native tool results distorted contents: %+v", body)
 	}
-	model := contents[0].(map[string]any)
-	user := contents[1].(map[string]any)
+	model := contents[1].(map[string]any)
+	user := contents[2].(map[string]any)
 	modelParts := model["parts"].([]any)
 	responses := user["parts"].([]any)
 	if len(modelParts) != 2 || len(responses) != 2 || model["role"] != "model" || user["role"] != "user" {

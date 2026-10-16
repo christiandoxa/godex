@@ -57,7 +57,7 @@ func TestGemini04371RequestPreservesHistoryAndMedia(t *testing.T) {
 		]
 	}`, "gemini-2.5-pro")
 	contents := value["contents"].([]any)
-	if len(contents) != 4 {
+	if len(contents) != 3 {
 		t.Fatalf("contents = %#v", contents)
 	}
 	parts := contents[0].(map[string]any)["parts"].([]any)
@@ -71,6 +71,10 @@ func TestGemini04371RequestPreservesHistoryAndMedia(t *testing.T) {
 	response := contents[2].(map[string]any)["parts"].([]any)[0].(map[string]any)["functionResponse"].(map[string]any)
 	if response["name"] != "lookup" || response["id"] != "call_1" {
 		t.Fatalf("function response = %#v", response)
+	}
+	userParts := contents[2].(map[string]any)["parts"].([]any)
+	if len(userParts) != 2 || userParts[1].(map[string]any)["text"] != "continue" {
+		t.Fatalf("coalesced user text was lost or reordered: %#v", userParts)
 	}
 }
 

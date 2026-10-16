@@ -56,8 +56,15 @@ func TestGeminiResponsesRequestHardensFirstUnsignedGemini3ToolCall(t *testing.T)
 		t.Fatal(err)
 	}
 	contents := native["contents"].([]any)
-	first := contents[0].(map[string]any)["parts"].([]any)[0].(map[string]any)
-	second := contents[1].(map[string]any)["parts"].([]any)[0].(map[string]any)
+	if len(contents) != 3 || contents[1].(map[string]any)["role"] != "model" {
+		t.Fatalf("compound tool history did not coalesce: %#v", contents)
+	}
+	parts := contents[1].(map[string]any)["parts"].([]any)
+	if len(parts) != 2 {
+		t.Fatalf("coalescing lost or duplicated a tool call: %#v", parts)
+	}
+	first := parts[0].(map[string]any)
+	second := parts[1].(map[string]any)
 	if first["thoughtSignature"] != "skip_thought_signature_validator" {
 		t.Fatalf("unsigned Gemini 3 tool call = %#v", first)
 	}
@@ -65,8 +72,10 @@ func TestGeminiResponsesRequestHardensFirstUnsignedGemini3ToolCall(t *testing.T)
 	if call["thoughtSignature"] != "sig" {
 		t.Fatalf("signed Gemini 3 tool call = %#v", second)
 	}
-	if second["thoughtSignature"] != "skip_thought_signature_validator" {
-		t.Fatalf("Gemini part signature must be present even when functionCall has a nested signature = %#v", second)
+	// Tagged signature hardening runs after coalescing and injects only the
+	// first functionCall part in each model row; nested signatures survive.
+	if _, exists := second["thoughtSignature"]; exists {
+		t.Fatalf("coalesced second call gained an extra part signature = %#v", second)
 	}
 }
 
@@ -83,7 +92,10 @@ func TestGeminiResponsesRequestDoesNotHardenGemini25ToolCalls(t *testing.T) {
 	if err := json.Unmarshal(translated.body, &native); err != nil {
 		t.Fatal(err)
 	}
-	part := native["contents"].([]any)[0].(map[string]any)["parts"].([]any)[0].(map[string]any)
+	part := native["contents"].([]any)[1].(map[string]any)["parts"].([]any)[0].(map[string]any)
+	if part["functionCall"].(map[string]any)["id"] != "unsigned" {
+		t.Fatalf("expected original Gemini 2.5 call, got %#v", part)
+	}
 	if _, exists := part["thoughtSignature"]; exists {
 		t.Fatalf("Gemini 2.5 tool call was hardened = %#v", part)
 	}

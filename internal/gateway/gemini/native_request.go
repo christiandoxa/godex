@@ -131,7 +131,7 @@ func geminiGenerateContentRequest(chat, original map[string]any) (map[string]any
 		result["systemInstruction"] = map[string]any{"parts": []any{map[string]any{"text": geminiJoinSystemParts(systemParts)}}}
 	}
 	if len(contents) > 0 {
-		result["contents"] = geminiShapePlainContents04380(contents)
+		result["contents"] = geminiHardenContents04380(contents)
 	}
 
 	tools := geminiNativeBuiltinTools(original["tools"])

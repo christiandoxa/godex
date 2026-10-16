@@ -57,7 +57,7 @@ func TestProdex04380GeminiNativePlainRoleHardenerPreservesFirstMetadataAndParts(
 		map[string]any{"role": "model", "parts": []any{map[string]any{"text": "answer"}}},
 		map[string]any{"role": "user", "parts": []any{map[string]any{"text": "Please continue."}}},
 	}
-	shaped := geminiShapePlainContents04380(original)
+	shaped := geminiEnforceContentRoleShape04380(original)
 	if !reflect.DeepEqual(shaped, expected) {
 		t.Fatalf("native plain role hardening lost first metadata or part order: %+v", shaped)
 	}
@@ -67,22 +67,27 @@ func TestProdex04380GeminiNativePlainRoleHardenerPreservesFirstMetadataAndParts(
 	}
 }
 
-func TestProdex04380GeminiNativeToolPairingCannotBeSilentlyChangedByPartialHardening(t *testing.T) {
+func TestProdex04380GeminiNativeToolPairingCoalescesFollowingUserText(t *testing.T) {
 	original := []any{
 		map[string]any{"role": "model", "parts": []any{map[string]any{"functionCall": map[string]any{"name": "lookup", "id": "call-1"}}}},
 		map[string]any{"role": "user", "parts": []any{map[string]any{"functionResponse": map[string]any{"name": "lookup", "id": "call-1"}}}},
 		map[string]any{"role": "user", "parts": []any{map[string]any{"text": "following user text"}}},
 	}
-	// The 0.438.0 provider has separate Mojo operations for tool pairing
-	// and response ordering. Until their exact public native fixture is
-	// qualified, keep the established transport-level tool sequence intact.
-	if got := geminiShapePlainContents04380(original); !reflect.DeepEqual(got, original) {
-		t.Fatalf("partial role hardening rewrote tool-call/result ordering: %+v", got)
+	expected := []any{
+		map[string]any{"role": "user", "parts": []any{map[string]any{"text": "[Continuing from previous Codex context.]"}}},
+		original[0],
+		map[string]any{"role": "user", "parts": []any{
+			map[string]any{"functionResponse": map[string]any{"name": "lookup", "id": "call-1"}},
+			map[string]any{"text": "following user text"},
+		}},
+	}
+	if got := geminiHardenContents04380(original); !reflect.DeepEqual(got, expected) {
+		t.Fatalf("native hardening changed paired identity or user text: %+v", got)
 	}
 }
 
 func TestProdex04380GeminiNativeEmptyPlainContentsStayEmpty(t *testing.T) {
-	if actual := geminiShapePlainContents04380(nil); len(actual) != 0 {
+	if actual := geminiHardenContents04380(nil); len(actual) != 0 {
 		t.Fatalf("empty native Gemini transcript invented a turn: %+v", actual)
 	}
 }

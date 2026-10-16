@@ -20,6 +20,7 @@ transfer 0.437.14 differential PASS claims to the new 0.438.0 target.
 | Copilot logged-in candidate input bounds | VERIFIED for local source-derived import fixture | Tagged 0.438.0 `prodex_profile_export_copilot_candidate_users_v1` and Rust adapter cap raw `(host, login)` views at 256 including one preferred last user, **before deduplication**. Godex formerly accepted 257 duplicates and reached account HTTP; failing synthetic loopback tests now PASS after bounding `Source.Load`, with exact-pair priority/dedup preserved. Real multi-user Copilot/keychain import remains PARTIAL. |
 | OpenAI retired-model catalog filter | VERIFIED for tagged predicate / local cache | Prodex 0.438.0 `catalog_openai_model_is_retired` trims Unicode whitespace then performs ASCII-only case-insensitive exact matches for `spark`, `gpt-5.3-codex-spark`, `gpt-5.3-spark`. Go previously used Unicode `strings.ToLower`, which incorrectly retired lookalikes such as `sparK`. Failing source-derived negative tests and a real synthetic `models_cache.json` picker regression now PASS using `asciiEqualFold` after `TrimSpace`; interactive PTY model-picker screenshot not yet directly compared. |
 | Gemini Chat-compatible null `functionCall` output | VERIFIED for one exact synthetic wire fixture | Tagged Rust source has two distinct buffered entry points with different text policies. Direct two-executable Prodex 0.438.0/Godex candidate `83fa59d5` comparison established the *public* Chat-compatible path keeps adjacent text and emits deterministic fallback `call_1` for `functionCall:null`. The separate internal buffering helper suppresses text. Focused Go tests failed before correction; full pinned Gemini differential **PASS 13/13**, zero diffs, mutation sentinels; broader function-call permutations remain PARTIAL. |
+| Native Gemini compound tool-history pipeline | VERIFIED for 14 compiled-source synthetic cases; native OAuth executable proof remains PARTIAL | The complete tagged order **0/1/2/4/3** now coalesces repeated model/user rows before ID-and-name pairing, stable ID ordering and role shaping. Every case failed before the fix and now matches outputs executed by the Mojo kernel archived from the canonical source commit. Fixtures preserve signatures, first-row metadata, existing errors, null-key presence and duplicate-ID order; missing results remain explicit errors. All five missing-pass negative controls fail closed. Regeneration is credential-free via `tools/gemini-content-oracle.py`; it is not a two-executable OAuth test. |
 | Gemini API-key invalid function-tool validation | VERIFIED for tagged malformed cases; PARTIAL for all tools | Full 0.438.0 tagged two-executable Gemini differential extended from 10 to **12** cases. Prodex rejects flat/wrapped invalid `tools[0].function.parameters` locally with HTTP 400, exit 2, indexed `invalid_request_error` JSON and zero upstream attempts; Godex initially forwarded the requests (false 200), then retried local 400s as transient, then emitted plaintext. Corrected adapter, Router and HTTP error shaping in local checkpoints. Clean exact-source/binary-pinned 12/12 differential PASS, `comparison_differences: []`; broader schema permutations remain untested. |
 | WebSocket terminal-frame Mojo classification | VERIFIED for tested status-wire cases; PARTIAL overall | Source-derived regressions reproduced actual Godex mismatches in `status`/`status_code` precedence, strict u16 bounds and nested/top-level connection-limit matching. Fixed in `4aac2592`; real pinned Prodex/Godex `--websocket` comparison confirms continuation after invalid/fractional/overflow primary status and **terminal error** for valid `65535` (one upstream attempt per mode; total 50). Status-frame mutation tests PASS. A newer **clean, exact-tagged two-binary** differential on `ab219e07` additionally verified top-level and nested connection-limit precommit recovery on a fresh WebSocket: one same-owner retry per case, neither precommit error leaks, total **58** upstream attempts. Persistent limits and already-retried budgets are bounded in in-process TCP tests, with no postcommit replay; broader future field permutations remain OPEN. |
 | Usage-limit native session candidate fallback after transient pool retry | PARTIAL | Tagged 0.438.0 compiled Mojo `usage_limit_recovery_candidate` allows the originally failed profile as the **last** candidate only after a transient wait and verified eligibility/quota. Godex formerly always excluded the original owner and could relaunch a previously exhausted backup. `TestProdex04380SessionRecoveryFailedProfileFallbackAfterPoolRetry` reproduced these failures and now passes with three profiles, model-aware ready claims, backup precedence, cancellation, owner/credential negative controls and prompt-no-replay. Legacy no-quota adapter backup retries remain unchanged. Independent exact-binary three-profile session recovery differential still OPEN. |
@@ -1182,3 +1183,61 @@ coalescing plus operation-4 order, live OAuth/multi-profile quota and relaunch,
 actual Codex foreground/background compaction, macOS/Windows process/TUI
 execution and isolated Rust accepted-socket clone pressure remain outside
 the demonstrated two-executable coverage.
+
+
+## Native Gemini compound history — compiled 0.438.0 source oracle
+
+This checkpoint supersedes the earlier same-role tool-history bypass. The
+canonical source `crates/prodex-provider-core/src/gemini_bridge/hardening/contents.rs`
+requires `Coalesce`, `PairToolCalls`, `RepairOrphanToolResponses`,
+`RefineToolResponseOrder`, then `EnforceContentRoleShape`. The corresponding
+`mojo/prodex_core/gemini_content_hardening.mojo` operations are **0/1/2/4/3**.
+
+`python3 tools/gemini-content-oracle.py /path/to/prodex-git-repository` archives
+only that pinned commit's Mojo sources, compiles its actual kernel as a shared
+library, and executes both measured and writing ABI calls for all five passes.
+The reference checkout's current HEAD is never used. Mojo 1.1.0 (8189361e)
+produced 14 golden cases in `internal/gateway/gemini/testdata/native_compound_04380.json`.
+Removing any of the five passes is detected by at least one fixture; all five
+negative controls PASS. No credentials, tools or provider requests are involved.
+
+`go test ./internal/gateway/gemini -run '^TestProdex04380GeminiNativeCompoundHistoryMatchesCompiledSource$' -count=1`
+failed in **14/14** subtests before the fix. The complete pipeline now matches
+all 14 outputs, leaves caller-owned history untouched and remains idempotent.
+Coverage includes consecutive model rows, consecutive user responses, reversed
+results, duplicate calls/results, equal IDs with different names, missing and
+orphan results, `functionCall:null`/`functionResponse:null`, invalid rows,
+custom roles, and mixed calls/results/text/media. Exact equality checks retained
+metadata, arguments, thought signatures and existing error payloads.
+
+The gateway applies final role shaping after repair: model-led histories get
+the tagged leading context prompt, and synthesized missing-result user rows
+already satisfy the final boundary. They do not gain an extra `Please continue.`
+or model turn. Signature hardening still runs afterward and injects only the
+first function-call part in a coalesced Gemini 3 model row; existing nested
+signatures survive. Earlier tests were updated to assert those exact tagged
+boundaries and retained following-user text, rather than obsolete row indices.
+
+Production ownership remains in `internal/gateway/gemini`; no shared helper,
+new dependency, account policy or retry/replay path was added. The generator
+is a development tool, with no production imports. No profile/state format,
+credential permissions, CLI flag or provider availability changed.
+
+Validation at this checkpoint:
+
+- `rtk test go test ./internal/gateway/gemini ./tools/differential`: **PASS**.
+- `rtk test go test -race ./internal/gateway/gemini ./tools/differential`: **PASS**.
+- Source regeneration with the canonical repository: **PASS**, 14 fixtures and
+  all five missing-pass negative controls.
+- `rtk test make verify`: **PASS**, including formatting, source size,
+  Bubble Tea guard, cross-build, installer checks, vet, full race tests and build.
+- The five clean-commit release phases are recorded in the following checkpoint
+  after they execute.
+
+**Scope:** VERIFIED for these compiled-source native content transforms.
+A shared library compiled from exact tagged source is not the official released
+Prodex executable. Native OAuth two-executable proof remains **PARTIAL**; managed
+Gemini OAuth runtime remains disabled. The public API-key 13-case differential
+checks a separate Chat-compatible entry point. Overall production parity stays
+**PARTIAL**, including live quotas, full compaction/cancellation and native
+Windows/macOS execution.

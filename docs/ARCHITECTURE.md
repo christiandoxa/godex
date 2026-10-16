@@ -39,6 +39,14 @@ The behavioral reference project grew into a large multi-provider Rust workspace
 
 Dependencies point inward. `main` creates concrete adapters and injects them into use cases.
 
+The native Gemini gateway owns GenerateContent history normalization. It
+coalesces equal roles, pairs missing tool results, repairs orphans, orders
+responses and enforces role boundaries in the tagged Prodex 0.438.0 order.
+These pure protocol transformations remain private to `gateway/gemini`;
+they do not execute tools, select accounts or authorize retries. Missing
+results carry an explicit unavailable-result error. The independent
+Chat-compatible transport and disabled OAuth runtime retain their contracts.
+
 ## Runtime components for v0.1
 
 ### Account store

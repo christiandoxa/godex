@@ -230,6 +230,12 @@ go test ./internal/repository/routing ./internal/usecase/routing ./internal/usec
 go test ./internal/gateway/gemini \
   -run '^TestProdex043711GeminiHardening' -count=1 -timeout=40s
 
+# Native compound histories use compiled-source golden cases covering all
+# five passes, ID/name matching, nulls, stable ordering and unavailable results.
+# This is local native protocol proof, not a two-executable OAuth oracle.
+go test -race ./internal/gateway/gemini \
+  -run '^TestProdex04380GeminiNative' -count=1 -timeout=35s
+
 # Prodex 0.438.0 DeepSeek streamed tool arguments use tagged serde_json
 # surrogate, depth and finite-number boundaries, independent of Go's more
 # permissive escape and recursion handling. Verify real SSE terminal frames.
@@ -364,12 +370,10 @@ go test -race ./internal/gateway/gemini ./tools/differential \
 # ID *and* name must match; duplicates and null values must remain bounded.
 # Operation 4 orders immediate tool responses by call ID, ahead of plain
 # text/media, without reordering duplicate IDs or synthesizing execution.
-# Do not apply the separate operation-4 reordering to unqualified compound
-# adjacent-model histories without native two-executable evidence.
-# Source-tagged 0.438.0 Gemini native generateContent role normalization:
-# coalesce plain adjacent role entries and repair model-only boundaries, but
-# preserve the separate tool-call/result pairing until a native OAuth oracle
-# proves its exact output order.
+# Compound same-role histories use the full tagged order 0/1/2/4/3 and
+# exact golden outputs from the independently compiled tagged Mojo kernel.
+# Synthetic repair never executes a tool or fabricates a successful result;
+# final role shaping must not create an extra model turn or trailing prompt.
 go test ./internal/gateway/gemini \
   -run '^TestProdex04380GeminiNative' -count=1 -timeout=35s
 
