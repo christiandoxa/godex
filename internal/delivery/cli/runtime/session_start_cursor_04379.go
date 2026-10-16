@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -35,7 +36,8 @@ func sessionStartTranscriptOffset04379(fields map[string]any, sessionID string) 
 	}
 	if strings.HasSuffix(strings.ToLower(path), ".jsonl.zst") {
 		info, err := os.Lstat(path)
-		if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o002 != 0 {
+		if err != nil || !info.Mode().IsRegular() ||
+			runtime.GOOS != "windows" && info.Mode().Perm()&0o002 != 0 {
 			return -1
 		}
 		data, ok := readCompressedRecovery04360(path, recoveryCompressedBaselineCap04360)
@@ -61,7 +63,7 @@ func sessionStartTranscriptOffset04379(fields map[string]any, sessionID string) 
 		return -1
 	}
 	defer file.Close()
-	if info.Mode().Perm()&0o002 != 0 {
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0o002 != 0 {
 		return -1
 	}
 	opened, err := file.Stat()

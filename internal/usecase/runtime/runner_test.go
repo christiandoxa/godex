@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -833,15 +834,17 @@ func (process *directSharedPreparingProcess) RunRuntimeDirect(_ context.Context,
 func TestRunDirectProfilePreparesManagedHomesBeforeNativeChild(t *testing.T) {
 	process := &directSharedPreparingProcess{}
 	runner := NewRunner(nil, process, nil)
-	runner.SetSharedCodexHome("/shared/codex")
+	root := t.TempDir()
+	home := filepath.Join(root, "profiles", "one")
+	runner.SetSharedCodexHome(filepath.Join(root, "shared", "codex"))
 
-	if err := runner.RunDirectProfileWithOptions(t.Context(), "/profiles/one", []string{"resume", "--last"}, RuntimeLaunchOptions{}); err != nil {
+	if err := runner.RunDirectProfileWithOptions(t.Context(), home, []string{"resume", "--last"}, RuntimeLaunchOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if process.directHome != "/profiles/one" {
+	if process.directHome != home {
 		t.Fatalf("direct launch home = %q", process.directHome)
 	}
-	if !reflect.DeepEqual(process.prepared, []string{"/profiles/one"}) {
+	if !reflect.DeepEqual(process.prepared, []string{home}) {
 		t.Fatalf("direct shared preparation = %#v", process.prepared)
 	}
 }

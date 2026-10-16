@@ -1581,3 +1581,33 @@ variant pass. The compiled native pipeline oracle still matches all 15 cases
 and rejects all five omitted-pass mutations. The existing preflight native
 Gemini test pattern includes this regression. This is VERIFIED for the narrow
 source-derived signature boundary; native OAuth executable proof remains PARTIAL.
+
+## Native Windows SessionStart cursor regression
+
+The native `windows-latest` lane in GitHub Actions run `38921361347` failed six
+SessionStart cursor/recovery tests on `3c41bc0d`. Both plain and compressed
+rollouts lost their callback offset, so an error arriving before the first
+monitor poll could be missed. The permission guard treated writable Windows
+files as POSIX world-writable files. Go's Windows `FileMode` reports `0666` for
+writable files and `0444` for read-only files; these bits do not describe ACLs.
+
+The callback adapter now applies its world-writable rejection on POSIX, matching
+the existing platform handling for private callback directories. Regular-file,
+symlink, session identity, bounded decode, prefix and rollout-binding checks
+remain enforced. The existing plain/compressed mode regression now also runs
+on Windows and covers private, read-only, group-writable and world-writable
+POSIX modes. The direct-profile launch fixture now builds absolute native paths
+with `t.TempDir` and `filepath.Join`; production absolute-path validation stays
+unchanged. These changes stay in their existing runtime delivery and test
+owners; no shared helper or persisted format is introduced.
+
+`rtk go test ./internal/delivery/cli/runtime ./internal/usecase/runtime -run
+'TestProdex04379.*(Cursor|Callback)|TestRunDirectProfilePreparesManagedHomesBeforeNativeChild'
+-count=1` passes locally (43 tests). `rtk test make verify` also passes, including
+the full race suite and Linux/macOS/Windows cross-build and test compilation.
+This is a source-confirmed platform fix
+with observed native fail-before evidence; native Windows pass-after remains
+PARTIAL until the corrected commit executes in that lane. The same run's
+macOS portable test/build lane passed; it does not prove all TUI or signal
+paths executed. The Sonar coverage job separately failed the real-FD-pressure
+test; that synchronization issue is tracked independently.
