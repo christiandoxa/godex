@@ -1467,3 +1467,13 @@ It uses synthetic credentials and loopback only; no provider request or live
 account is involved. The local source and exact executable behavior are
 VERIFIED for this typed-role case. Other malformed DeepSeek shapes and live
 provider behavior remain PARTIAL.
+
+## Exact DeepSeek local-error gate on `bd8e2861`
+
+`make verify` passes after the DeepSeek terminal-error correction, including
+cross-build/test-compile, installers, vet and full race tests. The independent
+`--phase=preflight-tests` release partition also passes on the clean commit
+`bd8e28617d0db333b771fd8b4261dd274c9c1465`; its new exact Prodex/Godex
+unsupported-role differential reports `comparison_differences: []` and
+negative controls PASS. This is the first executable proof for this local
+translation error; no live DeepSeek request is made.
