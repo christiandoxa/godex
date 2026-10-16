@@ -330,6 +330,12 @@ if [ "$phase" = 'all' ] || [ "$phase" = 'websocket' ]; then
   --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
   --websocket
 
+# Native 0.438.0 connection-limit frame may be top-level or nested. A fresh
+# WebSocket is retryable once before commitment, but never after visible output.
+go test ./tools/continuationparity \
+  -run '^TestProdex04380FreshConnectionLimitOracleRejectsOwnerAndReplayDrift$' \
+  -count=1 -timeout=30s
+
 fi
 
 # Printed only after all stages *selected for this invocation* succeeded.

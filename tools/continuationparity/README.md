@@ -13,7 +13,7 @@ the fixture is not a full feature-parity certificate.
 
 ## Strict WebSocket differential
 
-Use `--websocket` to exercise **seventeen** request paths against both
+Use `--websocket` to exercise **nineteen** request paths against both
 executables (including three paths on a freshly restarted gateway). The
 original thirteen owner/continuation paths are listed first:
 
@@ -49,8 +49,14 @@ all three must forward the exact following `response.completed` frame with
 error and the intentionally delayed second completion may not be forwarded.
 Every case checks exact frame bodies, strict same-owner count and negative
 controls against status truncation, premature close, replay or leaked
-post-terminal output. The complete pinned gate observes **50** synthetic
-WebSocket upstream attempts across both binaries, not 42.
+post-terminal output. The original tagged-status gate observed **50** synthetic WebSocket
+upstream attempts across both binaries. Two more cases now verify that a
+**fresh** connection-limit error in either `code` or nested `error.code`
+triggers exactly one new WebSocket attempt against the **same** profile.
+The mixed top-level/nested code precedence must not leak the precommit error,
+rotate owner, duplicate the user request or replay any committed output.
+The expanded gate observes **58** upstream attempts across both binaries;
+negative controls reject wrong retry count, owner, response ID or wire frame.
 
 The pinned Prodex executable selected account-a on all these synthetic
 requests; **this fixture does not prove that soft session IDs always select
