@@ -1417,27 +1417,6 @@ local 400 response, so it was not integrated or claimed as PASS. Native OAuth,
 live quota restart, Windows/macOS execution and full production 1:1 parity
 remain PARTIAL/OPEN.
 
-## Codex compaction v2 recovery — recognize `compaction_trigger`
-
-Canonical Prodex 0.438.0 runtime-proxy payload detection treats a
-`{"type":"compaction_trigger"}` item followed by remaining input as
-context-dependent, reconstructable full history. Godex's
-`reconstructableFullHistory` recognized only the older `compaction` type, so a
-previous-response recovery could return the stale error without one bounded
-full-history retry.
-
-`TestResponsesInvalidPreviousIDRetriesCompactionTriggerHistoryOnce` failed
-before the fix because the gateway saw only one attempt. It now passes with
-exactly two same-owner attempts; the second request removes
-`previous_response_id`, preserves the trigger and remaining input, and never
-retries again. The source-shaped predicate regression also covers the positive
-and negative neighboring cases. Focused routing and race tests pass.
-
-The correction is a one-condition change in `usecase/routing` and uses the
-existing full-history recovery path. It does not execute tools, change owner
-after commitment, or alter persisted formats. Live Codex compaction execution
-and native platform behavior remain PARTIAL.
-
 ## DeepSeek unsupported typed role — exact executable terminal error
 
 The canonical source validates explicit DeepSeek Responses message items before

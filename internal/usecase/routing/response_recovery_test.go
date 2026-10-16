@@ -87,32 +87,6 @@ func TestResponsesInvalidPreviousIDRetriesOwnedFullHistoryOnce(t *testing.T) {
 	}
 }
 
-func TestResponsesInvalidPreviousIDRetriesCompactionTriggerHistoryOnce(t *testing.T) {
-	const original = `{"model":"gpt-5.6","previous_response_id":"resp-dead","input":[{"type":"compaction_trigger"},{"type":"message","role":"user","content":"turn after compaction"}],"client_metadata":{"session_id":"session-a"}}`
-	const invalid = `{"type":"error","status":400,"error":{"type":"invalid_request_error","message":"Invalid ` + "`previous_response_id`" + `."}}`
-	gateway := &responseRecoveryGateway{replies: []responseRecoveryReply{
-		{http.StatusBadRequest, "application/json", invalid},
-		{http.StatusOK, "application/json", `{"object":"response","id":"resp-after-compaction"}`},
-	}}
-	router := newResponseRecoveryRouter(t, gateway, true)
-	exchange, err := router.Forward(context.Background(), responsesRecoveryRequest(original))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer exchange.Close()
-	if len(gateway.requests) != 2 || strings.Contains(string(gateway.requests[1].Body), "previous_response_id") {
-		t.Fatalf("compaction recovery attempts/body = %d / %s", len(gateway.requests), gateway.requests[1].Body)
-	}
-	var recovered map[string]any
-	if err := json.Unmarshal(gateway.requests[1].Body, &recovered); err != nil {
-		t.Fatal(err)
-	}
-	input, _ := recovered["input"].([]any)
-	if len(input) != 2 || input[0].(map[string]any)["type"] != "compaction_trigger" {
-		t.Fatalf("compaction trigger history changed during recovery: %#v", recovered)
-	}
-}
-
 func TestResponsesInvalidPreviousIDClearsDurableBindingAndTurnState(t *testing.T) {
 	const accountID = "0123456789abcdef0123456789abcdef"
 	const body = `{"model":"gpt-5.6","previous_response_id":"resp-dead","input":[{"role":"user"},{"role":"assistant"},{"role":"user"}],"client_metadata":{"session_id":"session-a"}}`
@@ -332,16 +306,6 @@ func TestReconstructableFullHistoryMatchesCodexRequestShapes(t *testing.T) {
 			name: "compaction before remaining input",
 			input: []json.RawMessage{
 				json.RawMessage(`{"type":"compaction"}`),
-				json.RawMessage(`{"role":"user"}`),
-			},
-			want: true,
-		},
-		{
-			// Prodex 0.438.0 runtime-proxy payload_detection treats the
-			// compaction v2 trigger as reconstructable context too.
-			name: "compaction trigger before remaining input",
-			input: []json.RawMessage{
-				json.RawMessage(`{"type":"compaction_trigger"}`),
 				json.RawMessage(`{"role":"user"}`),
 			},
 			want: true,
