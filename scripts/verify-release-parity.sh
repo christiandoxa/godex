@@ -83,6 +83,15 @@ go test ./internal/gateway/codex \
   -run '^TestProdex043711(SuccessfulSessionCompanionShowsResumeGuidanceAfterSocketClosed|SessionCompanionSuppressesGuidanceOnNonTTYAndFailure|ChildTerminalHandoffPreservesQueuedInputAndProtocols|NativeTUIRestoresTerminalAfterSuccessAndFailure|NonInteractiveChildNeverEmitsTerminalProtocols|OwnedCompanionRestoresTTYBeforeResumeGuidance)$' \
   -count=1 -timeout=75s
 
+# Optional independently verified official Codex rust-v0.163.0 app-server
+# handshake. This does not alter the user's installed codex or start turns.
+# Supply the verified test-only executable through the opt-in environment.
+if [ -n "${GODEX_TEST_CODEX_0163_APP_SERVER_BIN:-}" ]; then
+  go test ./internal/gateway/codex \
+    -run '^TestProdex04380OfficialCodex0163AppServerInitializeAndThreadList$' \
+    -count=1 -timeout=40s
+fi
+
 # Prodex 0.438.0: no recovery on native Unix SIGINT or Windows
 # signed NTSTATUS CONTROL_C_EXIT. Keep the existing 130 policy too.
 go test ./internal/delivery/cli/runtime -run '^TestProdex04380' -count=1 -timeout=45s
