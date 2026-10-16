@@ -2,14 +2,14 @@ package main
 
 import "net/http"
 
-const deepSeekUnsupportedRoleError = "upstream request failed"
+const deepSeekLocalError = "upstream request failed"
 
-func unsupportedMessageRoleInvariants(run productRun, prefix string) []string {
+func deepSeekInvalidInputInvariants(run productRun, prefix string) []string {
 	var failures []string
 	if run.ExitStatus != 2 {
 		failures = append(failures, prefix+".exit_status")
 	}
-	if run.Client.Status != http.StatusBadGateway || run.Client.Body != deepSeekUnsupportedRoleError {
+	if run.Client.Status != http.StatusBadGateway || run.Client.Body != deepSeekLocalError {
 		failures = append(failures, prefix+".local_error")
 	}
 	if run.Client.Headers.Get("Content-Type") != "text/plain; charset=utf-8" {

@@ -112,12 +112,12 @@ type mockPlan struct {
 }
 
 type runOptions struct {
-	retry           bool
-	cancel          bool
-	rotate          bool
-	stream          bool
-	userID          bool
-	unsupportedRole bool
+	retry        bool
+	cancel       bool
+	rotate       bool
+	stream       bool
+	userID       bool
+	invalidInput string
 }
 
 type mockServer struct {
@@ -157,7 +157,7 @@ func run() error {
 	expectedGodexCommit := flags.String("godex-commit", "", "expected Godex source HEAD commit SHA")
 	gemini := flags.Bool("gemini", false, "run isolated Gemini generateContent executable differential")
 	scenarioWorkers := flags.Int("scenario-workers", 1, "isolated DeepSeek scenario workers, 1-4 (parallel only for --scenario all)")
-	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, deepseek-unsupported-message-role, sse-stream, sse-rate-limit, sse-tool-surrogate, sse-tool-depth, sse-tool-overflow, sse-tool-paired, retry, deepseek-sse-terminal, single-key-401, single-key-403, single-key-429, single-key-503, single-key-500, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
+	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, deepseek-unsupported-message-role, deepseek-null-message-content, deepseek-request-over-kernel-limit, deepseek-input-type-null, deepseek-input-type-number, deepseek-input-type-empty, deepseek-empty-top-level-tool-name, deepseek-invalid-nested-shell-command, sse-stream, sse-rate-limit, sse-tool-surrogate, sse-tool-depth, sse-tool-overflow, sse-tool-paired, retry, deepseek-sse-terminal, single-key-401, single-key-403, single-key-429, single-key-503, single-key-500, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		return err
 	}
@@ -218,7 +218,7 @@ func run() error {
 			return runPair(root, mock, "deepseek-user-id", mockPlan{}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{userID: true})
 		}},
 		{"deepseek-unsupported-message-role", func(mock *mockServer) (scenarioResult, error) {
-			return runPair(root, mock, "deepseek-unsupported-message-role", mockPlan{}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{unsupportedRole: true})
+			return runPair(root, mock, "deepseek-unsupported-message-role", mockPlan{}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{invalidInput: "deepseek-unsupported-message-role"})
 		}},
 		{"sse-stream", func(mock *mockServer) (scenarioResult, error) {
 			// Exercise a real streaming Responses request through both
@@ -294,6 +294,12 @@ func run() error {
 		{"recover-after-503", func(mock *mockServer) (scenarioResult, error) {
 			return runRecoverAfter503(root, mock, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit)
 		}},
+	}
+	for _, name := range deepSeekInvalidInputScenarioNames()[1:] {
+		scenario := name
+		specs = append(specs, differentialScenario043713{scenario, func(mock *mockServer) (scenarioResult, error) {
+			return runPair(root, mock, scenario, mockPlan{}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{invalidInput: scenario})
+		}})
 	}
 	scenarios, err := executeDifferentialScenarios043713(specs, *scenarioName, *scenarioWorkers)
 	if err != nil {
@@ -519,13 +525,13 @@ func runProduct(root string, mock *mockServer, name, binary, commit string, plan
 	}
 	clientExchange, readErr := readExchange(childResult)
 	if readErr != nil && !options.cancel {
-		if !options.unsupportedRole {
+		if !isKnownDeepSeekInvalidInput(options.invalidInput) {
 			return productRun{}, fmt.Errorf("%s missing valid child response: %w", name, readErr)
 		}
 		clientExchange = exchange{}
 	}
 	upstream := mock.since(requestStart)
-	if len(upstream) == 0 && !options.unsupportedRole {
+	if len(upstream) == 0 && !isKnownDeepSeekInvalidInput(options.invalidInput) {
 		return productRun{}, fmt.Errorf("%s produced no upstream requests", name)
 	}
 	events := mock.eventsSince(eventStart)
@@ -574,8 +580,8 @@ func productEnv(name, stateHome, codexHome, userHome, shim, childResult string, 
 	if options.userID {
 		env = append(env, "DIFFERENTIAL_USER_ID=1")
 	}
-	if options.unsupportedRole {
-		env = append(env, "DIFFERENTIAL_UNSUPPORTED_ROLE=1")
+	if options.invalidInput != "" {
+		env = append(env, "DIFFERENTIAL_INVALID_INPUT="+options.invalidInput)
 	}
 	if runtime.GOOS == "windows" {
 		env = append(env, "SystemRoot="+os.Getenv("SystemRoot"))
@@ -641,10 +647,6 @@ func (mock *mockServer) serveHTTP(writer http.ResponseWriter, request *http.Requ
 	mock.active.Add(1)
 	defer mock.active.Done()
 	body, err := io.ReadAll(io.LimitReader(request.Body, bodyLimit+1))
-	if err != nil || len(body) > bodyLimit {
-		http.Error(writer, "synthetic request rejected", http.StatusRequestEntityTooLarge)
-		return
-	}
 	headers := request.Header.Clone()
 	// A synthetic credential must be from the exact configured set.
 	// Record only the slot, never its value, in the comparison report.
@@ -663,16 +665,25 @@ func (mock *mockServer) serveHTTP(writer http.ResponseWriter, request *http.Requ
 	if headers.Get("Authorization") != "" {
 		headers.Set("Authorization", "<redacted>")
 	}
+	oversized := err != nil || len(body) > bodyLimit
+	reportedBody := string(body)
+	if oversized {
+		reportedBody = fmt.Sprintf("<oversized body omitted: capture limit %d bytes>", bodyLimit)
+	}
 	mock.mu.Lock()
 	attempt := len(mock.requests) - mock.planStart + 1
 	mock.requests = append(mock.requests, upstreamRequest{
-		Method: request.Method, Path: request.URL.RequestURI(), Headers: headers, Body: string(body),
+		Method: request.Method, Path: request.URL.RequestURI(), Headers: headers, Body: reportedBody,
 		AuthOK:  authOK,
 		KeySlot: keySlot,
 	})
 	mock.events = append(mock.events, upstreamEvent{Kind: "upstream.request", Attempt: attempt})
 	plan := mock.plan
 	mock.mu.Unlock()
+	if oversized {
+		http.Error(writer, "synthetic request rejected", http.StatusRequestEntityTooLarge)
+		return
+	}
 	if request.Method != http.MethodPost {
 		http.Error(writer, "synthetic method rejected", http.StatusMethodNotAllowed)
 		return
@@ -805,9 +816,6 @@ func runCodexShim(arguments []string) int {
 	}
 	endpoint.Path = strings.TrimRight(endpoint.Path, "/") + "/responses"
 	requestBody := []byte(`{"model":"deepseek-v4-pro","input":[{"role":"user","content":[{"type":"input_text","text":"same request"}]}],"stream":false}`)
-	if os.Getenv("DIFFERENTIAL_UNSUPPORTED_ROLE") == "1" {
-		requestBody = []byte(`{"model":"deepseek-v4-pro","input":[{"type":"message","role":"critic","content":"no"}],"stream":false}`)
-	}
 	if os.Getenv("DIFFERENTIAL_PROVIDER") == "gemini" {
 		requestBody = []byte(`{"model":"gemini-3.1-pro-preview","input":[{"role":"user","content":[{"type":"input_text","text":"same request"}]}],"stream":false}`)
 		if os.Getenv("DIFFERENTIAL_GEMINI_INVALID_TOOL") == "1" {
@@ -833,6 +841,12 @@ func runCodexShim(arguments []string) int {
 	}
 	if os.Getenv("DIFFERENTIAL_USER_ID") == "1" {
 		requestBody = []byte(`{"model":"deepseek-v4-pro","input":[{"role":"user","content":[{"type":"input_text","text":"same request"}]}],"stream":false,"user":"user_123"}`)
+	}
+	if invalidInput := os.Getenv("DIFFERENTIAL_INVALID_INPUT"); invalidInput != "" {
+		requestBody = deepSeekInvalidInputFixture(invalidInput)
+		if requestBody == nil {
+			return shimFailure("synthetic Codex shim received an unknown invalid-input fixture")
+		}
 	}
 	timeout := 8 * time.Second
 	if os.Getenv("DIFFERENTIAL_CANCEL") == "1" {
@@ -1022,11 +1036,11 @@ func scenarioInvariants(scenario scenarioResult) []string {
 			if run.Client.Status != http.StatusInternalServerError || !validFixtureError(run.Client.Body, "internal_server_error") {
 				failures = append(failures, prefix+".unhandled_server_failure")
 			}
-		case "deepseek-unsupported-message-role":
-			wantExit = 2
-			failures = append(failures, unsupportedMessageRoleInvariants(run, prefix)...)
 		default:
-			if run.Client.Status != http.StatusOK || !validFixtureResponse(run.Client.Body) {
+			if isKnownDeepSeekInvalidInput(phase) {
+				wantExit = 2
+				failures = append(failures, deepSeekInvalidInputInvariants(run, prefix)...)
+			} else if run.Client.Status != http.StatusOK || !validFixtureResponse(run.Client.Body) {
 				failures = append(failures, prefix+".response_invalid")
 			}
 		}
@@ -1037,7 +1051,7 @@ func scenarioInvariants(scenario scenarioResult) []string {
 		if phase == "retry" || phase == "key-rotation-429" {
 			wantRequests = 2
 		}
-		if phase == "deepseek-unsupported-message-role" {
+		if isKnownDeepSeekInvalidInput(phase) {
 			wantRequests = 0
 		}
 		if phase == "key-rotation-restart" {
@@ -1058,7 +1072,7 @@ func scenarioInvariants(scenario scenarioResult) []string {
 			}
 		}
 		wantRetries := wantRequests - 1
-		if phase == "deepseek-unsupported-message-role" {
+		if isKnownDeepSeekInvalidInput(phase) {
 			wantRetries = 0
 		}
 		if len(run.Upstream) != wantRequests || run.Retries != wantRetries {

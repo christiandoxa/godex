@@ -1650,7 +1650,7 @@ There is no new shared helper, dependency, configuration or persistence format.
 both pass (370 tests). The source-size guard also passes.
 `rtk test make verify` also passes, including the full race suite and
 cross-build matrix. Exact two-executable validation of the expanded
-malformed-input fixtures is pending. Numeric JSON
+malformed-input fixtures is recorded below. Numeric JSON
 rendering at the exact policy byte limit has not been compared independently;
 broader malformed-input and live provider parity remain PARTIAL.
 
@@ -1677,3 +1677,28 @@ Local repeated validation passes:
 
 The native CI pass-after for this synchronization fix remains pending. It does
 not change the scope of the previously pinned cross-executable EMFILE proof.
+
+## Exact DeepSeek invalid-input executable expansion
+
+All seven new fixtures returned canonical generic HTTP 502, plain-text body
+`upstream request failed`, child exit 2 and zero upstream requests, events or
+retries on official Prodex 0.438.0. Clean old Godex `3c41bc0d` failed each:
+six returned HTTP 200 after one upstream request, while the oversized request
+reached the bounded mock and received HTTP 413. Clean fixed Godex
+`f2b4344792709f293b85bed9f8a5bacd4ee6bc22` passed every pair with no comparison
+differences. The existing explicit-role case retains the same contract.
+
+The durable `tools/differential` scenarios use one invalid-input discriminator,
+retain all source/binary provenance checks and only allow zero upstream calls
+for recognized local rejection fixtures. Oversized upstream attempts are
+counted and reported with their body omitted, so a mock-side size rejection
+cannot be mistaken for local validation. The expanded positive and mutation
+controls cover all eight rejection scenarios, including false success, altered
+status/body/content type, exit, attempts, retries and events. They supersede
+the narrower role-only mutation test without removing its assertions.
+
+The preflight-tests phase now includes all input-shape, normalized-bound and
+transport regressions plus these mutation controls. The full DeepSeek phase
+automatically includes the seven new executable cases. This is VERIFIED for
+the seven added public rejection fixtures; it does not certify all request
+shapes, exact numeric rendering at the policy limit or live provider behavior.

@@ -273,8 +273,10 @@ go test ./internal/gateway/deepseek \
   -run '^TestProdex043713DeepSeek' -count=1 -timeout=45s
 
 go test ./internal/gateway/deepseek \
-  -run '^TestProdex04380DeepSeekResponses(RejectsUnsupportedMessageRole|UntypedRoleRetainsChatFallback)$' \
+  -run '^TestProdex04380DeepSeek(Responses|InvalidInputIsTerminalBeforeUpstream|RequestBoundUsesNormalizedJSON)' \
   -count=1 -timeout=35s
+go test ./tools/differential \
+  -run '^TestProdex04380DeepSeekInvalidInput' -count=1 -timeout=30s
 
 # The exact pinned executable oracle rejects unsupported typed DeepSeek message
 # roles locally with a terminal 502, zero upstream attempts and no retry.
