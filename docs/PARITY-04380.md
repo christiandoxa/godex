@@ -1373,3 +1373,46 @@ Go standard library does not perform Rust's accepted-socket clone operation,
 so clone-specific fault injection and native Windows/macOS behavior remain
 PARTIAL. Complete closing requests intentionally finish after read EOF;
 this must not be described as ordinary downstream cancellation behavior.
+
+## Codex interactive interruption — preserve the native first SIGINT
+
+Canonical Codex runtime launches keep an interactive child in the terminal
+foreground group. The parent `signal.NotifyContext` consumes the first SIGINT;
+that interrupt belongs to the native Codex TUI and must not immediately tear
+down the managed session. A later SIGINT or SIGTERM is the bounded launcher
+shutdown request. Godex previously treated the first canceled context as an
+immediate child interruption.
+
+`TestWaitForSessionChildPreservesInteractiveChildAfterSIGINT` failed before the
+fix because the child stopped as soon as the parent received SIGINT. The Unix
+session gateway now recognizes the signal context cause only for an interactive
+child, waits for the child to handle that first interrupt, then arms a second
+signal path and preserves the existing two-second interrupt/terminate bound.
+Private process-group children retain the original cancellation path. The test
+uses a synthetic child, no Codex account and no model turn; package and race
+suites both PASS. Worker commit `db25bf8d` is integrated as `cc0e5e2c`.
+
+The change stays in `gateway/codex`, adds no public option or process wrapper,
+and preserves child reaping and socket cleanup. Native Windows signed exit,
+macOS terminal behavior and real Codex TUI execution remain PARTIAL.
+
+
+## Current clean checkpoint after parallel parity fixes
+
+The current candidate contains the Gemini compound pipeline (`c68ba481`),
+DeepSeek typed-role validation, pre-apply quota credential checks, proxy
+half-close and accept recovery, and Codex interactive interrupt handling
+(`cc0e5e2c`). `rtk test make verify` passes on this clean candidate after
+formatting, source-size, Bubble Tea, cross-build, installer, vet, full race and
+build checks. Focused package and race commands also pass for Gemini, DeepSeek,
+Codex, quota, repository/quota, proxy and differential tooling.
+
+The five independent release phases previously passed together on `c68ba481`:
+preflight-tests, preflight-oracles (34 stages), DeepSeek 22/22, Gemini 13/13
+and WebSocket 58 attempts. They must be rerun on the current clean commit after
+this follow-up before calling the new source set a complete finite gate. The
+parallel unsupported-role executable scenario remains pending: its source
+fixture is valid, but the existing child-exchange harness times out before
+materializing a local 400 response, so it was not integrated or claimed as
+PASS. Native OAuth, live quota restart, Windows/macOS execution and full
+production 1:1 parity remain PARTIAL/OPEN.
