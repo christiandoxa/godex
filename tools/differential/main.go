@@ -112,11 +112,12 @@ type mockPlan struct {
 }
 
 type runOptions struct {
-	retry  bool
-	cancel bool
-	rotate bool
-	stream bool
-	userID bool
+	retry           bool
+	cancel          bool
+	rotate          bool
+	stream          bool
+	userID          bool
+	unsupportedRole bool
 }
 
 type mockServer struct {
@@ -156,7 +157,7 @@ func run() error {
 	expectedGodexCommit := flags.String("godex-commit", "", "expected Godex source HEAD commit SHA")
 	gemini := flags.Bool("gemini", false, "run isolated Gemini generateContent executable differential")
 	scenarioWorkers := flags.Int("scenario-workers", 1, "isolated DeepSeek scenario workers, 1-4 (parallel only for --scenario all)")
-	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, sse-stream, sse-rate-limit, sse-tool-surrogate, sse-tool-depth, sse-tool-overflow, sse-tool-paired, retry, deepseek-sse-terminal, single-key-401, single-key-403, single-key-429, single-key-503, single-key-500, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
+	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, deepseek-unsupported-message-role, sse-stream, sse-rate-limit, sse-tool-surrogate, sse-tool-depth, sse-tool-overflow, sse-tool-paired, retry, deepseek-sse-terminal, single-key-401, single-key-403, single-key-429, single-key-503, single-key-500, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		return err
 	}
@@ -215,6 +216,9 @@ func run() error {
 			// The canonical DeepSeek adapter accepts Responses' user alias but
 			// forwards it as the provider's user_id field.
 			return runPair(root, mock, "deepseek-user-id", mockPlan{}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{userID: true})
+		}},
+		{"deepseek-unsupported-message-role", func(mock *mockServer) (scenarioResult, error) {
+			return runPair(root, mock, "deepseek-unsupported-message-role", mockPlan{}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{unsupportedRole: true})
 		}},
 		{"sse-stream", func(mock *mockServer) (scenarioResult, error) {
 			// Exercise a real streaming Responses request through both
@@ -515,10 +519,13 @@ func runProduct(root string, mock *mockServer, name, binary, commit string, plan
 	}
 	clientExchange, readErr := readExchange(childResult)
 	if readErr != nil && !options.cancel {
-		return productRun{}, fmt.Errorf("%s missing valid child response: %w", name, readErr)
+		if !options.unsupportedRole {
+			return productRun{}, fmt.Errorf("%s missing valid child response: %w", name, readErr)
+		}
+		clientExchange = exchange{}
 	}
 	upstream := mock.since(requestStart)
-	if len(upstream) == 0 {
+	if len(upstream) == 0 && !options.unsupportedRole {
 		return productRun{}, fmt.Errorf("%s produced no upstream requests", name)
 	}
 	events := mock.eventsSince(eventStart)
@@ -566,6 +573,9 @@ func productEnv(name, stateHome, codexHome, userHome, shim, childResult string, 
 	}
 	if options.userID {
 		env = append(env, "DIFFERENTIAL_USER_ID=1")
+	}
+	if options.unsupportedRole {
+		env = append(env, "DIFFERENTIAL_UNSUPPORTED_ROLE=1")
 	}
 	if runtime.GOOS == "windows" {
 		env = append(env, "SystemRoot="+os.Getenv("SystemRoot"))
@@ -795,6 +805,9 @@ func runCodexShim(arguments []string) int {
 	}
 	endpoint.Path = strings.TrimRight(endpoint.Path, "/") + "/responses"
 	requestBody := []byte(`{"model":"deepseek-v4-pro","input":[{"role":"user","content":[{"type":"input_text","text":"same request"}]}],"stream":false}`)
+	if os.Getenv("DIFFERENTIAL_UNSUPPORTED_ROLE") == "1" {
+		requestBody = []byte(`{"model":"deepseek-v4-pro","input":[{"type":"message","role":"critic","content":"no"}],"stream":false}`)
+	}
 	if os.Getenv("DIFFERENTIAL_PROVIDER") == "gemini" {
 		requestBody = []byte(`{"model":"gemini-3.1-pro-preview","input":[{"role":"user","content":[{"type":"input_text","text":"same request"}]}],"stream":false}`)
 		if os.Getenv("DIFFERENTIAL_GEMINI_INVALID_TOOL") == "1" {
@@ -1009,6 +1022,9 @@ func scenarioInvariants(scenario scenarioResult) []string {
 			if run.Client.Status != http.StatusInternalServerError || !validFixtureError(run.Client.Body, "internal_server_error") {
 				failures = append(failures, prefix+".unhandled_server_failure")
 			}
+		case "deepseek-unsupported-message-role":
+			wantExit = 2
+			failures = append(failures, unsupportedMessageRoleInvariants(run, prefix)...)
 		default:
 			if run.Client.Status != http.StatusOK || !validFixtureResponse(run.Client.Body) {
 				failures = append(failures, prefix+".response_invalid")
@@ -1020,6 +1036,9 @@ func scenarioInvariants(scenario scenarioResult) []string {
 		wantRequests := 1
 		if phase == "retry" || phase == "key-rotation-429" {
 			wantRequests = 2
+		}
+		if phase == "deepseek-unsupported-message-role" {
+			wantRequests = 0
 		}
 		if phase == "key-rotation-restart" {
 			wantRequests = len(run.Upstream)
@@ -1038,7 +1057,11 @@ func scenarioInvariants(scenario scenarioResult) []string {
 				failures = append(failures, prefix+".invalid_restart_credential_selection")
 			}
 		}
-		if len(run.Upstream) != wantRequests || run.Retries != wantRequests-1 {
+		wantRetries := wantRequests - 1
+		if phase == "deepseek-unsupported-message-role" {
+			wantRetries = 0
+		}
+		if len(run.Upstream) != wantRequests || run.Retries != wantRetries {
 			failures = append(failures, prefix+".upstream_attempts")
 		}
 		if len(run.StateIntegrity) != 0 {
