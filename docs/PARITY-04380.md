@@ -1721,10 +1721,10 @@ Local repeated validation passes:
 The native CI pass-after for this synchronization fix remains pending. It does
 not change the scope of the previously pinned cross-executable EMFILE proof.
 
-## Final five-phase gate on `fc3e6d09`
+## Final five-phase gate on `c4464123`
 
 The five independent release phases were rerun on the same clean Godex commit
-`fc3e6d09099f38928f1d1fde6306d79a06f2ca09`, with the exact tagged Prodex
+`c44641230e7f76831b90e350c95589b244f0c078`, with the exact tagged Prodex
 0.438.0 source and published Linux binary SHA recorded above:
 
 - `--phase=preflight-tests`: **PASS**.
@@ -1739,7 +1739,7 @@ The preflight oracle set also includes the three-profile quota/restart stage:
 authenticated probes, precommit owner rotation and restart credential
 revalidation.
 
-GitHub Actions run `38933408550` for this same SHA is fully green: native
+GitHub Actions run `38937631077` for this same SHA is fully green: native
 macOS and Windows portable tests/builds, Linux race/build/cross-build checks,
 SonarQube and KICS all passed. The final source tree is clean and remote
 `main` points at this SHA. This remains a finite synthetic/loopback gate, not
