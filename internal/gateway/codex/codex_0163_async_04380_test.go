@@ -87,5 +87,38 @@ func TestProdex04380OfficialCodex0163LoopbackAsyncCompactionLifecycle(t *testing
 	if triggerIndex != len(input)-1 {
 		t.Fatalf("background remote compaction trigger index = %d, want %d", triggerIndex, len(input)-1)
 	}
+	app.beginOperation()
+	if _, err := app.request(4, "turn/start", map[string]any{
+		"threadId": threadID,
+		"input":    []any{map[string]any{"type": "text", "text": "async followup"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.waitIdle(); err != nil {
+		t.Fatal(err)
+	}
+	followup, err := provider.waitCall(callContext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var followupRequest map[string]any
+	if err := json.Unmarshal(followup.body, &followupRequest); err != nil {
+		t.Fatalf("decode follow-up request: %v", err)
+	}
+	followupInput, ok := followupRequest["input"].([]any)
+	if !ok {
+		t.Fatalf("follow-up input = %#v, want array", followupRequest["input"])
+	}
+	adopted := false
+	for _, raw := range followupInput {
+		item, ok := raw.(map[string]any)
+		if ok && item["type"] == "compaction" && item["encrypted_content"] == "ASYNC_COMPACTION_SUMMARY" {
+			adopted = true
+			break
+		}
+	}
+	if !adopted {
+		t.Fatalf("follow-up request omitted adopted background compaction: %s", followup.body)
+	}
 	provider.assertNoCall(t, 250*time.Millisecond)
 }
