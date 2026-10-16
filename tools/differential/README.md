@@ -18,7 +18,7 @@ go build -trimpath -o /tmp/godex-candidate ./cmd/godex
 
 Use `--gemini` with the same `--prodex`, `--godex`,
 `--prodex-source`, `--godex-source`, and `--godex-commit` flags
-to run twelve **additional** cases against the published Prodex 0.438.0
+to run thirteen **additional** cases against the published Prodex 0.438.0
 binary, not against a guessed Gemini protocol. The reference was
 observed to send API-key Super requests as OpenAI-compatible
 `POST /v1beta/openai/chat/completions`, yet it decodes upstream
@@ -367,7 +367,7 @@ GenerateContent cases with a nested `response` envelope: with a string
 model, usage, no arbitrary outer fields, and a generated API-key Responses
 identity in the `resp_deepseek_` UUIDv7 namespace. Direct native Gemini
 transport is not changed by this identity contract. The source-pinned binary
-oracle now exercises twelve Gemini cases, including all earlier eight fixtures and two invalid function-tool request rejections.
+oracle now exercises thirteen Gemini cases, including all earlier eight fixtures, two invalid function-tool request rejections and one null function-call response.
 
 ### Bounded full DeepSeek oracle
 
@@ -408,3 +408,25 @@ provider and that malformed requests do not become deferred Router retries
 or plaintext HTTP errors. Existing successful Gemini cases and mutation
 negative controls remain mandatory. These tests use synthetic credentials
 and never make real Gemini model requests.
+
+### Public Gemini Chat-compatible `functionCall:null` response (0.438.0)
+
+`buffered-null-tool-text` is a source/SHA-pinned two-executable test with a
+synthetic Gemini native GenerateContent payload: text, `functionCall:null`,
+then text. The public Prodex **API-key Chat-compatible** adapter keeps the
+adjacent text in one assistant message, emits a second `function_call` with
+`name=tool_call`, `call_id=call_1` and `arguments={}`, and preserves native
+usage/metadata in a client-visible Responses JSON. Godex initially dropped
+the null tool, then an incorrect internal-buffered suppression assumption
+hid the text and used a generated fallback ID. The public contract was
+established against the actual tagged Prodex executable, not conflated with
+its separate provider-core buffered normalizer (which suppresses text).
+
+The entire **13-case** Gemini differential now compares the exact two output
+items and their ordering, including text, call name/ID, arguments, usage,
+metadata, HTTP status, model, and a single upstream POST. Only the
+nondeterministic client Responses UUID and clock fields are normalized, after
+verifying the required ID namespace. Mutation negative controls reject
+missing call, leaked/modified text, wrong fallback ID, wrong arguments,
+extra messages and missing/incorrect upstream dispatch. A separate Go test
+keeps direct native/OAuth GenerateContent semantics unchanged.

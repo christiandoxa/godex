@@ -321,6 +321,14 @@ go test -race ./internal/gateway/gemini ./internal/usecase/routing ./internal/de
   -run '^TestProdex04380(GeminiAPIKeyChat|LocalGeminiTool|GeminiInvalidFunctionTool|GeminiInvalidTool)' \
   -count=1 -timeout=55s
 
+# Prodex 0.438.0 public Gemini API-key Chat-compatible buffered responses
+# preserve text around `functionCall:null` and emit fallback `call_1`.
+# The separate provider-core internal buffered normalizer suppresses text:
+# never confuse that source-only entry point with the actual public wire.
+go test -race ./internal/gateway/gemini ./tools/differential \
+  -run '^TestProdex04380Gemini(Buffered|APIKeyBuffered|NativeGenerateContent)' \
+  -count=1 -timeout=55s
+
 # The 0.438.0 Gemini native envelope must unwrap `response` with or
 # without traceId. The API-key buffered bridge must generate its own UUIDv7
 # and must not expose stale native/trace IDs. These cases are mandatory parts

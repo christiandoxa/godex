@@ -17,6 +17,7 @@ transfer 0.437.14 differential PASS claims to the new 0.438.0 target.
 | Local proxy under accept and accepted-socket resource pressure | PARTIAL (Linux cross-binary recovery VERIFIED) | Actual official Prodex 0.438.0 and clean Godex gateway both reached RLIMIT_NOFILE=80 under 120 partially written TCP connections; each retained the original port, held a newly queued GET while saturated, served it exactly once after release, served a subsequent independent GET, and exited cleanly. The new source/SHA-pinned `profileparity` stage and mutation controls cover 3 exact upstream GETs. Go's stdlib has no Rust tiny_http accepted-clone step, so an isolated cross-executable clone-specific failure and native Windows/macOS behavior remain unverified. |
 | Official Codex 0.163.0 compatibility | PARTIAL | Official `rust-v0.163.0` asset metadata and SHA-256 verified; extracted binary `codex-cli 0.163.0` successfully completed real isolated app-server `initialize`, `thread/list` active and archived through the Godex protocol on Linux x86_64. `TestProdex04380OfficialCodex0163AppServerInitializeAndThreadList` PASS. `response.incomplete`, compaction, native retry/interrupt and Windows MCP environments still need separate executable evidence. |
 | 0.438.0 pinned release differential | VERIFIED (finite gate only) | On the same clean Godex `49caa1c4`, **both pinned preflight partitions PASS** (34 profile stages, 14 CLI probes, official Codex 0.163.0 handshake), DeepSeek **22/22**, Gemini **12/12**, and WebSocket **58 attempts** PASS with negative controls and `comparison_differences: []` where applicable. Six-target Linux/Darwin/Windows cross-build and test compilation PASS. Each phase verified tagged Prodex source, release manifest, official binary SHA and clean Go commit. Production-wide 1:1 remains PARTIAL. |
+| Gemini Chat-compatible null `functionCall` output | VERIFIED for one exact synthetic wire fixture | Tagged Rust source has two distinct buffered entry points with different text policies. Direct two-executable Prodex 0.438.0/Godex candidate `83fa59d5` comparison established the *public* Chat-compatible path keeps adjacent text and emits deterministic fallback `call_1` for `functionCall:null`. The separate internal buffering helper suppresses text. Focused Go tests failed before correction; full pinned Gemini differential **PASS 13/13**, zero diffs, mutation sentinels; broader function-call permutations remain PARTIAL. |
 | Gemini API-key invalid function-tool validation | VERIFIED for tagged malformed cases; PARTIAL for all tools | Full 0.438.0 tagged two-executable Gemini differential extended from 10 to **12** cases. Prodex rejects flat/wrapped invalid `tools[0].function.parameters` locally with HTTP 400, exit 2, indexed `invalid_request_error` JSON and zero upstream attempts; Godex initially forwarded the requests (false 200), then retried local 400s as transient, then emitted plaintext. Corrected adapter, Router and HTTP error shaping in local checkpoints. Clean exact-source/binary-pinned 12/12 differential PASS, `comparison_differences: []`; broader schema permutations remain untested. |
 | WebSocket terminal-frame Mojo classification | VERIFIED for tested status-wire cases; PARTIAL overall | Source-derived regressions reproduced actual Godex mismatches in `status`/`status_code` precedence, strict u16 bounds and nested/top-level connection-limit matching. Fixed in `4aac2592`; real pinned Prodex/Godex `--websocket` comparison confirms continuation after invalid/fractional/overflow primary status and **terminal error** for valid `65535` (one upstream attempt per mode; total 50). Status-frame mutation tests PASS. A newer **clean, exact-tagged two-binary** differential on `ab219e07` additionally verified top-level and nested connection-limit precommit recovery on a fresh WebSocket: one same-owner retry per case, neither precommit error leaks, total **58** upstream attempts. Persistent limits and already-retried budgets are bounded in in-process TCP tests, with no postcommit replay; broader future field permutations remain OPEN. |
 | Usage-limit native session candidate fallback after transient pool retry | PARTIAL | Tagged 0.438.0 compiled Mojo `usage_limit_recovery_candidate` allows the originally failed profile as the **last** candidate only after a transient wait and verified eligibility/quota. Godex formerly always excluded the original owner and could relaunch a previously exhausted backup. `TestProdex04380SessionRecoveryFailedProfileFallbackAfterPoolRetry` reproduced these failures and now passes with three profiles, model-aware ready claims, backup precedence, cancellation, owner/credential negative controls and prompt-no-replay. Legacy no-quota adapter backup retries remain unchanged. Independent exact-binary three-profile session recovery differential still OPEN. |
@@ -662,3 +663,33 @@ compaction, all Gemini/OAuth tool schema combinations, live multi-profile
 quota and session recovery, or independently forced Rust accepted-socket
 clone failures. Do not turn these bounded synthetic PASS results into a
 production-wide parity claim.
+
+
+## Gemini null tool-call public wire — independent tagged 0.438.0 evidence
+
+The tagged Rust test `gemini_provider_core_buffered_response_suppresses_visible_text_across_tool_calls`
+initially suggested a text-suppression rule for `functionCall:null`.
+A direct *public API-key Chat-compatible executable* oracle revealed that
+this was the **wrong entry point** to mirror: Prodex 0.438.0's real public
+Responses payload retains the adjacent text (`hidden beforehidden after`)
+as an assistant message, then emits a separate `function_call` item with
+`name:tool_call`, `call_id:call_1` and `arguments:{}`. Both message and tool
+call are client-visible. Godex originally ignored null `functionCall` and
+lost the tool item; a preliminary fix incorrectly suppressed text and used
+an unstable UUID. Neither incorrect state was pushed. The corrected Go
+API-key translation preserves both output items, the exact call fallback and
+metadata/usage, while the direct native/OAuth GenerateContent route retains
+its independently tested ID/visible-text policy.
+
+The candidate `83fa59d540edc7809a7bd57ecc93f7e6f7fa961d` completed the
+source/SHA-pinned **Gemini 13/13 executable differential PASS** against the
+official Prodex 0.438.0 binary, with `comparison_differences: []` and all
+negative controls PASS. The new fixture compares strict output ordering,
+text, function name, arguments, call ID and all nonvolatile response fields;
+it normalizes only independently validated generated Responses IDs and
+wall-clock fields. Go regression tests protect the native/OAuth route,
+unknown malformed part types, and null tool-call key presence. The
+`native_response.go` source-size baseline was lowered after moving shared
+candidate/alias helpers into a cohesive 0.438.0 module. This establishes
+only a bounded synthetic public-wire contract, not all live Gemini model
+tool-call variants or foreground compaction behavior.
