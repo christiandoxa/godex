@@ -239,7 +239,11 @@ func (transport *Transport) retryWebSocketConnectionLimit(
 	turnState string,
 	reusedSession bool,
 ) (*proxymodel.Response, bool, error) {
-	if !reusedSession || input.FirstEventRetryUsed || !isWebSocketConnectionLimit(event.payload) {
+	// Prodex 0.438.0 retries a connection-limit frame on the first fresh
+	// connection as well as on a recycled one. This helper is reached only
+	// before a frame commits output; FirstEventRetryUsed caps the retry at
+	// exactly one and preserves the original account and opaque turn body.
+	if input.FirstEventRetryUsed || !isWebSocketConnectionLimit(event.payload) {
 		return nil, false, nil
 	}
 	_ = connection.Close()

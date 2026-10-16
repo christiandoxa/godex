@@ -138,6 +138,10 @@ go test ./internal/usecase/routing -run '^TestProdex043714RetryAfter' -count=1 -
 # integer u16 statuses. A mistaken fallback can authorize unsafe rotation.
 go test ./internal/gateway/openai \
   -run '^TestProdex04380WebSocket' -count=1 -timeout=40s
+# Tagged Prodex 0.438.0 retries a first-event connection-limit on a *fresh*
+# WebSocket exactly once on the same owner, and never retries committed output.
+go test ./internal/gateway/openai \
+  -run '^TestProdex04380FreshWebSocket' -count=1 -timeout=40s
 
 # Native Codex 0.163.0 response.incomplete is an incomplete model result,
 # not a 429, fake completion, or entitlement to replay. Preserve all wire
