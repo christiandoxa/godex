@@ -92,6 +92,9 @@ if [ -n "${GODEX_TEST_CODEX_0163_APP_SERVER_BIN:-}" ]; then
   go test ./internal/gateway/codex \
     -run '^TestProdex04380OfficialCodex0163AppServerInitializeAndThreadList$' \
     -count=1 -timeout=40s
+  go test ./internal/gateway/codex \
+    -run '^TestProdex04380OfficialCodex0163Loopback' \
+    -count=1 -timeout=50s
 fi
 
 # Prodex 0.438.0's compiled Copilot candidate policy caps the raw logged-

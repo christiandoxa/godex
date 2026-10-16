@@ -93,6 +93,16 @@ or replace the user's Codex executable. This is VERIFIED for the narrow native
 app-server handshake on Linux x86_64 only; the other native Codex 0.163.0
 changes documented by Prodex remain PARTIAL/OPEN pending targeted tests.
 
+The opt-in `TestProdex04380OfficialCodex0163Loopback*` cases now run the same
+SHA-verified executable against a credential-free loopback Responses server.
+Foreground `thread/compact/start` preserves the original user and assistant
+messages before the checkpoint prompt and makes exactly one additional
+upstream call. A native `response.incomplete` carries usage `17/5/22` and its
+`max_output_tokens` reason to `turn/completed` without replay. Native
+`turn/interrupt` closes a held stream and returns to idle with one upstream
+call. The three cases pass on Linux amd64; they do not claim automatic
+background compaction, live OAuth/model inference, or Windows/macOS execution.
+
 ## Codex 0.163.0 incomplete-response wire checkpoint
 
 `TestProdex04380NativeResponseIncompletePreservesReasonAndUsageWithoutRotation`
