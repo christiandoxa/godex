@@ -98,7 +98,7 @@ fi
 # ASCII-case-only comparison after Unicode trim. A Unicode Kelvin `K` must
 # never become ASCII k and falsely hide a distinct catalog model ID.
 go test -race ./internal/usecase/ping \
-  -run '^TestProdex04380(RetiredOpenAIModelOnlyFoldsASCII|ModelPickerRetainsNonASCIILookalikesButHidesRetired)$' \
+  -run '^TestProdex04380(RetiredOpenAIModelOnlyFoldsASCII|ModelPickerRetainsNonASCIILookalikesButHidesRetired|DynamicOpenAIModelIdentityUsesASCIIOnlyFold|ASCIIModelComparisonChecksEveryUTF8Byte)$' \
   -count=1 -timeout=35s
 
 # Prodex 0.438.0 clap rejects Super --api-key without --provider as a

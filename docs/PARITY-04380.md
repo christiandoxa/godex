@@ -736,6 +736,25 @@ Rust accepted-stream-clone exhaustion. No live secret or real model turn
 was used for these local oracle cases.
 
 
+## OpenAI dynamic catalog identity — bytewise ASCII-only equality
+
+The same tagged `rich_catalog.mojo` model-identity comparisons fold ASCII
+A–Z *byte by byte*, but do not use Unicode case mappings or runewise
+shortcuts. Godex's model cache previously used `strings.ToLower` to form
+dedupe keys and its `asciiEqualFold` iterated only UTF-8 rune *starting*
+indices. This incorrectly merged `book-model` with `booK-model`, and
+`böok-model` with `BÖOK-MODEL`, despite the different code points. The
+`TestProdex04380DynamicOpenAIModelIdentityUsesASCIIOnlyFold` cache fixture
+reproduced those lost model choices, while
+`TestProdex04380ASCIIModelComparisonChecksEveryUTF8Byte` checks ASCII
+upper/lower success and distinct Kelvin, accented, canonical-composition and
+length cases. The fix uses an ASCII-byte normalized cache key, with a
+complete byte-index scan for equality, preserving original IDs and sorting.
+The previous retired-model regression continues to pass and the full local
+`internal/usecase/ping` package race suite passes. This is tagged-source
+and locally cached picker behavior; direct interactive terminal comparison
+has not been performed.
+
 ## OpenAI model catalog retired filter — ASCII-only 0.438.0
 
 The tagged Mojo `prodex_mojo_rich_catalog_openai_retired_v1` trims Unicode

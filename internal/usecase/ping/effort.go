@@ -90,10 +90,10 @@ func pingModelChoices() ([]string, []string) {
 	models = append(models, "")
 	seen := make(map[string]struct{}, len(entries)+len(dynamic))
 	for _, model := range dynamic {
-		seen[strings.ToLower(model.id)] = struct{}{}
+		seen[asciiModelKey04380(model.id)] = struct{}{}
 	}
 	for _, entry := range entries {
-		if _, exists := seen[strings.ToLower(entry.ID)]; exists {
+		if _, exists := seen[asciiModelKey04380(entry.ID)]; exists {
 			continue
 		}
 		label := strings.TrimSpace(entry.DisplayName)
@@ -142,7 +142,7 @@ func pingDynamicModels() []pingModelCatalog {
 		if id == "" || len(id) > 4096 || pingRetiredModel(id) {
 			continue
 		}
-		key := strings.ToLower(id)
+		key := asciiModelKey04380(id)
 		if _, exists := seen[key]; exists {
 			continue
 		}
@@ -251,11 +251,24 @@ func pingRetiredModel(model string) bool {
 		asciiEqualFold(trimmed, "gpt-5.3-spark")
 }
 
+// The tagged 0.438.0 model catalog performs ASCII byte-only case folding.
+// Avoid strings.ToLower: Unicode case mappings such as Kelvin K → k or
+// Ö → ö can collapse independent model identities in the cache/picker.
+func asciiModelKey04380(model string) string {
+	key := []byte(model)
+	for i, c := range key {
+		if c >= 'A' && c <= 'Z' {
+			key[i] = c + ('a' - 'A')
+		}
+	}
+	return string(key)
+}
+
 func asciiEqualFold(left, right string) bool {
 	if len(left) != len(right) {
 		return false
 	}
-	for index := range left {
+	for index := 0; index < len(left); index++ {
 		leftByte, rightByte := left[index], right[index]
 		if leftByte >= 'A' && leftByte <= 'Z' {
 			leftByte += 'a' - 'A'
