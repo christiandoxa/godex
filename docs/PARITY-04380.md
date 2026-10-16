@@ -95,7 +95,8 @@ without a hidden retry, quota classification or credential rotation.
 
 This is local deterministic HTTP evidence for 0.163.0 native passthrough and
 no-replay; it is **not** a live Codex inference run or an independent two-
-executable source-pinned incomplete-response differential. Other foreground/
+executable source-pinned incomplete-response differential at the time of this
+local-only checkpoint. A subsequent cross-binary fixture is recorded below. Other foreground/
 background Responses-v2 compaction and native interruption features remain
 open pending scenario-specific proof.
 
@@ -151,10 +152,27 @@ native Windows or macOS runtime execution.
 **Current overall parity status: PARTIAL.** The finite synthetic release
 oracle is verified, but full behavioral 1:1 parity still requires
 additional evidence for native Windows/macOS process and TUI behavior,
-the Rust-specific accepted-stream-clone fault and the separate native
-0.163.0 compaction and incomplete-result error cases, and a complete
+the Rust-specific accepted-stream-clone fault and separate native
+0.163.0 compaction and live incomplete-result error cases, and a complete
 live multi-profile OAuth/quota restart matrix. Never upgrade this finite
 fixture proof into a production-wide claim without executing those cases.
+
+## Exact Prodex/Godex native incomplete-response wire differential
+
+The new `gateway_native_incomplete_04380` profileparity stage runs official
+Prodex 0.438.0 and a Godex candidate in independent synthetic managed homes,
+pointing each at a private loopback Responses mock. For each executable the
+same fixture issues a buffered native `response.incomplete` and a streamed
+terminal `response.incomplete` and requires the **exact** original JSON/SSE
+payloads, original response ID, `max_output_tokens` reason plus opaque
+unknown details, original nested token usage, HTTP 200 and correct JSON/SSE
+content types. The upstream must receive **exactly two** well-authenticated
+requests with the correct model/input; no third attempt, invented completion,
+quota classification or escaped string substitution can pass. Positive
+cross-binary and mutation-negative-control runs PASS. Neither real accounts
+nor model inference are used. This closes the two-executable synthetic
+incomplete **wire** parity gap, not Codex-native inference, actual model
+compaction, or all possible incomplete termination reasons.
 
 ## Independent official-Prodex and Godex Linux FD-pressure differential
 

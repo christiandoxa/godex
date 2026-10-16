@@ -220,6 +220,11 @@ go test ./tools/differential \
 go test ./tools/profileparity \
   -run '^TestProdex04380GatewayDescriptorPressureRequiresActualFDAndQueuedRecovery$' \
   -count=1 -timeout=30s
+# Native Codex 0.163.0 buffered and streamed incomplete terminal frames
+# must survive real gateway forwarding unchanged across both executables.
+go test ./tools/profileparity \
+  -run '^TestProdex04380IncompleteGatewayOracleRejectsResponseAndReplayMutations$' \
+  -count=1 -timeout=30s
 go test ./tools/profileparity -run '^TestProdex043714Startup' -count=1 -timeout=30s
 
 # CLI argument rejection oracle. This catches delivery paths that accidentally

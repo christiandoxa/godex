@@ -110,6 +110,11 @@ func run() error {
 		return fmt.Errorf("real TCP gateway descriptor-pressure parity failed closed: %w", err)
 	}
 	stages = append(stages, pressureStages...)
+	incompleteStages, err := checkGatewayIncomplete04380(work, options)
+	if err != nil {
+		return fmt.Errorf("native incomplete response parity failed closed: %w", err)
+	}
+	stages = append(stages, incompleteStages...)
 	encoded, err := json.MarshalIndent(resultReport{
 		Status: "PASS", CanonicalSource: canonicalProdexCommit,
 		CandidateSource: options.godexCommit, Steps: stages,

@@ -128,3 +128,18 @@ credential checks. Every failure aborts the whole differential, and negative
 controls reject missing FD saturation, wrong counts, lost listener/queue, and
 unclean shutdown. Internal Rust socket-clone failure and native Windows/macOS
 behaviors are distinct from this Linux shared observable contract.
+
+### Prodex 0.438.0 native `response.incomplete` two-executable oracle
+
+The `gateway_native_incomplete_04380` scenario invokes both real gateway
+binaries with separate synthetic imported ChatGPT profiles and one loopback
+Responses upstream per candidate. Buffered JSON and streamed SSE terminal
+`response.incomplete` results must retain byte-identical bodies, response ID,
+reason, unknown extension fields and detailed token usage. The two HTTP 200
+responses keep their exact native content types. The server must observe
+exactly two authenticated POSTs to `/backend-api/codex/responses`, preserving
+model and input; extra attempts or fabricated completion fail. Mutation
+sentinels reject wrong status/type, missing SSE frame, changed bytes,
+credential violations, duplicate dispatch or unclean exit. This is a
+cross-executable synthetic wire fixture, not live native inference or
+foreground/background compaction qualification.
