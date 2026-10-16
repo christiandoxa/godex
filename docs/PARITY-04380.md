@@ -992,3 +992,29 @@ regressions rather than independently executed two-product live account
 flows. Native macOS/Windows runtime, Codex 0.163.0 real compaction, OAuth/
 multi-profile quota reset, and isolated Rust accepted-socket-clone failure
 remain material unverified surfaces.
+
+
+## Native Gemini plain-content role normalization — bounded 0.438.0 parity
+
+The tagged Prodex 0.438.0 `prodex_mojo_gemini_content_hardening_v1`
+operation 0 coalesces consecutive equal-role contents while preserving their
+original JSON part order and first retained row's metadata. Operation 3
+repairs the user/model conversation boundaries: a plain model-led transcript
+receives `[Continuing from previous Codex context.]`, and a model-ended
+transcript receives a final `Please continue.` user prompt. Godex's direct
+`geminiGenerateContentRequest` initially emitted separate adjacent user/model
+contents and lacked both boundary prompts. Source-derived
+`TestProdex04380GeminiNativeContentCoalescesAdjacentRoles` and
+`TestProdex04380GeminiNativeContentRepairsModelOnlyBoundaries` failed before
+the fix and now pass with full native Gemini regression coverage, race tests,
+metadata/primitive-part order checks and non-mutating normalization.
+
+**Scope constraint:** Prodex's complete native pipeline also invokes separate
+Mojo operations for missing tool-result pairing, orphan responses, and
+response order. Those operations have not yet been qualified in a native
+OAuth two-executable fixture. The Go fix therefore applies role coalescing
+and boundary shaping to *tool-free* contents only; tool-bearing transcripts
+retain the existing established tool order. This intentionally closes a
+bounded, source-derived plain-content gap without pretending the entire
+native Gemini/OAuth pipeline has been certified. All live native tool-pair
+permutations remain PARTIAL/OPEN.

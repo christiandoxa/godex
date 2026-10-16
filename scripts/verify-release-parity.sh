@@ -356,6 +356,13 @@ go test -race ./internal/gateway/gemini ./tools/differential \
   -run '^TestProdex04380Gemini(Buffered|APIKeyBuffered|NativeGenerateContent)' \
   -count=1 -timeout=55s
 
+# Source-tagged 0.438.0 Gemini native generateContent role normalization:
+# coalesce plain adjacent role entries and repair model-only boundaries, but
+# preserve the separate tool-call/result pairing until a native OAuth oracle
+# proves its exact output order.
+go test ./internal/gateway/gemini \
+  -run '^TestProdex04380GeminiNative' -count=1 -timeout=35s
+
 # The 0.438.0 Gemini native envelope must unwrap `response` with or
 # without traceId. The API-key buffered bridge must generate its own UUIDv7
 # and must not expose stale native/trace IDs. These cases are mandatory parts
