@@ -13,8 +13,9 @@ the fixture is not a full feature-parity certificate.
 
 ## Strict WebSocket differential
 
-Use `--websocket` to exercise **thirteen** request paths against both
-executables (including three paths on a freshly restarted gateway):
+Use `--websocket` to exercise **seventeen** request paths against both
+executables (including three paths on a freshly restarted gateway). The
+original thirteen owner/continuation paths are listed first:
 
 1. Seed a soft `session_id` preference and record its actual selected owner.
 2. `response.created` and `keepalive` followed by precommit overload:
@@ -38,6 +39,18 @@ executables (including three paths on a freshly restarted gateway):
 11–13. Restart the gateway process and repeat hard previous-response,
    hard turn-state, and soft-session-only requests. No local socket or
    in-memory router cache survives the restart.
+
+The four additional tagged **0.438.0 terminal-status** cases require an
+`error` with a present but invalid primary `status` to remain nonterminal
+when secondary `status_code` is 400. The invalid values are the string
+`"invalid"`, a fractional numeric `400.5`, and overflowing u16 `65536`;
+all three must forward the exact following `response.completed` frame with
+**one** upstream attempt. Conversely, `status:65535` is a valid terminal
+error and the intentionally delayed second completion may not be forwarded.
+Every case checks exact frame bodies, strict same-owner count and negative
+controls against status truncation, premature close, replay or leaked
+post-terminal output. The complete pinned gate observes **50** synthetic
+WebSocket upstream attempts across both binaries, not 42.
 
 The pinned Prodex executable selected account-a on all these synthetic
 requests; **this fixture does not prove that soft session IDs always select
