@@ -1733,6 +1733,22 @@ SonarQube and KICS all passed. The final source tree is clean and remote
 certification of live OAuth, live quota/restart, background compaction, or all
 native TUI/platform behavior.
 
+## Three-profile quota and restart executable proof
+
+The `profileparity` stage exercises three managed profiles against a bounded
+loopback server with exact synthetic credentials. It records live quota probes
+for every profile, a precommit `401` on the selected owner, one same-request
+recovery on the next authenticated profile, and a restart phase that rotates
+the original credential and requires a fresh authenticated quota probe before
+selecting the response owner. Persisted usage snapshots alone cannot authorize
+the restart. The fixture checks profile auth-file permissions, redacts
+credentials and bounds probe/response counts.
+
+The official Prodex 0.438.0 binary and a clean Godex executable both pass the
+fixture and mutation controls. This is VERIFIED for the synthetic POSIX
+loopback profile/restart matrix; it does not claim live OAuth, provider quota
+semantics or native Windows execution.
+
 ## Exact DeepSeek invalid-input executable expansion
 
 All seven new fixtures returned canonical generic HTTP 502, plain-text body

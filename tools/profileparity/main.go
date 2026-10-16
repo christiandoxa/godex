@@ -115,6 +115,11 @@ func run() error {
 		return fmt.Errorf("native incomplete response parity failed closed: %w", err)
 	}
 	stages = append(stages, incompleteStages...)
+	quotaStages, err := checkQuotaRestart04380(work, options)
+	if err != nil {
+		return fmt.Errorf("three-profile quota/restart parity failed closed: %w", err)
+	}
+	stages = append(stages, quotaStages...)
 	encoded, err := json.MarshalIndent(resultReport{
 		Status: "PASS", CanonicalSource: canonicalProdexCommit,
 		CandidateSource: options.godexCommit, Steps: stages,

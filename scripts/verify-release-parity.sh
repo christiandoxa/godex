@@ -287,6 +287,11 @@ go test ./internal/gateway/deepseek \
 go test ./tools/differential \
   -run '^TestProdex04380DeepSeekInvalidInput' -count=1 -timeout=30s
 
+# Three managed profiles, authenticated quota probes, precommit owner
+# rotation, restart credential revalidation and snapshot-not-auth evidence.
+go test ./tools/profileparity \
+  -run '^TestProdex04380QuotaRestart' -count=1 -timeout=45s
+
 # The exact pinned executable oracle rejects unsupported typed DeepSeek message
 # roles locally with a terminal 502, zero upstream attempts and no retry.
 "$tmp/differential" \
