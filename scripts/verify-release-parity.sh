@@ -339,6 +339,17 @@ go test ./tools/profileparity \
   -count=1 -timeout=30s
 go test ./tools/profileparity -run '^TestProdex043714Startup' -count=1 -timeout=30s
 
+# Establish response ownership with real seed requests before checking exact
+# history-tag replay decisions against both source-verified executables.
+GODEX_TEST_HISTORY_PRODEX_BIN="$tmp/prodex" \
+GODEX_TEST_HISTORY_PRODEX_SOURCE="$tmp/prodex-source" \
+GODEX_TEST_HISTORY_GODEX_BIN="$tmp/godex" \
+GODEX_TEST_HISTORY_GODEX_SOURCE="$root" \
+GODEX_TEST_HISTORY_GODEX_COMMIT="$(git rev-parse HEAD)" \
+  go test ./tools/continuationparity \
+    -run '^TestProdex04380(ExecutableHistoryReplayBoundary|HistoryOracle)' \
+    -count=1 -timeout=90s
+
 # CLI argument rejection oracle. This catches delivery paths that accidentally
 # discard user arguments before reaching their owning command parser.
 "$tmp/clierrorparity" \

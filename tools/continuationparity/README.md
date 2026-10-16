@@ -11,6 +11,22 @@ streaming output, cancellation, and process restart. Historical status
 and retry differences may remain within this bounded HTTP observation;
 the fixture is not a full feature-parity certificate.
 
+## Exact HTTP history replay boundary
+
+The opt-in `TestProdex04380ExecutableHistoryReplayBoundary` test verifies nine
+request-history shapes against the pinned executables. Each case creates its
+response owner with a real successful HTTP seed request before the upstream
+rejects the previous ID. Only exact compaction/completed-turn/function-call
+histories allow a second same-owner attempt; padded tags and
+`compaction_trigger` retain the original 400. Recovery removes only the previous
+ID and preserves context-window metadata and all other request fields.
+
+`scripts/verify-release-parity.sh --phase=preflight-oracles` supplies all five
+`GODEX_TEST_HISTORY_*` executable/source/commit settings and runs the test.
+Ordinary tests skip this executable fixture when paths are absent. Offline
+negative controls reject missing seeds, extra attempts, changed owners,
+false success, changed errors, retained previous IDs, and lost context.
+
 ## Strict WebSocket differential
 
 Use `--websocket` to exercise **nineteen** request paths against both

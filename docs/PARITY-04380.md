@@ -1547,5 +1547,19 @@ two attempts and HTTP 200. Both pass after the shared routing predicate uses
 exact decoded JSON strings. Valid escaped JSON tags remain accepted; identity
 whitespace handling is unchanged. The small predicate stays private in
 `usecase/routing`; no helper package, dependency, or persisted format is added.
-This is VERIFIED for the source-derived replay guard. An independent executable
-history differential is the next proof; full live compaction remains PARTIAL.
+This is VERIFIED for the source-derived replay guard; full live compaction
+remains PARTIAL.
+
+The new opt-in `tools/continuationparity` executable fixture establishes each
+response owner with an actual seed request. All nine cases passed on the exact
+official Prodex binary. Godex `e721197c` failed all four padded-tag cases with
+two attempts and HTTP 200; clean fixed candidate `3c41bc0d` passed all nine.
+The positive controls require exact compaction, escaped compaction, completed
+turn, and function-call histories to recover once. Negative controls require
+`compaction_trigger` and all padded tags to preserve one attempt and the
+original 400. Every attempt must keep the seeded owner and all request fields,
+except removal of the previous ID on a permitted recovery; context-window
+metadata is checked explicitly. Mutation tests reject false positives, lost
+context, missing seeds, and owner changes. This fixture is now wired into
+`--phase=preflight-oracles`. It is synthetic two-executable protocol evidence,
+not a live Codex compaction run.
