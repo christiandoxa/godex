@@ -1530,3 +1530,22 @@ clean Godex commit `6f4c544ec146e950c2ced9670d24c27d3a363458`, with remote
 `make verify` also passes on this commit. The gate is finite synthetic and
 loopback evidence; native OAuth, live quota/restart behavior, live Codex
 compaction, and native Windows/macOS execution remain PARTIAL.
+
+## Exact request-history tags before replay
+
+Canonical `mojo/prodex_core/runtime_proxy_request.mojo` compares history
+`type` and `role` tags exactly in both parsed and raw input-shape kernels.
+Godex trimmed those tags while deciding whether history could be reconstructed.
+As a result, `" compaction "` followed by a user message incorrectly authorized
+a second model request after an invalid previous ID and could replace the
+original HTTP 400 with a 200.
+
+`TestProdex04380FullHistoryRequiresExactProtocolTags` failed for padded
+compaction, user, assistant, and function-call tags. The routed regression
+`TestProdex04380InvalidPreviousIDDoesNotReplayPaddedCompaction` failed with
+two attempts and HTTP 200. Both pass after the shared routing predicate uses
+exact decoded JSON strings. Valid escaped JSON tags remain accepted; identity
+whitespace handling is unchanged. The small predicate stays private in
+`usecase/routing`; no helper package, dependency, or persisted format is added.
+This is VERIFIED for the source-derived replay guard. An independent executable
+history differential is the next proof; full live compaction remains PARTIAL.

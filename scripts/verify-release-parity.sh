@@ -177,6 +177,12 @@ go test -race ./internal/usecase/routing \
   -run '^Test(ResponsesInvalidPreviousIDDoesNotReplayCompactionTriggerHistory|ReconstructableFullHistoryMatchesCodexRequestShapes)$' \
   -count=1 -timeout=35s
 
+# Tagged request-shape kernels compare protocol type/role tags exactly;
+# padded tags cannot authorize full-history replay after an invalid ID.
+go test -race ./internal/usecase/routing \
+  -run '^TestProdex04380(FullHistoryRequiresExactProtocolTags|InvalidPreviousIDDoesNotReplayPaddedCompaction)$' \
+  -count=1 -timeout=35s
+
 # Prodex 0.438.0 loopback proxy listener survives real Linux RLIMIT_NOFILE
 # exhaustion and handles a queued request exactly once after FD release.
 # Go's standard net/http accept loop has bounded retry; do not copy tiny_http.

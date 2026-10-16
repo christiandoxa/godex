@@ -165,10 +165,10 @@ func reconstructableFullHistory(input []json.RawMessage) bool {
 		if json.Unmarshal(raw, &item) != nil {
 			continue
 		}
-		if jsonString(item["type"]) == "compaction" && index+1 < len(input) {
+		if exactJSONTag(item["type"], "compaction") && index+1 < len(input) {
 			return true
 		}
-		if jsonString(item["role"]) != "user" {
+		if !exactJSONTag(item["role"], "user") {
 			continue
 		}
 		for later := index + 1; later+1 < len(input); later++ {
@@ -176,12 +176,17 @@ func reconstructableFullHistory(input []json.RawMessage) bool {
 			if json.Unmarshal(input[later], &next) != nil {
 				continue
 			}
-			if jsonString(next["role"]) == "assistant" || jsonString(next["type"]) == "function_call" {
+			if exactJSONTag(next["role"], "assistant") || exactJSONTag(next["type"], "function_call") {
 				return true
 			}
 		}
 	}
 	return false
+}
+
+func exactJSONTag(raw json.RawMessage, expected string) bool {
+	var value string
+	return json.Unmarshal(raw, &value) == nil && value == expected
 }
 
 func requestPreviousResponseID(body []byte) string {
