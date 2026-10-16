@@ -138,10 +138,12 @@ This applies to login, runtime, proxy and capability commands; Windows keeps
 its explicit interrupt/`WaitDelay` cancellation path. The regression set covers a SIGTERM-aware
 non-TTY child, owned descendants without touching an unrelated process, a PTY
 first SIGINT/second-interrupt sequence, capability-probe non-interactivity and
-session-server companion cleanup. The focused package and race suite pass
-(335 tests each). This is VERIFIED for the Linux ownership/cancellation
-boundary; native Windows signal semantics, macOS execution and full Codex TUI
-behavior remain PARTIAL.
+session-server companion cleanup. The descendant process-group regression is
+Linux-only because it inspects `/proc` and Linux process groups; the Unix
+non-TTY and companion tests still compile and run on macOS. The focused Linux
+package and race suite pass (335 tests each). This is VERIFIED for the Linux
+ownership/cancellation boundary; native Windows signal semantics, macOS
+execution and full Codex TUI behavior remain PARTIAL.
 
 ## Shutdown during unresolved Linux descriptor exhaustion
 

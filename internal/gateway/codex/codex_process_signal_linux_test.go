@@ -7,7 +7,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strings"
@@ -91,5 +93,53 @@ func TestRunTerminalCommandPreservesInteractiveFirstInterrupt(t *testing.T) {
 	}
 	if got, err := os.ReadFile(marker); err != nil || string(got) != codexInteractiveMarkerText {
 		t.Fatalf("second interrupt signal = %q, err=%v", got, err)
+	}
+}
+
+func TestRunCancellationReapsNonTTYDescendants(t *testing.T) {
+	root := t.TempDir()
+	defer stopSessionCompanionNative(root)
+	t.Setenv(sessionCompanionHelperEnv, "1")
+	t.Setenv(sessionCompanionTreeEnv, "1")
+	marker := filepath.Join(root, "events")
+	t.Setenv(sessionCompanionMarkerEnv, marker)
+	home := filepath.Join(root, "home")
+	if err := os.MkdirAll(home, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	unrelated := exec.Command("sleep", "30")
+	if err := unrelated.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_ = unrelated.Process.Kill()
+		_ = unrelated.Wait()
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	process := NewCodexProcess(sessionCompanionTreeWrapper(t), Terminal{
+		Stdin: strings.NewReader(""), Stdout: io.Discard, Stderr: io.Discard,
+	})
+	finished := make(chan error, 1)
+	go func() {
+		finished <- process.Run(ctx, home, []string{"app-server", "--listen", "unix://" + filepath.Join(root, "outer.sock")})
+	}()
+	if !waitForSessionForegroundFile(filepath.Join(root, "native-ready")) {
+		t.Fatal("direct child fixture did not publish native readiness")
+	}
+	nativePID, err := readSessionCompanionPID(filepath.Join(root, "native-pid"))
+	if err != nil || !sessionCompanionProcessAlive(nativePID) {
+		t.Fatalf("native descendant %d was not live: %v", nativePID, err)
+	}
+	cancel()
+	if err := <-finished; !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancellation error = %v", err)
+	}
+	if !waitForSessionNativeGone(filepath.Join(root, "native-pid")) {
+		t.Fatal("non-TTY child descendant survived cancellation")
+	}
+	if err := syscall.Kill(unrelated.Process.Pid, 0); err != nil {
+		t.Fatalf("unrelated process was terminated: %v", err)
 	}
 }
