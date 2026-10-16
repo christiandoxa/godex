@@ -84,6 +84,21 @@ func (b *backend) serveWebSocket(writer http.ResponseWriter, request *http.Reque
 					`{"type":"response.completed","response":{"id":"resp-recovered"}}`,
 				}
 			}
+		case "ws-status-fraction":
+			payloads = []string{
+				`{"type":"error","status":400.5,"status_code":400}`,
+				`{"type":"response.completed","response":{"id":"resp-status-fraction"}}`,
+			}
+		case "ws-status-overflow":
+			payloads = []string{
+				`{"type":"error","status":65536,"status_code":400}`,
+				`{"type":"response.completed","response":{"id":"resp-status-overflow"}}`,
+			}
+		case "ws-status-high":
+			payloads = []string{
+				`{"type":"error","status":65535}`,
+				`{"type":"response.completed","response":{"id":"should-not-be-forwarded"}}`,
+			}
 		case "ws-status-priority":
 			// A present but invalid `status` must suppress `status_code`
 			// fallback. The first error frame is explicitly NON-terminal
@@ -107,7 +122,10 @@ func (b *backend) serveWebSocket(writer http.ResponseWriter, request *http.Reque
 		default:
 			payloads = []string{`{"type":"response.completed","response":{"id":"resp-default"}}`}
 		}
-		for _, payload := range payloads {
+		for i, payload := range payloads {
+			if envelope.Mode == "ws-status-high" && i == 1 {
+				time.Sleep(75 * time.Millisecond)
+			}
 			if websocketframe.WriteFrame(connection, 1, []byte(payload), false) != nil {
 				return
 			}
@@ -238,8 +256,19 @@ func websocketProbe(endpoint, mode string) (wsProbe, error) {
 		result.types = append(result.types, event.Type)
 		result.delta = append(result.delta, event.Delta)
 		result.body = append(result.body, string(payload))
+		if event.Type == "error" && mode == "ws-status-high" {
+			// The successful u16 terminal error must end the response; a
+			// deliberately delayed `response.completed` must NOT leak.
+			_ = connection.SetReadDeadline(time.Now().Add(250 * time.Millisecond))
+			extra, frameErr := websocketframe.ReadHeader(reader)
+			if frameErr == nil && extra.Opcode != 8 {
+				return result, fmt.Errorf("terminal high-u16 error leaked followup frame (opcode=%d)", extra.Opcode)
+			}
+			return result, nil
+		}
+		nonterminalError := mode == "ws-status-priority" || mode == "ws-status-fraction" || mode == "ws-status-overflow"
 		if event.Type == "response.failed" || event.Type == "response.completed" ||
-			(event.Type == "error" && mode != "ws-status-priority") {
+			(event.Type == "error" && !nonterminalError) {
 			return result, nil
 		}
 	}
@@ -269,6 +298,14 @@ func runWebSocketProduct(root string, b *backend, p product) error {
 		{mode: "ws-status-priority", want: []string{"error", "response.completed"}, attempts: 1, owner: "account-a",
 			rawFrames: []string{`{"type":"error","status":"invalid","status_code":400}`,
 				`{"type":"response.completed","response":{"id":"resp-status-priority"}}`}},
+		{mode: "ws-status-fraction", want: []string{"error", "response.completed"}, attempts: 1, owner: "account-a",
+			rawFrames: []string{`{"type":"error","status":400.5,"status_code":400}`,
+				`{"type":"response.completed","response":{"id":"resp-status-fraction"}}`}},
+		{mode: "ws-status-overflow", want: []string{"error", "response.completed"}, attempts: 1, owner: "account-a",
+			rawFrames: []string{`{"type":"error","status":65536,"status_code":400}`,
+				`{"type":"response.completed","response":{"id":"resp-status-overflow"}}`}},
+		{mode: "ws-status-high", want: []string{"error"}, attempts: 1, owner: "account-a",
+			rawFrames: []string{`{"type":"error","status":65535}`}},
 		{mode: "ws-bound", want: []string{"response.completed"}, attempts: 1, owner: "account-a"},
 		{mode: "ws-turn", want: []string{"response.completed"}, attempts: 1, owner: "account-a"},
 		{mode: "ws-unknown", want: []string{"response.completed"}, attempts: 1, owner: "account-a"},
