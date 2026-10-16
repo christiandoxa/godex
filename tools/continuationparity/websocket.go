@@ -84,6 +84,14 @@ func (b *backend) serveWebSocket(writer http.ResponseWriter, request *http.Reque
 					`{"type":"response.completed","response":{"id":"resp-recovered"}}`,
 				}
 			}
+		case "ws-status-priority":
+			// A present but invalid `status` must suppress `status_code`
+			// fallback. The first error frame is explicitly NON-terminal
+			// in 0.438.0; the following completion still has to arrive.
+			payloads = []string{
+				`{"type":"error","status":"invalid","status_code":400}`,
+				`{"type":"response.completed","response":{"id":"resp-status-priority"}}`,
+			}
 		case "ws-committed":
 			payloads = []string{
 				`{"type":"keepalive"}`,
@@ -230,7 +238,8 @@ func websocketProbe(endpoint, mode string) (wsProbe, error) {
 		result.types = append(result.types, event.Type)
 		result.delta = append(result.delta, event.Delta)
 		result.body = append(result.body, string(payload))
-		if event.Type == "response.failed" || event.Type == "response.completed" || event.Type == "error" {
+		if event.Type == "response.failed" || event.Type == "response.completed" ||
+			(event.Type == "error" && mode != "ws-status-priority") {
 			return result, nil
 		}
 	}
@@ -257,6 +266,9 @@ func runWebSocketProduct(root string, b *backend, p product) error {
 		{mode: "ws-session-seed", want: []string{"response.completed"}, attempts: 1, owner: "account-a"},
 		{mode: "ws-keepalive", want: []string{"response.output_text.delta", "response.completed"}, delta: "recovered", attempts: 2, owner: "account-a"},
 		{mode: "ws-committed", want: []string{"keepalive", "response.output_text.delta", "response.failed"}, delta: "visible", attempts: 1, owner: "account-a"},
+		{mode: "ws-status-priority", want: []string{"error", "response.completed"}, attempts: 1, owner: "account-a",
+			rawFrames: []string{`{"type":"error","status":"invalid","status_code":400}`,
+				`{"type":"response.completed","response":{"id":"resp-status-priority"}}`}},
 		{mode: "ws-bound", want: []string{"response.completed"}, attempts: 1, owner: "account-a"},
 		{mode: "ws-turn", want: []string{"response.completed"}, attempts: 1, owner: "account-a"},
 		{mode: "ws-unknown", want: []string{"response.completed"}, attempts: 1, owner: "account-a"},
@@ -320,6 +332,7 @@ type websocketExpectation struct {
 	owner       string
 	errorCode   string
 	errorStatus int
+	rawFrames   []string
 }
 
 func verifyWebsocketExpectation(probe websocketExpectation, got wsProbe, observed []string) error {
@@ -342,6 +355,16 @@ func verifyWebsocketExpectation(probe websocketExpectation, got wsProbe, observe
 	for i, want := range probe.want {
 		if got.types[i] != want {
 			return fmt.Errorf("%s event kinds %v, want %v", probe.mode, got.types, probe.want)
+		}
+	}
+	if len(probe.rawFrames) != 0 {
+		if len(got.body) != len(probe.rawFrames) {
+			return fmt.Errorf("%s missing exact native terminality frames", probe.mode)
+		}
+		for index, expected := range probe.rawFrames {
+			if got.body[index] != expected {
+				return fmt.Errorf("%s frame[%d]=%q, expected %q", probe.mode, index, got.body[index], expected)
+			}
 		}
 	}
 	if !strings.Contains(strings.Join(got.delta, ","), probe.delta) {
