@@ -16,7 +16,7 @@ transfer 0.437.14 differential PASS claims to the new 0.438.0 target.
 | Windows signed process exit and Unix cancellation | PARTIAL | A source-derived signed-i32 policy now detects Windows Ctrl-C NTSTATUS and real Unix SIGINT; original Go logic detected only exit 130. Tagged negative controls and native Linux child-signal tests PASS; Windows cross-compiled test binary, but Windows runtime execution has not been observed. |
 | Local proxy under accept and accepted-socket resource pressure | PARTIAL (Linux cross-binary recovery VERIFIED) | Actual official Prodex 0.438.0 and clean Godex gateway both reached RLIMIT_NOFILE=80 under 120 partially written TCP connections; each retained the original port, held a newly queued GET while saturated, served it exactly once after release, served a subsequent independent GET, and exited cleanly. The new source/SHA-pinned `profileparity` stage and mutation controls cover 3 exact upstream GETs. Go's stdlib has no Rust tiny_http accepted-clone step, so an isolated cross-executable clone-specific failure and native Windows/macOS behavior remain unverified. |
 | Official Codex 0.163.0 compatibility | PARTIAL | Official `rust-v0.163.0` asset metadata and SHA-256 verified; extracted binary `codex-cli 0.163.0` successfully completed real isolated app-server `initialize`, `thread/list` active and archived through the Godex protocol on Linux x86_64. `TestProdex04380OfficialCodex0163AppServerInitializeAndThreadList` PASS. `response.incomplete`, compaction, native retry/interrupt and Windows MCP environments still need separate executable evidence. |
-| 0.438.0 pinned release differential | VERIFIED (finite gate only) | All six independent binary harnesses use official 0.438.0 tagged source, manifest, binary version and SHA. On clean `c4cc8e0f` all four release phases PASS: preflight (including verified native Codex 0.163.0 app-server handshake, real EMFILE and shutdown), DeepSeek 22/22, Gemini 10/10, WebSocket 42 upstream attempts; negative controls retained, no reported material comparison differences. This is not a production-wide 1:1 certification. |
+| 0.438.0 pinned release differential | VERIFIED (finite gate only) | Clean Godex `37246b8b`: independently source/SHA-pinned `--phase=preflight-tests` and `--phase=preflight-oracles` both PASS (together full preflight, including official Codex 0.163.0 handshake and 34/34 profile stages with cross-binary FD recovery and 6 incomplete reason/frame cases). DeepSeek 22/22, Gemini 10/10, WebSocket 42 upstream attempts all PASS with negative controls, zero reported comparison differences. Six-target cross-build/test compilation PASS. Not production-wide 1:1 certification. |
 | Three-profile quota/auth restart | PARTIAL | Prior Godex 0.437.14 synthetic and multi-process tests PASS. Independent two-executable multi-profile restart differential is still needed. |
 
 **Status is PARTIAL, not certified 1:1 production parity.** Only a fully
@@ -236,3 +236,48 @@ PASS on an identical commit; either partition by itself is **not** the entire
 preflight. The existing `--phase=preflight` and no-argument full release gate
 retain **both** groups with no tests removed. This avoids hiding an uncompleted
 run behind a timeout or relaxing any negative control.
+
+## Complete pinned release-gate checkpoint on `37246b8b`
+
+The single-worktree/one-process preflight at `3b6d3c83` exceeded the
+synchronous tool budget after completing local tests; the independent pinned
+partitions added in `37246b8b` resolved that execution constraint **without
+removing or weakening any tests**. All of the following returned exit 0 on
+the **same exact clean Godex commit**
+`37246b8bf80025cce524943b1a567dfd70f9c7fb`:
+
+- `--phase=preflight-tests`: **PASS** (all local pinned regressions,
+  verified official Codex 0.163.0 native app-server, HTTP payload safety,
+  real Linux low-RLIMIT EMFILE acceptance and shutdown, auth recovery and
+  mutation controls).
+- `--phase=preflight-oracles`: **PASS** (published Prodex 0.438.0 source,
+  binary/version SHA and manifest checked; Linux PTY, profile lifecycle,
+  CLI errors and context; **34/34** profile stages, including cross-executable
+  Linux FD saturation with a queued/retained-port request and **six** native
+  buffered/SSE incomplete results for three distinct incomplete reasons).
+- `--phase=deepseek`: **PASS 22/22**, `comparison_differences: []`, all
+  configured negative mutation controls PASS.
+- `--phase=gemini`: **PASS 10/10**, `comparison_differences: []`, all
+  configured negative mutation controls PASS.
+- `--phase=websocket`: **PASS**, 42 loopback upstream attempts, precommit
+  retry, owner-affinity and strict no-postcommit-replay checks.
+
+Every invocation independently pinned Prodex source
+`8cab9794b0e08b2cb8507df8321a8e38ebd6492f`, published Linux binary
+SHA-256
+`9ec1702c58983a8e3bd7f2e7f49c34a2d656f766fd535bbe34d08c94d436ac2a`
+and manifest, then built/checksummed the same clean Godex VCS candidate.
+`make verify` PASS on the preceding production-equivalent commit `3b6d3c83`;
+`scripts/check-cross-build.sh` independently PASS on exact `37246b8b` across
+Linux AMD64/ARM64, Darwin AMD64/ARM64, Windows AMD64/ARM64 plus Darwin ARM64
+and Windows AMD64 cross-test compilation. The default no-option script and
+unsplit `--phase=preflight` still run the complete original groups and
+cannot report success for a partial group.
+
+The finite synthetic oracle is therefore **VERIFIED** for these checked
+contracts. Production-wide behavioral parity remains **PARTIAL**: genuine
+native Windows/macOS runtime and TUI, Rust accepted-stream-clone failure
+isolated from general FD exhaustion, real live multi-profile OAuth/quota
+restart behavior, and native Codex 0.163.0 foreground/background model
+compaction are outside the verified fixture coverage. Never claim
+unqualified 1:1 on the basis of finite synthetic runs alone.
