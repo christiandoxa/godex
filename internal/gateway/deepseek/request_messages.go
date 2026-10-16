@@ -7,12 +7,6 @@ import (
 	"strings"
 )
 
-type unsupportedMessageRoleError struct{ role string }
-
-func (err *unsupportedMessageRoleError) Error() string {
-	return fmt.Sprintf("DeepSeek message role `%s` is not supported by this Responses adapter", err.role)
-}
-
 func deepSeekMessages(object map[string]any) ([]any, error) {
 	messages := make([]any, 0)
 	if instructions, ok := object["instructions"].(string); ok && strings.TrimSpace(instructions) != "" {
@@ -47,7 +41,10 @@ func deepSeekInputItem(item map[string]any) ([]any, error) {
 	if _, found := item["prefix"]; found {
 		return nil, errors.New("DeepSeek chat prefix completion requires the beta chat endpoint, which is outside this Responses adapter")
 	}
-	kind, _ := item["type"].(string)
+	kind, kindPresent := item["type"].(string)
+	if _, found := item["type"]; found && (!kindPresent || kind == "") {
+		return nil, errors.New("DeepSeek input item type `` is not supported by this Responses adapter")
+	}
 	switch kind {
 	case "", "message":
 		message, err := deepSeekMessageItem(item)
@@ -86,7 +83,7 @@ func deepSeekMessageItem(item map[string]any) (map[string]any, error) {
 			return nil, errors.New("DeepSeek message role must be a string")
 		}
 		if item["type"] == "message" && text != "user" && text != "assistant" && text != "system" && text != "developer" {
-			return nil, &unsupportedMessageRoleError{role: text}
+			return nil, fmt.Errorf("DeepSeek message role `%s` is not supported by this Responses adapter", text)
 		}
 		switch text {
 		case "assistant", "system", "tool", "user":
@@ -95,7 +92,11 @@ func deepSeekMessageItem(item map[string]any) (map[string]any, error) {
 			role = "system"
 		}
 	}
-	content, err := deepSeekTextContent(item[deepSeekContentKey])
+	contentValue, contentPresent := item[deepSeekContentKey]
+	if item["type"] == "message" && contentPresent && contentValue == nil {
+		return nil, errors.New("DeepSeek message content must be a string, object, or array")
+	}
+	content, err := deepSeekTextContent(contentValue)
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +214,11 @@ func deepSeekToolCallItems(item map[string]any, kind string) ([]any, error) {
 		return nil, errors.New(deepSeekToolCallIDRequired)
 	}
 	name := firstStringValue(item, "name", "tool_name")
-	if name == "" {
+	_, topLevelNamePresent := item["name"].(string)
+	if !topLevelNamePresent {
+		_, topLevelNamePresent = item["tool_name"].(string)
+	}
+	if !topLevelNamePresent {
 		if function, ok := item[deepSeekFunctionKey].(map[string]any); ok {
 			name = firstStringValue(function, "name")
 		}
@@ -254,14 +259,18 @@ func deepSeekToolCallItems(item map[string]any, kind string) ([]any, error) {
 
 func deepSeekShellCallItem(item map[string]any) (map[string]any, error) {
 	callID := firstStringValue(item, deepSeekCallIDKey, deepSeekToolCallIDKey, "id")
-	if callID == "" {
+	if strings.TrimSpace(callID) == "" {
 		return nil, errors.New(deepSeekToolCallIDRequired)
 	}
 	command := ""
 	if action, ok := item["action"].(map[string]any); ok {
-		if raw, ok := action["command"].([]any); ok && len(raw) > 0 {
-			parts := make([]string, 0, len(raw))
-			for _, value := range raw {
+		if raw, found := action["command"]; found {
+			values, valid := raw.([]any)
+			if !valid || len(values) == 0 {
+				return nil, errors.New("DeepSeek local_shell_call action.command must be an array of strings")
+			}
+			parts := make([]string, 0, len(values))
+			for _, value := range values {
 				text, ok := value.(string)
 				if !ok || strings.TrimSpace(text) == "" {
 					return nil, errors.New("DeepSeek local_shell_call action.command must be an array of strings")
@@ -270,8 +279,7 @@ func deepSeekShellCallItem(item map[string]any) (map[string]any, error) {
 			}
 			command = strings.Join(parts, " ")
 		}
-	}
-	if command == "" {
+	} else {
 		command = firstStringValue(item, "command")
 	}
 	if strings.TrimSpace(command) == "" {

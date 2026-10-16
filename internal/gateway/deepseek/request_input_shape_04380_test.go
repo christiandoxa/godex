@@ -41,3 +41,58 @@ func TestProdex04380DeepSeekResponsesUntypedRoleRetainsChatFallback(t *testing.T
 		t.Fatalf("untyped chat-role fallback changed: %#v", messages)
 	}
 }
+
+// Prodex 0.438.0's tagged input-item validator treats an explicit null
+// content value as malformed; an omitted content field remains valid.
+func TestProdex04380DeepSeekResponsesRejectsNullTypedMessageContent(t *testing.T) {
+	_, err := ResponsesRequest([]byte(`{"input":[{"type":"message","role":"user","content":null}]}`), RequestOptions{})
+	if err == nil || !strings.Contains(err.Error(), "DeepSeek message content must be a string, object, or array") {
+		t.Fatalf("null typed message content error = %v", err)
+	}
+}
+
+// The tagged Responses transform bounds the request object at the 4 MiB Mojo
+// kernel limit; the separate SimpleRequest operation has a larger limit.
+func TestProdex04380DeepSeekResponsesRejectsRequestOverKernelLimit(t *testing.T) {
+	body := []byte(`{"input":"` + strings.Repeat("x", 4<<20) + `"}`)
+	_, err := ResponsesRequest(body, RequestOptions{})
+	if err == nil || !strings.Contains(err.Error(), "DeepSeek request policy input exceeds 4194304 bytes") {
+		t.Fatalf("oversized Responses request error = %v", err)
+	}
+}
+
+func TestProdex04380DeepSeekResponsesRejectsMalformedPresentInputType(t *testing.T) {
+	for _, rawType := range []string{"null", "1", `""`} {
+		t.Run(rawType, func(t *testing.T) {
+			body := []byte(`{"input":[{"type":` + rawType + `,"content":"note"}]}`)
+			_, err := ResponsesRequest(body, RequestOptions{})
+			if err == nil || !strings.Contains(err.Error(), "DeepSeek input item type `` is not supported by this Responses adapter") {
+				t.Fatalf("malformed input type %s error = %v", rawType, err)
+			}
+		})
+	}
+}
+
+func TestProdex04380DeepSeekResponsesRejectsEmptyTopLevelToolName(t *testing.T) {
+	body := []byte(`{"input":[{"type":"function_call","call_id":"call_1","name":"","function":{"name":"lookup"}}]}`)
+	_, err := ResponsesRequest(body, RequestOptions{})
+	if err == nil || !strings.Contains(err.Error(), "DeepSeek input tool call items require a function name") {
+		t.Fatalf("empty top-level tool name error = %v", err)
+	}
+}
+
+func TestProdex04380DeepSeekResponsesRejectsInvalidNestedShellCommand(t *testing.T) {
+	body := []byte(`{"input":[{"type":"local_shell_call","call_id":"call_1","action":{"command":[]},"command":"fallback"}]}`)
+	_, err := ResponsesRequest(body, RequestOptions{})
+	if err == nil || !strings.Contains(err.Error(), "DeepSeek local_shell_call action.command must be an array of strings") {
+		t.Fatalf("invalid nested shell command error = %v", err)
+	}
+}
+
+func TestProdex04380DeepSeekResponsesRejectsBlankShellCallID(t *testing.T) {
+	body := []byte(`{"input":[{"type":"local_shell_call","call_id":"  ","action":{"command":["echo","ok"]}}]}`)
+	_, err := ResponsesRequest(body, RequestOptions{})
+	if err == nil || !strings.Contains(err.Error(), "DeepSeek input tool items require a call_id") {
+		t.Fatalf("blank shell call ID error = %v", err)
+	}
+}

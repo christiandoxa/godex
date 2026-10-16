@@ -13,6 +13,7 @@ transfer 0.437.14 differential PASS claims to the new 0.438.0 target.
 
 | Surface | Status | Evidence / next proof |
 | --- | --- | --- |
+| Windows SessionStart callback cursors | VERIFIED for native CI regression scope | Native Windows run `38921361347` failed six callback/recovery tests and an absolute-path fixture on `3c41bc0d`. On corrected `e02445aa`, the native Windows and macOS portable test/build jobs in run `38923328140` passed. Plain/compressed rollouts, partial lines, root ownership and binding checks execute in this scope; physical TUI and signed child interruption remain PARTIAL. |
 | Windows signed process exit and Unix cancellation | PARTIAL | A source-derived signed-i32 policy now detects Windows Ctrl-C NTSTATUS and real Unix SIGINT; original Go logic detected only exit 130. Tagged negative controls and native Linux child-signal tests PASS; Windows cross-compiled test binary, but Windows runtime execution has not been observed. |
 | Local proxy under accept and accepted-socket resource pressure | PARTIAL (Linux cross-binary recovery VERIFIED) | Actual official Prodex 0.438.0 and clean Godex gateway both reached RLIMIT_NOFILE=80 under 120 partially written TCP connections; each retained the original port, held a newly queued GET while saturated, served it exactly once after release, served a subsequent independent GET, and exited cleanly. The new source/SHA-pinned `profileparity` stage and mutation controls cover 3 exact upstream GETs. Go's stdlib has no Rust tiny_http accepted-clone step, so an isolated cross-executable clone-specific failure and native Windows/macOS behavior remain unverified. |
 | Official Codex 0.163.0 compatibility | PARTIAL | Official `rust-v0.163.0` asset metadata and SHA-256 verified; extracted binary `codex-cli 0.163.0` successfully completed real isolated app-server `initialize`, `thread/list` active and archived through the Godex protocol on Linux x86_64. `TestProdex04380OfficialCodex0163AppServerInitializeAndThreadList` PASS. `response.incomplete`, compaction, native retry/interrupt and Windows MCP environments still need separate executable evidence. |
@@ -1606,8 +1607,49 @@ owners; no shared helper or persisted format is introduced.
 -count=1` passes locally (43 tests). `rtk test make verify` also passes, including
 the full race suite and Linux/macOS/Windows cross-build and test compilation.
 This is a source-confirmed platform fix
-with observed native fail-before evidence; native Windows pass-after remains
-PARTIAL until the corrected commit executes in that lane. The same run's
+with observed native fail-before evidence and the native pass-after below.
+The same fail-before run's
 macOS portable test/build lane passed; it does not prove all TUI or signal
 paths executed. The Sonar coverage job separately failed the real-FD-pressure
 test; that synchronization issue is tracked independently.
+
+Native pass-after is now observed on `e02445aa6df7cc9128c3754ab9d293d165716b9c`:
+the Windows portable test/build job `117048496251` and macOS portable job
+`117048496079` in run `38923328140` both passed. That run's Sonar coverage and
+quality gate also passed. The Linux race job separately reproduced the same
+real-FD-pressure test synchronization failure, so the overall run is not green.
+
+## DeepSeek malformed input and normalized policy bounds
+
+Canonical Mojo input-item validation tags 5, 11, 13 and 15 reject explicit null
+message content, malformed present item types, a blank present top-level tool
+name and malformed nested shell commands. A nested action also suppresses a
+top-level command fallback. Shell call IDs must contain non-whitespace text.
+The Rust `request_policy.rs` boundary checks a 4 MiB serialization of the parsed
+request object. Godex's existing raw-input cap stays at 16 MiB.
+
+Godex accepted all seven new malformed/oversized public gateway fixtures and
+made upstream requests. Translator validation alone then returned HTTP 400.
+`TestProdex04380DeepSeekInvalidInputIsTerminalBeforeUpstream` failed at both
+stages; it now checks eight fixtures, terminal generic HTTP 502 and zero
+upstream calls. The private input-validation error replaces the previous
+role-only error classification. It preserves internal error causes and maps
+the same input-validation boundary to the canonical public failure. Existing
+untyped message-role fallback remains covered.
+
+The policy bound is measured after decoding and compact serialization, with
+HTML escaping disabled and literal U+2028/U+2029 sizes restored to match
+`serde_json`. Positive controls for raw whitespace, duplicate keys, escaped
+text, HTML-like text and Unicode line separators protect accepted input;
+the first three failed under a raw 4 MiB cap. The implementation stays private
+in `gateway/deepseek`, which owns protocol validation and transport errors.
+There is no new shared helper, dependency, configuration or persistence format.
+
+`rtk go test ./internal/gateway/deepseek ./tools/differential -count=1` and
+`rtk go test -race ./internal/gateway/deepseek ./tools/differential -count=1`
+both pass (370 tests). The source-size guard also passes. Exact two-executable
+`rtk test make verify` also passes, including the full race suite and
+cross-build matrix. Exact two-executable validation of the expanded
+malformed-input fixtures is pending. Numeric JSON
+rendering at the exact policy byte limit has not been compared independently;
+broader malformed-input and live provider parity remain PARTIAL.

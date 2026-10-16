@@ -75,6 +75,9 @@ func parseResponsesObject(body []byte) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := checkRequestPolicySize(object); err != nil {
+		return nil, err
+	}
 	if err := rejectRequestFields(object); err != nil {
 		return nil, err
 	}
@@ -108,7 +111,7 @@ func translateRequestParts(object map[string]any, options RequestOptions) (trans
 	}
 	messages, err := deepSeekMessages(object)
 	if err != nil {
-		return translatedRequestParts{}, err
+		return translatedRequestParts{}, &invalidResponsesInputError{err}
 	}
 	tools, toolNames, err := deepSeekTools(object, options.StrictTools)
 	if err != nil {
