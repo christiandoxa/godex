@@ -94,6 +94,12 @@ if [ -n "${GODEX_TEST_CODEX_0163_APP_SERVER_BIN:-}" ]; then
     -count=1 -timeout=40s
 fi
 
+# Prodex 0.438.0 clap rejects Super --api-key without --provider as a
+# usage error (exit 2), not a runtime error (exit 1). Keep both normal and
+# `s` alias paths inside the source-pinned executable CLI differential.
+go test ./internal/delivery/cli/runtime ./tools/clierrorparity \
+  -run '^TestProdex04380Super' -count=1 -timeout=30s
+
 # Prodex 0.438.0 can select a previously failed authenticated profile
 # only after an exhausted transient pool and a successful bounded retry
 # wait, preserving eligible backup order and model-specific quota checks.

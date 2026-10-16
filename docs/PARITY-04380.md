@@ -19,6 +19,7 @@ transfer 0.437.14 differential PASS claims to the new 0.438.0 target.
 | 0.438.0 pinned release differential | VERIFIED (finite gate only) | Clean Godex `b0d0dc7f`: independently source/SHA-pinned `--phase=preflight-tests` and `--phase=preflight-oracles` both PASS (full preflight, including official Codex 0.163.0 handshake and 34/34 profile cases). DeepSeek 22/22, Gemini 10/10, WebSocket **50 upstream attempts** including status-field wire precedence PASS, negative controls retained; zero reported semantic differences. Six-target cross-build/test compilation PASS. Not a production-wide 1:1 certification. |
 | WebSocket terminal-frame Mojo classification | VERIFIED for tested status-wire cases; PARTIAL overall | Source-derived regressions reproduced actual Godex mismatches in `status`/`status_code` precedence, strict u16 bounds and nested/top-level connection-limit matching. Fixed in `4aac2592`; real pinned Prodex/Godex `--websocket` comparison confirms continuation after invalid/fractional/overflow primary status and **terminal error** for valid `65535` (one upstream attempt per mode; total 50). Status-frame mutation tests PASS. Broader native connection-limit and every future JSON field permutation remain open. |
 | Usage-limit native session candidate fallback after transient pool retry | PARTIAL | Tagged 0.438.0 compiled Mojo `usage_limit_recovery_candidate` allows the originally failed profile as the **last** candidate only after a transient wait and verified eligibility/quota. Godex formerly always excluded the original owner and could relaunch a previously exhausted backup. `TestProdex04380SessionRecoveryFailedProfileFallbackAfterPoolRetry` reproduced these failures and now passes with three profiles, model-aware ready claims, backup precedence, cancellation, owner/credential negative controls and prompt-no-replay. Legacy no-quota adapter backup retries remain unchanged. Independent exact-binary three-profile session recovery differential still OPEN. |
+| Super CLI required-provider usage exit | PARTIAL | Exact Prodex 0.438.0 CLI reports exit 2 for `super --api-key <value> --dry-run` without required `--provider`, while prior Godex reported exit 1 despite correct error text. Updated Godex's syntax-error classification and added source/binary-pinned CLI differential for both `super` and alias `s`, with negative controls rejecting exit 0/1/130 and no runtime execution. Focused tests PASS; direct clean-commit two-executable comparison to be run before marking VERIFIED. |
 | Three-profile quota/auth restart | PARTIAL | Prior Godex 0.437.14 synthetic and multi-process tests PASS. Independent two-executable multi-profile restart differential is still needed. |
 
 **Status is PARTIAL, not certified 1:1 production parity.** Only a fully
@@ -433,3 +434,19 @@ valid recent snapshot under its source-specific grace period; live credentials
 and model-specific quota transitions have not been matched across two
 independent native session executables. Never infer a production-wide 1:1
 certificate from the finite suite alone.
+
+## Super `--api-key` required-provider usage category
+
+A direct isolated Prodex 0.438.0 CLI experiment found that
+`prodex super --api-key synthetic-cli-key --dry-run` without a `--provider`
+returns **exit 2**, the canonical command-line syntax/required-argument
+status. Godex previously raised the same textual error but returned exit 1,
+incorrectly treating malformed command input as a runtime startup failure.
+Godex now uses its existing typed `cliArgumentError` for that narrow
+required-provider validation, retaining the same redacted diagnostic text
+and leaving unrelated runtime-error exit codes unchanged. Source-derived
+`TestProdex04380SuperAPIKeyWithoutProviderIsCLIUsageError` fails before
+and passes after the fix; the executable parity tool adds both the full
+`super` and short `s` paths, with mutation controls that reject exit 0, 1
+and 130 in place of the required exit 2. All fixtures use fake credentials
+in isolated temporary homes; actual provider keys are never used.

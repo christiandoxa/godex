@@ -552,7 +552,7 @@ func validateSuperOptions(options superOptions) error {
 		return errors.New("--base-url conflicts with --url")
 	}
 	if options.apiKey != "" && options.provider == "" {
-		return errors.New("--api-key requires --provider")
+		return markCLIArgumentError(errors.New("--api-key requires --provider"))
 	}
 	if (options.contextWindow != nil || options.autoCompact != nil) && options.provider == "" && options.localURL == "" {
 		return errors.New("context-window options require --provider or --url")

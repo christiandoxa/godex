@@ -149,6 +149,8 @@ func cliProbes() []probe {
 		{Name: "status_unknown_option_rejected", Arguments: []string{"status", "--json"}, Rejects: true},
 		{Name: "profile_add_missing_name_rejected", Arguments: []string{"profile", "add"}, Rejects: true},
 		{Name: "profile_remove_missing_selector_rejected", Arguments: []string{"profile", "remove"}, Rejects: true},
+		{Name: "super_api_key_requires_provider", Arguments: []string{"super", "--api-key", "synthetic-cli-key", "--dry-run"}, Rejects: true},
+		{Name: "short_super_api_key_requires_provider", Arguments: []string{"s", "--dry-run", "--api-key", "synthetic-cli-key"}, Rejects: true},
 	}
 }
 
