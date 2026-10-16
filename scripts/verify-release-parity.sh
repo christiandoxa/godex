@@ -213,6 +213,12 @@ go test -race ./internal/delivery/http/proxy \
   -run '^Test(Prodex04380CapturedClosingRequestIgnoresDelayedReadEOF|ProxyListenerRetriesPermanentAcceptFailureUntilShutdown|ProxyForwardsCapturedBodyAfterClientHalfClose|ProxyDoesNotForwardIncompleteBodyAfterClientHalfClose|ProxyCancellationStopsUpstream)$' \
   -count=1 -timeout=45s
 
+# Prodex 0.438.0 compaction v2 uses `compaction_trigger` as reconstructable
+# full-history context when recovering an invalid previous response ID.
+go test -race ./internal/usecase/routing \
+  -run '^Test(ResponsesInvalidPreviousIDRetriesCompactionTriggerHistoryOnce|ReconstructableFullHistoryMatchesCodexRequestShapes)$' \
+  -count=1 -timeout=35s
+
 # Prodex 0.438.0 restart rehydrates authenticated 401/403 penalties even
 # with a fresh quota DTO. A new receipt must retire only the exact old auth
 # generation, preserving newer 401 and independent generic/transport leases.

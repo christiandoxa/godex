@@ -165,7 +165,7 @@ func reconstructableFullHistory(input []json.RawMessage) bool {
 		if json.Unmarshal(raw, &item) != nil {
 			continue
 		}
-		if jsonString(item["type"]) == "compaction" && index+1 < len(input) {
+		if (jsonString(item["type"]) == "compaction" || jsonString(item["type"]) == "compaction_trigger") && index+1 < len(input) {
 			return true
 		}
 		if jsonString(item["role"]) != "user" {
