@@ -260,6 +260,29 @@ func TestDeepSeekOffModeRejectsSearchBeforeUpstream(t *testing.T) {
 	}
 }
 
+func TestProdex04380UnsupportedTypedRoleIsTerminalPreparationFailure(t *testing.T) {
+	var calls int
+	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { calls++ }))
+	defer server.Close()
+	transport, err := NewRuntimeTransport(server.URL, "fixture-key", server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer transport.Close()
+	_, err = transport.Execute(context.Background(), proxymodel.Request{
+		Method: http.MethodPost,
+		Path:   mountPath + "/responses",
+		Body:   []byte(`{"model":"deepseek-v4-pro","input":[{"type":"message","role":"critic","content":"no"}]}`),
+	}, proxymodel.Account{})
+	var proxyError *proxymodel.Error
+	if !errors.As(err, &proxyError) || proxyError.StatusCode != http.StatusBadGateway || proxyError.Message != "upstream request failed" {
+		t.Fatalf("unsupported typed role error = %v", err)
+	}
+	if calls != 0 {
+		t.Fatalf("unsupported typed role reached upstream: %d requests", calls)
+	}
+}
+
 func TestDeepSeekAdvancedResponsesTranslateBeforeUpstream(t *testing.T) {
 	var bodies []map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {

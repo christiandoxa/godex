@@ -278,6 +278,10 @@ func isProxyPreparationError(err error) bool {
 		presentation.Message == "proxied request could not be prepared" {
 		return true
 	}
+	if presentation.StatusCode == http.StatusBadGateway &&
+		presentation.Message == "upstream request failed" {
+		return true
+	}
 	// An invalid Gemini API-key function tool is rejected by the *local*
 	// tagged 0.438.0 bridge before upstream HTTP. Waiting or selecting a new
 	// provider credential cannot repair the submitted request, and could

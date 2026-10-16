@@ -143,6 +143,10 @@ func (transport *RuntimeTransport) prepareResponseAttempt(input proxymodel.Reque
 		Model: candidate, StrictTools: transport.options.StrictTools, WebSearchMode: transport.options.WebSearchMode,
 	}, history)
 	if err != nil {
+		var unsupportedRole *unsupportedMessageRoleError
+		if errors.As(err, &unsupportedRole) {
+			return deepSeekResponseAttempt{}, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
+		}
 		return deepSeekResponseAttempt{}, &proxymodel.Error{StatusCode: http.StatusBadRequest, Message: err.Error()}
 	}
 	attempt := deepSeekResponseAttempt{

@@ -7,6 +7,12 @@ import (
 	"strings"
 )
 
+type unsupportedMessageRoleError struct{ role string }
+
+func (err *unsupportedMessageRoleError) Error() string {
+	return fmt.Sprintf("DeepSeek message role `%s` is not supported by this Responses adapter", err.role)
+}
+
 func deepSeekMessages(object map[string]any) ([]any, error) {
 	messages := make([]any, 0)
 	if instructions, ok := object["instructions"].(string); ok && strings.TrimSpace(instructions) != "" {
@@ -80,7 +86,7 @@ func deepSeekMessageItem(item map[string]any) (map[string]any, error) {
 			return nil, errors.New("DeepSeek message role must be a string")
 		}
 		if item["type"] == "message" && text != "user" && text != "assistant" && text != "system" && text != "developer" {
-			return nil, fmt.Errorf("DeepSeek message role `%s` is not supported by this Responses adapter", text)
+			return nil, &unsupportedMessageRoleError{role: text}
 		}
 		switch text {
 		case "assistant", "system", "tool", "user":

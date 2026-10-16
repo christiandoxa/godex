@@ -53,6 +53,7 @@ func TestProxyPreparationErrorMatchIsNarrow(t *testing.T) {
 		{name: "preparation", err: &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "proxied request could not be prepared"}, want: true},
 		{name: "other status", err: &proxymodel.Error{StatusCode: http.StatusConflict, Message: "proxied request could not be prepared"}},
 		{name: "other message", err: &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "managed request failed"}},
+		{name: "deepseek local translation", err: &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}, want: true},
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
 			if got := isProxyPreparationError(fixture.err); got != fixture.want {
