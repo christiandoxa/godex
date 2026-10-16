@@ -158,7 +158,7 @@ func parseSuperArguments(arguments []string) (superOptions, error) {
 			maxConcurrencySource: "default",
 		},
 	}
-	arguments = rewriteSuperProviderAlias(arguments)
+	arguments, literalBoundary := superAliasArguments04380(arguments)
 	tailMode := false
 	for index := 0; index < len(arguments); {
 		if arguments[index] == "--" {
@@ -177,6 +177,7 @@ func parseSuperArguments(arguments []string) (superOptions, error) {
 		tailMode = true
 		index++
 	}
+	superSelectPositionedProvider04380(&options, literalBoundary)
 	if err := validateSuperOptions(options); err != nil {
 		return superOptions{}, err
 	}
@@ -195,19 +196,6 @@ func parseSuperArguments(arguments []string) (superOptions, error) {
 		options.codexArgs = append([]string{"-c", "model=" + strconv.Quote(options.model)}, options.codexArgs...)
 	}
 	return options, nil
-}
-
-func rewriteSuperProviderAlias(arguments []string) []string {
-	if len(arguments) == 0 {
-		return arguments
-	}
-	if arguments[0] != "gemini" && arguments[0] != "deepseek" {
-		return arguments
-	}
-	result := make([]string, 0, len(arguments)+1)
-	result = append(result, "--provider", arguments[0])
-	result = append(result, arguments[1:]...)
-	return result
 }
 
 func consumeSuperArgument(arguments []string, index int, options *superOptions, tailMode bool) (int, bool, error) {

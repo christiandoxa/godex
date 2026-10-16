@@ -36,6 +36,9 @@ type probe struct {
 	Name      string
 	Arguments []string
 	Rejects   bool
+	// A semantic provider selection must match even though the official
+	// Rust dry-run prints prodex-gemini/deepseek as internal provider labels.
+	Provider string
 }
 
 type commandResult struct {
@@ -151,6 +154,10 @@ func cliProbes() []probe {
 		{Name: "profile_remove_missing_selector_rejected", Arguments: []string{"profile", "remove"}, Rejects: true},
 		{Name: "super_api_key_requires_provider", Arguments: []string{"super", "--api-key", "synthetic-cli-key", "--dry-run"}, Rejects: true},
 		{Name: "short_super_api_key_requires_provider", Arguments: []string{"s", "--dry-run", "--api-key", "synthetic-cli-key"}, Rejects: true},
+		{Name: "short_super_positioned_gemini", Arguments: []string{"s", "--dry-run", "gemini"}, Provider: "gemini"},
+		{Name: "short_super_positioned_deepseek", Arguments: []string{"s", "--dry-run", "deepseek"}, Provider: "deepseek"},
+		{Name: "super_positioned_gemini", Arguments: []string{"super", "--no-presidio", "--dry-run", "gemini"}, Provider: "gemini"},
+		{Name: "super_positioned_deepseek", Arguments: []string{"super", "--dry-run", "deepseek"}, Provider: "deepseek"},
 	}
 }
 
@@ -164,6 +171,16 @@ func compareProbe(item probe, prodex, godex commandResult) []string {
 	}
 	if godex.ExitCode != prodex.ExitCode {
 		differences = append(differences, fmt.Sprintf("candidate exit=%d, canonical=%d", godex.ExitCode, prodex.ExitCode))
+	}
+	if item.Provider != "" {
+		for _, check := range []struct{ name, output, want string }{
+			{"Prodex", prodex.Output, "prodex-" + item.Provider},
+			{"Godex", godex.Output, item.Provider},
+		} {
+			if got, ok := cliDryRunProvider04380(check.output); !ok || got != check.want {
+				differences = append(differences, fmt.Sprintf("%s selected provider %q (present=%t), want %q", check.name, got, ok, check.want))
+			}
+		}
 	}
 	if item.Rejects && strings.TrimSpace(prodex.Output) == "" {
 		differences = append(differences, "canonical rejection had no diagnostic")

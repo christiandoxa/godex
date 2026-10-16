@@ -97,6 +97,9 @@ fi
 # Prodex 0.438.0 clap rejects Super --api-key without --provider as a
 # usage error (exit 2), not a runtime error (exit 1). Keep both normal and
 # `s` alias paths inside the source-pinned executable CLI differential.
+# Positioned Gemini/DeepSeek aliases after leading options are also parsed
+# before native Codex input; the literal -- and explicit --provider/--url
+# boundary remain authoritative and must not leak aliases into Codex args.
 go test ./internal/delivery/cli/runtime ./tools/clierrorparity \
   -run '^TestProdex04380Super' -count=1 -timeout=30s
 

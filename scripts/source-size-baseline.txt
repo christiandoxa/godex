@@ -5,7 +5,7 @@
 437	internal/delivery/cli/public_help.go
 431	internal/delivery/cli/runtime/run.go
 487	internal/delivery/cli/runtime/status_resource.go
-901	internal/delivery/cli/runtime/super.go
+889	internal/delivery/cli/runtime/super.go
 502	internal/delivery/cli/runtime/super_launch.go
 423	internal/delivery/cli/runtimebroker/store.go
 413	internal/delivery/cli/subagent/subagent.go
