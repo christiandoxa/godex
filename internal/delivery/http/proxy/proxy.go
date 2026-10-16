@@ -2,7 +2,6 @@ package proxy
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -326,32 +325,6 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 		result.Response.Header.Del("Set-Cookie")
 	}
 	proxy.forwardResponse(requestContext, writer, result.Response, result.Prefix, result.AccountID, lifecycle, result.ProviderKind)
-}
-
-func writeProxyError(writer http.ResponseWriter, path string, status int, message string) {
-	if status == http.StatusServiceUnavailable && isResponsesPath(path) {
-		writer.Header().Set("Content-Type", "application/json")
-		writer.Header().Set("Cache-Control", "no-store")
-		writer.Header().Set("X-Content-Type-Options", "nosniff")
-		writer.WriteHeader(status)
-		payload, _ := json.Marshal(struct {
-			Error struct {
-				Code    string `json:"code"`
-				Message string `json:"message"`
-			} `json:"error"`
-		}{Error: struct {
-			Code    string `json:"code"`
-			Message string `json:"message"`
-		}{Code: "service_unavailable", Message: message}})
-		_, _ = writer.Write(payload)
-		return
-	}
-	writeTextResponse(writer, status, message)
-}
-
-func isResponsesPath(path string) bool {
-	path = strings.TrimRight(path, "/")
-	return strings.HasSuffix(path, "/responses") || strings.HasSuffix(path, "/responses/compact")
 }
 
 var errRequestBodyTooLarge = errors.New("request body limit exceeded")

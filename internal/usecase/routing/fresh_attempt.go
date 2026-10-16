@@ -284,7 +284,7 @@ func isProxyPreparationError(err error) bool {
 	// falsely turn its exact 400 into a 503/timeout. Preserve local invalid-
 	// tool error semantics for both fresh and hard-affinity routing paths.
 	return presentation.StatusCode == http.StatusBadRequest &&
-		strings.HasPrefix(presentation.Message, "invalid_tool_declaration: Gemini request field `tools[")
+		strings.HasPrefix(presentation.Message, "invalid_tool_declaration: Gemini request field `tools")
 }
 
 // applyRetryOutcome preserves historical durable retry backoff for managed
