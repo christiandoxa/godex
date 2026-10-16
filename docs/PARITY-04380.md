@@ -135,7 +135,7 @@ The shared Unix terminal runner now uses the existing `waitForSessionChild`
 boundary, private process groups for non-TTY commands, and
 `prepareTerminalCommandWait` to disable the competing `exec.Cmd` cancellation.
 This applies to login, runtime, proxy and capability commands; Windows keeps
-the native `CommandContext` behavior. The regression set covers a SIGTERM-aware
+its explicit interrupt/`WaitDelay` cancellation path. The regression set covers a SIGTERM-aware
 non-TTY child, owned descendants without touching an unrelated process, a PTY
 first SIGINT/second-interrupt sequence, capability-probe non-interactivity and
 session-server companion cleanup. The focused package and race suite pass
