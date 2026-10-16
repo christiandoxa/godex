@@ -7,6 +7,8 @@ import (
 	"os/exec"
 )
 
+func configureTerminalCommandContext(_ *exec.Cmd) {}
+
 func runTerminalCommand(ctx context.Context, command *exec.Cmd) error {
 	privateProcessGroup := configureCodexSessionChildProcess(command)
 	prepareTerminalCommandWait(command)

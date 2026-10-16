@@ -113,7 +113,9 @@ func (process *CodexProcess) run(ctx context.Context, codexHome string, argument
 }
 
 func terminalCommand(ctx context.Context, binary string, arguments []string) *exec.Cmd {
-	return exec.CommandContext(ctx, binary, arguments...)
+	command := exec.CommandContext(ctx, binary, arguments...)
+	configureTerminalCommandContext(command)
+	return command
 }
 
 func (process *CodexProcess) Version(ctx context.Context) (string, error) {
