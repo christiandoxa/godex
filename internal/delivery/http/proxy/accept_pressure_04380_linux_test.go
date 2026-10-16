@@ -77,7 +77,10 @@ func TestProdex04380ProxyListenerSurvivesActualEMFILEAndQueuedRequest(t *testing
 		return strings.TrimSpace(strings.TrimPrefix(answer, prefix))
 	}
 	address := phase("LISTEN ")
-	client := &http.Client{Transport: &http.Transport{Proxy: nil, DisableKeepAlives: true}, Timeout: 6 * time.Second}
+	// Keep baseline accepted connection idle, then close it before pressure setup.
+	transport := &http.Transport{Proxy: nil}
+	defer transport.CloseIdleConnections()
+	client := &http.Client{Transport: transport, Timeout: 6 * time.Second}
 	post := func() string {
 		t.Helper()
 		response, err := client.Post(address+proxyPressurePath04380, "application/json", strings.NewReader(proxyPressureBody04380))
@@ -94,6 +97,11 @@ func TestProdex04380ProxyListenerSurvivesActualEMFILEAndQueuedRequest(t *testing
 	if result := post(); result != `{"call":1}` {
 		t.Fatalf("baseline proxy dispatch=%s", result)
 	}
+	_, _ = io.WriteString(stdin, "BASELINE\n")
+	phase("BASELINE_IDLE")
+	_, _ = io.WriteString(stdin, "CLOSE_BASELINE\n")
+	transport.CloseIdleConnections()
+	phase("BASELINE_CLOSED")
 	_, _ = io.WriteString(stdin, "PRESSURE\n")
 	phase("PRESSURE")
 	connection, err := net.DialTimeout("tcp", strings.TrimPrefix(address, "http://"), 2*time.Second)
@@ -164,14 +172,52 @@ func proxyPressureChildRun04380() error {
 	if err != nil {
 		return err
 	}
+	baselineIdle := make(chan struct{}, 1)
+	baselineClosed := make(chan struct{}, 1)
+	server.server.ConnState = func(_ net.Conn, state http.ConnState) {
+		switch state {
+		case http.StateIdle:
+			select {
+			case baselineIdle <- struct{}{}:
+			default:
+			}
+		case http.StateClosed:
+			select {
+			case baselineClosed <- struct{}{}:
+			default:
+			}
+		}
+	}
 	if err = server.Start(); err != nil {
 		return err
 	}
 	defer server.Close(context.Background())
 	fmt.Println("LISTEN " + server.Endpoint())
 	input := bufio.NewReader(os.Stdin)
-	if _, err = input.ReadString('\n'); err != nil {
+	line, err := input.ReadString('\n')
+	if err != nil {
 		return err
+	}
+	if strings.TrimSpace(line) != "BASELINE" {
+		return fmt.Errorf("baseline phase: %q", strings.TrimSpace(line))
+	}
+	<-baselineIdle
+	fmt.Println("BASELINE_IDLE")
+	line, err = input.ReadString('\n')
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(line) != "CLOSE_BASELINE" {
+		return fmt.Errorf("baseline close phase: %q", strings.TrimSpace(line))
+	}
+	<-baselineClosed
+	fmt.Println("BASELINE_CLOSED")
+	line, err = input.ReadString('\n')
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(line) != "PRESSURE" {
+		return fmt.Errorf("pressure phase: %q", strings.TrimSpace(line))
 	}
 	var limit syscall.Rlimit
 	if err = syscall.Getrlimit(syscall.RLIMIT_NOFILE, &limit); err != nil {

@@ -1647,9 +1647,33 @@ There is no new shared helper, dependency, configuration or persistence format.
 
 `rtk go test ./internal/gateway/deepseek ./tools/differential -count=1` and
 `rtk go test -race ./internal/gateway/deepseek ./tools/differential -count=1`
-both pass (370 tests). The source-size guard also passes. Exact two-executable
+both pass (370 tests). The source-size guard also passes.
 `rtk test make verify` also passes, including the full race suite and
 cross-build matrix. Exact two-executable validation of the expanded
 malformed-input fixtures is pending. Numeric JSON
 rendering at the exact policy byte limit has not been compared independently;
 broader malformed-input and live provider parity remain PARTIAL.
+
+## Real FD-pressure test synchronization
+
+Native CI exposed a setup race in the Linux real-EMFILE regression: the client
+had consumed the baseline response, but the server had not closed that accepted
+socket. If closure happened after descriptor filling, it freed a slot and let
+the queued request through before release. This failed both the Sonar coverage
+job in run `38921361347` and the Linux race job in run `38923328140`.
+
+The test now retains the baseline keep-alive connection until `StateIdle`,
+closes it explicitly and waits for server-side `StateClosed` before exhausting
+descriptors. The child also consumes the pressure command before filling them.
+It still requires actual accept EMFILE, the original listening port, a held
+queued request, exactly one recovered dispatch, a separate healthy request and
+clean shutdown. Only the test's synchronization changes; no production proxy
+behavior, architecture boundary or shared helper changes.
+
+Local repeated validation passes:
+
+- `rtk go test ./internal/delivery/http/proxy -run '^TestProdex04380ProxyListenerSurvivesActualEMFILEAndQueuedRequest$' -count=20 -shuffle=on -cover`
+- `rtk go test -race ./internal/delivery/http/proxy -run '^TestProdex04380ProxyListenerSurvivesActualEMFILEAndQueuedRequest$' -count=10 -shuffle=on`
+
+The native CI pass-after for this synchronization fix remains pending. It does
+not change the scope of the previously pinned cross-executable EMFILE proof.
