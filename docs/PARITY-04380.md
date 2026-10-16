@@ -219,3 +219,20 @@ content type and event bytes. A synthetic upstream counts each dispatch and
 rejects mismatched model, input, account or bearer. Focused live-binary smoke
 and mutation negative controls PASS. This is a **synthetic wire** oracle, not
 evidence of actual interrupted live inference or native compaction behavior.
+
+## Independently pinned preflight execution partitions
+
+After expanding the profile oracle to 34 stages (including three distinct
+`response.incomplete` reasons in buffered/SSE pairs), a single `--phase=preflight`
+invocation on candidate `3b6d3c83` reached the synchronous 112-second tool
+budget **after local focused checks passed but before the executable oracles
+completed**. This is neither a semantic FAIL nor evidence of a completed
+preflight on that commit. The script now supports `--phase=preflight-tests`
+(local regression and race sentinels) and `--phase=preflight-oracles`
+(exact-source and binary PTY/profile/CLI/context differentials) separately.
+Each partition independently verifies tagged Prodex source, published binary
+SHA and release manifest, then builds the same clean Godex source. Both must
+PASS on an identical commit; either partition by itself is **not** the entire
+preflight. The existing `--phase=preflight` and no-argument full release gate
+retain **both** groups with no tests removed. This avoids hiding an uncompleted
+run behind a timeout or relaxing any negative control.

@@ -7,10 +7,12 @@ set -euo pipefail
 case "${1:-}" in
   '') phase='all' ;;
   --phase=preflight) phase='preflight' ;;
+  --phase=preflight-tests) phase='preflight-tests' ;;
+  --phase=preflight-oracles) phase='preflight-oracles' ;;
   --phase=deepseek) phase='deepseek' ;;
   --phase=gemini) phase='gemini' ;;
   --phase=websocket) phase='websocket' ;;
-  *) echo 'usage: verify-release-parity.sh [--phase=preflight|deepseek|gemini|websocket]' >&2; exit 2 ;;
+  *) echo 'usage: verify-release-parity.sh [--phase=preflight|preflight-tests|preflight-oracles|deepseek|gemini|websocket]' >&2; exit 2 ;;
 esac
 if [ "$#" -gt 1 ]; then
   echo 'release parity accepts at most one phase option' >&2
@@ -68,7 +70,7 @@ go build -trimpath -o "$tmp/contextparity" ./tools/contextparity
 go build -trimpath -o "$tmp/continuationparity" ./tools/continuationparity
 go build -trimpath -o "$tmp/sessionfooterparity" ./tools/sessionfooterparity
 
-if [ "$phase" = 'all' ] || [ "$phase" = 'preflight' ]; then
+if [ "$phase" = 'all' ] || [ "$phase" = 'preflight' ] || [ "$phase" = 'preflight-tests' ]; then
 # Preserve the focused 0.437.10 goal-attachment recovery regressions while
 # migrating the executable oracles to 0.437.11. The 0.437.11 session-release
 # and full-history rotation regressions are qualified separately.
@@ -200,6 +202,12 @@ go test ./tools/differential \
   -run '^TestProdex043713StreamToolDifferentialFixtureRejectsMutations$' \
   -count=1 -timeout=30s
 
+fi
+
+# The original preflight runs BOTH halves; --phase=preflight-tests and
+# --phase=preflight-oracles are independently pinned execution partitions,
+# not a way to skip the other half or declare a partial release certificate.
+if [ "$phase" = 'all' ] || [ "$phase" = 'preflight' ] || [ "$phase" = 'preflight-oracles' ]; then
 # Independent Linux PTY footer oracle. It uses one synthetic Codex helper for
 # both exact binaries and checks launch-owned identity, picker fallback, and
 # all-stream TTY suppression without credentials or provider calls.
