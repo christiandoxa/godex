@@ -736,6 +736,22 @@ Rust accepted-stream-clone exhaustion. No live secret or real model turn
 was used for these local oracle cases.
 
 
+## OpenAI dynamic catalog aggregate alias/effort view ceilings
+
+Tagged Prodex 0.438.0 `prodex_mojo_rich_catalog_choices_v2` separately bounds
+the total number of alias and reasoning-effort views at **65,536** across
+the entire dynamic-model input. The 1 MiB cache-file limit does not enforce
+this property: 65,537 very short alias strings or one-character effort
+entries can still fit. Before this correction, Godex loaded such caches
+without checking the aggregate view count. Failing regressions now pass
+with explicit typed-view totals, rejecting 65,537 aliases/efforts, preserving
+an exactly-65,536-alias fixture and rejecting two individually valid models
+whose aliases together exceed the limit. The validator skips non-string
+aliases and non-object effort entries like the Rust source acquisition
+stage, but cannot be bypassed by heterogeneous JSON arrays. These local
+file-cache and race tests complement the earlier per-field/record bounds;
+a direct PTY model-picker differential is still PARTIAL.
+
 ## OpenAI dynamic model-cache input bounds and fail-closed fallback
 
 Prodex 0.438.0 `prodex_mojo_rich_catalog_choices_v2` rejects more than **1,024**

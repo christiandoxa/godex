@@ -9,6 +9,7 @@ const (
 	pingCatalogMaxModels04380    = 1024
 	pingCatalogMaxIDBytes04380   = 4096
 	pingCatalogMaxTextBytes04380 = 65536
+	pingCatalogMaxViews04380     = 65536
 )
 
 // Prodex 0.438.0 rich_catalog.mojo validates every input model, alias and
@@ -19,6 +20,7 @@ func pingCatalogInputValid04380(models []map[string]json.RawMessage) bool {
 	if len(models) > pingCatalogMaxModels04380 {
 		return false
 	}
+	totalAliases, totalEfforts := 0, 0
 	for _, entry := range models {
 		if len(catalogFirstString04380(entry, "slug", "id")) > pingCatalogMaxIDBytes04380 ||
 			len(catalogFirstString04380(entry, "display_name", "displayName")) > pingCatalogMaxTextBytes04380 ||
@@ -29,8 +31,18 @@ func pingCatalogInputValid04380(models []map[string]json.RawMessage) bool {
 		if json.Unmarshal(entry["aliases"], &aliases) == nil {
 			for _, rawAlias := range aliases {
 				var alias *string
-				if json.Unmarshal(rawAlias, &alias) == nil && alias != nil &&
-					len(strings.TrimSpace(*alias)) > pingCatalogMaxIDBytes04380 {
+				if json.Unmarshal(rawAlias, &alias) != nil || alias == nil {
+					continue
+				}
+				trimmed := strings.TrimSpace(*alias)
+				if trimmed == "" {
+					continue
+				}
+				if len(trimmed) > pingCatalogMaxIDBytes04380 {
+					return false
+				}
+				totalAliases++
+				if totalAliases > pingCatalogMaxViews04380 {
 					return false
 				}
 			}
@@ -39,8 +51,18 @@ func pingCatalogInputValid04380(models []map[string]json.RawMessage) bool {
 		if json.Unmarshal(entry["supported_reasoning_levels"], &levels) == nil {
 			for _, rawLevel := range levels {
 				var level map[string]json.RawMessage
-				if json.Unmarshal(rawLevel, &level) == nil &&
-					len(catalogFirstString04380(level, "effort")) > pingCatalogMaxTextBytes04380 {
+				if json.Unmarshal(rawLevel, &level) != nil {
+					continue
+				}
+				var effort *string
+				if json.Unmarshal(level["effort"], &effort) != nil || effort == nil {
+					continue
+				}
+				if len(*effort) > pingCatalogMaxTextBytes04380 {
+					return false
+				}
+				totalEfforts++
+				if totalEfforts > pingCatalogMaxViews04380 {
 					return false
 				}
 			}
