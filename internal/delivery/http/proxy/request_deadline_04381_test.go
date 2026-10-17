@@ -66,6 +66,41 @@ func TestProdex04381AdmissionExpiryDoesNotDispatchAndFreshRequestSucceeds(t *tes
 	}
 }
 
+func TestProdex04381ExpiredAdmissionCannotTakeReleasedPermit(t *testing.T) {
+	handler, ok := newActiveRequestHandlerWithLimits(
+		http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), oneLaneAdmissionLimits04381(),
+	).(*activeRequestHandler)
+	if !ok {
+		t.Fatal("admission handler type changed")
+	}
+	if !handler.acquire(context.Background(), admissionLaneResponses) {
+		t.Fatal("failed to hold admission permit")
+	}
+	waiting := make(chan struct{})
+	handler.wait = func(ctx context.Context, changed <-chan struct{}) bool {
+		close(waiting)
+		select {
+		case <-changed:
+			return true
+		case <-ctx.Done():
+			return false
+		}
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	acquired := make(chan bool, 1)
+	go func() { acquired <- handler.acquire(ctx, admissionLaneResponses) }()
+	<-waiting
+	cancel()
+	handler.release(admissionLaneResponses)
+	if <-acquired {
+		t.Fatal("expired waiter acquired a permit released after cancellation")
+	}
+	if handler.active != 0 || handler.laneActive[admissionLaneResponses] != 0 {
+		t.Fatalf("permit leaked after expired admission: active=%d lane=%d", handler.active, handler.laneActive[admissionLaneResponses])
+	}
+}
+
 type requestDeadlineGateway04381 struct {
 	calls      atomic.Int32
 	canceled   chan struct{}

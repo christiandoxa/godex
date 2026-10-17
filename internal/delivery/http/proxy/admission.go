@@ -195,12 +195,19 @@ func (handler *activeRequestHandler) acquireWithPolicy(
 		waitInterval = pressureAdmissionWaitInterval
 	}
 	for {
+		if ctx.Err() != nil {
+			return false
+		}
 		// Runtime ownership may take a different mutex. Project it before
 		// entering the admission notification mutex, then discard stale facts
 		// after any selection change and project again after the wakeup.
 		selectionRevision := handler.selectionRevision.Load()
 		bypassOwnedLane := projectOwner != nil && projectOwner()
 		handler.mu.Lock()
+		if ctx.Err() != nil {
+			handler.mu.Unlock()
+			return false
+		}
 		if handler.selectionRevision.Load() != selectionRevision {
 			handler.mu.Unlock()
 			continue
