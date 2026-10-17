@@ -204,6 +204,7 @@ func NewRouter(config Config) (*Router, error) {
 		autoRedeem:               config.AutoRedeem, redeemer: config.Redeemer,
 	}
 	router.selection.sequence.Store(config.SelectionSequenceSeed)
+	router.selection.changed = make(chan struct{})
 	router.persistenceEnabled.Store(true)
 	if err := router.initializeAffinityPersistence(config); err != nil {
 		return nil, fmt.Errorf("load continuation statuses: %w", err)

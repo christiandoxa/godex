@@ -25,7 +25,23 @@ func (router *Router) waitForFreshRecovery(
 	ctx context.Context,
 	delay time.Duration,
 ) error {
-	return router.wait(ctx, min(delay, maxFreshRecoveryWait))
+	delay = min(delay, maxFreshRecoveryWait)
+	_, changed := router.selectionWait()
+	if changed == nil {
+		return router.wait(ctx, delay)
+	}
+	waitCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	result := make(chan error, 1)
+	go func() { result <- router.wait(waitCtx, delay) }()
+	select {
+	case <-changed:
+		return nil
+	case err := <-result:
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (router *Router) freshRecoveryDelay(
