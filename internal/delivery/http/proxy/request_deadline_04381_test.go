@@ -73,6 +73,53 @@ type requestDeadlineGateway04381 struct {
 	started    chan bool
 }
 
+type blockingBody04381 struct {
+	closed chan struct{}
+	once   sync.Once
+}
+
+func (body *blockingBody04381) Read([]byte) (int, error) {
+	<-body.closed
+	return 0, io.ErrClosedPipe
+}
+
+func (body *blockingBody04381) Close() error {
+	body.once.Do(func() { close(body.closed) })
+	return nil
+}
+
+func TestProdex04381BodyCaptureUsesRequestDeadline(t *testing.T) {
+	gateway := &requestDeadlineGateway04381{
+		canceled: make(chan struct{}),
+		started:  make(chan bool, 1),
+	}
+	router, err := routingusecase.NewRouter(routingusecase.Config{
+		Gateway:                 gateway,
+		PrecommitWatchdogBudget: 35 * time.Millisecond,
+		Accounts: func(context.Context) ([]proxymodel.Account, error) {
+			return []proxymodel.Account{{ID: "body-deadline-profile", Home: "/synthetic", Enabled: true}}, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	proxy, err := NewProxy(Config{Router: router})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodPost, "/backend-api/status", nil)
+	request.Body = &blockingBody04381{closed: make(chan struct{})}
+	response := httptest.NewRecorder()
+	proxy.ServeHTTP(response, request)
+	if response.Code != http.StatusGatewayTimeout ||
+		!strings.Contains(response.Body.String(), `"code":"request_timeout"`) {
+		t.Fatalf("body capture timeout = %d/%q", response.Code, response.Body.String())
+	}
+	if gateway.calls.Load() != 0 {
+		t.Fatalf("expired body capture dispatched upstream %d times", gateway.calls.Load())
+	}
+}
+
 func (gateway *requestDeadlineGateway04381) Execute(ctx context.Context, _ proxymodel.Request, _ proxymodel.Account) (*proxymodel.Response, error) {
 	gateway.calls.Add(1)
 	_, hasDeadline := ctx.Deadline()

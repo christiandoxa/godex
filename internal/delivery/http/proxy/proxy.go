@@ -243,7 +243,7 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 			return
 		}
 		var err error
-		body, err = readLimited(request.Body, proxy.maxRequest)
+		body, err = readLimited(requestContext, request.Body, proxy.maxRequest)
 		if err != nil {
 			if requestDeadlineTimedOut(requestContext) {
 				activity.fail(http.StatusGatewayTimeout, requestRecoveryTimeoutMessage)
@@ -347,17 +347,31 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 
 var errRequestBodyTooLarge = errors.New("request body limit exceeded")
 
-func readLimited(reader io.ReadCloser, limit int64) ([]byte, error) {
+func readLimited(ctx context.Context, reader io.ReadCloser, limit int64) ([]byte, error) {
 	if reader == nil {
 		return nil, nil
 	}
-	defer reader.Close()
-	data, err := io.ReadAll(io.LimitReader(reader, limit+1))
-	if err != nil {
-		return nil, err
+	type result struct {
+		data []byte
+		err  error
 	}
-	if int64(len(data)) > limit {
-		return nil, errRequestBodyTooLarge
+	read := make(chan result, 1)
+	go func() {
+		data, err := io.ReadAll(io.LimitReader(reader, limit+1))
+		read <- result{data: data, err: err}
+	}()
+	select {
+	case result := <-read:
+		_ = reader.Close()
+		if result.err != nil {
+			return nil, result.err
+		}
+		if int64(len(result.data)) > limit {
+			return nil, errRequestBodyTooLarge
+		}
+		return result.data, nil
+	case <-ctx.Done():
+		_ = reader.Close()
+		return nil, ctx.Err()
 	}
-	return data, nil
 }
