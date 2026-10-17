@@ -49,6 +49,7 @@ The preflight phase additionally runs the focused 0.438.1 regressions:
 
 ```text
 TestProdex04381AdmissionExpiryDoesNotDispatchAndFreshRequestSucceeds
+TestProdex04381ExpiredAdmissionCannotTakeReleasedPermit
 TestProdex04381StandardRequestDeadlineCoversUpstreamAndReturns504
 TestProdex04381BodyCaptureUsesRequestDeadline
 TestFreshRecoveryWakeOnSelectionChange
@@ -65,7 +66,7 @@ regressions and do not pretend to be a two-executable proof.
 | Surface | Status | Evidence |
 | --- | --- | --- |
 | Profile recovery early wake | VERIFIED | `ec5f984c` adds selection revision/channel wakeups; deterministic recovery regression passes, including race testing. |
-| Request-local deadline through admission, body capture, and standard routing | VERIFIED for local source scope | `99623a04`, `9f046cd6`, and `14df2902` preserve one deadline, return local 504 `request_timeout`, cancel stalled capture/upstream work, avoid expired dispatch, and detach committed streams/WebSocket sessions. |
+| Request-local deadline through admission, body capture, and standard routing | VERIFIED for local source scope | `99623a04`, `9f046cd6`, `14df2902`, and `1ca9b69d` preserve one deadline, return local 504 `request_timeout`, cancel stalled capture/upstream work, reject expired work before a released permit, avoid expired dispatch, and detach committed streams/WebSocket sessions. |
 | Official 0.438.1 source/binary oracle pins | VERIFIED | Tag `c3c96af2a9b87896e262e37f37cd4741a562a66f`, binary SHA-256 `b347889a6fa5aec6f3a0f00a1d8346eb2df30b9933361e924900904ed85e165e`, and release manifest SHA-256 `210ffd34e5e455604b172f361760074801b35b6490c0a8d39e1a4cb29f510351` are pinned and checked. |
 | Cross-binary queue/recovery differential | OPEN | The current finite oracle has no controlled admission/cooldown fixture for both executables. |
 | Native OAuth, Windows/macOS execution, TUI, and live quota | PARTIAL | Source and Linux synthetic evidence only; native execution or live credentials were not used. |

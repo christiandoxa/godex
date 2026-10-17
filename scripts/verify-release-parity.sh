@@ -208,7 +208,7 @@ go test ./internal/delivery/http/proxy \
 # work and the local recovery path. Expired work must return a local 504,
 # avoid a second dispatch, and leave a later request usable.
 go test ./internal/delivery/http/proxy \
-  -run '^TestProdex04381(AdmissionExpiryDoesNotDispatchAndFreshRequestSucceeds|StandardRequestDeadlineCoversUpstreamAndReturns504|BodyCaptureUsesRequestDeadline)$' \
+  -run '^TestProdex04381(AdmissionExpiryDoesNotDispatchAndFreshRequestSucceeds|ExpiredAdmissionCannotTakeReleasedPermit|StandardRequestDeadlineCoversUpstreamAndReturns504|BodyCaptureUsesRequestDeadline)$' \
   -count=1 -timeout=35s
 
 # A profile readiness/selection change must wake a waiting recovery attempt
