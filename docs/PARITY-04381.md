@@ -118,5 +118,11 @@ published `SHA256SUMS` entry and the downloaded bytes before executing any
 fixture. The pinned release-manifest SHA-256 is
 `210ffd34e5e455604b172f361760074801b35b6490c0a8d39e1a4cb29f510351`.
 
+The pinned `--phase=preflight-tests` run passed on the pushed candidate. It
+used the official Prodex 0.438.1 executable and reported
+`comparison_differences: []` with negative controls passing. The exact
+cross-build command `./scripts/check-cross-build.sh` also passed for Linux,
+Darwin, and Windows compilation targets.
+
 No credentials or provider requests were used for pin verification. No tag or
 release was created by the parity gate.
