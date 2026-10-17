@@ -9,10 +9,13 @@ case "${1:-}" in
   --phase=preflight) phase='preflight' ;;
   --phase=preflight-tests) phase='preflight-tests' ;;
   --phase=preflight-oracles) phase='preflight-oracles' ;;
+  --phase=preflight-oracles-pty) phase='preflight-oracles-pty' ;;
+  --phase=preflight-oracles-profiles) phase='preflight-oracles-profiles' ;;
+  --phase=preflight-oracles-history) phase='preflight-oracles-history' ;;
   --phase=deepseek) phase='deepseek' ;;
   --phase=gemini) phase='gemini' ;;
   --phase=websocket) phase='websocket' ;;
-  *) echo 'usage: verify-release-parity.sh [--phase=preflight|preflight-tests|preflight-oracles|deepseek|gemini|websocket]' >&2; exit 2 ;;
+  *) echo 'usage: verify-release-parity.sh [--phase=preflight|preflight-tests|preflight-oracles|preflight-oracles-pty|preflight-oracles-profiles|preflight-oracles-history|deepseek|gemini|websocket]' >&2; exit 2 ;;
 esac
 if [ "$#" -gt 1 ]; then
   echo 'release parity accepts at most one phase option' >&2
@@ -354,7 +357,12 @@ fi
 # The original preflight runs BOTH halves; --phase=preflight-tests and
 # --phase=preflight-oracles are independently pinned execution partitions,
 # not a way to skip the other half or declare a partial release certificate.
-if [ "$phase" = 'all' ] || [ "$phase" = 'preflight' ] || [ "$phase" = 'preflight-oracles' ]; then
+if [ "$phase" = 'all' ] || [ "$phase" = 'preflight' ] || [ "$phase" = 'preflight-oracles' ] ||
+   [ "$phase" = 'preflight-oracles-pty' ] || [ "$phase" = 'preflight-oracles-profiles' ] || [ "$phase" = 'preflight-oracles-history' ]; then
+# The original preflight-oracles and default full release gate still execute
+# every oracle. These mutually exclusive slices permit synchronous verified
+# execution without treating a partial slice as a complete release gate.
+if [ "$phase" = 'all' ] || [ "$phase" = 'preflight' ] || [ "$phase" = 'preflight-oracles' ] || [ "$phase" = 'preflight-oracles-pty' ]; then
 # Independent Linux PTY footer oracle. It uses one synthetic Codex helper for
 # both exact binaries and checks launch-owned identity, picker fallback, and
 # all-stream TTY suppression without credentials or provider calls.
@@ -363,6 +371,9 @@ if [ "$phase" = 'all' ] || [ "$phase" = 'preflight' ] || [ "$phase" = 'preflight
   --prodex-source "$tmp/prodex-source" \
   --godex-source "$root" --godex-commit "$(git rev-parse HEAD)"
 
+fi
+
+if [ "$phase" = 'all' ] || [ "$phase" = 'preflight' ] || [ "$phase" = 'preflight-oracles' ] || [ "$phase" = 'preflight-oracles-profiles' ]; then
 # Independent managed-profile persistence oracle. All 29 CLI actions run in
 # separate subprocesses with isolated credential-free homes; state projections
 # must match across creation, active switching, rejected writes and deletion.
@@ -385,6 +396,9 @@ go test ./tools/profileparity \
   -count=1 -timeout=30s
 go test ./tools/profileparity -run '^TestProdex043714Startup' -count=1 -timeout=30s
 
+fi
+
+if [ "$phase" = 'all' ] || [ "$phase" = 'preflight' ] || [ "$phase" = 'preflight-oracles' ] || [ "$phase" = 'preflight-oracles-history' ]; then
 # Establish response ownership with real seed requests before checking exact
 # history-tag replay decisions against both source-verified executables.
 GODEX_TEST_HISTORY_PRODEX_BIN="$tmp/prodex" \
@@ -396,6 +410,9 @@ GODEX_TEST_HISTORY_GODEX_COMMIT="$(git rev-parse HEAD)" \
     -run '^TestProdex04380(ExecutableHistoryReplayBoundary|HistoryOracle)' \
     -count=1 -timeout=90s
 
+fi
+
+if [ "$phase" = 'all' ] || [ "$phase" = 'preflight' ] || [ "$phase" = 'preflight-oracles' ] || [ "$phase" = 'preflight-oracles-pty' ]; then
 # CLI argument rejection oracle. This catches delivery paths that accidentally
 # discard user arguments before reaching their owning command parser.
 "$tmp/clierrorparity" \
@@ -411,6 +428,7 @@ GODEX_TEST_HISTORY_GODEX_COMMIT="$(git rev-parse HEAD)" \
   --prodex-source "$tmp/prodex-source" \
   --godex-source "$root" --godex-commit "$(git rev-parse HEAD)"
 
+fi
 fi
 
 if [ "$phase" = 'all' ] || [ "$phase" = 'deepseek' ]; then

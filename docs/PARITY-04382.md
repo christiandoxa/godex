@@ -79,3 +79,23 @@ candidate commit** after re-pinning; old 0.438.1 gate logs cannot authorize
 a 0.438.2 parity claim. Release-specific provenance is checked before the
 executor attempts any synthetic profile or socket fixture. This retarget is
 not itself proof that the full release differential passes.
+
+## Complete oracle preflight without synchronous tool timeout
+
+The initial pinned `--phase=preflight-oracles` attempt emitted a passing real
+PTY footer differential but exceeded the command's synchronous 112-second
+execution window during subsequent profile cases. **That attempt is NOT a
+successful oracle phase.** To retain every original test, three explicitly
+non-overlapping execution slices were introduced:
+
+- `--phase=preflight-oracles-pty`: PTY footer, CLI and context oracles.
+- `--phase=preflight-oracles-profiles`: complete profile lifecycle including
+  three-profile restart, real FD pressure, queue wake and negative controls.
+- `--phase=preflight-oracles-history`: independent executable history/replay
+  boundary oracle.
+
+The existing `--phase=preflight-oracles`, unsplit `--phase=preflight` and
+no-argument full-gate behavior still execute **all three slices**. No source
+pin, binary digest, test assertion, negative control, or coverage was removed.
+A complete 0.438.2 preflight certificate requires all three independently
+pinned slices and preflight-tests to pass on one clean Godex source commit.
