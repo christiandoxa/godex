@@ -133,7 +133,6 @@ func (transport *Transport) readWebSocketMessage(
 	buffered := make([]byte, 0, websocketPrecommitLookaheadBytes)
 	responseID := ""
 	holdBytes := 0
-	firstTextSeen := false
 	for {
 		if err := ctx.Err(); err != nil {
 			_ = connection.Close()
@@ -158,12 +157,10 @@ func (transport *Transport) readWebSocketMessage(
 			_ = connection.Close()
 			return nil, err
 		}
-		if event.text && !firstTextSeen {
-			firstTextSeen = true
-			if watchdog, ok := connection.(*websocketReadWatchdog); ok {
-				watchdog.setTimeout(websocketCommittedStreamIdleTimeout)
-			}
-		}
+		// Hidden keepalive, metadata and prelude frames are still precommit.
+		// Do not promote their socket idle timer to the 300-second committed
+		// stream timer: Prodex 0.438.2 retains the original request watchdog
+		// until actual model output has passed the precommit checks below.
 		if event.turnState != "" {
 			state.turnState = event.turnState
 		}
