@@ -40,17 +40,22 @@ type BrokerConfig struct {
 }
 
 type Config struct {
-	Context             context.Context
-	UpstreamURL         string
-	ListenAddr          string
-	PreferredAccount    string
-	Provider            Provider
-	ProviderCredentials []ProviderCredential
-	AutoRedeem          bool
-	SkipQuotaPreflight  bool
-	UpstreamNoProxy     bool
-	SmartContextEnabled bool
-	Presidio            *PresidioConfig
-	Broker              *BrokerConfig
-	Accounts            func(context.Context) ([]Account, error)
+	Context                          context.Context
+	UpstreamURL                      string
+	ListenAddr                       string
+	PreferredAccount                 string
+	ActiveRequestLimit               int
+	AdmissionWaitBudget              time.Duration
+	PressureAdmissionWaitBudget      time.Duration
+	LongLivedQueueWaitBudget         time.Duration
+	PressureLongLivedQueueWaitBudget time.Duration
+	Provider                         Provider
+	ProviderCredentials              []ProviderCredential
+	AutoRedeem                       bool
+	SkipQuotaPreflight               bool
+	UpstreamNoProxy                  bool
+	SmartContextEnabled              bool
+	Presidio                         *PresidioConfig
+	Broker                           *BrokerConfig
+	Accounts                         func(context.Context) ([]Account, error)
 }

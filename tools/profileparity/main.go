@@ -110,6 +110,11 @@ func run() error {
 		return fmt.Errorf("real TCP gateway descriptor-pressure parity failed closed: %w", err)
 	}
 	stages = append(stages, pressureStages...)
+	queueStages, err := checkGatewayQueue04381(work, options)
+	if err != nil {
+		return fmt.Errorf("admission queue wake parity failed closed: %w", err)
+	}
+	stages = append(stages, queueStages...)
 	incompleteStages, err := checkGatewayIncomplete04380(work, options)
 	if err != nil {
 		return fmt.Errorf("native incomplete response parity failed closed: %w", err)

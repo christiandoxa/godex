@@ -272,7 +272,10 @@ func (runner *Runner) launchHomeWithOptions(
 	if override := strings.TrimSpace(options.UpstreamURL); override != "" {
 		upstream = override
 	}
-	config := runtimeProxyConfig(ctx, upstream, preferredID, provider, credentials, profiles, autoRedeem)
+	config, err := runtimeProxyConfig(ctx, upstream, preferredID, provider, credentials, profiles, autoRedeem)
+	if err != nil {
+		return err
+	}
 	config.SmartContextEnabled = options.SmartContextEnabled
 	config.SkipQuotaPreflight = options.SkipQuotaPreflight
 	config.UpstreamNoProxy = options.UpstreamNoProxy
@@ -340,21 +343,30 @@ func runtimeProxyConfig(
 	credentials []proxyconfig.ProviderCredential,
 	profiles []proxyconfig.Account,
 	autoRedeem bool,
-) proxyconfig.Config {
+) (proxyconfig.Config, error) {
+	settings, err := runtimeProxySettingsFromEnv()
+	if err != nil {
+		return proxyconfig.Config{}, err
+	}
 	return proxyconfig.Config{
-		Context:             ctx,
-		UpstreamURL:         upstream,
-		PreferredAccount:    preferredID,
-		Provider:            provider,
-		ProviderCredentials: append([]proxyconfig.ProviderCredential(nil), credentials...),
-		AutoRedeem:          autoRedeem,
+		Context:                          ctx,
+		UpstreamURL:                      upstream,
+		PreferredAccount:                 preferredID,
+		ActiveRequestLimit:               settings.activeRequestLimit,
+		AdmissionWaitBudget:              settings.admissionWaitBudget,
+		PressureAdmissionWaitBudget:      settings.pressureAdmissionWaitBudget,
+		LongLivedQueueWaitBudget:         settings.longLivedQueueWaitBudget,
+		PressureLongLivedQueueWaitBudget: settings.pressureLongLivedQueueWaitBudget,
+		Provider:                         provider,
+		ProviderCredentials:              append([]proxyconfig.ProviderCredential(nil), credentials...),
+		AutoRedeem:                       autoRedeem,
 		Accounts: func(ctx context.Context) ([]proxyconfig.Account, error) {
 			if err := ctx.Err(); err != nil {
 				return nil, err
 			}
 			return append([]proxyconfig.Account(nil), profiles...), nil
 		},
-	}
+	}, nil
 }
 
 func closeRuntimeProxy(ctx context.Context, proxy Proxy, runErr error) error {

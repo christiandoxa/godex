@@ -62,3 +62,26 @@ func TestAdmissionWaitUsesBoundedPollIntervals(t *testing.T) {
 		})
 	}
 }
+
+func TestAdmissionWaitUsesRuntimeLaneBudgets(t *testing.T) {
+	handler := newActiveRequestHandlerWithLimits(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), admissionLimits{
+		global: 1, lane: [admissionLaneCount]int{1, 1, 1, 1},
+	}).(*activeRequestHandler)
+	handler.admissionWaitBudget = 11 * time.Millisecond
+	handler.pressureAdmissionWaitBudget = 13 * time.Millisecond
+	handler.longLivedQueueWaitBudget = 17 * time.Millisecond
+	handler.pressureLongLivedQueueWaitBudget = 19 * time.Millisecond
+
+	if got := handler.waitBudget(admissionLaneStandard, false); got != 11*time.Millisecond {
+		t.Fatalf("standard wait budget = %s", got)
+	}
+	if got := handler.waitBudget(admissionLaneStandard, true); got != 13*time.Millisecond {
+		t.Fatalf("pressure wait budget = %s", got)
+	}
+	if got := handler.waitBudget(admissionLaneResponses, false); got != 17*time.Millisecond {
+		t.Fatalf("responses wait budget = %s", got)
+	}
+	if got := handler.waitBudget(admissionLaneWebSocket, true); got != 19*time.Millisecond {
+		t.Fatalf("websocket pressure wait budget = %s", got)
+	}
+}

@@ -28,6 +28,10 @@ type Config struct {
 	SmartContextEnabled              bool
 	Redactor                         BodyRedactor
 	ActiveRequestLimit               int
+	AdmissionWaitBudget              time.Duration
+	PressureAdmissionWaitBudget      time.Duration
+	LongLivedQueueWaitBudget         time.Duration
+	PressureLongLivedQueueWaitBudget time.Duration
 	PressureSnapshot                 func() AdmissionPressure
 	MaxRequestBytes, MaxInspectBytes int64
 }
@@ -89,6 +93,10 @@ func NewProxy(config Config) (*Proxy, error) {
 	if admission, ok := handler.(*activeRequestHandler); ok {
 		proxy.admission = admission
 		admission.requestBudget = config.Router.RequestWatchdogBudget()
+		admission.admissionWaitBudget = positiveWaitBudget(config.AdmissionWaitBudget, admissionWaitInterval)
+		admission.pressureAdmissionWaitBudget = positiveWaitBudget(config.PressureAdmissionWaitBudget, pressureAdmissionWaitInterval)
+		admission.longLivedQueueWaitBudget = positiveWaitBudget(config.LongLivedQueueWaitBudget, admissionWaitInterval)
+		admission.pressureLongLivedQueueWaitBudget = positiveWaitBudget(config.PressureLongLivedQueueWaitBudget, pressureAdmissionWaitInterval)
 		config.Router.SetAdmissionSelectionNotifier(admission.notifySelectionChange)
 	}
 	proxy.server = &http.Server{
@@ -96,6 +104,13 @@ func NewProxy(config Config) (*Proxy, error) {
 		ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 90 * time.Second,
 	}
 	return proxy, nil
+}
+
+func positiveWaitBudget(value, fallback time.Duration) time.Duration {
+	if value > 0 {
+		return value
+	}
+	return fallback
 }
 func (proxy *Proxy) Start() error {
 	proxy.mu.Lock()

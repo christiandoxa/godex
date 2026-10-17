@@ -68,7 +68,7 @@ regressions and do not pretend to be a two-executable proof.
 | Profile recovery early wake | VERIFIED | `ec5f984c` adds selection revision/channel wakeups; deterministic recovery regression passes, including race testing. |
 | Request-local deadline through admission, body capture, and standard routing | VERIFIED for local source scope | `99623a04`, `9f046cd6`, `14df2902`, and `1ca9b69d` preserve one deadline, return local 504 `request_timeout`, cancel stalled capture/upstream work, reject expired work before a released permit, avoid expired dispatch, and detach committed streams/WebSocket sessions. |
 | Official 0.438.1 source/binary oracle pins | VERIFIED | Tag `c3c96af2a9b87896e262e37f37cd4741a562a66f`, binary SHA-256 `b347889a6fa5aec6f3a0f00a1d8346eb2df30b9933361e924900904ed85e165e`, and release manifest SHA-256 `210ffd34e5e455604b172f361760074801b35b6490c0a8d39e1a4cb29f510351` are pinned and checked. |
-| Cross-binary queue/recovery differential | OPEN | The current finite oracle has no controlled admission/cooldown fixture for both executables. |
+| Cross-binary queue/recovery differential | PARTIAL | `tools/profileparity` now has a credential-free `gateway_admission_queue_wake_04381` stage: both binaries run with isolated synthetic profiles, one held upstream request, one queued request, a released permit, and a fresh follow-up; admission expiry and profile cooldown wake remain source-level only. |
 | Native OAuth, Windows/macOS execution, TUI, and live quota | PARTIAL | Source and Linux synthetic evidence only; native execution or live credentials were not used. |
 
 The clean candidate used by the final phases was pushed to `origin/main` at
@@ -79,24 +79,35 @@ at `80904e2f`; implementation commits are `ec5f984c`, `99623a04`, `9f046cd6`,
 ## Missing or previously mis-scoped evidence
 
 The existing profile and provider fixtures do not create local admission
-pressure or a controlled profile cooldown. They therefore cannot observe the
-new 0.438.1 watchdog and readiness contracts. The earlier release script ran
-only profile lifecycle, provider, native, Gemini, and WebSocket fixtures; a
-green run of those scenarios could not detect a deadline reset while a request
-was queued, a second dispatch after expiry, or a recovery wait that ignored a
+pressure or a controlled profile cooldown. The new
+`gateway_admission_queue_wake_04381` stage creates the first half of that
+surface: it holds one loopback upstream request, queues a second request,
+releases the permit, and checks exactly-once dispatch plus a fresh request for
+both executables. It cannot observe a deadline reset while a request is
+queued, a second dispatch after expiry, or a recovery wait that ignored a
 ready-profile notification.
 
-The new preflight tests close the deterministic local regressions. A separate
-cross-binary queue fixture remains open: it would need an isolated loopback
-gateway with controlled admission saturation, a queued request, a released
-permit, and a profile-ready notification for both the pinned Prodex binary and
-Godex. No real account, credential, model call, or user home is required for
-that future fixture.
+The new preflight tests close the deterministic local regressions. The
+cross-binary queue fixture is now credential-free and uses an isolated
+loopback gateway, synthetic profile, controlled saturation, a queued request,
+and a released permit for both the pinned Prodex binary and Godex. A complete
+expiry/cooldown differential still needs a Godex runtime tuning boundary that
+can shorten the watchdog and expose a profile-ready transition without
+changing production defaults. No real account, credential, model call, or
+user home is required for that follow-up artifact.
+
+The queue stage proves only the released-permit wake path. Godex now accepts
+the active-limit and admission-wait controls through
+`GODEX_RUNTIME_PROXY_*` (with the documented `PRODEX_RUNTIME_PROXY_*` aliases),
+while preserving the production defaults. The five-minute request watchdog and
+profile-readiness transition still have no runtime shortening or deterministic
+cross-process hook, so the local 504 and cooldown cases remain source-level
+evidence.
 
 The existing finite oracle still does not certify full OAuth, live quota,
 native Windows/macOS process behavior, TUI behavior, or arbitrary provider
-recovery. Overall 0.438.1 status remains **PARTIAL** until the cross-binary
-queue/recovery scenarios and the platform-specific evidence are available.
+recovery. Overall 0.438.1 status remains **PARTIAL** until binary expiry and
+cooldown evidence plus the platform-specific evidence are available.
 
 ## Pin verification evidence
 
@@ -139,6 +150,15 @@ candidate source `df4c448946fc458755789512e260e148470185bd`:
 Each phase used the pinned Prodex 0.438.1 executable and retained its negative
 controls. This is a finite synthetic release gate; it does not prove full
 production-wide 1:1 behavior.
+
+The new queue stage was also run directly against the pinned Linux artifact and
+a Godex binary built from this worktree:
+
+```text
+GODEX_TEST_PRODEX_04381_BIN=/home/doxa/.local/bin/prodex \
+GODEX_TEST_GODEX_04381_BIN=/tmp/godex-queue-04381 \
+go test ./tools/profileparity -run '^TestProdex04381GatewayQueueRealExecutables$' -count=1  PASS
+```
 
 No credentials or provider requests were used for pin verification. No tag or
 release was created by the parity gate.

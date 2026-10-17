@@ -125,10 +125,7 @@ func run() int {
 				return nil, err
 			}
 		}
-		return proxyhttp.NewProxy(proxyhttp.Config{
-			Router: router, Activity: activity, Broker: config.Broker, ListenAddr: config.ListenAddr,
-			SmartContextEnabled: config.SmartContextEnabled, Redactor: redactor,
-		})
+		return proxyhttp.NewProxy(runtimeProxyHTTPConfig(config, router, activity, redactor))
 	})
 	runner := runtimeusecase.NewRunner(store, process, factory, runtimerepo.NewGoalStateStore(settings.SharedCodexHome))
 	runner.SetProviderCatalogStore(providerCatalogs)

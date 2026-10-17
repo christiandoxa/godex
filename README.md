@@ -297,6 +297,15 @@ reference. Bounded conversation snapshots implement previous_response_id replay
 and tool-output call-id recovery without persisting conversation contents to
 profile metadata.
 
+Runtime admission tuning can be set with
+`GODEX_RUNTIME_PROXY_ACTIVE_REQUEST_LIMIT`,
+`GODEX_RUNTIME_PROXY_ADMISSION_WAIT_BUDGET_MS`,
+`GODEX_RUNTIME_PROXY_PRESSURE_ADMISSION_WAIT_BUDGET_MS`,
+`GODEX_RUNTIME_PROXY_LONG_LIVED_QUEUE_WAIT_BUDGET_MS`, and
+`GODEX_RUNTIME_PROXY_PRESSURE_LONG_LIVED_QUEUE_WAIT_BUDGET_MS`. Godex also
+accepts the corresponding `PRODEX_RUNTIME_PROXY_*` names for compatibility;
+unset values keep the existing defaults, and invalid values stop proxy startup.
+
 Local OpenAI-compatible Responses endpoints now match Prodex's `--url` surface.
 For example:
 

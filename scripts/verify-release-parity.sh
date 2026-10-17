@@ -358,6 +358,9 @@ if [ "$phase" = 'all' ] || [ "$phase" = 'preflight' ] || [ "$phase" = 'preflight
 # Independent managed-profile persistence oracle. All 29 CLI actions run in
 # separate subprocesses with isolated credential-free homes; state projections
 # must match across creation, active switching, rejected writes and deletion.
+# The same profileparity binary also runs the 0.438.1 admission queue fixture:
+# one held loopback request, one queued request, a released permit, and a
+# fresh follow-up must dispatch exactly once for both executables.
 "$tmp/profileparity" \
   --prodex "$tmp/prodex" --godex "$tmp/godex" \
   --prodex-source "$tmp/prodex-source" \

@@ -32,9 +32,13 @@ type admissionLimits struct {
 type admissionWaitFunc func(context.Context, <-chan struct{}) bool
 
 type activeRequestHandler struct {
-	next          http.Handler
-	wait          admissionWaitFunc
-	requestBudget time.Duration
+	next                             http.Handler
+	wait                             admissionWaitFunc
+	requestBudget                    time.Duration
+	admissionWaitBudget              time.Duration
+	pressureAdmissionWaitBudget      time.Duration
+	longLivedQueueWaitBudget         time.Duration
+	pressureLongLivedQueueWaitBudget time.Duration
 
 	mu                 sync.Mutex
 	active             int
@@ -190,10 +194,7 @@ func (handler *activeRequestHandler) acquireWithPolicy(
 	projectOwner admissionOwnerProjection,
 ) bool {
 	var waitStarted time.Time
-	waitInterval := admissionWaitInterval
-	if handler.pressureMode(lane) {
-		waitInterval = pressureAdmissionWaitInterval
-	}
+	waitInterval := handler.waitBudget(lane, handler.pressureMode(lane))
 	for {
 		if ctx.Err() != nil {
 			return false

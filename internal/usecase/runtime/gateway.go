@@ -222,7 +222,10 @@ func (runner *Runner) startGateway(
 	if upstream == "" {
 		upstream = runner.upstream
 	}
-	config := runtimeProxyConfig(ctx, upstream, preferredID, provider, credentials, accounts, false)
+	config, err := runtimeProxyConfig(ctx, upstream, preferredID, provider, credentials, accounts, false)
+	if err != nil {
+		return nil, err
+	}
 	config.ListenAddr = strings.TrimSpace(options.ListenAddr)
 	config.SkipQuotaPreflight = skipQuotaPreflight
 	config.SmartContextEnabled = options.SmartContextEnabled
