@@ -71,10 +71,10 @@ regressions and do not pretend to be a two-executable proof.
 | Cross-binary queue/recovery differential | OPEN | The current finite oracle has no controlled admission/cooldown fixture for both executables. |
 | Native OAuth, Windows/macOS execution, TUI, and live quota | PARTIAL | Source and Linux synthetic evidence only; native execution or live credentials were not used. |
 
-The clean candidate was pushed to `origin/main` at
-`14df2902d3d1b78273162acedb5fc83129bc80be`. The oracle/docs checkpoint is
-`80904e2f`; implementation commits are `ec5f984c`, `99623a04`, `9f046cd6`,
-and `14df2902`.
+The clean candidate used by the final phases was pushed to `origin/main` at
+`df4c448946fc458755789512e260e148470185bd`. The oracle pin checkpoint began
+at `80904e2f`; implementation commits are `ec5f984c`, `99623a04`, `9f046cd6`,
+`14df2902`, and `1ca9b69d`.
 
 ## Missing or previously mis-scoped evidence
 
@@ -126,7 +126,7 @@ cross-build command `./scripts/check-cross-build.sh` also passed for Linux,
 Darwin, and Windows compilation targets.
 
 The remaining release phases also passed independently against the same clean
-candidate source `282af52ce9ba973e4719de03d09b4f15349b602e`:
+candidate source `df4c448946fc458755789512e260e148470185bd`:
 
 ```text
 ./scripts/verify-release-parity.sh --phase=preflight-tests  PASS
