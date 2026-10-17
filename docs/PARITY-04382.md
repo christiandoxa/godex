@@ -99,3 +99,41 @@ no-argument full-gate behavior still execute **all three slices**. No source
 pin, binary digest, test assertion, negative control, or coverage was removed.
 A complete 0.438.2 preflight certificate requires all three independently
 pinned slices and preflight-tests to pass on one clean Godex source commit.
+
+## Complete pinned finite release gate — clean `046c15af`
+
+All the following stages exited 0 against **one clean Godex commit**
+`046c15af9669c6416d6efdaea70244f0f8201306`, using the exact official
+Prodex 0.438.2 source commit
+`decfed45f884fe2bef20911303beab7b198698b7`, published executable SHA,
+and release manifest pinned above:
+
+| Stage | Result |
+| --- | --- |
+| `--phase=preflight-tests` | PASS (including three new local 0.438.2 WebSocket regressions under `-race`) |
+| `--phase=preflight-oracles-pty` | PASS (official PTY footer, CLI and context executable oracles) |
+| `--phase=preflight-oracles-profiles` | PASS (managed-profile lifecycle, synthetic quota restart, Linux real FD pressure, and admission queue wake) |
+| `--phase=preflight-oracles-history` | PASS (real executable previous-response/continuation replay boundary tests) |
+| `--phase=deepseek` | PASS 30/30, `comparison_differences: []`, mutation controls PASS |
+| `--phase=gemini` | PASS 13/13, `comparison_differences: []`, mutation controls PASS |
+| `--phase=websocket` | PASS 58 synthetic upstream attempts, strict precommit retry, hard owner, and no committed replay |
+| `scripts/check-cross-build.sh` | PASS: Linux AMD64/ARM64, Darwin AMD64/ARM64, Windows AMD64/ARM64 and targeted Darwin/Windows test compilation |
+| `make verify` | PASS: format, vet, source-size, shuffled Go race tests and native Go production build |
+
+An opt-in Codex 0.163.0 handshake fixture was intentionally **not** counted
+in preflight-tests: the previously pinned standalone official binary at the
+historical test-only path was absent in this runtime. The script's normal
+mandatory preflight executed successfully without that optional override;
+Codex's native app-server has separately tested historical evidence, which
+is not represented as a new 0.438.2 checksum-verified handshake here.
+
+The existing 58-attempt cross-executable WebSocket fixture covers prior
+retry, status, hard-affinity and no-replay behavior, not yet a dedicated
+**two-executable concurrent idle-permit / repeated-hidden-prelude** 0.438.2
+comparison. Those two *new* release features are source-aligned and verified
+with the real Godex router and loopback TCP/WebSocket regressions, but their
+independent Prodex executable fixture remains **PARTIAL**. Similarly, native
+Windows/macOS execution, live OAuth and arbitrary upstream failures are not
+certified by cross-compilation or synthetic loopback tests. The complete
+bounded **finite synthetic release gate is VERIFIED** for the cases named
+above; overall production-wide 1:1 remains **PARTIAL**.
