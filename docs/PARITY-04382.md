@@ -58,9 +58,10 @@ scoped idle-permit behavior; no duplicate resource-owner or permit patch was
 introduced. Realtime duplex behavior remains protected by its separate
 existing lifecycle tests.
 
-The above are local loopback/source-derived regressions. **Full 0.438.2
-cross-executable parity is still PARTIAL** pending a new release-pinned
-binary differential covering the exact two new regressions. Native Windows/
+At the time of this initial checkpoint, these were only local loopback/
+source-derived regressions. The subsequent **two-executable** idle-capacity
+and absolute hidden-prelude deadline oracles below have since VERIFIED these
+two **bounded** release behaviors on clean Godex `4126a3e2`. Native Windows/
 macOS process execution, live OAuth/provider quota and arbitrary network
 failures remain outside the finite verified scope.
 
@@ -127,12 +128,13 @@ mandatory preflight executed successfully without that optional override;
 Codex's native app-server has separately tested historical evidence, which
 is not represented as a new 0.438.2 checksum-verified handshake here.
 
-The existing 58-attempt cross-executable WebSocket fixture covers prior
-retry, status, hard-affinity and no-replay behavior, not yet a dedicated
-**two-executable concurrent idle-permit / repeated-hidden-prelude** 0.438.2
-comparison. Those two *new* release features are source-aligned and verified
-with the real Godex router and loopback TCP/WebSocket regressions, but their
-independent Prodex executable fixture remains **PARTIAL**. Similarly, native
+At the earlier `046c15af` checkpoint, the inherited 58-attempt
+cross-executable WebSocket fixture covered only prior retry, status, affinity
+and no-replay behavior. The **later** pinned `4126a3e2` release gate, recorded
+below, adds independent official executable checks for idle capacity and
+absolute hidden-prelude deadline. This historical result is superseded for
+those explicitly tested cases, but untested live runtime permutations remain
+PARTIAL. Similarly, native
 Windows/macOS execution, live OAuth and arbitrary upstream failures are not
 certified by cross-compilation or synthetic loopback tests. The complete
 bounded **finite synthetic release gate is VERIFIED** for the cases named
@@ -162,7 +164,8 @@ protect the complete configuration path with synthetic identities. The
 routing composition was extracted to a cohesive 25-line module and the
 `cmd/godex/main.go` file reduced from 415 to 397 lines, below the default 400-line guard,
 removing its old special baseline rather than raising any threshold. This is **VERIFIED source-aligned configuration
-coverage**, not itself the missing two-binary concurrent WebSocket fixture.
+coverage**; the scoped two-executable idle-capacity fixture was
+subsequently completed, as shown below.
 
 
 ## Independent two-executable idle-permit capacity proof
@@ -209,8 +212,8 @@ has been exhaustively cloned.
 compile before the setting existed and now protect floor, override precedence,
 validation and the production launch chain. The request's deadline is still
 single-owner in Router; hidden prelude keepalive frames are forbidden from
-creating a fresh budget. The scoped two-executable **30-second** WebSocket
-watchdog fixture is a separate executable proof step.
+creating a fresh budget. The scoped two-executable **30-second** WebSocket watchdog fixture was
+subsequently completed on clean `4126a3e2`, as recorded below.
 
 
 ## Independent two-executable hidden-prelude deadline proof
@@ -238,3 +241,40 @@ original complete `--phase=websocket` while meeting synchronous deadlines.
 Verification must run both slices on the **same clean Godex commit**; the
 old 0.438.1 binary or historical 0.438.2 results do not qualify this
 expanded oracle by themselves.
+
+
+## Latest complete release-pinned finite gate — clean Godex `4126a3e2`
+
+Prodex 0.438.2 published source commit
+`decfed45f884fe2bef20911303beab7b198698b7`, Linux x86_64 published
+binary SHA-256
+`3f2fcd776fee0335dc49910d0651adc43a55c8627913556c307755b1575dac3f`
+and the release manifest were independently verified in every phase.
+The Godex source was one **clean exact commit**,
+`4126a3e207e2d8ca4f9607b3dbea1ebd74d3c2e8`, for all the following:
+
+| Independent phase | Verified result |
+| --- | --- |
+| `--phase=preflight-tests` | PASS, including local new WebSocket timeout/permit regressions under Go race tests |
+| `--phase=preflight-oracles-pty` | PASS, binary PTY/footer, 14 CLI probes, native context and mutation checks |
+| `--phase=preflight-oracles-profiles` | PASS, 34-stage managed profile lifecycle, synthetic quota, real Linux FD pressure and admission wake |
+| `--phase=preflight-oracles-history` | PASS, official binary history/continuation replay boundary oracle |
+| `--phase=deepseek` | PASS 30/30; `comparison_differences: []`; negative controls PASS |
+| `--phase=gemini` | PASS 13/13; `comparison_differences: []`; negative controls PASS |
+| `--phase=websocket-core` | PASS: 58 historical upstream attempts **plus 12 new idle-permit attempts**, exact response IDs, owner, body, no extra handshakes and negative controls |
+| `--phase=websocket-deadline` | PASS: two official binaries, each returning exact public `504 request_timeout` around **30.0s**, one timed-out inference request, one successful followup on the same local socket, no retry/rotation, strict mutation controls |
+| `scripts/check-cross-build.sh` | PASS: Linux AMD64/ARM64, Darwin AMD64/ARM64, Windows AMD64/ARM64 plus cross-platform test compilation |
+| `make verify` | PASS: format, source-size, vet, shuffled Go race tests and production build |
+
+The complete `--phase=websocket` continues to include both non-overlapping
+slices. They are invoked individually to fit synchronous execution budgets;
+**a single slice is not a complete release gate**. The Codex 0.163.0
+checksum-pinned handshake requires an optional external test binary and was
+not included in the current run; its previous evidence is historical only.
+
+**Status:** these finite synthetic 0.438.2 parity cases are VERIFIED. The
+full production-wide 1:1 parity is still **PARTIAL**, especially native
+Windows/macOS execution, live OAuth and quota/credential recovery, Codex
+model compaction with real provider state, runtime realtime duplex edge
+cases, and other unexercised failure permutations. Neither synthetic fixture
+coverage nor cross-compilation certifies those outstanding native behaviors.
