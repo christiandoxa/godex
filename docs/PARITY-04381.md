@@ -66,7 +66,7 @@ regressions and do not pretend to be a two-executable proof.
 | Surface | Status | Evidence |
 | --- | --- | --- |
 | Profile recovery early wake | VERIFIED | `ec5f984c` adds selection revision/channel wakeups; deterministic recovery regression passes, including race testing. |
-| Request-local deadline through admission, body capture, and standard routing | VERIFIED for local source scope | `99623a04`, `9f046cd6`, `14df2902`, and `1ca9b69d` preserve one deadline, return local 504 `request_timeout`, cancel stalled capture/upstream work, reject expired work before a released permit, avoid expired dispatch, and detach committed streams/WebSocket sessions. |
+| Request-local deadline through listener admission, body capture, and standard routing | VERIFIED for local source scope | `99623a04`, `9f046cd6`, `14df2902`, `1ca9b69d`, and `89d40d30` preserve one deadline from accepted connection through admission, return local 504 `request_timeout`, cancel stalled capture/upstream work, reject expired work before a released permit, avoid expired dispatch, and detach committed streams/WebSocket sessions. |
 | Official 0.438.1 source/binary oracle pins | VERIFIED | Tag `c3c96af2a9b87896e262e37f37cd4741a562a66f`, binary SHA-256 `b347889a6fa5aec6f3a0f00a1d8346eb2df30b9933361e924900904ed85e165e`, and release manifest SHA-256 `210ffd34e5e455604b172f361760074801b35b6490c0a8d39e1a4cb29f510351` are pinned and checked. |
 | Cross-binary queue/recovery differential | PARTIAL | `tools/profileparity` now has a credential-free `gateway_admission_queue_wake_04381` stage: both binaries run with isolated synthetic profiles, one held upstream request, one queued request, a released permit, and a fresh follow-up; admission expiry and profile cooldown wake remain source-level only. |
 | Native OAuth, Windows/macOS execution, TUI, and live quota | PARTIAL | Source and Linux synthetic evidence only; native execution or live credentials were not used. |
@@ -83,26 +83,27 @@ pressure or a controlled profile cooldown. The new
 `gateway_admission_queue_wake_04381` stage creates the first half of that
 surface: it holds one loopback upstream request, queues a second request,
 releases the permit, and checks exactly-once dispatch plus a fresh request for
-both executables. It cannot observe a deadline reset while a request is
-queued, a second dispatch after expiry, or a recovery wait that ignored a
-ready-profile notification.
+both executables. Godex's local watchdog now starts at connection acceptance,
+but the binary stage still cannot shorten the five-minute watchdog enough to
+observe expiry while a request is queued, a second dispatch after expiry, or a
+recovery wait that ignored a ready-profile notification.
 
 The new preflight tests close the deterministic local regressions. The
 cross-binary queue fixture is now credential-free and uses an isolated
 loopback gateway, synthetic profile, controlled saturation, a queued request,
 and a released permit for both the pinned Prodex binary and Godex. A complete
-expiry/cooldown differential still needs a Godex runtime tuning boundary that
-can shorten the watchdog and expose a profile-ready transition without
-changing production defaults. No real account, credential, model call, or
-user home is required for that follow-up artifact.
+expiry/cooldown differential still needs a reviewed way to shorten the
+five-minute watchdog and expose a profile-ready transition without changing
+production defaults. No real account, credential, model call, or user home is
+required for that follow-up artifact.
 
 The queue stage proves only the released-permit wake path. Godex now accepts
 the active-limit and admission-wait controls through
 `GODEX_RUNTIME_PROXY_*` (with the documented `PRODEX_RUNTIME_PROXY_*` aliases),
 while preserving the production defaults. The five-minute request watchdog and
-profile-readiness transition still have no runtime shortening or deterministic
-cross-process hook, so the local 504 and cooldown cases remain source-level
-evidence.
+profile-readiness transition still have no reviewed runtime shortening or
+deterministic cross-process hook, so the local 504 and cooldown cases remain
+source-level evidence.
 
 The existing finite oracle still does not certify full OAuth, live quota,
 native Windows/macOS process behavior, TUI behavior, or arbitrary provider
