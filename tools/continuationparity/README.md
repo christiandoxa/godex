@@ -133,3 +133,36 @@ real OAuth access or model API traffic is used. The independent test of
 **saturated active-turn reuse waiting** remains in Godex's real Router/TCP
 integration suite; this cross-executable fixture specifically proves the
 completed **idle** resource release/reuse lifecycle.
+
+
+## Prodex 0.438.2 original-deadline precommit executable oracle
+
+`--websocket-deadline` runs another independent tagged source/SHA-verified
+binary differential. Prodex's `recovery_watchdog_budget_ms` computes
+`max(stream_idle_timeout_ms, 30_000)`; both executable launchers receive
+**2000ms** stream idle, so one client-side `response.create` must time out at
+**30 seconds**. The synthetic upstream sends `keepalive` text frames about
+245ms apart until roughly 29s, then stays **open and silent** past the
+original deadline. This distinguishes the 0.438.2 bounded I/O behavior from
+an extra idle timeout granted after the last hidden frame. Neither product
+may expose a hidden prelude as committed model output.
+
+The exact client-visible terminal error is `HTTP 504`,
+`error.code=request_timeout`, with the exact **client-visible** message `request timed out` (the Router's
+longer internal error message is not part of the WebSocket wire). The
+fixture asserts that expiry occurred within a 27.5–31s bounded interval;
+only one authenticated upstream request was issued, no owner rotation or
+replay occurred, and a new turn on the **same local WebSocket** completed on
+`account-a` with `response.id=resp-after-watchdog`. One upstream connection
+for each turn means exactly two handshakes and two upstream requests.
+`TestProdex04382WebSocketDeadlineOracleRejectsMaterialMutations` actively
+rejects early/renewed timeouts, wrong status/code/message, duplicate or
+missing upstream requests, changed request body, foreign profile owner,
+missing followup completion and any extra handshake.
+
+The full `--phase=websocket` release gate retains both WebSocket fixture
+families. For synchronous execution the release script provides two
+**non-overlapping** slices: `--phase=websocket-core` (58 prior attempts,
+completed-idle permit and mutation tests) and `--phase=websocket-deadline`
+(this two-product 30s fixture and negative controls). Both must pass against
+the same clean candidate to establish the complete bounded 0.438.2 gate.

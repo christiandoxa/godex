@@ -72,8 +72,14 @@ func (b *backend) serveWebSocket(writer http.ResponseWriter, request *http.Reque
 		b.wsCounts[envelope.Mode]++
 		seen := b.wsCounts[envelope.Mode]
 		b.mu.Unlock()
+		if envelope.Mode == deadlineMode04382 {
+			serveHiddenPreludeDeadline04382(connection)
+			return
+		}
 		var payloads []string
 		switch envelope.Mode {
+		case deadlineFollowupMode04382:
+			payloads = []string{`{"type":"response.completed","response":{"id":"resp-after-watchdog"}}`}
 		case "ws-keepalive":
 			if seen == 1 {
 				payloads = []string{

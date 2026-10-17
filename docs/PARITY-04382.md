@@ -211,3 +211,30 @@ validation and the production launch chain. The request's deadline is still
 single-owner in Router; hidden prelude keepalive frames are forbidden from
 creating a fresh budget. The scoped two-executable **30-second** WebSocket
 watchdog fixture is a separate executable proof step.
+
+
+## Independent two-executable hidden-prelude deadline proof
+
+A new exact tagged `tools/continuationparity --websocket-deadline` exercise
+uses **both actual published executables** and isolated synthetic accounts.
+With the configured stream idle at 2000ms, the Mojo recovery-watchdog floor
+makes the request's precommit budget exactly **30 seconds**. The upstream
+emits hidden `keepalive` frames until approximately 29s, then deliberately
+holds the accepted socket open past the deadline. This forces the last
+blocking precommit read to obey the **original** deadline rather than
+accepting a fresh socket-idle window after its last prelude. A local client
+must see an exact `504 request_timeout` with the exact public message `request timed out`; there is
+one upstream request, no leaked prelude or committed model output, and no
+account rotation. A followup request on the same local WebSocket must
+complete once on the same profile with its exact ID.
+
+The new negative controls reject an early/late timeout, a 502/429 or wrong
+error body, extra/absent authenticated upstream requests, changed owner or
+request JSON, missing completion or extra handshake. The original WebSocket
+phase still exercises all pre-existing 58 attempts and the 12-attempt
+completed-idle permit differential. Two nonoverlapping release slices,
+`--phase=websocket-core` and `--phase=websocket-deadline`, preserve the
+original complete `--phase=websocket` while meeting synchronous deadlines.
+Verification must run both slices on the **same clean Godex commit**; the
+old 0.438.1 binary or historical 0.438.2 results do not qualify this
+expanded oracle by themselves.

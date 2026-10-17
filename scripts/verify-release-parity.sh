@@ -15,7 +15,9 @@ case "${1:-}" in
   --phase=deepseek) phase='deepseek' ;;
   --phase=gemini) phase='gemini' ;;
   --phase=websocket) phase='websocket' ;;
-  *) echo 'usage: verify-release-parity.sh [--phase=preflight|preflight-tests|preflight-oracles|preflight-oracles-pty|preflight-oracles-profiles|preflight-oracles-history|deepseek|gemini|websocket]' >&2; exit 2 ;;
+  --phase=websocket-core) phase='websocket-core' ;;
+  --phase=websocket-deadline) phase='websocket-deadline' ;;
+  *) echo 'usage: verify-release-parity.sh [--phase=preflight|preflight-tests|preflight-oracles|preflight-oracles-pty|preflight-oracles-profiles|preflight-oracles-history|deepseek|gemini|websocket|websocket-core|websocket-deadline]' >&2; exit 2 ;;
 esac
 if [ "$#" -gt 1 ]; then
   echo 'release parity accepts at most one phase option' >&2
@@ -519,7 +521,11 @@ go test ./internal/gateway/gemini ./tools/differential \
 
 fi
 
-if [ "$phase" = 'all' ] || [ "$phase" = 'websocket' ]; then
+# A complete WebSocket gate includes BOTH the existing 58-attempt + idle
+# capacity suite and the new ~30-second per-product deadline differential.
+# Mutually exclusive slices fit synchronous command deadlines; the existing
+# --phase=websocket and default all mode retain every assertion.
+if [ "$phase" = 'all' ] || [ "$phase" = 'websocket' ] || [ "$phase" = 'websocket-core' ]; then
 # Exact-tagged Responses WebSocket executable differential. A synthetic
 # heartbeat followed by capacity error must remain precommit; actual output
 # must never be replayed; trusted previous_response_id outranks soft session.
@@ -550,6 +556,25 @@ go test ./tools/continuationparity \
   -run '^TestProdex04380FreshConnectionLimitOracleRejectsOwnerAndReplayDrift$' \
   -count=1 -timeout=30s
 
+fi
+
+if [ "$phase" = 'all' ] || [ "$phase" = 'websocket' ] || [ "$phase" = 'websocket-deadline' ]; then
+# Tagged Prodex 0.438.2 bounds EVERY precommit upstream read by the ORIGINAL
+# 30-second request deadline (max(configured stream idle 2000ms, 30s)).
+# Repeated hidden keepalives cease before expiry but leave the old upstream
+# open: local client must receive exact 504 request_timeout near 30s, with
+# no second inference or auth/quota rotation. Then the SAME local socket must
+# send a fresh turn successfully against the same synthetic owner.
+"$tmp/continuationparity" \
+  --prodex "$tmp/prodex" --godex "$tmp/godex" \
+  --prodex-source "$tmp/prodex-source" \
+  --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
+  --websocket-deadline
+# Independent mutations prove this fixture would fail on a renewed/early
+# deadline, wrong 504/code/message, replay, owner change or followup loss.
+go test ./tools/continuationparity \
+  -run '^TestProdex04382WebSocketDeadlineOracleRejectsMaterialMutations$' \
+  -count=1 -timeout=30s
 fi
 
 # Printed only after all stages *selected for this invocation* succeeded.
