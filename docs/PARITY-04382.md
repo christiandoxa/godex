@@ -457,3 +457,34 @@ was discarded without patching runtime behavior or altering the existing
 58/12/2/2 WebSocket differential assertions. An independent deterministic
 **two-executable realtime permit/close** fixture is still **PARTIAL/OPEN**,
 not silently inferred from the local Router test.
+
+## SHA-pinned official Codex 0.163.0 native app-server and compaction proof
+
+An additional optional preflight coverage gap was closed on clean Godex
+`39580286e1db65ae330a6d5db76489526b28cf16`: the locally installed
+`codex` launcher was a small Node.js wrapper, but its private npm native
+package `@openai/codex-linux-x64` contained the **unmodified Linux musl
+Codex 0.163.0 executable**. The executable's independently verified SHA-256
+`399ff69c431c066e40de318fba45c2b07f45a76b19939d247ee4828fc70c4215`
+matched the source-pinned `officialCodex0163LinuxSHA04380` test oracle, and
+it reported `codex-cli 0.163.0` as required. No installation was changed.
+
+Opting in with `GODEX_TEST_CODEX_0163_APP_SERVER_BIN` targeting that
+verified native binary produced **PASS** for all six official-binary tests:
+
+- `TestProdex04380OfficialCodex0163AppServerInitializeAndThreadList`
+- `TestProdex04380OfficialCodex0163LoopbackForegroundCompactionRetainsHistory`
+- `TestProdex04380OfficialCodex0163LoopbackAutoCompactionLifecycle`
+- `TestProdex04380OfficialCodex0163LoopbackAsyncCompactionLifecycle`
+- `TestProdex04380OfficialCodex0163LoopbackIncompleteUsageDoesNotReplay`
+- `TestProdex04380OfficialCodex0163LoopbackInterruptCancelsWithoutReplay`
+
+The **entire** tagged `--phase=preflight-tests` (including new realtime
+weighted permit regression) then **PASS** on the same clean
+`39580286` with that SHA-pinned optional binary enabled. Earlier checkpoint
+reports saying the optional official binary was absent described the
+*historical fixture path*, not a permanent platform limitation. These are
+real native Codex 0.163.0 app-server sessions with an isolated, synthetic
+loopback provider and credential-free HOME. They do **not** prove live
+external-provider compaction, full production quota state, or native
+Windows/macOS app-server execution; those remain PARTIAL/OPEN.
