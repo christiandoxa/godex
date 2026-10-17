@@ -194,3 +194,27 @@ next request enters precommit, preventing an old stream timeout from
 mistakenly closing/retrying a fresh turn. Local `-race` tests exercise this
 state transition. The fixture is now part of the `--phase=websocket-core`
 and inherited full WebSocket gate alongside the prior 58 and 12 attempts.
+
+
+## Tagged 0.438.2 8KiB held precommit promotion into committed idle
+
+`--websocket-lookahead-idle` is an independent official Prodex 0.438.2
+source/SHA-pinned two-executable differential. One freshly opened local
+Responses WebSocket sends a single synthetic `response.create`. The upstream
+replies with a **precommit-only** `response.in_progress` padded with exactly
+8,192 `x` bytes, exhausting the bounded lookahead budget. It then remains
+open and silent until after the 2-second configured stream-idle timeout.
+The tagged Rust `precommit.rs` promotes the hold to a committed Responses
+stream and uses the same `commit.rs` timeout restoration as an ordinary
+visible delta. Godex originally left that promoted stream on an 8-second
+precommit progress timer rather than the real configured committed timeout.
+
+Both official Prodex and clean Godex must emit one identical full text frame,
+then an **empty opcode-8 WebSocket close** in 1.5–4 seconds. The fixture
+requires exactly one original opaque upstream request, one handshake, and
+unchanged `account-a` ownership. The independent mutation controls reject a
+lost/shortened hold, wrong event type, failure to promote, late/early close,
+abrupt TCP EOF, unexpected close body, duplicated inference, reconnected
+transport, changed owner or rewritten request JSON. The 58-attempt core,
+12-attempt idle-permit, two-attempt committed visible idle, and separate
+absolute 30-second precommit tests remain unchanged and mandatory.

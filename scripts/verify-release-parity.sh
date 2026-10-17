@@ -580,6 +580,19 @@ go test ./tools/continuationparity \
   -run '^TestProdex04382WebSocketCommittedIdleOracleRejectsWireMutations$' \
   -count=1 -timeout=30s
 
+# Tagged Prodex 0.438.2 can commit 8KiB of held `response.in_progress`
+# prelude even before visible model text. Shared commit.rs MUST switch to the
+# configured 2s committed idle, forwarding the full frame then sending an
+# EMPTY WebSocket close control frame (no 8s precommit timeout or replay).
+"$tmp/continuationparity" \
+  --prodex "$tmp/prodex" --godex "$tmp/godex" \
+  --prodex-source "$tmp/prodex-source" \
+  --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
+  --websocket-lookahead-idle
+go test ./tools/continuationparity \
+  -run '^TestProdex04382LookaheadIdleOracleRejectsMutations$' \
+  -count=1 -timeout=30s
+
 # Native 0.438.2 connection-limit frame may be top-level or nested. A fresh
 # WebSocket is retryable once before commitment, but never after visible output.
 go test ./tools/continuationparity \

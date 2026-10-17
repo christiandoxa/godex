@@ -363,3 +363,26 @@ that a short (under-8KiB) hidden prelude cannot promote or reset the original
 request deadline. The complete local OpenAI package and focused Go race tests
 PASS. This checkpoint is source-derived plus local physical WebSocket proof;
 a new **two-executable** lookahead idle fixture is a distinct next step.
+
+
+## Independent two-executable 8KiB lookahead promotion idle proof
+
+Following the fail-before/pass-after 8KiB commit-clock fix, a new pinned
+**official Prodex 0.438.2 versus Godex** WebSocket differential verified
+its actual public wire. The synthetic upstream writes a
+`response.in_progress` frame containing **8,192 bytes** of padding and
+keeps the connection silent/open afterward. Both executables promote the
+bounded hold to committed output, forward the complete frame exactly once,
+and send an **empty close control frame (opcode 8)** around **2.0 seconds**
+when `STREAM_IDLE_TIMEOUT_MS=2000`. Both make exactly **one** authenticated
+upstream request with unchanged request body, account owner and handshake.
+
+`tools/continuationparity --websocket-lookahead-idle` is independently
+source/SHA-verified and now part of the release `--phase=websocket-core`
+without weakening the prior continuation, idle-capacity, normal-visible
+committed idle or absolute-precommit tests. The mutation sentinels reject
+missing/altered padding, incorrect output type, missing close handshake,
+wrong early/late clock, extra upstream attempts, changed account or request.
+This **bounded 8KiB promotion/idle contract is VERIFIED across both
+executables**, not an assertion that every native Codex streaming state or
+platform-specific socket expiry has been certified.

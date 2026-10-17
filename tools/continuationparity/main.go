@@ -154,11 +154,12 @@ func main() {
 	websocketCapacity := flag.Bool("websocket-capacity", false, "check 0.438.2 completed WebSocket profile capacity and cached reuse")
 	websocketDeadline := flag.Bool("websocket-deadline", false, "compare original precommit deadline after hidden frames across both official binaries")
 	websocketCommittedIdle := flag.Bool("websocket-committed-idle", false, "compare committed output stream idle expiry/close frame across both pinned binaries")
+	websocketLookaheadIdle := flag.Bool("websocket-lookahead-idle", false, "compare 8KiB precommit hold promotion into committed stream idle against both binaries")
 	godexSource := flag.String("godex-source", "", "clean Godex commit source (required with either WebSocket fixture)")
 	godexCommit := flag.String("godex-commit", "", "exact 40-character Godex commit (required with either WebSocket fixture)")
 	flag.Parse()
 	chosen := 0
-	for _, mode := range []bool{*websocket, *websocketCapacity, *websocketDeadline, *websocketCommittedIdle} {
+	for _, mode := range []bool{*websocket, *websocketCapacity, *websocketDeadline, *websocketCommittedIdle, *websocketLookaheadIdle} {
 		if mode {
 			chosen++
 		}
@@ -172,7 +173,7 @@ func main() {
 	if err := verifyProdex(*prodex, *prodexSource); err != nil {
 		fatal(err.Error())
 	}
-	if *websocket || *websocketCapacity || *websocketDeadline || *websocketCommittedIdle {
+	if *websocket || *websocketCapacity || *websocketDeadline || *websocketCommittedIdle || *websocketLookaheadIdle {
 		if err := verifyWebSocketCandidate(*godex, *godexSource, *godexCommit); err != nil {
 			fatal(err.Error())
 		}
@@ -189,7 +190,9 @@ func main() {
 	for _, spec := range []struct{ name, binary string }{{"prodex", *prodex}, {"godex", *godex}} {
 		p := product{name: spec.name, binary: spec.binary}
 		var err error
-		if *websocketCommittedIdle {
+		if *websocketLookaheadIdle {
+			err = runWebSocketLookaheadIdleProduct04382(root, b, p)
+		} else if *websocketCommittedIdle {
 			err = runWebSocketCommittedIdleProduct04382(root, b, p)
 		} else if *websocketDeadline {
 			err = runWebSocketDeadlineProduct04382(root, b, p)
@@ -203,6 +206,10 @@ func main() {
 		if err != nil {
 			fatal(spec.name + ": " + err.Error())
 		}
+	}
+	if *websocketLookaheadIdle {
+		fmt.Printf("PASS Prodex 0.438.2 precommit 8KiB lookahead committed idle: %d upstream attempts across both binaries\n", len(mustAttempts(b)))
+		return
 	}
 	if *websocketCommittedIdle {
 		fmt.Printf("PASS Prodex 0.438.2 committed output WebSocket idle graceful closure: %d authenticated upstream attempts across both binaries\n", len(mustAttempts(b)))

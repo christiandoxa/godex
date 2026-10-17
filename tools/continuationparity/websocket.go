@@ -72,6 +72,10 @@ func (b *backend) serveWebSocket(writer http.ResponseWriter, request *http.Reque
 		b.wsCounts[envelope.Mode]++
 		seen := b.wsCounts[envelope.Mode]
 		b.mu.Unlock()
+		if envelope.Mode == lookaheadIdleMode04382 {
+			serveLookaheadStalledStream04382(connection)
+			return
+		}
 		if envelope.Mode == committedIdleMode04382 {
 			serveCommittedStalledStream04382(connection)
 			return
