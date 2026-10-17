@@ -32,8 +32,9 @@ type admissionLimits struct {
 type admissionWaitFunc func(context.Context, <-chan struct{}) bool
 
 type activeRequestHandler struct {
-	next http.Handler
-	wait admissionWaitFunc
+	next          http.Handler
+	wait          admissionWaitFunc
+	requestBudget time.Duration
 
 	mu                 sync.Mutex
 	active             int
@@ -168,6 +169,9 @@ func (handler *activeRequestHandler) ServeHTTP(writer http.ResponseWriter, reque
 		handler.next.ServeHTTP(writer, request)
 		return
 	}
+	requestContext, cancel := withRequestDeadline(request.Context(), handler.requestBudget)
+	defer cancel()
+	request = request.WithContext(requestContext)
 	lane := admissionLaneForRequest(request)
 	if lane == admissionLaneStandard && handler.shedOptionalStartupMetadata(writer, request.URL.Path) {
 		return
@@ -178,7 +182,9 @@ func (handler *activeRequestHandler) ServeHTTP(writer http.ResponseWriter, reque
 		return
 	}
 	if !handler.acquireRequest(request, lane) {
-		if request.Context().Err() == nil {
+		if requestDeadlineTimedOut(request.Context()) {
+			writeProxyError(writer, request.URL.Path, http.StatusGatewayTimeout, requestRecoveryTimeoutMessage)
+		} else if request.Context().Err() == nil {
 			handler.markLocalOverload()
 			writeLocalAdmissionOverloadResponse(writer, lane, isWebSocketUpgradeRequest(request))
 		}

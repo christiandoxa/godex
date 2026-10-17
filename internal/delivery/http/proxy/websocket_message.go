@@ -25,7 +25,7 @@ func (proxy *Proxy) forwardWebSocketMessages(
 		return err
 	}
 	sessionID := proxy.sequence.Add(1)
-	sessionContext, cancel := context.WithCancel(request.Context())
+	sessionContext, cancel := context.WithCancel(withoutRequestDeadline(request.Context()))
 	tunnel := &websocketTunnel{
 		client: client, toClient: &websocketFrameWriter{writer: buffered.Writer}, cancel: cancel,
 	}

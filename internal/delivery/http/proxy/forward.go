@@ -43,7 +43,7 @@ func (proxy *Proxy) forwardResponse(ctx context.Context, writer http.ResponseWri
 		if len(providerKinds) > 0 {
 			providerKind = providerKinds[0]
 		}
-		proxy.finishCommittedStream(ctx, writer, response, prepared, accountID, lifecycle, providerKind)
+		proxy.finishCommittedStream(withoutRequestDeadline(ctx), writer, response, prepared, accountID, lifecycle, providerKind)
 		return
 	}
 	proxy.finishCommittedBody(writer, response, prepared, lifecycle)

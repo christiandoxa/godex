@@ -35,6 +35,7 @@ type Proxy struct {
 	router                    *routingusecase.Router
 	server                    *http.Server
 	listenAddr                string
+	requestBudget             time.Duration
 	maxRequest, maxInspect    int64
 	mu                        sync.Mutex
 	sequence                  atomic.Uint64
@@ -73,7 +74,8 @@ func NewProxy(config Config) (*Proxy, error) {
 	}
 	proxy := &Proxy{
 		router: config.Router, activity: config.Activity, broker: config.Broker, listenAddr: config.ListenAddr,
-		maxRequest: config.MaxRequestBytes, maxInspect: config.MaxInspectBytes,
+		requestBudget: config.Router.RequestWatchdogBudget(),
+		maxRequest:    config.MaxRequestBytes, maxInspect: config.MaxInspectBytes,
 		smartContextEnabled:       config.SmartContextEnabled,
 		redactor:                  config.Redactor,
 		pressureSnapshot:          config.PressureSnapshot,
@@ -86,6 +88,7 @@ func NewProxy(config Config) (*Proxy, error) {
 	handler := newActiveRequestHandlerWithRecorder(proxy, config.ActiveRequestLimit, config.Activity)
 	if admission, ok := handler.(*activeRequestHandler); ok {
 		proxy.admission = admission
+		admission.requestBudget = config.Router.RequestWatchdogBudget()
 		config.Router.SetAdmissionSelectionNotifier(admission.notifySelectionChange)
 	}
 	proxy.server = &http.Server{
@@ -199,10 +202,14 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 	}
 	proxy.activeRequests.Add(1)
 	defer proxy.activeRequests.Add(-1)
+	requestContext, cancel := withRequestDeadline(request.Context(), proxy.requestBudget)
+	defer cancel()
+	request = request.WithContext(requestContext)
 	activity := proxy.startActivity(request)
 	activityContext := context.WithoutCancel(request.Context())
-	requestContext := request.Context()
 	defer proxy.finishActivity(activityContext, activity)
+	var detachCancel context.CancelFunc = func() {}
+	defer func() { detachCancel() }()
 	lifecycle := &requestLifecycle{}
 	websocket := isWebSocketUpgradeRequest(request)
 	websocketKey := ""
@@ -238,6 +245,11 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 		var err error
 		body, err = readLimited(request.Body, proxy.maxRequest)
 		if err != nil {
+			if requestDeadlineTimedOut(requestContext) {
+				activity.fail(http.StatusGatewayTimeout, requestRecoveryTimeoutMessage)
+				writeProxyError(writer, request.URL.Path, http.StatusGatewayTimeout, requestRecoveryTimeoutMessage)
+				return
+			}
 			if request.Context().Err() != nil {
 				activity.fail(0, "request canceled")
 				return
@@ -253,8 +265,13 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 		// A closing server connection can report read EOF at any point after
 		// capture. Finish its complete request like the reference runtime;
 		// body-read failures and ordinary request cancellation still stop work.
+		if requestDeadlineTimedOut(requestContext) {
+			activity.fail(http.StatusGatewayTimeout, requestRecoveryTimeoutMessage)
+			writeProxyError(writer, request.URL.Path, http.StatusGatewayTimeout, requestRecoveryTimeoutMessage)
+			return
+		}
 		if requestContext.Err() != nil || request.RequestURI != "" && request.Close {
-			requestContext = context.WithoutCancel(requestContext)
+			requestContext, detachCancel = detachRequestDeadline(requestContext)
 		}
 		if proxy.redactor != nil && len(body) > 0 {
 			redacted, err := proxy.redactor.Redact(requestContext, body)
@@ -286,6 +303,11 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 		QuotaSelection: proxy.quotaSelection(request.URL.Path, websocket, body),
 	})
 	if err != nil {
+		if requestDeadlineTimedOut(requestContext) {
+			activity.fail(http.StatusGatewayTimeout, requestRecoveryTimeoutMessage)
+			writeProxyError(writer, request.URL.Path, http.StatusGatewayTimeout, requestRecoveryTimeoutMessage)
+			return
+		}
 		if requestContext.Err() != nil {
 			activity.fail(0, "request canceled")
 			return

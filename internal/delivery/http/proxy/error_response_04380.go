@@ -13,6 +13,9 @@ func writeProxyError(writer http.ResponseWriter, path string, status int, messag
 	// attempt. Unrelated 400 errors and non-Responses routes retain their
 	// original text response contract.
 	code := ""
+	if status == http.StatusGatewayTimeout && message == requestRecoveryTimeoutMessage {
+		code = "request_timeout"
+	}
 	if isResponsesPath(path) {
 		if status == http.StatusServiceUnavailable {
 			code = "service_unavailable"
