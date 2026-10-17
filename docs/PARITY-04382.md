@@ -137,3 +137,29 @@ Windows/macOS execution, live OAuth and arbitrary upstream failures are not
 certified by cross-compilation or synthetic loopback tests. The complete
 bounded **finite synthetic release gate is VERIFIED** for the cases named
 above; overall production-wide 1:1 remains **PARTIAL**.
+
+
+## Production profile inflight hard-limit configuration
+
+Tagged Prodex 0.438.2 exposes
+`PRODEX_RUNTIME_PROXY_PROFILE_INFLIGHT_HARD_LIMIT` in its runtime tuning
+parser. Godex previously hard-coded the usecase Router default of eight:
+its runtime launcher provided no way to configure the **weighted per-profile
+permit limit** separately from the listener/admission request cap. That
+omission made the one-ready-profile WebSocket capacity behavior dependent on
+an unrelated queue limit. The source-derived regression initially failed to
+compile against the missing setting. The production adapter now accepts the
+canonical `GODEX_RUNTIME_PROXY_PROFILE_INFLIGHT_HARD_LIMIT` with the tagged
+Prodex key as an alias, validates positive bounded integers without silently
+coercing zero/negative/overflow, and forwards it through the runtime launch
+config to `routing.NewRouter`. No setting preserves the existing default of
+eight. The malformed setting is rejected before a real request is sent.
+
+`TestProdex04382ProfileInflightHardLimitEnvironmentMatchesTaggedPolicy`,
+`TestProdex04382RuntimeProxyLaunchPropagatesProfileInflightHardLimit` and
+`TestProdex04382RuntimeRoutingPreservesConfiguredProfileInflightHardLimit`
+protect the complete configuration path with synthetic identities. The
+routing composition was extracted to a cohesive 25-line module and the
+`cmd/godex/main.go` file reduced from 415 to 397 lines, below the default 400-line guard,
+removing its old special baseline rather than raising any threshold. This is **VERIFIED source-aligned configuration
+coverage**, not itself the missing two-binary concurrent WebSocket fixture.

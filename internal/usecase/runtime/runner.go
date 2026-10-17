@@ -353,6 +353,7 @@ func runtimeProxyConfig(
 		UpstreamURL:                      upstream,
 		PreferredAccount:                 preferredID,
 		ActiveRequestLimit:               settings.activeRequestLimit,
+		ProfileInflightHardLimit:         settings.profileInflightHardLimit,
 		AdmissionWaitBudget:              settings.admissionWaitBudget,
 		PressureAdmissionWaitBudget:      settings.pressureAdmissionWaitBudget,
 		LongLivedQueueWaitBudget:         settings.longLivedQueueWaitBudget,

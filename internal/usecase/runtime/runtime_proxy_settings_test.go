@@ -53,3 +53,41 @@ func TestRuntimeProxySettingsRejectInvalidValues(t *testing.T) {
 		})
 	}
 }
+
+// Prodex 0.438.2's published `PRODEX_RUNTIME_PROXY_PROFILE_INFLIGHT_HARD_LIMIT`
+// knob is observable: idle completed sockets must release weight=2, and a
+// later response reacquires exactly one weighted permit. Keep the Godex
+// canonical spelling and source-compatible Prodex alias, both validated.
+func TestProdex04382ProfileInflightHardLimitEnvironmentMatchesTaggedPolicy(t *testing.T) {
+	cases := []struct {
+		name   string
+		values map[string]string
+		want   int
+		bad    bool
+	}{
+		{"default retains router policy", nil, 0, false},
+		{"Prodex-compatible alias", map[string]string{"PRODEX_RUNTIME_PROXY_PROFILE_INFLIGHT_HARD_LIMIT": "2"}, 2, false},
+		{"Godex canonical precedence", map[string]string{
+			"GODEX_RUNTIME_PROXY_PROFILE_INFLIGHT_HARD_LIMIT":  "3",
+			"PRODEX_RUNTIME_PROXY_PROFILE_INFLIGHT_HARD_LIMIT": "9",
+		}, 3, false},
+		{"zero denied", map[string]string{"GODEX_RUNTIME_PROXY_PROFILE_INFLIGHT_HARD_LIMIT": "0"}, 0, true},
+		{"negative denied", map[string]string{"GODEX_RUNTIME_PROXY_PROFILE_INFLIGHT_HARD_LIMIT": "-1"}, 0, true},
+		{"text denied", map[string]string{"PRODEX_RUNTIME_PROXY_PROFILE_INFLIGHT_HARD_LIMIT": "invalid"}, 0, true},
+		{"integer overflow denied", map[string]string{"PRODEX_RUNTIME_PROXY_PROFILE_INFLIGHT_HARD_LIMIT": "18446744073709551615"}, 0, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			settings, err := runtimeProxySettingsWithLookup(func(key string) (string, bool) { v, ok := tc.values[key]; return v, ok })
+			if tc.bad {
+				if err == nil {
+					t.Fatalf("invalid hard limit accepted: %+v", settings)
+				}
+				return
+			}
+			if err != nil || settings.profileInflightHardLimit != tc.want {
+				t.Fatalf("profile inflight hard limit=%d, want=%d err=%v", settings.profileInflightHardLimit, tc.want, err)
+			}
+		})
+	}
+}

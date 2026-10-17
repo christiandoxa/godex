@@ -173,6 +173,14 @@ go test -race ./internal/gateway/openai \
   -run '^TestProdex04382(CompletedIdleWebSocketReleasesPermitAndReuseWaits|HiddenWebSocketPreludeCannotPromoteIdleDeadline|RepeatedHiddenPreludeRespectsOriginalDeadlineAndFreshRequest)$' \
   -count=1 -timeout=35s
 
+# Prodex 0.438.2 profile execution capacity can be configured via the
+# published PRODEX_RUNTIME_PROXY_PROFILE_INFLIGHT_HARD_LIMIT knob. The
+# canonical GODEX alias wins, invalid numbers are rejected, and the parsed
+# value must reach the production Router (not just the listener queue).
+go test ./internal/usecase/runtime ./cmd/godex \
+  -run '^TestProdex04382(ProfileInflightHardLimitEnvironmentMatchesTaggedPolicy|RuntimeProxyLaunchPropagatesProfileInflightHardLimit|RuntimeRoutingPreservesConfiguredProfileInflightHardLimit)$' \
+  -count=1 -timeout=30s
+
 # Prodex 0.438.2 WebSocket terminal Mojo policy checks nested and top-level
 # connection-limit codes independently (ASCII casefold only), gives explicit
 # `status` priority over `status_code` even if malformed, and accepts only

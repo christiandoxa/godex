@@ -9,6 +9,7 @@ import (
 
 type runtimeProxySettings struct {
 	activeRequestLimit               int
+	profileInflightHardLimit         int
 	admissionWaitBudget              time.Duration
 	pressureAdmissionWaitBudget      time.Duration
 	longLivedQueueWaitBudget         time.Duration
@@ -32,6 +33,11 @@ func runtimeProxySettingsWithLookup(lookup func(string) (string, bool)) (runtime
 	settings := defaultRuntimeProxySettings()
 	var err error
 	if settings.activeRequestLimit, err = positiveRuntimeInt(lookup, "GODEX_RUNTIME_PROXY_ACTIVE_REQUEST_LIMIT", "PRODEX_RUNTIME_PROXY_ACTIVE_REQUEST_LIMIT"); err != nil {
+		return runtimeProxySettings{}, err
+	}
+	if settings.profileInflightHardLimit, err = positiveRuntimeInt(lookup,
+		"GODEX_RUNTIME_PROXY_PROFILE_INFLIGHT_HARD_LIMIT",
+		"PRODEX_RUNTIME_PROXY_PROFILE_INFLIGHT_HARD_LIMIT"); err != nil {
 		return runtimeProxySettings{}, err
 	}
 	if settings.admissionWaitBudget, err = positiveRuntimeDuration(lookup, "GODEX_RUNTIME_PROXY_ADMISSION_WAIT_BUDGET_MS", "PRODEX_RUNTIME_PROXY_ADMISSION_WAIT_BUDGET_MS", settings.admissionWaitBudget); err != nil {

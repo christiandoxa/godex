@@ -45,6 +45,7 @@ type Config struct {
 	ListenAddr                       string
 	PreferredAccount                 string
 	ActiveRequestLimit               int
+	ProfileInflightHardLimit         int
 	AdmissionWaitBudget              time.Duration
 	PressureAdmissionWaitBudget      time.Duration
 	LongLivedQueueWaitBudget         time.Duration
