@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	prodexCommit = "c3c96af2a9b87896e262e37f37cd4741a562a66f"
-	prodexSHA    = "b347889a6fa5aec6f3a0f00a1d8346eb2df30b9933361e924900904ed85e165e"
+	prodexCommit = "decfed45f884fe2bef20911303beab7b198698b7"
+	prodexSHA    = "3f2fcd776fee0335dc49910d0651adc43a55c8627913556c307755b1575dac3f"
 )
 
 type attempt struct{ account, mode, body string }
@@ -146,9 +146,9 @@ type product struct {
 }
 
 func main() {
-	prodex := flag.String("prodex", "", "official Prodex 0.438.1 binary")
+	prodex := flag.String("prodex", "", "official Prodex 0.438.2 binary")
 	godex := flag.String("godex", "", "Godex binary")
-	prodexSource := flag.String("prodex-source", "", "tagged Prodex 0.438.1 source")
+	prodexSource := flag.String("prodex-source", "", "tagged Prodex 0.438.2 source")
 	websocket := flag.Bool("websocket", false, "run the isolated WebSocket request/recovery differential")
 	godexSource := flag.String("godex-source", "", "clean Godex commit source (required with --websocket)")
 	godexCommit := flag.String("godex-commit", "", "exact 40-character Godex commit (required with --websocket)")
@@ -197,7 +197,7 @@ func verifyProdex(binary, source string) error {
 		return fmt.Errorf("Prodex binary digest %s, want %s", got, prodexSHA)
 	}
 	output, err := exec.Command(binary, "--version").CombinedOutput()
-	if err != nil || strings.TrimSpace(string(output)) != "prodex 0.438.1" {
+	if err != nil || strings.TrimSpace(string(output)) != "prodex 0.438.2" {
 		return fmt.Errorf("unexpected Prodex version %q: %v", output, err)
 	}
 	if err := verifyProdexSource(source); err != nil {
@@ -209,7 +209,7 @@ func verifyProdex(binary, source string) error {
 func verifyProdexSource(source string) error {
 	output, err := exec.Command("git", "-C", source, "rev-parse", "HEAD").Output()
 	if err != nil || strings.TrimSpace(string(output)) != prodexCommit {
-		return fmt.Errorf("Prodex source is not tag 0.438.1")
+		return fmt.Errorf("Prodex source is not tag 0.438.2")
 	}
 	return verifyProdexSourceClean(source)
 }

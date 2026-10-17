@@ -63,3 +63,19 @@ cross-executable parity is still PARTIAL** pending a new release-pinned
 binary differential covering the exact two new regressions. Native Windows/
 macOS process execution, live OAuth/provider quota and arbitrary network
 failures remain outside the finite verified scope.
+
+## Active release oracle retarget (0.438.1 → 0.438.2)
+
+The current `scripts/verify-release-parity.sh` and all seven executable
+oracle code paths now pin **only** the published 0.438.2 tag, manifest,
+source commit, Linux SHA-256 and version string. The previous 0.438.1
+checkpoint remains in `PARITY-04381.md` and the pre-retarget Git history.
+The active gate retains each inherited phase and its mutation controls;
+`--phase=preflight-tests` additionally runs all three tagged local 0.438.2
+WebSocket permit/precommit fixtures under the race detector.
+
+As always, every pass must be re-established against the **same clean Godex
+candidate commit** after re-pinning; old 0.438.1 gate logs cannot authorize
+a 0.438.2 parity claim. Release-specific provenance is checked before the
+executor attempts any synthetic profile or socket fixture. This retarget is
+not itself proof that the full release differential passes.
