@@ -163,3 +163,21 @@ routing composition was extracted to a cohesive 25-line module and the
 `cmd/godex/main.go` file reduced from 415 to 397 lines, below the default 400-line guard,
 removing its old special baseline rather than raising any threshold. This is **VERIFIED source-aligned configuration
 coverage**, not itself the missing two-binary concurrent WebSocket fixture.
+
+
+## Independent two-executable idle-permit capacity proof
+
+`tools/continuationparity --websocket-capacity` adds a new exact-tagged
+Prodex 0.438.2 versus Godex differential with five **kept-open local client
+WebSockets**, each having completed a turn while only one synthetic profile
+is ready. Both binaries run with a real published profile execution capacity
+knob set to two (weighted Responses turn = 2). A sixth request on the first
+local socket must preserve account ownership and use its cached upstream
+connection without another handshake. The assertions require **six exact
+completed response IDs and wire-shaped requests**, six authenticated upstream
+attempts, and **only five** server handshake connections per executable.
+Mutation sentinels detect failed release/reuse, extra/missing turns, owner or
+body mutation, and lost or substituted completion IDs. This isolates an
+observable 0.438.2 **idle** permit contract independently in both binaries;
+active-turn contention, cancellation and session teardown remain covered by
+local Go race/TCP tests until their own two-executable negative fixture exists.

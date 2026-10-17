@@ -522,6 +522,20 @@ if [ "$phase" = 'all' ] || [ "$phase" = 'websocket' ]; then
   --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
   --websocket
 
+# Prodex 0.438.2 idle-completed Responses sockets must release the weighted
+# profile permit yet remain reusable. Five local client WebSockets stay OPEN
+# with hard profile capacity=2, then the first is reused without an extra
+# upstream handshake. This is a new independent exact-tagged two-executable
+# differential; the previous 58 attempt fixture does not prove idle release.
+"$tmp/continuationparity" \
+  --prodex "$tmp/prodex" --godex "$tmp/godex" \
+  --prodex-source "$tmp/prodex-source" \
+  --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
+  --websocket-capacity
+go test ./tools/continuationparity \
+  -run '^TestProdex04382WebSocketCapacityOracleRejectsMaterialMutations$' \
+  -count=1 -timeout=30s
+
 # Native 0.438.2 connection-limit frame may be top-level or nested. A fresh
 # WebSocket is retryable once before commitment, but never after visible output.
 go test ./tools/continuationparity \

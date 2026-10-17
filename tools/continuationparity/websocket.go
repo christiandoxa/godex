@@ -28,6 +28,9 @@ func (b *backend) serveWebSocket(writer http.ResponseWriter, request *http.Reque
 		return
 	}
 	defer connection.Close()
+	b.mu.Lock()
+	b.wsHandshakes++
+	b.mu.Unlock()
 	_, _ = fmt.Fprintf(buffered, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\n\r\n",
 		base64.StdEncoding.EncodeToString(digest[:]))
 	if buffered.Flush() != nil {

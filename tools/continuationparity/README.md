@@ -107,3 +107,29 @@ and invalid framing. Unit negative controls intentionally mutate these
 observations. See `scripts/verify-release-parity.sh` for the exact-tagged
 release-only invocation. That release script still blocks on *all* other
 oracle checks; local scenario passes do not authorize a tag or release.
+
+
+## Tagged Prodex 0.438.2 completed-idle WebSocket permit oracle
+
+The `--websocket-capacity` flag is a separate published SHA/source-tag
+verified two-executable fixture, not a substitute for the original 58-attempt
+WebSocket continuation differential. Both products receive identical isolated
+synthetic profiles and a **weighted hard per-profile execution limit of 2**.
+Five distinct local client WebSocket connections each complete a native
+Responses turn and then **remain open**; the fixture checks one authenticated
+upstream dispatch per turn on `account-a`. A sixth turn on the **first**
+client WebSocket must reuse the previously cached upstream transport.
+Expected per product: exactly **6 completed turns**, **6 upstream requests**,
+**5 upstream handshakes**, no client re-connect, no duplicate dispatch, and
+no owner or request-body changes. Keeping five idle connections open makes a
+leaked execution permit observable instead of accidentally masking it by
+closing every completed client session. Reuse when capacity is again ready
+must not throw away session lineage or create a new upstream handshake.
+
+The Go package's `TestProdex04382WebSocketCapacityOracleRejectsMaterialMutations`
+requires the fixture to detect lost/extra dispatch, changed owner or model
+request bytes, missing/mutated completion IDs, and a sixth handshake. No
+real OAuth access or model API traffic is used. The independent test of
+**saturated active-turn reuse waiting** remains in Godex's real Router/TCP
+integration suite; this cross-executable fixture specifically proves the
+completed **idle** resource release/reuse lifecycle.

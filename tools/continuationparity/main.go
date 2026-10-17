@@ -29,11 +29,12 @@ const (
 
 type attempt struct{ account, mode, body string }
 type backend struct {
-	server    *httptest.Server
-	mu        sync.Mutex
-	attempts  []attempt
-	cancelled int
-	wsCounts  map[string]int
+	server       *httptest.Server
+	mu           sync.Mutex
+	attempts     []attempt
+	cancelled    int
+	wsCounts     map[string]int
+	wsHandshakes int
 }
 
 func newBackend() *backend {
@@ -150,16 +151,20 @@ func main() {
 	godex := flag.String("godex", "", "Godex binary")
 	prodexSource := flag.String("prodex-source", "", "tagged Prodex 0.438.2 source")
 	websocket := flag.Bool("websocket", false, "run the isolated WebSocket request/recovery differential")
-	godexSource := flag.String("godex-source", "", "clean Godex commit source (required with --websocket)")
-	godexCommit := flag.String("godex-commit", "", "exact 40-character Godex commit (required with --websocket)")
+	websocketCapacity := flag.Bool("websocket-capacity", false, "check 0.438.2 completed WebSocket profile capacity and cached reuse")
+	godexSource := flag.String("godex-source", "", "clean Godex commit source (required with either WebSocket fixture)")
+	godexCommit := flag.String("godex-commit", "", "exact 40-character Godex commit (required with either WebSocket fixture)")
 	flag.Parse()
+	if *websocket && *websocketCapacity {
+		fatal("select at most one WebSocket fixture")
+	}
 	if *prodex == "" || *godex == "" || *prodexSource == "" {
 		fatal("usage: continuationparity --prodex BIN --godex BIN --prodex-source DIR")
 	}
 	if err := verifyProdex(*prodex, *prodexSource); err != nil {
 		fatal(err.Error())
 	}
-	if *websocket {
+	if *websocket || *websocketCapacity {
 		if err := verifyWebSocketCandidate(*godex, *godexSource, *godexCommit); err != nil {
 			fatal(err.Error())
 		}
@@ -176,7 +181,9 @@ func main() {
 	for _, spec := range []struct{ name, binary string }{{"prodex", *prodex}, {"godex", *godex}} {
 		p := product{name: spec.name, binary: spec.binary}
 		var err error
-		if *websocket {
+		if *websocketCapacity {
+			err = runWebSocketCapacityProduct04382(root, b, p)
+		} else if *websocket {
 			err = runWebSocketProduct(root, b, p)
 		} else {
 			err = runProduct(root, b, p)
@@ -184,6 +191,10 @@ func main() {
 		if err != nil {
 			fatal(spec.name + ": " + err.Error())
 		}
+	}
+	if *websocketCapacity {
+		fmt.Printf("PASS Prodex 0.438.2 completed-idle WebSocket capacity/reuse: %d total upstream attempts across both binaries\n", len(mustAttempts(b)))
+		return
 	}
 	if *websocket {
 		fmt.Printf("PASS WebSocket continuation loopback: %d upstream attempts, strict precommit-retry, hard-owner and no-replay checks\n", len(mustAttempts(b)))
