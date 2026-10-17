@@ -28,8 +28,8 @@ import (
 )
 
 const (
-	prodexCommit         = "8cab9794b0e08b2cb8507df8321a8e38ebd6492f"
-	prodexBinarySHA256   = "9ec1702c58983a8e3bd7f2e7f49c34a2d656f766fd535bbe34d08c94d436ac2a"
+	prodexCommit         = "c3c96af2a9b87896e262e37f37cd4741a562a66f"
+	prodexBinarySHA256   = "b347889a6fa5aec6f3a0f00a1d8346eb2df30b9933361e924900904ed85e165e"
 	apiKey               = "synthetic-provider-key"
 	bodyLimit            = 1 << 20
 	rotationPrimaryKey   = "synthetic-primary-credential"
@@ -150,9 +150,9 @@ func main() {
 
 func run() error {
 	flags := flag.NewFlagSet("differential", flag.ContinueOnError)
-	prodexBin := flags.String("prodex", "", "exact Prodex 0.438.0 product binary")
+	prodexBin := flags.String("prodex", "", "exact Prodex 0.438.1 product binary")
 	godexBin := flags.String("godex", "", "Godex candidate product binary")
-	prodexSource := flags.String("prodex-source", "", "exact Prodex 0.438.0 source checkout")
+	prodexSource := flags.String("prodex-source", "", "exact Prodex 0.438.1 source checkout")
 	godexSource := flags.String("godex-source", "", "Godex candidate source checkout")
 	expectedGodexCommit := flags.String("godex-commit", "", "expected Godex source HEAD commit SHA")
 	gemini := flags.Bool("gemini", false, "run isolated Gemini generateContent executable differential")
@@ -169,7 +169,7 @@ func run() error {
 		return fmt.Errorf("inspect Prodex source: %w", err)
 	}
 	if prodexSourceCommit != prodexCommit {
-		return fmt.Errorf("Prodex source commit %s, want exact 0.438.0 commit %s", prodexSourceCommit, prodexCommit)
+		return fmt.Errorf("Prodex source commit %s, want exact 0.438.1 commit %s", prodexSourceCommit, prodexCommit)
 	}
 	if err := requireCleanSource(*prodexSource); err != nil {
 		return fmt.Errorf("Prodex reference must be an unmodified canonical checkout: %w", err)
@@ -351,8 +351,8 @@ func verifyProdexArtifact(binary string) error {
 	if err != nil {
 		return fmt.Errorf("read version: %w", err)
 	}
-	if version != "prodex 0.438.0" {
-		return fmt.Errorf("version %q, want prodex 0.438.0", version)
+	if version != "prodex 0.438.1" {
+		return fmt.Errorf("version %q, want prodex 0.438.1", version)
 	}
 	return nil
 }
@@ -473,8 +473,8 @@ func runProduct(root string, mock *mockServer, name, binary, commit string, plan
 	if err != nil {
 		return productRun{}, err
 	}
-	if isProdex(name) && version != "prodex 0.438.0" {
-		return productRun{}, fmt.Errorf("binary %s reports %q, want prodex 0.438.0", resolved, version)
+	if isProdex(name) && version != "prodex 0.438.1" {
+		return productRun{}, fmt.Errorf("binary %s reports %q, want prodex 0.438.1", resolved, version)
 	}
 	digest, err := fileSHA256(resolved)
 	if err != nil {

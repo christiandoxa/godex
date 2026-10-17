@@ -21,35 +21,35 @@ fi
 
 # Release-only proof: the public oracle is pinned by commit and binary digest.
 # No live provider accounts, real credentials, or external model calls.
-ref_commit='8cab9794b0e08b2cb8507df8321a8e38ebd6492f'
-prodex_binary_sha256='9ec1702c58983a8e3bd7f2e7f49c34a2d656f766fd535bbe34d08c94d436ac2a'
+ref_commit='c3c96af2a9b87896e262e37f37cd4741a562a66f'
+prodex_binary_sha256='b347889a6fa5aec6f3a0f00a1d8346eb2df30b9933361e924900904ed85e165e'
 root="$(git rev-parse --show-toplevel)"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/godex-release-parity.XXXXXXXX")"
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
 cd "$root"
 
-git clone --quiet --depth 1 --branch 0.438.0 \
+git clone --quiet --depth 1 --branch 0.438.1 \
   https://github.com/christiandoxa/prodex.git "$tmp/prodex-source"
 test "$(git -C "$tmp/prodex-source" rev-parse HEAD)" = "$ref_commit" || {
-  echo "Prodex oracle source does not match 0.438.0" >&2
+  echo "Prodex oracle source does not match 0.438.1" >&2
   exit 1
 }
 
 curl --fail --location --silent --show-error --retry 3 \
   --output "$tmp/prodex" \
-  'https://github.com/christiandoxa/prodex/releases/download/0.438.0/prodex-x86_64-unknown-linux-gnu'
+  'https://github.com/christiandoxa/prodex/releases/download/0.438.1/prodex-x86_64-unknown-linux-gnu'
 curl --fail --location --silent --show-error --retry 3 \
   --output "$tmp/SHA256SUMS" \
-  'https://github.com/christiandoxa/prodex/releases/download/0.438.0/SHA256SUMS'
+  'https://github.com/christiandoxa/prodex/releases/download/0.438.1/SHA256SUMS'
 curl --fail --location --silent --show-error --retry 3 \
   --output "$tmp/release-manifest.json" \
-  'https://github.com/christiandoxa/prodex/releases/download/0.438.0/release-manifest.json'
+  'https://github.com/christiandoxa/prodex/releases/download/0.438.1/release-manifest.json'
 grep -Fqx "$prodex_binary_sha256  prodex-x86_64-unknown-linux-gnu" "$tmp/SHA256SUMS" || {
   echo "Prodex executable is absent or mismatched in published SHA256SUMS" >&2
   exit 1
 }
-grep -Fq '"version": "0.438.0"' "$tmp/release-manifest.json" &&
-grep -Fq '"commit": "8cab9794b0e08b2cb8507df8321a8e38ebd6492f"' "$tmp/release-manifest.json" &&
+grep -Fq '"version": "0.438.1"' "$tmp/release-manifest.json" &&
+grep -Fq '"commit": "c3c96af2a9b87896e262e37f37cd4741a562a66f"' "$tmp/release-manifest.json" &&
 grep -Fq '"asset": "prodex-x86_64-unknown-linux-gnu"' "$tmp/release-manifest.json" || {
   echo "Prodex release manifest does not describe the pinned oracle" >&2
   exit 1
@@ -59,7 +59,7 @@ echo "$prodex_binary_sha256  $tmp/prodex" | sha256sum --check --status || {
   exit 1
 }
 chmod +x "$tmp/prodex"
-test "$("$tmp/prodex" --version)" = "prodex 0.438.0"
+test "$("$tmp/prodex" --version)" = "prodex 0.438.1"
 
 # Go's build VCS metadata must identify the clean release commit, not WIP.
 go build -trimpath -o "$tmp/godex" ./cmd/godex
@@ -103,7 +103,7 @@ if [ -n "${GODEX_TEST_CODEX_0163_APP_SERVER_BIN:-}" ]; then
     -count=1 -timeout=50s
 fi
 
-# Prodex 0.438.0's compiled Copilot candidate policy caps the raw logged-
+# Prodex 0.438.1's compiled Copilot candidate policy caps the raw logged-
 # in user list plus preferred lastLoggedInUser at 256 BEFORE deduplication.
 # Oversized synthetic imports must not attempt token resolution or HTTP IO.
 go test -race ./internal/gateway/copilot \
@@ -116,7 +116,7 @@ go test -race ./internal/usecase/ping \
   -run '^TestProdex04380(RetiredOpenAIModelOnlyFoldsASCII|ModelPickerRetainsNonASCIILookalikesButHidesRetired|DynamicOpenAIModelIdentityUsesASCIIOnlyFold|ASCIIModelComparisonChecksEveryUTF8Byte|DynamicModelCache|DynamicCatalog)' \
   -count=1 -timeout=35s
 
-# Prodex 0.438.0 clap rejects Super --api-key without --provider as a
+# Prodex 0.438.1 clap rejects Super --api-key without --provider as a
 # usage error (exit 2), not a runtime error (exit 1). Keep both normal and
 # `s` alias paths inside the source-pinned executable CLI differential.
 # Positioned Gemini/DeepSeek aliases after leading options are also parsed
@@ -125,7 +125,7 @@ go test -race ./internal/usecase/ping \
 go test ./internal/delivery/cli/runtime ./tools/clierrorparity \
   -run '^TestProdex04380Super' -count=1 -timeout=30s
 
-# Prodex 0.438.0 can select a previously failed authenticated profile
+# Prodex 0.438.1 can select a previously failed authenticated profile
 # only after an exhausted transient pool and a successful bounded retry
 # wait, preserving eligible backup order and model-specific quota checks.
 # Cancellation, absent quota evidence, foreign owner and any original prompt
@@ -134,18 +134,18 @@ go test -race ./internal/delivery/cli/runtime ./internal/usecase/runtime \
   -run '^TestProdex04380(SessionRecoveryFailedProfileFallback|FailedProfileFallbackRequires|NativeRecoveryRequiresModelSpecificQuota)' \
   -count=1 -timeout=65s
 
-# Prodex 0.438.0: no recovery on native Unix SIGINT or Windows
+# Prodex 0.438.1: no recovery on native Unix SIGINT or Windows
 # signed NTSTATUS CONTROL_C_EXIT. Keep the existing 130 policy too.
 go test ./internal/delivery/cli/runtime -run '^TestProdex04380' -count=1 -timeout=45s
 
-# Prodex 0.438.0 saved-session output must carry the launch-owned identity,
+# Prodex 0.438.1 saved-session output must carry the launch-owned identity,
 # preserve CRLF append-only boundaries, offer a picker when unknown, and only
 # allocate identity hooks for interactive companion launches.
 go test ./internal/gateway/codex \
   -run '^TestProdex043712' \
   -count=1 -timeout=30s
 
-# Prodex 0.438.0 resets DEC 1047 (no DECRC) after native TUI exit,
+# Prodex 0.438.1 resets DEC 1047 (no DECRC) after native TUI exit,
 # and the live runtime only accepts the exact terminal WebSocket idle timeout.
 # Both fail-before regressions protect native output and recovery boundaries.
 go test ./internal/gateway/codex \
@@ -153,17 +153,17 @@ go test ./internal/gateway/codex \
 go test ./internal/delivery/cli/runtime \
   -run '^TestProdex043713WebSocketIdle' -count=1 -timeout=45s
 
-# Prodex 0.438.0 Retry-After text parser uses UInt128 bounds, rejects
+# Prodex 0.438.1 Retry-After text parser uses UInt128 bounds, rejects
 # zero/signed values, rounds fractional millis, and caps at five minutes.
 go test ./internal/usecase/routing -run '^TestProdex043714RetryAfter' -count=1 -timeout=30s
 
-# Prodex 0.438.0 WebSocket terminal Mojo policy checks nested and top-level
+# Prodex 0.438.1 WebSocket terminal Mojo policy checks nested and top-level
 # connection-limit codes independently (ASCII casefold only), gives explicit
 # `status` priority over `status_code` even if malformed, and accepts only
 # integer u16 statuses. A mistaken fallback can authorize unsafe rotation.
 go test ./internal/gateway/openai \
   -run '^TestProdex04380WebSocket' -count=1 -timeout=40s
-# Tagged Prodex 0.438.0 retries a first-event connection-limit on a *fresh*
+# Tagged Prodex 0.438.1 retries a first-event connection-limit on a *fresh*
 # WebSocket exactly once on the same owner, and never retries committed output.
 go test ./internal/gateway/openai \
   -run '^TestProdex04380FreshWebSocket' -count=1 -timeout=40s
@@ -180,7 +180,7 @@ go test ./internal/usecase/routing \
   -run '^TestProdex04380ObserveRecordsNativeIncompleteTokenUsage$' \
   -count=1 -timeout=35s
 
-# Prodex 0.438.0 classifies compaction_trigger as context-dependent, but not
+# Prodex 0.438.1 classifies compaction_trigger as context-dependent, but not
 # reconstructable full history after an invalid previous_response_id.
 go test -race ./internal/usecase/routing \
   -run '^Test(ResponsesInvalidPreviousIDDoesNotReplayCompactionTriggerHistory|ReconstructableFullHistoryMatchesCodexRequestShapes)$' \
@@ -192,12 +192,26 @@ go test -race ./internal/usecase/routing \
   -run '^TestProdex04380(FullHistoryRequiresExactProtocolTags|InvalidPreviousIDDoesNotReplayPaddedCompaction)$' \
   -count=1 -timeout=35s
 
-# Prodex 0.438.0 loopback proxy listener survives real Linux RLIMIT_NOFILE
+# Prodex 0.438.1 loopback proxy listener survives real Linux RLIMIT_NOFILE
 # exhaustion and handles a queued request exactly once after FD release.
 # Go's standard net/http accept loop has bounded retry; do not copy tiny_http.
 go test ./internal/delivery/http/proxy \
   -run '^TestProdex04380Proxy(ListenerSurvivesActualEMFILEAndQueuedRequest|ShutdownStopsAcceptRetryDuringEMFILE)$' \
   -count=1 -timeout=45s
+
+# Prodex 0.438.1 keeps one request-local watchdog across admission, upstream
+# work and the local recovery path. Expired work must return a local 504,
+# avoid a second dispatch, and leave a later request usable.
+go test ./internal/delivery/http/proxy \
+  -run '^TestProdex04381(AdmissionExpiryDoesNotDispatchAndFreshRequestSucceeds|StandardRequestDeadlineCoversUpstreamAndReturns504)$' \
+  -count=1 -timeout=35s
+
+# A profile readiness/selection change must wake a waiting recovery attempt
+# before the projected cooldown expires; sleeping the old epoch hides ready
+# capacity and can turn a recoverable request into a local timeout.
+go test ./internal/usecase/routing \
+  -run '^TestFreshRecoveryWakeOnSelectionChange$' \
+  -count=1 -timeout=20s
 
 # The live observer must distinguish an absent goal from an unavailable DB,
 # preserve unread failure evidence under EMFILE, and recover after resources
@@ -206,19 +220,19 @@ go test ./internal/repository/runtime ./internal/delivery/cli/runtime \
   -run '^TestProdex043713(GoalStoreDistinguishes|UnavailableGoalDatabase|LiveObserverDescriptor|ObserverMarker)' \
   -count=1 -timeout=65s
 
-# Prodex 0.438.0 does not allow delayed older successful quota probes
+# Prodex 0.438.1 does not allow delayed older successful quota probes
 # to overwrite later confirmed observations and durable quota snapshots.
 go test -race ./internal/usecase/quota \
   -run '^TestProdex043714LateSuccessfulProbe' -count=1 -timeout=60s
 
-# Prodex 0.438.0: only the exact successful HTTP request credential
+# Prodex 0.438.1: only the exact successful HTTP request credential
 # qualifies to clear an older auth failure. Rotated credentials, newer 401s,
 # unknown quota cache, stale observations and unrelated retry leases stay blocked.
 go test -race ./internal/gateway/openai ./internal/usecase/quota ./internal/usecase/routing \
   -run '^TestProdex043714(QuotaReceipt|QuotaUnauthorized|QuotaCurrentIdentity|QuotaRecoveryReceipt|FailedUpstreamResponse|AuthenticatedProbe|AuthenticatedQuotaRecovery|NewerQuotaObservation|BlockedAuthRecovery|EmptyAuthPoolWaits)' \
   -count=1 -timeout=65s
 
-# Prodex 0.438.0: newer accepted quota observations refresh the target
+# Prodex 0.438.1: newer accepted quota observations refresh the target
 # account's routing cache without poisoning other profiles or retry leases.
 # Exercise the original three-profile five-hour/weekly and Pro Lite transition
 # with a previously auth-quarantined profile, plus exactly-once dispatch.
@@ -239,7 +253,7 @@ go test -race ./internal/delivery/http/proxy \
   -run '^Test(Prodex04380CapturedClosingRequestIgnoresDelayedReadEOF|ProxyListenerRetriesPermanentAcceptFailureUntilShutdown|ProxyForwardsCapturedBodyAfterClientHalfClose|ProxyDoesNotForwardIncompleteBodyAfterClientHalfClose|ProxyCancellationStopsUpstream)$' \
   -count=1 -timeout=45s
 
-# Prodex 0.438.0 restart rehydrates authenticated 401/403 penalties even
+# Prodex 0.438.1 restart rehydrates authenticated 401/403 penalties even
 # with a fresh quota DTO. A new receipt must retire only the exact old auth
 # generation, preserving newer 401 and independent generic/transport leases.
 # Invalid or public auth-backoff sidecars never silently authorize selection.
@@ -275,7 +289,7 @@ go test ./internal/gateway/gemini \
 go test -race ./internal/gateway/gemini \
   -run '^TestProdex04380GeminiNative' -count=1 -timeout=35s
 
-# Prodex 0.438.0 DeepSeek streamed tool arguments use tagged serde_json
+# Prodex 0.438.1 DeepSeek streamed tool arguments use tagged serde_json
 # surrogate, depth and finite-number boundaries, independent of Go's more
 # permissive escape and recursion handling. Verify real SSE terminal frames.
 go test ./internal/gateway/deepseek \
@@ -300,21 +314,21 @@ go test ./tools/profileparity \
   --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
   --scenario deepseek-unsupported-message-role
 
-# Prodex 0.438.0 Anthropic ResponseOutput planner caps content at exactly
+# Prodex 0.438.1 Anthropic ResponseOutput planner caps content at exactly
 # 65536 elements, even for no-visible-text thinking blocks whose bounded
 # source JSON still fits inside the 4 MiB native response limit.
 go test ./internal/gateway/deepseek \
   -run '^TestProdex04380AnthropicResponsePlanRejectsTooManyContentBlocks$' \
   -count=1 -timeout=40s
 
-# Tagged Prodex 0.438.0 Mojo Anthropic RequestKernel enforces JSON recursion
+# Tagged Prodex 0.438.1 Mojo Anthropic RequestKernel enforces JSON recursion
 # depth <= 128 for the projected content-block array (not outer metadata).
 # Deep tool-use input must fail before producing a synthetic Responses output.
 go test ./internal/gateway/deepseek \
   -run '^TestProdex04380Anthropic(ResponseToolInputDepthMustStayBounded|JSONDepthIgnoresEscapedBraces|ResponseDepthIgnoresOuterExtensions)$' \
   -count=1 -timeout=40s
 
-# The 0.438.0 streamed-argument differential compares four exact-tagged
+# The 0.438.1 streamed-argument differential compares four exact-tagged
 # real SSE tool-call envelopes. Reject extra empty arguments in item.added,
 # unstable invalid-JSON diagnostics, bad Unicode/numeric/depth validation,
 # failed completion ordering, and any extra/missing stream event.
@@ -415,7 +429,7 @@ if [ "$phase" = 'all' ] || [ "$phase" = 'gemini' ]; then
   --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
   --gemini
 
-# Tagged 0.438.0 rejects invalid wrapped/flat Gemini function tools
+# Tagged 0.438.1 rejects invalid wrapped/flat Gemini function tools
 # *locally*, before any API-key upstream request. Both products must
 # return HTTP 400 with the same indexed invalid_request_error JSON envelope,
 # exit 2, and zero upstream POSTs; cache/retry/rotation cannot mask 400.
@@ -423,7 +437,7 @@ go test -race ./internal/gateway/gemini ./internal/usecase/routing ./internal/de
   -run '^TestProdex04380(GeminiAPIKeyChat|LocalGeminiTool|GeminiInvalidFunctionTool|GeminiInvalidTool)' \
   -count=1 -timeout=55s
 
-# Prodex 0.438.0 public Gemini API-key Chat-compatible buffered responses
+# Prodex 0.438.1 public Gemini API-key Chat-compatible buffered responses
 # preserve text around `functionCall:null` and emit fallback `call_1`.
 # The separate provider-core internal buffered normalizer suppresses text:
 # never confuse that source-only entry point with the actual public wire.
@@ -431,7 +445,7 @@ go test -race ./internal/gateway/gemini ./tools/differential \
   -run '^TestProdex04380Gemini(Buffered|APIKeyBuffered|NativeGenerateContent)' \
   -count=1 -timeout=55s
 
-# Tagged 0.438.0 operation-3 role decisions happen on RAW first/last rows
+# Tagged 0.438.1 operation-3 role decisions happen on RAW first/last rows
 # before rejecting invalid contents. Guard null/empty/model edge cases,
 # metadata ownership, custom roles and output ordering before API-key tests.
 # Tagged Gemini Mojo operations 1 and 2 synthesize unavailable results for
@@ -446,7 +460,7 @@ go test -race ./internal/gateway/gemini ./tools/differential \
 go test ./internal/gateway/gemini \
   -run '^TestProdex04380GeminiNative' -count=1 -timeout=35s
 
-# The 0.438.0 Gemini native envelope must unwrap `response` with or
+# The 0.438.1 Gemini native envelope must unwrap `response` with or
 # without traceId. The API-key buffered bridge must generate its own UUIDv7
 # and must not expose stale native/trace IDs. These cases are mandatory parts
 # of the full --gemini differential above.
@@ -466,7 +480,7 @@ if [ "$phase" = 'all' ] || [ "$phase" = 'websocket' ]; then
   --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
   --websocket
 
-# Native 0.438.0 connection-limit frame may be top-level or nested. A fresh
+# Native 0.438.1 connection-limit frame may be top-level or nested. A fresh
 # WebSocket is retryable once before commitment, but never after visible output.
 go test ./tools/continuationparity \
   -run '^TestProdex04380FreshConnectionLimitOracleRejectsOwnerAndReplayDrift$' \
@@ -476,4 +490,4 @@ fi
 
 # Printed only after all stages *selected for this invocation* succeeded.
 # --phase=... must never be mistaken for the default complete release gate.
-printf 'PASS: Prodex 0.438.0 parity phase %s (Godex %s)\n' "$phase" "$(git rev-parse HEAD)"
+printf 'PASS: Prodex 0.438.1 parity phase %s (Godex %s)\n' "$phase" "$(git rev-parse HEAD)"

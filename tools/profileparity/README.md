@@ -1,4 +1,4 @@
-# Prodex 0.438.0 managed-profile lifecycle differential
+# Prodex 0.438.1 managed-profile lifecycle differential
 
 This tool compares real Prodex and Godex binaries, each operating in a
 separate fresh HOME/PRODEX_HOME/GODEX_HOME, over 29 sequential CLI operations.
@@ -7,9 +7,9 @@ or external model request is needed. The subprocess receives a minimal
 environment with nonfunctional outbound proxy settings.
 
 It pins the Prodex source to commit
-8cab9794b0e08b2cb8507df8321a8e38ebd6492f and the official Linux
+c3c96af2a9b87896e262e37f37cd4741a562a66f and the official Linux
 artifact SHA-256 to
-9ec1702c58983a8e3bd7f2e7f49c34a2d656f766fd535bbe34d08c94d436ac2a.
+b347889a6fa5aec6f3a0f00a1d8346eb2df30b9933361e924900904ed85e165e.
 It checks that the Godex executable's embedded clean VCS revision equals the
 candidate source commit. Both source checkouts must be clean.
 
@@ -17,9 +17,9 @@ To run from a clean Godex checkout, build the two Go binaries and invoke:
 
     go build -trimpath -o /tmp/godex-candidate ./cmd/godex
     go build -trimpath -o /tmp/profileparity ./tools/profileparity
-    /tmp/profileparity --prodex /path/to/official/prodex-0.438.0 \
+    /tmp/profileparity --prodex /path/to/official/prodex-0.438.1 \
       --godex /tmp/godex-candidate \
-      --prodex-source /path/to/prodex-tag-0.438.0 \
+      --prodex-source /path/to/prodex-tag-0.438.1 \
       --godex-source "$PWD" --godex-commit "$(git rev-parse HEAD)"
 
 The tool returns exit 1 for *any* unexpected outcome and produces a JSON
@@ -66,7 +66,7 @@ path redirected under a managed profile home.
 
 The additional negative CLI case supplies a synthetic DeepSeek --api-key
 but deliberately configures no managed/active Codex-compatible profile.
-Prodex 0.438.0 requires compatible profile selection before starting the
+Prodex 0.438.1 requires compatible profile selection before starting the
 gateway, so both implementations must reject startup with exit 1 and
 leave all state unchanged. The separate Go regression proves a configured
 provider profile can still open and close the raw-key gateway successfully.
@@ -94,7 +94,7 @@ executable CLIs without changing the credential-free persisted state.
 A separate Go test ensures a valid argument set that fails during
 runtime initialization is **not** misclassified as a usage error.
 
-### Prodex 0.438.0 startup quota 401 reload
+### Prodex 0.438.1 startup quota 401 reload
 
 The isolated `startup_usage_401_credential_reload` scenario rotates a
 synthetic managed-profile credential after a rejected HTTP quota request. Both
@@ -108,7 +108,7 @@ symlinked paths, operates only inside test-specific temporary roots, and never
 uses personal accounts. This does not certify recovery of inherited auth
 penalties across a process restart.
 
-### Exact Prodex 0.438.0 Linux socket exhaustion differential
+### Exact Prodex 0.438.1 Linux socket exhaustion differential
 
 In addition to synthetic profile lifecycle and HTTP 401 reload checks,
 `profileparity` runs `gateway_fd_pressure_recovery` on Linux against the
@@ -129,7 +129,7 @@ controls reject missing FD saturation, wrong counts, lost listener/queue, and
 unclean shutdown. Internal Rust socket-clone failure and native Windows/macOS
 behaviors are distinct from this Linux shared observable contract.
 
-### Prodex 0.438.0 native `response.incomplete` two-executable oracle
+### Prodex 0.438.1 native `response.incomplete` two-executable oracle
 
 The `gateway_native_incomplete_04380` scenario invokes both real gateway
 binaries with separate synthetic imported ChatGPT profiles and one loopback

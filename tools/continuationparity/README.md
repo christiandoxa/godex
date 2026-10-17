@@ -1,6 +1,6 @@
-# Prodex 0.438.0 continuation and WebSocket executable differential
+# Prodex 0.438.1 continuation and WebSocket executable differential
 
-This harness compares an official SHA-256-pinned Prodex `0.438.0` binary
+This harness compares an official SHA-256-pinned Prodex `0.438.1` binary
 and Godex using isolated two-profile homes, synthetic credentials, and a
 loopback-only upstream. It does **not** send real model requests or use
 the caller's account credentials.
@@ -56,7 +56,7 @@ original thirteen owner/continuation paths are listed first:
    hard turn-state, and soft-session-only requests. No local socket or
    in-memory router cache survives the restart.
 
-The four additional tagged **0.438.0 terminal-status** cases require an
+The four additional tagged **0.438.1 terminal-status** cases require an
 `error` with a present but invalid primary `status` to remain nonterminal
 when secondary `status_code` is 400. The invalid values are the string
 `"invalid"`, a fractional numeric `400.5`, and overflowing u16 `65536`;
@@ -86,17 +86,17 @@ containing Go VCS metadata:
 ```sh
 go build -trimpath -o /tmp/godex-043710-candidate ./cmd/godex
 go run ./tools/continuationparity \
-  --prodex /path/to/official/prodex-0.438.0 \
-  --prodex-source /path/to/clean/prodex-tag-0.438.0 \
+  --prodex /path/to/official/prodex-0.438.1 \
+  --prodex-source /path/to/clean/prodex-tag-0.438.1 \
   --godex /tmp/godex-043710-candidate \
   --godex-source "$PWD" --godex-commit "$(git rev-parse HEAD)" \
   --websocket
 ```
 
-The official reference executable must report `prodex 0.438.0`, have
-SHA-256 `9ec1702c58983a8e3bd7f2e7f49c34a2d656f766fd535bbe34d08c94d436ac2a`,
+The official reference executable must report `prodex 0.438.1`, have
+SHA-256 `b347889a6fa5aec6f3a0f00a1d8346eb2df30b9933361e924900904ed85e165e`,
 and correspond to source commit
-`8cab9794b0e08b2cb8507df8321a8e38ebd6492f`.
+`c3c96af2a9b87896e262e37f37cd4741a562a66f`.
 The WebSocket mode additionally rejects a dirty Godex source tree, a
 different expected commit, or missing/modified Go executable VCS metadata.
 

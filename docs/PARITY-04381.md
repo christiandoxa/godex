@@ -1,0 +1,104 @@
+# Godex ↔ Prodex 0.438.1 parity checkpoint
+
+**Target:** official Prodex tag `0.438.1`, source commit
+`c3c96af2a9b87896e262e37f37cd4741a562a66f`.
+
+The published Linux x86_64 executable
+`prodex-x86_64-unknown-linux-gnu` has SHA-256
+`b347889a6fa5aec6f3a0f00a1d8346eb2df30b9933361e924900904ed85e165e` and
+reports `prodex 0.438.1`. The previous `0.438.0` record remains in
+[`PARITY-04380.md`](PARITY-04380.md); its claims are historical and are not
+silently reused as 0.438.1 evidence.
+
+## Release delta
+
+Prodex 0.438.1 is a maintenance release. Its externally observable changes
+are the queue and recovery contracts described in the tagged
+`docs/release-notes/0.438.1.md`:
+
+- A profile recovery wait observes selection and in-flight-release revisions.
+  A quota refresh, circuit clearance, or released slot wakes the request
+  promptly. A notification does not bypass an authoritative quota block or
+  clear a failed-profile exclusion by itself.
+- One request-local watchdog covers admission, listener queueing, standard
+  HTTP work, and no-sleep recovery. A queued request carries its original
+  deadline to the worker; dequeueing and profile reselection never grant a new
+  retry budget.
+- Expired admission or queued work returns local HTTP 504 with
+  `request_timeout`, makes no upstream attempt, and does not penalize a ready
+  profile. A committed stream remains readable. WebSocket upgrades detach the
+  handshake watchdog so later turns keep their own request deadline.
+
+The source release notes list qualification for queue expiry, admission expiry,
+fast reselection, a real 504 without an upstream send, a fresh request after a
+timeout, and readiness notification interruption. These are the minimum new
+scenarios for this checkpoint.
+
+## Oracle changes
+
+The release-only oracle now pins the 0.438.1 tag, source commit, release
+manifest, Linux artifact digest, and `--version` output in:
+
+- [`scripts/verify-release-parity.sh`](../scripts/verify-release-parity.sh)
+- `tools/differential` (DeepSeek/Gemini executable differential)
+- `tools/profileparity` (managed-profile and gateway executable differential)
+- `tools/contextparity`, `tools/continuationparity`,
+  `tools/sessionfooterparity`, and `tools/clierrorparity`
+
+The preflight phase additionally runs the focused 0.438.1 regressions:
+
+```text
+TestProdex04381AdmissionExpiryDoesNotDispatchAndFreshRequestSucceeds
+TestProdex04381StandardRequestDeadlineCoversUpstreamAndReturns504
+TestFreshRecoveryWakeOnSelectionChange
+```
+
+The tests assert a local 504 and `request_timeout`, exactly one upstream
+dispatch where applicable, cancellation at the original deadline, a usable
+fresh request, and recovery that wakes after a readiness change. They are
+source-level regressions and do not pretend to be a two-executable proof.
+
+## Missing or previously mis-scoped evidence
+
+The existing profile and provider fixtures do not create local admission
+pressure or a controlled profile cooldown. They therefore cannot observe the
+new 0.438.1 watchdog and readiness contracts. The earlier release script ran
+only profile lifecycle, provider, native, Gemini, and WebSocket fixtures; a
+green run of those scenarios could not detect a deadline reset while a request
+was queued, a second dispatch after expiry, or a recovery wait that ignored a
+ready-profile notification.
+
+The new preflight tests close the deterministic local regressions. A separate
+cross-binary queue fixture remains open: it would need an isolated loopback
+gateway with controlled admission saturation, a queued request, a released
+permit, and a profile-ready notification for both the pinned Prodex binary and
+Godex. No real account, credential, model call, or user home is required for
+that future fixture.
+
+The existing finite oracle still does not certify full OAuth, live quota,
+native Windows/macOS process behavior, TUI behavior, or arbitrary provider
+recovery. Overall 0.438.1 status remains **PARTIAL** until the cross-binary
+queue/recovery scenarios and the platform-specific evidence are available.
+
+## Pin verification evidence
+
+The pins were checked against the official repository and release API:
+
+```text
+git ls-remote https://github.com/christiandoxa/prodex.git refs/tags/0.438.1
+c3c96af2a9b87896e262e37f37cd4741a562a66f
+
+sha256(prodex-x86_64-unknown-linux-gnu)
+b347889a6fa5aec6f3a0f00a1d8346eb2df30b9933361e924900904ed85e165e
+
+prodex --version
+prodex 0.438.1
+```
+
+The release API also reports the same digest in the asset metadata and the
+same commit in the release manifest. The release script verifies both the
+published `SHA256SUMS` entry and the downloaded bytes before executing any
+fixture.
+
+No credentials or provider requests were used for pin verification. No commit,
+push, tag, or release was created by the parity gate.

@@ -1,5 +1,5 @@
 // contextparity compares native context configuration forwarding with the
-// official Prodex 0.438.0 executable and a Godex candidate.
+// official Prodex 0.438.1 executable and a Godex candidate.
 package main
 
 import (
@@ -20,9 +20,9 @@ import (
 )
 
 const (
-	oracleVersion      = "prodex 0.438.0"
-	oracleSourceCommit = "8cab9794b0e08b2cb8507df8321a8e38ebd6492f"
-	oracleSHA256       = "9ec1702c58983a8e3bd7f2e7f49c34a2d656f766fd535bbe34d08c94d436ac2a"
+	oracleVersion      = "prodex 0.438.1"
+	oracleSourceCommit = "c3c96af2a9b87896e262e37f37cd4741a562a66f"
+	oracleSHA256       = "b347889a6fa5aec6f3a0f00a1d8346eb2df30b9933361e924900904ed85e165e"
 	probeProfileConfig = "model = \"gpt-6.1-sol\"\nmodel_context_window = 640000\nmodel_auto_compact_token_limit = 520000\n"
 )
 
@@ -148,9 +148,9 @@ func run() error {
 func parseOptions() (options, error) {
 	var result options
 	flags := flag.NewFlagSet("contextparity", flag.ContinueOnError)
-	flags.StringVar(&result.prodex, "prodex", "", "official Prodex 0.438.0 binary")
+	flags.StringVar(&result.prodex, "prodex", "", "official Prodex 0.438.1 binary")
 	flags.StringVar(&result.godex, "godex", "", "Godex candidate binary")
-	flags.StringVar(&result.prodexSource, "prodex-source", "", "tagged Prodex 0.438.0 clean source")
+	flags.StringVar(&result.prodexSource, "prodex-source", "", "tagged Prodex 0.438.1 clean source")
 	flags.StringVar(&result.godexSource, "godex-source", "", "clean Godex candidate source")
 	flags.StringVar(&result.godexCommit, "godex-commit", "", "full expected Godex commit SHA")
 	if err := flags.Parse(os.Args[1:]); err != nil {

@@ -1,7 +1,7 @@
 # CLI error parity oracle
 
 `clierrorparity` runs a credential-free matrix of valid and invalid command
-forms against the exact Prodex 0.437.11 binary and a clean Godex build. It
+forms against the exact Prodex 0.438.1 binary and a clean Godex build. It
 requires the pinned Prodex source commit and binary digest, and it checks the
 candidate's embedded clean Git revision before executing any probe.
 
