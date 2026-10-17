@@ -386,3 +386,45 @@ wrong early/late clock, extra upstream attempts, changed account or request.
 This **bounded 8KiB promotion/idle contract is VERIFIED across both
 executables**, not an assertion that every native Codex streaming state or
 platform-specific socket expiry has been certified.
+
+## Latest complete 0.438.2 finite gate — 8KiB promotion and idle close
+
+All mandatory finite release phases exited **PASS** on the exact same clean
+Godex commit `aeb90b98db61aadea54b23986c84bc711f67286b`, against the
+official Prodex `0.438.2` source
+`decfed45f884fe2bef20911303beab7b198698b7`, published Linux x86_64
+binary SHA-256
+`3f2fcd776fee0335dc49910d0651adc43a55c8627913556c307755b1575dac3f`
+and pinned published release manifest. No actual personal OAuth credentials
+or live external model requests were used.
+
+| Individually pinned phase | Result on clean `aeb90b98` |
+| --- | --- |
+| `--phase=preflight-tests` | PASS, including real Go TCP/WebSocket deadline, 8KiB precommit promotion, committed timeout, graceful control-frame close, recycled-socket phase-reset regressions, and native-format mutation controls |
+| `--phase=preflight-oracles-pty` | PASS, official two-executable PTY footer, 14 CLI probes, and context/negative oracles |
+| `--phase=preflight-oracles-profiles` | PASS, 34 managed-profile stages, synthetic quota/auth recovery, real Linux descriptor saturation and admission wake |
+| `--phase=preflight-oracles-history` | PASS, two-executable history/continuation and replay boundary controls |
+| `--phase=deepseek` | PASS **30/30**, `comparison_differences: []`, negative controls PASS |
+| `--phase=gemini` | PASS **13/13**, `comparison_differences: []`, negative controls PASS |
+| `--phase=websocket-core` | PASS, original **58** continuation upstream attempts + **12** completed-idle permit attempts + **2** visible committed-idle graceful closes + **2** promoted 8KiB precommit committed-idle graceful closes = **74 total synthetic upstream attempts across both executables**, plus per-fixture negative controls |
+| `--phase=websocket-deadline` | PASS, **4** upstream attempts across both binaries: one absolute 30-second hidden-prelude `504 request_timeout` and one successful subsequent turn on the same local WebSocket per binary |
+| `make verify` | PASS, format, source-size, vet, complete shuffled Go race suite, production build |
+| `scripts/check-cross-build.sh` | PASS, Linux AMD64/ARM64, Darwin AMD64/ARM64, Windows AMD64/ARM64 builds plus targeted Darwin/Windows test compilation |
+
+Both **new** bounded 0.438.2 lifetime contracts have real two-executable
+wire evidence: a committed visible delta and a separately promoted **8KiB**
+`response.in_progress` frame each trigger an empty WebSocket close control
+frame (`opcode=8`) after about **2.0 seconds**, with no extra owner,
+handshake, inference or lost client frame. Below the hold-promotion budget,
+hidden prelude frames do **not** reset the **original** 30-second precommit
+deadline, and late frames cannot cause another inference or profile penalty.
+The previous 58-attempt and 12-attempt WebSocket fixtures remain mandatory.
+
+The Codex 0.163.0 official app-server handshake is an **optional** fixture
+that requires a separately verified binary which was not available at its
+historical location; it was not executed or counted PASS in this run. Do not
+interpret cross-build as native Windows/macOS execution, or bounded synthetic
+release-gate success as complete production 1:1. Native platform lifecycle,
+real OAuth/multi-profile quotas, foreground/background Codex compaction,
+realtime duplex edge cases and unexercised upstream failure permutations
+remain **PARTIAL/OPEN**. These finite tested contracts are **VERIFIED**.
