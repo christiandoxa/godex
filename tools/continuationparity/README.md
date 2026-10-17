@@ -166,3 +166,31 @@ families. For synchronous execution the release script provides two
 completed-idle permit and mutation tests) and `--phase=websocket-deadline`
 (this two-product 30s fixture and negative controls). Both must pass against
 the same clean candidate to establish the complete bounded 0.438.2 gate.
+
+
+## 0.438.2 committed-output WebSocket idle close-frame differential
+
+`--websocket-committed-idle` compares the official SHA/source-pinned Prodex
+0.438.2 binary and clean Godex using the **configured** `stream_idle_timeout_ms
+= 2000`. Both launch isolated synthetic homes and connect a local Responses
+WebSocket to a real loopback upstream that sends one committed
+`response.output_text.delta` with `delta:visible-idle`, then remains silent
+for up to seven seconds. The tagged Rust `response_tracking/commit.rs` socket
+must close at about 2s after this visible output. Both executables must
+forward that exact delta and then send an **empty WebSocket close control
+frame** (opcode 8) to the client. A TCP EOF without a close frame is NOT
+wire-equivalent: it was the concrete Godex mismatch before the scoped patch.
+
+The oracle verifies exactly **one authenticated upstream request**, one
+upstream handshake, original opaque model request bytes, account-a ownership,
+visible output once, graceful empty close frame, and elapsed 1.5–4.0 seconds.
+Negative controls reject silent loss/changed delta, early/late close, a
+response.failed frame masquerading as a close, extra handshakes or replay,
+owner rotation and any changed request JSON. The transport labels committed
+idle expiry distinctly from precommit timeout/cancellation/other upstream
+errors; delivery emits a close frame **only** for this committed idle case.
+For reused upstream sockets the committed flag is reset atomically when the
+next request enters precommit, preventing an old stream timeout from
+mistakenly closing/retrying a fresh turn. Local `-race` tests exercise this
+state transition. The fixture is now part of the `--phase=websocket-core`
+and inherited full WebSocket gate alongside the prior 58 and 12 attempts.

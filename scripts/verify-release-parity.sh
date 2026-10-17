@@ -558,6 +558,20 @@ go test ./tools/continuationparity \
   -run '^TestProdex04382WebSocketCapacityOracleRejectsMaterialMutations$' \
   -count=1 -timeout=30s
 
+# The tagged 0.438.2 committed-stream timeout comes from the effective
+# stream_idle_timeout_ms, separate from the 30-second precommit watchdog.
+# A visible delta followed by stalled upstream I/O must reach the client,
+# then emit the official EMPTY WebSocket close control frame around 2000ms.
+# An abrupt TCP EOF is a material observable protocol difference.
+"$tmp/continuationparity" \
+  --prodex "$tmp/prodex" --godex "$tmp/godex" \
+  --prodex-source "$tmp/prodex-source" \
+  --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
+  --websocket-committed-idle
+go test ./tools/continuationparity \
+  -run '^TestProdex04382WebSocketCommittedIdleOracleRejectsWireMutations$' \
+  -count=1 -timeout=30s
+
 # Native 0.438.2 connection-limit frame may be top-level or nested. A fresh
 # WebSocket is retryable once before commitment, but never after visible output.
 go test ./tools/continuationparity \

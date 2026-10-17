@@ -305,3 +305,36 @@ fixture with a physically stalled committed stream should verify exact
 client-visible timeout/failure behavior of both official binaries before
 claiming the **end-to-end** stalled-stream expiry VERIFIED. HTTP/SSE stream-idle
 transport tuning is also not certified by this WebSocket-specific fix.
+
+
+## Graceful close control on configured committed WebSocket idle expiry
+
+An additional **exact two-executable** test exposed a client-visible 0.438.2
+wire mismatch after configuring the published stream idle to **2000ms**.
+Both Prodex and Godex correctly forwarded a single visible
+`response.output_text.delta` and ended the stalled committed upstream read
+at about 2 seconds. However, official Prodex sent a WebSocket **close
+control frame** (`opcode=8`, empty payload), whereas Godex abruptly dropped
+the client TCP connection and returned EOF. The latter lacks the protocol
+close handshake and is not behavioral parity for native Codex clients.
+
+Godex now distinguishes a timer-expired **committed** upstream read from
+precommit expiry, arbitrary transport failures, and user cancellation via an
+explicit model-layer sentinel. The WebSocket transport propagates that
+sentinel through the response body; delivery translates *only* that case
+into the official empty close control frame before orderly session teardown.
+The watchdog's committed/precommit transition is atomic; recycling a completed
+upstream socket clears the prior committed flag, so a precommit deadline in a
+new turn cannot be mislabeled as the previous stream's committed idle expiry.
+
+`TestProdex04382CommittedIdleTimeoutIsTypedWithoutReplaying` and
+`TestProdex04382RecycledSocketClearsCommittedIdleOwnership` validate the
+separate clock owners under the race detector. The independent pinned
+`--websocket-committed-idle` differential now checks the exact visible delta,
+**empty opcode-8 control frame**, the 2s elapsed idle bound, one authenticated
+upstream request/handshake, original owner/body and no postcommit replay.
+Mutation sentinels intentionally reject abrupt EOF, lost output,
+wrong control frames and duplicate attempts. This makes the bounded
+**configured committed-idle WebSocket expiry behavior VERIFIED** against two
+executables, without treating untested live provider/realtime stream failures
+as a production-wide 1:1 certification.

@@ -1,6 +1,7 @@
 package openai
 
 import (
+	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	"io"
 	"sync"
 	"time"
@@ -9,12 +10,14 @@ import (
 type websocketReadWatchdog struct {
 	connection io.ReadWriteCloser
 
-	mu       sync.Mutex
-	timer    *time.Timer
-	timeout  time.Duration
-	deadline time.Time
-	paused   bool
-	closed   bool
+	mu        sync.Mutex
+	timer     *time.Timer
+	timeout   time.Duration
+	deadline  time.Time
+	paused    bool
+	closed    bool
+	expired   bool
+	committed bool
 }
 
 func newWebSocketReadWatchdog(connection io.ReadWriteCloser, timeout time.Duration) *websocketReadWatchdog {
@@ -31,6 +34,14 @@ func (watchdog *websocketReadWatchdog) Read(buffer []byte) (int, error) {
 	count, err := watchdog.connection.Read(buffer)
 	if count > 0 {
 		watchdog.noteProgress()
+	}
+	if count == 0 && err != nil {
+		watchdog.mu.Lock()
+		committedExpiry := watchdog.expired && watchdog.committed
+		watchdog.mu.Unlock()
+		if committedExpiry {
+			return 0, proxymodel.ErrWebSocketCommittedIdleTimeout
+		}
 	}
 	return count, err
 }
@@ -54,6 +65,17 @@ func (watchdog *websocketReadWatchdog) Close() error {
 }
 
 func (watchdog *websocketReadWatchdog) setTimeout(timeout time.Duration) {
+	watchdog.setTimeoutPhase04382(timeout, false)
+}
+
+// Reused upstream sockets move back to PRECOMMIT before the next message.
+// Updating the timeout and its ownership must be atomic so an old committed
+// timer cannot relabel the new request's precommit cancellation/expiry.
+func (watchdog *websocketReadWatchdog) markCommittedIdle04382(timeout time.Duration) {
+	watchdog.setTimeoutPhase04382(timeout, true)
+}
+
+func (watchdog *websocketReadWatchdog) setTimeoutPhase04382(timeout time.Duration, committed bool) {
 	if timeout <= 0 {
 		return
 	}
@@ -62,6 +84,7 @@ func (watchdog *websocketReadWatchdog) setTimeout(timeout time.Duration) {
 		watchdog.mu.Unlock()
 		return
 	}
+	watchdog.committed = committed
 	watchdog.timeout = timeout
 	watchdog.deadline = time.Now().Add(timeout)
 	watchdog.paused = false
@@ -113,6 +136,7 @@ func (watchdog *websocketReadWatchdog) expire() {
 		return
 	}
 	watchdog.closed = true
+	watchdog.expired = true
 	watchdog.mu.Unlock()
 	_ = watchdog.connection.Close()
 }

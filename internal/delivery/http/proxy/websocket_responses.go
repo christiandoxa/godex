@@ -178,6 +178,17 @@ func (proxy *Proxy) forwardResponsesWebSocket(
 		}
 		closeErr := forwarded.Close()
 		tunnel.clearUpstream()
+		if errors.Is(err, proxymodel.ErrWebSocketCommittedIdleTimeout) {
+			// Prodex 0.438.2 emits an empty WebSocket close control frame
+			// when an already committed stream hits its configured idle
+			// deadline, rather than abruptly terminating the client TCP
+			// connection. This is NOT a precommit retry/quota failure.
+			if frameErr := tunnel.toClient.writeFrame(8, nil); frameErr != nil {
+				return frameErr
+			}
+			lifecycle.complete()
+			return nil
+		}
 		if err != nil {
 			return err
 		}
