@@ -338,3 +338,28 @@ wrong control frames and duplicate attempts. This makes the bounded
 **configured committed-idle WebSocket expiry behavior VERIFIED** against two
 executables, without treating untested live provider/realtime stream failures
 as a production-wide 1:1 certification.
+
+
+## Precommit 8KiB lookahead promotion uses the committed timeout owner
+
+Tag `0.438.2` also promotes fresh Responses WebSocket precommit hold frames
+when they exhaust the `RUNTIME_PROXY_SSE_LOOKAHEAD_BYTES` (8KiB) budget, even
+without a visible model text delta. The Rust
+`runtime_proxy/websocket/response_tracking/precommit.rs` promotion then
+enters the same `response_tracking/commit.rs` path that restores the
+configured committed upstream idle timeout. Godex previously returned a
+committed response from this **8KiB promotion branch** but accidentally kept
+its fixed **8-second precommit socket timer**, instead of the configured
+committed 2-second or default 300-second idle clock. This could falsely
+terminate a promoted stream early or delay an idle stop beyond its configured
+stream budget. It also misclassified a subsequent read timeout's ownership.
+
+`TestProdex04382LookaheadPromotedWebSocketUsesConfiguredCommittedIdle`
+reproduced both timer and committed-state mismatches before the fix, then
+passed after installing the same socket-commit timeout transition used by a
+regular visible frame. Its negative control
+`TestProdex04382HiddenWebSocketPreludeCannotPromoteIdleDeadline` still proves
+that a short (under-8KiB) hidden prelude cannot promote or reset the original
+request deadline. The complete local OpenAI package and focused Go race tests
+PASS. This checkpoint is source-derived plus local physical WebSocket proof;
+a new **two-executable** lookahead idle fixture is a distinct next step.

@@ -175,6 +175,14 @@ func (transport *Transport) readWebSocketMessage(
 			}
 			buffered = append(buffered, event.frames...)
 			if plan.holdPromotionAllowed && holdBytes >= websocketPrecommitLookaheadBytes {
+				// Prodex 0.438.2 calls its shared commit.rs path for either
+				// first visible output OR bounded 8KiB lookahead promotion.
+				// Promote socket timeout ownership only at that point; a
+				// smaller hidden prelude retains the original precommit
+				// watchdog and cannot extend the request's deadline.
+				if watchdog, ok := connection.(*websocketReadWatchdog); ok {
+					watchdog.markCommittedIdle04382(transport.CommittedWebSocketIdleTimeout04382())
+				}
 				return websocketCommittedResponse(
 					connection, buffered, "", responseID, state,
 					input.FirstEventRetryUsed, reusedSession, reuseIdle,

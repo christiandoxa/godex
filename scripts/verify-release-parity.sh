@@ -199,6 +199,14 @@ go test ./internal/usecase/runtime ./cmd/godex \
   -run '^TestProdex04382(StreamIdleTuningBoundsOriginalPrecommitWatchdog|RuntimeLaunchForwardsStreamIdleWatchdog|RouterReceivesLaunchOwnedPrecommitWatchdog)$' \
   -count=1 -timeout=30s
 
+# The tagged Prodex 0.438.2 precommit hold planner may commit after an 8KiB
+# bounded lookahead (without visible model text). Its *shared* commit.rs path
+# switches to configured committed idle, just like normal visible output;
+# smaller hidden preludes retain the original request precommit deadline.
+go test -race ./internal/gateway/openai \
+  -run '^TestProdex04382(LookaheadPromotedWebSocketUsesConfiguredCommittedIdle|HiddenWebSocketPreludeCannotPromoteIdleDeadline)$' \
+  -count=1 -timeout=35s
+
 # Prodex 0.438.2 WebSocket terminal Mojo policy checks nested and top-level
 # connection-limit codes independently (ASCII casefold only), gives explicit
 # `status` priority over `status_code` even if malformed, and accepts only
