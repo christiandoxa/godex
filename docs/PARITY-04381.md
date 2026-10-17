@@ -124,5 +124,20 @@ used the official Prodex 0.438.1 executable and reported
 cross-build command `./scripts/check-cross-build.sh` also passed for Linux,
 Darwin, and Windows compilation targets.
 
+The remaining release phases also passed independently against the same clean
+candidate source `282af52ce9ba973e4719de03d09b4f15349b602e`:
+
+```text
+./scripts/verify-release-parity.sh --phase=preflight-tests  PASS
+./scripts/verify-release-parity.sh --phase=preflight-oracles PASS
+./scripts/verify-release-parity.sh --phase=deepseek          PASS
+./scripts/verify-release-parity.sh --phase=gemini            PASS
+./scripts/verify-release-parity.sh --phase=websocket         PASS
+```
+
+Each phase used the pinned Prodex 0.438.1 executable and retained its negative
+controls. This is a finite synthetic release gate; it does not prove full
+production-wide 1:1 behavior.
+
 No credentials or provider requests were used for pin verification. No tag or
 release was created by the parity gate.
