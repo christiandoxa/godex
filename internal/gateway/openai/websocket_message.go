@@ -198,7 +198,7 @@ func (transport *Transport) readWebSocketMessage(
 
 		buffered = append(buffered, event.frames...)
 		if watchdog, ok := connection.(*websocketReadWatchdog); ok {
-			watchdog.setTimeout(websocketCommittedStreamIdleTimeout)
+			watchdog.setTimeout(transport.CommittedWebSocketIdleTimeout04382())
 		}
 		return websocketCommittedResponse(
 			connection, buffered, terminalKind(event), responseID, state,

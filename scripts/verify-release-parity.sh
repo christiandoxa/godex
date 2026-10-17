@@ -183,6 +183,14 @@ go test ./internal/usecase/runtime ./cmd/godex \
   -run '^TestProdex04382(ProfileInflightHardLimitEnvironmentMatchesTaggedPolicy|RuntimeProxyLaunchPropagatesProfileInflightHardLimit|RuntimeRoutingPreservesConfiguredProfileInflightHardLimit)$' \
   -count=1 -timeout=30s
 
+# Prodex 0.438.2 websocket/response_tracking/commit.rs restores the real
+# configured stream_idle_timeout_ms on a committed upstream WebSocket.
+# It must not retain Godex's historic fixed 300s when the published runtime
+# stream idle knob requests 250ms/2000ms; precommit retains its own budget.
+go test ./internal/gateway/openai ./internal/usecase/runtime ./cmd/godex \
+  -run '^TestProdex04382(WebSocketCommittedOutputUsesConfiguredStreamIdle|RuntimeLaunchCarriesConfiguredWebSocketCommittedIdle|RuntimeOpenAITransportRetainsWebSocketStreamIdleSetting)$' \
+  -count=1 -timeout=30s
+
 # Tagged 0.438.2 composes the original request-local precommit watchdog as
 # max(configured stream idle, 30_000 ms). Go must preserve that same budget
 # across hidden WebSocket frames and carry the tuning through its real launcher

@@ -47,6 +47,7 @@ type Config struct {
 	ActiveRequestLimit               int
 	ProfileInflightHardLimit         int
 	PrecommitWatchdogBudget          time.Duration
+	WebSocketCommittedIdleTimeout    time.Duration
 	AdmissionWaitBudget              time.Duration
 	PressureAdmissionWaitBudget      time.Duration
 	LongLivedQueueWaitBudget         time.Duration

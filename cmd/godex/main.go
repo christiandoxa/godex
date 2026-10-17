@@ -241,7 +241,9 @@ func newRuntimeGateway(
 	client := runtimeUpstreamHTTPClient(config.UpstreamNoProxy)
 	switch config.Provider.Kind {
 	case "", "openai":
-		return openai.NewTransport(config.UpstreamURL, client, process)
+		return openai.NewTransportWithCommittedWebSocketIdle04382(
+			config.UpstreamURL, client, process, config.WebSocketCommittedIdleTimeout,
+		)
 	case "copilot":
 		return newCopilotRuntimeGateway(config, copilotSource, providerCatalogs, client)
 	case "anthropic":

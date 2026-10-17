@@ -278,3 +278,30 @@ Windows/macOS execution, live OAuth and quota/credential recovery, Codex
 model compaction with real provider state, runtime realtime duplex edge
 cases, and other unexercised failure permutations. Neither synthetic fixture
 coverage nor cross-compilation certifies those outstanding native behaviors.
+
+
+## Configured idle timeout AFTER WebSocket response commitment
+
+Official tagged 0.438.2 `runtime_proxy/websocket/response_tracking/commit.rs`
+sets the upstream socket read/write idle timeout to the effective published
+`stream_idle_timeout_ms` after the first genuinely committed model output.
+Godex previously kept a fixed 300-second committed idle timeout even if the
+user explicitly set `PRODEX_RUNTIME_PROXY_STREAM_IDLE_TIMEOUT_MS=250` or
+`2000`; its runtime setting only changed the **separate** request-scoped
+precommit watchdog (`max(stream idle, 30_000)`). That was a material
+behavioral mismatch for an active but stalled Responses stream, despite the
+matching precommit timeout in the release oracle.
+
+`TestProdex04382WebSocketCommittedOutputUsesConfiguredStreamIdle`,
+`TestProdex04382RuntimeLaunchCarriesConfiguredWebSocketCommittedIdle` and
+`TestProdex04382RuntimeOpenAITransportRetainsWebSocketStreamIdleSetting`
+initially failed to compile against the missing knob/transport constructor;
+after the change, the active committed socket timer reads 250ms/2s when
+configured and retains the published 300s default otherwise. The existing
+precommit hidden-frame 30s boundary is not changed. The Go transport accepts
+the settings at construction (not through a mutable per-turn global), so
+parallel requests cannot race to overwrite the timer policy. A separate
+fixture with a physically stalled committed stream should verify exact
+client-visible timeout/failure behavior of both official binaries before
+claiming the **end-to-end** stalled-stream expiry VERIFIED. HTTP/SSE stream-idle
+transport tuning is also not certified by this WebSocket-specific fix.

@@ -33,14 +33,15 @@ type unauthorizedAuthRefresher interface {
 	RefreshUnauthorizedAuth(context.Context, string, proxymodel.Auth) (proxymodel.Auth, error)
 }
 type Transport struct {
-	client                   *http.Client
-	websocketClient          *http.Client
-	upstream                 *url.URL
-	auth                     authReader
-	cookies                  *webSocketCookieJar
-	websocketMessageMu       sync.Mutex
-	websocketMessageSessions map[uint64]websocketMessageSession
-	websocketMessageClosed   bool
+	client                      *http.Client
+	websocketClient             *http.Client
+	upstream                    *url.URL
+	auth                        authReader
+	cookies                     *webSocketCookieJar
+	websocketMessageMu          sync.Mutex
+	websocketMessageSessions    map[uint64]websocketMessageSession
+	websocketMessageClosed      bool
+	websocketCommittedIdle04382 time.Duration
 }
 
 func NewTransport(upstream string, client *http.Client, auth authReader) (*Transport, error) {

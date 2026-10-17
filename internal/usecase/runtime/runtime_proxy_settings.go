@@ -13,6 +13,7 @@ type runtimeProxySettings struct {
 	activeRequestLimit               int
 	profileInflightHardLimit         int
 	precommitWatchdogBudget          time.Duration
+	websocketCommittedIdleTimeout    time.Duration
 	admissionWaitBudget              time.Duration
 	pressureAdmissionWaitBudget      time.Duration
 	longLivedQueueWaitBudget         time.Duration
@@ -57,6 +58,7 @@ func runtimeProxySettingsWithLookup(lookup func(string) (string, bool)) (runtime
 			return runtimeProxySettings{}, parseErr
 		}
 		settings.precommitWatchdogBudget = max(idle, 30*time.Second)
+		settings.websocketCommittedIdleTimeout = idle
 	}
 	if settings.admissionWaitBudget, err = positiveRuntimeDuration(lookup, "GODEX_RUNTIME_PROXY_ADMISSION_WAIT_BUDGET_MS", "PRODEX_RUNTIME_PROXY_ADMISSION_WAIT_BUDGET_MS", settings.admissionWaitBudget); err != nil {
 		return runtimeProxySettings{}, err
@@ -138,6 +140,7 @@ func runtimeProxyConfig(
 		ActiveRequestLimit:               settings.activeRequestLimit,
 		ProfileInflightHardLimit:         settings.profileInflightHardLimit,
 		PrecommitWatchdogBudget:          settings.precommitWatchdogBudget,
+		WebSocketCommittedIdleTimeout:    settings.websocketCommittedIdleTimeout,
 		AdmissionWaitBudget:              settings.admissionWaitBudget,
 		PressureAdmissionWaitBudget:      settings.pressureAdmissionWaitBudget,
 		LongLivedQueueWaitBudget:         settings.longLivedQueueWaitBudget,
