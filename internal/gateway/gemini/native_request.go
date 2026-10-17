@@ -89,6 +89,13 @@ func geminiGenerateContentRequest(chat, original map[string]any) (map[string]any
 			}
 		}
 	}
+	if len(contents) == 0 {
+		// The native bridge emits one empty user turn when input has no
+		// material parts, including an empty input array.
+		contents = append(contents, map[string]any{
+			"role": "user", "parts": []any{map[string]any{"text": ""}},
+		})
+	}
 
 	contextual := make([]string, 0)
 	for _, raw := range messages {

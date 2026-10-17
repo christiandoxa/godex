@@ -88,6 +88,19 @@ func geminiInputMessage(item map[string]any) ([]any, bool) {
 		}
 		return []any{message}, true
 	}
+	// The native bridge defaults absent and non-string roles to user. Keep
+	// structured content instead of dropping those history items.
+	_, hasRole := item["role"]
+	content, hasContent := item["content"]
+	_, hasText := item["text"]
+	if hasRole || hasContent || hasText {
+		if _, ok := content.(string); !ok {
+			if _, ok := content.([]any); !ok {
+				content = item["text"]
+			}
+		}
+		return []any{map[string]any{"role": "user", "content": content}}, true
+	}
 	if kind == "input_text" || kind == "output_text" {
 		if text, ok := item["text"].(string); ok {
 			return []any{map[string]any{"role": "user", "content": text}}, true
