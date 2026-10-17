@@ -100,7 +100,7 @@ func NewProxy(config Config) (*Proxy, error) {
 		config.Router.SetAdmissionSelectionNotifier(admission.notifySelectionChange)
 	}
 	proxy.server = &http.Server{
-		Handler:           handler,
+		Handler: handler, ConnContext: proxyConnContext,
 		ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 90 * time.Second,
 	}
 	return proxy, nil

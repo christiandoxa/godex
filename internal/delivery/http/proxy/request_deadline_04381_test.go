@@ -2,7 +2,9 @@ package proxy
 
 import (
 	"context"
+	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -17,6 +19,79 @@ import (
 
 func oneLaneAdmissionLimits04381() admissionLimits {
 	return admissionLimits{global: 1, lane: [admissionLaneCount]int{1, 1, 1, 1}}
+}
+
+func TestProdex04381RequestDeadlineIncludesAcceptedConnectionTime(t *testing.T) {
+	acceptedAt := time.Now().Add(-500 * time.Millisecond)
+	parent := context.WithValue(context.Background(), requestAcceptedAtContextKey{}, acceptedAt)
+	ctx, cancel := withRequestDeadline(parent, 100*time.Millisecond)
+	defer cancel()
+	deadline, ok := ctx.Deadline()
+	if !ok || deadline.Sub(acceptedAt.Add(100*time.Millisecond)) > time.Millisecond ||
+		deadline.Sub(acceptedAt.Add(100*time.Millisecond)) < -time.Millisecond {
+		t.Fatalf("deadline=%v, want accepted-at deadline near %v", deadline, acceptedAt.Add(100*time.Millisecond))
+	}
+	if !requestDeadlineTimedOut(ctx) {
+		t.Fatal("deadline that elapsed in the listener queue was not expired")
+	}
+}
+
+func TestProdex04381ProxyConnContextCarriesAcceptedTime(t *testing.T) {
+	acceptedAt := time.Now().Add(-time.Second)
+	client, server := net.Pipe()
+	defer client.Close()
+	defer server.Close()
+	ctx := proxyConnContext(context.Background(), acceptedAtConnection{Conn: client, acceptedAt: acceptedAt})
+	got, ok := requestAcceptedAt(ctx)
+	if !ok || !got.Equal(acceptedAt) {
+		t.Fatalf("accepted time=%v/%t, want %v/true", got, ok, acceptedAt)
+	}
+}
+
+func TestProdex04381AcceptedTimeReachesHTTPRequestContext(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	accepted := make(chan time.Time, 1)
+	server := &http.Server{
+		ConnContext: proxyConnContext,
+		Handler: http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			at, _ := requestAcceptedAt(request.Context())
+			accepted <- at
+			writer.Header().Set("Connection", "close")
+			_, _ = io.WriteString(writer, "ok")
+		}),
+	}
+	serveDone := make(chan error, 1)
+	go func() { serveDone <- server.Serve(acceptedAtListener{Listener: listener}) }()
+	connection, err := net.Dial("tcp", listener.Addr().String())
+	if err != nil {
+		_ = server.Close()
+		t.Fatal(err)
+	}
+	_, _ = connection.Write([]byte("GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+	_, _ = io.ReadAll(connection)
+	_ = connection.Close()
+	select {
+	case at := <-accepted:
+		if at.IsZero() {
+			t.Fatal("HTTP request lost accepted connection time")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("HTTP request did not reach handler")
+	}
+	shutdownContext, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_ = server.Shutdown(shutdownContext)
+	select {
+	case serveErr := <-serveDone:
+		if serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
+			t.Fatal(serveErr)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("HTTP server did not stop")
+	}
 }
 
 func TestProdex04381AdmissionExpiryDoesNotDispatchAndFreshRequestSucceeds(t *testing.T) {
