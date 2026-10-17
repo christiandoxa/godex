@@ -23,6 +23,7 @@ fi
 # No live provider accounts, real credentials, or external model calls.
 ref_commit='c3c96af2a9b87896e262e37f37cd4741a562a66f'
 prodex_binary_sha256='b347889a6fa5aec6f3a0f00a1d8346eb2df30b9933361e924900904ed85e165e'
+prodex_manifest_sha256='210ffd34e5e455604b172f361760074801b35b6490c0a8d39e1a4cb29f510351'
 root="$(git rev-parse --show-toplevel)"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/godex-release-parity.XXXXXXXX")"
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
@@ -56,6 +57,10 @@ grep -Fq '"asset": "prodex-x86_64-unknown-linux-gnu"' "$tmp/release-manifest.jso
 }
 echo "$prodex_binary_sha256  $tmp/prodex" | sha256sum --check --status || {
   echo "Prodex oracle executable SHA-256 mismatch" >&2
+  exit 1
+}
+echo "$prodex_manifest_sha256  $tmp/release-manifest.json" | sha256sum --check --status || {
+  echo "Prodex release manifest SHA-256 mismatch" >&2
   exit 1
 }
 chmod +x "$tmp/prodex"
@@ -203,7 +208,7 @@ go test ./internal/delivery/http/proxy \
 # work and the local recovery path. Expired work must return a local 504,
 # avoid a second dispatch, and leave a later request usable.
 go test ./internal/delivery/http/proxy \
-  -run '^TestProdex04381(AdmissionExpiryDoesNotDispatchAndFreshRequestSucceeds|StandardRequestDeadlineCoversUpstreamAndReturns504)$' \
+  -run '^TestProdex04381(AdmissionExpiryDoesNotDispatchAndFreshRequestSucceeds|StandardRequestDeadlineCoversUpstreamAndReturns504|BodyCaptureUsesRequestDeadline)$' \
   -count=1 -timeout=35s
 
 # A profile readiness/selection change must wake a waiting recovery attempt
