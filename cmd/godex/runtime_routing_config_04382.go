@@ -14,6 +14,7 @@ func runtimeRoutingConfig(
 		Gateway: gateway, Accounts: runtimeAccountSource(config.Accounts, gateway),
 		PreferredAccount: config.PreferredAccount, Bindings: dependencies.bindings,
 		ProfileInflightHardLimit: config.ProfileInflightHardLimit,
+		PrecommitWatchdogBudget:  config.PrecommitWatchdogBudget,
 		RoutingState:             dependencies.bindings,
 		Activity:                 dependencies.activity,
 		AutoRedeem:               config.AutoRedeem, Redeemer: dependencies.autoRedeemer,

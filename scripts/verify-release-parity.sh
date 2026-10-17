@@ -181,6 +181,14 @@ go test ./internal/usecase/runtime ./cmd/godex \
   -run '^TestProdex04382(ProfileInflightHardLimitEnvironmentMatchesTaggedPolicy|RuntimeProxyLaunchPropagatesProfileInflightHardLimit|RuntimeRoutingPreservesConfiguredProfileInflightHardLimit)$' \
   -count=1 -timeout=30s
 
+# Tagged 0.438.2 composes the original request-local precommit watchdog as
+# max(configured stream idle, 30_000 ms). Go must preserve that same budget
+# across hidden WebSocket frames and carry the tuning through its real launcher
+# to the Router, rather than silently falling back to a fixed five minutes.
+go test ./internal/usecase/runtime ./cmd/godex \
+  -run '^TestProdex04382(StreamIdleTuningBoundsOriginalPrecommitWatchdog|RuntimeLaunchForwardsStreamIdleWatchdog|RouterReceivesLaunchOwnedPrecommitWatchdog)$' \
+  -count=1 -timeout=30s
+
 # Prodex 0.438.2 WebSocket terminal Mojo policy checks nested and top-level
 # connection-limit codes independently (ASCII casefold only), gives explicit
 # `status` priority over `status_code` even if malformed, and accepts only

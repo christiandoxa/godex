@@ -1,7 +1,9 @@
 package runtime
 
 import (
+	"context"
 	"fmt"
+	proxyconfig "github.com/christiandoxa/godex/internal/model/proxy"
 	"os"
 	"strconv"
 	"time"
@@ -10,6 +12,7 @@ import (
 type runtimeProxySettings struct {
 	activeRequestLimit               int
 	profileInflightHardLimit         int
+	precommitWatchdogBudget          time.Duration
 	admissionWaitBudget              time.Duration
 	pressureAdmissionWaitBudget      time.Duration
 	longLivedQueueWaitBudget         time.Duration
@@ -39,6 +42,21 @@ func runtimeProxySettingsWithLookup(lookup func(string) (string, bool)) (runtime
 		"GODEX_RUNTIME_PROXY_PROFILE_INFLIGHT_HARD_LIMIT",
 		"PRODEX_RUNTIME_PROXY_PROFILE_INFLIGHT_HARD_LIMIT"); err != nil {
 		return runtimeProxySettings{}, err
+	}
+	// The official 0.438.2 precommit request deadline is
+	// max(stream_idle_timeout_ms, 30_000). Keep the Router's existing
+	// five-minute default when no override is present; scope only the
+	// request watchdog here, without rewriting streaming idle behavior.
+	if _, configured := runtimeProxyEnvValue(lookup,
+		"GODEX_RUNTIME_PROXY_STREAM_IDLE_TIMEOUT_MS",
+		"PRODEX_RUNTIME_PROXY_STREAM_IDLE_TIMEOUT_MS"); configured {
+		idle, parseErr := positiveRuntimeDuration(lookup,
+			"GODEX_RUNTIME_PROXY_STREAM_IDLE_TIMEOUT_MS",
+			"PRODEX_RUNTIME_PROXY_STREAM_IDLE_TIMEOUT_MS", 0)
+		if parseErr != nil {
+			return runtimeProxySettings{}, parseErr
+		}
+		settings.precommitWatchdogBudget = max(idle, 30*time.Second)
 	}
 	if settings.admissionWaitBudget, err = positiveRuntimeDuration(lookup, "GODEX_RUNTIME_PROXY_ADMISSION_WAIT_BUDGET_MS", "PRODEX_RUNTIME_PROXY_ADMISSION_WAIT_BUDGET_MS", settings.admissionWaitBudget); err != nil {
 		return runtimeProxySettings{}, err
@@ -99,4 +117,39 @@ func runtimeProxyEnvValue(lookup func(string) (string, bool), canonical, legacy 
 		return value, true
 	}
 	return lookup(legacy)
+}
+
+func runtimeProxyConfig(
+	ctx context.Context,
+	upstream, preferredID string,
+	provider proxyconfig.Provider,
+	credentials []proxyconfig.ProviderCredential,
+	profiles []proxyconfig.Account,
+	autoRedeem bool,
+) (proxyconfig.Config, error) {
+	settings, err := runtimeProxySettingsFromEnv()
+	if err != nil {
+		return proxyconfig.Config{}, err
+	}
+	return proxyconfig.Config{
+		Context:                          ctx,
+		UpstreamURL:                      upstream,
+		PreferredAccount:                 preferredID,
+		ActiveRequestLimit:               settings.activeRequestLimit,
+		ProfileInflightHardLimit:         settings.profileInflightHardLimit,
+		PrecommitWatchdogBudget:          settings.precommitWatchdogBudget,
+		AdmissionWaitBudget:              settings.admissionWaitBudget,
+		PressureAdmissionWaitBudget:      settings.pressureAdmissionWaitBudget,
+		LongLivedQueueWaitBudget:         settings.longLivedQueueWaitBudget,
+		PressureLongLivedQueueWaitBudget: settings.pressureLongLivedQueueWaitBudget,
+		Provider:                         provider,
+		ProviderCredentials:              append([]proxyconfig.ProviderCredential(nil), credentials...),
+		AutoRedeem:                       autoRedeem,
+		Accounts: func(ctx context.Context) ([]proxyconfig.Account, error) {
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
+			return append([]proxyconfig.Account(nil), profiles...), nil
+		},
+	}, nil
 }

@@ -181,3 +181,33 @@ body mutation, and lost or substituted completion IDs. This isolates an
 observable 0.438.2 **idle** permit contract independently in both binaries;
 active-turn contention, cancellation and session teardown remain covered by
 local Go race/TCP tests until their own two-executable negative fixture exists.
+
+
+## Stream-idle tuning for original request-local precommit deadline
+
+Tagged Prodex 0.438.2 `runtime_proxy::recovery_deadline` obtains a single
+precommit deadline from the compiled Mojo
+`recovery_watchdog_budget_ms(stream_idle_timeout_ms, 30_000)`. The kernel
+computes `max(stream_idle_timeout_ms, 30_000)`; a 1ms/150ms configured
+stream idle still gives a **30-second minimum request budget**, while a
+longer override can extend the request watchdog. An unset variable retains
+the published 300,000ms default (the same existing Godex five minutes).
+Godex previously ignored `PRODEX_RUNTIME_PROXY_STREAM_IDLE_TIMEOUT_MS`
+entirely, making a release-configured shorter precommit deadline silently
+remain five minutes even while Prodex expired at 30 seconds. The new scoped
+settings parser honors the canonical
+`GODEX_RUNTIME_PROXY_STREAM_IDLE_TIMEOUT_MS` or compatible `PRODEX_*` key,
+rejects zero/signed/overflow durations, and forwards the calculated
+**request-local precommit** budget through the actual runtime launcher and
+Router. The default, timeout ownership, and postcommit stream rules remain
+unchanged; this does not pretend that all other HTTP/SSE stream-idle tuning
+has been exhaustively cloned.
+
+`TestProdex04382StreamIdleTuningBoundsOriginalPrecommitWatchdog`,
+`TestProdex04382RuntimeLaunchForwardsStreamIdleWatchdog` and
+`TestProdex04382RouterReceivesLaunchOwnedPrecommitWatchdog` failed to
+compile before the setting existed and now protect floor, override precedence,
+validation and the production launch chain. The request's deadline is still
+single-owner in Router; hidden prelude keepalive frames are forbidden from
+creating a fresh budget. The scoped two-executable **30-second** WebSocket
+watchdog fixture is a separate executable proof step.

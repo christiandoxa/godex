@@ -336,40 +336,6 @@ func (runner *Runner) prepareProviderLaunch(
 	return provider, result, nil
 }
 
-func runtimeProxyConfig(
-	ctx context.Context,
-	upstream, preferredID string,
-	provider proxyconfig.Provider,
-	credentials []proxyconfig.ProviderCredential,
-	profiles []proxyconfig.Account,
-	autoRedeem bool,
-) (proxyconfig.Config, error) {
-	settings, err := runtimeProxySettingsFromEnv()
-	if err != nil {
-		return proxyconfig.Config{}, err
-	}
-	return proxyconfig.Config{
-		Context:                          ctx,
-		UpstreamURL:                      upstream,
-		PreferredAccount:                 preferredID,
-		ActiveRequestLimit:               settings.activeRequestLimit,
-		ProfileInflightHardLimit:         settings.profileInflightHardLimit,
-		AdmissionWaitBudget:              settings.admissionWaitBudget,
-		PressureAdmissionWaitBudget:      settings.pressureAdmissionWaitBudget,
-		LongLivedQueueWaitBudget:         settings.longLivedQueueWaitBudget,
-		PressureLongLivedQueueWaitBudget: settings.pressureLongLivedQueueWaitBudget,
-		Provider:                         provider,
-		ProviderCredentials:              append([]proxyconfig.ProviderCredential(nil), credentials...),
-		AutoRedeem:                       autoRedeem,
-		Accounts: func(ctx context.Context) ([]proxyconfig.Account, error) {
-			if err := ctx.Err(); err != nil {
-				return nil, err
-			}
-			return append([]proxyconfig.Account(nil), profiles...), nil
-		},
-	}, nil
-}
-
 func closeRuntimeProxy(ctx context.Context, proxy Proxy, runErr error) error {
 	closeContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()

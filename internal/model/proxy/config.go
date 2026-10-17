@@ -46,6 +46,7 @@ type Config struct {
 	PreferredAccount                 string
 	ActiveRequestLimit               int
 	ProfileInflightHardLimit         int
+	PrecommitWatchdogBudget          time.Duration
 	AdmissionWaitBudget              time.Duration
 	PressureAdmissionWaitBudget      time.Duration
 	LongLivedQueueWaitBudget         time.Duration
