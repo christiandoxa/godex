@@ -191,6 +191,14 @@ go test ./internal/gateway/openai ./internal/usecase/runtime ./cmd/godex \
   -run '^TestProdex04382(WebSocketCommittedOutputUsesConfiguredStreamIdle|RuntimeLaunchCarriesConfiguredWebSocketCommittedIdle|RuntimeOpenAITransportRetainsWebSocketStreamIdleSetting)$' \
   -count=1 -timeout=30s
 
+# Tagged Prodex 0.438.2 realtime duplex must RETAIN its weighted permit
+# while any live binary/audio frames flow. A saturated Responses turn waits
+# on the only ready profile and wakes on the realtime session close. This
+# is separate from completed-idle Responses socket permit release.
+go test -race ./internal/usecase/routing \
+  -run '^TestProdex04382RealtimeDuplexRetainsWeightedPermitUntilClose$' \
+  -count=1 -timeout=35s
+
 # Tagged 0.438.2 composes the original request-local precommit watchdog as
 # max(configured stream idle, 30_000 ms). Go must preserve that same budget
 # across hidden WebSocket frames and carry the tuning through its real launcher

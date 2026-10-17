@@ -428,3 +428,32 @@ release-gate success as complete production 1:1. Native platform lifecycle,
 real OAuth/multi-profile quotas, foreground/background Codex compaction,
 realtime duplex edge cases and unexercised upstream failure permutations
 remain **PARTIAL/OPEN**. These finite tested contracts are **VERIFIED**.
+
+
+## Native realtime duplex permit held until close — local Router/TCP proof
+
+The tagged Prodex 0.438.2 Rust caller test
+`websocket_realtime_connection_retains_its_live_duplex_permit` asserts that
+a `/live` realtime connection **does not** release its weighted execution
+permit when it receives or forwards frames, unlike a completed Responses
+turn. Godex's local
+`TestProdex04382RealtimeDuplexRetainsWeightedPermitUntilClose` now uses
+a real Router, a single synthetic ready profile with hard inflight capacity
+of two, and a duplex `net.Pipe` gateway. It verifies a live session takes
+weight **2**, forwards a real synthetic model-output text frame without
+releasing any permit, and blocks a competing Responses request **before**
+upstream dispatch. Closing the realtime session releases the exact permit,
+wakes the waiting request, permits it to dispatch once on the same owner,
+and leaves the inflight count at zero with two admissions, two releases and
+**zero** underflows. The fixture runs repeatedly under Go's race detector
+and does not use real accounts, external services or private tokens.
+
+A separate exploratory *two-executable* realtime `/live` loopback probe was
+not considered authoritative: the official Prodex 0.438.2 process was also
+conducting internal `wham/usage` probes while the test was trying to infer
+admission from total backend request count; its close handshake did not
+complete in the synthetic fixture's short timeout. That exploratory test
+was discarded without patching runtime behavior or altering the existing
+58/12/2/2 WebSocket differential assertions. An independent deterministic
+**two-executable realtime permit/close** fixture is still **PARTIAL/OPEN**,
+not silently inferred from the local Router test.
