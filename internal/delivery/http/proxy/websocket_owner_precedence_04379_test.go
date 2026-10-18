@@ -102,9 +102,12 @@ func TestProdex04379PublicWebSocketHardPreviousOutranksConflictingSession(t *tes
 	if status, _ := readResponsesPublicHandshake(t, reader); status != http.StatusSwitchingProtocols {
 		t.Fatalf("handshake returned %d", status)
 	}
-	_ = socket.SetDeadline(time.Now().Add(2 * time.Second))
 	send := func(payload string) string {
 		t.Helper()
+		// Each turn persists ownership; a previous turn must not spend its I/O budget.
+		if err := socket.SetDeadline(time.Now().Add(10 * time.Second)); err != nil {
+			t.Fatal(err)
+		}
 		if _, err := socket.Write(protocolClientFrame(1, true, []byte(payload), true)); err != nil {
 			t.Fatal(err)
 		}

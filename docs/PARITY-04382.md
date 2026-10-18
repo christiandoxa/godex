@@ -653,3 +653,18 @@ surrogates, excessive nesting, malformed UTF-8 and overflow; valid surrogate
 pairs and literal escaped `\\uD800` paths remain accepted. DeepSeek's stable
 public malformed-tool error and terminal SSE behavior are unchanged. No
 credential, saved session or profile config is rewritten.
+
+## Native Windows ownership fixtures retain assertions with owned I/O budgets
+
+Native run [39112990057](https://github.com/christiandoxa/godex/actions/runs/39112990057)
+on `43fe307e` passed the corrected workspace assertion and macOS portable lane.
+Windows then failed two existing proxy fixtures: first-conversation owner
+serialization exhausted its five-second context, and the six-turn owner
+precedence test exhausted one shared two-second socket deadline on its second
+turn. These fixtures assert ownership and dispatch counts, not storage latency.
+The serialization test keeps its deterministic channel barriers with a bounded
+30-second filesystem budget. The WebSocket fixture now assigns a bounded
+10-second I/O budget to each turn. Every original account, route, binding,
+attempt-count and no-replay assertion remains present; no test was skipped or
+weakened to accept a wrong owner. This changes test observation budgets only,
+not production admission/recovery deadlines or provider retry timing.

@@ -152,7 +152,8 @@ func (gateway *firstOwnerGateway) Execute(ctx context.Context, _ proxymodel.Requ
 }
 
 func TestIndependentRoutersSerializeFirstConversationOwner(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	// Admission is synchronized by channels; allow native durable writes to finish.
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 	store := observedBindingStore{routingrepo.NewStore(t.TempDir()), make(chan struct{}, 2)}
 	gateway := &firstOwnerGateway{started: make(chan struct{}), proceed: make(chan struct{})}
