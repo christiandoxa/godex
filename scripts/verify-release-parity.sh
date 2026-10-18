@@ -552,7 +552,7 @@ go test ./internal/gateway/gemini ./tools/differential \
 
 fi
 
-# A complete WebSocket gate includes BOTH the existing 58-attempt + idle
+# A complete WebSocket gate includes BOTH the existing 56-model-attempt + idle
 # capacity suite and the new ~30-second per-product deadline differential.
 # Mutually exclusive slices fit synchronous command deadlines; the existing
 # --phase=websocket and default all mode retain every assertion.
@@ -571,7 +571,7 @@ if [ "$phase" = 'all' ] || [ "$phase" = 'websocket' ] || [ "$phase" = 'websocket
 # profile permit yet remain reusable. Five local client WebSockets stay OPEN
 # with hard profile capacity=2, then the first is reused without an extra
 # upstream handshake. This is a new independent exact-tagged two-executable
-# differential; the previous 58 attempt fixture does not prove idle release.
+# differential; the previous 56-model-attempt fixture does not prove idle release.
 "$tmp/continuationparity" \
   --prodex "$tmp/prodex" --godex "$tmp/godex" \
   --prodex-source "$tmp/prodex-source" \

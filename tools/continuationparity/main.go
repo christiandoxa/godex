@@ -29,12 +29,14 @@ const (
 
 type attempt struct{ account, mode, body string }
 type backend struct {
-	server       *httptest.Server
-	mu           sync.Mutex
-	attempts     []attempt
-	cancelled    int
-	wsCounts     map[string]int
-	wsHandshakes int
+	server        *httptest.Server
+	mu            sync.Mutex
+	attempts      []attempt
+	cancelled     int
+	wsCounts      map[string]int
+	wsHandshakes  int
+	usageProbes   int
+	separateUsage bool
 }
 
 func newBackend() *backend {
@@ -53,7 +55,12 @@ func newBackend() *backend {
 		}
 		account := r.Header.Get("ChatGPT-Account-Id")
 		b.mu.Lock()
-		b.attempts = append(b.attempts, attempt{account: account, mode: mode, body: string(body)})
+		if mode == "usage" {
+			b.usageProbes++
+		}
+		if mode != "usage" || !b.separateUsage {
+			b.attempts = append(b.attempts, attempt{account: account, mode: mode, body: string(body)})
+		}
 		b.mu.Unlock()
 		if mode == "usage" {
 			writeJSON(w, http.StatusOK, `{"plan_type":"plus","rate_limit":{"primary_window":{"used_percent":10,"reset_at":4102444800,"limit_window_seconds":18000},"secondary_window":{"used_percent":10,"reset_at":4102444800,"limit_window_seconds":604800}}}`)
@@ -200,6 +207,9 @@ func main() {
 	}
 	b := newBackend()
 	defer b.close()
+	b.mu.Lock()
+	b.separateUsage = chosen > 0
+	b.mu.Unlock()
 	for _, spec := range []struct{ name, binary string }{{"prodex", *prodex}, {"godex", *godex}} {
 		p := product{name: spec.name, binary: spec.binary}
 		var err error
@@ -225,6 +235,11 @@ func main() {
 			}
 			fatal(spec.name + ": " + err.Error())
 		}
+	}
+	if chosen > 0 && !*websocketRealtime {
+		b.mu.Lock()
+		fmt.Printf("WebSocket quota_probes=%d (separate from model attempts)\n", b.usageProbes)
+		b.mu.Unlock()
 	}
 	if *websocketRealtime {
 		fmt.Println("PASS Prodex 0.438.2 realtime duplex permit and close lifecycle across both binaries")
@@ -504,6 +519,17 @@ func postContextHeader(client *http.Client, url, body, name, value string) (exch
 func seedProductState(p product) error {
 	now := time.Now().Unix()
 	if p.name == "prodex" {
+		// Imported Windows auth can inherit an unprotected Administrators ACL.
+		// Runtime qualification requires private synthetic inputs, not import parity.
+		paths, err := filepath.Glob(filepath.Join(p.state, "profiles", "*", "auth.json"))
+		if err != nil {
+			return err
+		}
+		for _, path := range paths {
+			if err := secureFixtureFile(path); err != nil {
+				return err
+			}
+		}
 		binding := func(profile string) map[string]any {
 			return map[string]any{"profile_name": profile, "bound_at": now}
 		}

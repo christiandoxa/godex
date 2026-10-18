@@ -876,3 +876,35 @@ reference-binary workaround. No assertion, checksum or pinned artifact changed.
 `rtk go test -race ./tools/continuationparity -count=1 -timeout=90s` PASS:
 112 tests. Windows test cross-compilation, `rtk err make verify` and
 `git diff --check` PASS.
+
+## Reference import ACL defect and separate WebSocket quota observations
+
+Native [metadata run](https://github.com/christiandoxa/godex/actions/runs/39117651872)
+on `57f022c9d7e72ee3465925e9faa851f88e89ec11` confirms: macOS auth/state
+files have mode 0600 and the runner's UID; private directories have mode 0700
+and trusted ancestors. Its realtime reset remains unexplained. Windows raw
+fixture inputs have a protected current-user ACL, but the official import's
+managed auth files have owner Administrators and inherited, unprotected ACLs.
+The runtime's private-file rejection is therefore justified; it is not evidence
+that a Godex routing policy should change.
+
+Runtime fixture preparation now seals only the reference's managed auth after
+import, preserving bytes. Godex output is not repaired. Native CLI import
+privacy remains outside this runtime oracle's verified scope and its observed
+reference defect is retained here. No gateway receives `--insecure`.
+`TestProdex04382ReferenceFixtureSealsManagedAuthAfterImport` failed before this
+correction with an intentionally readable imported file.
+
+`TestProdex04382WebSocketBackendSeparatesQuotaProbesFromModelTurns` also failed
+before correction: two usage probes and one WebSocket turn were recorded as
+three model attempts. WebSocket fixture mode now records quota probes
+separately and retains exact handshake/inference/owner/wire assertions. The
+same continuation traffic is now reported as 56 model attempts plus two quota
+probes, rather than 58 mixed requests; no scenario or negative control was
+removed. The no-flag HTTP continuation oracle keeps its explicit usage checks.
+
+`rtk go test -race ./tools/continuationparity -count=1 -timeout=90s` PASS:
+114 tests. `rtk err make verify`, `git diff --check` and PowerShell parsing
+PASS. The native script now runs every mode and all negative controls before
+reporting the failed-mode list and exiting nonzero, retaining failure evidence
+and any independent successful slices. Native qualification remains PARTIAL.

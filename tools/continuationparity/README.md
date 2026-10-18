@@ -71,8 +71,10 @@ upstream attempts across both binaries. Two more cases now verify that a
 triggers exactly one new WebSocket attempt against the **same** profile.
 The mixed top-level/nested code precedence must not leak the precommit error,
 rotate owner, duplicate the user request or replay any committed output.
-The expanded gate observes **58** upstream attempts across both binaries;
-negative controls reject wrong retry count, owner, response ID or wire frame.
+The expanded gate observes **56** model attempts across both binaries;
+quota probes have their own counter. Earlier 58-request totals included two
+usage probes. Negative controls still reject wrong retry count, owner,
+response ID or wire frame.
 
 The pinned Prodex executable selected account-a on all these synthetic
 requests; **this fixture does not prove that soft session IDs always select
@@ -112,7 +114,7 @@ oracle checks; local scenario passes do not authorize a tag or release.
 ## Tagged Prodex 0.438.2 completed-idle WebSocket permit oracle
 
 The `--websocket-capacity` flag is a separate published SHA/source-tag
-verified two-executable fixture, not a substitute for the original 58-attempt
+verified two-executable fixture, not a substitute for the original 56-model-attempt
 WebSocket continuation differential. Both products receive identical isolated
 synthetic profiles and a **weighted hard per-profile execution limit of 2**.
 Five distinct local client WebSocket connections each complete a native
@@ -162,7 +164,7 @@ missing followup completion and any extra handshake.
 
 The full `--phase=websocket` release gate retains both WebSocket fixture
 families. For synchronous execution the release script provides two
-**non-overlapping** slices: `--phase=websocket-core` (58 prior attempts,
+**non-overlapping** slices: `--phase=websocket-core` (56 prior model attempts,
 completed-idle permit and mutation tests) and `--phase=websocket-deadline`
 (this two-product 30s fixture and negative controls). Both must pass against
 the same clean candidate to establish the complete bounded 0.438.2 gate.
@@ -193,7 +195,7 @@ For reused upstream sockets the committed flag is reset atomically when the
 next request enters precommit, preventing an old stream timeout from
 mistakenly closing/retrying a fresh turn. Local `-race` tests exercise this
 state transition. The fixture is now part of the `--phase=websocket-core`
-and inherited full WebSocket gate alongside the prior 58 and 12 attempts.
+and inherited full WebSocket gate alongside the prior 56 and 12 model attempts.
 
 
 ## Tagged 0.438.2 8KiB held precommit promotion into committed idle
@@ -215,7 +217,7 @@ requires exactly one original opaque upstream request, one handshake, and
 unchanged `account-a` ownership. The independent mutation controls reject a
 lost/shortened hold, wrong event type, failure to promote, late/early close,
 abrupt TCP EOF, unexpected close body, duplicated inference, reconnected
-transport, changed owner or rewritten request JSON. The 58-attempt core,
+transport, changed owner or rewritten request JSON. The 56-model-attempt core,
 12-attempt idle-permit, two-attempt committed visible idle, and separate
 absolute 30-second precommit tests remain unchanged and mandatory.
 
@@ -265,3 +267,10 @@ ACL on Windows, including rewrites. Profile import uses its strict path;
 `--insecure` would skip the reference's Windows ACL sealing and leave files
 that a subsequent strict gateway refuses. Native file-security code stays
 private to this developer tool without widening the Codex gateway API.
+
+Published Windows Prodex import currently leaves managed auth with an inherited
+Administrators ACL even with strict input. Runtime fixture preparation seals
+those reference files after import; Godex output is not normalized. This
+qualifies runtime behavior only and does not certify native CLI import privacy.
+All six native modes and negative controls run even if an earlier mode fails;
+any failed mode still makes the script fail.

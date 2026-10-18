@@ -39,12 +39,14 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'build native Godex candidate failed' }
     go build -trimpath -o $taskOracle ./tools/continuationparity
     if ($LASTEXITCODE -ne 0) { throw 'build native executable oracle failed' }
+    $taskFailures = @()
     foreach ($taskMode in @('--websocket-realtime', '--websocket', '--websocket-capacity', '--websocket-committed-idle', '--websocket-lookahead-idle', '--websocket-deadline')) {
         & $taskOracle --prodex $taskProdex --prodex-source $taskOracleSource --godex $taskGodex --godex-source $taskSource --godex-commit $taskCommit $taskMode
-        if ($LASTEXITCODE -ne 0) { throw "native $taskPlatform parity failed: $taskMode" }
+        if ($LASTEXITCODE -ne 0) { $taskFailures += $taskMode; Write-Output "FAIL native $taskPlatform parity: $taskMode" }
     }
     go test ./tools/continuationparity -run '^TestProdex04382' -count=1 -timeout=45s
     if ($LASTEXITCODE -ne 0) { throw 'native oracle negative controls failed' }
+    if ($taskFailures.Count -ne 0) { throw "native $taskPlatform parity failed: $($taskFailures -join ', ')" }
     Write-Output "PASS native Prodex 0.438.2 executable parity: $taskPlatform Godex $taskCommit"
 } finally {
     Remove-Item -LiteralPath $taskRoot -Recurse -Force

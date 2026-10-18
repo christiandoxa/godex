@@ -43,7 +43,7 @@ func verifyWebSocketCapacity04382(result websocketCapacityResult04382) error {
 }
 
 // This release-specific two-executable fixture must NOT reuse the sequential
-// 58-attempt WebSocket suite as proof of idle permit release. Multiple local
+// 56-model-attempt WebSocket suite as proof of idle permit release. Multiple local
 // sockets stay open after their completed response while a fresh session
 // still dispatches on the *same* synthetic owner. Reuse of the first local
 // socket must use the cached upstream transport without a new handshake.
