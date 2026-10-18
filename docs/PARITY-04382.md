@@ -1036,3 +1036,35 @@ repeatedly under Go's race detector after the scoped fix. This is
 **source-aligned local Router behavior**; its own two-executable admission
 expiry boundary fixture remains separate from the existing 30-second hidden
 prelude differential and is not silently certified by those older results.
+
+
+## Cancellation across WebSocket auth and owner retries (0.438.2)
+
+The tagged 0.438.2 precommit watchdog covers **every** upstream send, not
+only the first permit acquisition. An additional fail-before regression
+showed that Godex's `executeWebSocketMessage` and normal upgrade auth-reload
+loops could issue a second upstream request after their original context
+had already been canceled. The same flaw affected hard owner transport
+recovery: a first synthetic precommit transport error returned *after*
+cancellation still authorized another owner-affine WebSocket attempt. Even a
+request whose context had expired before the first iteration could be
+forwarded by a context-insensitive gateway. The existing Router-wide permit
+admission guards do not protect cancellations arriving **during** the first
+upstream attempt, so that retry boundary requires its own policy check.
+
+The minimal fix checks `ctx.Err()` at the start of each WebSocket upgrade and
+message-attempt iteration, preserving the original context rather than
+allocating a new per-retry deadline. A canceled or deadline-expired loop now
+returns `context.Canceled`/`context.DeadlineExceeded` without any additional
+upstream dispatch, owner rotation, quota penalty or transport replay.
+`TestProdex04382CanceledWebSocketAuthReloadNeverStartsSecondAttempt`,
+`TestProdex04382CanceledWebSocketOwnerTransportRetryNeverReplays`,
+`TestProdex04382AlreadyExpiredWebSocketNeverStartsInitialAttempt`, and
+`TestProdex04382ExpiredWebSocketDeadlineNeverStartsHandshakeOrMessage`
+exercise the exact failure using deliberately context-insensitive synthetic
+gateways. Their negative controls require the first obsolete response body
+to be closed exactly once, zero later requests, and original cancellation/
+deadline errors. All local tests pass under repeated Go race detection after
+the fix; active-context retry behavior remains governed by existing Router
+WebSocket tests. This is source-aligned local retry/cancellation protection,
+not an untested claim of full native provider session parity.

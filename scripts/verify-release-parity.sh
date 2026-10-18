@@ -200,6 +200,14 @@ go test -race ./internal/usecase/routing \
   -run '^TestProdex04382(ExpiredRequestCannotAcquireFreshProfilePermit|ExpiredDeadlineCannotDispatchBoundOrFreshTurn|CanceledWaiterAwakenedByPermitReleaseCannotDispatch|CancellationDuringPermitAdmissionBlocksUpstreamSend)$' \
   -count=1 -timeout=35s
 
+# The original 0.438.2 deadline also owns each WebSocket retry iteration:
+# auth-401 reload, bound-owner transport fallback and a late initial upgrade
+# must not send another inference after cancellation/expiry. The synthetic
+# upstream ignores context deliberately; Router must enforce no replay.
+go test -race ./internal/usecase/routing \
+  -run '^TestProdex04382(CanceledWebSocketAuthReloadNeverStartsSecondAttempt|CanceledWebSocketOwnerTransportRetryNeverReplays|AlreadyExpiredWebSocketNeverStartsInitialAttempt|ExpiredWebSocketDeadlineNeverStartsHandshakeOrMessage)$' \
+  -count=1 -timeout=35s
+
 # Tagged Prodex 0.438.2 realtime duplex must RETAIN its weighted permit
 # while any live binary/audio frames flow. A saturated Responses turn waits
 # on the only ready profile and wakes on the realtime session close. This

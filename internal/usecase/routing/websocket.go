@@ -46,6 +46,11 @@ func (router *Router) executeWebSocket(
 	websocket websocketGateway,
 ) (*proxymodel.Response, error) {
 	for reload := 0; reload < 2; reload++ {
+		// Native 0.438.2 retry attempts share the ORIGINAL request deadline.
+		// A 401 arriving after expiry cannot authorize another handshake.
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		response, err := router.observedWebSocketConnectAttempt(ctx, request, account, func() (*proxymodel.Response, error) {
 			return websocket.ExecuteWebSocket(ctx, request, account)
 		})
@@ -70,6 +75,12 @@ func (router *Router) executeWebSocketMessage(
 	turnStateRetryDelays := [...]time.Duration{75 * time.Millisecond, 200 * time.Millisecond, 500 * time.Millisecond}
 	turnStateRetryIndex := 0
 	for {
+		// Keep the first request's deadline across auth reload, owner
+		// transport retry and turn-state continuation. The downstream
+		// gateway is not responsible for suppressing a canceled retry.
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		response, err := router.observedWebSocketMessageAttempt(ctx, request, account, func() (*proxymodel.Response, error) {
 			return websocket.ExecuteWebSocketMessage(ctx, request, account)
 		})
