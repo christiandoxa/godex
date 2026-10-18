@@ -130,6 +130,9 @@ func TestCodexSessionCompanionHelper(t *testing.T) {
 }
 
 func runSessionCompanionForegroundWrapper(marker string) {
+	stopped := make(chan os.Signal, 1)
+	signal.Notify(stopped, syscall.SIGTERM, os.Interrupt)
+	defer signal.Stop(stopped)
 	root := filepath.Dir(marker)
 	readySocket := filepath.Join(root, "foreground-ready.sock")
 	child := exec.Command(os.Args[0], "-test.run=^"+sessionCompanionHelperName+"$", "--", "native", readySocket)
@@ -138,7 +141,9 @@ func runSessionCompanionForegroundWrapper(marker string) {
 		os.Exit(19)
 	}
 	waitForSessionCompanionFile(filepath.Join(root, "native-ready"))
-	select {}
+	<-stopped
+	_ = child.Process.Signal(syscall.SIGTERM)
+	_ = child.Wait()
 }
 
 func runSessionCompanionWrapper(listen, marker string) {

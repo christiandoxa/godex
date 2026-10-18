@@ -668,3 +668,42 @@ The serialization test keeps its deterministic channel barriers with a bounded
 attempt-count and no-replay assertion remains present; no test was skipped or
 weakened to accept a wrong owner. This changes test observation budgets only,
 not production admission/recovery deadlines or provider retry timing.
+
+## Fresh full finite gate — clean `700183ba`
+
+All eight mandatory release phases PASS on clean
+`700183ba4272171d1ef340daba57786e65961981`, with the SHA-pinned native Codex
+0.163.0 option enabled. `rtk test make verify` and the separately executed
+`./scripts/check-cross-build.sh` PASS. The independent workspace oracle now
+includes imported filenames and malformed-surrogate metadata; both official
+executables produce current plus exactly five expected recent workspaces.
+DeepSeek remains 30/30 and Gemini 13/13, zero differences, negative controls
+PASS. Realtime client/upstream close, cancellation and shutdown remain mandatory
+alongside the prior WebSocket 74-attempt core and four-attempt deadline proof.
+
+The exact phase commands executed on that same clean candidate were:
+
+```sh
+./scripts/verify-release-parity.sh --phase=preflight-tests
+./scripts/verify-release-parity.sh --phase=preflight-oracles-pty
+./scripts/verify-release-parity.sh --phase=preflight-oracles-profiles
+./scripts/verify-release-parity.sh --phase=preflight-oracles-history
+./scripts/verify-release-parity.sh --phase=deepseek
+./scripts/verify-release-parity.sh --phase=gemini
+./scripts/verify-release-parity.sh --phase=websocket-core
+./scripts/verify-release-parity.sh --phase=websocket-deadline
+```
+
+Native CI [39113607312](https://github.com/christiandoxa/godex/actions/runs/39113607312)
+on `700183ba` confirms Windows portable tests/build and both security lanes
+PASS. The macOS lane failed the existing foreground cancellation fixture:
+its native readiness marker existed, but its descendant was already gone
+before cancellation. That test helper blocked forever in an unowned empty
+`select {}`. It now explicitly waits for its owned termination signal and
+reaps the native child, keeping the same process-group, descendant-liveness,
+cancellation and unrelated-process assertions. This is test lifecycle cleanup,
+not a production process-policy patch. A focused non-race Linux repeat of the
+old case passed 40 times; the native macOS failure is recorded rather than
+misrepresented as a locally reproduced production bug. A new native CI run
+is required to qualify the corrected fixture. Full production-wide parity
+remains PARTIAL at the live-provider and native differential boundaries above.
