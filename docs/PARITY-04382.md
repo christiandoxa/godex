@@ -488,3 +488,48 @@ real native Codex 0.163.0 app-server sessions with an isolated, synthetic
 loopback provider and credential-free HOME. They do **not** prove live
 external-provider compaction, full production quota state, or native
 Windows/macOS app-server execution; those remain PARTIAL/OPEN.
+
+## Native realtime two-executable permit and close lifecycle
+
+**VERIFIED, bounded synthetic Linux scope.** The independent
+`tools/continuationparity --websocket-realtime` fixture now passes against
+the SHA-pinned official Prodex 0.438.2 executable and clean Godex baseline
+`ea1ecce83f6c703f61b9d3c6ccebb923be77defb`. Four isolated cases per product
+cover client close, upstream close, abrupt client cancellation and successful
+gateway shutdown. No production mismatch was demonstrated, so no speculative
+permit or realtime transport patch was made.
+
+The tagged source explains the earlier non-authoritative fixture failure:
+`runtime_proxy/dispatch/websocket.rs` calls the HTTP listener's session loop
+with `realtime_duplex=false`, whereas `runtime_proxy/realtime_sidecar.rs`
+uses `true` and a bounded duplex pump. `runtime_broker/live_source.rs`
+publishes its separate loopback `realtime_ws_addr`. The new fixture resolves
+that actual native endpoint from the isolated runtime registry. Connecting
+`/live` to the ordinary Prodex HTTP listener reproduced an audio-control
+timeout before this fixture correction; connecting the advertised realtime
+sidecar passes. This was fixture evidence, not a Godex production failure.
+
+Each case uses one ready profile, two weekly-exhausted profiles and hard
+weighted capacity two. Session/text/audio/binary frames and one realtime
+model completion must preserve the exact wire. A competing Responses socket
+must emit a production `profile_inflight_saturated` marker while the backend
+still observes zero Responses handshakes and inference dispatches. Closing
+either realtime peer or cancelling its TCP connection releases capacity for
+exactly one waiting turn, preserving `account-a` and the original body.
+Shutdown instead exits successfully, closes the upstream and cancels waiting
+work without a second inference. Each case has exactly one realtime handshake,
+two controls, one binary audio frame, one live model turn and one closure.
+Usage probes are separately counted (one per Prodex case, zero per Godex case
+in the observed run) and never classified as inference.
+
+`go test -race ./tools/continuationparity ./internal/usecase/routing -run
+'^TestProdex04382Realtime' -count=5 -timeout=45s` passes. The Router regression
+also closes the old live exchange again while the follower holds capacity:
+the follower keeps weight two, then final accounting is two admissions, two
+releases and zero underflows. Negative controls reject changed owner/auth/
+request bytes, lost/duplicate live or waiting traffic, missing/double close,
+reconnect, bypassed waiting and shutdown replay. The two-executable fixture
+also passed when run under Go's race detector. It is now mandatory in
+`--phase=websocket-core`; a complete fresh release gate remains a separate
+same-clean-commit requirement. Native Windows/macOS execution, live OAuth,
+real audio inference and arbitrary production failures remain PARTIAL/OPEN.

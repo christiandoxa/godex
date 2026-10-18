@@ -607,6 +607,19 @@ go test ./tools/continuationparity \
   -run '^TestProdex04380FreshConnectionLimitOracleRejectsOwnerAndReplayDrift$' \
   -count=1 -timeout=30s
 
+# Native realtime uses Prodex's registry-advertised duplex sidecar. Background
+# usage probes are counted separately from handshakes, controls and model turns.
+# A saturated follower waits for client/upstream close or cancellation; shutdown
+# cancels it without dispatch. Every case uses one ready/two exhausted profiles.
+"$tmp/continuationparity" \
+  --prodex "$tmp/prodex" --godex "$tmp/godex" \
+  --prodex-source "$tmp/prodex-source" \
+  --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
+  --websocket-realtime
+go test -race ./tools/continuationparity \
+  -run '^TestProdex04382RealtimeOracleRejectsMutations$' \
+  -count=1 -timeout=30s
+
 fi
 
 if [ "$phase" = 'all' ] || [ "$phase" = 'websocket' ] || [ "$phase" = 'websocket-deadline' ]; then

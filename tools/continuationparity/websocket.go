@@ -171,7 +171,11 @@ type wsProbe struct {
 }
 
 func wsConnect(endpoint string) (net.Conn, *bufio.Reader, error) {
-	endpointURL, err := url.Parse(endpoint + "/responses")
+	return wsConnectURL(endpoint + "/responses")
+}
+
+func wsConnectURL(endpoint string) (net.Conn, *bufio.Reader, error) {
+	endpointURL, err := url.Parse(endpoint)
 	if err != nil {
 		return nil, nil, err
 	}

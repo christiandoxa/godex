@@ -218,3 +218,24 @@ abrupt TCP EOF, unexpected close body, duplicated inference, reconnected
 transport, changed owner or rewritten request JSON. The 58-attempt core,
 12-attempt idle-permit, two-attempt committed visible idle, and separate
 absolute 30-second precommit tests remain unchanged and mandatory.
+
+## Native realtime duplex admission and close lifecycle
+
+`--websocket-realtime` compares four isolated cases per executable: client
+close, upstream close, abrupt client cancellation, and graceful gateway
+shutdown. Prodex uses the private registry's loopback `realtime_ws_addr`
+sidecar; its ordinary HTTP gateway WebSocket listener runs Responses mode.
+Godex serves the realtime route on its existing listener. Each case imports
+three synthetic profiles, marks two weekly-exhausted, and limits the ready
+profile to two weighted inflight units.
+
+The live socket exchanges exact session-update, text, audio-control and binary
+audio frames, including a completed realtime model turn. A separate Responses
+request must record `profile_inflight_saturated` before any upstream handshake
+or model turn. Client/upstream close or cancellation then admits exactly one
+waiting turn on the same owner; shutdown must exit successfully and cancel it
+without inference. Quota probes have their own counter and cannot affect the
+handshake, control, audio, inference or close assertions. Mutation tests reject
+altered ownership/authentication/payload, missing or duplicate traffic, bypassed
+admission, reconnects and shutdown replay. `--phase=websocket-core` includes
+these cases and their race-tested negative controls.

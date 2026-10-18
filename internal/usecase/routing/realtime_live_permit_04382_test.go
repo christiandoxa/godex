@@ -172,6 +172,10 @@ func TestProdex04382RealtimeDuplexRetainsWeightedPermitUntilClose(t *testing.T) 
 			t.Fatalf("follower was stranded after live close: %v", got.err)
 		}
 		assertCount(2)
+		if err := live.Close(); err != nil {
+			t.Fatal(err)
+		}
+		assertCount(2)
 		if err := got.exchange.Close(); err != nil {
 			t.Fatal(err)
 		}
