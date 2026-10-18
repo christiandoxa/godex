@@ -239,3 +239,23 @@ handshake, control, audio, inference or close assertions. Mutation tests reject
 altered ownership/authentication/payload, missing or duplicate traffic, bypassed
 admission, reconnects and shutdown replay. `--phase=websocket-core` includes
 these cases and their race-tested negative controls.
+
+## Published native macOS and Windows executables
+
+`scripts/verify-native-parity.ps1` runs the same six executable fixture modes
+on a clean native checkout: continuation, completed-idle capacity, visible
+committed idle, lookahead committed idle, realtime lifecycle and the absolute
+precommit deadline. The portable CI matrix invokes it after its native build.
+The script downloads only exact 0.438.2 assets, checks the platform binary and
+manifest against independent fixed digests and published SHA256SUMS, verifies
+the clean tagged source and candidate Go VCS metadata, then runs the loopback
+fixtures and their mutation controls. A cross-build is not an execution pass.
+
+All operating-system home/config/cache variables and Codex/profile paths are
+isolated under the synthetic fixture; ambient provider API keys are removed.
+The compiled oracle supplies its own no-op Codex stub, avoiding `/bin/true` on
+Windows. Windows gateways receive a private console. A short-lived sender
+attaches only to that console and sends its actual Ctrl-C event, allowing the
+same graceful shutdown assertions without signalling the CI runner. A forced
+kill still fails the realtime shutdown case. Existing Linux release slices
+retain all scenarios and additionally verify the adjacent published manifest.

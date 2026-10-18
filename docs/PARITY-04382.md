@@ -736,3 +736,42 @@ compaction and arbitrary failure permutations remain OPEN. No personal
 credentials were accessed and no live inference was performed. The primary
 dirty checkout remains on its original local commit with its WIP preserved;
 all changes were made in isolated worktrees.
+
+## Native official-executable platform oracle — qualification in progress
+
+**PARTIAL until the named native runs complete.** The preceding portable CI
+lanes execute Godex tests on Windows/macOS but do not compare the corresponding
+published Prodex executable. `scripts/verify-native-parity.ps1` now pins the
+published 0.438.2 platform assets and manifest, clones the exact tagged source,
+builds a clean Godex candidate and reuses all six continuation/WebSocket modes.
+The portable CI lanes run this same script on their actual native platforms.
+
+Before the fixture correction,
+`TestProdex04382OracleIsolatesNativeHomeAndCodexExecutable` failed because the
+oracle inherited an ambient `USERPROFILE`; its Codex command also depended on
+Linux `/bin/true`. The environment now isolates native user/config/cache roots,
+strips ambient provider keys and supplies a compiled no-op Codex child. Windows
+gateway shutdown uses a private console and its real Ctrl-C event, with a
+separate attached sender. Microsoft's [console control contract](https://learn.microsoft.com/en-us/windows/console/generateconsolectrlevent)
+does not target Ctrl-C to a nonzero process group; the fixture therefore
+isolates the console instead of broadcasting into the CI runner. Forced kills
+remain failures of the realtime graceful-shutdown assertion.
+
+`go test -race ./tools/continuationparity -count=1 -timeout=90s` PASS: 106 tests,
+including native-home isolation, all six platform pins, unknown-platform
+rejection and missing/mutated-manifest rejection. Windows test cross-compilation
+PASS. PowerShell was absent locally; an official 7.4.6 tarball was downloaded
+to a private temporary directory and its published SHA256SUMS verified before
+the script parser PASS. No host installation or production dependency changed.
+Actual native executable results are recorded only after CI execution; live
+OAuth, real model inference and production quota claims remain outside scope.
+
+Before committing the platform harness, all six modes PASS locally against
+clean Godex `0d7ed766f9d6199c162d8d4bd3cdfcbafd51fbe6` and the SHA-verified
+official Linux executable: continuation 58 attempts, idle capacity 12,
+committed idle 2, lookahead idle 2, all four realtime closure paths, deadline 4.
+`rtk err make verify`, `git diff --check`, the PowerShell parser and the
+script's dirty-candidate rejection self-check PASS. The focused
+`rtk go test -race ./tools/continuationparity -run '^TestProdex04382' -count=1 -timeout=45s`
+also PASS (67 tests). These preserve the Linux baseline; they do not substitute
+for the forthcoming native platform runs.

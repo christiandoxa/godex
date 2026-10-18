@@ -147,6 +147,18 @@ type product struct {
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "__native-stop" {
+		if err := stopNativeGateway(os.Args[2:]); err != nil {
+			fatal(err.Error())
+		}
+		return
+	}
+	if os.Getenv("GODEX_CONTINUATION_CODEX_STUB") == "1" {
+		if len(os.Args) > 1 && os.Args[1] == "--version" {
+			fmt.Println("codex-cli 0.163.0")
+		}
+		return
+	}
 	prodex := flag.String("prodex", "", "official Prodex 0.438.2 binary")
 	godex := flag.String("godex", "", "Godex binary")
 	prodexSource := flag.String("prodex-source", "", "tagged Prodex 0.438.2 source")
@@ -238,8 +250,15 @@ func main() {
 }
 
 func verifyProdex(binary, source string) error {
-	if got := sha256File(binary); got != prodexSHA {
-		return fmt.Errorf("Prodex binary digest %s, want %s", got, prodexSHA)
+	asset, digest, err := nativeProdexPin()
+	if err != nil {
+		return err
+	}
+	if got := sha256File(binary); got != digest {
+		return fmt.Errorf("Prodex binary digest %s, want %s for %s", got, digest, asset)
+	}
+	if err := verifyProdexManifest04382(filepath.Join(filepath.Dir(binary), "release-manifest.json"), asset); err != nil {
+		return err
 	}
 	output, err := exec.Command(binary, "--version").CombinedOutput()
 	if err != nil || strings.TrimSpace(string(output)) != "prodex 0.438.2" {
@@ -284,7 +303,11 @@ func sha256File(path string) string {
 func prepareProduct(root string, p *product) error {
 	p.root = filepath.Join(root, p.name)
 	p.user, p.state = filepath.Join(p.root, "user"), filepath.Join(p.root, "state")
-	p.env = productEnv(*p)
+	environment, err := productEnv(*p)
+	if err != nil {
+		return err
+	}
+	p.env = environment
 	if err := os.MkdirAll(filepath.Join(p.user, ".codex"), 0700); err != nil {
 		return err
 	}
@@ -598,18 +621,32 @@ func writeAuth(path, account, token string) error {
 	return os.WriteFile(path, data, 0600)
 }
 
-func productEnv(p product) []string {
+func productEnv(p product) ([]string, error) {
 	base := make([]string, 0, len(os.Environ())+16)
 	for _, item := range os.Environ() {
 		key := strings.SplitN(item, "=", 2)[0]
-		switch key {
-		case "HOME", "CODEX_HOME", "GODEX_HOME", "PRODEX_HOME", "PRODEX_CODEX_BIN", "GODEX_CODEX_BIN", "PRODEX_SECRET_BACKEND":
+		upper := strings.ToUpper(key)
+		if strings.HasPrefix(upper, "PRODEX_") || strings.HasPrefix(upper, "GODEX_") || strings.HasPrefix(upper, "CODEX_") || strings.HasSuffix(upper, "_API_KEY") || strings.HasSuffix(upper, "_API_KEYS") {
+			continue
+		}
+		switch upper {
+		case "HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME":
 			continue
 		}
 		base = append(base, item)
 	}
-	base = append(base, "HOME="+p.user, "CODEX_HOME="+filepath.Join(p.user, ".codex"), "PRODEX_HOME="+p.state, "GODEX_HOME="+p.state, "PRODEX_CODEX_BIN=/bin/true", "GODEX_CODEX_BIN=/bin/true", "PRODEX_SECRET_BACKEND=file", "PRODEX_NO_UPDATE_CHECK=1", "GODEX_NO_UPDATE_CHECK=1", "PRODEX_PRESIDIO_AUTO_START=0", "PRODEX_RUNTIME_LOG_DIR="+filepath.Join(p.state, "logs"), "GODEX_RUNTIME_LOG_DIR="+filepath.Join(p.state, "logs"), "NO_PROXY=127.0.0.1,localhost", "no_proxy=127.0.0.1,localhost")
-	return base
+	stub, err := os.Executable()
+	if err != nil {
+		return nil, err
+	}
+	base = append(base, "HOME="+p.user, "USERPROFILE="+p.user,
+		"APPDATA="+filepath.Join(p.user, "AppData", "Roaming"), "LOCALAPPDATA="+filepath.Join(p.user, "AppData", "Local"),
+		"XDG_CONFIG_HOME="+filepath.Join(p.user, ".config"), "XDG_DATA_HOME="+filepath.Join(p.user, ".local", "share"), "XDG_CACHE_HOME="+filepath.Join(p.user, ".cache"),
+		"CODEX_HOME="+filepath.Join(p.user, ".codex"), "PRODEX_SHARED_CODEX_HOME="+filepath.Join(p.user, ".codex"),
+		"PRODEX_HOME="+p.state, "GODEX_HOME="+p.state,
+		"PRODEX_CODEX_BIN="+stub, "GODEX_CODEX_BIN="+stub, "GODEX_CONTINUATION_CODEX_STUB=1",
+		"PRODEX_SECRET_BACKEND=file", "PRODEX_NO_UPDATE_CHECK=1", "GODEX_NO_UPDATE_CHECK=1", "PRODEX_PRESIDIO_AUTO_START=0", "PRODEX_RUNTIME_LOG_DIR="+filepath.Join(p.state, "logs"), "GODEX_RUNTIME_LOG_DIR="+filepath.Join(p.state, "logs"), "NO_PROXY=127.0.0.1,localhost", "no_proxy=127.0.0.1,localhost")
+	return base, nil
 }
 
 func invoke(binary string, env []string, args ...string) ([]byte, error) {
@@ -627,6 +664,7 @@ func invoke(binary string, env []string, args ...string) ([]byte, error) {
 func startGateway(p product, baseURL string) (string, *exec.Cmd, error) {
 	args := []string{"gateway", "--listen", "127.0.0.1:0", "--base-url", baseURL, "--no-presidio"}
 	cmd := exec.Command(p.binary, args...)
+	configureGatewayProcess(cmd)
 	cmd.Env = p.env
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -662,7 +700,7 @@ func stopGateway(cmd *exec.Cmd) {
 	if cmd == nil || cmd.Process == nil {
 		return
 	}
-	_ = cmd.Process.Signal(os.Interrupt)
+	_ = signalGateway(cmd)
 	done := make(chan struct{})
 	go func() { _ = cmd.Wait(); close(done) }()
 	select {
