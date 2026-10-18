@@ -74,11 +74,21 @@ func collectWorkspacePaths(ctx context.Context, root string, visited *int, paths
 				}
 				continue
 			}
-			include, err := sessionWalkEntry(ctx, root, entry, nil)
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			if entry.Type()&os.ModeSymlink != 0 {
+				continue
+			}
+			name := entry.Name()
+			if !strings.HasSuffix(name, ".json") && !strings.HasSuffix(name, ".jsonl") && !strings.HasSuffix(name, ".jsonl.zst") {
+				continue
+			}
+			info, err := entry.Info()
 			if err != nil {
 				return err
 			}
-			if include {
+			if info.Mode().IsRegular() {
 				*paths = append(*paths, path)
 			}
 		}

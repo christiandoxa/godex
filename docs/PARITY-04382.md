@@ -569,3 +569,66 @@ saved profile configuration remain intact. The independent Python oracle is
 mandatory in the PTY release slice; fresh clean-candidate qualification follows
 the scoped implementation commit. Native Windows/macOS execution and histories
 beyond the documented scan bounds remain outside this proof.
+
+## Imported workspace names and native Windows assertion
+
+The extended oracle reproduced another concrete gap on clean `aabb99b0`:
+tagged `session_file_name_policy_v1` accepts every `.json`, `.jsonl` or
+`.jsonl.zst` metadata filename, whereas Godex's reused catalog filter required
+`rollout-`. Prodex selected the synthetic `imported-session.jsonl` workspace;
+Godex omitted it. The repository regression failed with that missing path and
+the official two-executable oracle rejected Godex's workspace list. Workspace
+discovery now uses the tagged suffix rule while retaining regular-file,
+symlink, byte, cancellation and directory-entry bounds. The session catalog's
+existing filename contract is unchanged.
+
+Native CI run [39112394206](https://github.com/christiandoxa/godex/actions/runs/39112394206)
+on `aabb99b0` passed Linux race tests and the macOS portable test/build lane,
+but failed the new Windows workspace test. Its production TOML correctly
+escaped backslashes; the test incorrectly searched the encoded value for a raw
+Windows path. A synthetic backslash path reproduces the same failure on Linux.
+The assertion now parses TOML and checks one exact trusted workspace key,
+preserving its original invariant. Focused local race tests PASS. Historical
+run [39110921049](https://github.com/christiandoxa/godex/actions/runs/39110921049)
+on `97cd030a` passed both native portable lanes. Neither result is a native
+two-executable Prodex-versus-Godex differential or live-provider certificate.
+
+## Non-WebSocket 0.438.1..0.438.2 delta audit
+
+**Gemini timing: VERIFIED source scope; bounded public behavior VERIFIED.**
+The exact tagged `provider_constraints.mojo` was compiled locally with Mojo
+1.1.0. An independent ctypes check passed 524 combinations: retry indices
+0–8 use 5/10/20/30-second defaults, the maximum of header/body/default is
+capped at 300 seconds, index 9+ stops, inline accepts only `(0, 30000]` ms,
+and invalid-stream backoff is `1000 * 2^min(index, 8)` ms. Tagged native
+callers retain their three-attempt invalid-stream limit. This proves the
+reference kernel, not an unimplemented Go OAuth runtime. Gemini OAuth/native
+CLI routing is disabled in this release. Public API-key launches use the
+separate `local_rewrite_gemini_openai.rs` Chat-compatible path. Four loopback
+cases per official executable and clean Godex `aabb99b0` confirm: plaintext
+429 preserves status/body/Retry-After with one attempt; structured 429 with
+5s or 301s Retry-After advances immediately to the next model and succeeds
+with exactly two attempts; an unrecognized SSE stream ends with one attempt.
+No native inline sleep/backoff was copied into the different public path.
+
+**DeepSeek parameter reporting: VERIFIED source scope.** Compiling the tagged
+`openai_compat` kernel and calling its reporting operation produces the exact
+five ordered fields and reasons in `translators/deepseek/supported_params.rs`.
+They match the pre-0.438.2 Rust report byte-for-byte; the release moved ownership
+without changing the report. Production CLI code has no caller of that
+provider-core reporting trait; its only external caller in the source tree
+is the developer `provider-contract-matrix` example. Runtime bridge validation
+is separate: existing Go tests cover false parallel controls, text-only input,
+function tools, safety/user mapping and web-search validation; the pinned
+30-scenario executable gate checks observable request/error behavior. No new
+Godex reporting API or stricter runtime rejection was invented from descriptive
+report entries.
+
+**Native Codex/platform limits: PARTIAL.** Six Linux SHA-verified native Codex
+0.163.0 app-server cases cover foreground/automatic/asynchronous compaction,
+incomplete usage and interrupt without replay. Native CI exercises Go platform
+tests and builds, with the Windows assertion issue explicitly recorded above.
+Published macOS/Windows Prodex-versus-Godex realtime/process differentials,
+real OAuth renewal, real provider quota/audio/compaction and arbitrary network
+failures are still OPEN. Synthetic accounts cannot establish those live
+contracts. Overall production-wide 1:1 remains PARTIAL.

@@ -27,6 +27,7 @@ func TestProdex04382RecentWorkspacesReadInitialMetadataAndFileMtime(t *testing.T
 		{"sessions", "rollout-b.jsonl", metadata(b), 200},
 		{"archived_sessions", "rollout-c.json", metadata(c), 200},
 		{"sessions", "rollout-relative.jsonl", metadata("relative/workspace"), 300},
+		{"sessions", "imported-session.jsonl", metadata(filepath.Join(home, "imported")), 400},
 		{"sessions", "rollout-preepoch.jsonl", metadata(a), -100},
 		{"sessions", "rollout-invalid.jsonl", "not metadata\n" + metadata(filepath.Join(home, "invalid")), 400},
 	} {
@@ -52,7 +53,7 @@ func TestProdex04382RecentWorkspacesReadInitialMetadataAndFileMtime(t *testing.T
 		}
 	}
 	got := sessionentity.RecentWorkspaces(candidates, 4096)
-	if want := []string{b, c, a}; !reflect.DeepEqual(got, want) {
+	if want := []string{filepath.Join(home, "imported"), b, c, a}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("workspaces=%q want=%q", got, want)
 	}
 	ctx, cancel := context.WithCancel(context.Background())

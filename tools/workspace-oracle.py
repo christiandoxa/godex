@@ -109,7 +109,8 @@ def run_product(root, name, binary, fake, endpoint):
     fixtures = [('sessions', 'rollout-z.jsonl', 'tie-z', 300), ('sessions', 'rollout-a.jsonl', 'tie-a', 300),
                 ('sessions', 'rollout-new.jsonl', 'newest', 500), ('sessions', 'rollout-duplicate.jsonl', 'newest', 400),
                 ('sessions', 'rollout-relative.jsonl', None, 900), ('sessions', 'rollout-invalid.jsonl', 'invalid', 1000),
-                ('archived_sessions', 'rollout-old.jsonl', 'archived', 100)]
+                ('archived_sessions', 'rollout-old.jsonl', 'archived', 100),
+                ('sessions', 'imported-session.jsonl', 'imported', 600)]
     for index, (directory, filename, workspace, modified) in enumerate(fixtures):
         path = home / '.codex' / directory / filename
         cwd = str(root / workspace) if workspace else 'relative/workspace'

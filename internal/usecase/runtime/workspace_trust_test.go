@@ -26,7 +26,7 @@ func (f workspaceFixture) WorkspaceAliases(ctx context.Context, path string) ([]
 
 func TestProdex04382SuperTrustPreservesSelectionAndUserArguments(t *testing.T) {
 	root := t.TempDir()
-	current := filepath.Join(root, "current")
+	current := filepath.Join(root, `current\workspace`)
 	directory := func() (string, error) { return current, nil }
 	a, b := filepath.Join(root, "a"), filepath.Join(root, "b")
 	runner := &Runner{}
@@ -55,8 +55,15 @@ func TestProdex04382SuperTrustPreservesSelectionAndUserArguments(t *testing.T) {
 	}
 	runner.SetWorkspaceTrust(workspaceFixture{err: errors.New("synthetic unavailable history")}, directory)
 	got, err = runner.trustedWorkspaceArguments(context.Background(), nil)
-	if err != nil || len(got) != 2 || !strings.Contains(got[1], current) {
+	if err != nil || len(got) != 2 {
 		t.Fatalf("history failure lost current workspace: %q, %v", got, err)
+	}
+	parsed.Projects = nil
+	if err := toml.Unmarshal([]byte(got[1]), &parsed); err != nil {
+		t.Fatal(err)
+	}
+	if len(parsed.Projects) != 1 || parsed.Projects[current].TrustLevel != "trusted" {
+		t.Fatalf("history failure changed current workspace: %+v", parsed.Projects)
 	}
 }
 
