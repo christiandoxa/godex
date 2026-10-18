@@ -86,6 +86,7 @@ type Router struct {
 	maxInspect                            int64
 	affinity                              *affinityStore
 	mu                                    sync.Mutex
+	stopping                              bool
 	retryBackoffMu                        sync.Mutex
 	authBackoffMu                         sync.Mutex
 	transportMu                           sync.Mutex
@@ -363,6 +364,7 @@ func (router *Router) executeAccount(ctx context.Context, request proxymodel.Req
 }
 
 func (router *Router) Close() {
+	router.StopAdmission()
 	if closer, ok := router.gateway.(interface{ Close() }); ok {
 		closer.Close()
 	}

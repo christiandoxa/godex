@@ -178,6 +178,7 @@ func (proxy *Proxy) Endpoint() string {
 
 func (proxy *Proxy) Close(ctx context.Context) error {
 	defer proxy.router.Close()
+	proxy.router.StopAdmission()
 	proxy.mu.Lock()
 	proxy.closing = true
 	done := proxy.done

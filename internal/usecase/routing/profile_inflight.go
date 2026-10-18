@@ -57,6 +57,10 @@ func (router *Router) tryAcquireProfileInflight(
 ) (func(), bool) {
 	weight := requestProfileInflightWeight(request)
 	router.mu.Lock()
+	if router.stopping {
+		router.mu.Unlock()
+		return nil, false
+	}
 	current := router.inflight[accountID]
 	hardLimit := effectiveProfileInflightHardLimit(router.profileInflightHardLimit, weight)
 	if !hardAffinity && current > hardLimit-weight {
@@ -129,6 +133,10 @@ func (router *Router) waitForProfileInflight(
 	}
 	weight := requestProfileInflightWeight(request)
 	router.mu.Lock()
+	if router.stopping {
+		router.mu.Unlock()
+		return context.Canceled
+	}
 	limit := effectiveProfileInflightHardLimit(router.profileInflightHardLimit, weight)
 	for _, candidate := range candidates {
 		if router.inflight[candidate.ID] <= limit-weight {

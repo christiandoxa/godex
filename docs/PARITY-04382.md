@@ -1,6 +1,6 @@
 # Godex ↔ Prodex 0.438.2 parity checkpoint
 
-Latest qualification: [native five-mode results and realtime portability](#native-five-mode-results-and-realtime-portability).
+Latest qualification: [native shutdown admission mismatch](#native-shutdown-admission-mismatch).
 
 **Target:** official tagged Prodex `0.438.2` source commit
 `decfed45f884fe2bef20911303beab7b198698b7`. **Published** Linux x86_64
@@ -940,3 +940,42 @@ packet segmentation or delayed first messages.
 116 tests. `rtk err make verify`, `git diff --check` and all four realtime
 closure differentials on Linux PASS using the clean `011d8cc3` candidate.
 Corrected native realtime results still require another native CI execution.
+
+## Native shutdown admission mismatch
+
+The clean `f0c66c8856c87e0a86a7ab13407103875f6aac34` candidate PASS all eight
+Linux release phases and the complete PowerShell native script, retaining
+native Codex 0.163.0, DeepSeek 30/30, Gemini 13/13 and all realtime closes.
+Native [CI execution](https://github.com/christiandoxa/godex/actions/runs/39119182542)
+PASS the same five non-realtime executable modes on macOS ARM64 and Windows
+AMD64. Linux and both security lanes PASS. macOS still resets its first
+realtime control exchange; coalescing frames alone has not resolved it.
+
+The Windows log-file correction now exposes a genuine Godex shutdown mismatch.
+All four official Prodex realtime closures PASS; Godex client/upstream/cancel
+PASS, but Godex shutdown dispatches one waiting Responses turn after releasing
+the live permit. The reference closes without that handshake or inference.
+The oracle correctly fails the `1/1` observation instead of its required `0/0`.
+
+`TestProdex04382ProxyShutdownStopsAdmissionBeforeReleasingLivePermit`
+reproduces the race deterministically on Linux: a saturated follower is already
+waiting, and closing the active socket releases its permit before teardown
+continues. Before the fix, the assertion records two gateway dispatches.
+Routing now stops new weighted admission under its existing mutex and wakes
+waiters with cancellation before HTTP delivery closes any active tunnel.
+Final gateway cleanup remains after transport teardown. The regression and
+the existing realtime permit-lifetime regression PASS with the race detector.
+
+Ownership remains explicit: `usecase/routing` owns admission policy and
+`delivery/http/proxy` owns teardown order. The stop state is private and is
+never persisted; there is no new dependency, helper package, configuration,
+CLI flag or credential access. Full focused/race/build and clean-executable
+qualification results for this production correction are recorded below once
+they complete. Native overall parity remains PARTIAL.
+
+Before committing the shutdown correction,
+`rtk go test -race ./internal/delivery/http/proxy ./internal/usecase/routing ./internal/usecase/runtime -count=1 -timeout=120s`
+PASS (1,120 tests), and `rtk err make verify` plus `git diff --check` PASS.
+The production change adds one routing lifecycle operation and a private stop
+flag, reusing the existing permit-generation channel and mutex. No shared
+helper or speculative cancellation subsystem was introduced.

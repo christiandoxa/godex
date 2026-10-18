@@ -113,6 +113,13 @@ failures are skipped only when another eligible profile remains; an all-blocked
 pool fails open to the existing upstream path.
 Full Prodex route scoring and its model-aware pre-send quota gate remain gaps.
 
+Proxy shutdown first invokes `usecase/routing.Router.StopAdmission` before
+closing active sockets. Routing owns the stop flag under the same mutex as
+weighted permits and wakes queued requests with cancellation. Releasing a
+live duplex permit during shutdown cannot admit a waiting model request.
+Delivery retains socket/server teardown; final router close retains gateway
+cleanup. Active response bodies keep their ownership until normal closure.
+
 
 
 Doctor diagnostics remain a runtime-owned orchestration surface.
