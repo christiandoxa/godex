@@ -2,10 +2,47 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"runtime"
+
+	"github.com/christiandoxa/godex/internal/helper/redact"
 )
 
 const manifestSHA04382 = "93b5b5f90d59b23f800e47d17127ee7671d8a16ef72c6cabf30edd1093617725"
+
+func createFixtureRoot() (string, error) {
+	root, err := os.MkdirTemp("", "godex-continuation-parity-")
+	if err != nil {
+		return "", err
+	}
+	// macOS's default /var temporary path is a symlink rejected for secrets.
+	canonical, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		_ = os.RemoveAll(root)
+		return "", fmt.Errorf("canonicalize fixture root: %w", err)
+	}
+	return canonical, nil
+}
+
+func writeProdexFailureLogs04382(output io.Writer, root string) {
+	for _, pattern := range []string{
+		filepath.Join(root, "prodex", "state", "logs", "prodex-runtime-*.log"),
+		filepath.Join(root, "*", "prodex", "state", "logs", "prodex-runtime-*.log"),
+	} {
+		paths, _ := filepath.Glob(pattern)
+		for _, path := range paths[:min(len(paths), 4)] {
+			file, err := os.Open(path)
+			if err != nil {
+				continue
+			}
+			data, _ := io.ReadAll(io.LimitReader(file, 16<<10))
+			_ = file.Close()
+			fmt.Fprintln(output, redact.Secrets(string(data)))
+		}
+	}
+}
 
 func nativeProdexPin() (string, string, error) {
 	return prodexPlatformPin04382(runtime.GOOS, runtime.GOARCH)

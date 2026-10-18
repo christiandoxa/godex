@@ -1,11 +1,59 @@
 package main
 
 import (
+	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
+
+func TestProdex04382OracleFailureLogsAreBoundedAndRedacted(t *testing.T) {
+	root := t.TempDir()
+	logs := filepath.Join(root, "prodex", "state", "logs")
+	if err := os.MkdirAll(logs, 0700); err != nil {
+		t.Fatal(err)
+	}
+	for i := range 5 {
+		data := "fixture-log Authorization: Bearer private-fixture-value\n" + strings.Repeat("x", 32<<10) + "out-of-bounds"
+		if err := os.WriteFile(filepath.Join(logs, fmt.Sprintf("prodex-runtime-%d.log", i)), []byte(data), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var output bytes.Buffer
+	writeProdexFailureLogs04382(&output, root)
+	if strings.Count(output.String(), "fixture-log") != 4 || output.Len() > 4*(16<<10+1) || strings.Contains(output.String(), "private-fixture-value") || strings.Contains(output.String(), "out-of-bounds") {
+		t.Fatal("native failure diagnostics exceeded bounds or exposed credentials")
+	}
+}
+
+func TestProdex04382OracleCanonicalizesNativeTempRoot(t *testing.T) {
+	parent := t.TempDir()
+	link := filepath.Join(parent, "linked-temp")
+	if err := os.Symlink(parent, link); err != nil {
+		if runtime.GOOS == "windows" {
+			t.Skip("creating a symlink requires a privileged Windows account")
+		}
+		t.Fatal(err)
+	}
+	for _, key := range []string{"TMPDIR", "TMP", "TEMP"} {
+		t.Setenv(key, link)
+	}
+	root, err := createFixtureRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(root)
+	canonical, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if root != canonical {
+		t.Fatal("fixture path retains a symlink rejected by the official secret store")
+	}
+}
 
 func TestProdex04382OracleIsolatesNativeHomeAndCodexExecutable(t *testing.T) {
 	t.Setenv("USERPROFILE", "synthetic-ambient-home")

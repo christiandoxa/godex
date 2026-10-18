@@ -775,3 +775,39 @@ script's dirty-candidate rejection self-check PASS. The focused
 `rtk go test -race ./tools/continuationparity -run '^TestProdex04382' -count=1 -timeout=45s`
 also PASS (67 tests). These preserve the Linux baseline; they do not substitute
 for the forthcoming native platform runs.
+
+## Canonical native fixture roots and first platform failures
+
+On clean `f90c7a9b8a9d518b0312f334d63136726fc940ca`, all eight Linux
+`verify-release-parity.sh` phases PASS again, including the six SHA-verified
+Codex 0.163.0 app-server tests, DeepSeek 30/30, Gemini 13/13 and realtime.
+The complete `rtk err /tmp/godex-parity-pwsh-drWiP0/pwsh -NoProfile -File ./scripts/verify-native-parity.ps1`
+also PASS on Linux. This uses a temporarily unpacked, verified PowerShell;
+it does not install or modify the host's tools.
+
+The first official-native [CI run](https://github.com/christiandoxa/godex/actions/runs/39115337465)
+passed Linux and both security lanes. Native Go tests/build passed on both
+portable platforms, but the new executable differential did not: macOS
+rejected its `/var`-aliased fixture auth path as an invalid secret location;
+Windows reached the gateway and returned 503 before any model dispatch.
+Neither failure is counted as native parity. The Windows cause is still
+under investigation; production routing has not been patched from that
+unexplained reference-side result.
+
+`TestProdex04382OracleCanonicalizesNativeTempRoot` reproduced the macOS
+fixture defect on Linux with an explicit temporary-directory symlink and
+failed before the fix. Fixture creation now canonicalizes its owned root
+before constructing any secret/profile paths; reference symlink checks stay
+enabled. All four realtime closure differentials then PASS through a
+synthetic symlinked TMPDIR with private ancestors on Linux. An initial local
+probe with a group-writable ancestor correctly failed the reference security
+check and is not reported as a parity pass.
+
+Native failure diagnostics now read only bounded fixture runtime-log files,
+using the existing credential redactor; a regression rejects exposed bearer
+values and excessive file/output counts. `rtk go test -race ./tools/continuationparity -count=1 -timeout=90s`
+PASS: 108 tests. The changes remain developer tooling, with no new production
+package, helper, dependency, persistent format or CLI contract.
+`rtk err make verify`, `git diff --check` and the PowerShell parser also PASS.
+The native script retains all six modes and executes realtime first so a
+continuation failure cannot hide that higher-priority lifecycle result.

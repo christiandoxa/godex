@@ -191,7 +191,7 @@ func main() {
 			fatal(err.Error())
 		}
 	}
-	root, err := os.MkdirTemp("", "godex-continuation-parity-")
+	root, err := createFixtureRoot()
 	if err != nil {
 		fatal(err.Error())
 	}
@@ -219,6 +219,9 @@ func main() {
 			err = runProduct(root, b, p)
 		}
 		if err != nil {
+			if spec.name == "prodex" {
+				writeProdexFailureLogs04382(os.Stderr, root)
+			}
 			fatal(spec.name + ": " + err.Error())
 		}
 	}

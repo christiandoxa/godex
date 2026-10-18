@@ -39,7 +39,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'build native Godex candidate failed' }
     go build -trimpath -o $taskOracle ./tools/continuationparity
     if ($LASTEXITCODE -ne 0) { throw 'build native executable oracle failed' }
-    foreach ($taskMode in @('--websocket', '--websocket-capacity', '--websocket-committed-idle', '--websocket-lookahead-idle', '--websocket-realtime', '--websocket-deadline')) {
+    foreach ($taskMode in @('--websocket-realtime', '--websocket', '--websocket-capacity', '--websocket-committed-idle', '--websocket-lookahead-idle', '--websocket-deadline')) {
         & $taskOracle --prodex $taskProdex --prodex-source $taskOracleSource --godex $taskGodex --godex-source $taskSource --godex-commit $taskCommit $taskMode
         if ($LASTEXITCODE -ne 0) { throw "native $taskPlatform parity failed: $taskMode" }
     }
