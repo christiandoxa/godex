@@ -216,6 +216,14 @@ go test -race ./internal/usecase/routing \
   -run '^TestProdex04382(ExpiredFreshAttemptIsNotCapacitySaturation|SaturatedFreshAttemptStillReportsOnlyCapacity)$' \
   -count=1 -timeout=35s
 
+# A provider that returns success AFTER the original request's deadline
+# cannot deliver uncommitted output. The Router closes its late body and
+# releases exactly one weighted permit. A genuinely committed output stream
+# has a separate lifetime and must not be torn down by precommit expiry.
+go test -race ./internal/usecase/routing \
+  -run '^TestProdex04382(LateUncommittedResultAfterCancelCannotBeDelivered|LatePrecommitDeadlineExpiresBeforeGatewayResult|FreshRequestAfterLatePrecommitCancellationStillRuns|CommittedResultRetainsPermitPastOriginalDeadline)$' \
+  -count=1 -timeout=35s
+
 # Tagged Prodex 0.438.2 realtime duplex must RETAIN its weighted permit
 # while any live binary/audio frames flow. A saturated Responses turn waits
 # on the only ready profile and wakes on the realtime session close. This

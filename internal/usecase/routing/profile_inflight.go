@@ -184,6 +184,19 @@ func (router *Router) tryExecuteWithProfileInflight(
 		release()
 		return nil, true, err
 	}
+	// Prodex 0.438.2 rejects a LATE precommit response after the original
+	// request-local deadline has expired. The gateway may race cancellation
+	// or ignore its context; an uncommitted result is not client-visible and
+	// must close without a retry, quota penalty or leaked profile permit.
+	// Once a real model event committed, its stream has independent lifetime
+	// and the precommit watchdog must NOT tear it down.
+	if canceled := ctx.Err(); canceled != nil && (response == nil || !response.FirstEventCommitted) {
+		if response != nil && response.Body != nil {
+			_ = response.Body.Close()
+		}
+		release()
+		return nil, true, canceled
+	}
 	if response != nil {
 		response.RequestedStreaming = requestedResponsesStream(request)
 	}

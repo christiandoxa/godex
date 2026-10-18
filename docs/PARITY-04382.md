@@ -1133,3 +1133,35 @@ a genuinely full weighted profile is **still** classified for the normal
 admission wait, with no upstream call or quota mutation. Focused regressions
 passed ten Go race detector repetitions. This is source-aligned local Router
 correctness, not a separate native two-executable expired-queue differential.
+
+
+## Late upstream success after original precommit cancellation
+
+An additional 0.438.2 request-lifetime regression demonstrates that a
+context-insensitive upstream gateway can return an apparently successful
+**uncommitted** response only after the original request was canceled or
+expired. Godex previously allowed this response into downstream delivery,
+retaining its weighted profile execution permit until the late response body
+was eventually closed. The 0.438.2 tagged precommit watchdog must reject a
+late frame **before commitment**, even when the gateway ignores a canceled
+context; local timeout must not be accepted as a new successful model turn.
+
+`TestProdex04382LateUncommittedResultAfterCancelCannotBeDelivered` failed
+before the fix with a spurious HTTP 200 and retained permit. The Router now
+checks the original context immediately after the gateway attempt returns,
+closes an uncommitted late response exactly once, releases its existing
+weighted permit and returns the original `context.Canceled`/
+`context.DeadlineExceeded`, without a quota penalty, profile rotation or
+retry. `TestProdex04382LatePrecommitDeadlineExpiresBeforeGatewayResult`
+uses an actual expiring context while the synthetic gateway deliberately
+waits for cancellation, proving it cannot renew that deadline.
+`TestProdex04382FreshRequestAfterLatePrecommitCancellationStillRuns`
+proves that the next independent request is not stranded by the predecessor's
+permit; two admissions equal two releases with zero underflows. The negative
+control `TestProdex04382CommittedResultRetainsPermitPastOriginalDeadline`
+ensures a **genuinely committed** response is not prematurely closed by its
+old precommit context: its body and permit remain owned until the committed
+stream closes, then release exactly once. These focused scenarios passed
+repeatedly under Go's race detector. They provide bounded local Router/
+resource-lifetime proof, not an independent new two-executable late-gateway
+oracle or a claim about real provider sessions.
