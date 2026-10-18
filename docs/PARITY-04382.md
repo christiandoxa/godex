@@ -1108,3 +1108,28 @@ previously passed. Live OAuth/real quota renewal, real external model
 compaction, arbitrary network failures and some platform-specific lifecycle
 behaviors remain PARTIAL/OPEN. Compilation for a platform is not native
 runtime execution on that platform.
+
+
+## Fresh-request cancellation must not masquerade as profile saturation
+
+A follow-up review of the 0.438.2 request-local admission fix found a
+second-order classification bug. `tryExecuteWithProfileInflight` correctly
+returns `(response=nil, acquired=false, err=ctx.Err())` when an already
+canceled/deadline-expired request tries to enter weighted capacity. Its fresh
+caller `freshAttempt` previously tested **only** `!acquired` first, converting
+both `context.Canceled` and `context.DeadlineExceeded` into
+`(saturated=true, err=nil)`. This incorrectly allowed a local terminal
+request to enter the capacity-wait/recovery path as if a healthy profile
+were busy. It did not itself prove extra inference, but it violated the
+request's original deadline and classified capacity falsely.
+
+`TestProdex04382ExpiredFreshAttemptIsNotCapacitySaturation` reproduced the
+failure on both cancellation and already-expired deadline cases, with a
+context-insensitive synthetic gateway and no external account. The fix
+preserves the admission error when capacity was not acquired; only the
+actual `(acquired=false, err=nil)` state is treated as saturation.
+`TestProdex04382SaturatedFreshAttemptStillReportsOnlyCapacity` proves that
+a genuinely full weighted profile is **still** classified for the normal
+admission wait, with no upstream call or quota mutation. Focused regressions
+passed ten Go race detector repetitions. This is source-aligned local Router
+correctness, not a separate native two-executable expired-queue differential.

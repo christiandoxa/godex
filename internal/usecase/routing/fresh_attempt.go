@@ -181,6 +181,12 @@ func (router *Router) freshAttempt(
 ) (*proxymodel.Forwarded, *pendingResponse, bool, error) {
 	response, acquired, err := router.tryExecuteWithProfileInflight(ctx, request, account, false)
 	if !acquired {
+		// Cancellation before permit acquisition returns (false, ctx.Err()).
+		// Only (false, nil) means actual capacity saturation. Conflating
+		// them would requeue an already-expired request as a healthy waiter.
+		if err != nil {
+			return nil, nil, false, err
+		}
 		return nil, nil, true, nil
 	}
 	if err != nil {

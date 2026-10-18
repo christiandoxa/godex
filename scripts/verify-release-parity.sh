@@ -208,6 +208,14 @@ go test -race ./internal/usecase/routing \
   -run '^TestProdex04382(CanceledWebSocketAuthReloadNeverStartsSecondAttempt|CanceledWebSocketOwnerTransportRetryNeverReplays|AlreadyExpiredWebSocketNeverStartsInitialAttempt|ExpiredWebSocketDeadlineNeverStartsHandshakeOrMessage)$' \
   -count=1 -timeout=35s
 
+# Prodex 0.438.2 canceled fresh turns are NOT profile-capacity saturation.
+# The admission helper may return (acquired=false, err=context canceled);
+# preserve the exact original context error without queuing/retrying it.
+# A truly saturated request remains eligible for the existing capacity wait.
+go test -race ./internal/usecase/routing \
+  -run '^TestProdex04382(ExpiredFreshAttemptIsNotCapacitySaturation|SaturatedFreshAttemptStillReportsOnlyCapacity)$' \
+  -count=1 -timeout=35s
+
 # Tagged Prodex 0.438.2 realtime duplex must RETAIN its weighted permit
 # while any live binary/audio frames flow. A saturated Responses turn waits
 # on the only ready profile and wakes on the realtime session close. This
