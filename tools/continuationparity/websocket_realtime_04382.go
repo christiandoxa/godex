@@ -23,7 +23,7 @@ func prepareRealtimeProduct04382(root string, p *product) error {
 	if err := writeAuth(filepath.Join(p.user, ".codex", "auth.json"), "account-c", "synthetic-c"); err != nil {
 		return err
 	}
-	if _, err := invoke(p.binary, p.env, "profile", "import-current", "third", "--insecure"); err != nil {
+	if _, err := invoke(p.binary, p.env, "profile", "import-current", "third"); err != nil {
 		return err
 	}
 	if _, err := invoke(p.binary, p.env, "profile", "use", "--profile", "main"); err != nil {

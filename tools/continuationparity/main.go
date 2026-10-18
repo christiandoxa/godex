@@ -320,13 +320,13 @@ func prepareProduct(root string, p *product) error {
 	if err := writeAuth(filepath.Join(p.user, ".codex", "auth.json"), "account-a", "token-a"); err != nil {
 		return err
 	}
-	if _, err := invoke(p.binary, p.env, "profile", "import-current", "main", "--insecure"); err != nil {
+	if _, err := invoke(p.binary, p.env, "profile", "import-current", "main"); err != nil {
 		return err
 	}
 	if err := writeAuth(filepath.Join(p.user, ".codex", "auth.json"), "account-b", "token-b"); err != nil {
 		return err
 	}
-	if _, err := invoke(p.binary, p.env, "profile", "import-current", "second", "--insecure"); err != nil {
+	if _, err := invoke(p.binary, p.env, "profile", "import-current", "second"); err != nil {
 		return err
 	}
 	if _, err := invoke(p.binary, p.env, "profile", "use", "--profile", "main"); err != nil {
@@ -616,12 +616,19 @@ func writeJSONFile(path string, value any) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0600)
+	return writeFixtureFile(path, data)
 }
 
 func writeAuth(path, account, token string) error {
 	data := []byte(fmt.Sprintf(`{"auth_mode":"chatgpt","tokens":{"access_token":%q,"account_id":%q}}`, token, account))
-	return os.WriteFile(path, data, 0600)
+	return writeFixtureFile(path, data)
+}
+
+func writeFixtureFile(path string, data []byte) error {
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		return err
+	}
+	return secureFixtureFile(path)
 }
 
 func productEnv(p product) ([]string, error) {

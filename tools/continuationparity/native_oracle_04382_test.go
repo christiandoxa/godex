@@ -29,6 +29,36 @@ func TestProdex04382OracleFailureLogsAreBoundedAndRedacted(t *testing.T) {
 	}
 }
 
+func TestProdex04382FixtureRewriteRestoresPrivatePermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("protected Windows ACLs are checked by the native Windows regression")
+	}
+	for _, kind := range []string{"auth", "state"} {
+		t.Run(kind, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), kind+".json")
+			if err := os.WriteFile(path, []byte("{}"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Chmod(path, 0644); err != nil {
+				t.Fatal(err)
+			}
+			var err error
+			if kind == "auth" {
+				err = writeAuth(path, "synthetic-account", "private-fixture-value")
+			} else {
+				err = writeJSONFile(path, map[string]any{"generation": 1})
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			info, err := os.Stat(path)
+			if err != nil || info.Mode().Perm() != 0600 {
+				t.Fatal("fixture rewrite left a secret or state file readable by other users")
+			}
+		})
+	}
+}
+
 func TestProdex04382OracleCanonicalizesNativeTempRoot(t *testing.T) {
 	parent := t.TempDir()
 	link := filepath.Join(parent, "linked-temp")

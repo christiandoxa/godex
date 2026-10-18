@@ -811,3 +811,44 @@ package, helper, dependency, persistent format or CLI contract.
 `rtk err make verify`, `git diff --check` and the PowerShell parser also PASS.
 The native script retains all six modes and executes realtime first so a
 continuation failure cannot hide that higher-priority lifecycle result.
+
+## Strict native fixture imports and protected file permissions
+
+The second [native run](https://github.com/christiandoxa/godex/actions/runs/39116381897)
+on `10d522488f1a165780324ce7115b4d8de1206bdd` passed native Go tests/builds,
+but both official-executable realtime attempts failed before successful
+upstream model traffic. Windows diagnostics now identify
+`auth_not_quota_compatible` and an invalid secret location reading the managed
+profile's auth file. macOS passed the formerly rejected import path but logged
+private-state read/write failures and a realtime-sidecar connection reset.
+Neither is a native parity pass.
+
+Tagged `prodex-secret-store/src/secure_file/windows.rs` requires protected
+owner ACLs for private files and deliberately skips sealing when the import's
+`--insecure` guard is active. The fixture had relied on Unix-only creation modes
+and imported under that guard. It now seals all auth/state writes explicitly
+with mode 0600 or a protected current-user Windows ACL, and all three profile
+imports use strict validation. No security exception is passed to the gateway.
+
+`TestProdex04382FixtureRewriteRestoresPrivatePermissions` failed for both auth
+and state before the correction: `os.WriteFile(..., 0600)` preserves the old
+0644 mode when the file already exists. Its corrected implementation PASS;
+the Windows regression separately inspects the owner, protection bit, ACE
+count and granted principal for both file kinds. Windows test cross-compilation
+PASS; actual protected-ACL execution awaits the next native CI run.
+`rtk go test -race ./tools/continuationparity -count=1 -timeout=90s` PASS:
+111 tests. All four strict-import realtime closure differentials PASS against
+both Linux executables using clean Godex `10d52248`.
+
+The small platform-specific sealing code remains inside the oracle: it seals
+owned, already-written fixture paths, while the production Codex gateway's
+private helper owns a live file handle. No application API or shared helper
+was expanded for these developer fixtures, and no production behavior changed.
+
+The complete six-mode strict-import Linux differential PASS: continuation
+58 attempts, completed capacity 12, committed idle 2, lookahead idle 2,
+all four realtime closes and absolute deadline 4. `rtk err make verify`
+and `git diff --check` PASS. All eight release phases also PASS on the
+unchanged clean `10d52248` baseline with the verified Codex app-server opt-in.
+The corrected Windows/macOS executable runs still require native execution;
+the preceding native failures remain explicitly recorded above.

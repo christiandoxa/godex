@@ -259,3 +259,9 @@ attaches only to that console and sends its actual Ctrl-C event, allowing the
 same graceful shutdown assertions without signalling the CI runner. A forced
 kill still fails the realtime shutdown case. Existing Linux release slices
 retain all scenarios and additionally verify the adjacent published manifest.
+
+Fixture auth/state files use mode 0600 on Unix and a protected current-user
+ACL on Windows, including rewrites. Profile import uses its strict path;
+`--insecure` would skip the reference's Windows ACL sealing and leave files
+that a subsequent strict gateway refuses. Native file-security code stays
+private to this developer tool without widening the Codex gateway API.
