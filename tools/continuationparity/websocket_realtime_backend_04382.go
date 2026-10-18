@@ -142,7 +142,11 @@ func (r *realtimeBackend04382) write(opcode byte, payload []byte) error {
 	r.mu.Unlock()
 	r.writer.Lock()
 	defer r.writer.Unlock()
-	return websocketframe.WriteFrame(conn, opcode, payload, false)
+	writer := bufio.NewWriter(conn)
+	if err := websocketframe.WriteFrame(writer, opcode, payload, false); err != nil {
+		return err
+	}
+	return writer.Flush()
 }
 
 func readRealtimeFrame04382(reader *bufio.Reader) (websocketframe.Frame, []byte, error) {

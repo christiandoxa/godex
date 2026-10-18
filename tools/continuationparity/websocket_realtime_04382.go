@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"net"
 	"os"
@@ -274,8 +275,13 @@ func realtimeEndpoint04382(p product, endpoint string) (string, error) {
 	return "http://" + address.String() + registry.Mount + "/live", nil
 }
 
-func realtimeRoundTrip04382(conn net.Conn, reader *bufio.Reader, opcode byte, payload []byte, expected string) error {
-	if err := websocketframe.WriteFrame(conn, opcode, payload, true); err != nil {
+func realtimeRoundTrip04382(conn io.Writer, reader *bufio.Reader, opcode byte, payload []byte, expected string) error {
+	// Avoid splitting a small control frame across the sidecar's 20ms pump.
+	writer := bufio.NewWriter(conn)
+	if err := websocketframe.WriteFrame(writer, opcode, payload, true); err != nil {
+		return err
+	}
+	if err := writer.Flush(); err != nil {
 		return err
 	}
 	for i := 0; i < 4; i++ {
@@ -306,6 +312,11 @@ func waitRealtimeSaturation04382(p product) error {
 				return err
 			}
 			if entry.IsDir() {
+				return nil
+			}
+			switch filepath.Ext(path) {
+			case ".log", ".jsonl":
+			default:
 				return nil
 			}
 			data, err := os.ReadFile(path)

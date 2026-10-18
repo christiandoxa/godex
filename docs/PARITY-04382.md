@@ -1,5 +1,7 @@
 # Godex ↔ Prodex 0.438.2 parity checkpoint
 
+Latest qualification: [native five-mode results and realtime portability](#native-five-mode-results-and-realtime-portability).
+
 **Target:** official tagged Prodex `0.438.2` source commit
 `decfed45f884fe2bef20911303beab7b198698b7`. **Published** Linux x86_64
 asset `prodex-x86_64-unknown-linux-gnu` SHA-256
@@ -908,3 +910,33 @@ removed. The no-flag HTTP continuation oracle keeps its explicit usage checks.
 PASS. The native script now runs every mode and all negative controls before
 reporting the failed-mode list and exiting nonzero, retaining failure evidence
 and any independent successful slices. Native qualification remains PARTIAL.
+
+## Native five-mode results and realtime portability
+
+All eight Linux release phases PASS on exact clean
+`011d8cc394fe638a347521ac5a9e94eeccfd0f99`, including the six verified native
+Codex 0.163.0 app-server cases, DeepSeek 30/30, Gemini 13/13 and realtime.
+The complete PowerShell native script also PASS on this clean Linux commit.
+
+Actual native [CI execution](https://github.com/christiandoxa/godex/actions/runs/39118467016)
+now PASS **five of six executable modes on both macOS ARM64 and Windows AMD64**:
+continuation (56 model attempts with quota probes separate), completed-idle
+capacity (12), committed idle (2), lookahead idle (2), absolute deadline (4).
+All native negative controls PASS. Linux and both security lanes PASS.
+Realtime remains **PARTIAL**: macOS resets its initial control exchange;
+Windows completes control/audio/turn exchange but the fixture then tries to
+read an exclusively held `.log.lock` file while waiting for saturation.
+
+The saturation observer now opens only `.log` and `.jsonl` event files.
+`TestProdex04382RealtimeSaturationReadsLogsWithoutOpeningLockFiles` failed
+before correction with an unreadable lock sentinel, then PASS. Small realtime
+control frames and fixture replies now buffer their header/payload into one
+transport write before the peer's 20ms pump timeout; the single-write regression
+also failed before correction. Wire payloads, ownership, permit admission,
+close and replay assertions remain unchanged. This does not certify arbitrary
+packet segmentation or delayed first messages.
+
+`rtk go test -race ./tools/continuationparity -count=1 -timeout=90s` PASS:
+116 tests. `rtk err make verify`, `git diff --check` and all four realtime
+closure differentials on Linux PASS using the clean `011d8cc3` candidate.
+Corrected native realtime results still require another native CI execution.
