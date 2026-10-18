@@ -1165,3 +1165,40 @@ stream closes, then release exactly once. These focused scenarios passed
 repeatedly under Go's race detector. They provide bounded local Router/
 resource-lifetime proof, not an independent new two-executable late-gateway
 oracle or a claim about real provider sessions.
+
+## Complete pinned finite gate after late-precommit cancellation correction
+
+The exact, clean Godex commit
+`caac9afdbd070f1b7105e4fd156c13f9ad661f52` passed **all eight** pinned
+release phases against the official Prodex 0.438.2 source
+`decfed45f884fe2bef20911303beab7b198698b7`, published Linux x86_64
+executable SHA-256
+`3f2fcd776fee0335dc49910d0651adc43a55c8627913556c307755b1575dac3f`
+and verified release manifest. This supersedes earlier finite checks for the
+explicitly covered scenarios without removing their historical records.
+
+| Phase | Qualified result on exact `caac9afd` |
+| --- | --- |
+| `--phase=preflight-tests` | **PASS**, including original-deadline admission, canceled fresh/saturated distinction, canceled WebSocket retry, late-uncommitted result closure, postdeadline fresh-request recovery and six checksum-pinned native Codex 0.163.0 app-server cases |
+| `--phase=preflight-oracles-pty` | **PASS**, PTY/footer, 14 CLI probes, context and newest-first workspace trust differential with negative controls |
+| `--phase=preflight-oracles-profiles` | **PASS**, 34 managed profile/auth/quota/FD/admission lifecycle cases and negative controls |
+| `--phase=preflight-oracles-history` | **PASS**, two-executable previous-response/continuation replay boundary checks |
+| `--phase=deepseek` | **PASS 30/30**, `comparison_differences: []`, mutations detected |
+| `--phase=gemini` | **PASS 13/13**, `comparison_differences: []`, mutations detected |
+| `--phase=websocket-core` | **PASS**, 56 actual model attempts in prior continuation cases, separately counted usage probes, 12 idle permit attempts, committed visible/8KiB idle close and four native realtime closure modes on **both** executables |
+| `--phase=websocket-deadline` | **PASS**, public `504 request_timeout` at the original 30s deadline followed by a successful new request on the **same** local socket, exact one original and one followup request on each executable |
+| `make verify` | **PASS**, Go formatting, source-size, vet, shuffled full race suite and production build |
+| `scripts/check-cross-build.sh` | **PASS**, Linux AMD64/ARM64, Darwin AMD64/ARM64, Windows AMD64/ARM64, plus targeted Darwin ARM64/Windows AMD64 test compilation |
+
+The six native Codex cases ran using the unmodified, installed Linux musl
+`codex-cli 0.163.0` executable, independently SHA-verified as
+`399ff69c431c066e40de318fba45c2b07f45a76b19939d247ee4828fc70c4215`.
+All finite source/executable checks here use synthetic credential homes and
+mock providers; they do not access live OAuth or change the user's profile.
+
+**Conclusion:** finite synthetic Prodex 0.438.2 release parity is **VERIFIED
+for the enumerated cases**. Full production 1:1 remains **PARTIAL**, notably
+the independently unqualified native macOS ARM64 realtime initial-control
+path, genuine OAuth/quota renewal, native model audio/compaction with remote
+provider state, and arbitrary platform/network fault permutations. Cross-
+compilation is not evidence of native runtime execution on macOS/Windows.
