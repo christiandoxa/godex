@@ -10,6 +10,24 @@ import (
 	"testing"
 )
 
+func TestProdex04382FixtureSecurityDiagnosticsNeverReadFileContents(t *testing.T) {
+	root := t.TempDir()
+	for i := range 40 {
+		path := filepath.Join(root, fmt.Sprintf("profile-%02d", i))
+		if err := os.Mkdir(path, 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(path, "auth.json"), []byte("private-fixture-value"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var output bytes.Buffer
+	writeFixtureSecurityMetadata04382(&output, root)
+	if !strings.Contains(output.String(), "auth.json") || strings.Contains(output.String(), "private-fixture-value") || strings.Count(output.String(), "fixture_security") > 44 {
+		t.Fatal("security diagnostics read secret content or exceeded the metadata bound")
+	}
+}
+
 func TestProdex04382OracleFailureLogsAreBoundedAndRedacted(t *testing.T) {
 	root := t.TempDir()
 	logs := filepath.Join(root, "prodex", "state", "logs")

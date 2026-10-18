@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -24,6 +25,37 @@ func createFixtureRoot() (string, error) {
 		return "", fmt.Errorf("canonicalize fixture root: %w", err)
 	}
 	return canonical, nil
+}
+
+func writeFixtureSecurityMetadata04382(output io.Writer, root string) {
+	printPath := func(path string) {
+		info, err := os.Lstat(path)
+		if err == nil {
+			fmt.Fprintf(output, "fixture_security path=%q mode=%s metadata=%+v acl=%s\n", path, info.Mode(), info.Sys(), fixtureSecurityMetadata(path))
+		}
+	}
+	for path, count := root, 0; count < 12; count++ {
+		printPath(path)
+		parent := filepath.Dir(path)
+		if parent == path {
+			break
+		}
+		path = parent
+	}
+	remaining := 32
+	_ = filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return fs.SkipDir
+		}
+		if entry.IsDir() || entry.Name() == "auth.json" || entry.Name() == "runtime-usage-snapshots.json" {
+			printPath(path)
+			remaining--
+		}
+		if remaining == 0 {
+			return fs.SkipAll
+		}
+		return nil
+	})
 }
 
 func writeProdexFailureLogs04382(output io.Writer, root string) {

@@ -852,3 +852,27 @@ and `git diff --check` PASS. All eight release phases also PASS on the
 unchanged clean `10d52248` baseline with the verified Codex app-server opt-in.
 The corrected Windows/macOS executable runs still require native execution;
 the preceding native failures remain explicitly recorded above.
+
+## Native runtime boundary after strict imports — still PARTIAL
+
+All eight Linux release phases and the full native script PASS on exact clean
+`afc37dfa1a4f8ae7f970258861c37f1f972bf818`, retaining the SHA-verified native
+Codex tests and every differential negative control. In the corresponding
+[native CI run](https://github.com/christiandoxa/godex/actions/runs/39117016361),
+Linux, SonarQube and KICS PASS. Windows/macOS Go tests and builds also PASS;
+this includes actual execution of the protected-owner Windows ACL regression.
+The official native executables still fail the first realtime scenario:
+Windows rejects managed auth during runtime; macOS records private-state
+failures and resets its realtime client. Strict import itself succeeds.
+The preceding fixture corrections therefore do not establish native parity.
+
+The next diagnostic checkpoint records bounded file/directory metadata,
+including native Unix UID/mode data and Windows security descriptors, without
+reading auth contents. It examines at most 12 ancestors and 32 fixture entries;
+Windows descriptors are capped at 512 characters. A regression creates 40
+synthetic profiles and verifies the metadata bound and absence of secret-file
+content. This is evidence collection, not a routing, permission-validation or
+reference-binary workaround. No assertion, checksum or pinned artifact changed.
+`rtk go test -race ./tools/continuationparity -count=1 -timeout=90s` PASS:
+112 tests. Windows test cross-compilation, `rtk err make verify` and
+`git diff --check` PASS.

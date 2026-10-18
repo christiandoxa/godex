@@ -220,6 +220,7 @@ func main() {
 		}
 		if err != nil {
 			if spec.name == "prodex" {
+				writeFixtureSecurityMetadata04382(os.Stderr, root)
 				writeProdexFailureLogs04382(os.Stderr, root)
 			}
 			fatal(spec.name + ": " + err.Error())
