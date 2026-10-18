@@ -199,6 +199,12 @@ go test -race ./internal/usecase/routing \
   -run '^TestProdex04382RealtimeDuplexRetainsWeightedPermitUntilClose$' \
   -count=1 -timeout=35s
 
+# Shutdown closes admission before releasing active realtime capacity, so a
+# saturated follower cannot dispatch a model turn while sockets are torn down.
+go test -race ./internal/delivery/http/proxy \
+  -run '^TestProdex04382ProxyShutdownStopsAdmissionBeforeReleasingLivePermit$' \
+  -count=1 -timeout=35s
+
 # Tagged 0.438.2 composes the original request-local precommit watchdog as
 # max(configured stream idle, 30_000 ms). Go must preserve that same budget
 # across hidden WebSocket frames and carry the tuning through its real launcher

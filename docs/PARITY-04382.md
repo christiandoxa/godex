@@ -1,6 +1,6 @@
 # Godex ↔ Prodex 0.438.2 parity checkpoint
 
-Latest qualification: [native shutdown admission mismatch](#native-shutdown-admission-mismatch).
+Latest qualification: [Windows native qualification and first-message calibration](#windows-native-qualification-and-first-message-calibration).
 
 **Target:** official tagged Prodex `0.438.2` source commit
 `decfed45f884fe2bef20911303beab7b198698b7`. **Published** Linux x86_64
@@ -979,3 +979,30 @@ PASS (1,120 tests), and `rtk err make verify` plus `git diff --check` PASS.
 The production change adds one routing lifecycle operation and a private stop
 flag, reusing the existing permit-generation channel and mutex. No shared
 helper or speculative cancellation subsystem was introduced.
+
+## Windows native qualification and first-message calibration
+
+The shutdown production correction is now **VERIFIED on native Windows AMD64**
+in [CI run 39120366803](https://github.com/christiandoxa/godex/actions/runs/39120366803)
+using exact clean `8f72e2ec0a49bc49e1222157e9288a38a6a24038` and the published
+Windows Prodex executable. All six executable modes and native negative
+controls PASS. Both products' realtime shutdown record zero waiting Responses
+handshakes and zero waiting model turns, with one live handshake/control/audio/
+turn/close lifecycle and unchanged `account-a` ownership. Linux and both
+security lanes PASS. macOS ARM64 retains five passing modes and its initial
+realtime reset; the complete CI run therefore still fails that native lane.
+
+The next fixture-only calibration prepares the first masked control frame
+before connecting, then writes it only after the HTTP 101 upgrade. This keeps
+mask preparation outside the reference sidecar's initial 20ms pump without
+changing the payload, timeout policy or protocol ordering. Read failures now
+include bounded preparation/write/reply timing, retaining the underlying error.
+The shared reply reader stays private to the oracle. This is not a macOS PASS
+until its named native execution succeeds.
+
+The release preflight now also runs the deterministic shutdown admission
+regression explicitly. `rtk go test -race ./tools/continuationparity -count=1 -timeout=90s`
+PASS (116 tests); `rtk err make verify`, shell syntax, `git diff --check`,
+and all four realtime close differentials on Linux PASS using the clean
+`8f72e2ec` production candidate. No additional production policy, dependency,
+shared helper or configuration changed in this calibration.

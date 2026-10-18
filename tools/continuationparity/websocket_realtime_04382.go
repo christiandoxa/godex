@@ -114,14 +114,26 @@ func runRealtimeClosure04382(root string, p product, closure string) error {
 	if err != nil {
 		return err
 	}
+	// Prepare masking before the sidecar starts its short post-upgrade pump.
+	preparedAt := time.Now()
+	var initial bytes.Buffer
+	if err := websocketframe.WriteFrame(&initial, 1, []byte(realtimeUpdate04382), true); err != nil {
+		return err
+	}
+	preparedIn := time.Since(preparedAt)
 	live, reader, err := wsConnectURL(liveEndpoint)
 	if err != nil {
 		return err
 	}
 	defer live.Close()
 	_ = live.SetDeadline(time.Now().Add(10 * time.Second))
-	if err := realtimeRoundTrip04382(live, reader, 1, []byte(realtimeUpdate04382), `{"type":"session.updated","session":{"id":"synthetic-live"}}`); err != nil {
-		return fmt.Errorf("session update: %w", err)
+	sentAt := time.Now()
+	if _, err := initial.WriteTo(live); err != nil {
+		return err
+	}
+	sentIn := time.Since(sentAt)
+	if err := readRealtimeReply04382(reader, 1, `{"type":"session.updated","session":{"id":"synthetic-live"}}`); err != nil {
+		return fmt.Errorf("session update (prepare=%s write=%s): %w", preparedIn, sentIn, err)
 	}
 	if err := realtimeRoundTrip04382(live, reader, 1, []byte(realtimeAudio04382), `{"type":"output_audio.delta","delta":"AAEC"}`); err != nil {
 		return fmt.Errorf("audio control: %w", err)
@@ -284,10 +296,15 @@ func realtimeRoundTrip04382(conn io.Writer, reader *bufio.Reader, opcode byte, p
 	if err := writer.Flush(); err != nil {
 		return err
 	}
+	return readRealtimeReply04382(reader, opcode, expected)
+}
+
+func readRealtimeReply04382(reader *bufio.Reader, opcode byte, expected string) error {
+	started := time.Now()
 	for i := 0; i < 4; i++ {
 		frame, data, err := readRealtimeFrame04382(reader)
 		if err != nil {
-			return err
+			return fmt.Errorf("read realtime reply after %s: %w", time.Since(started), err)
 		}
 		if frame.Opcode == 10 {
 			continue
