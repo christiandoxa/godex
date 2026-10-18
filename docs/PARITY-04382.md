@@ -632,3 +632,24 @@ Published macOS/Windows Prodex-versus-Godex realtime/process differentials,
 real OAuth renewal, real provider quota/audio/compaction and arbitrary network
 failures are still OPEN. Synthetic accounts cannot establish those live
 contracts. Overall production-wide 1:1 remains PARTIAL.
+
+## Malformed workspace JSON cannot create a substituted trusted path
+
+The extended two-executable workspace oracle reproduced a Unicode boundary
+gap on clean `43fe307e`: an initial metadata CWD containing an unpaired
+`\uD800` escape is rejected by tagged serde_json, but Go previously replaced
+it with U+FFFD and added the substituted path to the trusted workspace list.
+The official binary kept five expected recent workspaces; Godex's additional
+path failed the exact list assertion. The focused repository regression also
+failed before the fix on that same lone surrogate.
+
+The existing DeepSeek Unicode/depth validator now lives in stateless
+`helper/jsonutil`, consumed by both the DeepSeek gateway and session repository.
+There is one implementation, with the original 127-container bound, valid
+surrogate-pair and escaped-backslash behavior preserved. Session metadata also
+uses Go's finite-number JSON decode before extracting any path, matching the
+tagged rejection of overflow numbers. Focused tests reject high/low unpaired
+surrogates, excessive nesting, malformed UTF-8 and overflow; valid surrogate
+pairs and literal escaped `\\uD800` paths remain accepted. DeepSeek's stable
+public malformed-tool error and terminal SSE behavior are unchanged. No
+credential, saved session or profile config is rewritten.

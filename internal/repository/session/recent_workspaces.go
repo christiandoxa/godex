@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	sessionentity "github.com/christiandoxa/godex/internal/entity/session"
+	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 	"github.com/klauspost/compress/zstd"
 )
 
@@ -162,12 +163,11 @@ func initialWorkspace(ctx context.Context, path string) (string, error) {
 
 func workspaceMetadata(content []byte) (sessionentity.Session, bool) {
 	var report sessionentity.Session
-	var fields map[string]json.RawMessage
-	if json.Unmarshal(content, &fields) != nil {
+	var fields map[string]any
+	if jsonutil.CheckSerdeBoundary(string(content)) != nil || json.Unmarshal(content, &fields) != nil {
 		return report, false
 	}
-	var kind string
-	if raw, ok := fields["type"]; ok && json.Unmarshal(raw, &kind) == nil && kind != "session_meta" && string(raw) != "null" {
+	if kind, ok := fields["type"].(string); ok && kind != "session_meta" {
 		return report, false
 	}
 	applySessionMetadata(&report, content)

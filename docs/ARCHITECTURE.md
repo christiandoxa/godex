@@ -609,7 +609,10 @@ same file/line byte limits. `entity/session` selects 4,096 newest absolute paths
 with stable mtime ties and exact deduplication. `usecase/runtime` consumes this
 reader and its path-alias port, rendering at most 128 KiB of temporary project
 overrides before user arguments. `config` resolves physical working-directory
-input; the composition root injects that resolver. No shared helper is needed.
+input; the composition root injects that resolver. Stateless `helper/jsonutil`
+checks serde_json Unicode/recursion compatibility for both session metadata
+and DeepSeek streamed tool arguments; owning callers validate JSON syntax and
+finite numeric range. It performs no I/O or domain decisions.
 
 The composition root injects the runtime launcher through a narrow consumed
 interface; session workflows do not import the runtime use-case implementation.

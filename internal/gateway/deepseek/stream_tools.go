@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
+	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 )
 
 func deepSeekStreamAddedToolItem(callID, name string) map[string]any {
@@ -81,7 +82,7 @@ func deepSeekValidateStreamToolCall(index uint64, call *deepSeekChatStreamToolCa
 	invalid := func() error {
 		return fmt.Errorf("DeepSeek streamed malformed JSON arguments for tool call `%s` at index %d: invalid JSON", call.name, index)
 	}
-	if deepSeekStreamJSONBoundary043713(arguments) != nil {
+	if jsonutil.CheckSerdeBoundary(arguments) != nil {
 		return invalid()
 	}
 	var value any

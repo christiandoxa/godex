@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -99,5 +100,24 @@ func TestProdex04382WorkspaceLegacyJSONAndInvalidMetadata(t *testing.T) {
 				t.Fatalf("workspace=%q want=%q err=%v", got, tc.want, err)
 			}
 		})
+	}
+}
+
+func TestProdex04382WorkspaceMetadataRejectsInvalidSerdeJSON(t *testing.T) {
+	for _, tail := range []string{
+		`"cwd":"/synthetic/\uD800"`,
+		`"cwd":"/synthetic/\uDC00"`,
+		`"cwd":"/synthetic/valid","value":1e309`,
+		`"cwd":"/synthetic/valid","value":` + strings.Repeat("[", 128) + "0" + strings.Repeat("]", 128),
+	} {
+		content := []byte(`{"id":"synthetic-session",` + tail + `}`)
+		if _, valid := workspaceMetadata(content); valid {
+			t.Fatalf("malformed session JSON accepted: %s", content)
+		}
+	}
+	for _, cwd := range []string{`/synthetic/\uD83D\uDE00`, `/synthetic/\\uD800`} {
+		if report, valid := workspaceMetadata([]byte(`{"id":"synthetic-session","cwd":"` + cwd + `"}`)); !valid || report.CWD == "" {
+			t.Fatal("valid surrogate/escaped path rejected")
+		}
 	}
 }

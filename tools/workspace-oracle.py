@@ -110,11 +110,14 @@ def run_product(root, name, binary, fake, endpoint):
                 ('sessions', 'rollout-new.jsonl', 'newest', 500), ('sessions', 'rollout-duplicate.jsonl', 'newest', 400),
                 ('sessions', 'rollout-relative.jsonl', None, 900), ('sessions', 'rollout-invalid.jsonl', 'invalid', 1000),
                 ('archived_sessions', 'rollout-old.jsonl', 'archived', 100),
-                ('sessions', 'imported-session.jsonl', 'imported', 600)]
+                ('sessions', 'imported-session.jsonl', 'imported', 600),
+                ('sessions', 'rollout-surrogate.jsonl', None, 900)]
     for index, (directory, filename, workspace, modified) in enumerate(fixtures):
         path = home / '.codex' / directory / filename
         cwd = str(root / workspace) if workspace else 'relative/workspace'
         body = json.dumps({'type': 'session_meta', 'payload': {'id': f'01900000-0000-7000-8000-{index + 1:012}', 'cwd': cwd}})
+        if filename == 'rollout-surrogate.jsonl':
+            body = json.dumps({'type': 'session_meta', 'payload': {'id': 'synthetic-unpaired', 'cwd': '/synthetic/unpaired-' + chr(0xD800)}})
         path.write_text(('invalid prefix\n' if workspace == 'invalid' else '') + body +
                         '\n{"type":"turn_context","payload":{"cwd":"/untrusted-later-context"}}\n')
         os.utime(path, (modified, modified))

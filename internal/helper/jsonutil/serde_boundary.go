@@ -1,4 +1,4 @@
-package deepseek
+package jsonutil
 
 import (
 	"errors"
@@ -6,14 +6,14 @@ import (
 	"unicode/utf8"
 )
 
-// deepSeekStreamJSONBoundary043713 enforces the tagged Prodex 0.437.13
-// serde_json/Mojo stream argument boundaries *before* Go's JSON decoder.
+// CheckSerdeBoundary enforces serde_json encoding and recursion boundaries
+// before Go's JSON decoder.
 // Go otherwise replaces unmatched Unicode surrogates and admits nested JSON
 // beyond the 127-container recursion bound. Structural syntax and finite
 // numeric range are still checked by encoding/json at the owning caller.
-func deepSeekStreamJSONBoundary043713(raw string) error {
+func CheckSerdeBoundary(raw string) error {
 	if !utf8.ValidString(raw) {
-		return errors.New("invalid UTF-8 in streamed JSON arguments")
+		return errors.New("invalid UTF-8 in JSON")
 	}
 	depth, insideString := 0, false
 	for pos := 0; pos < len(raw); pos++ {
@@ -31,22 +31,22 @@ func deepSeekStreamJSONBoundary043713(raw string) error {
 				pos++
 				continue
 			}
-			unit, ok := deepSeekStreamUnicodeUnit043713(raw, pos+2)
+			unit, ok := unicodeUnit(raw, pos+2)
 			if !ok {
-				return errors.New("invalid streamed Unicode escape")
+				return errors.New("invalid JSON Unicode escape")
 			}
 			switch {
 			case unit >= 0xD800 && unit <= 0xDBFF:
 				if pos+12 > len(raw) || raw[pos+6:pos+8] != `\u` {
-					return errors.New("unpaired streamed high surrogate")
+					return errors.New("unpaired JSON high surrogate")
 				}
-				next, valid := deepSeekStreamUnicodeUnit043713(raw, pos+8)
+				next, valid := unicodeUnit(raw, pos+8)
 				if !valid || next < 0xDC00 || next > 0xDFFF {
-					return errors.New("unpaired streamed high surrogate")
+					return errors.New("unpaired JSON high surrogate")
 				}
 				pos += 11
 			case unit >= 0xDC00 && unit <= 0xDFFF:
-				return errors.New("unpaired streamed low surrogate")
+				return errors.New("unpaired JSON low surrogate")
 			default:
 				pos += 5
 			}
@@ -54,7 +54,7 @@ func deepSeekStreamJSONBoundary043713(raw string) error {
 			if !insideString {
 				depth++
 				if depth > 127 {
-					return errors.New("streamed JSON nesting exceeds 127 containers")
+					return errors.New("JSON nesting exceeds 127 containers")
 				}
 			}
 		case ']', '}':
@@ -66,7 +66,7 @@ func deepSeekStreamJSONBoundary043713(raw string) error {
 	return nil
 }
 
-func deepSeekStreamUnicodeUnit043713(raw string, offset int) (uint64, bool) {
+func unicodeUnit(raw string, offset int) (uint64, bool) {
 	if offset+4 > len(raw) {
 		return 0, false
 	}
