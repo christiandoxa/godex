@@ -707,3 +707,32 @@ old case passed 40 times; the native macOS failure is recorded rather than
 misrepresented as a locally reproduced production bug. A new native CI run
 is required to qualify the corrected fixture. Full production-wide parity
 remains PARTIAL at the live-provider and native differential boundaries above.
+
+## Final source-qualified checkpoint — clean `81adbb06`
+
+**VERIFIED finite synthetic gate.** Every exact phase command listed above
+was re-executed on the same clean
+`81adbb064e9c16e84be010f20f422e687a8415f7`. All eight phases PASS, including
+the SHA-verified native Codex 0.163.0 preflight option, workspace mutation
+oracle, 30 DeepSeek cases, 13 Gemini cases, eight realtime close/admission
+cases, the 74-attempt inherited WebSocket core and four-attempt absolute
+deadline proof. Both provider reports have `comparison_differences: []`;
+negative controls PASS. `rtk test make verify` and the separately executed
+`./scripts/check-cross-build.sh` PASS for the final code. No dependencies,
+versions, tags or releases changed.
+
+Native [CI run 39114142898](https://github.com/christiandoxa/godex/actions/runs/39114142898)
+also PASS on this exact commit: Linux shuffled race suite/build, macOS portable
+tests/build, Windows portable tests/build/installer smoke, SonarQube and KICS.
+This resolves the recorded Windows test-budget and macOS helper-lifecycle
+failures without dropping assertions. Pushes occurred after local validation,
+before waiting for CI, and remote `main` accepted `81adbb06`.
+
+**PARTIAL overall parity:** native Go CI is now real execution evidence,
+but it does not compare the official macOS/Windows Prodex executables or run
+live external authentication/model traffic. Those platform differentials,
+real OAuth refresh, actual multi-account provider quotas, real audio/model
+compaction and arbitrary failure permutations remain OPEN. No personal
+credentials were accessed and no live inference was performed. The primary
+dirty checkout remains on its original local commit with its WIP preserved;
+all changes were made in isolated worktrees.
