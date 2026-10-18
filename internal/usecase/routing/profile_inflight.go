@@ -156,9 +156,22 @@ func (router *Router) tryExecuteWithProfileInflight(
 	account proxymodel.Account,
 	hardAffinity bool,
 ) (*proxymodel.Response, bool, error) {
+	// The 0.438.2 request-local watchdog covers admission as well as the
+	// upstream attempt. An expired waiter may wake at the same instant a
+	// permit is released; that wakeup must never authorize a late model turn.
+	if err := ctx.Err(); err != nil {
+		return nil, false, err
+	}
 	release, acquired := router.tryAcquireProfileInflight(account.ID, request, hardAffinity)
 	if !acquired {
 		return nil, false, nil
+	}
+	// Context cancellation may happen between capacity checking and the
+	// permit-admission marker. Release that permit BEFORE any gateway send.
+	// Do not record a transport/quota failure for this local cancellation.
+	if err := ctx.Err(); err != nil {
+		release()
+		return nil, true, err
 	}
 	var response *proxymodel.Response
 	var err error

@@ -1006,3 +1006,33 @@ PASS (116 tests); `rtk err make verify`, shell syntax, `git diff --check`,
 and all four realtime close differentials on Linux PASS using the clean
 `8f72e2ec` production candidate. No additional production policy, dependency,
 shared helper or configuration changed in this calibration.
+
+
+## Request deadline versus weighted permit release race (0.438.2)
+
+Prodex 0.438.2's original request-local watchdog must remain authoritative
+through profile admission. A real Godex routing gap was reproduced by three
+**fail-before** regression groups: a canceled request could acquire a fresh
+permit and dispatch inference, a saturated waiter could wake after another
+turn released its permit even though the waiter was already canceled, and
+cancellation in the interval between an admission marker and gateway send
+could still start upstream traffic. The previous `tryExecuteWithProfileInflight`
+relied on downstream context handling and did not check context expiry before
+or after weighted permit acquisition. A deliberately context-insensitive
+synthetic gateway showed the late dispatches without any external account.
+
+The fix performs an initial `ctx.Err()` check before capacity acquisition,
+then a second check immediately after acquisition/marker and **before**
+upstream dispatch, releasing an acquired permit exactly once if cancellation
+arrived during admission. The full request-local deadline and ordinary cancel
+both preserve their original error (`context.DeadlineExceeded` or
+`context.Canceled`); they do not cause quota penalties, transport retries,
+new owner selection or inference replay. The regression suite covers fresh
+and hard-affinity requests, saturation wake concurrent with cancellation,
+cancellation during synchronous admission observation, and already-expired
+wall-clock deadlines. Negative controls require zero downstream calls,
+zero leaked inflight weight and zero release underflows. All cases passed
+repeatedly under Go's race detector after the scoped fix. This is
+**source-aligned local Router behavior**; its own two-executable admission
+expiry boundary fixture remains separate from the existing 30-second hidden
+prelude differential and is not silently certified by those older results.

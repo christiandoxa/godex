@@ -191,6 +191,15 @@ go test ./internal/gateway/openai ./internal/usecase/runtime ./cmd/godex \
   -run '^TestProdex04382(WebSocketCommittedOutputUsesConfiguredStreamIdle|RuntimeLaunchCarriesConfiguredWebSocketCommittedIdle|RuntimeOpenAITransportRetainsWebSocketStreamIdleSetting)$' \
   -count=1 -timeout=30s
 
+# Tagged Prodex 0.438.2 request-local expiry owns admission too. A canceled
+# waiter awakened by a released permit or a context canceled after admission
+# bookkeeping must not dispatch a late model turn or leak the weighted slot.
+# The gateway deliberately ignores context cancellation: the Router is
+# required to enforce expiry before sending, including hard-affinity turns.
+go test -race ./internal/usecase/routing \
+  -run '^TestProdex04382(ExpiredRequestCannotAcquireFreshProfilePermit|ExpiredDeadlineCannotDispatchBoundOrFreshTurn|CanceledWaiterAwakenedByPermitReleaseCannotDispatch|CancellationDuringPermitAdmissionBlocksUpstreamSend)$' \
+  -count=1 -timeout=35s
+
 # Tagged Prodex 0.438.2 realtime duplex must RETAIN its weighted permit
 # while any live binary/audio frames flow. A saturated Responses turn waits
 # on the only ready profile and wakes on the realtime session close. This
