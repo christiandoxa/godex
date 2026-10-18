@@ -34,6 +34,13 @@ func (runner *Runner) RunDirectProfileWithOptions(
 			return err
 		}
 	}
+	if options.SuperOverlay {
+		prepared, err := runner.trustedWorkspaceArguments(ctx, args)
+		if err != nil {
+			return err
+		}
+		args = prepared
+	}
 	if process, ok := runner.process.(directRuntimeProcess); ok {
 		return process.RunRuntimeDirect(ctx, home, args, options.UpstreamNoProxy)
 	}

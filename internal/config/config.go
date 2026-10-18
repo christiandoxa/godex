@@ -63,6 +63,15 @@ func LoadAntigravity() (Config, error) {
 	return Config{AgyBin: resolveAgyBin(), SharedCodexHome: sharedCodexHome}, nil
 }
 
+// Match native current_dir rather than a logical alias inherited through PWD.
+func WorkingDirectory() (string, error) {
+	directory, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	return filepath.EvalSymlinks(directory)
+}
+
 func resolveAgyBin() string {
 	if binary := os.Getenv(AgyBinEnv); binary != "" {
 		return binary

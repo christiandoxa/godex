@@ -49,6 +49,8 @@ type providerCredentialResolver interface {
 type presidioConfigResolver func(context.Context, bool) (*proxyconfig.PresidioConfig, error)
 
 type Runner struct {
+	workspaces          workspaceReader
+	workspace           func() (string, error)
 	accounts            launchAccounts
 	process             codexProcess
 	newProxy            ProxyFactory
@@ -221,6 +223,11 @@ func (runner *Runner) launchHomeWithOptions(
 		if runner == nil || runner.managedProfilesRoot == "" {
 			return errors.New("managed profile root is not configured for Godex Super")
 		}
+		trustedArguments, err := runner.trustedWorkspaceArguments(ctx, arguments)
+		if err != nil {
+			return err
+		}
+		arguments = trustedArguments
 		overlay, err := PrepareSuperOverlay(runner.managedProfilesRoot, home)
 		if err != nil {
 			return err

@@ -133,6 +133,7 @@ func run() int {
 	runner.SetUpstreamURL(settings.UpstreamURL)
 	runner.SetCurrentCodexHome(settings.CurrentCodexHome)
 	runner.SetSharedCodexHome(settings.SharedCodexHome)
+	runner.SetWorkspaceTrust(sessionrepo.NewReader(), config.WorkingDirectory)
 	runner.SetManagedProfilesRoot(filepath.Join(settings.Home, "profiles"))
 	runner.SetPresidioConfigResolver(func(ctx context.Context, required bool) (*proxyconfig.PresidioConfig, error) {
 		return presidiogateway.ResolveForLaunch(ctx, settings.Home, required)

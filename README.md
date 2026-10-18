@@ -441,6 +441,10 @@ Available profile, account, and runtime commands:
 | godex status [--once] [--interval SECONDS] | Show or watch the runtime snapshot. |
 | godex log [stream\|last\|upstream] [--json] | Follow persisted, redacted runtime request events. |
 
+Super runtime launches temporarily trust the current workspace and up to 4,096
+recent absolute session workspaces. These overrides preserve user-supplied
+Codex configuration precedence and do not change the saved profile config.
+
 Quota follows Prodex 0.435.1's aggregate default: unless `--profile` or
 `--raw` is supplied, Godex enables the all-profile detailed view automatically.
 Without `--once`, that view refreshes every five seconds; `--watch` is also

@@ -533,3 +533,39 @@ also passed when run under Go's race detector. It is now mandatory in
 `--phase=websocket-core`; a complete fresh release gate remains a separate
 same-clean-commit requirement. Native Windows/macOS execution, live OAuth,
 real audio inference and arbitrary production failures remain PARTIAL/OPEN.
+
+## Fresh complete finite gate with native realtime — clean `97cd030a`
+
+All eight release phases, `make verify` and the explicit cross-build script
+PASS on clean `97cd030aab45d3b85bd09e655a3f23d9d164aae0`, accepted by remote
+`main`. The SHA-verified native Codex 0.163.0 fixture runs all six cases.
+DeepSeek is 30/30 and Gemini 13/13 with zero differences. WebSocket core keeps
+74 prior attempts plus eight live turns and six admitted realtime followers;
+deadline retains four attempts and exact 30-second 504 errors. Negative
+controls PASS. This supersedes the earlier finite gate for its named cases.
+
+## Recent session workspace trust — reproduced production gap
+
+Tagged `prodex-session-store/src/recent_workspaces.rs` and
+`mojo/prodex_core/session_selector.mojo` select newest initial session CWDs,
+preserve discovery order on mtime ties, skip relative paths, deduplicate exact
+strings and cap selection at 4,096. `runtime_tools/super_trust.rs` injects
+these alongside the current workspace as temporary Codex project overrides.
+Godex previously injected none. `tools/workspace-oracle.py` confirms the
+official binary's current plus four expected recent workspaces, then fails
+the clean pre-fix Godex executable with `expected exactly one temporary
+projects override`. Its negative controls reject missing, duplicate, changed,
+untrusted or malformed project entries. Manifest, source, binary and clean
+candidate VCS provenance are mandatory; no real credentials/model calls occur.
+
+The implementation uses session entity selection, session repository metadata
+and alias reads, runtime use-case orchestration and composition-root wiring.
+Focused Go race tests PASS for ordering, limits, initial versus legacy JSON
+metadata, archive inclusion, cancellation, aliases, physical PWD, escaping,
+user override precedence and direct Super dispatch. The reader retains bounded
+I/O (65,536 directory entries, 4 MiB/file, 512 KiB/line); a failed optional
+history scan keeps current-workspace trust. The 128 KiB argument bound and
+saved profile configuration remain intact. The independent Python oracle is
+mandatory in the PTY release slice; fresh clean-candidate qualification follows
+the scoped implementation commit. Native Windows/macOS execution and histories
+beyond the documented scan bounds remain outside this proof.

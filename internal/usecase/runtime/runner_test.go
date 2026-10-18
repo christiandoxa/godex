@@ -823,11 +823,12 @@ type directSharedPreparingProcess struct {
 	directHome string
 }
 
-func (process *directSharedPreparingProcess) RunRuntimeDirect(_ context.Context, home string, _ []string, _ bool) error {
+func (process *directSharedPreparingProcess) RunRuntimeDirect(_ context.Context, home string, args []string, _ bool) error {
 	if len(process.prepared) != 1 {
 		return errors.New("direct child started before its managed home was prepared")
 	}
 	process.directHome = home
+	process.runArgs = append([]string(nil), args...)
 	return nil
 }
 

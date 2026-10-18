@@ -594,7 +594,7 @@ reference feature and must still satisfy the architecture rules in `AGENTS.md`.
 ## Managed sessions
 
 `repository/session` reads Codex-owned active and archived rollout metadata and
-`session_index.jsonl` thread names. Each profile scan is bounded to 4,096 files,
+`session_index.jsonl` thread names. Each catalog scan is bounded to 4,096 files,
 4 MiB per rollout, 512 KiB per JSON line, and a 16 MiB name index. Symlink roots
 are rejected and symlink rollout entries are skipped. Malformed rollouts without
 valid UUID metadata are skipped; conversation bodies are never returned.
@@ -603,6 +603,14 @@ sorts, resolves unique IDs/prefixes, and preserves profile ownership on resume.
 `model/session` carries queries and reports; `delivery/cli/session` owns flags
 and text/JSON presentation. These packages follow the repository's layer-first,
 domain-second layout. Session helpers remain private to their owning packages.
+For Super workspace trust, `repository/session` separately reads initial rollout
+metadata in native directory order, bounded to 65,536 directory entries and the
+same file/line byte limits. `entity/session` selects 4,096 newest absolute paths
+with stable mtime ties and exact deduplication. `usecase/runtime` consumes this
+reader and its path-alias port, rendering at most 128 KiB of temporary project
+overrides before user arguments. `config` resolves physical working-directory
+input; the composition root injects that resolver. No shared helper is needed.
+
 The composition root injects the runtime launcher through a narrow consumed
 interface; session workflows do not import the runtime use-case implementation.
 

@@ -470,6 +470,13 @@ if [ "$phase" = 'all' ] || [ "$phase" = 'preflight' ] || [ "$phase" = 'preflight
   --prodex-source "$tmp/prodex-source" \
   --godex-source "$root" --godex-commit "$(git rev-parse HEAD)"
 
+# Python standard-library oracle: exact-tagged native Super launches must pass
+# current/recent workspace trust through argv without modifying profile config.
+python3 tools/workspace-oracle.py \
+  --prodex "$tmp/prodex" --prodex-source "$tmp/prodex-source" \
+  --godex "$tmp/godex" --godex-source "$root" \
+  --godex-commit "$(git rev-parse HEAD)"
+
 fi
 fi
 

@@ -6,6 +6,21 @@ import (
 	"testing"
 )
 
+func TestProdex04382WorkingDirectoryResolvesLogicalPWD(t *testing.T) {
+	root := t.TempDir()
+	alias := filepath.Join(root, "logical")
+	if err := os.Symlink(root, alias); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	t.Chdir(alias)
+	t.Setenv("PWD", alias)
+	got, err := WorkingDirectory()
+	want, resolveErr := filepath.EvalSymlinks(root)
+	if err != nil || resolveErr != nil || got != want {
+		t.Fatalf("directory=%q want=%q errors=%v/%v", got, want, err, resolveErr)
+	}
+}
+
 func TestLoadResolvesConfiguredHomeAndCodexBinary(t *testing.T) {
 	t.Setenv(HomeEnv, filepath.Join("relative", "godex"))
 	t.Setenv(CodexBinEnv, "/opt/codex")
