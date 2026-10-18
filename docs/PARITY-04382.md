@@ -1068,3 +1068,43 @@ deadline errors. All local tests pass under repeated Go race detection after
 the fix; active-context retry behavior remains governed by existing Router
 WebSocket tests. This is source-aligned local retry/cancellation protection,
 not an untested claim of full native provider session parity.
+
+## Complete pinned gate after request-expiry admission and retry guards
+
+All **eight individually pinned** Prodex 0.438.2 release phases PASS against
+**one clean Godex commit**, `e897b5358cb376236a0bcf473117d38e1cfa3ee3`,
+using official tagged source
+`decfed45f884fe2bef20911303beab7b198698b7`, the verified published
+Linux x86_64 binary SHA-256
+`3f2fcd776fee0335dc49910d0651adc43a55c8627913556c307755b1575dac3f`
+and its published release manifest. No personal credentials, live model
+service, or destructive mutation of the user's checkout was required.
+
+| Release phase | Result on exact `e897b535` |
+| --- | --- |
+| `--phase=preflight-tests` | PASS, including the two new context-expiry admission/retry negative-control families **and** six SHA-verified official native Codex 0.163.0 app-server cases |
+| `--phase=preflight-oracles-pty` | PASS, official PTY/footer, 14 CLI probes, context and workspace trust oracles |
+| `--phase=preflight-oracles-profiles` | PASS, all 34 managed-profile cases including auth/quota recovery, real Linux FD pressure, admission and queue wake |
+| `--phase=preflight-oracles-history` | PASS, independent continuation/history/replay boundary oracle |
+| `--phase=deepseek` | PASS **30/30**, `comparison_differences: []`, mutation controls PASS |
+| `--phase=gemini` | PASS **13/13**, `comparison_differences: []`, mutation controls PASS |
+| `--phase=websocket-core` | PASS, **56** continuation model attempts (two quota probes separately accounted), **12** completed-idle permit requests, **2** visible committed-idle, **2** 8KiB lookahead-idle, all four realtime closure modes on both binaries and mandatory negative controls |
+| `--phase=websocket-deadline` | PASS, both official binaries issue exact public `504 request_timeout` near **30 seconds** with one original request and one same-local-socket follow-up each, no replay |
+| `make verify` | PASS on the production source: formatting, file-size policy, vet, shuffled Go race suite and executable build |
+| `scripts/check-cross-build.sh` | PASS: Linux AMD64/ARM64, Darwin AMD64/ARM64 and Windows AMD64/ARM64 plus targeted Darwin/Windows test compilation |
+
+The official native Codex 0.163.0 Linux musl binary was loaded from the
+installed npm native package **without modifying it**. Its SHA-256
+`399ff69c431c066e40de318fba45c2b07f45a76b19939d247ee4828fc70c4215`
+was checked before enabling the six app-server/compaction/incomplete/interrupt
+regressions in this exact preflight run.
+
+**Boundary of this result:** the finite synthetic release gate is VERIFIED
+for the named cases, including both newly discovered request-local
+cancel/deadline races. It is not a production-wide 1:1 certification. The
+macOS ARM64 official realtime initial-control reset still lacks a passing
+native two-executable proof; Windows native realtime and its six-mode fixture
+previously passed. Live OAuth/real quota renewal, real external model
+compaction, arbitrary network failures and some platform-specific lifecycle
+behaviors remain PARTIAL/OPEN. Compilation for a platform is not native
+runtime execution on that platform.
