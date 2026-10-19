@@ -30,16 +30,15 @@ func (router *Router) recoverWebSocketTurnStateFullHistory04383(
 		!requestHasReconstructableFullHistory(request) {
 		return proxymodel.Forwarded{}, false, nil
 	}
-	// A ready alternate is required. Never rotate into a quarantined,
-	// exhausted, unregistered, unrelated-provider or capacity-full owner.
-	decision := router.websocketQuotaFallbackDecisionWithContext(request, accounts, failed, true)
-	if decision.kind != websocketQuotaFallbackReady {
-		return proxymodel.Forwarded{}, false, nil
+	// Full history may wait for capacity; quota/auth failures still exclude
+	// the alternate under the existing full-context recovery policy.
+	var fallback []proxymodel.Account
+	for _, candidate := range accounts {
+		if router.websocketQuotaFullContextFallbackRecoverable(request, []proxymodel.Account{candidate}, failed) {
+			fallback = append(fallback, candidate)
+		}
 	}
-	// A cached authenticated negative quota receipt also excludes the
-	// candidate. An idle permit is not sufficient evidence of model quota.
-	if cachedState, present := router.cachedQuotaCheck(decision.account.ID, request.QuotaSelection, router.now()); present &&
-		!cachedState.ready && (cachedState.retryAt.IsZero() || cachedState.retryAt.After(router.now())) {
+	if len(fallback) == 0 {
 		return proxymodel.Forwarded{}, false, nil
 	}
 	owner, err := router.affinity.owner(ctx, affinityKeys{turn: metadata.turnState}, router.now())
@@ -60,6 +59,6 @@ func (router *Router) recoverWebSocketTurnStateFullHistory04383(
 	clean := requestWithoutTurnState(request)
 	// Keep the full body/history and original logical request deadline;
 	// never forward the failed transport's stale turn token to another home.
-	recovered, err := router.forwardFresh(ctx, clean, []proxymodel.Account{decision.account})
+	recovered, err := router.forwardFresh(ctx, clean, fallback)
 	return recovered, true, err
 }

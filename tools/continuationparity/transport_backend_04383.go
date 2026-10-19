@@ -4,6 +4,7 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -32,10 +33,12 @@ type transportBackend04383 struct {
 	invalid    bool
 	warmups    int
 	canceled   chan struct{}
+	busy       chan struct{}
+	occupied   bool
 }
 
 func newTransportBackend04383(scenario string) *transportBackend04383 {
-	b := &transportBackend04383{scenario: scenario, receipts: make(map[string]int), canceled: make(chan struct{}, 1)}
+	b := &transportBackend04383{scenario: scenario, receipts: make(map[string]int), canceled: make(chan struct{}, 1), busy: make(chan struct{}, 1)}
 	b.server = httptest.NewServer(http.HandlerFunc(b.serve))
 	return b
 }
@@ -59,6 +62,11 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if strings.HasSuffix(r.URL.Path, "/responses") && r.Method == http.MethodPost {
+		body, _ := io.ReadAll(io.LimitReader(r.Body, 4096))
+		if strings.Contains(string(body), `"mode":"capacity-blocker"`) {
+			b.holdCapacity04383(w, r)
+			return
+		}
 		b.mu.Lock()
 		b.warmups++
 		b.mu.Unlock()

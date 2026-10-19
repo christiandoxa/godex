@@ -171,6 +171,9 @@ func verifyTransportNegativeOwners04383(p product, scenario string) error {
 	if strings.HasPrefix(scenario, "unbound-") {
 		wantTurn = ""
 	}
+	if scenario == "busy-history" {
+		wantTurn = ""
+	}
 	deadline := time.NewTimer(3 * time.Second)
 	defer deadline.Stop()
 	ticker := time.NewTicker(20 * time.Millisecond)

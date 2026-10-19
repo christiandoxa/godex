@@ -845,3 +845,28 @@ macOS official realtime-sidecar failure, a proven strict compact-followup
 executable negative control, and live OAuth/keyring/provider/network coverage
 remain **OPEN/PARTIAL**. The successful ten-case macOS transport run on
 `5dec0593` does not qualify later commits or the failed realtime mode.
+
+## Full-history recovery waits for a busy healthy alternate
+
+A pinned two-executable comparison on clean `1e7ea486` held second's full
+two-unit capacity with an authenticated HTTP Responses stream. Both profiles
+had applied healthy quota probes before main's full-history WebSocket attempt
+failed before commitment. Official Prodex released the failed turn, retained
+main's session and unrelated response, and waited until the original 30-second
+deadline returned exact `504 request_timeout`. Godex returned `503
+service_unavailable` after 83 ms and retained the failed turn instead.
+
+The fail-before routing regression covers transport and quota failures with
+memory and durable bindings. Full-history recovery now reuses the existing
+full-context candidate policy and fresh-request admission wait. Busy capacity
+does not invalidate an otherwise healthy alternate; quota/auth exclusions,
+history proof, stale-token scrubbing and the original cancellation/deadline
+remain in force. The unsafe-replay tests now use reconstructable history so
+each independent rejection condition is exercised.
+
+The mandatory transport slice adds `busy-history`, its thirteenth scenario.
+It checks the exact timeout, one main inference and handshake, no alternate
+dispatch, an independently live capacity blocker and the final durable owners.
+The blocker uses only synthetic authenticated loopback traffic. Clean-candidate
+qualification follows local checks; this result does not establish native
+macOS realtime or full feature parity.

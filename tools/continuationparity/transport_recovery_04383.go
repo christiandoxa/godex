@@ -14,7 +14,7 @@ import (
 )
 
 func runWebSocketTransportProduct04383(root string, p product) error {
-	for _, scenario := range []string{"full-history", "unbound-history", "quota-history", "unbound-quota-history", "turn-missing", "delta-only", "unbound-delta", "unbound-quota-delta", "previous-response", "postcommit", "cancellation", "deadline"} {
+	for _, scenario := range []string{"full-history", "unbound-history", "quota-history", "unbound-quota-history", "turn-missing", "delta-only", "unbound-delta", "unbound-quota-delta", "previous-response", "postcommit", "cancellation", "deadline", "busy-history"} {
 		if err := runTransportCase04383(filepath.Join(root, scenario), p, scenario); err != nil {
 			return fmt.Errorf("%s: %w", scenario, err)
 		}
@@ -36,6 +36,9 @@ func runTransportCase04383(root string, p product, scenario string) error {
 		}
 	}
 	p.env = append(p.env, "PRODEX_RUNTIME_PROXY_STREAM_IDLE_TIMEOUT_MS=2000", "GODEX_RUNTIME_PROXY_STREAM_IDLE_TIMEOUT_MS=2000", "PRODEX_RUNTIME_LOG_RECORD=true")
+	if scenario == "busy-history" {
+		p.env = append(p.env, "PRODEX_RUNTIME_PROXY_PROFILE_INFLIGHT_HARD_LIMIT=2", "GODEX_RUNTIME_PROXY_PROFILE_INFLIGHT_HARD_LIMIT=2")
+	}
 	b := newTransportBackend04383(scenario)
 	defer b.server.Close()
 	endpoint, stop, err := startTransportLaunch04383(p, b.server.URL+"/backend-api")
@@ -67,6 +70,13 @@ func runTransportCase04383(root string, p product, scenario string) error {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
+	if scenario == "busy-history" {
+		stopBusy, err := startTransportCapacityBlocker04383(p, b, endpoint)
+		if err != nil {
+			return err
+		}
+		defer stopBusy()
+	}
 	connection, reader, err := wsConnectHeaders04383(endpoint+"/responses", "x-codex-turn-state: turn-a\r\nsession_id: sess-transport\r\n")
 	if err != nil {
 		return err
@@ -83,8 +93,14 @@ func runTransportCase04383(root string, p product, scenario string) error {
 	if err := websocketframe.WriteFrame(connection, 1, []byte(body), true); err != nil {
 		return err
 	}
-	if scenario == "deadline" || scenario == "cancellation" || scenario == "postcommit" {
-		return runTransportLifecycle04383(p, b, connection, reader)
+	if scenario == "deadline" || scenario == "cancellation" || scenario == "postcommit" || scenario == "busy-history" {
+		if err := runTransportLifecycle04383(p, b, connection, reader); err != nil {
+			return err
+		}
+		if scenario == "busy-history" {
+			return verifyTransportNegativeOwners04383(p, scenario)
+		}
+		return nil
 	}
 	var frames []string
 	for len(frames) < 2 {

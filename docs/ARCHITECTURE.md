@@ -721,7 +721,11 @@ selected-profile discovery; other opaque transports fail closed. An unbound
 HTTP Responses `previous_response_id` gets one bounded upstream discovery
 attempt. Independently complete WebSocket history may recover a precommit
 transport or quota failure on a Ready alternate, while delta-only input stays with its
-selected profile. Stable thread/session bindings
+selected profile. Full-history recovery uses routing's existing full-context
+candidate policy and admission wait when the healthy alternate is busy. The
+failed turn releases before waiting; the accompanying session and unrelated
+response retain their owners. Admission still uses the original request
+cancellation and precommit deadline. Stable thread/session bindings
 never expire or get evicted. The snapshot allows 8,192 total bindings; it evicts old opaque response/turn digests
 and refuses new conversations if protected bindings fill the store. Opaque
 entries expire after 30 days. Conflicting concurrent ownership updates fail.

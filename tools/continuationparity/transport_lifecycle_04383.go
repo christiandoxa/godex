@@ -21,7 +21,7 @@ type transportLifecycleResult04383 struct {
 func runTransportLifecycle04383(p product, b *transportBackend04383, connection net.Conn, reader *bufio.Reader) error {
 	result := transportLifecycleResult04383{scenario: b.scenario}
 	switch b.scenario {
-	case "deadline":
+	case "deadline", "busy-history":
 		_ = connection.SetDeadline(time.Now().Add(34 * time.Second))
 		start := time.Now()
 		var err error
@@ -73,6 +73,9 @@ func runTransportLifecycle04383(p product, b *transportBackend04383, connection 
 	}
 	b.mu.Lock()
 	result.invalid = b.invalid
+	if b.scenario == "busy-history" && !b.occupied {
+		result.invalid = true
+	}
 	result.attempts = append([]transportAttempt04383(nil), b.attempts...)
 	result.handshakes = append([]string(nil), b.handshakes...)
 	b.mu.Unlock()
@@ -88,8 +91,12 @@ func verifyTransportLifecycle04383(result transportLifecycleResult04383) error {
 		return fmt.Errorf("%s replayed or changed context: handshakes=%v attempts=%+v", result.scenario, result.handshakes, result.attempts)
 	}
 	switch result.scenario {
-	case "deadline":
-		if result.code != "request_timeout" || result.status != 504 || result.message != "request timed out" || result.heartbeats < 1 || result.heartbeats > 40 || result.elapsed < 27500*time.Millisecond || result.elapsed > 31*time.Second {
+	case "deadline", "busy-history":
+		minimumHeartbeats := 1
+		if result.scenario == "busy-history" {
+			minimumHeartbeats = 0
+		}
+		if result.code != "request_timeout" || result.status != 504 || result.message != "request timed out" || result.heartbeats < minimumHeartbeats || result.heartbeats > 40 || result.elapsed < 27500*time.Millisecond || result.elapsed > 31*time.Second {
 			return fmt.Errorf("full-history deadline mutated: %s/%d/%s heartbeats=%d elapsed=%s", result.code, result.status, result.message, result.heartbeats, result.elapsed)
 		}
 	case "cancellation":
