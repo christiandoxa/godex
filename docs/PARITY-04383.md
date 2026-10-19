@@ -449,3 +449,31 @@ cross-profile recovery. The experimental fixture remains off `main` and out
 of the release gate until Ready-profile evidence and exact owner provenance
 are independently established on both executables. Native Windows/macOS,
 live OAuth, keyring and unbounded production fault coverage remain partial.
+
+## Terminal precommit transport failure must reach the client
+
+The independent recovery investigation found why the earlier `gateway`
+experiment had no alternate: that command intentionally fixes the runtime
+pool to its active profile in both products. A managed `run` launch, with
+two isolated synthetic profiles, authenticated loopback quota receipts and
+an explicit main-owned turn, instead performs the expected two-attempt
+full-history recovery on both pinned executables. This also preserves large
+JSON integers, tool arguments, and the exact visible completion frames.
+
+Its delta-only negative control exposed a real discrepancy on clean baseline
+`46d8b0fe`: published Prodex returns a terminal `503 service_unavailable`,
+while Godex forwards an empty typed transport attempt and leaves the client
+waiting. Both the bound-owner and exhausted-fresh finalization paths now
+replace a terminal precommit WebSocket transport attempt with the same public
+503 envelope and retry-budget message. Routing remains the sole retry owner;
+the transport still returns typed empty attempts for safe recovery decisions.
+No alternate inference or affinity release is added for delta-only input.
+
+`TestProdex04383DeltaOnlyTransportFailureReturnsTerminal503WithoutReplay`
+and `TestProdex04383FreshExhaustedWebSocketTransportFailureReturnsTerminal503`
+failed before this repair with HTTP 502 and an empty body. Focused regression
+and race checks pass after it. Committed output, realtime duplex, ordinary
+HTTP and application-error responses retain their existing finalization.
+The investigation's new executable fixture is still being qualified,
+including durable session-state and unsafe-replay controls; this checkpoint
+does not close the full transport-recovery gap or certify FULL parity.

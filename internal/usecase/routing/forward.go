@@ -303,6 +303,7 @@ func pendingForwarded(
 	outcome responseOutcome,
 	pending *pendingResponse,
 ) proxymodel.Forwarded {
+	pending.finishWebSocketTransportFailure()
 	pending.commitStream()
 	return proxymodel.Forwarded{
 		Response: pending.response, Prefix: pending.prefix, AccountID: accountID,

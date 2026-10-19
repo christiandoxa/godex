@@ -371,6 +371,7 @@ func finishFresh(last **pendingResponse) (proxymodel.Forwarded, error) {
 		pending.close()
 		return proxymodel.Forwarded{Response: staleResponsesContinuationResponse(), AccountID: pending.accountID, Failed: true}, nil
 	}
+	pending.finishWebSocketTransportFailure()
 	pending.commitStream()
 	return proxymodel.Forwarded{Response: pending.response, Prefix: pending.prefix, AccountID: pending.accountID, Failed: true}, nil
 }
