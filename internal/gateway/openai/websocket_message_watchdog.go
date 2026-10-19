@@ -3,6 +3,7 @@ package openai
 import (
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	"io"
+	"net"
 	"sync"
 	"time"
 )
@@ -18,6 +19,7 @@ type websocketReadWatchdog struct {
 	closed    bool
 	expired   bool
 	committed bool
+	reading   bool
 }
 
 func newWebSocketReadWatchdog(connection io.ReadWriteCloser, timeout time.Duration) *websocketReadWatchdog {
@@ -30,18 +32,73 @@ func newWebSocketReadWatchdog(connection io.ReadWriteCloser, timeout time.Durati
 	return watchdog
 }
 
+type websocketDeadlineSetter04383 interface {
+	SetReadDeadline(time.Time) error
+}
+
+// A queued TCP/TLS frame must be checked BEFORE classifying the connection
+// as idle. Prodex 0.438.3 explicitly drains an already-buffered terminal
+// frame before applying its timeout; a Go timer closing an unread socket
+// discarded response.completed/failed while local delivery was busy.
 func (watchdog *websocketReadWatchdog) Read(buffer []byte) (int, error) {
-	count, err := watchdog.connection.Read(buffer)
-	if count > 0 {
-		watchdog.noteProgress()
-	}
-	if count == 0 && err != nil {
-		watchdog.mu.Lock()
-		committedExpiry := watchdog.expired && watchdog.committed
+	watchdog.mu.Lock()
+	if watchdog.closed {
+		committed := watchdog.expired && watchdog.committed
 		watchdog.mu.Unlock()
-		if committedExpiry {
+		if committed {
 			return 0, proxymodel.ErrWebSocketCommittedIdleTimeout
 		}
+		return 0, net.ErrClosed
+	}
+	// A timer that expired when NO read was pending leaves the socket live
+	// long enough for one bounded, readiness-like buffered-data probe.
+	// SetReadDeadline only if supported (net.Conn and tls.Conn); never use
+	// blocking SO_RCVTIMEO on Windows and never update the logical watchdog.
+	deferred := watchdog.expired
+	deadlineConn, hasDeadline := watchdog.connection.(websocketDeadlineSetter04383)
+	if deferred && hasDeadline {
+		if err := deadlineConn.SetReadDeadline(time.Now().Add(5 * time.Millisecond)); err != nil {
+			watchdog.closed = true
+			watchdog.mu.Unlock()
+			_ = watchdog.connection.Close()
+			return 0, err
+		}
+	}
+	watchdog.reading = true
+	watchdog.mu.Unlock()
+	count, err := watchdog.connection.Read(buffer)
+	if deferred && hasDeadline {
+		_ = deadlineConn.SetReadDeadline(time.Time{})
+	}
+	watchdog.mu.Lock()
+	watchdog.reading = false
+	if count > 0 && deferred && !watchdog.closed {
+		watchdog.expired = false
+	}
+	expired := watchdog.expired
+	committed := watchdog.committed
+	watchdog.mu.Unlock()
+	if count > 0 {
+		watchdog.noteProgress()
+		return count, err
+	}
+	if deferred {
+		watchdog.mu.Lock()
+		if !watchdog.closed {
+			watchdog.closed = true
+		}
+		watchdog.mu.Unlock()
+		_ = watchdog.connection.Close()
+		if committed {
+			return 0, proxymodel.ErrWebSocketCommittedIdleTimeout
+		}
+		if err != nil {
+			return 0, err
+		}
+		return 0, net.ErrClosed
+	}
+	if err != nil && expired && committed {
+		return 0, proxymodel.ErrWebSocketCommittedIdleTimeout
 	}
 	return count, err
 }
@@ -85,6 +142,7 @@ func (watchdog *websocketReadWatchdog) setTimeoutPhase04382(timeout time.Duratio
 		return
 	}
 	watchdog.committed = committed
+	watchdog.expired = false
 	watchdog.timeout = timeout
 	watchdog.deadline = time.Now().Add(timeout)
 	watchdog.paused = false
@@ -135,8 +193,18 @@ func (watchdog *websocketReadWatchdog) expire() {
 		watchdog.mu.Unlock()
 		return
 	}
-	watchdog.closed = true
 	watchdog.expired = true
+	// If application-side state persistence delayed its NEXT read while a
+	// terminal frame arrived in the kernel buffer, keep the connection long
+	// enough to perform a single nonblocking-style read at that boundary.
+	// An ACTIVE blocked read still expires immediately, preserving genuine
+	// silence semantics. Non-deadline transports retain legacy closure.
+	_, canProbe := watchdog.connection.(websocketDeadlineSetter04383)
+	if !watchdog.reading && canProbe {
+		watchdog.mu.Unlock()
+		return
+	}
+	watchdog.closed = true
 	watchdog.mu.Unlock()
 	_ = watchdog.connection.Close()
 }

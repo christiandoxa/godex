@@ -606,6 +606,15 @@ if [ "$phase" = 'all' ] || [ "$phase" = 'websocket' ] || [ "$phase" = 'websocket
   --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
   --websocket
 
+# Tagged 0.438.3 polls an upstream socket for already-queued terminal frames
+# before an elapsed idle clock can declare the stream dead. Preserve an
+# already-buffered completed/failed frame after a slow synchronous commit,
+# but still time out a genuinely silent connection (including no active
+# reader), without labeling precommit expiry as committed-stream idle.
+go test -race ./internal/gateway/openai \
+  -run '^TestProdex04383(QueuedTerminalBeatsExpiredCommittedIdle|GenuinelySilentCommittedStreamStillTimesOut|ExpiredQuietSocketWithoutActiveReaderStillTimesOut|ExpiredQuietSocketBeforeCommitIsNotCommittedIdle)$' \
+  -count=1 -timeout=35s
+
 # Prodex 0.438.3 sends EMPTY local-client Ping control frames at bounded
 # 1000ms intervals while safely holding precommit metadata or waiting on a
 # quiet committed Responses stream. Pong is masked client-side and must not

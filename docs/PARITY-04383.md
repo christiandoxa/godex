@@ -176,3 +176,38 @@ hidden precommit output leaks. A heartbeat may not convert a terminal idle
 failure into indefinite progress. These changes should be requalified on
 one clean Godex commit against the official Prodex 0.438.3 executable before
 claiming the new liveness differential VERIFIED.
+
+
+## 0.438.3 readiness check before upstream idle expiry — bounded local fix
+
+The tagged 0.438.3 `websocket/response_tracking/readiness.rs` policy checks
+for ready/queued upstream bytes before treating the upstream idle clock as a
+terminal timeout. A Godex read watchdog previously closed a TCP/TLS
+connection from its timer even when no application read was pending and the
+OS already had a complete `response.completed` or `response.failed` frame
+queued in the receive buffer. A slow synchronous state-persistence interval
+could therefore hide a real terminal response behind a synthetic timeout.
+
+`TestProdex04383QueuedTerminalBeatsExpiredCommittedIdle` reproduces that
+case with a real loopback TCP socket, two exact terminal frame variants,
+and a deliberately delayed next application read. The bounded Go fix
+indicates a deferred expiry when no read is active and the transport
+supports `SetReadDeadline`. On the next read it performs **one short,
+non-blocking-style queued-data probe** before classifying the original idle
+boundary. Already buffered bytes are preserved and start a new progress
+interval; a socket with no queued bytes closes and reports the configured
+committed idle timeout. When a read is already blocked at expiry, the old
+prompt close behavior is unchanged. Non-deadline-capable readers stay on the
+legacy close path. The probe never extends a logical request's original
+precommit deadline, does not create replay rights, and cannot mutate quota.
+
+`TestProdex04383GenuinelySilentCommittedStreamStillTimesOut`,
+`TestProdex04383ExpiredQuietSocketWithoutActiveReaderStillTimesOut`, and
+`TestProdex04383ExpiredQuietSocketBeforeCommitIsNotCommittedIdle` are negative
+controls for silence, bounded delayed reads, and distinct precommit error
+ownership. All local cases passed repeated Go `-race` runs, including true
+TCP queued-data delivery; they do not certify TLS partial-record buffering,
+native macOS/Windows poll behavior, or arbitrary upstream handshake failures.
+A native official-binary differential for this exact readiness race remains
+**PARTIAL** until the same queued-terminal timing can be controlled in both
+published executables.
