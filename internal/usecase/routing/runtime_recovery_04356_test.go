@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -422,6 +423,7 @@ func TestProdex04356CompactPreviousAffinityRetryableFailuresSignalFullContext(t 
 		{name: "auth", status: 401, body: `{"error":{"code":"authentication_error"}}`},
 		{name: "profile unavailable", status: 403, body: `{"detail":{"code":"deactivated_workspace"}}`},
 		{name: "transport", err: errors.New("connection reset by peer")},
+		{name: "empty HTTP response", err: &url.Error{Op: "Post", URL: "https://upstream.test/responses/compact", Err: io.EOF}},
 	}
 	for _, fixture := range fixtures {
 		t.Run(fixture.name, func(t *testing.T) {
@@ -492,6 +494,7 @@ func TestProdex04356CompactSessionRetryableFailuresRotateAndRebind(t *testing.T)
 		{name: "auth", status: 401, body: `{"error":{"code":"authentication_error"}}`},
 		{name: "profile unavailable", status: 403, body: `{"detail":{"code":"deactivated_workspace"}}`},
 		{name: "transport", err: errors.New("connection reset by peer")},
+		{name: "empty HTTP response", err: &url.Error{Op: "Post", URL: "https://upstream.test/responses/compact", Err: io.EOF}},
 	}
 	for _, fixture := range fixtures {
 		t.Run(fixture.name, func(t *testing.T) {

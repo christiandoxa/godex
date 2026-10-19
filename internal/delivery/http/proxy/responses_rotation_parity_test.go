@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -427,7 +428,21 @@ func TestProxyResponsesRecoversAfterPrecommitTransportFailures(t *testing.T) {
 		_, _ = io.WriteString(writer, "recovered")
 	}))
 	defer upstream.Close()
-	proxy := newTestProxy(t, upstream.URL, accounts)
+	started := time.Unix(20_000, 0)
+	var clock atomic.Int64
+	clock.Store(started.UnixNano())
+	proxy := newParityProxyWithConfig(t, ProxyConfig{
+		ListenAddr: "127.0.0.1:0", UpstreamURL: upstream.URL,
+		Accounts: func(context.Context) ([]RuntimeAccount, error) { return accounts, nil },
+		Now:      func() time.Time { return time.Unix(0, clock.Load()) },
+		Wait: func(ctx context.Context, delay time.Duration) error {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			clock.Add(int64(delay))
+			return nil
+		},
+	})
 	response := doProxyJSON(t, proxy.URL+"/responses", `{}`, nil)
 	body, err := io.ReadAll(response.Body)
 	_ = response.Body.Close()
@@ -437,6 +452,9 @@ func TestProxyResponsesRecoversAfterPrecommitTransportFailures(t *testing.T) {
 	want := []string{"Bearer token-a", "Bearer token-b", "Bearer token-a", "Bearer token-b", "Bearer token-a"}
 	if response.StatusCode != http.StatusOK || string(body) != "recovered" || !reflect.DeepEqual(seen, want) {
 		t.Fatalf("transport recovery = %d %q, attempts %#v", response.StatusCode, body, seen)
+	}
+	if elapsed := time.Unix(0, clock.Load()).Sub(started); elapsed < 15*time.Second {
+		t.Fatalf("transport recovery bypassed its cooldown: %s", elapsed)
 	}
 }
 

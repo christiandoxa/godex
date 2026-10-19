@@ -120,17 +120,21 @@ func TestTransportBackoffDoublesToTaggedMaximum(t *testing.T) {
 
 func TestIsTransportFailureUsesTypedNetworkCauses(t *testing.T) {
 	for name, err := range map[string]error{
-		"network reset":  &url.Error{Op: "Get", URL: "https://upstream.test", Err: &net.OpError{Op: "dial", Err: errors.New("connection reset")}},
-		"read timeout":   &net.OpError{Op: "read", Err: osTimeoutError{}},
-		"unexpected eof": io.ErrUnexpectedEOF,
+		"network reset":       &url.Error{Op: "Get", URL: "https://upstream.test", Err: &net.OpError{Op: "dial", Err: errors.New("connection reset")}},
+		"read timeout":        &net.OpError{Op: "read", Err: osTimeoutError{}},
+		"unexpected eof":      io.ErrUnexpectedEOF,
+		"empty HTTP response": &url.Error{Op: "Post", URL: "https://upstream.test/responses/compact", Err: io.EOF},
 	} {
 		if !isTransportFailure(err) {
 			t.Errorf("%s was not classified as transport failure", name)
 		}
 	}
 	for name, err := range map[string]error{
-		"application error":   errors.New("invalid request"),
-		"caller cancellation": context.Canceled,
+		"application error":      errors.New("invalid request"),
+		"caller cancellation":    context.Canceled,
+		"normal reader eof":      io.EOF,
+		"untyped eof text":       errors.New("EOF"),
+		"HTTP application error": &url.Error{Op: "Post", URL: "https://upstream.test", Err: errors.New("invalid request")},
 	} {
 		if isTransportFailure(err) {
 			t.Errorf("%s was classified as transport failure", name)

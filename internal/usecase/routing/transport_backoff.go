@@ -92,8 +92,8 @@ func isTransportFailure(err error) bool {
 		return true
 	}
 	for cause := err; cause != nil; cause = errors.Unwrap(cause) {
-		if _, wrappedURL := cause.(*url.Error); wrappedURL {
-			if transportFailureMessage(cause.Error()) {
+		if requestError, wrappedURL := cause.(*url.Error); wrappedURL {
+			if errors.Is(requestError.Err, io.EOF) || transportFailureMessage(cause.Error()) {
 				return true
 			}
 			continue

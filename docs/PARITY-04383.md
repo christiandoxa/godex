@@ -986,3 +986,45 @@ bounded lock wait, successful write after lock release and cancellation with
 the trigger still unopened. Focused race checks and twenty repeated recovery
 and cancellation runs passed. Native Windows confirmation remains required;
 this fixture repair does not certify the separate managed-launch issue.
+
+The complete default release gate subsequently passed on clean
+`2022bfb055c2cf0d152acf8286d9c20f8d392b8d`, including the thirteen-case
+transport slice and HTTP keep-alive mode. Native Windows job `118177903636`
+in run `39287310068` passed all eight executable modes on that same commit,
+including managed transport launches and keep-alive renewal. This successful
+run does not explain the earlier intermittent launch failures. On `68182776`,
+both portable lanes passed ordinary Go tests, including the repaired live-goal
+fixtures; their native executable modes were still running at this checkpoint.
+The separate Sonar lane failed coverage generation in
+`TestProdex04355DeepSeekStreamIdleResetsAfterEachChunk`; it did not reach its
+quality analysis. That timing failure remains unresolved here.
+
+## Recognize an empty HTTP response as a transport failure
+
+A synthetic paired-executable experiment on clean `68182776` established two
+authenticated Ready profiles, retained main's turn owner, then closed its
+Compact HTTP connection before any response headers. Official Prodex retried
+second with the same opaque request and returned 200; a previous-response
+dependency instead returned exact 400 `previous_response_not_found` without
+dispatching second. Godex returned 502 in both cases and retained main's owner.
+
+Go's HTTP client reports this failure as a typed `url.Error` wrapping `io.EOF`.
+Routing incorrectly rejected that cause, bypassing its existing transport
+backoff and bound-recovery policy. The shared classifier now recognizes that
+typed HTTP failure. Bare reader EOF and untyped `EOF` text remain ordinary
+end-of-input evidence, and caller cancellation still prevents recovery.
+Fail-before classifier and Compact session/previous-response regressions
+cover the missed branch. No gateway, delivery, model or helper API changes.
+
+The first three-package race run timed out in the existing multi-sweep HTTP
+recovery test once EOF started applying real transport cooldowns; its concurrent
+`make verify` was stopped. The fixture now advances its injected clock across
+those waits and also requires at least one full transport cooldown. Its five
+dispatches and final output are unchanged. The repaired three-package race
+suite passed 1,213 tests, twenty repeated HTTP recovery checks passed, and the
+final `make verify` passed. Clean-candidate executable confirmation follows.
+
+The experiment also exposed turn-only Compact recovery as a separate open
+case: it has no session key, so its bound fallback guard currently rejects
+recovery even after transport classification. No strict compact-followup
+WebSocket qualification or FULL parity is claimed by these observations.
