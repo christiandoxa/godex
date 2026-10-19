@@ -147,6 +147,11 @@ func (router *Router) handleBoundWebSocketRetryable(
 	pending *pendingResponse,
 ) (proxymodel.Forwarded, error) {
 	metadata := routedWebSocketRequestMetadata(request)
+	if result, handled, err := router.recoverWebSocketTurnStateTransport04383(
+		ctx, request, accounts, account, metadata, outcome, pending,
+	); handled || err != nil {
+		return result, err
+	}
 
 	if metadata.previousResponseID != "" {
 		decision := router.websocketQuotaFallbackDecisionWithContext(
