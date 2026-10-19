@@ -42,6 +42,11 @@ reject lost auth evidence, extra requests/handshakes, changed owners, rounded
 integers, stale tokens, altered output and empty terminal responses.
 Their durable snapshots also require the session to remain on main. Delta-only
 failure retains both hard bindings; the previous-response signal releases them.
+The `turn-missing` case has a turn token but no previous-response ID and receives
+an upstream missing-response error. It retries on second with the entire opaque
+request unchanged, retains the original turn on main, records the new response
+on second and persists the session conflict. This differs from a transport fault,
+which removes the failed turn token before replay.
 Run `./scripts/verify-release-parity.sh --phase=websocket-transport` for this
 source/binary/manifest-pinned slice. Strict compact-followup setup and native
 macOS/Windows qualification remain separate from the Linux release gate.

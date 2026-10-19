@@ -54,20 +54,24 @@ func seedTransportAlternate04383(p product) error {
 	return writeJSONFile(path, state)
 }
 
-func verifyTransportDurable04383(p product, recoveryEvent string) error {
+func verifyTransportDurable04383(p product, scenario, recoveryEvent string) error {
+	wantTurn := ""
+	if scenario == "turn-missing" {
+		wantTurn = "main"
+	}
 	deadline := time.NewTimer(3 * time.Second)
 	defer deadline.Stop()
 	ticker := time.NewTicker(20 * time.Millisecond)
 	defer ticker.Stop()
 	for {
 		owners, err := readTransportOwners04383(p)
-		if err == nil && owners["turn"] == "" && owners["response"] == "second" && owners["unrelated"] == "main" && owners["session"] == "__prodex_hard_binding_conflict__" {
+		if err == nil && owners["turn"] == wantTurn && owners["response"] == "second" && owners["unrelated"] == "main" && owners["session"] == "__prodex_hard_binding_conflict__" {
 			if p.name == "prodex" {
 				if err := verifyTransportReadyLog04383(p, recoveryEvent); err != nil {
 					return err
 				}
 			}
-			fmt.Printf("%s durable transport snapshot: failed turn absent; recovered response=second; unrelated response=main; session snapshot=%q\n", p.name, owners["session"])
+			fmt.Printf("%s durable transport snapshot: original turn=%q; recovered response=second; unrelated response=main; session snapshot=%q\n", p.name, owners["turn"], owners["session"])
 			return nil
 		}
 		select {
@@ -169,6 +173,10 @@ func verifyTransportNegativeOwners04383(p product, scenario string) error {
 }
 
 func verifyTransportReadyLog04383(p product, recoveryEvent string) error {
+	recoveryMarker := recoveryEvent + " profile=main affinity_released=true"
+	if recoveryEvent == "previous_response_not_found" {
+		recoveryMarker = recoveryEvent + " profile=main retry_index=0 replay_turn_state=None"
+	}
 	paths, err := filepath.Glob(filepath.Join(p.state, "logs", "prodex-runtime-*.log"))
 	if err != nil {
 		return err
@@ -180,7 +188,7 @@ func verifyTransportReadyLog04383(p product, recoveryEvent string) error {
 		}
 		recovery, ready := false, false
 		for _, line := range strings.Split(string(data), "\n") {
-			recovery = recovery || strings.Contains(line, recoveryEvent+" profile=main affinity_released=true")
+			recovery = recovery || strings.Contains(line, recoveryMarker)
 			ready = ready || (strings.Contains(line, "selection_keep_current route=websocket profile=second") && strings.Contains(line, "quota_source=probe_cache") && strings.Contains(line, "quota_band=quota_healthy"))
 		}
 		if recovery && ready {

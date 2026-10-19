@@ -89,7 +89,12 @@ func (router *Router) forwardBound(
 		return result, nil
 	}
 	if request.WebSocketMessage {
-		return router.handleBoundWebSocketResponse(ctx, request, accounts, account, response)
+		result, err := router.handleBoundWebSocketResponse(ctx, request, accounts, account, response)
+		if err == nil && result.AccountID != account.ID && keys != nil {
+			// Replaying a requested token does not verify its owner on the alternate.
+			keys.turn = ""
+		}
+		return result, err
 	}
 	if failed {
 		return router.legacyBoundResponse(ctx, request, account, response, true), nil

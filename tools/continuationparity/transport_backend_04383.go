@@ -97,6 +97,10 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 	b.attempts = append(b.attempts, transportAttempt04383{owner: owner, turn: r.Header.Get("x-codex-turn-state"), body: string(payload), ready: b.receipts["account-a"] > 0 && b.receipts["account-b"] > 0})
 	b.mu.Unlock()
 	if owner == "account-a" {
+		if b.scenario == "turn-missing" {
+			_ = websocketframe.WriteFrame(connection, 1, []byte(`{"type":"error","status":400,"error":{"code":"previous_response_not_found","message":"synthetic missing"}}`), false)
+			return
+		}
 		if b.scenario == "deadline" {
 			_ = connection.SetDeadline(time.Now().Add(40 * time.Second))
 			serveHiddenPreludeDeadline04382(connection)

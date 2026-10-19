@@ -13,7 +13,7 @@ func TestProdex04383TransportOracleRejectsMaterialMutations(t *testing.T) {
 	}
 	frames := []string{transportDelta04383, transportCompleted04383}
 	owners := []string{"account-a", "account-b"}
-	if err := verifyTransportRecovery04383(owners, base, frames, false); err != nil {
+	if err := verifyTransportRecovery04383("full-history", owners, base, frames, false); err != nil {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
@@ -71,10 +71,30 @@ func TestProdex04383TransportOracleRejectsMaterialMutations(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			a, h, f, invalid := tc.mutate(append([]transportAttempt04383(nil), base...), append([]string(nil), owners...), append([]string(nil), frames...))
-			if err := verifyTransportRecovery04383(h, a, f, invalid); err == nil {
+			if err := verifyTransportRecovery04383("full-history", h, a, f, invalid); err == nil {
 				t.Fatal("material transport mutation escaped the oracle")
 			}
 		})
+	}
+}
+
+func TestProdex04383MissingResponseOracleKeepsOpaqueTurnOnReplay(t *testing.T) {
+	base := []transportAttempt04383{
+		{owner: "account-a", turn: "turn-a", body: transportHistory04383, ready: true},
+		{owner: "account-b", turn: "turn-a", body: transportHistory04383, ready: true},
+	}
+	for _, mutation := range []string{"none", "header", "metadata"} {
+		attempts := append([]transportAttempt04383(nil), base...)
+		if mutation == "header" {
+			attempts[1].turn = ""
+		}
+		if mutation == "metadata" {
+			attempts[1].body = strings.ReplaceAll(transportHistory04383, `"x-codex-turn-state":"turn-a",`, "")
+		}
+		err := verifyTransportRecovery04383("turn-missing", []string{"account-a", "account-b"}, attempts, []string{transportDelta04383, transportCompleted04383}, false)
+		if (err == nil) != (mutation == "none") {
+			t.Fatalf("missing-response turn mutation %s: %v", mutation, err)
+		}
 	}
 }
 

@@ -22,14 +22,14 @@ func (router *Router) rotateTurnOrSessionOnlyWebSocketPreviousResponse(
 		(metadata.turnState == "" && metadata.sessionID == "") {
 		return proxymodel.Forwarded{}, false, nil
 	}
-	if err := router.affinity.forgetOwned(
-		ctx,
-		account.ID,
-		affinityKeys{turn: metadata.turnState, session: metadata.sessionID},
-		router.now(),
-	); err != nil {
-		closePendingResponse(pending)
-		return proxymodel.Forwarded{}, true, err
+	// No previous ID was supplied, so its error does not invalidate a hard turn.
+	if metadata.turnState == "" {
+		if err := router.affinity.forgetOwned(
+			ctx, account.ID, affinityKeys{session: metadata.sessionID}, router.now(),
+		); err != nil {
+			closePendingResponse(pending)
+			return proxymodel.Forwarded{}, true, err
+		}
 	}
 
 	fallback := make([]proxymodel.Account, 0, len(accounts))

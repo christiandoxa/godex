@@ -315,11 +315,12 @@ func (router *Router) forwardWithoutWatchdog(ctx context.Context, request proxym
 		defer durableRelease()
 	}
 	restorePreviousResponseTurnState(ctx, &request, accounts, owner, &keys, router.affinity, router.now())
+	softSessionAffinity := keys.hasSoftSessionAffinity(request.QuotaSelection)
 	result, err := router.routeRequest(ctx, request, accounts, owner, &keys)
 	if err != nil {
 		return nil, err
 	}
-	if owner != "" && keys.hasSoftSessionAffinity(request.QuotaSelection) &&
+	if owner != "" && softSessionAffinity &&
 		result.AccountID != owner && result.Response != nil && !result.Failed && result.Response.StatusCode < 400 {
 		if err := router.affinity.forgetOwned(ctx, owner, affinityKeys{session: keys.session}, router.now()); err != nil {
 			_ = result.Response.Body.Close()

@@ -746,6 +746,12 @@ An accompanying session claim remains with its owner until a later routing
 decision or successful replay resolves it. Soft-session rotation retains its
 separate release operation.
 
+A WebSocket missing-response error without a requested previous-response ID
+does not invalidate an existing turn owner. Recovery may send the unchanged
+opaque request to an alternate, but the requested turn token does not verify
+ownership there. Routing retains the original hard owner and observes new
+upstream response/turn evidence separately.
+
 The routing repository also exposes a first-owner OS guard to the routing use
 case. Independent processes re-read ownership under that guard before an upstream
 attempt and commit the binding before releasing it. The guard is global only for

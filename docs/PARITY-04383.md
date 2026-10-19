@@ -695,3 +695,44 @@ previous-response signal releases them; both retain main's session and create
 no alternate response binding. No new model, repository format, helper package,
 gateway, dependency or background worker is introduced. Clean executable
 qualification of this repair follows the local tests.
+
+The strengthened seven-case phase passed on clean
+`45d7583ce6e18ecd2ae09b061cf28a5f30035b02`. Both executable snapshots retain
+main's session for delta-only and previous-response terminal failures; only
+the latter releases the original response and turn. Exact frame, request count,
+handshake and lifecycle assertions also passed on that commit.
+
+## Missing response without a previous ID retains the original turn owner
+
+An independent two-executable experiment on clean `624649ec` sent a known
+main-owned turn and full history without `previous_response_id`, then returned
+an upstream `400 previous_response_not_found`. Both products dispatched main
+then second and preserved the opaque turn header, nested metadata, large
+integers, tool arguments and exact visible completion frames. Official Prodex
+retained the original turn and unrelated response on main, recorded the new
+response on second and persisted the accompanying session conflict. Godex
+instead removed the session and reassigned the original turn to second.
+
+The fail-before memory/durable regression now covers that exact ownership
+difference. Routing preserves the existing hard turn on this missing-response
+path and removes only a session-only preference when appropriate. After an
+alternate succeeds, the requested token itself is excluded from new ownership
+evidence; any returned response/turn identity is still observed normally.
+The original request's soft-session status is captured before recovery mutates
+its binding keys, preserving the established transport/quota session conflicts.
+No new model field, gateway contract, helper, persistence format or dependency
+is needed.
+
+The committed transport slice adds `turn-missing` with exact unchanged replay
+bytes, original-turn retention and matching durable snapshots. Its official log
+requires the missing-response decision and authenticated Ready alternate. The
+existing transport/quota cases still require stale-token removal. Mutations
+reject removing either the turn header or metadata from this distinct replay.
+Clean-candidate executable qualification follows the local checks.
+
+The complete default release gate separately passed on clean
+`624649ec8df4b64b7a92df60072dc4fd24a83dcf`, including all original finite
+oracles and the seven-case transport/quota slice. Native run `39273563445`
+also passed every Windows mode on that commit and the expanded transport slice
+on macOS; macOS realtime still failed in official Prodex. Those results are
+not attributed to the later retry-signal or missing-response ownership fixes.

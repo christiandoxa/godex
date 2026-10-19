@@ -14,7 +14,7 @@ import (
 )
 
 func runWebSocketTransportProduct04383(root string, p product) error {
-	for _, scenario := range []string{"full-history", "quota-history", "delta-only", "previous-response", "postcommit", "cancellation", "deadline"} {
+	for _, scenario := range []string{"full-history", "quota-history", "turn-missing", "delta-only", "previous-response", "postcommit", "cancellation", "deadline"} {
 		if err := runTransportCase04383(filepath.Join(root, scenario), p, scenario); err != nil {
 			return fmt.Errorf("%s: %w", scenario, err)
 		}
@@ -86,7 +86,7 @@ func runTransportCase04383(root string, p product, scenario string) error {
 			return fmt.Errorf("unexpected client opcode %d", opcode)
 		}
 		frames = append(frames, string(payload))
-		if scenario != "full-history" && scenario != "quota-history" {
+		if scenario != "full-history" && scenario != "quota-history" && scenario != "turn-missing" {
 			b.mu.Lock()
 			err := verifyTransportNegative04383(scenario, body, b.handshakes, b.attempts, string(payload), b.invalid)
 			b.mu.Unlock()
@@ -104,7 +104,7 @@ func runTransportCase04383(root string, p product, scenario string) error {
 		}
 	}
 	b.mu.Lock()
-	err = verifyTransportRecovery04383(b.handshakes, b.attempts, frames, b.invalid)
+	err = verifyTransportRecovery04383(scenario, b.handshakes, b.attempts, frames, b.invalid)
 	b.mu.Unlock()
 	if err != nil {
 		return err
@@ -113,10 +113,13 @@ func runTransportCase04383(root string, p product, scenario string) error {
 	if scenario == "quota-history" {
 		recoveryEvent = "quota_blocked_turn_state_full_context_replay"
 	}
-	if err := verifyTransportDurable04383(p, recoveryEvent); err != nil {
+	if scenario == "turn-missing" {
+		recoveryEvent = "previous_response_not_found"
+	}
+	if err := verifyTransportDurable04383(p, scenario, recoveryEvent); err != nil {
 		return err
 	}
-	fmt.Printf("%s %s: authenticated Ready owners=2; handshakes=2; requests=account-a,account-b; stale turn removed; exact history/client frames preserved\n", p.name, scenario)
+	fmt.Printf("%s %s: authenticated Ready owners=2; handshakes=2; requests=account-a,account-b; exact turn policy/history/client frames preserved\n", p.name, scenario)
 	return nil
 }
 
@@ -147,7 +150,7 @@ func sameTransportJSON04383(left, right string) bool {
 	return first.Decode(&a) == nil && second.Decode(&b) == nil && reflect.DeepEqual(a, b)
 }
 
-func verifyTransportRecovery04383(handshakes []string, attempts []transportAttempt04383, frames []string, invalid bool) error {
+func verifyTransportRecovery04383(scenario string, handshakes []string, attempts []transportAttempt04383, frames []string, invalid bool) error {
 	if invalid || !reflect.DeepEqual(handshakes, []string{"account-a", "account-b"}) || len(attempts) != 2 {
 		return fmt.Errorf("transport auth/handshakes/attempt count changed: invalid=%t handshakes=%v attempts=%d", invalid, handshakes, len(attempts))
 	}
@@ -159,7 +162,7 @@ func verifyTransportRecovery04383(handshakes []string, attempts []transportAttem
 			return fmt.Errorf("attempt %d lacks authenticated Ready evidence or changed owner", index)
 		}
 		wantTurn := "turn-a"
-		if index == 1 {
+		if index == 1 && scenario != "turn-missing" {
 			wantTurn = ""
 		}
 		if attempt.turn != wantTurn {
@@ -173,7 +176,7 @@ func verifyTransportRecovery04383(handshakes []string, attempts []transportAttem
 		if actual.Decode(&got) != nil || expected.Decode(&want) != nil {
 			return errors.New("invalid transport request JSON")
 		}
-		if index == 1 {
+		if index == 1 && scenario != "turn-missing" {
 			delete(want, "x-codex-turn-state")
 			delete(want["client_metadata"].(map[string]any), "x-codex-turn-state")
 		}
