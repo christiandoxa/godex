@@ -827,3 +827,21 @@ The repaired delivery/routing race suite passed 994 tests. Fifty repetitions of
 the new race regression and original watchdog test passed 200 tests under race
 detection. Native Windows re-execution remains required before the original
 native failure is considered resolved.
+
+## Complete finite gate after ownership and deadline repairs
+
+The complete `./scripts/verify-release-parity.sh` gate passed on clean
+`39c9cc1ba891047c00c7889c7e6a10da45494ee1`, including all original
+finite phases and the expanded twelve-case transport/quota slice. Reference
+source, executable and manifest pins were verified for that exact candidate.
+Before its push, `go test ./... -count=1 -timeout=120s` passed 4,401 tests
+in 81 packages and `make verify` passed its full local checks. The targeted
+delivery/routing race suite and fifty repeated watchdog/race regressions
+also passed as recorded above.
+
+This is **VERIFIED finite Linux parity**, not FULL 1:1 feature parity. Actual
+latest Windows confirmation of the deadline repair remains pending. The pinned
+macOS official realtime-sidecar failure, a proven strict compact-followup
+executable negative control, and live OAuth/keyring/provider/network coverage
+remain **OPEN/PARTIAL**. The successful ten-case macOS transport run on
+`5dec0593` does not qualify later commits or the failed realtime mode.
