@@ -916,3 +916,33 @@ credential redaction. The child stream is fully drained and diagnostics are
 read only after process completion. The focused regression rejects truncation
 leaks, secret exposure across write boundaries and lost operation context.
 This tooling change does not retry a failed launch or relax any parity check.
+
+## Renew the local request budget on a reused HTTP connection
+
+A two-executable experiment on clean `07551467` configured both stream-idle
+budgets to 2 seconds, yielding the tagged 30-second precommit minimum. Both
+clients reused the same TCP connection for a second request after 31 seconds.
+Official Prodex returned 200 with two main-owned upstream requests. Godex
+returned local `504 request_timeout` and dispatched only the first request.
+The earlier default-budget experiment returned 200 in both products and was
+not used to establish this discrepancy.
+
+HTTP delivery now atomically claims the connection's acceptance timestamp
+once. Its first request still includes time waiting after accept; subsequent
+keep-alive requests receive a fresh admission budget. Fail-before coverage
+checks both the preserved first-request queue age and two real HTTP requests
+on one reused socket past a short test budget. No persistence, gateway,
+model, helper-root, dependency or background-worker change is needed.
+
+The independent `--http-keepalive` oracle requires the same TCP connection,
+one connection acquisition per request, exact 200 bodies, unchanged input,
+main ownership and exactly two upstream requests after the original budget.
+Mutations reject timeout reuse, reconnects, automatic HTTP retries, extra or
+missing inference, owner/input/output drift and a wait shorter than 30 seconds.
+`--phase=http-keepalive` is mandatory in the default gate and native matrix.
+Clean-candidate executable qualification follows local checks.
+
+The complete `./scripts/verify-release-parity.sh` gate separately passed on
+clean `07551467481ad853f692c0ecde305b5f4ab83f70`, including the thirteen-case
+transport slice and all earlier finite phases. That gate did not yet contain
+the newly discovered HTTP keep-alive case and does not qualify its repair.

@@ -18,7 +18,8 @@ case "${1:-}" in
   --phase=websocket-core) phase='websocket-core' ;;
   --phase=websocket-deadline) phase='websocket-deadline' ;;
   --phase=websocket-transport) phase='websocket-transport' ;;
-  *) echo 'usage: verify-release-parity.sh [--phase=preflight|preflight-tests|preflight-oracles|preflight-oracles-pty|preflight-oracles-profiles|preflight-oracles-history|deepseek|gemini|websocket|websocket-core|websocket-deadline|websocket-transport]' >&2; exit 2 ;;
+  --phase=http-keepalive) phase='http-keepalive' ;;
+  *) echo 'usage: verify-release-parity.sh [--phase=preflight|preflight-tests|preflight-oracles|preflight-oracles-pty|preflight-oracles-profiles|preflight-oracles-history|deepseek|gemini|websocket|websocket-core|websocket-deadline|websocket-transport|http-keepalive]' >&2; exit 2 ;;
 esac
 if [ "$#" -gt 1 ]; then
   echo 'release parity accepts at most one phase option' >&2
@@ -753,6 +754,16 @@ if [ "$phase" = 'all' ] || [ "$phase" = 'websocket' ] || [ "$phase" = 'websocket
   --websocket-transport
 go test -race ./tools/continuationparity \
   -run '^TestProdex04383Transport' -count=1 -timeout=40s
+fi
+
+if [ "$phase" = 'all' ] || [ "$phase" = 'http-keepalive' ]; then
+"$tmp/continuationparity" \
+  --prodex "$tmp/prodex" --godex "$tmp/godex" \
+  --prodex-source "$tmp/prodex-source" \
+  --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
+  --http-keepalive
+go test -race ./tools/continuationparity \
+  -run '^TestProdex04383HTTPKeepAliveOracleRejectsMutations$' -count=1 -timeout=30s
 fi
 
 # Printed only after all stages *selected for this invocation* succeeded.

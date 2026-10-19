@@ -18,6 +18,17 @@ The 0.438.2 names below identify where particular compatibility fixtures
 originated; their active executable reference is **0.438.3**. All release
 phases must use the same clean Godex commit.
 
+## HTTP keep-alive request budgets
+
+`--http-keepalive` sends two Responses requests on the same TCP connection,
+31 seconds apart under the configured 30-second minimum request budget. Both
+must return exact 200 responses with unchanged input, account-a ownership and
+two upstream requests. Reconnection or an automatic HTTP retry invalidates the
+proof. Its mutation tests reject each material deviation.
+
+Run `./scripts/verify-release-parity.sh --phase=http-keepalive` for this slice.
+It is also mandatory in the complete gate and native executable matrix.
+
 ## Authenticated precommit transport recovery
 
 `--websocket-transport` uses a managed `run` launch with two profiles.

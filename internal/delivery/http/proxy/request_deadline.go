@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -15,6 +16,11 @@ var errLocalRequestDeadline = fmt.Errorf("local request deadline: %w", context.D
 
 type requestDeadlineContextKey struct{}
 type requestAcceptedAtContextKey struct{}
+
+type connectionRequestStart struct {
+	acceptedAt time.Time
+	claimed    atomic.Bool
+}
 
 type requestAcceptedAtProvider interface {
 	AcceptedAt() time.Time
@@ -35,7 +41,7 @@ func withRequestDeadline(parent context.Context, budget time.Duration) (context.
 		return parent, func() {}
 	}
 	start := time.Now()
-	if acceptedAt, ok := requestAcceptedAt(parent); ok && acceptedAt.Before(start) {
+	if acceptedAt, ok := claimRequestAcceptedAt(parent); ok && acceptedAt.Before(start) {
 		start = acceptedAt
 	}
 	deadline := start.Add(budget)
@@ -96,15 +102,20 @@ func proxyConnContext(ctx context.Context, connection net.Conn) context.Context 
 	if !ok {
 		return ctx
 	}
-	return context.WithValue(ctx, requestAcceptedAtContextKey{}, accepted.AcceptedAt())
+	start := &connectionRequestStart{acceptedAt: accepted.AcceptedAt()}
+	return context.WithValue(ctx, requestAcceptedAtContextKey{}, start)
 }
 
-func requestAcceptedAt(ctx context.Context) (time.Time, bool) {
+func claimRequestAcceptedAt(ctx context.Context) (time.Time, bool) {
 	if ctx == nil {
 		return time.Time{}, false
 	}
-	acceptedAt, ok := ctx.Value(requestAcceptedAtContextKey{}).(time.Time)
-	return acceptedAt, ok && !acceptedAt.IsZero()
+	start, ok := ctx.Value(requestAcceptedAtContextKey{}).(*connectionRequestStart)
+	// Queue age belongs to the first request, not every HTTP keep-alive turn.
+	if !ok || start == nil || start.claimed.Swap(true) {
+		return time.Time{}, false
+	}
+	return start.acceptedAt, !start.acceptedAt.IsZero()
 }
 
 func requestDeadlineScopeFor(ctx context.Context) (requestDeadlineScope, bool) {

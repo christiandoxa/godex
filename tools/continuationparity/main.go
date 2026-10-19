@@ -182,17 +182,18 @@ func main() {
 	websocketLookaheadIdle := flag.Bool("websocket-lookahead-idle", false, "compare 8KiB precommit hold promotion into committed stream idle against both binaries")
 	websocketRealtime := flag.Bool("websocket-realtime", false, "compare realtime duplex permit retention, admission and session closure")
 	websocketTransport := flag.Bool("websocket-transport", false, "compare authenticated full-history precommit transport recovery in a rotating managed launch")
-	godexSource := flag.String("godex-source", "", "clean Godex commit source (required with either WebSocket fixture)")
-	godexCommit := flag.String("godex-commit", "", "exact 40-character Godex commit (required with either WebSocket fixture)")
+	httpKeepAlive := flag.Bool("http-keepalive", false, "compare request-local deadlines across a reused HTTP connection")
+	godexSource := flag.String("godex-source", "", "clean Godex commit source (required with an isolated fixture)")
+	godexCommit := flag.String("godex-commit", "", "exact 40-character Godex commit (required with an isolated fixture)")
 	flag.Parse()
 	chosen := 0
-	for _, mode := range []bool{*websocket, *websocketCapacity, *websocketDeadline, *websocketCommittedIdle, *websocketLookaheadIdle, *websocketRealtime, *websocketTransport} {
+	for _, mode := range []bool{*websocket, *websocketCapacity, *websocketDeadline, *websocketCommittedIdle, *websocketLookaheadIdle, *websocketRealtime, *websocketTransport, *httpKeepAlive} {
 		if mode {
 			chosen++
 		}
 	}
 	if chosen > 1 {
-		fatal("select at most one WebSocket fixture")
+		fatal("select at most one continuation fixture")
 	}
 	if *prodex == "" || *godex == "" || *prodexSource == "" {
 		fatal("usage: continuationparity --prodex BIN --godex BIN --prodex-source DIR")
@@ -220,7 +221,9 @@ func main() {
 	for _, spec := range []struct{ name, binary string }{{"prodex", *prodex}, {"godex", *godex}} {
 		p := product{name: spec.name, binary: spec.binary}
 		var err error
-		if *websocketTransport {
+		if *httpKeepAlive {
+			err = runHTTPKeepAliveProduct04383(root, p)
+		} else if *websocketTransport {
 			err = runWebSocketTransportProduct04383(root, p)
 		} else if *websocketRealtime {
 			err = runWebSocketRealtimeProduct04382(root, p)
@@ -244,6 +247,10 @@ func main() {
 			}
 			fatal(spec.name + ": " + err.Error())
 		}
+	}
+	if *httpKeepAlive {
+		fmt.Println("PASS Prodex 0.438.3 HTTP keepalive request-budget renewal across both binaries")
+		return
 	}
 	if *websocketTransport {
 		fmt.Println("PASS Prodex 0.438.3 authenticated full-history WebSocket transport recovery across both binaries")

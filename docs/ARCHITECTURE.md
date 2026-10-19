@@ -439,6 +439,10 @@ and stops its timer; no shared helper or background worker is introduced.
 The budget lives in delivery's request scope, outside `Context.Deadline`, whose
 parent deadline remains stable before and after commitment. The timer's own
 cancellation cause distinguishes local expiry from caller cancellation.
+The connection's acceptance timestamp is claimed only by its first request.
+Later HTTP keep-alive requests start their own admission budget; connection
+age cannot expire unrelated follow-up requests. The claim is connection-owned
+and atomic, with no global connection registry or shared helper.
 
 A forwarded request starts as **uncommitted**. Rotation is legal only in this state.
 

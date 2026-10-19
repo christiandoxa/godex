@@ -23,7 +23,7 @@ func oneLaneAdmissionLimits04381() admissionLimits {
 
 func TestProdex04381RequestDeadlineIncludesAcceptedConnectionTime(t *testing.T) {
 	acceptedAt := time.Now().Add(-500 * time.Millisecond)
-	parent := context.WithValue(context.Background(), requestAcceptedAtContextKey{}, acceptedAt)
+	parent := context.WithValue(context.Background(), requestAcceptedAtContextKey{}, &connectionRequestStart{acceptedAt: acceptedAt})
 	ctx, cancel := withRequestDeadline(parent, 100*time.Millisecond)
 	defer cancel()
 	scope, ok := requestDeadlineScopeFor(ctx)
@@ -43,7 +43,7 @@ func TestProdex04381ProxyConnContextCarriesAcceptedTime(t *testing.T) {
 	defer client.Close()
 	defer server.Close()
 	ctx := proxyConnContext(context.Background(), acceptedAtConnection{Conn: client, acceptedAt: acceptedAt})
-	got, ok := requestAcceptedAt(ctx)
+	got, ok := claimRequestAcceptedAt(ctx)
 	if !ok || !got.Equal(acceptedAt) {
 		t.Fatalf("accepted time=%v/%t, want %v/true", got, ok, acceptedAt)
 	}
@@ -58,7 +58,7 @@ func TestProdex04381AcceptedTimeReachesHTTPRequestContext(t *testing.T) {
 	server := &http.Server{
 		ConnContext: proxyConnContext,
 		Handler: http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-			at, _ := requestAcceptedAt(request.Context())
+			at, _ := claimRequestAcceptedAt(request.Context())
 			accepted <- at
 			writer.Header().Set("Connection", "close")
 			_, _ = io.WriteString(writer, "ok")
