@@ -14,6 +14,7 @@ func (router *Router) forwardFresh(
 	ctx context.Context,
 	request proxymodel.Request,
 	accounts []proxymodel.Account,
+	excludedAccountIDs ...string,
 ) (proxymodel.Forwarded, error) {
 	observedAuthProgress, authProgressAvailable := router.authRecoveryProgressRevision043714()
 	candidates := router.requestCandidatesForRequest(accounts, request, router.now())
@@ -46,6 +47,11 @@ func (router *Router) forwardFresh(
 	retryable := make(map[string]bool, len(candidates))
 	for _, account := range candidates {
 		retryable[account.ID] = true
+	}
+	// Recovery handoffs keep their failed owners excluded across pool reloads.
+	for _, accountID := range excludedAccountIDs {
+		excluded[accountID] = true
+		retryable[accountID] = false
 	}
 	firstEventRetryUsed := request.FirstEventRetryUsed
 	autoRedeemAttempted := false

@@ -59,6 +59,6 @@ func (router *Router) recoverWebSocketTurnStateFullHistory04383(
 	clean := requestWithoutTurnState(request)
 	// Keep the full body/history and original logical request deadline;
 	// never forward the failed transport's stale turn token to another home.
-	recovered, err := router.forwardFresh(ctx, clean, fallback)
+	recovered, err := router.forwardFresh(ctx, clean, fallback, failed.ID)
 	return recovered, true, err
 }

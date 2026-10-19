@@ -22,17 +22,24 @@ func TestProdex04383FullHistoryWaitsForBusyAlternateUntilCancellation(t *testing
 				if failure == "quota" {
 					response = websocketQuotaFailureResponse()
 				}
-				gateway := &websocketDispatchGateway{responses: []*proxymodel.Response{response}}
+				gateway := &websocketDispatchGateway{responses: []*proxymodel.Response{response, websocketCommittedTestResponse("unexpected-replay")}}
 				ctx, cancel := context.WithCancel(context.WithValue(t.Context(), requestContextKey{}, "original-request"))
 				defer cancel()
 				waits := 0
+				now := time.Now()
 				config := Config{
 					Gateway: gateway, PreferredAccount: websocketQuotaOwnerA, ProfileInflightHardLimit: 2,
+					Now:      func() time.Time { return now },
 					Accounts: func(context.Context) ([]proxymodel.Account, error) { return websocketQuotaAccounts(), nil },
 					ProfileInflightWait: func(waitCtx context.Context, _ <-chan struct{}, _ time.Duration) error {
 						waits++
 						if waitCtx.Value(requestContextKey{}) != "original-request" {
 							t.Fatal("capacity recovery lost the original request context")
+						}
+						if waits == 1 {
+							// Cooldown expiry cannot reintroduce the failed owner into this handoff.
+							now = now.Add(time.Minute)
+							return nil
 						}
 						cancel()
 						return waitCtx.Err()
@@ -60,7 +67,7 @@ func TestProdex04383FullHistoryWaitsForBusyAlternateUntilCancellation(t *testing
 				if result != nil {
 					_ = result.Close()
 				}
-				if !errors.Is(err, context.Canceled) || waits != 1 || strings.Join(gateway.accounts, ",") != websocketQuotaOwnerA {
+				if !errors.Is(err, context.Canceled) || waits != 2 || strings.Join(gateway.accounts, ",") != websocketQuotaOwnerA {
 					t.Fatalf("busy recovery did not wait without dispatch: err=%v waits=%d attempts=%v", err, waits, gateway.accounts)
 				}
 				store := router.affinity

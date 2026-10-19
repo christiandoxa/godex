@@ -870,3 +870,11 @@ dispatch, an independently live capacity blocker and the final durable owners.
 The blocker uses only synthetic authenticated loopback traffic. Clean-candidate
 qualification follows local checks; this result does not establish native
 macOS realtime or full feature parity.
+
+The first expanded gate on clean `bdd10fe5` rejected a second main-owned
+attempt after a capacity wait. Fresh routing reloaded the global pool and
+forgot that this handoff had excluded main. Its existing retryable-candidate
+map now retains that explicit exclusion across every reload. The strengthened
+fail-before regression advances a controllable clock beyond cooldown expiry,
+keeps second busy for two wait epochs and then cancels without another model
+dispatch. Other fresh-request callers keep their dynamic pool reload behavior.
