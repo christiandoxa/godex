@@ -586,3 +586,25 @@ The focused schema regression passes. This repairs invalid oracle state;
 it does not establish the cause or resolution of the separate immediate
 native realtime connection reset. Native qualification remains OPEN pending
 actual execution of the repaired fixture. No Godex production behavior changes.
+
+## Complete Linux gate and applied quota-probe prerequisite
+
+The complete `./scripts/verify-release-parity.sh` gate passed on clean
+`f293407a098e5253ac3fd32452090aed4043c201`, including all six authenticated
+transport recovery and lifecycle scenarios. The pinned source, executable and
+manifest checks passed on that exact candidate. This qualifies that finite
+Linux slice; strict compact-followup and full feature parity remain OPEN.
+
+Native run `39270223855` passed the expanded transport phase on macOS but
+failed on Windows because the official log did not establish the required
+authenticated Ready selection. The fixture counted incoming usage probes
+before Prodex had applied their asynchronous results. It now waits within its
+existing five-second preparation budget for both `profile_probe_refresh_ok`
+events before starting the fault. The fail-before regression rejects pending,
+partially applied and failed probes even with both authenticated receipts.
+The exact recovery selection, wire and durable-owner assertions remain in force.
+The repaired prerequisite still requires clean-candidate executable qualification.
+
+That same native run also failed macOS realtime session setup in official
+Prodex and one Godex committed-idle close/Ping observation. These remain
+unresolved native evidence; neither is certified by the passing Linux gate.

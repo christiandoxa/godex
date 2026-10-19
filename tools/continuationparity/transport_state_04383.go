@@ -166,3 +166,28 @@ func verifyTransportReadyLog04383(p product) error {
 	}
 	return errors.New("official runtime log lacks failed main owner and authenticated Ready alternate selection")
 }
+
+func transportProfilesReady04383(p product, b *transportBackend04383) bool {
+	b.mu.Lock()
+	ready := b.receipts["account-a"] > 0 && b.receipts["account-b"] > 0 && b.warmups == 2 && !b.invalid
+	b.mu.Unlock()
+	if !ready || p.name != "prodex" {
+		return ready
+	}
+	// A server receipt precedes Prodex applying the asynchronous quota result.
+	paths, err := filepath.Glob(filepath.Join(p.state, "logs", "prodex-runtime-*.log"))
+	if err != nil {
+		return false
+	}
+	for _, path := range paths[:min(len(paths), 4)] {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return false
+		}
+		log := string(data)
+		if strings.Contains(log, "profile_probe_refresh_ok profile=main ") && strings.Contains(log, "profile_probe_refresh_ok profile=second ") {
+			return true
+		}
+	}
+	return false
+}

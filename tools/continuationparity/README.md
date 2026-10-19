@@ -24,6 +24,8 @@ phases must use the same clean Godex commit.
 The `gateway` command fixes its pool to the active profile and cannot prove
 cross-profile recovery. Two owner-pinned warmups establish authenticated
 loopback quota receipts without changing the failed turn's main owner.
+The fixture also waits for Prodex to log both successful quota-cache updates;
+receiving a probe at the upstream alone does not prove its result was applied.
 The upstream accepts a complete request, sends hidden metadata, then closes
 before commitment. Both products must attempt main exactly once and the Ready
 alternate exactly once, remove the failed turn from headers and nested metadata,
@@ -38,7 +40,7 @@ reject lost auth evidence, extra requests/handshakes, changed owners, rounded
 integers, stale tokens, altered output and empty terminal responses.
 Run `./scripts/verify-release-parity.sh --phase=websocket-transport` for this
 source/binary/manifest-pinned slice. Strict compact-followup setup and native
-macOS/Windows execution remain separate qualification work.
+macOS/Windows qualification remain separate from the Linux release gate.
 
 The same mode also runs three full-history lifecycle controls with an
 authenticated Ready alternate: visible output followed by upstream TCP EOF

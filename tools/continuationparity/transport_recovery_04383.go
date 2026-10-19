@@ -46,10 +46,7 @@ func runTransportCase04383(root string, p product, scenario string) error {
 	}
 	readyDeadline := time.Now().Add(5 * time.Second)
 	for {
-		b.mu.Lock()
-		ready := b.receipts["account-a"] > 0 && b.receipts["account-b"] > 0 && b.warmups == 2 && !b.invalid
-		b.mu.Unlock()
-		if ready {
+		if transportProfilesReady04383(p, b) {
 			break
 		}
 		if time.Now().After(readyDeadline) {
