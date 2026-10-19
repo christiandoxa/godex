@@ -30,6 +30,17 @@ func (router *Router) recoverBoundRetryableFailure(
 		local := requestRoutingAffinity(request)
 		keys = &local
 	}
+	if outcome.transport && request.QuotaSelection.RouteKind == quotamodel.RouteKindResponses &&
+		keys.previous == "" && keys.turn != "" {
+		owned, err := router.turnStateOwnedBy(ctx, keys.turn, failed.ID)
+		if err != nil {
+			closePendingResponse(pending)
+			return proxymodel.Forwarded{}, true, err
+		}
+		if owned {
+			return proxymodel.Forwarded{}, false, nil
+		}
+	}
 	fallback := router.boundRecoveryFallbackAccounts(accounts, failed, request)
 	if len(fallback) == 0 {
 		return proxymodel.Forwarded{}, false, nil

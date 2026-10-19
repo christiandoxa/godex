@@ -1098,3 +1098,26 @@ the tests still exercise the real gateway timers and shutdown. No production
 clock hook, timeout change, dependency or helper package is needed. One hundred
 repeated race runs passed all 300 checks, and the gateway coverage run passed
 247 tests. Native re-execution is still needed to qualify the repaired fixture.
+
+## Preserve an owned HTTP Responses turn after transport failure
+
+A paired experiment on exact clean `cef9c84c` reused the authenticated Ready
+setup with the HTTP Responses route. With a known turn and accompanying
+session, official Prodex returned exact 503 after one main-owned request and
+retained the turn, session and unrelated response. Godex replayed on second,
+returned 200 and replaced the turn owner. The turn-only 503 and previous-response
+400 controls already matched. Compact's two-profile replay policy therefore
+cannot be applied to this Responses failure.
+
+Routing now checks the existing turn owner before recovering this HTTP
+transport failure. A verified turn on the failed account returns the existing
+local 503 and preserves its bindings. Unknown turns, previous-response reset
+handling, quota full-history recovery, Compact and WebSocket policies retain
+their existing paths. Owner-lookup failures propagate with response cleanup;
+no new helper, public contract, persistence format or dependency is introduced.
+
+The fail-before memory and real-repository tests use reconstructable full
+history, require a single dispatch and check all three owners after failure.
+The focused suite, including Compact and quota recovery controls, passes.
+Clean-candidate executable confirmation follows local checks; this does not
+qualify the separate strict compact-followup WebSocket branch.
