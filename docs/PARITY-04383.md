@@ -550,3 +550,25 @@ three production repairs were independently checked on clean `abc86d03`
 with the exploratory six-case executable harness and `make verify`.
 The complete original finite release gate separately passed on `f41611c9`;
 that result is not attributed to the later late-ID repair.
+
+## Full-history replay lifecycle controls
+
+The authenticated `--websocket-transport` slice now also checks the original
+30-second request deadline, explicit client cancellation after upstream
+dispatch, and upstream EOF after visible output. All three use the same
+reconstructable history and an independently authenticated Ready alternate,
+so replay would otherwise be eligible. They require exactly one main-owned
+inference, intact request context, and no alternate dispatch. The postcommit
+case requires exact created/delta frames followed by TCP EOF, matching this
+specific official transport-close fault; an idle-timeout close frame is a
+different contract. Deadline mutation tests reject early/renewed budgets or
+changed public errors. Cancellation requires observed upstream teardown.
+
+These controls passed the exploratory pinned two-executable run on clean
+`abc86d03`, together with the matching durable ownership snapshots. The
+expanded committed phase must be requalified before being counted as VERIFIED.
+Strict compact-followup setup remains OPEN: the earlier compact experiment
+had an ordinary turn owner, which suppressed the strict compact-followup
+selection slot and allowed normal full-history recovery in official Prodex.
+That experiment is preserved outside the repository and is excluded from
+the passing oracle. It is not evidence of unsafe strict-compact replay.

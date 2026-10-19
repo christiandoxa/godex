@@ -40,6 +40,14 @@ Run `./scripts/verify-release-parity.sh --phase=websocket-transport` for this
 source/binary/manifest-pinned slice. Strict compact-followup setup and native
 macOS/Windows execution remain separate qualification work.
 
+The same mode also runs three full-history lifecycle controls with an
+authenticated Ready alternate: visible output followed by upstream TCP EOF
+must retain both exact frames and the reference's abrupt EOF without replay;
+client cancellation after dispatch must close the upstream; and hidden
+keepalives must end in the original 30-second 504 despite the available
+alternate. Independent mutations reject changed close framing, partial EOF,
+missing output, extended/early deadlines, failed cancellation or extra inference.
+
 ## Exact HTTP history replay boundary
 
 The opt-in `TestProdex04380ExecutableHistoryReplayBoundary` test verifies nine

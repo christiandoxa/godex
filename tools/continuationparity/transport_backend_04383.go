@@ -24,16 +24,18 @@ type transportAttempt04383 struct {
 
 type transportBackend04383 struct {
 	server     *httptest.Server
+	scenario   string
 	mu         sync.Mutex
 	receipts   map[string]int
 	handshakes []string
 	attempts   []transportAttempt04383
 	invalid    bool
 	warmups    int
+	canceled   chan struct{}
 }
 
-func newTransportBackend04383() *transportBackend04383 {
-	b := &transportBackend04383{receipts: make(map[string]int)}
+func newTransportBackend04383(scenario string) *transportBackend04383 {
+	b := &transportBackend04383{scenario: scenario, receipts: make(map[string]int), canceled: make(chan struct{}, 1)}
 	b.server = httptest.NewServer(http.HandlerFunc(b.serve))
 	return b
 }
@@ -95,9 +97,26 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 	b.attempts = append(b.attempts, transportAttempt04383{owner: owner, turn: r.Header.Get("x-codex-turn-state"), body: string(payload), ready: b.receipts["account-a"] > 0 && b.receipts["account-b"] > 0})
 	b.mu.Unlock()
 	if owner == "account-a" {
+		if b.scenario == "deadline" {
+			_ = connection.SetDeadline(time.Now().Add(40 * time.Second))
+			serveHiddenPreludeDeadline04382(connection)
+			return
+		}
+		if b.scenario == "cancellation" {
+			_, err := connection.Read(make([]byte, 1))
+			if err != nil {
+				select {
+				case b.canceled <- struct{}{}:
+				default:
+				}
+			}
+			return
+		}
 		// This metadata stays below the commit threshold; EOF is deterministic.
 		_ = websocketframe.WriteFrame(connection, 1, []byte(`{"type":"response.created","response":{"id":"discarded-transport"}}`), false)
-
+		if b.scenario == "postcommit" {
+			_ = websocketframe.WriteFrame(connection, 1, []byte(`{"type":"response.output_text.delta","delta":"visible"}`), false)
+		}
 		return
 	}
 	for _, event := range []string{transportDelta04383, transportCompleted04383} {

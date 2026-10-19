@@ -14,7 +14,7 @@ import (
 )
 
 func runWebSocketTransportProduct04383(root string, p product) error {
-	for _, scenario := range []string{"full-history", "delta-only", "previous-response"} {
+	for _, scenario := range []string{"full-history", "delta-only", "previous-response", "postcommit", "cancellation", "deadline"} {
 		if err := runTransportCase04383(filepath.Join(root, scenario), p, scenario); err != nil {
 			return fmt.Errorf("%s: %w", scenario, err)
 		}
@@ -30,7 +30,7 @@ func runTransportCase04383(root string, p product, scenario string) error {
 		return err
 	}
 	p.env = append(p.env, "PRODEX_RUNTIME_PROXY_STREAM_IDLE_TIMEOUT_MS=2000", "GODEX_RUNTIME_PROXY_STREAM_IDLE_TIMEOUT_MS=2000", "PRODEX_RUNTIME_LOG_RECORD=true")
-	b := newTransportBackend04383()
+	b := newTransportBackend04383(scenario)
 	defer b.server.Close()
 	endpoint, stop, err := startTransportLaunch04383(p, b.server.URL+"/backend-api")
 	if err != nil {
@@ -76,7 +76,9 @@ func runTransportCase04383(root string, p product, scenario string) error {
 	if err := websocketframe.WriteFrame(connection, 1, []byte(body), true); err != nil {
 		return err
 	}
-
+	if scenario == "deadline" || scenario == "cancellation" || scenario == "postcommit" {
+		return runTransportLifecycle04383(p, b, connection, reader)
+	}
 	var frames []string
 	for len(frames) < 2 {
 		opcode, payload, _, err := readWebSocketLivenessFrame04383(connection, reader)
