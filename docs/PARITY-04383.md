@@ -348,3 +348,29 @@ it is **not** a passing 0.438.3 replay oracle. That gap, native macOS/Windows
 runtime permutations, live OAuth/real quota reset, and unobserved provider
 faults remain PARTIAL/OPEN. The complete synthetic release gate is not a
 production-wide FULL 1:1 parity certification.
+
+## Full-history transport replay preserves opaque numeric input
+
+A subsequent 0.438.3 source-aligned Router audit found that removing a failed
+`x-codex-turn-state` from a reconstructable full-history WebSocket request
+re-decoded the **entire** request through Go's `map[string]any`. This silently
+rounded the user's large JSON integers before dispatching the replay to the
+Ready profile: `9007199254740993` became `9007199254740992`, and
+`18446744073709551615` became `18446744073709552000`. Unlike a permitted
+turn-binding removal, changing opaque input/tool arguments violates the
+full-history replay contract.
+
+`TestProdex04383TurnStateRecoveryPreservesOpaqueNumericHistory` and the
+extended end-to-end Router fixture
+`TestProdex04383TransportBoundTurnStateFullHistoryRotatesToReadyProfile`
+both failed before the fix. The scoped change now decodes only the outer
+object and `client_metadata` into `json.RawMessage`, removes the exact stale
+turn-state keys, and leaves all other JSON subtrees/numbers opaque. HTTP
+headers are cloned; the original request is not mutated. Affinity ownership,
+retry eligibility, deadlines, and strict no-postcommit-replay gates remain
+unchanged.
+
+This is a local precision/identity regression, **not** an independent
+published-Prodex executable differential for large numeric payloads. The
+previous pinned finite-gate result belongs to `9ee52e0e`; it must be rerun
+on the new clean commit before being attributed to this change.

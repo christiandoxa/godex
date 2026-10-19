@@ -26,7 +26,10 @@ func requestWithoutTurnState(request proxymodel.Request) proxymodel.Request {
 	}
 	request.Header.Del("x-codex-turn-state")
 
-	var body map[string]any
+	// Keep the client's input and unknown fields opaque: decoding into
+	// map[string]any would round large JSON integers through float64 and
+	// silently rewrite full-history tool arguments during 0.438.3 recovery.
+	var body map[string]json.RawMessage
 	if json.Unmarshal(request.Body, &body) != nil {
 		return request
 	}
@@ -35,10 +38,14 @@ func requestWithoutTurnState(request proxymodel.Request) proxymodel.Request {
 		delete(body, "x-codex-turn-state")
 		removed = true
 	}
-	if metadata, ok := body["client_metadata"].(map[string]any); ok {
+	var metadata map[string]json.RawMessage
+	if json.Unmarshal(body["client_metadata"], &metadata) == nil {
 		if _, found := metadata["x-codex-turn-state"]; found {
 			delete(metadata, "x-codex-turn-state")
-			removed = true
+			if encoded, err := json.Marshal(metadata); err == nil {
+				body["client_metadata"] = encoded
+				removed = true
+			}
 		}
 	}
 	if !removed {

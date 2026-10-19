@@ -46,7 +46,7 @@ func TestProdex04383TransportBoundTurnStateFullHistoryRotatesToReadyProfile(t *t
 	if err := seed.Close(); err != nil {
 		t.Fatal(err)
 	}
-	request := websocketDispatchRequest(`{"type":"response.create","session_id":"session-transport","client_metadata":{"x-codex-turn-state":"turn-transport-a"},"input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"new question"}]}`, 831)
+	request := websocketDispatchRequest(`{"type":"response.create","session_id":"session-transport","client_metadata":{"x-codex-turn-state":"turn-transport-a","sequence":18446744073709551615},"input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"new question","sequence":9007199254740993}]}`, 831)
 	request.Header.Set("x-codex-turn-state", "turn-transport-a")
 	result, err := router.Forward(t.Context(), request)
 	if err != nil {
@@ -62,7 +62,9 @@ func TestProdex04383TransportBoundTurnStateFullHistoryRotatesToReadyProfile(t *t
 	}
 	replay := gateway.requests[2]
 	if replay.Header.Get("x-codex-turn-state") != "" || strings.Contains(string(replay.Body), "turn-transport-a") ||
-		!strings.Contains(string(replay.Body), "new question") || replay.FirstEventRetryUsed {
+		!strings.Contains(string(replay.Body), "new question") ||
+		!strings.Contains(string(replay.Body), "9007199254740993") ||
+		!strings.Contains(string(replay.Body), "18446744073709551615") || replay.FirstEventRetryUsed {
 		t.Fatalf("full-history replay leaked failed turn state or damaged history: header=%v body=%s retryUsed=%v", replay.Header, replay.Body, replay.FirstEventRetryUsed)
 	}
 }
