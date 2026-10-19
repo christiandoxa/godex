@@ -70,3 +70,35 @@ work must verify the release's typed connection/send/read/close failures and
 full-history replay using the official binary; the existing 0.438.2 gate is
 currently historical until re-pinned and re-executed. Overall production 1:1
 remains **PARTIAL**, including native Windows/macOS and live OAuth behavior.
+
+## Typed upstream WebSocket precommit transport failures
+
+Prodex 0.438.3 returns typed **attempt outcomes** when precommit connection,
+send, read or upstream close fails. Previously Godex's `ExecuteWebSocketMessage`
+returned raw Go errors for fresh handshake failures and for read/close errors
+on hard turn-state, previous-response or compact/session-bound requests.
+Those errors escaped the typed precommit classifier, potentially closing the
+local client before its affinity-aware recovery owner considered whether
+safe replay was permitted. A source-derived transport regression failed on
+all three hard-affinity read/close cases and on an unopened upstream socket.
+
+The OpenAI WebSocket adapter now returns `websocketTransportFailure` with
+`PrecommitFailure.Transport=true`, `FirstEventCommitted=false`, HTTP 502 and
+an empty client-visible precommit body for all non-canceled connection,
+send and read errors. A canceled context still preserves the original
+`ctx.Err()`; the realtime duplex branch still uses its distinct committed
+lifecycle. The transport **never** grants permission to rotate credentials,
+replay a previous-response dependency or bypass quota. Routing owns those
+decisions. `TestProdex04383BoundWebSocketUpstreamReadFailureIsTypedAttempt`,
+`TestProdex04383WebSocketFailedHandshakeReturnsTypedPrecommitAttempt` and
+`TestProdex04383PartialPrecommitWebSocketFrameIsTypedNotCommitted` prove the
+bounded behavior against actual local TCP/WebSocket connections, including
+a truncated payload header followed by EOF. The latter's partial bytes must
+never be promoted to committed output. All focused tests and race detection
+PASS, as do the existing noncommitted/committed owner-retry regression suites.
+
+These tests establish **source-derived local adapter parity**, not a full
+published Prodex 0.438.3 two-executable transport recovery oracle. The
+subsequent release gate must pin and exercise the actual new binary to
+qualify cross-product behavior; release 0.438.2 differential logs cannot
+be substituted.

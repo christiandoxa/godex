@@ -36,7 +36,17 @@ func (transport *Transport) ExecuteWebSocketMessage(
 		response, err := transport.ExecuteWebSocket(ctx, handshake, account)
 		connectDuration = time.Since(connectStarted)
 		if err != nil {
-			return nil, err
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+			if input.WebSocketPolicy.RealtimeDuplex {
+				return nil, err
+			}
+			// Prodex 0.438.3 reports a precommit connection failure as an
+			// attempted transport outcome. Only outer affinity-aware routing
+			// may decide whether a full-history request can safely move.
+			return websocketTransportFailure("", state.turnState,
+				input.FirstEventRetryUsed, false, 0), nil
 		}
 		response.FirstEventRetryUsed = input.FirstEventRetryUsed
 		state.turnState = strings.TrimSpace(response.Header.Get("x-codex-turn-state"))
@@ -78,12 +88,10 @@ func (transport *Transport) ExecuteWebSocketMessage(
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		if reusedSession {
-			return websocketTransportFailure(
-				"", state.turnState, input.FirstEventRetryUsed, true, reuseIdle,
-			), nil
-		}
-		return nil, fmt.Errorf("send upstream websocket message: %w", err)
+		// The send has not committed client-visible output. Returning an
+		// error here used to skip the 0.438.3 retry owner's safety proof.
+		return websocketTransportFailure("", state.turnState,
+			input.FirstEventRetryUsed, reusedSession, reuseIdle), nil
 	}
 	plan := websocketResponsePlanFor(input, reusedSession)
 	response, err := transport.readWebSocketMessage(
@@ -144,14 +152,12 @@ func (transport *Transport) readWebSocketMessage(
 				_ = connection.Close()
 				return nil, ctx.Err()
 			}
-			if reusedSession || plan.transportRetryAllowed {
-				_ = connection.Close()
-				return websocketTransportFailure(
-					responseID, state.turnState, input.FirstEventRetryUsed, reusedSession, reuseIdle,
-				), nil
-			}
+			// All non-canceled read/close errors before visible commitment
+			// are typed attempts in 0.438.3, even on a hard turn-state owner.
+			// The route owner still decides if replay/rotation is allowed.
 			_ = connection.Close()
-			return nil, fmt.Errorf("runtime websocket upstream failed before response commitment: %w", readErr)
+			return websocketTransportFailure(responseID, state.turnState,
+				input.FirstEventRetryUsed, reusedSession, reuseIdle), nil
 		}
 		if err := ctx.Err(); err != nil {
 			_ = connection.Close()
