@@ -10,9 +10,9 @@ import (
 // Prodex 0.438.3 shares the tagged full-history proof between quota and
 // *precommit transport* recovery. A failed turn-state-only connection can
 // hand off a reconstructable full transcript to a different Ready profile,
-// after releasing only the failed owner's exact binding. This must never
+// after releasing any matching failed-owner binding. This must never
 // replay previous_response_id dependencies, delta-only tool output, compact
-// followups, an unowned turn-state, or already committed model output.
+// followups, another profile's owned turn-state, or committed model output.
 func (router *Router) recoverWebSocketTurnStateTransport04383(
 	ctx context.Context,
 	request proxymodel.Request,
@@ -42,12 +42,12 @@ func (router *Router) recoverWebSocketTurnStateTransport04383(
 		!cachedState.ready && (cachedState.retryAt.IsZero() || cachedState.retryAt.After(router.now())) {
 		return proxymodel.Forwarded{}, false, nil
 	}
-	owned, err := router.turnStateOwnedBy(ctx, metadata.turnState, failed.ID)
+	owner, err := router.affinity.owner(ctx, affinityKeys{turn: metadata.turnState}, router.now())
 	if err != nil {
 		closePendingResponse(pending)
 		return proxymodel.Forwarded{}, true, err
 	}
-	if !owned {
+	if owner != "" && owner != failed.ID {
 		return proxymodel.Forwarded{}, false, nil
 	}
 	// The tagged release plan retains session ownership beside a hard turn.

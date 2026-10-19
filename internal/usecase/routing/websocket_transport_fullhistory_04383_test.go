@@ -110,6 +110,7 @@ func TestProdex04383TransportFullHistoryRejectsUnsafeRotationVariants(t *testing
 		policy        proxymodel.WebSocketPolicy
 		failure       responseOutcome
 		owned         bool
+		otherOwner    bool
 		ready         bool
 		compact       bool
 		retryUsed     bool
@@ -123,7 +124,7 @@ func TestProdex04383TransportFullHistoryRejectsUnsafeRotationVariants(t *testing
 		{name: "realtime duplex", body: `{"type":"response.create","x-codex-turn-state":"turn-bound","input":[{"type":"message","role":"user","content":"full"}]}`, policy: proxymodel.WebSocketPolicy{RealtimeDuplex: true}, failure: responseOutcome{kind: responseRetry, transport: true}, owned: true, ready: true},
 		{name: "committed output is not retry", body: `{"type":"response.create","x-codex-turn-state":"turn-bound","input":[{"type":"message","role":"user","content":"full"}]}`, failure: responseOutcome{kind: responsePass, transport: true}, owned: true, ready: true},
 		{name: "quota has own recovery policy", body: `{"type":"response.create","x-codex-turn-state":"turn-bound","input":[{"type":"message","role":"user","content":"full"}]}`, failure: responseOutcome{kind: responseRetry, quota: true}, owned: true, ready: true},
-		{name: "unowned turn is never transferred", body: `{"type":"response.create","x-codex-turn-state":"turn-bound","input":[{"type":"message","role":"user","content":"full"}]}`, failure: responseOutcome{kind: responseRetry, transport: true}, ready: true},
+		{name: "another profile's turn is never transferred", body: `{"type":"response.create","x-codex-turn-state":"turn-bound","input":[{"type":"message","role":"user","content":"full"}]}`, failure: responseOutcome{kind: responseRetry, transport: true}, owned: true, otherOwner: true, ready: true},
 		{name: "no ready alternate", body: `{"type":"response.create","x-codex-turn-state":"turn-bound","input":[{"type":"message","role":"user","content":"full"}]}`, failure: responseOutcome{kind: responseRetry, transport: true}, owned: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -138,8 +139,12 @@ func TestProdex04383TransportFullHistoryRejectsUnsafeRotationVariants(t *testing
 				t.Fatal(err)
 			}
 			defer router.Close()
+			bindingOwner := websocketQuotaOwnerA
+			if tc.otherOwner {
+				bindingOwner = websocketQuotaOwnerB
+			}
 			if tc.owned {
-				if err := router.affinity.remember(t.Context(), websocketQuotaOwnerA,
+				if err := router.affinity.remember(t.Context(), bindingOwner,
 					affinityKeys{turn: "turn-bound"}, router.now()); err != nil {
 					t.Fatal(err)
 				}
@@ -177,7 +182,7 @@ func TestProdex04383TransportFullHistoryRejectsUnsafeRotationVariants(t *testing
 			}
 			if tc.owned {
 				owner, err := router.affinity.owner(t.Context(), affinityKeys{turn: "turn-bound"}, router.now())
-				if err != nil || owner != websocketQuotaOwnerA {
+				if err != nil || owner != bindingOwner {
 					t.Fatalf("denied replay deleted original binding: owner=%q err=%v", owner, err)
 				}
 			}

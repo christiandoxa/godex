@@ -10,12 +10,13 @@ import (
 // An opaque WebSocket chain with no verified owner may select one profile
 // for discovery, as tagged Prodex 0.437.9 does. The gateway's bounded
 // previous-response retry planner can repeat the *same-owner* attempt,
-// but this is never permission to replay on another profile or drop
-// tool-output continuation context.
+// but cannot drop tool-output continuation context. Prodex 0.438.3 also
+// permits precommit transport recovery with independently complete history.
 func (router *Router) forwardUnboundWebSocketDiscovery(
 	ctx context.Context,
 	request proxymodel.Request,
 	accounts []proxymodel.Account,
+	keys *affinityKeys,
 ) (proxymodel.Forwarded, error) {
 	candidates := router.requestCandidatesForRequest(accounts, request, router.now())
 	if len(candidates) == 0 {
@@ -52,9 +53,19 @@ func (router *Router) forwardUnboundWebSocketDiscovery(
 			return *result, nil
 		}
 		if pending != nil {
-			// The first profile has already seen this opaque continuation.
-			// Never select a second profile or convert a tool result into
-			// a fresh context-less request after a precommit failure.
+			transportFailure := pending.transport
+			if response := pending.response; response != nil && response.PrecommitFailure != nil && !response.FirstEventCommitted {
+				transportFailure = transportFailure || response.PrecommitFailure.Transport
+			}
+			if recovered, handled, err := router.recoverWebSocketTurnStateTransport04383(
+				ctx, request, accounts, account, routedWebSocketRequestMetadata(request),
+				responseOutcome{kind: responseRetry, transport: transportFailure}, pending,
+			); handled || err != nil {
+				if keys != nil && err == nil {
+					keys.turn = ""
+				}
+				return recovered, err
+			}
 			return finishFresh(&pending)
 		}
 		return proxymodel.Forwarded{}, &proxymodel.Error{

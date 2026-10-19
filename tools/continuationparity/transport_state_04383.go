@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-func seedTransportAlternate04383(p product) error {
+func seedTransportAlternate04383(p product, scenario string) error {
 	name := "routing.json"
 	if p.name == "prodex" {
 		name = "runtime-continuations.json"
@@ -28,6 +28,10 @@ func seedTransportAlternate04383(p product) error {
 	}
 	if p.name == "prodex" {
 		value := state["value"].(map[string]any)
+		if scenario == "unbound-history" || scenario == "unbound-delta" {
+			delete(value["turn_state_bindings"].(map[string]any), "turn-a")
+			delete(value["statuses"].(map[string]any)["turn_state"].(map[string]any), "turn-a")
+		}
 		value["response_profile_bindings"].(map[string]any)["resp-ready-b"] = map[string]any{"profile_name": "second", "bound_at": time.Now().Unix()}
 		value["statuses"].(map[string]any)["response"].(map[string]any)["resp-ready-b"] = map[string]any{"state": "Verified", "confidence": 4, "last_verified_at": time.Now().Unix(), "last_touched_at": time.Now().Unix(), "last_verified_route": "responses", "success_count": 1}
 	} else {
@@ -50,6 +54,16 @@ func seedTransportAlternate04383(p product) error {
 		}
 		digest := sha256.Sum256([]byte("previous:resp-ready-b"))
 		state["bindings"] = append(state["bindings"].([]any), map[string]any{"kind": "previous", "key": hex.EncodeToString(digest[:]), "account_id": id, "updated_unix": time.Now().Unix()})
+		if scenario == "unbound-history" || scenario == "unbound-delta" {
+			turn := sha256.Sum256([]byte("turn:turn-a"))
+			var bindings []any
+			for _, raw := range state["bindings"].([]any) {
+				if raw.(map[string]any)["key"] != hex.EncodeToString(turn[:]) {
+					bindings = append(bindings, raw)
+				}
+			}
+			state["bindings"] = bindings
+		}
 	}
 	return writeJSONFile(path, state)
 }
@@ -67,7 +81,7 @@ func verifyTransportDurable04383(p product, scenario, recoveryEvent string) erro
 		owners, err := readTransportOwners04383(p)
 		if err == nil && owners["turn"] == wantTurn && owners["response"] == "second" && owners["unrelated"] == "main" && owners["session"] == "__prodex_hard_binding_conflict__" {
 			if p.name == "prodex" {
-				if err := verifyTransportReadyLog04383(p, recoveryEvent); err != nil {
+				if err := verifyTransportReadyLog04383(p, scenario, recoveryEvent); err != nil {
 					return err
 				}
 			}
@@ -150,9 +164,12 @@ func readTransportOwners04383(p product) (map[string]string, error) {
 }
 
 func verifyTransportNegativeOwners04383(p product, scenario string) error {
-	wantHard := "main"
+	wantTurn, wantPrevious := "main", "main"
 	if scenario == "previous-response" {
-		wantHard = ""
+		wantTurn, wantPrevious = "", ""
+	}
+	if scenario == "unbound-delta" {
+		wantTurn = ""
 	}
 	deadline := time.NewTimer(3 * time.Second)
 	defer deadline.Stop()
@@ -160,8 +177,8 @@ func verifyTransportNegativeOwners04383(p product, scenario string) error {
 	defer ticker.Stop()
 	for {
 		owners, err := readTransportOwners04383(p)
-		if err == nil && owners["session"] == "main" && owners["turn"] == wantHard && owners["unrelated"] == wantHard && owners["response"] == "" {
-			fmt.Printf("%s %s durable snapshot: session=main; original hard bindings=%q; no alternate response\n", p.name, scenario, wantHard)
+		if err == nil && owners["session"] == "main" && owners["turn"] == wantTurn && owners["unrelated"] == wantPrevious && owners["response"] == "" {
+			fmt.Printf("%s %s durable snapshot: session=main; original turn=%q response=%q; no alternate response\n", p.name, scenario, wantTurn, wantPrevious)
 			return nil
 		}
 		select {
@@ -172,8 +189,13 @@ func verifyTransportNegativeOwners04383(p product, scenario string) error {
 	}
 }
 
-func verifyTransportReadyLog04383(p product, recoveryEvent string) error {
+func verifyTransportReadyLog04383(p product, scenario, recoveryEvent string) error {
 	recoveryMarker := recoveryEvent + " profile=main affinity_released=true"
+	selectionMarker := "selection_keep_current route=websocket profile=second"
+	if scenario == "unbound-history" {
+		recoveryMarker = recoveryEvent + " profile=main affinity_released=false"
+		selectionMarker = "selection_pick route=websocket profile=second mode=ready"
+	}
 	if recoveryEvent == "previous_response_not_found" {
 		recoveryMarker = recoveryEvent + " profile=main retry_index=0 replay_turn_state=None"
 	}
@@ -189,7 +211,7 @@ func verifyTransportReadyLog04383(p product, recoveryEvent string) error {
 		recovery, ready := false, false
 		for _, line := range strings.Split(string(data), "\n") {
 			recovery = recovery || strings.Contains(line, recoveryMarker)
-			ready = ready || (strings.Contains(line, "selection_keep_current route=websocket profile=second") && strings.Contains(line, "quota_source=probe_cache") && strings.Contains(line, "quota_band=quota_healthy"))
+			ready = ready || (strings.Contains(line, selectionMarker) && strings.Contains(line, "quota_source=probe_cache") && strings.Contains(line, "quota_band=quota_healthy"))
 		}
 		if recovery && ready {
 			return nil

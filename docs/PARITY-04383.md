@@ -736,3 +736,39 @@ oracles and the seven-case transport/quota slice. Native run `39273563445`
 also passed every Windows mode on that commit and the expanded transport slice
 on macOS; macOS realtime still failed in official Prodex. Those results are
 not attributed to the later retry-signal or missing-response ownership fixes.
+
+The expanded eight-case executable phase passed on clean
+`a2c193874cacf110b0656a30285e30e9fe68e475`, including the unchanged
+turn-missing replay, original hard-turn retention, new response ownership and
+session conflict. All earlier transport/quota/negative/lifecycle controls passed.
+
+Native run `39274749877` on the earlier `45d7583c` passed all Windows modes
+and the seven-case macOS transport slice with durable negative-state checks.
+Its sole native macOS failure remained official Prodex realtime setup.
+
+## Unbound turn discovery can recover independently complete history
+
+The next canonical experiment removed the turn binding and status before
+startup, completed both authenticated quota probes and used an owner-pinned
+final warmup to make main current. Official Prodex attempted main then second,
+stripped the failed unbound turn token, preserved complete history and output,
+and recorded no owner for that token. Its log independently reported
+`affinity_released=false`, `reports=1 ready=1` and a healthy authenticated
+`selection_pick` for second. Godex instead returned terminal 503 without recovery.
+This reproduces on clean `624649ec`; it is distinct from a bound-owner setup.
+
+Fail-before regressions now cover complete-history recovery and delta-only
+refusal in memory and durable storage. Unbound discovery invokes the existing
+bounded transport-recovery workflow after an actual precommit failure. That
+workflow permits a truly missing owner but rejects a turn owned by another
+profile, conflicting ownership, previous-response dependencies, incomplete
+history and the existing commit/deadline restrictions. Replaying an unknown
+request token does not create an owner for it. No new model field, exported API,
+helper package, dependency or background worker is introduced.
+
+The executable slice adds `unbound-history` and `unbound-delta`. Preparation
+checks that no turn owner exists, and the positive case requires the official
+no-release marker plus the Ready selection rather than a bound-owner marker.
+The delta control requires one attempt, exact 503, retained main session and
+unrelated response, and no turn/recovered-response binding. The resulting
+ten-case slice requires clean-candidate qualification before it is counted.

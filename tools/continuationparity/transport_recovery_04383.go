@@ -14,7 +14,7 @@ import (
 )
 
 func runWebSocketTransportProduct04383(root string, p product) error {
-	for _, scenario := range []string{"full-history", "quota-history", "turn-missing", "delta-only", "previous-response", "postcommit", "cancellation", "deadline"} {
+	for _, scenario := range []string{"full-history", "unbound-history", "quota-history", "turn-missing", "delta-only", "unbound-delta", "previous-response", "postcommit", "cancellation", "deadline"} {
 		if err := runTransportCase04383(filepath.Join(root, scenario), p, scenario); err != nil {
 			return fmt.Errorf("%s: %w", scenario, err)
 		}
@@ -26,8 +26,14 @@ func runTransportCase04383(root string, p product, scenario string) error {
 	if err := prepareProduct(root, &p); err != nil {
 		return err
 	}
-	if err := seedTransportAlternate04383(p); err != nil {
+	if err := seedTransportAlternate04383(p, scenario); err != nil {
 		return err
+	}
+	if scenario == "unbound-history" || scenario == "unbound-delta" {
+		owners, err := readTransportOwners04383(p)
+		if err != nil || owners["turn"] != "" {
+			return fmt.Errorf("unbound fixture acquired a turn owner: owners=%v err=%v", owners, err)
+		}
 	}
 	p.env = append(p.env, "PRODEX_RUNTIME_PROXY_STREAM_IDLE_TIMEOUT_MS=2000", "GODEX_RUNTIME_PROXY_STREAM_IDLE_TIMEOUT_MS=2000", "PRODEX_RUNTIME_LOG_RECORD=true")
 	b := newTransportBackend04383(scenario)
@@ -38,7 +44,11 @@ func runTransportCase04383(root string, p product, scenario string) error {
 	}
 	defer stop()
 	client := &http.Client{Timeout: 5 * time.Second}
-	for _, previous := range []string{"resp-main", "resp-ready-b"} {
+	warmups := []string{"resp-main", "resp-ready-b"}
+	if scenario == "unbound-history" || scenario == "unbound-delta" {
+		warmups[0], warmups[1] = warmups[1], warmups[0]
+	}
+	for _, previous := range warmups {
 		warmup, err := post(client, endpoint+"/responses", fmt.Sprintf(`{"previous_response_id":%q,"input":[]}`, previous))
 		if err != nil || warmup.status != 200 || !strings.Contains(warmup.body, "resp-warmup") {
 			return fmt.Errorf("owner warmup %s: status=%d err=%v", previous, warmup.status, err)
@@ -64,7 +74,7 @@ func runTransportCase04383(root string, p product, scenario string) error {
 	defer connection.Close()
 	_ = connection.SetDeadline(time.Now().Add(12 * time.Second))
 	body := transportHistory04383
-	if scenario == "delta-only" {
+	if scenario == "delta-only" || scenario == "unbound-delta" {
 		body = `{"type":"response.create","model":"gpt-6","session_id":"sess-transport","client_metadata":{"x-codex-turn-state":"turn-a"},"input":[{"type":"function_call_output","call_id":"call-large","output":"done"}]}`
 	}
 	if scenario == "previous-response" {
@@ -86,7 +96,7 @@ func runTransportCase04383(root string, p product, scenario string) error {
 			return fmt.Errorf("unexpected client opcode %d", opcode)
 		}
 		frames = append(frames, string(payload))
-		if scenario != "full-history" && scenario != "quota-history" && scenario != "turn-missing" {
+		if scenario == "delta-only" || scenario == "unbound-delta" || scenario == "previous-response" {
 			b.mu.Lock()
 			err := verifyTransportNegative04383(scenario, body, b.handshakes, b.attempts, string(payload), b.invalid)
 			b.mu.Unlock()

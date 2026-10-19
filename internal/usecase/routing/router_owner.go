@@ -100,7 +100,7 @@ func (router *Router) routeRequest(
 	}
 	if request.WebSocketMessage && keys != nil &&
 		allowsUnboundWebSocketDiscovery(*keys, request.QuotaSelection) {
-		return router.forwardUnboundWebSocketDiscovery(ctx, request, accounts)
+		return router.forwardUnboundWebSocketDiscovery(ctx, request, accounts, keys)
 	}
 	return router.forwardFresh(ctx, request, accounts)
 }

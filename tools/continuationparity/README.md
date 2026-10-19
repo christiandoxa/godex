@@ -47,6 +47,10 @@ an upstream missing-response error. It retries on second with the entire opaque
 request unchanged, retains the original turn on main, records the new response
 on second and persists the session conflict. This differs from a transport fault,
 which removes the failed turn token before replay.
+The unbound variants remove the initial turn binding before startup, finish both
+authenticated quota probes and make main current with the final warmup. Complete
+history then recovers on second with `affinity_released=false`; delta-only still
+returns the exact 503 without replay or creating an owner for the unknown turn.
 Run `./scripts/verify-release-parity.sh --phase=websocket-transport` for this
 source/binary/manifest-pinned slice. Strict compact-followup setup and native
 macOS/Windows qualification remain separate from the Linux release gate.

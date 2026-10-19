@@ -712,9 +712,12 @@ Persistence failure stops the committed stream without replaying it.
 SHA-256 continuity-key digests, account IDs, key kinds, and timestamps. Routing
 use cases persist new bindings before forwarding their associated output bytes.
 Known bindings avoid repeated writes, including stream chunks. In-memory expiry
-reloads durable ownership; unknown WebSocket and other non-Responses opaque
-tokens fail closed, while an unbound HTTP Responses `previous_response_id`
-gets one bounded upstream discovery attempt. Stable thread/session bindings
+reloads durable ownership. Unbound WebSocket response/turn tokens get bounded
+selected-profile discovery; other opaque transports fail closed. An unbound
+HTTP Responses `previous_response_id` gets one bounded upstream discovery
+attempt. Independently complete WebSocket history may recover a precommit
+transport failure on a Ready alternate, while delta-only input stays with its
+selected profile. Stable thread/session bindings
 never expire or get evicted. The snapshot allows 8,192 total bindings; it evicts old opaque response/turn digests
 and refuses new conversations if protected bindings fill the store. Opaque
 entries expire after 30 days. Conflicting concurrent ownership updates fail.
@@ -764,8 +767,8 @@ Native `thread-id` identifies durable Codex ownership. Session resolution looks
 up its upstream owner independently of the profile holding the rollout. Resume
 keeps that rollout home while fixing upstream traffic to its owner, bypassing
 fresh-work quota selection. Legacy/imported sessions without a known binding
-use their containing profile; unknown WebSocket and other non-Responses opaque
-continuations still fail closed. An unbound HTTP Responses `previous_response_id`
+use their containing profile; unknown opaque continuations on transports without
+discovery still fail closed. An unbound HTTP Responses `previous_response_id`
 gets one bounded upstream discovery attempt.
 Removed or disabled upstream owners cause a continuity-preserving error.
 

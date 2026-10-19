@@ -10,6 +10,30 @@ import (
 	"testing"
 )
 
+func TestProdex04383UnboundRecoveryRequiresNoReleasedBindingAndReadySelection(t *testing.T) {
+	p := product{name: "prodex", state: t.TempDir()}
+	logs := filepath.Join(p.state, "logs")
+	if err := os.Mkdir(logs, 0700); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(logs, "prodex-runtime-fixture.log")
+	const event = "transport_failure_turn_state_full_context_replay"
+	const log = event + " profile=main affinity_released=false\nselection_pick route=websocket profile=second mode=ready quota_source=probe_cache quota_band=quota_healthy\n"
+	for _, field := range []string{"", "affinity_released=false", "profile=main", "mode=ready", "quota_source=probe_cache", "quota_band=quota_healthy"} {
+		data := log
+		if field != "" {
+			data = strings.Replace(data, field, "mutated", 1)
+		}
+		if err := os.WriteFile(path, []byte(data), 0600); err != nil {
+			t.Fatal(err)
+		}
+		err := verifyTransportReadyLog04383(p, "unbound-history", event)
+		if (err == nil) != (field == "") {
+			t.Fatalf("unbound recovery evidence mutation %q: %v", field, err)
+		}
+	}
+}
+
 func TestProdex04383RecoveryLogRequiresMatchingFailureAndReadyCache(t *testing.T) {
 	p := product{name: "prodex", state: t.TempDir()}
 	logs := filepath.Join(p.state, "logs")
@@ -22,14 +46,14 @@ func TestProdex04383RecoveryLogRequiresMatchingFailureAndReadyCache(t *testing.T
 		if err := os.WriteFile(path, []byte(log), 0600); err != nil {
 			t.Fatal(err)
 		}
-		if err := verifyTransportReadyLog04383(p, event); err != nil {
+		if err := verifyTransportReadyLog04383(p, "full-history", event); err != nil {
 			t.Fatal(err)
 		}
 		for _, field := range []string{event, "profile=main", "affinity_released=true", "profile=second", "quota_source=probe_cache", "quota_band=quota_healthy"} {
 			if err := os.WriteFile(path, []byte(strings.Replace(log, field, "mutated", 1)), 0600); err != nil {
 				t.Fatal(err)
 			}
-			if err := verifyTransportReadyLog04383(p, event); err == nil {
+			if err := verifyTransportReadyLog04383(p, "full-history", event); err == nil {
 				t.Fatalf("%s accepted mutated %s", event, field)
 			}
 		}
