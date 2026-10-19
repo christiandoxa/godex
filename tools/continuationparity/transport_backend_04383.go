@@ -126,6 +126,10 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		// This metadata stays below the commit threshold; EOF is deterministic.
 		_ = websocketframe.WriteFrame(connection, 1, []byte(`{"type":"response.created","response":{"id":"discarded-transport"}}`), false)
+		if frame := retryableFailureFrame04383(b.scenario); frame != "" {
+			_ = websocketframe.WriteFrame(connection, 1, []byte(frame), false)
+			return
+		}
 		if b.scenario == "quota-history" || strings.HasPrefix(b.scenario, "unbound-quota-") {
 			_ = websocketframe.WriteFrame(connection, 1, []byte(`{"type":"error","status":429,"error":{"code":"insufficient_quota","message":"synthetic quota"}}`), false)
 		}
@@ -139,4 +143,16 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+}
+
+func retryableFailureFrame04383(scenario string) string {
+	switch scenario {
+	case "previous-quota", "unknown-quota":
+		return `{"type":"error","status":429,"error":{"code":"insufficient_quota","message":"synthetic quota"}}`
+	case "previous-rate", "unknown-rate":
+		return `{"type":"error","status":429,"error":{"code":"rate_limit_exceeded","message":"synthetic rate"}}`
+	case "previous-overload", "unknown-overload":
+		return `{"type":"error","status":503,"error":{"code":"server_is_overloaded","message":"synthetic overload"}}`
+	}
+	return ""
 }

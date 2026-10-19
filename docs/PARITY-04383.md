@@ -1286,3 +1286,49 @@ the unknown-ID negative control as its fourteenth scenario, requires its ID to
 remain unbound and rejects mutations that substitute the known-owner 400 reset.
 Exact clean executable qualification follows local validation. This control does
 not qualify the separate strict WebSocket compact-followup branch.
+
+The fourteen-case `--phase=websocket-transport` gate passed on exact clean
+`74c48c4b1cd3b20188475961dc503a38fc9cb219`, including the known/unknown
+previous-response pair. That commit was pushed and its remote HEAD confirmed.
+
+Native macOS job `118216934132` on clean `16f3eefb` passed both four-case HTTP
+modes, including Compact's debounced conflict and unknown-ID projection. This
+confirms the corrected durable child lifecycle on a native host. Official
+realtime still failed immediately after 101 with `local_read_error`; its isolated
+raw accept probe again measured nonblocking inheritance and a 1-microsecond read.
+That separate failure remains **OPEN**.
+
+## Preserve WebSocket application failures beside an unowned previous ID
+
+A six-case paired experiment on clean `74c48c4b` covered quota, rate-limit and
+overload failures with known and unknown previous IDs. The three known-ID
+controls matched exact one-request 400 reset events and accompanying-session
+retention. With an unknown ID beside the verified turn/session, official Prodex
+instead forwarded the exact original 429 quota/rate or 503 overload frame,
+retained the turn/session and unrelated response, and never bound the unknown
+ID. Godex incorrectly returned 400 and removed the turn in all three cases.
+
+The existing routing owner check now applies to every bound WebSocket retry
+outcome, following the tagged full-context eligibility policy. This removes
+the transport-only exception and preserves the upstream failure when the input
+ID has no matching owner. The implementation shrinks by two lines. No new
+helper, production boundary, dependency, persisted field or configuration is
+needed. Pre-send quota and live authentication are not qualified by this slice.
+
+The renamed memory/durable regression covers all four failure classes with
+both known and unknown IDs. Its six new unknown-ID cases failed before the
+change. The focused race suite passed 53 checks and twenty repeated runs passed
+340 checks. The mandatory transport oracle adds all six application cases as
+scenarios 15–20, comparing exact terminal frames, one authenticated main attempt,
+opaque history/header and durable owners. Fixture golden checks prevent an
+application error from silently becoming EOF, while mutation checks reject a
+400 reset, an empty frame, changed status or model replay. The initial 429
+status mutation did not alter its fixture; it was corrected and all 91 focused
+oracle checks passed. Clean executable qualification follows local validation.
+
+The final tooling race run passed 375 checks and `rtk make verify` passed.
+The expanded strict tool rejects clean `74c48c4b` at `unknown-quota` after all
+twenty official controls pass: the old executable substitutes the known-owner
+400 frame. The complete default gate passed separately on exact clean
+`16f3eefb`; it predates the WebSocket mixed-ID and application-failure additions
+and does not qualify those newer cases.

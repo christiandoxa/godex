@@ -166,7 +166,7 @@ func readTransportOwners04383(p product) (map[string]string, error) {
 
 func verifyTransportNegativeOwners04383(p product, scenario string) error {
 	wantTurn, wantPrevious := "main", "main"
-	if scenario == "previous-response" {
+	if strings.HasPrefix(scenario, "previous-") {
 		wantTurn, wantPrevious = "", ""
 	}
 	if strings.HasPrefix(scenario, "unbound-") {

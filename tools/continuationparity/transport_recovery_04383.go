@@ -14,7 +14,7 @@ import (
 )
 
 func runWebSocketTransportProduct04383(root string, p product) error {
-	for _, scenario := range []string{"full-history", "unbound-history", "quota-history", "unbound-quota-history", "turn-missing", "delta-only", "unbound-delta", "unbound-quota-delta", "previous-response", "unknown-previous", "postcommit", "cancellation", "deadline", "busy-history"} {
+	for _, scenario := range []string{"full-history", "unbound-history", "quota-history", "unbound-quota-history", "turn-missing", "delta-only", "unbound-delta", "unbound-quota-delta", "previous-response", "unknown-previous", "previous-quota", "unknown-quota", "previous-rate", "unknown-rate", "previous-overload", "unknown-overload", "postcommit", "cancellation", "deadline", "busy-history"} {
 		if err := runTransportCase04383(filepath.Join(root, scenario), p, scenario); err != nil {
 			return fmt.Errorf("%s: %w", scenario, err)
 		}
@@ -87,10 +87,10 @@ func runTransportCase04383(root string, p product, scenario string) error {
 	if scenario == "delta-only" || strings.HasSuffix(scenario, "-delta") {
 		body = `{"type":"response.create","model":"gpt-6","session_id":"sess-transport","client_metadata":{"x-codex-turn-state":"turn-a"},"input":[{"type":"function_call_output","call_id":"call-large","output":"done"}]}`
 	}
-	if scenario == "previous-response" {
+	if strings.HasPrefix(scenario, "previous-") {
 		body = strings.Replace(body, `"type":"response.create"`, `"type":"response.create","previous_response_id":"resp-main"`, 1)
 	}
-	if scenario == "unknown-previous" {
+	if strings.HasPrefix(scenario, "unknown-") {
 		body = strings.Replace(body, `"type":"response.create"`, `"type":"response.create","previous_response_id":"resp-unknown"`, 1)
 	}
 	if err := websocketframe.WriteFrame(connection, 1, []byte(body), true); err != nil {
@@ -115,7 +115,7 @@ func runTransportCase04383(root string, p product, scenario string) error {
 			return fmt.Errorf("unexpected client opcode %d", opcode)
 		}
 		frames = append(frames, string(payload))
-		if scenario == "delta-only" || strings.HasSuffix(scenario, "-delta") || scenario == "previous-response" || scenario == "unknown-previous" {
+		if scenario == "delta-only" || strings.HasSuffix(scenario, "-delta") || strings.HasPrefix(scenario, "previous-") || strings.HasPrefix(scenario, "unknown-") {
 			b.mu.Lock()
 			err := verifyTransportNegative04383(scenario, body, b.handshakes, b.attempts, string(payload), b.invalid)
 			b.mu.Unlock()
@@ -161,7 +161,10 @@ func verifyTransportNegative04383(scenario, body string, handshakes []string, at
 	if scenario == "unbound-quota-delta" {
 		want = `{"type":"error","status":429,"error":{"code":"insufficient_quota","message":"synthetic quota"}}`
 	}
-	if scenario == "previous-response" {
+	if frame := retryableFailureFrame04383(scenario); frame != "" && strings.HasPrefix(scenario, "unknown-") {
+		want = frame
+	}
+	if strings.HasPrefix(scenario, "previous-") {
 		want = `{"error":{"code":"previous_response_not_found","message":"Previous response was not found. Retrying the full request."},"status":400,"type":"error"}`
 	}
 	if payload != want {

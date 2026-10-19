@@ -99,12 +99,19 @@ func TestProdex04383MissingResponseOracleKeepsOpaqueTurnOnReplay(t *testing.T) {
 }
 
 func TestProdex04383TransportNegativeOracleRejectsReplayAndEmptyTerminal(t *testing.T) {
+	unknownBody := strings.Replace(transportHistory04383, `"model":"gpt-6",`, `"model":"gpt-6","previous_response_id":"resp-unknown",`, 1)
 	for scenario, body := range map[string]string{
 		"delta-only":       `{"type":"response.create","input":[{"type":"function_call_output","call_id":"call-large","output":"done"}]}`,
-		"unknown-previous": strings.Replace(transportHistory04383, `"model":"gpt-6",`, `"model":"gpt-6","previous_response_id":"resp-unknown",`, 1),
+		"unknown-previous": unknownBody,
+		"unknown-quota":    unknownBody,
+		"unknown-rate":     unknownBody,
+		"unknown-overload": unknownBody,
 	} {
 		t.Run(scenario, func(t *testing.T) {
-			const terminal = `{"error":{"code":"service_unavailable","message":"Runtime proxy could not secure a healthy upstream profile before the pre-commit retry budget was exhausted. Retry the request."},"status":503,"type":"error"}`
+			terminal := `{"error":{"code":"service_unavailable","message":"Runtime proxy could not secure a healthy upstream profile before the pre-commit retry budget was exhausted. Retry the request."},"status":503,"type":"error"}`
+			if frame := retryableFailureFrame04383(scenario); frame != "" {
+				terminal = frame
+			}
 			base := transportAttempt04383{owner: "account-a", turn: "turn-a", body: body, ready: true}
 			if err := verifyTransportNegative04383(scenario, body, []string{"account-a"}, []transportAttempt04383{base}, terminal, false); err != nil {
 				t.Fatal(err)
@@ -115,7 +122,7 @@ func TestProdex04383TransportNegativeOracleRejectsReplayAndEmptyTerminal(t *test
 			}{
 				{"incorrect owner reset", `{"error":{"code":"previous_response_not_found","message":"Previous response was not found. Retrying the full request."},"status":400,"type":"error"}`, []transportAttempt04383{base}},
 				{"empty terminal", "", []transportAttempt04383{base}},
-				{"wrong status", strings.Replace(terminal, "503", "502", 1), []transportAttempt04383{base}},
+				{"wrong status", strings.NewReplacer(`"status":429`, `"status":502`, `"status":503`, `"status":502`).Replace(terminal), []transportAttempt04383{base}},
 				{"model replay", terminal, []transportAttempt04383{base, base}},
 				{"no attempt", terminal, nil},
 			} {
@@ -143,5 +150,22 @@ func TestProdex04383UnboundQuotaDeltaKeepsExact429WithoutReplay(t *testing.T) {
 	}
 	if err := verifyTransportNegative04383("unbound-quota-delta", body, []string{"account-a"}, []transportAttempt04383{base, base}, terminal, false); err == nil {
 		t.Fatal("unbound quota delta model replay accepted")
+	}
+}
+
+func TestProdex04383TransportApplicationFailureFixtures(t *testing.T) {
+	for kind, want := range map[string]string{
+		"quota":    `{"type":"error","status":429,"error":{"code":"insufficient_quota","message":"synthetic quota"}}`,
+		"rate":     `{"type":"error","status":429,"error":{"code":"rate_limit_exceeded","message":"synthetic rate"}}`,
+		"overload": `{"type":"error","status":503,"error":{"code":"server_is_overloaded","message":"synthetic overload"}}`,
+	} {
+		for _, prefix := range []string{"previous-", "unknown-"} {
+			if got := retryableFailureFrame04383(prefix + kind); got != want {
+				t.Fatalf("%s%s failure became a different error or EOF: got=%s want=%s", prefix, kind, got, want)
+			}
+		}
+	}
+	if retryableFailureFrame04383("unknown-previous") != "" {
+		t.Fatal("transport fixture became an application error")
 	}
 }

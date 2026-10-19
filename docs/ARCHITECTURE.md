@@ -767,7 +767,7 @@ remain pinned to their bound owner.
 
 Full-context retry signals after quota or retryable upstream failure release
 the matching response/turn identities through routing's dead-binding policy.
-Responses HTTP/WebSocket and HTTP Compact transport resets require a
+WebSocket retry resets and HTTP Responses/Compact transport resets require a
 previous-response ID owned by the failed account. An unknown input ID cannot
 authorize releasing an existing turn owner.
 An accompanying session claim remains with its owner until a later routing
