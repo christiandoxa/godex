@@ -1,7 +1,6 @@
 package runtime
 
 import (
-	"database/sql"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,12 +11,9 @@ import (
 func fixtureGoalDB04360(t *testing.T, root, id, status string) string {
 	t.Helper()
 	path := filepath.Join(root, "goals_1.sqlite")
-	db, err := sql.Open("sqlite", path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := openGoalFixtureDB04383(t, path)
 	defer db.Close()
-	_, err = db.Exec("CREATE TABLE thread_goals (thread_id TEXT, status TEXT, updated_at_ms INTEGER)")
+	_, err := db.Exec("CREATE TABLE thread_goals (thread_id TEXT, status TEXT, updated_at_ms INTEGER)")
 	if err != nil {
 		t.Fatal(err)
 	}

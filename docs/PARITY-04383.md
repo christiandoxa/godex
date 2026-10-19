@@ -946,3 +946,43 @@ The complete `./scripts/verify-release-parity.sh` gate separately passed on
 clean `07551467481ad853f692c0ecde305b5f4ab83f70`, including the thirteen-case
 transport slice and all earlier finite phases. That gate did not yet contain
 the newly discovered HTTP keep-alive case and does not qualify its repair.
+
+## Exact clean keep-alive qualification and native checkpoint
+
+`./scripts/verify-release-parity.sh --phase=http-keepalive` passed on clean
+`2022bfb055c2cf0d152acf8286d9c20f8d392b8d`. Both products returned exact
+200 responses on the same TCP socket after 31 seconds, with exactly two
+main-owned upstream requests. The focused delivery/tooling race suite and
+twenty repeated first-request/keep-alive regression runs passed before push,
+as did `make verify`.
+
+Native macOS run `39287310068`, job `118177903452`, passed the new keep-alive
+mode on that exact commit, including both same-socket 200 responses and two
+upstream requests. Its sole failing native mode remains official Prodex's
+realtime sidecar: it logs `local_read_error` immediately after upgrade and
+resets the session-update connection. That failure remains **OPEN**; passing
+the other modes does not qualify the complete native matrix.
+
+## Bound live-goal test writers and join canceled fixtures
+
+Native Windows run `39285545927`, job `118170310202`, failed an ordinary
+live-goal regression on clean `07551467` before reaching the executable
+oracles. The test writer returned `SQLITE_BUSY`, then temporary-directory
+cleanup found its SQLite file still open. The production observer already
+uses read-only connections with a two-second busy timeout and closes them
+after each observation; this failure did not establish a production leak.
+
+The private CLI runtime fixture opener now gives every writer one connection,
+a bounded two-second busy timeout and unconditional test cleanup. Both
+asynchronous recovery tests cancel and join their runners even on failure;
+their fake children honor cancellation while waiting for the trigger. Ready
+alternates are established before publishing the recoverable goal update.
+The existing same-goal, affinity-release and multi-generation assertions
+remain intact. No production boundary, dependency or persistence format changes.
+
+Fail-before controls independently observed an immediate locked-write error
+and both child fixtures ignoring pre-trigger cancellation. They now prove a
+bounded lock wait, successful write after lock release and cancellation with
+the trigger still unopened. Focused race checks and twenty repeated recovery
+and cancellation runs passed. Native Windows confirmation remains required;
+this fixture repair does not certify the separate managed-launch issue.

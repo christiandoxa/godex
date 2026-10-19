@@ -2,7 +2,6 @@ package runtime
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"io"
 	"os"
@@ -20,8 +19,6 @@ import (
 	sessionrepo "github.com/christiandoxa/godex/internal/repository/session"
 	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
 	sessionusecase "github.com/christiandoxa/godex/internal/usecase/session"
-
-	_ "modernc.org/sqlite"
 )
 
 type liveGoalProcess04361 struct {
@@ -86,7 +83,11 @@ func (process *liveGoalMultiProcess04374) Run(ctx context.Context, home string, 
 			return err
 		}
 		close(process.started)
-		<-process.trigger
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-process.trigger:
+		}
 		<-ctx.Done()
 		return ctx.Err()
 	case 2:
@@ -137,7 +138,11 @@ func (process *liveGoalProcess04361) Run(ctx context.Context, home string, args 
 	if process.started != nil {
 		close(process.started)
 	}
-	<-process.trigger
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-process.trigger:
+	}
 	<-ctx.Done()
 	return ctx.Err()
 }
@@ -205,10 +210,7 @@ func liveGoalFixture04361(t *testing.T, status string) (string, string, string) 
 	}
 	id := "019c9e3d-45a0-7ad0-a6ee-b194ac2d44f9"
 	dbPath := fixtureGoalDB04360(t, shared, id, status)
-	database, err := sql.Open("sqlite", dbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	database := openGoalFixtureDB04383(t, dbPath)
 	if _, err := database.Exec("UPDATE thread_goals SET updated_at_ms=1 WHERE thread_id=?", id); err != nil {
 		t.Fatal(err)
 	}
@@ -264,15 +266,24 @@ func TestProdex04361LiveGoalLimitCancelsChildReleasesAffinityAndResumesGoal(t *t
 		return nil
 	})
 
-	done := make(chan error, 1)
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	var runErr error
 	go func() {
-		done <- RunProfiles(t.Context(), runner, sessions, profiles, []string{"exec", "original task"}, io.Discard)
+		defer close(done)
+		runErr = RunProfiles(ctx, runner, sessions, profiles, []string{"exec", "original task"}, io.Discard)
 	}()
-	<-process.started
-	database, err := sql.Open("sqlite", process.dbPath)
-	if err != nil {
-		t.Fatal(err)
+	defer func() {
+		cancel()
+		<-done
+	}()
+	select {
+	case <-process.started:
+	case <-done:
+		t.Fatalf("live goal runner exited before starting: %v", runErr)
 	}
+	database := openGoalFixtureDB04383(t, process.dbPath)
+	backupReady.Store(true)
 	if _, err := database.Exec(
 		"UPDATE thread_goals SET status='usage_limited',updated_at_ms=? WHERE thread_id=?",
 		time.Now().UnixMilli()+1000, id,
@@ -282,10 +293,10 @@ func TestProdex04361LiveGoalLimitCancelsChildReleasesAffinityAndResumesGoal(t *t
 	if err := database.Close(); err != nil {
 		t.Fatal(err)
 	}
-	backupReady.Store(true)
 	close(process.trigger)
-	if err := <-done; err != nil {
-		t.Fatal(err)
+	<-done
+	if runErr != nil {
+		t.Fatal(runErr)
 	}
 	if process.calls != 2 || released.Load() != 1 {
 		t.Fatalf("live recovery calls=%d affinity releases=%d", process.calls, released.Load())
@@ -352,29 +363,37 @@ func TestProdex04374LiveGoalRecoveryUsesPlannerAcrossGenerations(t *testing.T) {
 		return nil
 	})
 
-	done := make(chan error, 1)
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	var runErr error
 	go func() {
-		done <- RunProfiles(t.Context(), runner, sessions, profiles, []string{"exec", "original task"}, io.Discard)
+		defer close(done)
+		runErr = RunProfiles(ctx, runner, sessions, profiles, []string{"exec", "original task"}, io.Discard)
 	}()
-	<-process.started
-	database, err := sql.Open("sqlite", filepath.Join(shared, "goals_1.sqlite"))
-	if err != nil {
-		t.Fatal(err)
+	defer func() {
+		cancel()
+		<-done
+	}()
+	select {
+	case <-process.started:
+	case <-done:
+		t.Fatalf("live goal runner exited before starting: %v", runErr)
 	}
+	database := openGoalFixtureDB04383(t, filepath.Join(shared, "goals_1.sqlite"))
+	backupsReady.Store(true)
 	if _, err := database.Exec(
 		"UPDATE thread_goals SET status='usage_limited',updated_at_ms=? WHERE thread_id=?",
 		time.Now().UnixMilli()+1000, id,
 	); err != nil {
-		_ = database.Close()
 		t.Fatal(err)
 	}
 	if err := database.Close(); err != nil {
 		t.Fatal(err)
 	}
-	backupsReady.Store(true)
 	close(process.trigger)
-	if err := <-done; err != nil {
-		t.Fatal(err)
+	<-done
+	if runErr != nil {
+		t.Fatal(runErr)
 	}
 	if len(process.calls) != 3 || released.Load() != 2 {
 		t.Fatalf("live multi-generation calls=%d homes=%v releases=%d", len(process.calls), process.calls, released.Load())
