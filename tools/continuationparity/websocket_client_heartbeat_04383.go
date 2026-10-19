@@ -15,6 +15,7 @@ import (
 func readWebSocketLivenessFrame04383(connection net.Conn, reader *bufio.Reader) (byte, []byte, int, error) {
 	const maxControlFrames = 48 // bounded even for the ~30-second deadline case
 	heartbeats := 0
+	var pongErr error
 	for heartbeats < maxControlFrames {
 		frame, err := websocketframe.ReadHeader(reader)
 		if err != nil {
@@ -29,14 +30,21 @@ func readWebSocketLivenessFrame04383(connection net.Conn, reader *bufio.Reader) 
 		}
 		switch frame.Opcode {
 		case 9:
+			if pongErr != nil {
+				return 0, nil, heartbeats, pongErr
+			}
 			if len(payload) != 0 {
 				return 0, nil, heartbeats, fmt.Errorf("heartbeat Ping unexpectedly carried %d bytes", len(payload))
 			}
 			heartbeats++
-			if err := websocketframe.WriteFrame(connection, 10, payload, true); err != nil {
-				return 0, nil, heartbeats, err
+			// A closing peer can reject Pong while its complete CLOSE is queued.
+			pongErr = websocketframe.WriteFrame(connection, 10, payload, true)
+		case 1:
+			if pongErr != nil {
+				return 0, nil, heartbeats, pongErr
 			}
-		case 1, 8:
+			return frame.Opcode, payload, heartbeats, nil
+		case 8:
 			return frame.Opcode, payload, heartbeats, nil
 		default:
 			return 0, nil, heartbeats, fmt.Errorf("unexpected WebSocket opcode during liveness: %d", frame.Opcode)

@@ -640,3 +640,27 @@ local regression checks. Strict compact-followup remains unverified: even a
 compact-only turn lineage was resolved by the official executable through its
 ordinary turn-owner path, which allowed full-history replay. That experiment
 must not be counted as the strict no-replay control.
+
+## Native transport checkpoint and close/Pong observation
+
+Native run `39272192121` on clean `714e82f1` passed the six-scenario transport
+phase on macOS and all seven native modes on Windows. The Windows lane's final
+native-executable parity marker passed. The macOS realtime mode still failed
+inside official Prodex before a Godex comparison; the quota snapshot schema
+repair did not resolve it. The native transport results do not cover the later
+quota-session production repair.
+
+The expanded seven-case transport/quota phase passed both pinned executables on
+clean `624649ec8df4b64b7a92df60072dc4fd24a83dcf`. It includes the newly fixed
+quota-recovery session conflict plus all previous transport lifecycle controls.
+`go test ./... -count=1 -timeout=120s` passed 4,367 tests in 81 packages and
+`make verify` passed before that production repair was pushed.
+
+The earlier macOS committed-idle failure stopped on a Pong write error without
+reading any queued close frame. A deterministic harness regression reproduced
+that loss with a complete empty CLOSE already buffered. The liveness reader now
+consumes that complete close before deciding the result. A failed Pong still
+rejects following application output, another Ping, abrupt EOF and a truncated
+close. Existing wire assertions still require the exact empty close and idle
+budget. This is an observation repair; it does not prove the exact cause of the
+earlier native failure or change Godex's transport behavior.
