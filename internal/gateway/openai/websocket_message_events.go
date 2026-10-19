@@ -44,6 +44,12 @@ func readWebSocketEvent(connection io.ReadWriteCloser) (websocketEvent, error) {
 			if err := handleUpstreamWebSocketControl(connection, frame); err != nil {
 				return websocketEvent{}, err
 			}
+			// Even a control frame is progress only when its entire
+			// payload and validation have completed. Keepalive does not
+			// change the logical request-wide precommit deadline.
+			if watchdog, ok := connection.(*websocketReadWatchdog); ok {
+				watchdog.noteProgress()
+			}
 			continue
 		}
 		if !messageStarted {
@@ -81,6 +87,12 @@ func readWebSocketEvent(connection io.ReadWriteCloser) (websocketEvent, error) {
 			}
 			event.terminal = websocketPayloadTerminal(event.kind, event.payload)
 			event.terminalReset = event.terminal && websocketTerminalShouldReset(event.kind)
+		}
+		// The 0.438.3 upstream idle window advances only after a complete
+		// WebSocket message (including all fragments), never after a lone
+		// header or partial TLS record that a peer can drip indefinitely.
+		if watchdog, ok := connection.(*websocketReadWatchdog); ok {
+			watchdog.noteProgress()
 		}
 		return event, nil
 	}

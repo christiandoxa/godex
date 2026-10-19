@@ -72,14 +72,20 @@ func (watchdog *websocketReadWatchdog) Read(buffer []byte) (int, error) {
 	}
 	watchdog.mu.Lock()
 	watchdog.reading = false
-	if count > 0 && deferred && !watchdog.closed {
+	// A precommit partial header/payload is not an upstream WS *frame*.
+	// Tungstenite's 0.438.3 liveness plan advances on a complete message,
+	// not individual TCP/TLS bytes. The event decoder owns that progress
+	// marker; this byte-oriented read remains valid for COMMITTED streams.
+	committed := watchdog.committed
+	if count > 0 && deferred && committed && !watchdog.closed {
 		watchdog.expired = false
 	}
 	expired := watchdog.expired
-	committed := watchdog.committed
 	watchdog.mu.Unlock()
 	if count > 0 {
-		watchdog.noteProgress()
+		if committed {
+			watchdog.noteProgress()
+		}
 		return count, err
 	}
 	if deferred {
@@ -161,6 +167,9 @@ func (watchdog *websocketReadWatchdog) noteProgress() {
 		watchdog.mu.Unlock()
 		return
 	}
+	// A previously deferred idle event is valid if the next complete
+	// frame was already queued; accept that frame as actual progress.
+	watchdog.expired = false
 	timeout := watchdog.timeout
 	watchdog.deadline = time.Now().Add(timeout)
 	if watchdog.timer == nil {

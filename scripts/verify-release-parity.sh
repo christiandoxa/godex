@@ -606,6 +606,15 @@ if [ "$phase" = 'all' ] || [ "$phase" = 'websocket' ] || [ "$phase" = 'websocket
   --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
   --websocket
 
+# Prodex 0.438.3 liveness advances only on a FULL Tungstenite message,
+# never raw TCP/TLS bytes from an incomplete header or fragmented precommit
+# payload. A peer cannot defeat the upstream progress timeout by trickling
+# unusable partial frames. Conversely, a valid complete fragmented message
+# or complete queued terminal still advances the original progress clock.
+go test -race ./internal/gateway/openai \
+  -run '^TestProdex04383(IncompletePrecommitPayloadCannotRenewProgressDeadline|CompletedPrecommitFrameRenewsProgressDeadline|FragmentedMessageAdvancesProgressOnlyAfterFinalContinuation|PartialPrecommitFrameStillTimesOut)$' \
+  -count=1 -timeout=35s
+
 # Tagged 0.438.3 polls an upstream socket for already-queued terminal frames
 # before an elapsed idle clock can declare the stream dead. Preserve an
 # already-buffered completed/failed frame after a slow synchronous commit,

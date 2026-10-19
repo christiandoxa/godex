@@ -211,3 +211,40 @@ native macOS/Windows poll behavior, or arbitrary upstream handshake failures.
 A native official-binary differential for this exact readiness race remains
 **PARTIAL** until the same queued-terminal timing can be controlled in both
 published executables.
+
+
+## Partial upstream WebSocket bytes do not count as frame progress
+
+The tagged Prodex 0.438.3
+`runtime_proxy/websocket/response_tracking/frame.rs` liveness loop advances
+`last_upstream_frame` only when Tungstenite returns a **complete** decoded
+WebSocket message. A partial header, incomplete TLS/WebSocket payload or
+unfinished fragmented text message does **not** produce a new upstream event
+and cannot postpone the precommit transport progress watchdog. Godex's
+`websocketReadWatchdog.Read` previously refreshed the progress timer on
+**every positive socket byte count**, even while
+`readWebSocketEvent` was still assembling an unfinished frame. This was a
+real bounded discrepancy: a slow peer could drip invalid partial bytes to
+renew the upstream idle budget without ever delivering a model response.
+
+`TestProdex04383IncompletePrecommitPayloadCannotRenewProgressDeadline`
+reproduced the bug **before the patch**: an incomplete text payload renewed
+the configured timer by more than 60ms without a complete message. The
+scoped fix leaves byte-oriented progress tracking intact for genuinely
+**committed** output streams, but lets the precommit event parser update
+progress **only after a complete, validated message** (including control
+Ping/Pong messages). `TestProdex04383FragmentedMessageAdvancesProgressOnlyAfterFinalContinuation`
+asserts a nonfinal text fragment does not renew the clock and the final
+continuation does, while preserving the complete terminal event's bytes and
+identity. `TestProdex04383CompletedPrecommitFrameRenewsProgressDeadline`
+protects legitimate complete-frame liveness, and
+`TestProdex04383PartialPrecommitFrameStillTimesOut` protects a truncated
+message's bounded failure. Existing physical queued-terminal readiness and
+silent-stream negative controls still PASS with repeated `-race` runs.
+
+This is **source-aligned local WebSocket frame progress proof**, not a claim
+that native Windows, TLS partial records, or every production network fault
+has been qualified in an independent two-executable release fixture. It
+preserves the original request-wide precommit deadline, hard-affinity owner,
+quota classification and no-replay rules. The release's full executable
+oracles must be rerun on one clean Godex revision after this change.
