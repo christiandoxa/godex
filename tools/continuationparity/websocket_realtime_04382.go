@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"net"
 	"os"
 	"path/filepath"
@@ -33,6 +34,23 @@ func prepareRealtimeProduct04382(root string, p *product) error {
 	if err := seedProductState(*p); err != nil {
 		return err
 	}
+	if err := seedRealtimeQuota04383(*p); err != nil {
+		return err
+	}
+	env := p.env[:0]
+	for _, value := range p.env {
+		key, _, _ := strings.Cut(value, "=")
+		switch key {
+		case "PRODEX_RUNTIME_PROXY_PROFILE_INFLIGHT_HARD_LIMIT", "GODEX_RUNTIME_PROXY_PROFILE_INFLIGHT_HARD_LIMIT", "PRODEX_RUNTIME_LOG_RECORD":
+			continue
+		}
+		env = append(env, value)
+	}
+	p.env = append(env, "PRODEX_RUNTIME_PROXY_PROFILE_INFLIGHT_HARD_LIMIT=2", "GODEX_RUNTIME_PROXY_PROFILE_INFLIGHT_HARD_LIMIT=2", "PRODEX_RUNTIME_LOG_RECORD=1")
+	return nil
+}
+
+func seedRealtimeQuota04383(p product) error {
 	path := filepath.Join(p.state, "runtime-usage-snapshots.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -59,7 +77,7 @@ func prepareRealtimeProduct04382(root string, p *product) error {
 			}
 		}
 	} else {
-		values["third"] = map[string]any{"checked_at": time.Now().Unix(), "plan_type": "plus", "five_hour_status": "Ready", "five_hour_remaining_percent": 90, "weekly_status": "Exhausted", "weekly_remaining_percent": 0, "weekly_reset_at": 4102444800}
+		values["third"] = maps.Clone(values["second"].(map[string]any))
 	}
 	for key, raw := range values {
 		if key != ready {
@@ -73,16 +91,6 @@ func prepareRealtimeProduct04382(root string, p *product) error {
 	if len(values) != 3 || values[ready] == nil {
 		return errors.New("realtime fixture requires one ready and two weekly-exhausted profiles")
 	}
-	env := p.env[:0]
-	for _, value := range p.env {
-		key, _, _ := strings.Cut(value, "=")
-		switch key {
-		case "PRODEX_RUNTIME_PROXY_PROFILE_INFLIGHT_HARD_LIMIT", "GODEX_RUNTIME_PROXY_PROFILE_INFLIGHT_HARD_LIMIT", "PRODEX_RUNTIME_LOG_RECORD":
-			continue
-		}
-		env = append(env, value)
-	}
-	p.env = append(env, "PRODEX_RUNTIME_PROXY_PROFILE_INFLIGHT_HARD_LIMIT=2", "GODEX_RUNTIME_PROXY_PROFILE_INFLIGHT_HARD_LIMIT=2", "PRODEX_RUNTIME_LOG_RECORD=1")
 	return nil
 }
 

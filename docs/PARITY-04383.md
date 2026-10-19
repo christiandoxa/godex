@@ -572,3 +572,17 @@ had an ordinary turn owner, which suppressed the strict compact-followup
 selection slot and allowed normal full-history recovery in official Prodex.
 That experiment is preserved outside the repository and is excluded from
 the passing oracle. It is not evidence of unsafe strict-compact replay.
+
+## Native realtime fixture quota schema repair
+
+Actual macOS CI on `abc86d03` failed inside the official Prodex realtime
+sidecar before Godex ran that case. The same log showed persisted usage
+snapshots rejected with `runtime_proxy_recovery_fallback`; source audit found
+the fixture's third profile omitted required `five_hour_reset_at`.
+`TestProdex04383RealtimeFixtureKeepsEveryRequiredQuotaField` reproduced the
+missing field before the repair. Realtime preparation now clones an existing
+complete synthetic snapshot before marking both alternates weekly-exhausted.
+The focused schema regression passes. This repairs invalid oracle state;
+it does not establish the cause or resolution of the separate immediate
+native realtime connection reset. Native qualification remains OPEN pending
+actual execution of the repaired fixture. No Godex production behavior changes.
