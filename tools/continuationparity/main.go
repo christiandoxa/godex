@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	prodexCommit = "decfed45f884fe2bef20911303beab7b198698b7"
-	prodexSHA    = "3f2fcd776fee0335dc49910d0651adc43a55c8627913556c307755b1575dac3f"
+	prodexCommit = "42042d765100fc06895a27e0904ffb64842092e6"
+	prodexSHA    = "5efa06fef57b0026eae7ec3cad23ac76b40c3e5d8a3afaee6c20feaeb5737923"
 )
 
 type attempt struct{ account, mode, body string }
@@ -166,11 +166,11 @@ func main() {
 		}
 		return
 	}
-	prodex := flag.String("prodex", "", "official Prodex 0.438.2 binary")
+	prodex := flag.String("prodex", "", "official Prodex 0.438.3 binary")
 	godex := flag.String("godex", "", "Godex binary")
-	prodexSource := flag.String("prodex-source", "", "tagged Prodex 0.438.2 source")
+	prodexSource := flag.String("prodex-source", "", "tagged Prodex 0.438.3 source")
 	websocket := flag.Bool("websocket", false, "run the isolated WebSocket request/recovery differential")
-	websocketCapacity := flag.Bool("websocket-capacity", false, "check 0.438.2 completed WebSocket profile capacity and cached reuse")
+	websocketCapacity := flag.Bool("websocket-capacity", false, "check 0.438.3 completed WebSocket profile capacity and cached reuse")
 	websocketDeadline := flag.Bool("websocket-deadline", false, "compare original precommit deadline after hidden frames across both official binaries")
 	websocketCommittedIdle := flag.Bool("websocket-committed-idle", false, "compare committed output stream idle expiry/close frame across both pinned binaries")
 	websocketLookaheadIdle := flag.Bool("websocket-lookahead-idle", false, "compare 8KiB precommit hold promotion into committed stream idle against both binaries")
@@ -242,23 +242,23 @@ func main() {
 		b.mu.Unlock()
 	}
 	if *websocketRealtime {
-		fmt.Println("PASS Prodex 0.438.2 realtime duplex permit and close lifecycle across both binaries")
+		fmt.Println("PASS Prodex 0.438.3 realtime duplex permit and close lifecycle across both binaries")
 		return
 	}
 	if *websocketLookaheadIdle {
-		fmt.Printf("PASS Prodex 0.438.2 precommit 8KiB lookahead committed idle: %d upstream attempts across both binaries\n", len(mustAttempts(b)))
+		fmt.Printf("PASS Prodex 0.438.3 precommit 8KiB lookahead committed idle: %d upstream attempts across both binaries\n", len(mustAttempts(b)))
 		return
 	}
 	if *websocketCommittedIdle {
-		fmt.Printf("PASS Prodex 0.438.2 committed output WebSocket idle graceful closure: %d authenticated upstream attempts across both binaries\n", len(mustAttempts(b)))
+		fmt.Printf("PASS Prodex 0.438.3 committed output WebSocket idle graceful closure: %d authenticated upstream attempts across both binaries\n", len(mustAttempts(b)))
 		return
 	}
 	if *websocketDeadline {
-		fmt.Printf("PASS Prodex 0.438.2 absolute precommit WebSocket deadline: %d total upstream attempts across both binaries\n", len(mustAttempts(b)))
+		fmt.Printf("PASS Prodex 0.438.3 absolute precommit WebSocket deadline: %d total upstream attempts across both binaries\n", len(mustAttempts(b)))
 		return
 	}
 	if *websocketCapacity {
-		fmt.Printf("PASS Prodex 0.438.2 completed-idle WebSocket capacity/reuse: %d total upstream attempts across both binaries\n", len(mustAttempts(b)))
+		fmt.Printf("PASS Prodex 0.438.3 completed-idle WebSocket capacity/reuse: %d total upstream attempts across both binaries\n", len(mustAttempts(b)))
 		return
 	}
 	if *websocket {
@@ -280,7 +280,7 @@ func verifyProdex(binary, source string) error {
 		return err
 	}
 	output, err := exec.Command(binary, "--version").CombinedOutput()
-	if err != nil || strings.TrimSpace(string(output)) != "prodex 0.438.2" {
+	if err != nil || strings.TrimSpace(string(output)) != "prodex 0.438.3" {
 		return fmt.Errorf("unexpected Prodex version %q: %v", output, err)
 	}
 	if err := verifyProdexSource(source); err != nil {
@@ -292,7 +292,7 @@ func verifyProdex(binary, source string) error {
 func verifyProdexSource(source string) error {
 	output, err := exec.Command("git", "-C", source, "rev-parse", "HEAD").Output()
 	if err != nil || strings.TrimSpace(string(output)) != prodexCommit {
-		return fmt.Errorf("Prodex source is not tag 0.438.2")
+		return fmt.Errorf("Prodex source is not tag 0.438.3")
 	}
 	return verifyProdexSourceClean(source)
 }

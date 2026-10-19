@@ -102,3 +102,18 @@ published Prodex 0.438.3 two-executable transport recovery oracle. The
 subsequent release gate must pin and exercise the actual new binary to
 qualify cross-product behavior; release 0.438.2 differential logs cannot
 be substituted.
+
+
+## Active 0.438.3 executable release gate provenance
+
+The active `scripts/verify-release-parity.sh` and all seven Prodex official
+executable parity oracle entry points have been re-pinned from `0.438.2` to
+`0.438.3`, using the tagged source commit, published SHA-256 binary, version
+string and release manifest recorded at the beginning of this document.
+The historical `PARITY-04382.md` remains unchanged. The active preflight
+adds the 0.438.3 fail-before transport full-history and typed precommit
+outcome regression suite under Go's race detector. Every old synthetic
+profile, CLI, context, DeepSeek, Gemini and WebSocket replay/affinity fixture
+remains mandatory. Changing the pins alone does **not** establish release
+parity: all executable phases must pass against **one clean Godex candidate**
+using the actual published 0.438.3 binary.
