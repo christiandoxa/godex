@@ -175,6 +175,10 @@ func wsConnect(endpoint string) (net.Conn, *bufio.Reader, error) {
 }
 
 func wsConnectURL(endpoint string) (net.Conn, *bufio.Reader, error) {
+	return wsConnectHeaders04383(endpoint, "")
+}
+
+func wsConnectHeaders04383(endpoint, headers string) (net.Conn, *bufio.Reader, error) {
 	endpointURL, err := url.Parse(endpoint)
 	if err != nil {
 		return nil, nil, err
@@ -185,8 +189,8 @@ func wsConnectURL(endpoint string) (net.Conn, *bufio.Reader, error) {
 	}
 	reader := bufio.NewReader(connection)
 	_, err = fmt.Fprintf(connection,
-		"GET %s HTTP/1.1\r\nHost: %s\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Protocol: codex.realtime\r\n\r\n",
-		endpointURL.EscapedPath(), endpointURL.Host)
+		"GET %s HTTP/1.1\r\nHost: %s\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Protocol: codex.realtime\r\n%s\r\n",
+		endpointURL.EscapedPath(), endpointURL.Host, headers)
 	if err != nil {
 		_ = connection.Close()
 		return nil, nil, err

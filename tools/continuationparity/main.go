@@ -161,6 +161,12 @@ func main() {
 		return
 	}
 	if os.Getenv("GODEX_CONTINUATION_CODEX_STUB") == "1" {
+		if control := os.Getenv("GODEX_CONTINUATION_TRANSPORT_CONTROL"); control != "" {
+			if err := transportChild04383(control, os.Args[1:]); err != nil {
+				fatal(err.Error())
+			}
+			return
+		}
 		if len(os.Args) > 1 && os.Args[1] == "--version" {
 			fmt.Println("codex-cli 0.163.0")
 		}
@@ -175,11 +181,12 @@ func main() {
 	websocketCommittedIdle := flag.Bool("websocket-committed-idle", false, "compare committed output stream idle expiry/close frame across both pinned binaries")
 	websocketLookaheadIdle := flag.Bool("websocket-lookahead-idle", false, "compare 8KiB precommit hold promotion into committed stream idle against both binaries")
 	websocketRealtime := flag.Bool("websocket-realtime", false, "compare realtime duplex permit retention, admission and session closure")
+	websocketTransport := flag.Bool("websocket-transport", false, "compare authenticated full-history precommit transport recovery in a rotating managed launch")
 	godexSource := flag.String("godex-source", "", "clean Godex commit source (required with either WebSocket fixture)")
 	godexCommit := flag.String("godex-commit", "", "exact 40-character Godex commit (required with either WebSocket fixture)")
 	flag.Parse()
 	chosen := 0
-	for _, mode := range []bool{*websocket, *websocketCapacity, *websocketDeadline, *websocketCommittedIdle, *websocketLookaheadIdle, *websocketRealtime} {
+	for _, mode := range []bool{*websocket, *websocketCapacity, *websocketDeadline, *websocketCommittedIdle, *websocketLookaheadIdle, *websocketRealtime, *websocketTransport} {
 		if mode {
 			chosen++
 		}
@@ -193,7 +200,7 @@ func main() {
 	if err := verifyProdex(*prodex, *prodexSource); err != nil {
 		fatal(err.Error())
 	}
-	if *websocket || *websocketCapacity || *websocketDeadline || *websocketCommittedIdle || *websocketLookaheadIdle || *websocketRealtime {
+	if chosen > 0 {
 		if err := verifyWebSocketCandidate(*godex, *godexSource, *godexCommit); err != nil {
 			fatal(err.Error())
 		}
@@ -213,7 +220,9 @@ func main() {
 	for _, spec := range []struct{ name, binary string }{{"prodex", *prodex}, {"godex", *godex}} {
 		p := product{name: spec.name, binary: spec.binary}
 		var err error
-		if *websocketRealtime {
+		if *websocketTransport {
+			err = runWebSocketTransportProduct04383(root, p)
+		} else if *websocketRealtime {
 			err = runWebSocketRealtimeProduct04382(root, p)
 		} else if *websocketLookaheadIdle {
 			err = runWebSocketLookaheadIdleProduct04382(root, b, p)
@@ -235,6 +244,10 @@ func main() {
 			}
 			fatal(spec.name + ": " + err.Error())
 		}
+	}
+	if *websocketTransport {
+		fmt.Println("PASS Prodex 0.438.3 authenticated full-history WebSocket transport recovery across both binaries")
+		return
 	}
 	if chosen > 0 && !*websocketRealtime {
 		b.mu.Lock()

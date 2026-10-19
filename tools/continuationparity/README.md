@@ -18,6 +18,28 @@ The 0.438.2 names below identify where particular compatibility fixtures
 originated; their active executable reference is **0.438.3**. All release
 phases must use the same clean Godex commit.
 
+## Authenticated precommit transport recovery
+
+`--websocket-transport` uses a managed `run` launch with two profiles.
+The `gateway` command fixes its pool to the active profile and cannot prove
+cross-profile recovery. Two owner-pinned warmups establish authenticated
+loopback quota receipts without changing the failed turn's main owner.
+The upstream accepts a complete request, sends hidden metadata, then closes
+before commitment. Both products must attempt main exactly once and the Ready
+alternate exactly once, remove the failed turn from headers and nested metadata,
+preserve all history/tool arguments/large integers, and emit exact client frames.
+The official runtime log must confirm `quota_source=probe_cache` for the alternate.
+
+The durable snapshot must retain the recovered response on second, an unrelated
+response on main, no failed turn binding, and the accompanying session conflict.
+Delta-only input returns the exact terminal 503 without replay. A previous-response
+dependency returns the exact full-context 400 signal without replay. Mutation tests
+reject lost auth evidence, extra requests/handshakes, changed owners, rounded
+integers, stale tokens, altered output and empty terminal responses.
+Run `./scripts/verify-release-parity.sh --phase=websocket-transport` for this
+source/binary/manifest-pinned slice. Strict compact-followup setup and native
+macOS/Windows execution remain separate qualification work.
+
 ## Exact HTTP history replay boundary
 
 The opt-in `TestProdex04380ExecutableHistoryReplayBoundary` test verifies nine

@@ -520,3 +520,33 @@ Truncated messages produce no observation. A persistence error stops the
 committed response without replay. Focused integration and race checks pass;
 full release qualification must use the resulting clean commit before it is
 attributed to this repair.
+
+## Independent authenticated transport oracle
+
+`tools/continuationparity --websocket-transport` now exercises a genuine
+multi-profile managed launch rather than the fixed active-profile gateway.
+Both synthetic profiles receive authenticated, healthy loopback quota
+responses before the failed main-owned turn is sent. The official runtime
+log must independently report the alternate's healthy `probe_cache` source
+and the exact main-owned transport replay decision. A hidden upstream
+`response.created` followed by TCP EOF deterministically fails before commit.
+
+The full-history case requires exactly two authenticated handshakes and
+inferences, main then second; exact client delta/completion frames; removal
+of stale turn-state headers and nested metadata; and preservation of tool
+arguments plus integers `9007199254740993` and `18446744073709551615`.
+Both durable stores must contain the recovered response on second, the
+unrelated original response on main, no failed turn, and the accompanying
+session conflict sentinel. Delta-only and previous-response controls require
+exact 503 and 400 terminal frames respectively, with one main inference and
+no alternate dispatch. Mutation controls reject each material deviation.
+
+The new finite slice is available as
+`./scripts/verify-release-parity.sh --phase=websocket-transport` and is also
+mandatory in the default all gate and native PowerShell matrix. Qualification
+of this committed harness follows on a clean candidate; native macOS/Windows
+execution and a proven strict compact-followup fixture remain OPEN. The
+three production repairs were independently checked on clean `abc86d03`
+with the exploratory six-case executable harness and `make verify`.
+The complete original finite release gate separately passed on `f41611c9`;
+that result is not attributed to the later late-ID repair.

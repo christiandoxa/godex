@@ -17,7 +17,8 @@ case "${1:-}" in
   --phase=websocket) phase='websocket' ;;
   --phase=websocket-core) phase='websocket-core' ;;
   --phase=websocket-deadline) phase='websocket-deadline' ;;
-  *) echo 'usage: verify-release-parity.sh [--phase=preflight|preflight-tests|preflight-oracles|preflight-oracles-pty|preflight-oracles-profiles|preflight-oracles-history|deepseek|gemini|websocket|websocket-core|websocket-deadline]' >&2; exit 2 ;;
+  --phase=websocket-transport) phase='websocket-transport' ;;
+  *) echo 'usage: verify-release-parity.sh [--phase=preflight|preflight-tests|preflight-oracles|preflight-oracles-pty|preflight-oracles-profiles|preflight-oracles-history|deepseek|gemini|websocket|websocket-core|websocket-deadline|websocket-transport]' >&2; exit 2 ;;
 esac
 if [ "$#" -gt 1 ]; then
   echo 'release parity accepts at most one phase option' >&2
@@ -739,6 +740,19 @@ if [ "$phase" = 'all' ] || [ "$phase" = 'websocket' ] || [ "$phase" = 'websocket
 go test ./tools/continuationparity \
   -run '^TestProdex04382WebSocketDeadlineOracleRejectsMaterialMutations$' \
   -count=1 -timeout=30s
+fi
+
+if [ "$phase" = 'all' ] || [ "$phase" = 'websocket' ] || [ "$phase" = 'websocket-transport' ]; then
+# Managed run admits both authenticated profiles; public gateway fixes its
+# pool to the active owner. Check the actual Ready fallback, opaque history,
+# stale token removal, exact client frames and durable owner snapshot.
+"$tmp/continuationparity" \
+  --prodex "$tmp/prodex" --godex "$tmp/godex" \
+  --prodex-source "$tmp/prodex-source" \
+  --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
+  --websocket-transport
+go test -race ./tools/continuationparity \
+  -run '^TestProdex04383Transport' -count=1 -timeout=40s
 fi
 
 # Printed only after all stages *selected for this invocation* succeeded.
