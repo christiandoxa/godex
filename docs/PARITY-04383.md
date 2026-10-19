@@ -1075,3 +1075,26 @@ cases against clean `774f6286`. The tooling race suite passed 260 tests,
 including fifty Compact mutation checks; `bash -n` and `make verify` passed.
 The release phase must still qualify the committed harness on its exact clean
 candidate. No native nine-mode result is claimed before actual execution.
+
+`./scripts/verify-release-parity.sh --phase=http-compact` passed on exact clean
+`68a60bfd50f9bd86eb573a22826df7d5891d6beb` before its push. All three cases
+and mutation controls passed with source, executable and manifest provenance
+checked by the release gate. This verifies the finite HTTP Compact slice;
+the complete new default gate and native nine-mode matrix remain separate.
+
+## Make native stream-idle fixtures independent of host scheduling
+
+Run `39289226215` failed Sonar coverage generation on `68182776` because
+`TestProdex04355DeepSeekStreamIdleResetsAfterEachChunk` lost its second delta
+under host scheduling delay. Its 100 ms chunk delays and 250 ms idle limit
+depended on wall time. This failure occurred before quality analysis and did
+not establish a production stream-timer defect.
+
+The three private native-stream idle tests now use the standard library's
+`testing/synctest`, already used elsewhere in the repository. The same fixture
+chunks, delays, idle limits, timeout bound and terminal-output assertions remain
+in force. Virtual time advances only while the owned goroutines are blocked;
+the tests still exercise the real gateway timers and shutdown. No production
+clock hook, timeout change, dependency or helper package is needed. One hundred
+repeated race runs passed all 300 checks, and the gateway coverage run passed
+247 tests. Native re-execution is still needed to qualify the repaired fixture.

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
@@ -61,54 +62,60 @@ func (body *delayedAnthropicBody) Close() error {
 }
 
 func TestProdex04355DeepSeekStreamIdleAcceptsSubIdleGaps(t *testing.T) {
-	stream := runNativeIdleFixture(t,
-		[]string{
-			`event: message_start` + "\ndata: " + `{"type":"message_start","message":{"id":"msg_idle"}}` + "\n\n",
-			`event: content_block_start` + "\ndata: " + `{"type":"content_block_start","index":0,"content_block":{"type":"text"}}` + "\n\n" +
-				`event: content_block_delta` + "\ndata: " + `{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"ready"}}` + "\n\n",
-			`event: message_stop` + "\ndata: " + `{"type":"message_stop"}` + "\n\n",
-		},
-		[]time.Duration{0, 50 * time.Millisecond, 50 * time.Millisecond},
-		500*time.Millisecond,
-	)
-	if !strings.Contains(stream, `"delta":"ready"`) || !strings.Contains(stream, "event: response.completed") {
-		t.Fatalf("sub-idle stream = %s", stream)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		stream := runNativeIdleFixture(t,
+			[]string{
+				`event: message_start` + "\ndata: " + `{"type":"message_start","message":{"id":"msg_idle"}}` + "\n\n",
+				`event: content_block_start` + "\ndata: " + `{"type":"content_block_start","index":0,"content_block":{"type":"text"}}` + "\n\n" +
+					`event: content_block_delta` + "\ndata: " + `{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"ready"}}` + "\n\n",
+				`event: message_stop` + "\ndata: " + `{"type":"message_stop"}` + "\n\n",
+			},
+			[]time.Duration{0, 50 * time.Millisecond, 50 * time.Millisecond},
+			500*time.Millisecond,
+		)
+		if !strings.Contains(stream, `"delta":"ready"`) || !strings.Contains(stream, "event: response.completed") {
+			t.Fatalf("sub-idle stream = %s", stream)
+		}
+	})
 }
 
 func TestProdex04355DeepSeekStreamIdleResetsAfterEachChunk(t *testing.T) {
-	stream := runNativeIdleFixture(t,
-		[]string{
-			`event: message_start` + "\ndata: " + `{"type":"message_start","message":{"id":"msg_reset"}}` + "\n\n",
-			`event: content_block_start` + "\ndata: " + `{"type":"content_block_start","index":0,"content_block":{"type":"text"}}` + "\n\n",
-			`event: content_block_delta` + "\ndata: " + `{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"a"}}` + "\n\n",
-			`event: content_block_delta` + "\ndata: " + `{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"b"}}` + "\n\n" +
-				`event: message_stop` + "\ndata: " + `{"type":"message_stop"}` + "\n\n",
-		},
-		[]time.Duration{0, 100 * time.Millisecond, 100 * time.Millisecond, 100 * time.Millisecond},
-		250*time.Millisecond,
-	)
-	if !strings.Contains(stream, `"delta":"a"`) || !strings.Contains(stream, `"delta":"b"`) || !strings.Contains(stream, "event: response.completed") {
-		t.Fatalf("reset-idle stream = %s", stream)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		stream := runNativeIdleFixture(t,
+			[]string{
+				`event: message_start` + "\ndata: " + `{"type":"message_start","message":{"id":"msg_reset"}}` + "\n\n",
+				`event: content_block_start` + "\ndata: " + `{"type":"content_block_start","index":0,"content_block":{"type":"text"}}` + "\n\n",
+				`event: content_block_delta` + "\ndata: " + `{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"a"}}` + "\n\n",
+				`event: content_block_delta` + "\ndata: " + `{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"b"}}` + "\n\n" +
+					`event: message_stop` + "\ndata: " + `{"type":"message_stop"}` + "\n\n",
+			},
+			[]time.Duration{0, 100 * time.Millisecond, 100 * time.Millisecond, 100 * time.Millisecond},
+			250*time.Millisecond,
+		)
+		if !strings.Contains(stream, `"delta":"a"`) || !strings.Contains(stream, `"delta":"b"`) || !strings.Contains(stream, "event: response.completed") {
+			t.Fatalf("reset-idle stream = %s", stream)
+		}
+	})
 }
 
 func TestProdex04355DeepSeekStreamIdleTimeoutFailsWithoutHanging(t *testing.T) {
-	started := time.Now()
-	stream := runNativeIdleFixture(t,
-		[]string{
-			`event: message_start` + "\ndata: " + `{"type":"message_start","message":{"id":"msg_timeout"}}` + "\n\n",
-			`event: message_stop` + "\ndata: " + `{"type":"message_stop"}` + "\n\n",
-		},
-		[]time.Duration{0, 250 * time.Millisecond},
-		25*time.Millisecond,
-	)
-	if elapsed := time.Since(started); elapsed >= time.Second {
-		t.Fatalf("idle timeout took %s", elapsed)
-	}
-	if !strings.Contains(stream, "event: response.failed") || !strings.Contains(stream, "provider_stream_error") || strings.Contains(stream, "event: response.completed") {
-		t.Fatalf("idle timeout stream = %s", stream)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		started := time.Now()
+		stream := runNativeIdleFixture(t,
+			[]string{
+				`event: message_start` + "\ndata: " + `{"type":"message_start","message":{"id":"msg_timeout"}}` + "\n\n",
+				`event: message_stop` + "\ndata: " + `{"type":"message_stop"}` + "\n\n",
+			},
+			[]time.Duration{0, 250 * time.Millisecond},
+			25*time.Millisecond,
+		)
+		if elapsed := time.Since(started); elapsed >= time.Second {
+			t.Fatalf("idle timeout took %s", elapsed)
+		}
+		if !strings.Contains(stream, "event: response.failed") || !strings.Contains(stream, "provider_stream_error") || strings.Contains(stream, "event: response.completed") {
+			t.Fatalf("idle timeout stream = %s", stream)
+		}
+	})
 }
 
 func runNativeIdleFixture(t *testing.T, chunks []string, delays []time.Duration, idle time.Duration) string {
