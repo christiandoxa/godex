@@ -1054,3 +1054,24 @@ status, unrelated-response retention and the exact session conflict. Initial
 durable fixture setup was corrected to use valid synthetic IDs and restore
 continuation statuses as the production constructor does. The focused Compact
 race suite now passes; clean executable qualification follows local checks.
+
+The repeated Compact race regression passed 100 checks and `make verify`
+passed before `774f6286` was pushed. A paired experiment on that exact clean
+commit matched the two 200 recoveries, the one-request 400 reset and all
+three durable-owner projections. Those observations remained exploratory.
+
+The new mandatory `--phase=http-compact` gate turns them into strict assertions
+against both pinned executables: original ownership after the two warmups,
+applied Ready quota evidence, exact upstream counts and owners, unchanged wire
+bytes including large integers, exact final output/status and durable state
+after orderly shutdown. Its previous-response control rejects replay, and
+mutation tests independently reject each material deviation. The default gate
+and native matrix now include this ninth mode. Clean-candidate qualification
+follows local checks; the strict WebSocket compact-followup gap remains open.
+
+The strict oracle rejected clean `86a157de` at the expected Godex turn-only
+503 after all three official Prodex cases passed. It then passed all three
+cases against clean `774f6286`. The tooling race suite passed 260 tests,
+including fifty Compact mutation checks; `bash -n` and `make verify` passed.
+The release phase must still qualify the committed harness on its exact clean
+candidate. No native nine-mode result is claimed before actual execution.

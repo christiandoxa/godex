@@ -29,6 +29,23 @@ proof. Its mutation tests reject each material deviation.
 Run `./scripts/verify-release-parity.sh --phase=http-keepalive` for this slice.
 It is also mandatory in the complete gate and native executable matrix.
 
+## HTTP Compact transport recovery
+
+`--http-compact` proves both owner-pinned warmups and applied authenticated
+quota evidence before closing main's Compact connection without response
+headers. Turn-only and accompanying-session requests must retry second exactly
+once, preserving the entire opaque payload and turn header. The failed turn
+must remain absent from durable state; the unrelated response stays on main,
+and the accompanying session becomes a conflict. A previous-response dependency
+instead returns the exact 400 reset without replay, retains the session on main,
+and removes only the failed hard owners. Mutation controls reject changes to
+readiness, authentication, count, owner, wire bytes, large numbers, output,
+status and every durable-owner projection.
+
+Run `./scripts/verify-release-parity.sh --phase=http-compact` for this slice.
+The complete gate and nine-mode native matrix require it. This HTTP route is
+separate from the still-open strict WebSocket compact-followup control.
+
 ## Authenticated precommit transport recovery
 
 `--websocket-transport` uses a managed `run` launch with two profiles.
