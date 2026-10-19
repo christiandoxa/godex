@@ -177,7 +177,7 @@ func (proxy *Proxy) forwardResponsesWebSocket(
 			return closeErr
 		}
 		if result.Response.WebSocketFrames {
-			err = copyWebSocketFrames(result.Response.Body, tunnel.toClient)
+			err = copyWebSocketFrames(proxy.websocketResponseReader04383(sessionContext, result), tunnel.toClient)
 		} else {
 			err = proxy.forwardResponsesWebSocketHTTPBody(
 				result.Response, result.Prefix, tunnel.toClient,

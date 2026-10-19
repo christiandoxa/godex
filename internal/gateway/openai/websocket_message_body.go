@@ -8,6 +8,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/christiandoxa/godex/internal/helper/websocketframe"
+	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
 type websocketMessageState struct {
@@ -26,6 +27,8 @@ type websocketResponseBody struct {
 	messageOpen   bool
 	messageBytes  uint64
 	messageBody   []byte
+	observation   *proxymodel.WebSocketEvent
+	responseID    string
 
 	frameActive    bool
 	frameFinal     bool
@@ -80,6 +83,9 @@ func (body *websocketResponseBody) Read(buffer []byte) (int, error) {
 					body.frameRemaining -= uint64(count)
 					if body.messageOpcode == 1 {
 						body.messageBody = append(body.messageBody, buffer[:count]...)
+					}
+					if body.frameRemaining == 0 {
+						return count, body.finishFrame()
 					}
 					return count, nil
 				}
@@ -163,11 +169,21 @@ func (body *websocketResponseBody) finishFrame() error {
 		if !utf8.Valid(body.messageBody) {
 			return errors.New("upstream websocket text message is not valid UTF-8")
 		}
-		kind, _, turnState := websocketEventMetadata(body.messageBody)
+		kind, responseID, turnState := websocketEventMetadata(body.messageBody)
+		changed := responseID != "" && responseID != body.responseID
+		if responseID != "" {
+			body.responseID = responseID
+		}
 		if turnState != "" && body.state != nil {
+			changed = changed || turnState != body.state.turnState
 			body.state.turnState = turnState
 		}
-		if websocketPayloadTerminal(kind, body.messageBody) {
+		terminal := websocketPayloadTerminal(kind, body.messageBody)
+		if body.observation != nil && (changed || terminal) {
+			body.observation.Sequence++
+			body.observation.Payload = body.messageBody
+		}
+		if terminal {
 			body.done = true
 			body.terminalObserved = true
 			body.terminalReset = websocketTerminalShouldReset(kind)

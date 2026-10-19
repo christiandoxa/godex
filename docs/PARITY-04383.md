@@ -499,3 +499,24 @@ with the preserved conflict, removed failed turn, unchanged original response
 and exactly one alternate inference. This is a fail-closed ownership change;
 the complete independent fixture remains under qualification, especially its
 strict compact-followup setup.
+
+## Persist response identity first observed after WebSocket commitment
+
+The stronger executable oracle now reads both durable ownership snapshots.
+It exposed another existing gap: a recovered stream can emit a visible delta
+before revealing its response ID in `response.completed`. Prodex persists
+that terminal ID's alternate owner; Godex previously forwarded it without
+recording the new binding, losing continuation ownership after restart.
+
+`TestProdex04383LateWebSocketResponseOwnerPersistsBeforeTerminalDelivery`
+failed before the patch for ordinary, fragmented, and 128 KiB terminal
+envelopes: the client received `resp-late`, but the durable owner map was
+empty. The existing gateway parser now exposes complete late metadata through
+a borrowed model event. HTTP delivery invokes routing's existing observation
+workflow before forwarding the final payload bytes. This reuses the parser's
+already bounded buffer, adds no goroutine or dependency, preserves exact frame
+bytes, and does not write affinity state for every unchanged token delta.
+Truncated messages produce no observation. A persistence error stops the
+committed response without replay. Focused integration and race checks pass;
+full release qualification must use the resulting clean commit before it is
+attributed to this repair.

@@ -698,6 +698,14 @@ payloads, and answers pings at the socket that received them. Response IDs bind
 continuations to the selected account. Realtime/live paths keep the raw frame
 tunnel. Managed Codex itself stays configured for HTTP/SSE.
 
+The OpenAI WebSocket parser exposes complete late response/turn metadata and
+terminal usage through a borrowed `model/proxy.WebSocketEvent`. The delivery
+reader consumes that data on the same goroutine before forwarding the final
+payload bytes, invoking routing's existing observation use case for durable
+ownership. No extra stream buffer, goroutine or shared helper is added.
+Repeated token deltas with unchanged identity do not trigger observations.
+Persistence failure stops the committed stream without replaying it.
+
 ## Durable upstream ownership
 
 `repository/routing` stores a bounded, versioned `routing.json` containing only

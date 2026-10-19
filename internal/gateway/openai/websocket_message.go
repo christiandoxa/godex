@@ -312,9 +312,13 @@ func websocketCommittedResponse(
 	reuseIdle time.Duration,
 	recycle func(io.ReadWriteCloser, string),
 ) *proxymodel.Response {
+	body := newWebSocketResponseBody(connection, frames, terminalKind, state, recycle)
+	body.observation = &proxymodel.WebSocketEvent{}
+	body.responseID = responseID
 	return &proxymodel.Response{
 		StatusCode: http.StatusOK, Header: make(http.Header),
-		Body:                   newWebSocketResponseBody(connection, frames, terminalKind, state, recycle),
+		Body:                   body,
+		WebSocketEvent:         body.observation,
 		WebSocketResponseID:    responseID,
 		WebSocketTurnState:     state.turnState,
 		WebSocketFrames:        true,

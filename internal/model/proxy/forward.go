@@ -40,6 +40,7 @@ type Response struct {
 	Body                    io.ReadCloser
 	Trailer                 http.Header
 	WebSocketResponseID     string
+	WebSocketEvent          *WebSocketEvent `json:"-"`
 	WebSocketTurnState      string
 	WebSocketFrames         bool
 	WebSocketReusedSession  bool
@@ -53,6 +54,13 @@ type Response struct {
 	// bypassing the precommit SSE inspector. Never serialize this field.
 	RequestedStreaming bool `json:"-"`
 	PrecommitFailure   *PrecommitFailure
+}
+
+// WebSocketEvent is borrowed parser output, valid until the next body Read.
+// The body reader and its delivery observer consume it on the same goroutine.
+type WebSocketEvent struct {
+	Sequence uint64
+	Payload  []byte
 }
 type PrecommitFailure struct {
 	Code string
