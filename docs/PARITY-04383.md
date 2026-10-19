@@ -1217,3 +1217,39 @@ suite passed 31 checks, twenty repeated runs passed 100 checks and `make verify`
 passed. Exact clean executable confirmation and the expanded strict HTTP
 controls follow these local checks; no mixed-identity qualification is claimed
 from the exploratory output alone.
+
+## Strict mixed-ID HTTP controls and durable child lifecycle
+
+Both mandatory HTTP transport modes now include an `unknown-previous` case
+beside turn-only, with-session and known previous-response controls. Each
+product must first prove both authenticated profiles Ready and the original
+turn/session owners intact. The strict verifiers compare status, exact body,
+dispatch count, account order and opaque request bytes. They also observe the
+unknown input ID in both durable formats and reject any invented owner.
+Responses must retain the original turn/session after its one-request 503;
+Compact must retry second, return 200, release the failed turn and persist the
+session conflict while keeping the unknown ID unbound.
+
+The shared HTTP workflow now waits at most three seconds for the complete
+expected durable projection before stopping the managed child. This follows
+the existing bounded state-observation pattern used by the WebSocket fixture.
+It then rereads state and recounts upstream attempts after shutdown and repeats
+the same verifier. No durability, wire, readiness or no-replay assertion is
+relaxed. A deterministic `testing/synctest` regression publishes a debounced
+session conflict after the first observation, requires the wait to see it and
+rejects state that never settles. Its read-once control failed before polling
+was added. These changes stay in developer tooling; production layer ownership,
+dependencies and persistence formats remain unchanged.
+
+`rtk go test -race ./tools/continuationparity -count=1 -timeout=120s`
+passed 348 checks and `rtk make verify` passed. The expanded strict tool rejects
+clean `e060f427` at each route's unknown-ID control: the old executable returns
+400 after one attempt. Both four-case modes pass against exact clean
+`061043c69a5e74c8479e4377063c1345929fe5ba`, including the official controls
+and all durable projections. The committed harness phases follow this check.
+
+The complete default gate also passed on exact clean `e060f427`; that older
+gate lacks the mixed-ID cases. Native Windows job `118205235978` passed all
+ten modes on that commit. Native Compact confirmation with the corrected
+lifecycle, the strict WebSocket compact-followup control and official macOS
+realtime remain **OPEN**.

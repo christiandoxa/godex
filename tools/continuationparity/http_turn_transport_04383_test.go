@@ -6,7 +6,7 @@ import (
 )
 
 func TestProdex04383HTTPResponsesTurnOracleRejectsMutations(t *testing.T) {
-	for _, scenario := range []string{"turn-only", "with-session", "previous-response"} {
+	for _, scenario := range []string{"turn-only", "with-session", "previous-response", "unknown-previous"} {
 		t.Run(scenario, func(t *testing.T) {
 			valid := func() httpTransportResult04383 {
 				v := httpTransportResult04383{
@@ -41,6 +41,7 @@ func TestProdex04383HTTPResponsesTurnOracleRejectsMutations(t *testing.T) {
 				"turn binding":       func(v *httpTransportResult04383) { v.owners["turn"] = "second" },
 				"response binding":   func(v *httpTransportResult04383) { v.owners["response"] = "second" },
 				"session binding":    func(v *httpTransportResult04383) { v.owners["session"] = "second" },
+				"unknown ID learned": func(v *httpTransportResult04383) { v.owners["unknown"] = "second" },
 				"unrelated response": func(v *httpTransportResult04383) { v.owners["unrelated"] = "second" },
 			} {
 				t.Run(name, func(t *testing.T) {

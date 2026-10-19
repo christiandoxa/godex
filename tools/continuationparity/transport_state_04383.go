@@ -117,6 +117,7 @@ func readTransportOwners04383(p product) (map[string]string, error) {
 			return nil, err
 		}
 		owners["turn"] = snapshot.Value.Turns["turn-a"].Profile
+		owners["unknown"] = snapshot.Value.Responses["resp-unknown"].Profile
 		owners["response"] = snapshot.Value.Responses["resp-transport-recovered"].Profile
 		owners["unrelated"] = snapshot.Value.Responses["resp-main"].Profile
 		owners["session"] = snapshot.Value.Sessions["sess-transport"].Profile
@@ -148,7 +149,7 @@ func readTransportOwners04383(p product) (map[string]string, error) {
 	if err := json.Unmarshal(raw, &snapshot); err != nil {
 		return nil, err
 	}
-	for label, value := range map[string]string{"turn": "turn:turn-a", "response": "previous:resp-transport-recovered", "unrelated": "previous:resp-main", "session": "session:sess-transport"} {
+	for label, value := range map[string]string{"unknown": "previous:resp-unknown", "turn": "turn:turn-a", "response": "previous:resp-transport-recovered", "unrelated": "previous:resp-main", "session": "session:sess-transport"} {
 		digest := sha256.Sum256([]byte(value))
 		for _, binding := range snapshot.Bindings {
 			if binding.Key == hex.EncodeToString(digest[:]) {

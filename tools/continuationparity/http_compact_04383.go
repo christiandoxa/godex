@@ -22,7 +22,7 @@ type httpTransportResult04383 struct {
 }
 
 func runHTTPCompactProduct04383(root string, p product) error {
-	for _, scenario := range []string{"turn-only", "with-session", "previous-response"} {
+	for _, scenario := range []string{"turn-only", "with-session", "previous-response", "unknown-previous"} {
 		if err := runHTTPTransportCase04383(filepath.Join(root, scenario), p, scenario, "/responses/compact"); err != nil {
 			return fmt.Errorf("%s: %w", scenario, err)
 		}
@@ -64,7 +64,7 @@ func runHTTPTransportCase04383(root string, p product, scenario, route string) e
 		time.Sleep(10 * time.Millisecond)
 	}
 	owners, err := readTransportOwners04383(p)
-	if err != nil || owners["turn"] != "main" || owners["session"] != "main" || owners["unrelated"] != "main" {
+	if err != nil || owners["turn"] != "main" || owners["session"] != "main" || owners["unrelated"] != "main" || owners["unknown"] != "" {
 		return fmt.Errorf("Compact warmups changed the initial owner: owners=%v err=%v", owners, err)
 	}
 	request, err := http.NewRequest(http.MethodPost, endpoint+route, strings.NewReader(httpTransportBody04383(scenario)))
@@ -82,19 +82,25 @@ func runHTTPTransportCase04383(root string, p product, scenario, route string) e
 	if err != nil {
 		return err
 	}
-	stop()
-	stop = nil
-	owners, err = readTransportOwners04383(p)
-	if err != nil {
-		return err
-	}
 	b.mu.Lock()
-	result := httpTransportResult04383{reply: exchange{status: response.StatusCode, body: string(payload)}, attempts: append([]transportAttempt04383(nil), b.attempts...), owners: owners, invalid: b.invalid}
+	result := httpTransportResult04383{reply: exchange{status: response.StatusCode, body: string(payload)}, attempts: append([]transportAttempt04383(nil), b.attempts...), invalid: b.invalid}
 	b.mu.Unlock()
 	verify := verifyHTTPCompact04383
 	if route == "/responses" {
 		verify = verifyHTTPResponsesTurn04383
 	}
+	if err := waitHTTPTransportDurable04383(p, scenario, &result, verify); err != nil {
+		return err
+	}
+	stop()
+	stop = nil
+	result.owners, err = readTransportOwners04383(p)
+	if err != nil {
+		return err
+	}
+	b.mu.Lock()
+	result.attempts, result.invalid = append([]transportAttempt04383(nil), b.attempts...), b.invalid
+	b.mu.Unlock()
 	if err := verify(scenario, result); err != nil {
 		return err
 	}
@@ -106,6 +112,9 @@ func httpTransportBody04383(scenario string) string {
 	body := strings.Replace(transportHistory04383, `"type":"response.create",`, "", 1)
 	if scenario == "turn-only" {
 		return strings.Replace(body, `"session_id":"sess-transport",`, "", 1)
+	}
+	if scenario == "unknown-previous" {
+		return strings.Replace(body, `"model":"gpt-6",`, `"model":"gpt-6","previous_response_id":"resp-unknown",`, 1)
 	}
 	if scenario == "previous-response" {
 		return strings.Replace(body, `"model":"gpt-6",`, `"model":"gpt-6","previous_response_id":"resp-main",`, 1)
@@ -148,7 +157,7 @@ func verifyHTTPCompact04383(scenario string, result httpTransportResult04383) er
 	session, unrelated := "main", "main"
 	if scenario == "previous-response" {
 		count, status, body, unrelated = 1, http.StatusBadRequest, compactRetry04383, ""
-	} else if scenario == "with-session" {
+	} else if scenario == "with-session" || scenario == "unknown-previous" {
 		session = "__prodex_hard_binding_conflict__"
 	} else if scenario != "turn-only" {
 		return errors.New("unknown Compact transport scenario")
@@ -165,7 +174,7 @@ func verifyHTTPCompact04383(scenario string, result httpTransportResult04383) er
 			return fmt.Errorf("Compact attempt %d changed authenticated readiness, owner or opaque wire", index)
 		}
 	}
-	if result.owners["turn"] != "" || result.owners["response"] != "" || result.owners["unrelated"] != unrelated || result.owners["session"] != session {
+	if result.owners["unknown"] != "" || result.owners["turn"] != "" || result.owners["response"] != "" || result.owners["unrelated"] != unrelated || result.owners["session"] != session {
 		return fmt.Errorf("Compact durable ownership changed: %v", result.owners)
 	}
 	return nil

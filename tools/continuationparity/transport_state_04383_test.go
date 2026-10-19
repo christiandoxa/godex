@@ -100,7 +100,7 @@ func TestProdex04383TransportDurableProjectionKeepsConflictAndResponseOwners(t *
 			if name == "prodex" {
 				if err := writeJSONFile(filepath.Join(p.state, "runtime-continuations.json"), map[string]any{"generation": 2, "value": map[string]any{
 					"turn_state_bindings":       map[string]any{},
-					"response_profile_bindings": map[string]any{"resp-main": map[string]string{"profile_name": "main"}, "resp-transport-recovered": map[string]string{"profile_name": "second"}},
+					"response_profile_bindings": map[string]any{"resp-main": map[string]string{"profile_name": "main"}, "resp-transport-recovered": map[string]string{"profile_name": "second"}, "resp-unknown": map[string]string{"profile_name": "second"}},
 					"session_id_bindings":       map[string]any{"sess-transport": map[string]string{"profile_name": conflict}},
 				}}); err != nil {
 					t.Fatal(err)
@@ -110,7 +110,7 @@ func TestProdex04383TransportDurableProjectionKeepsConflictAndResponseOwners(t *
 					t.Fatal(err)
 				}
 				var bindings []map[string]string
-				for value, owner := range map[string]string{"previous:resp-main": "a", "previous:resp-transport-recovered": "b", "session:sess-transport": conflict} {
+				for value, owner := range map[string]string{"previous:resp-unknown": "b", "previous:resp-main": "a", "previous:resp-transport-recovered": "b", "session:sess-transport": conflict} {
 					digest := sha256.Sum256([]byte(value))
 					bindings = append(bindings, map[string]string{"key": hex.EncodeToString(digest[:]), "account_id": owner})
 				}
@@ -122,11 +122,11 @@ func TestProdex04383TransportDurableProjectionKeepsConflictAndResponseOwners(t *
 			if err != nil {
 				t.Fatal(err)
 			}
-			if owners["turn"] != "" || owners["response"] != "second" || owners["unrelated"] != "main" || owners["session"] != conflict {
+			if owners["unknown"] != "second" || owners["turn"] != "" || owners["response"] != "second" || owners["unrelated"] != "main" || owners["session"] != conflict {
 				t.Fatalf("durable ownership changed: %v", owners)
 			}
 			delete(owners, "turn")
-			if !reflect.DeepEqual(owners, map[string]string{"response": "second", "unrelated": "main", "session": conflict}) {
+			if !reflect.DeepEqual(owners, map[string]string{"unknown": "second", "response": "second", "unrelated": "main", "session": conflict}) {
 				t.Fatalf("unexpected durable ownership: %v", owners)
 			}
 		})

@@ -6,7 +6,7 @@ import (
 )
 
 func TestProdex04383HTTPCompactOracleRejectsMutations(t *testing.T) {
-	for _, scenario := range []string{"turn-only", "with-session", "previous-response"} {
+	for _, scenario := range []string{"turn-only", "with-session", "previous-response", "unknown-previous"} {
 		t.Run(scenario, func(t *testing.T) {
 			valid := func() httpTransportResult04383 {
 				v := httpTransportResult04383{
@@ -17,7 +17,7 @@ func TestProdex04383HTTPCompactOracleRejectsMutations(t *testing.T) {
 						{owner: "account-b", turn: "turn-a", body: httpTransportBody04383(scenario), ready: true},
 					},
 				}
-				if scenario == "with-session" {
+				if scenario == "with-session" || scenario == "unknown-previous" {
 					v.owners["session"] = "__prodex_hard_binding_conflict__"
 				} else if scenario == "previous-response" {
 					v.attempts = v.attempts[:1]
@@ -47,6 +47,7 @@ func TestProdex04383HTTPCompactOracleRejectsMutations(t *testing.T) {
 				"turn rebound":       func(v *httpTransportResult04383) { v.owners["turn"] = "second" },
 				"response rebound":   func(v *httpTransportResult04383) { v.owners["response"] = "second" },
 				"session":            func(v *httpTransportResult04383) { v.owners["session"] = "second" },
+				"unknown ID learned": func(v *httpTransportResult04383) { v.owners["unknown"] = "second" },
 				"unrelated response": func(v *httpTransportResult04383) { v.owners["unrelated"] = "second" },
 			}
 			if scenario != "previous-response" {
