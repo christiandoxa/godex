@@ -50,8 +50,9 @@ func (router *Router) recoverWebSocketTurnStateTransport04383(
 	if !owned {
 		return proxymodel.Forwarded{}, false, nil
 	}
+	// The tagged release plan retains session ownership beside a hard turn.
 	if err := router.affinity.releaseOwnedDead(ctx, failed.ID,
-		affinityKeys{turn: metadata.turnState, session: metadata.sessionID}, router.now()); err != nil {
+		affinityKeys{turn: metadata.turnState}, router.now()); err != nil {
 		closePendingResponse(pending)
 		return proxymodel.Forwarded{}, true, err
 	}

@@ -46,7 +46,7 @@ only the bounded 0.438.3 recovery decision for a WebSocket response failure
 that is a typed **precommit transport** outcome (not a quota or application
 failure). It requires a reconstructable full-history request, a turn-state
 binding **verified** to belong to the failed profile and another independently
-Ready same-provider profile. Only then does it release the failed turn/session
+Ready same-provider profile. Only then does it release the failed turn
 binding, remove the stale `x-codex-turn-state` from both HTTP headers and
 nested request metadata, preserve the request's original full input and
 deadline, and replay on the selected other owner.
@@ -477,3 +477,25 @@ HTTP and application-error responses retain their existing finalization.
 The investigation's new executable fixture is still being qualified,
 including durable session-state and unsafe-replay controls; this checkpoint
 does not close the full transport-recovery gap or certify FULL parity.
+
+## Transport recovery retains an accompanying session binding
+
+The now-authenticated two-profile executable experiment also compared durable
+ownership after successful full-history recovery. Prodex's tagged
+`runtime_lineage.release_plan` releases a matching turn-state binding but
+deliberately retains session ownership whenever a previous-response or turn
+identifier is present. When the alternate returns a successful result,
+the conflicting session claims persist as the hard-owner conflict sentinel.
+The new response belongs to the alternate, the original unrelated response
+still belongs to main, and the failed turn binding is absent.
+
+Godex instead released both the failed turn and its accompanying session,
+silently assigning that session to the alternate. The transport-only recovery
+now releases only its exact failed turn. No persistence format, gateway,
+shared helper or quota-recovery policy changes. The regression
+`TestProdex04383TransportTurnRecoveryRetainsAccompanyingSessionOwner` failed
+before the patch in both memory and durable-store variants, then passed
+with the preserved conflict, removed failed turn, unchanged original response
+and exactly one alternate inference. This is a fail-closed ownership change;
+the complete independent fixture remains under qualification, especially its
+strict compact-followup setup.
