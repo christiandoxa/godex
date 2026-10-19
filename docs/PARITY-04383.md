@@ -374,3 +374,34 @@ This is a local precision/identity regression, **not** an independent
 published-Prodex executable differential for large numeric payloads. The
 previous pinned finite-gate result belongs to `9ee52e0e`; it must be rerun
 on the new clean commit before being attributed to this change.
+
+## Full pinned finite release gate after opaque-history precision repair
+
+The **complete 0.438.3 finite source/synthetic gate** was independently
+rerun on one clean Godex candidate, commit
+`b6e91489d1881fc02aac78c2e6100a08efefb59c`, after merging the numeric
+turn-state replay repair. Every individual release script phase exited
+**PASS** against the SHA-256-pinned official 0.438.3 binary, manifest and
+tagged source (pins in this document's opening). No live OAuth, user home,
+paid model endpoint or real credential was used.
+
+| Release-script phase | Result on exact `b6e91489` |
+| --- | --- |
+| `--phase=preflight-tests` | PASS, including deterministic and race regressions |
+| `--phase=preflight-oracles-pty` | PASS, PTY/CLI/context/workspace controls |
+| `--phase=preflight-oracles-profiles` | PASS, lifecycle/quota/admission/FD controls |
+| `--phase=preflight-oracles-history` | PASS, native previous-response replay |
+| `--phase=deepseek` | PASS, pinned provider response oracle and mutation controls |
+| `--phase=gemini` | PASS, pinned provider response oracle and mutation controls |
+| `--phase=websocket-core` | PASS, 56 model-attempt baseline plus capacity, idle-close, 8KiB lookahead, realtime and race controls |
+| `--phase=websocket-deadline` | PASS, both executables returned 504 at the original 30-second precommit deadline and accepted a followup |
+
+Separately, `make verify`, `go test ./... -count=1 -timeout=90s`,
+`go test -race ./internal/usecase/routing -count=1 -timeout=105s` and
+`./scripts/check-cross-build.sh` all exited PASS on this same candidate.
+This qualifies the full pinned **finite** gate after the production fix; it
+is not a claim that all native runtime faults, Linux keyring interoperability,
+Windows/macOS live execution, OAuth, provider outages, or arbitrary
+full-history transport failure shapes have achieved production-wide 1:1
+parity. A cross-binary large-numeric/full-history transport replay fixture
+remains unproven independently of the local causal regressions above.

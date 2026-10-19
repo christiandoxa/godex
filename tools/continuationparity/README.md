@@ -1,6 +1,6 @@
-# Prodex 0.438.2 continuation and WebSocket executable differential
+# Prodex 0.438.3 continuation and WebSocket executable differential
 
-This harness compares an official SHA-256-pinned Prodex `0.438.2` binary
+This harness compares an official SHA-256-pinned Prodex `0.438.3` binary
 and Godex using isolated two-profile homes, synthetic credentials, and a
 loopback-only upstream. It does **not** send real model requests or use
 the caller's account credentials.
@@ -10,6 +10,13 @@ affinity, overload/quota and full-context recovery, already-committed
 streaming output, cancellation, and process restart. Historical status
 and retry differences may remain within this bounded HTTP observation;
 the fixture is not a full feature-parity certificate.
+
+The current runner and published native manifest are pinned to source commit
+`42042d765100fc06895a27e0904ffb64842092e6` and release-manifest
+SHA-256 `300a8f046041a95f9757e4cbdb72917d37927683b6e1af442492254e2f1a37da`.
+The 0.438.2 names below identify where particular compatibility fixtures
+originated; their active executable reference is **0.438.3**. All release
+phases must use the same clean Godex commit.
 
 ## Exact HTTP history replay boundary
 
@@ -86,19 +93,19 @@ Run from a **clean committed Godex checkout**, with a locally built candidate
 containing Go VCS metadata:
 
 ```sh
-go build -trimpath -o /tmp/godex-043710-candidate ./cmd/godex
+go build -trimpath -o /tmp/godex-04383-candidate ./cmd/godex
 go run ./tools/continuationparity \
-  --prodex /path/to/official/prodex-0.438.2 \
-  --prodex-source /path/to/clean/prodex-tag-0.438.2 \
-  --godex /tmp/godex-043710-candidate \
+  --prodex /path/to/official/prodex-0.438.3 \
+  --prodex-source /path/to/clean/prodex-tag-0.438.3 \
+  --godex /tmp/godex-04383-candidate \
   --godex-source "$PWD" --godex-commit "$(git rev-parse HEAD)" \
   --websocket
 ```
 
-The official reference executable must report `prodex 0.438.2`, have
-SHA-256 `3f2fcd776fee0335dc49910d0651adc43a55c8627913556c307755b1575dac3f`,
+The official reference executable must report `prodex 0.438.3`, have
+SHA-256 `5efa06fef57b0026eae7ec3cad23ac76b40c3e5d8a3afaee6c20feaeb5737923`,
 and correspond to source commit
-`decfed45f884fe2bef20911303beab7b198698b7`.
+`42042d765100fc06895a27e0904ffb64842092e6`.
 The WebSocket mode additionally rejects a dirty Godex source tree, a
 different expected commit, or missing/modified Go executable VCS metadata.
 
@@ -167,13 +174,13 @@ families. For synchronous execution the release script provides two
 **non-overlapping** slices: `--phase=websocket-core` (56 prior model attempts,
 completed-idle permit and mutation tests) and `--phase=websocket-deadline`
 (this two-product 30s fixture and negative controls). Both must pass against
-the same clean candidate to establish the complete bounded 0.438.2 gate.
+the same clean candidate to establish the complete bounded 0.438.3 gate.
 
 
 ## 0.438.2 committed-output WebSocket idle close-frame differential
 
 `--websocket-committed-idle` compares the official SHA/source-pinned Prodex
-0.438.2 binary and clean Godex using the **configured** `stream_idle_timeout_ms
+0.438.3 binary and clean Godex using the **configured** `stream_idle_timeout_ms
 = 2000`. Both launch isolated synthetic homes and connect a local Responses
 WebSocket to a real loopback upstream that sends one committed
 `response.output_text.delta` with `delta:visible-idle`, then remains silent
@@ -248,7 +255,7 @@ these cases and their race-tested negative controls.
 on a clean native checkout: continuation, completed-idle capacity, visible
 committed idle, lookahead committed idle, realtime lifecycle and the absolute
 precommit deadline. The portable CI matrix invokes it after its native build.
-The script downloads only exact 0.438.2 assets, checks the platform binary and
+The script downloads only exact 0.438.3 assets, checks the platform binary and
 manifest against independent fixed digests and published SHA256SUMS, verifies
 the clean tagged source and candidate Go VCS metadata, then runs the loopback
 fixtures and their mutation controls. A cross-build is not an execution pass.
