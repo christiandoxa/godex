@@ -117,3 +117,23 @@ profile, CLI, context, DeepSeek, Gemini and WebSocket replay/affinity fixture
 remains mandatory. Changing the pins alone does **not** establish release
 parity: all executable phases must pass against **one clean Godex candidate**
 using the actual published 0.438.3 binary.
+
+## Native macOS/Windows/Linux oracle manifest pins
+
+The independent `--websocket-*` continuation oracle validates a **second**
+platform-specific release asset table, rather than relying solely on the
+standard Linux release-gate pin. The first exact 0.438.3 WebSocket invocation
+failed at its **manifest digest preflight**, before any upstream model case,
+because this table still pinned 0.438.2. This was a provenance mismatch in
+the test harness, not a demonstrated Godex transport failure.
+
+The native oracle platform table in
+`tools/continuationparity/native_oracle_04382.go` now pins the six official
+0.438.3 executables published in the verified SHA256SUMS, plus the new
+manifest digest. `scripts/verify-native-parity.ps1` and the standalone
+`tools/workspace-oracle.py` use the same independently published pins, exact
+tag commit and version. The existing negative controls, source-integrity
+checks and six-mode native executable matrix are retained; historic names
+with the `_04382` suffix are module/test identifiers, not oracle versions.
+The native macOS/Windows modes must still be **run** on those hosts before
+claiming parity there; retargeting a checksum is not a native test pass.
