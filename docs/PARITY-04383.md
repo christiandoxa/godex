@@ -1175,3 +1175,45 @@ Ten repeated Linux probe race checks, the 307-test tooling race suite and
 `darwin/arm64` and `windows/amd64`; neither compilation is a native execution.
 The exact clean executable comparison and actual macOS measurement follow
 these local checks.
+
+The complete ten-mode gate passed on exact clean
+`3b5bb352c2eb9e9e17dd8f98b02449a891f03708`, including both strict HTTP
+transport modes and all earlier finite phases. It does not cover the later
+mixed-identity discrepancy below or establish FULL feature parity.
+
+Native macOS job `118205235858` on clean `e060f427` measured
+`accepted_nonblocking=true` and `read_wait_us=1`; the Linux core gate measured
+`accepted_nonblocking=false` and `read_wait_us=21614`. Host inheritance is now
+observed and supports the sidecar hypothesis, but the official binary's exact
+failing syscall remains uninstrumented. The native job still failed official
+realtime. It also failed Compact's final session projection: the expected
+conflict had not become durable when the harness stopped the child. Tagged
+`lifecycle.rs` detaches workers on non-test drop without waiting for state
+saves. The fixture needs a bounded durable-state observation before releasing
+the managed child, followed by the existing post-shutdown assertions. That
+native Compact qualification remains **OPEN** pending this fixture correction.
+
+## Require an owned previous response before a transport reset
+
+A paired experiment on clean `e060f427` supplied an unknown previous-response
+ID beside a verified main-owned turn and session. Official Responses returned
+503 after one main request and retained those owners. Official Compact retried
+second, returned 200, removed the failed turn, retained the unrelated response,
+left the unknown ID unbound and persisted the session conflict. Godex returned
+400 and removed the turn in both routes. The known previous-response controls
+already matched the exact one-request 400 reset.
+
+HTTP transport recovery now checks the previous ID's actual owner before
+choosing that reset. Responses retains its verified turn when the previous ID
+is unowned. Compact reuses its existing alternate recovery and removes only
+the unverified input ID from binding accounting; the entire outbound request
+remains unchanged. This prevents a successful Compact replay from inventing
+an owner for the unknown ID or losing the accompanying session conflict.
+Other failure classes retain their existing policies. No helper, dependency,
+model, persistence format or public API is added.
+
+All four memory/durable route regressions failed before the patch. The focused
+suite passed 31 checks, twenty repeated runs passed 100 checks and `make verify`
+passed. Exact clean executable confirmation and the expanded strict HTTP
+controls follow these local checks; no mixed-identity qualification is claimed
+from the exploratory output alone.

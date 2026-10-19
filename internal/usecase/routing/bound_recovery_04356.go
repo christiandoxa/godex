@@ -30,8 +30,22 @@ func (router *Router) recoverBoundRetryableFailure(
 		local := requestRoutingAffinity(request)
 		keys = &local
 	}
+	resetPrevious := (request.QuotaSelection.RouteKind == quotamodel.RouteKindResponses ||
+		request.QuotaSelection.RouteKind == quotamodel.RouteKindCompact) && keys.previous != ""
+	if outcome.transport && resetPrevious {
+		owner, err := router.affinity.owner(ctx, affinityKeys{previous: keys.previous}, router.now())
+		if err != nil {
+			closePendingResponse(pending)
+			return proxymodel.Forwarded{}, true, err
+		}
+		resetPrevious = owner == failed.ID
+		if !resetPrevious && request.QuotaSelection.RouteKind == quotamodel.RouteKindCompact {
+			// Preserve the opaque wire without promoting an unverified input ID.
+			keys.previous = ""
+		}
+	}
 	if outcome.transport && request.QuotaSelection.RouteKind == quotamodel.RouteKindResponses &&
-		keys.previous == "" && keys.turn != "" {
+		!resetPrevious && keys.turn != "" {
 		owned, err := router.turnStateOwnedBy(ctx, keys.turn, failed.ID)
 		if err != nil {
 			closePendingResponse(pending)
@@ -69,8 +83,7 @@ func (router *Router) recoverBoundRetryableFailure(
 		}
 	}
 
-	if (request.QuotaSelection.RouteKind == quotamodel.RouteKindResponses ||
-		request.QuotaSelection.RouteKind == quotamodel.RouteKindCompact) && keys.previous != "" {
+	if resetPrevious {
 		if err := router.affinity.releaseOwnedDead(ctx, failed.ID, *keys, router.now()); err != nil {
 			closePendingResponse(pending)
 			return proxymodel.Forwarded{}, true, err
