@@ -315,6 +315,12 @@ absolute 30-second precommit tests remain unchanged and mandatory.
 
 ## Native realtime duplex admission and close lifecycle
 
+Before the realtime fixture, the oracle reports raw accepted-socket flags and
+idle-read behavior on Linux/macOS. This isolated loopback diagnostic uses a
+nonblocking listener and 20 ms receive timeout, and closes its descriptors before
+either executable starts. Other hosts report `measured=false`. It helps diagnose
+the official macOS reset while keeping every protocol and parity assertion.
+
 `--websocket-realtime` compares four isolated cases per executable: client
 close, upstream close, abrupt client cancellation, and graceful gateway
 shutdown. Prodex uses the private registry's loopback `realtime_ws_addr`

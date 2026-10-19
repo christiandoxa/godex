@@ -1141,3 +1141,37 @@ cases against clean `69d9b857`. The tooling race suite passed 306 checks,
 including both HTTP verifiers, and `bash -n` plus `make verify` passed. Both
 HTTP phases must still qualify the shared fixture on this committed harness;
 no complete ten-mode or native result is claimed before actual execution.
+
+Both `--phase=http-turn-transport` and `--phase=http-compact` passed on exact
+clean `3b5bb352c2eb9e9e17dd8f98b02449a891f03708` before push. The strict
+Responses and Compact transport slices are **VERIFIED** for that commit.
+Separately, the complete nine-mode default gate passed on clean `cef9c84c`,
+including its Compact mode and virtual-time stream fixtures. That historical
+gate predates the owned HTTP Responses repair and tenth mode; the complete
+ten-mode gate remains a separate qualification.
+
+## Observe native realtime socket inheritance
+
+Native macOS job `118196088209` on clean `cef9c84c` again passed HTTP Compact
+and keep-alive modes but failed official Prodex realtime session update directly
+after upgrade with `local_read_error`. Tagged `realtime_sidecar.rs` creates a
+nonblocking listener, accepts its raw stream and sets receive timeouts without
+explicitly resetting the accepted socket mode. Inheritance remains a hypothesis
+until the host's behavior is observed; the harness does not pipeline a frame
+before the required 101 response or retry away the failure.
+
+The realtime oracle now emits an isolated raw-socket diagnostic before opening
+either product. On Linux/macOS it configures a nonblocking loopback listener,
+observes the accepted descriptor flags and performs an idle read with the same
+20 ms receive timeout. Connection readiness is bounded by polling; every
+descriptor is closed before the executable fixture begins. Other hosts report
+that this diagnostic is unmeasured. It uses the already-pinned `x/sys` module
+and introduces no application hook, dependency or protocol change. The native
+oracle's assertions remain intact; raw socket evidence alone does not prove
+the exact cause inside the official binary or qualify native realtime parity.
+
+Ten repeated Linux probe race checks, the 307-test tooling race suite and
+`make verify` passed. The oracle test package also cross-compiled for
+`darwin/arm64` and `windows/amd64`; neither compilation is a native execution.
+The exact clean executable comparison and actual macOS measurement follow
+these local checks.

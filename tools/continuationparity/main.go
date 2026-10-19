@@ -208,6 +208,11 @@ func main() {
 			fatal(err.Error())
 		}
 	}
+	if *websocketRealtime {
+		if err := realtimeSocketMode04383(os.Stdout); err != nil {
+			fatal(err.Error())
+		}
+	}
 	root, err := createFixtureRoot()
 	if err != nil {
 		fatal(err.Error())
