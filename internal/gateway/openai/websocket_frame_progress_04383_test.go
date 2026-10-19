@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"net"
 	"testing"
 	"time"
@@ -164,5 +165,96 @@ func TestProdex04383FragmentedMessageAdvancesProgressOnlyAfterFinalContinuation(
 	watcher.mu.Unlock()
 	if completed.Sub(original) < 40*time.Millisecond {
 		t.Fatalf("complete message did not record progress: %s", completed.Sub(original))
+	}
+}
+
+// Tagged Prodex 0.438.3's committed response_tracking loop uses the same
+// complete-message progress boundary after visible output has committed.
+// A slow peer cannot keep a committed stream alive by trickling bytes of an
+// unfinished WebSocket frame; that is not a model event or terminal frame.
+func TestProdex04383IncompleteCommittedPayloadCannotRenewProgressDeadline(t *testing.T) {
+	local, remote := net.Pipe()
+	defer remote.Close()
+	watchdog := newWebSocketReadWatchdog(local, 700*time.Millisecond)
+	watchdog.markCommittedIdle04382(700 * time.Millisecond)
+	defer watchdog.Close()
+	body := newWebSocketResponseBody(watchdog, nil, "", nil, nil)
+	defer body.Close()
+	watchdog.mu.Lock()
+	original := watchdog.deadline
+	watchdog.mu.Unlock()
+	done := make(chan error, 1)
+	go func() { _, err := io.Copy(io.Discard, body); done <- err }()
+	time.Sleep(60 * time.Millisecond)
+	var frame bytes.Buffer
+	payload := []byte(`{"type":"response.completed","response":{"id":"committed-04383"}}`)
+	if err := websocketframe.WriteFrame(&frame, 1, payload, false); err != nil {
+		t.Fatal(err)
+	}
+	encoded := frame.Bytes()
+	// Socket header and a few bytes arrive now. The rest comes later.
+	if _, err := remote.Write(encoded[:8]); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(20 * time.Millisecond)
+	watchdog.mu.Lock()
+	partial := watchdog.deadline
+	watchdog.mu.Unlock()
+	if !partial.Equal(original) {
+		t.Fatalf("committed incomplete WebSocket frame extended idle by %s", partial.Sub(original))
+	}
+	select {
+	case err := <-done:
+		t.Fatalf("partial committed frame ended stream: %v", err)
+	default:
+	}
+	if _, err := remote.Write(encoded[8:]); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("complete committed terminal was not forwarded")
+	}
+	watchdog.mu.Lock()
+	complete := watchdog.deadline
+	watchdog.mu.Unlock()
+	if complete.Sub(original) < 40*time.Millisecond {
+		t.Fatalf("committed complete frame did not renew idle: %s", complete.Sub(original))
+	}
+}
+
+func TestProdex04383CompleteCommittedControlFrameCountsAsProgress(t *testing.T) {
+	local, remote := net.Pipe()
+	defer remote.Close()
+	watchdog := newWebSocketReadWatchdog(local, 700*time.Millisecond)
+	watchdog.markCommittedIdle04382(700 * time.Millisecond)
+	defer watchdog.Close()
+	body := newWebSocketResponseBody(watchdog, nil, "", nil, nil)
+	defer body.Close()
+	watchdog.mu.Lock()
+	original := watchdog.deadline
+	watchdog.mu.Unlock()
+	done := make(chan error, 1)
+	go func() { _, err := io.Copy(io.Discard, body); done <- err }()
+	time.Sleep(60 * time.Millisecond)
+	if err := websocketframe.WriteFrame(remote, 9, nil, false); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(15 * time.Millisecond)
+	watchdog.mu.Lock()
+	observed := watchdog.deadline
+	watchdog.mu.Unlock()
+	if observed.Sub(original) < 40*time.Millisecond {
+		t.Fatalf("complete upstream ping control failed to advance upstream frame clock: %s", observed.Sub(original))
+	}
+	_ = watchdog.Close()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("committed control reader blocked after shutdown")
 	}
 }

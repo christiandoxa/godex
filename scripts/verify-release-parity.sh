@@ -606,6 +606,15 @@ if [ "$phase" = 'all' ] || [ "$phase" = 'websocket' ] || [ "$phase" = 'websocket
   --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
   --websocket
 
+# The committed Responses body has the SAME full-message progress rule:
+# receiving a raw header, split payload or nonfinal continuation is not
+# fresh upstream progress. Only the final complete text/binary message or
+# complete control Ping/Pong refreshes the committed idle clock; this keeps
+# configured timeout and the 0.438.3 queued-terminal readiness invariant.
+go test -race ./internal/gateway/openai \
+  -run '^TestProdex04383(IncompleteCommittedPayloadCannotRenewProgressDeadline|CompleteCommittedControlFrameCountsAsProgress)$' \
+  -count=1 -timeout=35s
+
 # Prodex 0.438.3 liveness advances only on a FULL Tungstenite message,
 # never raw TCP/TLS bytes from an incomplete header or fragmented precommit
 # payload. A peer cannot defeat the upstream progress timeout by trickling

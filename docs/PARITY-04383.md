@@ -248,3 +248,34 @@ has been qualified in an independent two-executable release fixture. It
 preserves the original request-wide precommit deadline, hard-affinity owner,
 quota classification and no-replay rules. The release's full executable
 oracles must be rerun on one clean Godex revision after this change.
+
+
+## Committed-stream partial bytes cannot extend upstream idle
+
+The 0.438.3 complete-upstream-message liveness contract applies **after
+commit** as well as before it. A follow-on fail-before regression showed
+that Godex's committed `websocketResponseBody` could receive only the header
+and a few bytes of an unfinished text frame, yet its socket-level watchdog
+would reset the configured idle timer on each positive byte read. Tagged
+Prodex's `response_tracking/frame.rs` instead marks progress after Tungstenite
+returns a **complete** assembled WebSocket message, including the final
+continuation of fragmented data or a complete control frame. Trickle partial
+payloads cannot postpone upstream expiry indefinitely.
+
+`TestProdex04383IncompleteCommittedPayloadCannotRenewProgressDeadline`
+reproduced a spurious ~60ms extension on a truncated committed frame
+**before** the fix. Godex's socket watchdog now delegates all upstream
+progress accounting to the owning WebSocket parsers: precommit
+`readWebSocketEvent` and committed `websocketResponseBody.finishFrame` and
+`handleControlFrame`. A complete valid model message, binary frame or
+Ping/Pong control advances the timer exactly once, while incomplete headers,
+partial TCP/TLS payloads and unfinished fragments do **not**. The previously
+implemented queued-terminal readiness probe retains its original bounded
+behavior, and a completed control frame cannot create model output or retry
+rights. `TestProdex04383CompleteCommittedControlFrameCountsAsProgress`
+protects the positive Ping-control case. All focused precommit/committed
+frame and queued-terminal regressions pass repeated Go race tests, including
+the configured committed-idle timeout negative control. Actual TLS frame
+buffering and arbitrary network/platform poll failures still require
+independent full two-executable coverage; no claim of production-wide parity
+is made from these local checks alone.

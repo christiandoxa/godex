@@ -72,20 +72,15 @@ func (watchdog *websocketReadWatchdog) Read(buffer []byte) (int, error) {
 	}
 	watchdog.mu.Lock()
 	watchdog.reading = false
-	// A precommit partial header/payload is not an upstream WS *frame*.
-	// Tungstenite's 0.438.3 liveness plan advances on a complete message,
-	// not individual TCP/TLS bytes. The event decoder owns that progress
-	// marker; this byte-oriented read remains valid for COMMITTED streams.
+	// Partial TCP/TLS reads are not valid upstream WebSocket messages.
+	// Both the precommit event decoder and committed response-body decoder
+	// own frame progress, only after a fully assembled valid message.
+	// Keeping a deferred expiry pending until that point also prevents a
+	// queued half-frame from renewing an already-expired idle budget.
 	committed := watchdog.committed
-	if count > 0 && deferred && committed && !watchdog.closed {
-		watchdog.expired = false
-	}
 	expired := watchdog.expired
 	watchdog.mu.Unlock()
 	if count > 0 {
-		if committed {
-			watchdog.noteProgress()
-		}
 		return count, err
 	}
 	if deferred {

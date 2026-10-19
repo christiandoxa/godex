@@ -173,6 +173,12 @@ func (body *websocketResponseBody) finishFrame() error {
 			body.terminalReset = websocketTerminalShouldReset(kind)
 		}
 	}
+	// A fragmented message is upstream progress only after its last
+	// continuation frame. The raw socket may yield header/payload chunks,
+	// but none of those chunks independently renew the 0.438.3 idle clock.
+	if watchdog, ok := body.connection.(*websocketReadWatchdog); ok {
+		watchdog.noteProgress()
+	}
 	body.messageOpcode = 0
 	body.messageOpen = false
 	body.messageBytes = 0
@@ -203,6 +209,11 @@ func (body *websocketResponseBody) handleControlFrame(frame websocketframe.Frame
 	body.prefix = append(body.prefix[:0], encoded.Bytes()...)
 	body.offset = 0
 	body.done = frame.Opcode == 8
+	// Upstream Ping/Pong control is a complete frame; it is progress on
+	// the upstream transport, but never a new model turn or retry right.
+	if watchdog, ok := body.connection.(*websocketReadWatchdog); ok {
+		watchdog.noteProgress()
+	}
 	return nil
 }
 
