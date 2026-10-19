@@ -90,17 +90,15 @@ func TestProdex04354WebSocketQuotaSignalsFullContextWhenFallbackReady(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	if previousOwner != "" || sessionOwner != "" {
-		t.Fatalf("quota signal retained affinity: previous=%q session=%q", previousOwner, sessionOwner)
+	if previousOwner != "" || sessionOwner != websocketQuotaOwnerA {
+		t.Fatalf("quota signal owners: previous=%q session=%q", previousOwner, sessionOwner)
 	}
 	persisted, err := store.Load(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, binding := range persisted {
-		if binding.Kind == "previous" || binding.Kind == "session" {
-			t.Fatalf("released quota affinity persisted: %#v", binding)
-		}
+	if len(persisted) != 1 || persisted[0].Kind != "session" || persisted[0].AccountID != websocketQuotaOwnerA || persisted[0].Key != affinityDigest("session", "session-quota") {
+		t.Fatalf("quota signal must retain only the accompanying session: %#v", persisted)
 	}
 
 	replay, err := router.Forward(t.Context(), websocketDispatchRequest(
@@ -239,7 +237,7 @@ func TestProdex04355WebSocketContextConstraintSignalsFullContextWhenLastChanceEx
 	}
 	defer signal.Close()
 	assertProdex04355FullContextSignal(t, signal, websocketQuotaOwnerA)
-	assertProdex04355AffinityReleased(t, router, "resp-main", "session-context")
+	assertProdex04355HardAffinityReleased(t, router, "resp-main", "session-context")
 	if strings.Join(gateway.accounts, ",") != websocketQuotaOwnerA+","+websocketQuotaOwnerA {
 		t.Fatalf("full-context signal upstream attempts = %v", gateway.accounts)
 	}

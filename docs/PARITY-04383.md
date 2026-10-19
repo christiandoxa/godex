@@ -664,3 +664,34 @@ rejects following application output, another Ping, abrupt EOF and a truncated
 close. Existing wire assertions still require the exact empty close and idle
 budget. This is an observation repair; it does not prove the exact cause of the
 earlier native failure or change Godex's transport behavior.
+
+The close/Pong observation repair passed the pinned
+`./scripts/verify-release-parity.sh --phase=websocket-core` on clean
+`b947d1d65fac0dabd86919278b6015ab8bd8a68e`. All Linux core observations,
+including committed idle close and realtime permit lifecycle, passed. This
+does not resolve the separately observed macOS official-sidecar failure.
+
+## Full-context retry signals preserve accompanying session ownership
+
+A new durable snapshot check on clean `624649ec` exposed a separate deletion
+after the exact `400 previous_response_not_found` WebSocket retry signal.
+Official Prodex removed the failed response and turn bindings but retained
+the accompanying session on main; Godex removed all three. Neither product
+dispatched an alternate inference. Both snapshots were read after process
+shutdown, so this difference was not a pending-write observation.
+
+The retry-signal consumers now use the existing shared dead-binding release
+operation, which enforces the tagged hard-identity/session policy. This covers
+post-upstream WebSocket failures, pre-send quota signals and the equivalent
+HTTP Responses/Compact signal. Ordinary soft-session rotation keeps its existing
+release operation. Fail-before regressions cover transport, quota and pre-send
+WebSocket paths in memory and durable storage, plus HTTP transport/quota paths.
+Older quota assertions now require the retained exact session owner and still
+verify that a following full-history request recovers on the alternate.
+
+The executable negative controls now verify durable state as well as exact
+frames and no replay: delta-only retains its original hard bindings, while the
+previous-response signal releases them; both retain main's session and create
+no alternate response binding. No new model, repository format, helper package,
+gateway, dependency or background worker is introduced. Clean executable
+qualification of this repair follows the local tests.

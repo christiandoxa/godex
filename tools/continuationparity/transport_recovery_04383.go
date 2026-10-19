@@ -93,6 +93,9 @@ func runTransportCase04383(root string, p product, scenario string) error {
 			if err != nil {
 				return err
 			}
+			if err := verifyTransportNegativeOwners04383(p, scenario); err != nil {
+				return err
+			}
 			fmt.Printf("%s %s: authenticated Ready alternate; one account-a attempt; terminal=%s\n", p.name, scenario, payload)
 			return nil
 		}

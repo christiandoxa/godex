@@ -145,6 +145,29 @@ func readTransportOwners04383(p product) (map[string]string, error) {
 	return owners, nil
 }
 
+func verifyTransportNegativeOwners04383(p product, scenario string) error {
+	wantHard := "main"
+	if scenario == "previous-response" {
+		wantHard = ""
+	}
+	deadline := time.NewTimer(3 * time.Second)
+	defer deadline.Stop()
+	ticker := time.NewTicker(20 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		owners, err := readTransportOwners04383(p)
+		if err == nil && owners["session"] == "main" && owners["turn"] == wantHard && owners["unrelated"] == wantHard && owners["response"] == "" {
+			fmt.Printf("%s %s durable snapshot: session=main; original hard bindings=%q; no alternate response\n", p.name, scenario, wantHard)
+			return nil
+		}
+		select {
+		case <-deadline.C:
+			return fmt.Errorf("%s changed durable signal ownership: owners=%v err=%v", scenario, owners, err)
+		case <-ticker.C:
+		}
+	}
+}
+
 func verifyTransportReadyLog04383(p product, recoveryEvent string) error {
 	paths, err := filepath.Glob(filepath.Join(p.state, "logs", "prodex-runtime-*.log"))
 	if err != nil {

@@ -740,6 +740,12 @@ The durable snapshot and in-memory cache both retain at most 4,096 newest
 records, with stable key ordering for timestamp ties. WebSocket message retries
 remain pinned to their bound owner.
 
+Full-context retry signals after quota or retryable upstream failure release
+the matching response/turn identities through routing's dead-binding policy.
+An accompanying session claim remains with its owner until a later routing
+decision or successful replay resolves it. Soft-session rotation retains its
+separate release operation.
+
 The routing repository also exposes a first-owner OS guard to the routing use
 case. Independent processes re-read ownership under that guard before an upstream
 attempt and commit the binding before releasing it. The guard is global only for

@@ -40,6 +40,8 @@ Delta-only input returns the exact terminal 503 without replay. A previous-respo
 dependency returns the exact full-context 400 signal without replay. Mutation tests
 reject lost auth evidence, extra requests/handshakes, changed owners, rounded
 integers, stale tokens, altered output and empty terminal responses.
+Their durable snapshots also require the session to remain on main. Delta-only
+failure retains both hard bindings; the previous-response signal releases them.
 Run `./scripts/verify-release-parity.sh --phase=websocket-transport` for this
 source/binary/manifest-pinned slice. Strict compact-followup setup and native
 macOS/Windows qualification remain separate from the Linux release gate.

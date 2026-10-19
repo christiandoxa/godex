@@ -50,7 +50,7 @@ func (router *Router) handleBoundWebSocketPreSendQuotaBlock(
 		}
 	}
 	if metadata.previousResponseID != "" {
-		if err := router.affinity.forgetOwned(
+		if err := router.affinity.releaseOwnedDead(
 			ctx,
 			account.ID,
 			affinityKeys{
@@ -165,7 +165,7 @@ func (router *Router) handleBoundWebSocketRetryable(
 		if decision.kind == websocketQuotaFallbackUnavailable {
 			return pendingForwarded(account.ID, outcome, pending), nil
 		}
-		if err := router.affinity.forgetOwned(
+		if err := router.affinity.releaseOwnedDead(
 			ctx,
 			account.ID,
 			affinityKeys{

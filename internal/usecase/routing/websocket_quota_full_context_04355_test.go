@@ -47,7 +47,7 @@ func TestProdex04355PreSendQuotaBlockedHardAffinitySignalsFullContextReplay(t *t
 	if got := strings.Join(gateway.accounts, ","); got != websocketQuotaOwnerA {
 		t.Fatalf("pre-send block reached upstream: attempts=%v", gateway.accounts)
 	}
-	assertProdex04355AffinityReleased(t, router, "resp-presend-owner", "session-presend")
+	assertProdex04355HardAffinityReleased(t, router, "resp-presend-owner", "session-presend")
 
 	replay := mustProdex04355WebSocketForward(t, router, `{"type":"response.create","session_id":"session-presend","input":[{"type":"message","role":"user","content":"turn one"},{"type":"message","role":"assistant","content":"turn one result"},{"type":"message","role":"user","content":"turn two"}]}`, 552)
 	defer replay.Close()
@@ -93,7 +93,7 @@ func TestProdex04355HardAffinityQuotaSignalAcceptsLastChanceFallback(t *testing.
 	if err := signal.Close(); err != nil {
 		t.Fatal(err)
 	}
-	assertProdex04355AffinityReleased(t, router, "resp-last-owner", "session-last")
+	assertProdex04355HardAffinityReleased(t, router, "resp-last-owner", "session-last")
 
 	replay := mustProdex04355WebSocketForward(t, router, `{"type":"response.create","session_id":"session-last","input":[{"type":"message","role":"user","content":"turn one"},{"type":"message","role":"assistant","content":"turn one result"},{"type":"message","role":"user","content":"turn two"}]}`, 554)
 	defer replay.Close()
@@ -140,7 +140,7 @@ func TestProdex04372PreSendFullContextSignalKeepsHardCappedFallbackRecoverable(t
 	}
 	defer signal.Close()
 	assertProdex04355FullContextSignal(t, signal, websocketQuotaOwnerA)
-	assertProdex04355AffinityReleased(t, router, "resp-hard-cap-owner", "session-hard-cap-4355")
+	assertProdex04355HardAffinityReleased(t, router, "resp-hard-cap-owner", "session-hard-cap-4355")
 	if got := strings.Join(gateway.accounts, ","); got != websocketQuotaOwnerA {
 		t.Fatalf("hard-capped pre-send fallback reached upstream: %v", gateway.accounts)
 	}
@@ -175,7 +175,7 @@ func assertProdex04355FullContextSignal(t *testing.T, exchange *Exchange, owner 
 	}
 }
 
-func assertProdex04355AffinityReleased(t *testing.T, router *Router, previous, session string) {
+func assertProdex04355HardAffinityReleased(t *testing.T, router *Router, previous, session string) {
 	t.Helper()
 	previousOwner, err := router.affinity.owner(t.Context(), affinityKeys{previous: previous}, router.now())
 	if err != nil {
@@ -185,7 +185,7 @@ func assertProdex04355AffinityReleased(t *testing.T, router *Router, previous, s
 	if err != nil {
 		t.Fatal(err)
 	}
-	if previousOwner != "" || sessionOwner != "" {
-		t.Fatalf("full-context signal retained affinity: previous=%q session=%q", previousOwner, sessionOwner)
+	if previousOwner != "" || sessionOwner != websocketQuotaOwnerA {
+		t.Fatalf("full-context signal owners: previous=%q session=%q", previousOwner, sessionOwner)
 	}
 }

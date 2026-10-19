@@ -60,7 +60,7 @@ func (router *Router) recoverBoundRetryableFailure(
 
 	if (request.QuotaSelection.RouteKind == quotamodel.RouteKindResponses ||
 		request.QuotaSelection.RouteKind == quotamodel.RouteKindCompact) && keys.previous != "" {
-		if err := router.affinity.forgetOwned(ctx, failed.ID, *keys, router.now()); err != nil {
+		if err := router.affinity.releaseOwnedDead(ctx, failed.ID, *keys, router.now()); err != nil {
 			closePendingResponse(pending)
 			return proxymodel.Forwarded{}, true, err
 		}
