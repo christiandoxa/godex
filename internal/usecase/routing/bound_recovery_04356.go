@@ -72,10 +72,15 @@ func (router *Router) recoverBoundRetryableFailure(
 		}, true, nil
 	}
 
-	if keys.thread == "" && keys.session == "" {
+	compactTurn := request.QuotaSelection.RouteKind == quotamodel.RouteKindCompact && keys.turn != ""
+	if keys.thread == "" && keys.session == "" && !compactTurn {
 		return proxymodel.Forwarded{}, false, nil
 	}
-	if err := router.affinity.forgetOwned(ctx, failed.ID, *keys, router.now()); err != nil {
+	releaseAffinity := router.affinity.forgetOwned
+	if compactTurn {
+		releaseAffinity = router.affinity.releaseOwnedDead
+	}
+	if err := releaseAffinity(ctx, failed.ID, *keys, router.now()); err != nil {
 		closePendingResponse(pending)
 		return proxymodel.Forwarded{}, true, err
 	}

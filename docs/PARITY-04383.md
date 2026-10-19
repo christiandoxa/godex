@@ -1028,3 +1028,29 @@ The experiment also exposed turn-only Compact recovery as a separate open
 case: it has no session key, so its bound fallback guard currently rejects
 recovery even after transport classification. No strict compact-followup
 WebSocket qualification or FULL parity is claimed by these observations.
+
+## Recover a Compact turn without replacing its old owner
+
+The same paired experiment on clean `86a157de` confirmed the HTTP EOF repair:
+the session-bearing Compact request now returns the exact reference 200 body,
+and its previous-response control returns the exact 400 without replay. Two
+differences remained. Godex rejected a turn-only request with local 503 while
+Prodex retried second and returned 200. With a session, Godex rebound the failed
+turn and session to second; Prodex removed the failed turn and persisted the
+session conflict while keeping the unrelated response on main.
+
+Routing now admits an owned Compact turn to the existing fallback workflow
+without requiring a session or thread key. It reuses the existing dead-identity
+release policy, which preserves the accompanying session and prevents a
+successful replay from binding the failed token again. The outbound request
+retains its turn header and nested metadata exactly, as the reference requires
+for Compact. This differs from the WebSocket full-history recovery workflow.
+No new helper, port, model, dependency or persistence format is introduced.
+
+Fail-before regressions cover both turn-only and accompanying-session requests
+in memory and through the real routing repository. They check dispatch count,
+opaque bytes and large JSON numbers, failed-token removal, persisted dead
+status, unrelated-response retention and the exact session conflict. Initial
+durable fixture setup was corrected to use valid synthetic IDs and restore
+continuation statuses as the production constructor does. The focused Compact
+race suite now passes; clean executable qualification follows local checks.
