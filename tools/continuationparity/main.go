@@ -184,11 +184,12 @@ func main() {
 	websocketTransport := flag.Bool("websocket-transport", false, "compare authenticated full-history precommit transport recovery in a rotating managed launch")
 	httpKeepAlive := flag.Bool("http-keepalive", false, "compare request-local deadlines across a reused HTTP connection")
 	httpCompact := flag.Bool("http-compact", false, "compare Compact precommit transport recovery and durable ownership")
+	httpTurnTransport := flag.Bool("http-turn-transport", false, "compare owned HTTP Responses turn transport failure without replay")
 	godexSource := flag.String("godex-source", "", "clean Godex commit source (required with an isolated fixture)")
 	godexCommit := flag.String("godex-commit", "", "exact 40-character Godex commit (required with an isolated fixture)")
 	flag.Parse()
 	chosen := 0
-	for _, mode := range []bool{*websocket, *websocketCapacity, *websocketDeadline, *websocketCommittedIdle, *websocketLookaheadIdle, *websocketRealtime, *websocketTransport, *httpKeepAlive, *httpCompact} {
+	for _, mode := range []bool{*websocket, *websocketCapacity, *websocketDeadline, *websocketCommittedIdle, *websocketLookaheadIdle, *websocketRealtime, *websocketTransport, *httpKeepAlive, *httpCompact, *httpTurnTransport} {
 		if mode {
 			chosen++
 		}
@@ -222,7 +223,9 @@ func main() {
 	for _, spec := range []struct{ name, binary string }{{"prodex", *prodex}, {"godex", *godex}} {
 		p := product{name: spec.name, binary: spec.binary}
 		var err error
-		if *httpCompact {
+		if *httpTurnTransport {
+			err = runHTTPResponsesTurnProduct04383(root, p)
+		} else if *httpCompact {
 			err = runHTTPCompactProduct04383(root, p)
 		} else if *httpKeepAlive {
 			err = runHTTPKeepAliveProduct04383(root, p)
@@ -250,6 +253,10 @@ func main() {
 			}
 			fatal(spec.name + ": " + err.Error())
 		}
+	}
+	if *httpTurnTransport {
+		fmt.Println("PASS Prodex 0.438.3 owned HTTP Responses turn transport failure and durable ownership across both binaries")
+		return
 	}
 	if *httpCompact {
 		fmt.Println("PASS Prodex 0.438.3 HTTP Compact transport recovery and durable ownership across both binaries")

@@ -1072,7 +1072,7 @@ follows local checks; the strict WebSocket compact-followup gap remains open.
 The strict oracle rejected clean `86a157de` at the expected Godex turn-only
 503 after all three official Prodex cases passed. It then passed all three
 cases against clean `774f6286`. The tooling race suite passed 260 tests,
-including fifty Compact mutation checks; `bash -n` and `make verify` passed.
+including fifty Compact oracle checks; `bash -n` and `make verify` passed.
 The release phase must still qualify the committed harness on its exact clean
 candidate. No native nine-mode result is claimed before actual execution.
 
@@ -1121,3 +1121,23 @@ history, require a single dispatch and check all three owners after failure.
 The focused suite, including Compact and quota recovery controls, passes.
 Clean-candidate executable confirmation follows local checks; this does not
 qualify the separate strict compact-followup WebSocket branch.
+
+Before `69d9b857` was pushed, `make verify`, the 26-test focused race suite and
+sixty repeated memory/durable checks passed. A paired experiment on that exact
+clean commit then matched all three terminal responses, single-request counts
+and durable owners. These observations remained exploratory.
+
+The new `--phase=http-turn-transport` gate reuses the existing HTTP fault fixture
+with a separate Responses verifier. It asserts the two exact 503 no-replay
+cases and the exact previous-response 400 control, applied authenticated Ready
+evidence, unchanged full history and turn metadata, and all durable owners after
+shutdown. Mutation controls reject each material deviation. The default gate
+and native matrix require this tenth mode; the HTTP Compact verifier and its
+controls remain active. Clean-candidate qualification follows local checks.
+
+The strict Responses oracle rejected clean `cef9c84c` at the expected two-request
+200 replay after all three official Prodex controls passed. It passed all three
+cases against clean `69d9b857`. The tooling race suite passed 306 checks,
+including both HTTP verifiers, and `bash -n` plus `make verify` passed. Both
+HTTP phases must still qualify the shared fixture on this committed harness;
+no complete ten-mode or native result is claimed before actual execution.

@@ -43,8 +43,17 @@ readiness, authentication, count, owner, wire bytes, large numbers, output,
 status and every durable-owner projection.
 
 Run `./scripts/verify-release-parity.sh --phase=http-compact` for this slice.
-The complete gate and nine-mode native matrix require it. This HTTP route is
+The complete gate and native matrix require it. This HTTP route is
 separate from the still-open strict WebSocket compact-followup control.
+
+`--http-turn-transport` reuses the same authenticated fault fixture on Responses.
+Owned turns return exact 503 without replay, with or without an accompanying
+session. The original turn, session and unrelated response stay on main.
+The previous-response control returns exact 400, releases its hard owners and
+retains the session. Its mutations reject replay, changed auth/readiness,
+wire bytes, owner, status, body and durable state. Run
+`./scripts/verify-release-parity.sh --phase=http-turn-transport` for this slice;
+the complete gate and ten-mode native matrix require it.
 
 ## Authenticated precommit transport recovery
 

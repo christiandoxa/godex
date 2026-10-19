@@ -14,7 +14,7 @@ import (
 const compactReply04383 = `{"id":"resp-transport-recovered","object":"response.compaction","output":[{"type":"compaction","encrypted_content":"synthetic-opaque"}]}`
 const compactRetry04383 = `{"error":{"code":"previous_response_not_found","message":"Previous response was not found. Retrying the full request."}}`
 
-type httpCompactResult04383 struct {
+type httpTransportResult04383 struct {
 	reply    exchange
 	attempts []transportAttempt04383
 	owners   map[string]string
@@ -23,14 +23,14 @@ type httpCompactResult04383 struct {
 
 func runHTTPCompactProduct04383(root string, p product) error {
 	for _, scenario := range []string{"turn-only", "with-session", "previous-response"} {
-		if err := runHTTPCompactCase04383(filepath.Join(root, scenario), p, scenario); err != nil {
+		if err := runHTTPTransportCase04383(filepath.Join(root, scenario), p, scenario, "/responses/compact"); err != nil {
 			return fmt.Errorf("%s: %w", scenario, err)
 		}
 	}
 	return nil
 }
 
-func runHTTPCompactCase04383(root string, p product, scenario string) error {
+func runHTTPTransportCase04383(root string, p product, scenario, route string) error {
 	if err := prepareProduct(root, &p); err != nil {
 		return err
 	}
@@ -38,7 +38,7 @@ func runHTTPCompactCase04383(root string, p product, scenario string) error {
 		return err
 	}
 	p.env = append(p.env, "PRODEX_RUNTIME_LOG_RECORD=true")
-	b := newHTTPCompactBackend04383()
+	b := newHTTPTransportBackend04383(route)
 	defer b.server.Close()
 	endpoint, stop, err := startTransportLaunch04383(p, b.server.URL+"/backend-api")
 	if err != nil {
@@ -67,7 +67,7 @@ func runHTTPCompactCase04383(root string, p product, scenario string) error {
 	if err != nil || owners["turn"] != "main" || owners["session"] != "main" || owners["unrelated"] != "main" {
 		return fmt.Errorf("Compact warmups changed the initial owner: owners=%v err=%v", owners, err)
 	}
-	request, err := http.NewRequest(http.MethodPost, endpoint+"/responses/compact", strings.NewReader(httpCompactBody04383(scenario)))
+	request, err := http.NewRequest(http.MethodPost, endpoint+route, strings.NewReader(httpTransportBody04383(scenario)))
 	if err != nil {
 		return err
 	}
@@ -89,16 +89,20 @@ func runHTTPCompactCase04383(root string, p product, scenario string) error {
 		return err
 	}
 	b.mu.Lock()
-	result := httpCompactResult04383{reply: exchange{status: response.StatusCode, body: string(payload)}, attempts: append([]transportAttempt04383(nil), b.attempts...), owners: owners, invalid: b.invalid}
+	result := httpTransportResult04383{reply: exchange{status: response.StatusCode, body: string(payload)}, attempts: append([]transportAttempt04383(nil), b.attempts...), owners: owners, invalid: b.invalid}
 	b.mu.Unlock()
-	if err := verifyHTTPCompact04383(scenario, result); err != nil {
+	verify := verifyHTTPCompact04383
+	if route == "/responses" {
+		verify = verifyHTTPResponsesTurn04383
+	}
+	if err := verify(scenario, result); err != nil {
 		return err
 	}
-	fmt.Printf("%s HTTP compact %s: applied Ready owners=2; upstream_requests=%d; status=%d; opaque wire and durable owners preserved\n", p.name, scenario, len(result.attempts), result.reply.status)
+	fmt.Printf("%s HTTP %s %s: applied Ready owners=2; upstream_requests=%d; status=%d; opaque wire and durable owners preserved\n", p.name, route, scenario, len(result.attempts), result.reply.status)
 	return nil
 }
 
-func httpCompactBody04383(scenario string) string {
+func httpTransportBody04383(scenario string) string {
 	body := strings.Replace(transportHistory04383, `"type":"response.create",`, "", 1)
 	if scenario == "turn-only" {
 		return strings.Replace(body, `"session_id":"sess-transport",`, "", 1)
@@ -109,10 +113,10 @@ func httpCompactBody04383(scenario string) string {
 	return body
 }
 
-func newHTTPCompactBackend04383() *transportBackend04383 {
+func newHTTPTransportBackend04383(route string) *transportBackend04383 {
 	b := &transportBackend04383{receipts: make(map[string]int)}
 	b.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !strings.HasSuffix(r.URL.Path, "/responses/compact") {
+		if !strings.HasSuffix(r.URL.Path, route) || r.Header.Get("x-codex-turn-state") == "" {
 			b.serve(w, r)
 			return
 		}
@@ -130,12 +134,16 @@ func newHTTPCompactBackend04383() *transportBackend04383 {
 			}
 			return
 		}
-		writeJSON(w, 200, compactReply04383)
+		reply := compactReply04383
+		if route == "/responses" {
+			reply = `{"id":"resp-transport-recovered","object":"response","output":[]}`
+		}
+		writeJSON(w, 200, reply)
 	}))
 	return b
 }
 
-func verifyHTTPCompact04383(scenario string, result httpCompactResult04383) error {
+func verifyHTTPCompact04383(scenario string, result httpTransportResult04383) error {
 	count, status, body := 2, http.StatusOK, compactReply04383
 	session, unrelated := "main", "main"
 	if scenario == "previous-response" {
@@ -153,7 +161,7 @@ func verifyHTTPCompact04383(scenario string, result httpCompactResult04383) erro
 		if index == 1 {
 			wantOwner = "account-b"
 		}
-		if !attempt.ready || attempt.owner != wantOwner || attempt.turn != "turn-a" || attempt.body != httpCompactBody04383(scenario) {
+		if !attempt.ready || attempt.owner != wantOwner || attempt.turn != "turn-a" || attempt.body != httpTransportBody04383(scenario) {
 			return fmt.Errorf("Compact attempt %d changed authenticated readiness, owner or opaque wire", index)
 		}
 	}
