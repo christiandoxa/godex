@@ -23,9 +23,10 @@ func (handler *activeRequestHandler) ServeHTTP(writer http.ResponseWriter, reque
 		return
 	}
 	if !handler.acquireRequest(request, lane) {
-		if requestDeadlineTimedOut(request.Context()) {
+		contextErr := request.Context().Err()
+		if requestDeadlineTimedOut(request.Context(), contextErr) {
 			writeProxyError(writer, request.URL.Path, http.StatusGatewayTimeout, requestRecoveryTimeoutMessage)
-		} else if request.Context().Err() == nil {
+		} else if contextErr == nil {
 			handler.markLocalOverload()
 			writeLocalAdmissionOverloadResponse(writer, lane, isWebSocketUpgradeRequest(request))
 		}

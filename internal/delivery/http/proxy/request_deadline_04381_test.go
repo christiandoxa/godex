@@ -31,7 +31,7 @@ func TestProdex04381RequestDeadlineIncludesAcceptedConnectionTime(t *testing.T) 
 		deadline.Sub(acceptedAt.Add(100*time.Millisecond)) < -time.Millisecond {
 		t.Fatalf("deadline=%v, want accepted-at deadline near %v", deadline, acceptedAt.Add(100*time.Millisecond))
 	}
-	if !requestDeadlineTimedOut(ctx) {
+	if !requestDeadlineTimedOut(ctx, ctx.Err()) {
 		t.Fatal("deadline that elapsed in the listener queue was not expired")
 	}
 }

@@ -799,3 +799,31 @@ correct session/original-response ownership. The executable slice adds
 `unbound-quota-history` and `unbound-quota-delta`, with exact 429 and no-replay
 mutation controls. The expanded twelve-case slice still requires qualification
 on a clean candidate before these new quota cases are counted as VERIFIED.
+
+The twelve-case slice passed both pinned executables on clean
+`20014bb5b29a5caf546cfa04e4e6b9076c4ff698`. Both bound and unbound
+transport/quota histories recovered with matching exact frames and durable
+owners; all delta, previous-response, missing-response and lifecycle controls
+passed on that commit. This remains a finite Linux qualification.
+
+## Deadline classification cannot become an empty HTTP 200
+
+Native Windows run `39275609588` failed its ordinary tests on clean `a2c19387`
+before reaching the executable oracle. The existing Compact watchdog regression
+received HTTP 200 with an empty body instead of typed 504. Delivery read the
+request's context error separately for timeout and cancellation, allowing a
+local deadline to fire between those reads and suppress the error response.
+
+`TestProdex04383DeadlineBetweenErrorChecksNeverReturnsEmpty200` deterministically
+reproduced the empty 200 for both Responses and Compact before the repair. It
+uses the real routing watchdog with controlled context expiration during error
+classification. Delivery now samples the context error once in upstream-error,
+body-capture-error and admission-error handling. Existing timeout status, public
+message and cancellation behavior remain intact. The deadline helper stays
+private to `delivery/http/proxy`; no gateway, repository, use-case contract,
+shared helper package or dependency changes.
+
+The repaired delivery/routing race suite passed 994 tests. Fifty repetitions of
+the new race regression and original watchdog test passed 200 tests under race
+detection. Native Windows re-execution remains required before the original
+native failure is considered resolved.

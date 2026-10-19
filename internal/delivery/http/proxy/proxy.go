@@ -261,12 +261,13 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 		var err error
 		body, err = readLimited(requestContext, request.Body, proxy.maxRequest)
 		if err != nil {
-			if requestDeadlineTimedOut(requestContext) {
+			contextErr := requestContext.Err()
+			if requestDeadlineTimedOut(requestContext, contextErr) {
 				activity.fail(http.StatusGatewayTimeout, requestRecoveryTimeoutMessage)
 				writeProxyError(writer, request.URL.Path, http.StatusGatewayTimeout, requestRecoveryTimeoutMessage)
 				return
 			}
-			if request.Context().Err() != nil {
+			if contextErr != nil {
 				activity.fail(0, "request canceled")
 				return
 			}
@@ -281,7 +282,7 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 		// A closing server connection can report read EOF at any point after
 		// capture. Finish its complete request like the reference runtime;
 		// body-read failures and ordinary request cancellation still stop work.
-		if requestDeadlineTimedOut(requestContext) {
+		if requestDeadlineTimedOut(requestContext, requestContext.Err()) {
 			activity.fail(http.StatusGatewayTimeout, requestRecoveryTimeoutMessage)
 			writeProxyError(writer, request.URL.Path, http.StatusGatewayTimeout, requestRecoveryTimeoutMessage)
 			return
@@ -319,12 +320,13 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 		QuotaSelection: proxy.quotaSelection(request.URL.Path, websocket, body),
 	})
 	if err != nil {
-		if requestDeadlineTimedOut(requestContext) {
+		contextErr := requestContext.Err()
+		if requestDeadlineTimedOut(requestContext, contextErr) {
 			activity.fail(http.StatusGatewayTimeout, requestRecoveryTimeoutMessage)
 			writeProxyError(writer, request.URL.Path, http.StatusGatewayTimeout, requestRecoveryTimeoutMessage)
 			return
 		}
-		if requestContext.Err() != nil {
+		if contextErr != nil {
 			activity.fail(0, "request canceled")
 			return
 		}

@@ -67,9 +67,10 @@ func requestDeadlineScopeFor(ctx context.Context) (requestDeadlineScope, bool) {
 	return scope, ok && scope.parent != nil
 }
 
-func requestDeadlineTimedOut(ctx context.Context) bool {
+// Classify the caller's error snapshot; a second read can race expiration.
+func requestDeadlineTimedOut(ctx context.Context, contextErr error) bool {
 	scope, ok := requestDeadlineScopeFor(ctx)
-	return ok && scope.local && errors.Is(ctx.Err(), context.DeadlineExceeded)
+	return ok && scope.local && errors.Is(contextErr, context.DeadlineExceeded)
 }
 
 func withoutRequestDeadline(ctx context.Context) context.Context {

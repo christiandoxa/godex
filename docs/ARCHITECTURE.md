@@ -669,6 +669,10 @@ same narrow auth port. The stateless `helper/httpheader` package shares RFC
 hop-header policy between the two concrete HTTP boundaries, with focused tests.
 The sole integration root remains `cmd/godex`.
 
+HTTP delivery uses one context-error snapshot when distinguishing its local
+request deadline from client cancellation. A deadline firing during error
+presentation must retain the typed timeout instead of returning empty success.
+
 Fresh-stream startup quota classification belongs to `usecase/routing`; HTTP
 delivery still owns commitment, byte forwarding, and incremental ownership
 observation. Both reuse `helper/sse` for bounded SSE framing only. It has no
