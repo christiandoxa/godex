@@ -24,7 +24,14 @@ func requestWithoutTurnState(request proxymodel.Request) proxymodel.Request {
 	if request.Header == nil {
 		request.Header = make(http.Header)
 	}
-	request.Header.Del("x-codex-turn-state")
+	// net/http canonicalizes Del's argument, not every existing map key.
+	// A caller-built Header can contain several ASCII-case variants; remove
+	// all of them to match Prodex's tagged outbound header filter.
+	for key := range request.Header {
+		if len(key) == len("x-codex-turn-state") && strings.EqualFold(key, "x-codex-turn-state") {
+			delete(request.Header, key)
+		}
+	}
 
 	// Keep the client's input and unknown fields opaque: decoding into
 	// map[string]any would round large JSON integers through float64 and

@@ -55,3 +55,28 @@ func TestProdex04383TurnStateRecoveryPreservesOpaqueNumericHistory(t *testing.T)
 		t.Fatalf("opaque metadata numbers changed: %s", after["client_metadata"])
 	}
 }
+
+// The Go Header map can contain both canonical and noncanonical keys when a
+// caller constructs it directly. The tagged Prodex adapter drops *all* ASCII
+// case-insensitive variants before handing history to another profile; merely
+// calling http.Header.Del would leave the lowercase and uppercase aliases.
+func TestProdex04383TransportReplayRemovesEveryTurnStateHeaderCase(t *testing.T) {
+	request := proxymodel.Request{Header: http.Header{
+		"X-Codex-Turn-State": {"stale-canonical"},
+		"x-codex-turn-state": {"stale-lowercase"},
+		"X-CODEX-TURN-STATE": {"stale-uppercase"},
+		"x-cOdeX-tuRN-stAte": {"stale-mixed"},
+		"X-Request-Id":       {"synthetic-request"},
+	}, Body: []byte(`{"type":"response.create","input":[]}`)}
+
+	clean := requestWithoutTurnState(request)
+	for key := range clean.Header {
+		if strings.EqualFold(key, "x-codex-turn-state") {
+			t.Fatalf("recovered request leaked old owner via %q: %v", key, clean.Header)
+		}
+	}
+	if clean.Header.Get("X-Request-Id") != "synthetic-request" ||
+		len(request.Header) != 5 || len(clean.Header) != 1 {
+		t.Fatalf("unrelated header lost or original mutated: original=%v replay=%v", request.Header, clean.Header)
+	}
+}

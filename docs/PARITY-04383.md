@@ -405,3 +405,16 @@ Windows/macOS live execution, OAuth, provider outages, or arbitrary
 full-history transport failure shapes have achieved production-wide 1:1
 parity. A cross-binary large-numeric/full-history transport replay fixture
 remains unproven independently of the local causal regressions above.
+
+## Transport replay removes noncanonical HTTP turn-state header aliases
+
+The tagged 0.438.3 `runtime_request_without_turn_state` removes **every**
+ASCII-case-insensitive `x-codex-turn-state` header, rather than relying on a
+canonical map-key lookup. A Go-caller-built request could contain a canonical,
+lowercase, uppercase and mixed-case copy at once. The old `Header.Del` removed
+only the canonical key, leaving a failed owner's turn token on the replay.
+`TestProdex04383TransportReplayRemovesEveryTurnStateHeaderCase` failed on
+that exact leak before the fix and passes with all variants removed, while
+preserving unrelated headers and the original request. This is a local
+source-aligned regression and does not qualify the unresolved independent
+full-history transport failure fixture.
