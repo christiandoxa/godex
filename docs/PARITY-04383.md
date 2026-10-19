@@ -1253,3 +1253,36 @@ gate lacks the mixed-ID cases. Native Windows job `118205235978` passed all
 ten modes on that commit. Native Compact confirmation with the corrected
 lifecycle, the strict WebSocket compact-followup control and official macOS
 realtime remain **OPEN**.
+
+Both expanded HTTP release phases passed on exact clean
+`16f3eefbed05d51183ba81b04a26122901be709b`. Each mode ran all four cases
+against both pinned executables, then its mutation suite. Native Compact
+confirmation with the corrected child lifecycle still requires host execution.
+
+## WebSocket transport reset requires the actual previous owner
+
+A targeted paired experiment on exact clean `16f3eefb` reproduced the mixed-ID
+problem on WebSocket too. Both profiles had authenticated, applied Ready
+evidence. An unknown previous-response ID beside the verified main turn/session
+produced one main request on each product. Official Prodex returned exact 503
+`service_unavailable`, kept the turn/session and unrelated response, and left
+the unknown ID unbound. Godex returned the 400 full-context reset. The known-ID
+control already matched the one-request 400 and retained accompanying session.
+
+`usecase/routing` now checks that the previous ID belongs to the failed account
+before authorizing a WebSocket transport reset. An unowned ID keeps the pending
+terminal failure and existing owners. Known-ID resets, non-transport recovery
+and previous-response no-replay rules keep their existing policies. The ten-line
+change stays at the consuming routing boundary; no helper, model, dependency,
+persistence format or gateway behavior is added.
+
+The new memory/durable regressions failed before the fix on both unknown-ID
+cases. They check the exact terminal event, one original-owner attempt, unchanged
+opaque body/header, retained unrelated response and durable owners. The focused
+race suite passed 41 checks, twenty repeated regression runs passed 100 checks
+and the tooling race suite passed 356 checks. `rtk make verify` passed. The
+mandatory transport mode adds
+the unknown-ID negative control as its fourteenth scenario, requires its ID to
+remain unbound and rejects mutations that substitute the known-owner 400 reset.
+Exact clean executable qualification follows local validation. This control does
+not qualify the separate strict WebSocket compact-followup branch.

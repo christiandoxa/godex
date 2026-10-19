@@ -154,6 +154,16 @@ func (router *Router) handleBoundWebSocketRetryable(
 	}
 
 	if metadata.previousResponseID != "" {
+		if outcome.transport {
+			owner, err := router.affinity.owner(ctx, affinityKeys{previous: metadata.previousResponseID}, router.now())
+			if err != nil {
+				closePendingResponse(pending)
+				return proxymodel.Forwarded{}, err
+			}
+			if owner != account.ID {
+				return pendingForwarded(account.ID, outcome, pending), nil
+			}
+		}
 		decision := router.websocketQuotaFallbackDecisionWithContext(
 			request, accounts, account, false,
 		)

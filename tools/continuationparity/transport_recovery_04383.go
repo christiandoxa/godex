@@ -14,7 +14,7 @@ import (
 )
 
 func runWebSocketTransportProduct04383(root string, p product) error {
-	for _, scenario := range []string{"full-history", "unbound-history", "quota-history", "unbound-quota-history", "turn-missing", "delta-only", "unbound-delta", "unbound-quota-delta", "previous-response", "postcommit", "cancellation", "deadline", "busy-history"} {
+	for _, scenario := range []string{"full-history", "unbound-history", "quota-history", "unbound-quota-history", "turn-missing", "delta-only", "unbound-delta", "unbound-quota-delta", "previous-response", "unknown-previous", "postcommit", "cancellation", "deadline", "busy-history"} {
 		if err := runTransportCase04383(filepath.Join(root, scenario), p, scenario); err != nil {
 			return fmt.Errorf("%s: %w", scenario, err)
 		}
@@ -90,6 +90,9 @@ func runTransportCase04383(root string, p product, scenario string) error {
 	if scenario == "previous-response" {
 		body = strings.Replace(body, `"type":"response.create"`, `"type":"response.create","previous_response_id":"resp-main"`, 1)
 	}
+	if scenario == "unknown-previous" {
+		body = strings.Replace(body, `"type":"response.create"`, `"type":"response.create","previous_response_id":"resp-unknown"`, 1)
+	}
 	if err := websocketframe.WriteFrame(connection, 1, []byte(body), true); err != nil {
 		return err
 	}
@@ -112,7 +115,7 @@ func runTransportCase04383(root string, p product, scenario string) error {
 			return fmt.Errorf("unexpected client opcode %d", opcode)
 		}
 		frames = append(frames, string(payload))
-		if scenario == "delta-only" || strings.HasSuffix(scenario, "-delta") || scenario == "previous-response" {
+		if scenario == "delta-only" || strings.HasSuffix(scenario, "-delta") || scenario == "previous-response" || scenario == "unknown-previous" {
 			b.mu.Lock()
 			err := verifyTransportNegative04383(scenario, body, b.handshakes, b.attempts, string(payload), b.invalid)
 			b.mu.Unlock()

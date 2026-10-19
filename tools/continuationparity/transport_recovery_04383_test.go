@@ -99,24 +99,31 @@ func TestProdex04383MissingResponseOracleKeepsOpaqueTurnOnReplay(t *testing.T) {
 }
 
 func TestProdex04383TransportNegativeOracleRejectsReplayAndEmptyTerminal(t *testing.T) {
-	const body = `{"type":"response.create","input":[{"type":"function_call_output","call_id":"call-large","output":"done"}]}`
-	const terminal = `{"error":{"code":"service_unavailable","message":"Runtime proxy could not secure a healthy upstream profile before the pre-commit retry budget was exhausted. Retry the request."},"status":503,"type":"error"}`
-	base := transportAttempt04383{owner: "account-a", turn: "turn-a", body: body, ready: true}
-	if err := verifyTransportNegative04383("delta-only", body, []string{"account-a"}, []transportAttempt04383{base}, terminal, false); err != nil {
-		t.Fatal(err)
-	}
-	for _, tc := range []struct {
-		name, frame string
-		attempts    []transportAttempt04383
-	}{
-		{"empty terminal", "", []transportAttempt04383{base}},
-		{"wrong status", strings.Replace(terminal, "503", "502", 1), []transportAttempt04383{base}},
-		{"model replay", terminal, []transportAttempt04383{base, base}},
-		{"no attempt", terminal, nil},
+	for scenario, body := range map[string]string{
+		"delta-only":       `{"type":"response.create","input":[{"type":"function_call_output","call_id":"call-large","output":"done"}]}`,
+		"unknown-previous": strings.Replace(transportHistory04383, `"model":"gpt-6",`, `"model":"gpt-6","previous_response_id":"resp-unknown",`, 1),
 	} {
-		t.Run(tc.name, func(t *testing.T) {
-			if err := verifyTransportNegative04383("delta-only", body, []string{"account-a"}, tc.attempts, tc.frame, false); err == nil {
-				t.Fatal("negative control mutation escaped the oracle")
+		t.Run(scenario, func(t *testing.T) {
+			const terminal = `{"error":{"code":"service_unavailable","message":"Runtime proxy could not secure a healthy upstream profile before the pre-commit retry budget was exhausted. Retry the request."},"status":503,"type":"error"}`
+			base := transportAttempt04383{owner: "account-a", turn: "turn-a", body: body, ready: true}
+			if err := verifyTransportNegative04383(scenario, body, []string{"account-a"}, []transportAttempt04383{base}, terminal, false); err != nil {
+				t.Fatal(err)
+			}
+			for _, tc := range []struct {
+				name, frame string
+				attempts    []transportAttempt04383
+			}{
+				{"incorrect owner reset", `{"error":{"code":"previous_response_not_found","message":"Previous response was not found. Retrying the full request."},"status":400,"type":"error"}`, []transportAttempt04383{base}},
+				{"empty terminal", "", []transportAttempt04383{base}},
+				{"wrong status", strings.Replace(terminal, "503", "502", 1), []transportAttempt04383{base}},
+				{"model replay", terminal, []transportAttempt04383{base, base}},
+				{"no attempt", terminal, nil},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					if err := verifyTransportNegative04383(scenario, body, []string{"account-a"}, tc.attempts, tc.frame, false); err == nil {
+						t.Fatal("negative control mutation escaped the oracle")
+					}
+				})
 			}
 		})
 	}

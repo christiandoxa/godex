@@ -618,7 +618,7 @@ control, backups, bug reports, or fixtures.
 - [Runtime rotation and affinity](docs/ROTATION.md) — selection, retries,
   commitment, streaming, and forwarding rules.
 - [Prodex 0.438.3 parity](docs/PARITY-04383.md) — pinned executable oracles,
-  HTTP transport ownership controls and remaining verification gaps.
+  HTTP/WebSocket transport ownership controls and remaining verification gaps.
 - [Prodex 0.437.4 oracle](docs/PARITY-04374.md) — pinned differential
   references and the session app-server process-tree fixture.
 - [Prodex 0.437.10 oracle](docs/PARITY-043710.md) — verified goal attachment

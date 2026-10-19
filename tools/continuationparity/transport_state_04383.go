@@ -181,7 +181,7 @@ func verifyTransportNegativeOwners04383(p product, scenario string) error {
 	defer ticker.Stop()
 	for {
 		owners, err := readTransportOwners04383(p)
-		if err == nil && owners["session"] == "main" && owners["turn"] == wantTurn && owners["unrelated"] == wantPrevious && owners["response"] == "" {
+		if err == nil && owners["unknown"] == "" && owners["session"] == "main" && owners["turn"] == wantTurn && owners["unrelated"] == wantPrevious && owners["response"] == "" {
 			fmt.Printf("%s %s durable snapshot: session=main; original turn=%q response=%q; no alternate response\n", p.name, scenario, wantTurn, wantPrevious)
 			return nil
 		}
