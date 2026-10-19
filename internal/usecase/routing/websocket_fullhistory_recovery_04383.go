@@ -8,12 +8,12 @@ import (
 )
 
 // Prodex 0.438.3 shares the tagged full-history proof between quota and
-// *precommit transport* recovery. A failed turn-state-only connection can
+// precommit transport recovery. A failed turn-state-only connection can
 // hand off a reconstructable full transcript to a different Ready profile,
 // after releasing any matching failed-owner binding. This must never
 // replay previous_response_id dependencies, delta-only tool output, compact
 // followups, another profile's owned turn-state, or committed model output.
-func (router *Router) recoverWebSocketTurnStateTransport04383(
+func (router *Router) recoverWebSocketTurnStateFullHistory04383(
 	ctx context.Context,
 	request proxymodel.Request,
 	accounts []proxymodel.Account,
@@ -22,7 +22,7 @@ func (router *Router) recoverWebSocketTurnStateTransport04383(
 	outcome responseOutcome,
 	pending *pendingResponse,
 ) (proxymodel.Forwarded, bool, error) {
-	if !request.WebSocketMessage || outcome.kind != responseRetry || !outcome.transport ||
+	if !request.WebSocketMessage || outcome.kind != responseRetry || (!outcome.transport && !outcome.quota) ||
 		metadata.previousResponseID != "" || metadata.turnState == "" ||
 		request.WebSocketPolicy.RealtimeDuplex || request.FirstEventRetryUsed ||
 		request.QuotaSelection.RouteKind == quotamodel.RouteKindCompact ||

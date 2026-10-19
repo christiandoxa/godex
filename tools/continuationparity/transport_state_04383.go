@@ -28,7 +28,7 @@ func seedTransportAlternate04383(p product, scenario string) error {
 	}
 	if p.name == "prodex" {
 		value := state["value"].(map[string]any)
-		if scenario == "unbound-history" || scenario == "unbound-delta" {
+		if strings.HasPrefix(scenario, "unbound-") {
 			delete(value["turn_state_bindings"].(map[string]any), "turn-a")
 			delete(value["statuses"].(map[string]any)["turn_state"].(map[string]any), "turn-a")
 		}
@@ -54,7 +54,7 @@ func seedTransportAlternate04383(p product, scenario string) error {
 		}
 		digest := sha256.Sum256([]byte("previous:resp-ready-b"))
 		state["bindings"] = append(state["bindings"].([]any), map[string]any{"kind": "previous", "key": hex.EncodeToString(digest[:]), "account_id": id, "updated_unix": time.Now().Unix()})
-		if scenario == "unbound-history" || scenario == "unbound-delta" {
+		if strings.HasPrefix(scenario, "unbound-") {
 			turn := sha256.Sum256([]byte("turn:turn-a"))
 			var bindings []any
 			for _, raw := range state["bindings"].([]any) {
@@ -168,7 +168,7 @@ func verifyTransportNegativeOwners04383(p product, scenario string) error {
 	if scenario == "previous-response" {
 		wantTurn, wantPrevious = "", ""
 	}
-	if scenario == "unbound-delta" {
+	if strings.HasPrefix(scenario, "unbound-") {
 		wantTurn = ""
 	}
 	deadline := time.NewTimer(3 * time.Second)
@@ -192,7 +192,7 @@ func verifyTransportNegativeOwners04383(p product, scenario string) error {
 func verifyTransportReadyLog04383(p product, scenario, recoveryEvent string) error {
 	recoveryMarker := recoveryEvent + " profile=main affinity_released=true"
 	selectionMarker := "selection_keep_current route=websocket profile=second"
-	if scenario == "unbound-history" {
+	if strings.HasPrefix(scenario, "unbound-") {
 		recoveryMarker = recoveryEvent + " profile=main affinity_released=false"
 		selectionMarker = "selection_pick route=websocket profile=second mode=ready"
 	}

@@ -14,7 +14,7 @@ import (
 )
 
 func runWebSocketTransportProduct04383(root string, p product) error {
-	for _, scenario := range []string{"full-history", "unbound-history", "quota-history", "turn-missing", "delta-only", "unbound-delta", "previous-response", "postcommit", "cancellation", "deadline"} {
+	for _, scenario := range []string{"full-history", "unbound-history", "quota-history", "unbound-quota-history", "turn-missing", "delta-only", "unbound-delta", "unbound-quota-delta", "previous-response", "postcommit", "cancellation", "deadline"} {
 		if err := runTransportCase04383(filepath.Join(root, scenario), p, scenario); err != nil {
 			return fmt.Errorf("%s: %w", scenario, err)
 		}
@@ -29,7 +29,7 @@ func runTransportCase04383(root string, p product, scenario string) error {
 	if err := seedTransportAlternate04383(p, scenario); err != nil {
 		return err
 	}
-	if scenario == "unbound-history" || scenario == "unbound-delta" {
+	if strings.HasPrefix(scenario, "unbound-") {
 		owners, err := readTransportOwners04383(p)
 		if err != nil || owners["turn"] != "" {
 			return fmt.Errorf("unbound fixture acquired a turn owner: owners=%v err=%v", owners, err)
@@ -45,7 +45,7 @@ func runTransportCase04383(root string, p product, scenario string) error {
 	defer stop()
 	client := &http.Client{Timeout: 5 * time.Second}
 	warmups := []string{"resp-main", "resp-ready-b"}
-	if scenario == "unbound-history" || scenario == "unbound-delta" {
+	if strings.HasPrefix(scenario, "unbound-") {
 		warmups[0], warmups[1] = warmups[1], warmups[0]
 	}
 	for _, previous := range warmups {
@@ -74,7 +74,7 @@ func runTransportCase04383(root string, p product, scenario string) error {
 	defer connection.Close()
 	_ = connection.SetDeadline(time.Now().Add(12 * time.Second))
 	body := transportHistory04383
-	if scenario == "delta-only" || scenario == "unbound-delta" {
+	if scenario == "delta-only" || strings.HasSuffix(scenario, "-delta") {
 		body = `{"type":"response.create","model":"gpt-6","session_id":"sess-transport","client_metadata":{"x-codex-turn-state":"turn-a"},"input":[{"type":"function_call_output","call_id":"call-large","output":"done"}]}`
 	}
 	if scenario == "previous-response" {
@@ -96,7 +96,7 @@ func runTransportCase04383(root string, p product, scenario string) error {
 			return fmt.Errorf("unexpected client opcode %d", opcode)
 		}
 		frames = append(frames, string(payload))
-		if scenario == "delta-only" || scenario == "unbound-delta" || scenario == "previous-response" {
+		if scenario == "delta-only" || strings.HasSuffix(scenario, "-delta") || scenario == "previous-response" {
 			b.mu.Lock()
 			err := verifyTransportNegative04383(scenario, body, b.handshakes, b.attempts, string(payload), b.invalid)
 			b.mu.Unlock()
@@ -120,7 +120,7 @@ func runTransportCase04383(root string, p product, scenario string) error {
 		return err
 	}
 	recoveryEvent := "transport_failure_turn_state_full_context_replay"
-	if scenario == "quota-history" {
+	if scenario == "quota-history" || scenario == "unbound-quota-history" {
 		recoveryEvent = "quota_blocked_turn_state_full_context_replay"
 	}
 	if scenario == "turn-missing" {
@@ -139,6 +139,9 @@ func verifyTransportNegative04383(scenario, body string, handshakes []string, at
 		return fmt.Errorf("%s changed owner/opaque input or replayed: handshakes=%v attempts=%+v invalid=%t", scenario, handshakes, attempts, invalid)
 	}
 	want := `{"error":{"code":"service_unavailable","message":"Runtime proxy could not secure a healthy upstream profile before the pre-commit retry budget was exhausted. Retry the request."},"status":503,"type":"error"}`
+	if scenario == "unbound-quota-delta" {
+		want = `{"type":"error","status":429,"error":{"code":"insufficient_quota","message":"synthetic quota"}}`
+	}
 	if scenario == "previous-response" {
 		want = `{"error":{"code":"previous_response_not_found","message":"Previous response was not found. Retrying the full request."},"status":400,"type":"error"}`
 	}

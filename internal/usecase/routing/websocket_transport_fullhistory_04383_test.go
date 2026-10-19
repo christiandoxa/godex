@@ -123,7 +123,7 @@ func TestProdex04383TransportFullHistoryRejectsUnsafeRotationVariants(t *testing
 		{name: "cached negative quota evidence", body: `{"type":"response.create","x-codex-turn-state":"turn-bound","input":[{"type":"message","role":"user","content":"full"}]}`, failure: responseOutcome{kind: responseRetry, transport: true}, owned: true, ready: true, cachedBlocked: true},
 		{name: "realtime duplex", body: `{"type":"response.create","x-codex-turn-state":"turn-bound","input":[{"type":"message","role":"user","content":"full"}]}`, policy: proxymodel.WebSocketPolicy{RealtimeDuplex: true}, failure: responseOutcome{kind: responseRetry, transport: true}, owned: true, ready: true},
 		{name: "committed output is not retry", body: `{"type":"response.create","x-codex-turn-state":"turn-bound","input":[{"type":"message","role":"user","content":"full"}]}`, failure: responseOutcome{kind: responsePass, transport: true}, owned: true, ready: true},
-		{name: "quota has own recovery policy", body: `{"type":"response.create","x-codex-turn-state":"turn-bound","input":[{"type":"message","role":"user","content":"full"}]}`, failure: responseOutcome{kind: responseRetry, quota: true}, owned: true, ready: true},
+		{name: "application failure without quota or transport", body: `{"type":"response.create","x-codex-turn-state":"turn-bound","input":[{"type":"message","role":"user","content":"full"}]}`, failure: responseOutcome{kind: responseRetry}, owned: true, ready: true},
 		{name: "another profile's turn is never transferred", body: `{"type":"response.create","x-codex-turn-state":"turn-bound","input":[{"type":"message","role":"user","content":"full"}]}`, failure: responseOutcome{kind: responseRetry, transport: true}, owned: true, otherOwner: true, ready: true},
 		{name: "no ready alternate", body: `{"type":"response.create","x-codex-turn-state":"turn-bound","input":[{"type":"message","role":"user","content":"full"}]}`, failure: responseOutcome{kind: responseRetry, transport: true}, owned: true},
 	} {
@@ -168,7 +168,7 @@ func TestProdex04383TransportFullHistoryRejectsUnsafeRotationVariants(t *testing
 				PrecommitFailure: &proxymodel.PrecommitFailure{Transport: true},
 			}
 			pending := &pendingResponse{response: response}
-			result, handled, err := router.recoverWebSocketTurnStateTransport04383(
+			result, handled, err := router.recoverWebSocketTurnStateFullHistory04383(
 				t.Context(), request, accounts, accounts[0], routedWebSocketRequestMetadata(request), tc.failure, pending,
 			)
 			if err != nil {

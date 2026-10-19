@@ -121,3 +121,20 @@ func TestProdex04383TransportNegativeOracleRejectsReplayAndEmptyTerminal(t *test
 		})
 	}
 }
+
+func TestProdex04383UnboundQuotaDeltaKeepsExact429WithoutReplay(t *testing.T) {
+	const terminal = `{"type":"error","status":429,"error":{"code":"insufficient_quota","message":"synthetic quota"}}`
+	const body = `{"type":"response.create","input":[{"type":"function_call_output","call_id":"call-large","output":"done"}]}`
+	base := transportAttempt04383{owner: "account-a", turn: "turn-a", body: body, ready: true}
+	if err := verifyTransportNegative04383("unbound-quota-delta", body, []string{"account-a"}, []transportAttempt04383{base}, terminal, false); err != nil {
+		t.Fatal(err)
+	}
+	for _, payload := range []string{"", strings.Replace(terminal, "429", "503", 1)} {
+		if err := verifyTransportNegative04383("unbound-quota-delta", body, []string{"account-a"}, []transportAttempt04383{base}, payload, false); err == nil {
+			t.Fatalf("quota delta terminal mutation accepted: %s", payload)
+		}
+	}
+	if err := verifyTransportNegative04383("unbound-quota-delta", body, []string{"account-a"}, []transportAttempt04383{base, base}, terminal, false); err == nil {
+		t.Fatal("unbound quota delta model replay accepted")
+	}
+}

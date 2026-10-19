@@ -51,6 +51,9 @@ The unbound variants remove the initial turn binding before startup, finish both
 authenticated quota probes and make main current with the final warmup. Complete
 history then recovers on second with `affinity_released=false`; delta-only still
 returns the exact 503 without replay or creating an owner for the unknown turn.
+The corresponding unbound quota cases use the same history proof. Complete
+history recovers on second; delta-only preserves the exact original 429 quota
+frame, one inference and unchanged durable ownership.
 Run `./scripts/verify-release-parity.sh --phase=websocket-transport` for this
 source/binary/manifest-pinned slice. Strict compact-followup setup and native
 macOS/Windows qualification remain separate from the Linux release gate.

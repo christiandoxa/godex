@@ -716,7 +716,7 @@ reloads durable ownership. Unbound WebSocket response/turn tokens get bounded
 selected-profile discovery; other opaque transports fail closed. An unbound
 HTTP Responses `previous_response_id` gets one bounded upstream discovery
 attempt. Independently complete WebSocket history may recover a precommit
-transport failure on a Ready alternate, while delta-only input stays with its
+transport or quota failure on a Ready alternate, while delta-only input stays with its
 selected profile. Stable thread/session bindings
 never expire or get evicted. The snapshot allows 8,192 total bindings; it evicts old opaque response/turn digests
 and refuses new conversations if protected bindings fill the store. Opaque

@@ -11,7 +11,7 @@ import (
 // for discovery, as tagged Prodex 0.437.9 does. The gateway's bounded
 // previous-response retry planner can repeat the *same-owner* attempt,
 // but cannot drop tool-output continuation context. Prodex 0.438.3 also
-// permits precommit transport recovery with independently complete history.
+// permits precommit transport/quota recovery with independently complete history.
 func (router *Router) forwardUnboundWebSocketDiscovery(
 	ctx context.Context,
 	request proxymodel.Request,
@@ -57,9 +57,9 @@ func (router *Router) forwardUnboundWebSocketDiscovery(
 			if response := pending.response; response != nil && response.PrecommitFailure != nil && !response.FirstEventCommitted {
 				transportFailure = transportFailure || response.PrecommitFailure.Transport
 			}
-			if recovered, handled, err := router.recoverWebSocketTurnStateTransport04383(
+			if recovered, handled, err := router.recoverWebSocketTurnStateFullHistory04383(
 				ctx, request, accounts, account, routedWebSocketRequestMetadata(request),
-				responseOutcome{kind: responseRetry, transport: transportFailure}, pending,
+				responseOutcome{kind: responseRetry, transport: transportFailure, quota: pending.quota}, pending,
 			); handled || err != nil {
 				if keys != nil && err == nil {
 					keys.turn = ""

@@ -772,3 +772,30 @@ no-release marker plus the Ready selection rather than a bound-owner marker.
 The delta control requires one attempt, exact 503, retained main session and
 unrelated response, and no turn/recovered-response binding. The resulting
 ten-case slice requires clean-candidate qualification before it is counted.
+
+The ten-case transport phase passed both pinned executables on clean
+`5dec0593ef98f0a162eb7ae68d8ec5a27b906096`, including both new unbound
+cases, exact Ready/no-release evidence, wire preservation and durable owners.
+
+## Share the full-history proof with unbound quota recovery
+
+The quota variant reproduced the same unbound discrepancy on clean `a2c19387`:
+official Prodex recovered the complete history on second, while Godex forwarded
+the original 429. A separate pinned negative experiment on clean `5dec0593`
+confirmed that delta-only input must preserve the exact original quota frame
+with one main inference and no new turn or response ownership in both products.
+
+The shared routing workflow now accepts either a precommit transport or quota
+failure after the same complete-history, owner, Ready, deadline and commitment
+checks. Unbound discovery passes its existing typed quota evidence into that
+workflow. The superseded bound quota replay block is removed, so both consumers
+use one policy and neither can bypass its cached-quota check. The private file
+and operation are named for full-history recovery; domain and layer ownership
+remain `usecase/routing`, without a new interface, model field or helper package.
+
+The quota complete-history regression failed before the repair in memory and
+durable variants. Both transport and quota regressions retain delta refusal and
+correct session/original-response ownership. The executable slice adds
+`unbound-quota-history` and `unbound-quota-delta`, with exact 429 and no-replay
+mutation controls. The expanded twelve-case slice still requires qualification
+on a clean candidate before these new quota cases are counted as VERIFIED.
