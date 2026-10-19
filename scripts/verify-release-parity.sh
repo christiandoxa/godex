@@ -643,6 +643,15 @@ go test -race ./internal/delivery/http/proxy ./tools/continuationparity \
   -run '^TestProdex04383QuietResponsesTransportPingsBeforeCommitWithoutReplay$|^TestProdex04382(WebSocketDeadlineOracleRejectsMaterialMutations|WebSocketCommittedIdleOracleRejectsWireMutations|LookaheadIdleOracleRejectsMutations)$' \
   -count=1 -timeout=40s
 
+# The 0.438.3 local-client Ping is advisory. If a visible model/close
+# frame holds the shared writer mutex, the heartbeat must skip this tick;
+# blocking behind that lock would deadlock response teardown and retain a
+# weighted profile permit after a peer stops reading. The real Ping/Pong
+# positive fixture above must continue to pass with no lock contention.
+go test -race ./internal/delivery/http/proxy \
+  -run '^TestProdex04383Heartbeat(SkipsContendedModelWriter|ShutdownDoesNotWaitForBlockedClientWriter)$' \
+  -count=1 -timeout=20s
+
 # Tagged 0.438.3 returns typed precommit connection/read/close failures
 # to the outer affinity-aware owner. A failed turn-state-only request with
 # reconstructable full history may move to a Ready profile ONLY after

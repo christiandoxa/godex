@@ -279,3 +279,32 @@ the configured committed-idle timeout negative control. Actual TLS frame
 buffering and arbitrary network/platform poll failures still require
 independent full two-executable coverage; no claim of production-wide parity
 is made from these local checks alone.
+
+
+## Heartbeat/model-output writer contention — bounded shutdown guarantee
+
+The 0.438.3 response-transport liveness Ping is **advisory** control output.
+It must never delay or interleave a model data/terminal frame that already
+owns the local client `websocketFrameWriter` mutex. A deterministic
+fail-before test found an edge case in Godex's newly introduced heartbeat:
+`sendHeartbeat04383` waited **unbounded** for the writer mutex. During a
+client stalled on a visible model frame, the heartbeat worker could become
+stuck acquiring the same lock; its `stopHeartbeat()` then waited for the
+worker, blocking Responses teardown and weighted profile permit release.
+
+`TestProdex04383HeartbeatSkipsContendedModelWriter` acquires the data writer
+mutex and verifies an advisory Ping returns immediately rather than waiting
+for active model output. `TestProdex04383HeartbeatShutdownDoesNotWaitForBlockedClientWriter`
+lets a heartbeat tick occur while the model writer holds that mutex, then
+asserts that shutdown completes even before the model frame is drained.
+Both tests failed before the fix and now pass repeatedly with Go race
+instrumentation. The scoped fix uses Go's nonblocking `TryLock` for the
+advisory control: when actual data output owns the writer, the Ping tick is
+**skipped**, not buffered behind model output. An uncontended tick still
+sends an empty opcode-9 Ping with the original bounded write deadline and
+mutex protection, and the previous public Ping/Pong and exact two-binary
+wire, owner, 30-second deadline, and no-replay tests remain mandatory.
+
+This is a bounded local contention/shutdown regression, **not** proof of all
+Prodex-native client backpressure permutations. It does not reset upstream
+progress, change quota/account selection, or grant a retry after commitment.

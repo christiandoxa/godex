@@ -56,7 +56,14 @@ func (tunnel *responsesWebSocketTunnel) startHeartbeat04383(ctx context.Context)
 
 func (tunnel *responsesWebSocketTunnel) sendHeartbeat04383() error {
 	writer := tunnel.toClient
-	writer.mu.Lock()
+	// A visible model/close frame owns writer.mu while it flushes. A Ping
+	// is advisory and must never hold teardown hostage while waiting for
+	// that lock (or interleave with the active application frame). Skipping
+	// this tick is safe; the next tick can try again if the turn remains
+	// live. The upstream deadline/permit ownership are unaffected.
+	if !writer.mu.TryLock() {
+		return nil
+	}
 	defer writer.mu.Unlock()
 	// Hold writer.mu throughout deadline installation and restoration:
 	// otherwise a concurrent model/close frame could inherit the Ping's
