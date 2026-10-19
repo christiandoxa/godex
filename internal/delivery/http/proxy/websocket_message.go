@@ -34,6 +34,7 @@ func (proxy *Proxy) forwardWebSocketMessages(
 	defer proxy.router.CloseWebSocketSession(sessionID)
 	defer tunnel.close()
 
+	disarmRequestDeadline(request.Context())
 	lifecycle.commit()
 	handshake := "HTTP/1.1 101 Switching Protocols\r\n" +
 		"Upgrade: websocket\r\n" +

@@ -57,7 +57,7 @@ func (tunnel *websocketTunnel) clearUpstream() {
 	tunnel.mu.Unlock()
 }
 
-func (proxy *Proxy) forwardWebSocket(writer http.ResponseWriter, response *proxymodel.Response, lifecycle *requestLifecycle, clientKey string) error {
+func (proxy *Proxy) forwardWebSocket(ctx context.Context, writer http.ResponseWriter, response *proxymodel.Response, lifecycle *requestLifecycle, clientKey string) error {
 	upstream, ok := response.Body.(io.ReadWriteCloser)
 	if !ok {
 		http.Error(writer, "upstream websocket handshake failed", http.StatusBadGateway)
@@ -78,6 +78,7 @@ func (proxy *Proxy) forwardWebSocket(writer http.ResponseWriter, response *proxy
 	defer remove()
 	defer tunnel.close()
 
+	disarmRequestDeadline(ctx)
 	lifecycle.commit()
 	handshake := "HTTP/1.1 101 Switching Protocols\r\n" +
 		"Upgrade: websocket\r\n" +

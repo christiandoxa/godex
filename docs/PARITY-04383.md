@@ -878,3 +878,17 @@ map now retains that explicit exclusion across every reload. The strengthened
 fail-before regression advances a controllable clock beyond cooldown expiry,
 keeps second busy for two wait epochs and then cancels without another model
 dispatch. Other fresh-request callers keep their dynamic pool reload behavior.
+
+The rerun on clean `b94bdc13` rejected a second attempt on second shortly
+before the waiting WebSocket's deadline. Its capacity blocker had visibly
+committed, but Godex's delivery-owned HTTP deadline still canceled that
+upstream body at 30 seconds. This released its permit roughly 80 ms before
+the later WebSocket deadline. Official Prodex kept the committed blocker live.
+
+The fail-before HTTP integration regression now holds visible SSE output past
+the original local deadline and checks that explicit client cancellation still
+reaches upstream. Delivery owns a stoppable local request watchdog, disarmed
+at HTTP or WebSocket commitment. Parent deadlines and cancellation remain in
+force, and admission/body capture/precommit work retain their original budget.
+No retry assertion or capacity-blocker requirement was relaxed. Qualification
+of the combined repairs follows local tests.

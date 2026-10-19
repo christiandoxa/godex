@@ -347,7 +347,7 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 	}
 	defer activity.finishLifecycle(lifecycle)
 	if websocket && result.Response.StatusCode == http.StatusSwitchingProtocols {
-		if err := proxy.forwardWebSocket(writer, result.Response, lifecycle, websocketKey); err != nil {
+		if err := proxy.forwardWebSocket(requestContext, writer, result.Response, lifecycle, websocketKey); err != nil {
 			if lifecycle.canAttempt() {
 				activity.fail(http.StatusBadGateway, "upstream websocket handshake failed before commitment")
 			} else {

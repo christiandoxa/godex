@@ -36,6 +36,7 @@ func (proxy *Proxy) forwardResponse(ctx context.Context, writer http.ResponseWri
 		writer.Header()["Date"] = nil
 	}
 	declareResponseTrailers(writer.Header(), response.Header, response.Trailer)
+	disarmRequestDeadline(ctx)
 	lifecycle.commit()
 	writer.WriteHeader(response.StatusCode)
 	if stream {

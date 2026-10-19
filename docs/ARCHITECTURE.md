@@ -431,6 +431,12 @@ does not write turn-state values to `routing.json`.
 
 ## Commit boundary
 
+HTTP delivery owns the accepted-request watchdog across admission, body capture
+and precommit routing. Commitment disarms only that local watchdog, including
+the timer inherited by the upstream response body. Parent cancellation and
+parent deadlines remain active through stream completion. Each request owns
+and stops its timer; no shared helper or background worker is introduced.
+
 A forwarded request starts as **uncommitted**. Rotation is legal only in this state.
 
 For a normal response, commitment occurs immediately before downstream headers/status are written. For a streaming response, commitment occurs no later than forwarding the first response bytes. After commitment, Godex may report/propagate failure but must not replay the request on another account.
