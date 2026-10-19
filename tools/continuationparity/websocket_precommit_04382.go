@@ -26,6 +26,7 @@ const deadlineMessage04382 = "request timed out"
 type websocketDeadlineResult04382 struct {
 	code, message, completed string
 	status, handshakes       int
+	heartbeats               int
 	elapsed                  time.Duration
 	attempts                 []attempt
 }
@@ -33,6 +34,9 @@ type websocketDeadlineResult04382 struct {
 func verifyWebSocketDeadline04382(result websocketDeadlineResult04382) error {
 	if result.status != 504 || result.code != "request_timeout" || result.message != deadlineMessage04382 {
 		return fmt.Errorf("precommit deadline status/code/message=%d/%q/%q", result.status, result.code, result.message)
+	}
+	if result.heartbeats < 1 || result.heartbeats > 40 {
+		return fmt.Errorf("precommit hidden metadata was not kept alive by 0.438.3 Ping frames: %d", result.heartbeats)
 	}
 	if result.elapsed < deadlineBudget04382-2500*time.Millisecond || result.elapsed > 31*time.Second {
 		return fmt.Errorf("precommit watchdog shifted from original 30s: %s", result.elapsed)
@@ -109,7 +113,7 @@ func runWebSocketDeadlineProduct04382(root string, b *backend, p product) error 
 	if err := websocketframe.WriteFrame(conn, 1, []byte(`{"type":"response.create","mode":"`+deadlineMode04382+`","input":[]}`), true); err != nil {
 		return err
 	}
-	code, status, message, err := readDeadlineError04382(reader)
+	code, status, message, heartbeatCount, err := readDeadlineError04382(conn, reader)
 	elapsed := time.Since(start)
 	if err != nil {
 		return fmt.Errorf("%s: 0.438.2 hidden precommit deadline: %w", p.name, err)
@@ -121,13 +125,13 @@ func runWebSocketDeadlineProduct04382(root string, b *backend, p product) error 
 	if err := websocketframe.WriteFrame(conn, 1, []byte(`{"type":"response.create","mode":"`+deadlineFollowupMode04382+`","input":[]}`), true); err != nil {
 		return fmt.Errorf("%s: local WebSocket not reusable after 504: %w", p.name, err)
 	}
-	completed, err := readDeadlineCompleted04382(reader)
+	completed, err := readDeadlineCompleted04382(conn, reader)
 	if err != nil {
 		return fmt.Errorf("%s: followup turn after 504: %w", p.name, err)
 	}
 	b.mu.Lock()
 	result := websocketDeadlineResult04382{
-		code: code, status: status, message: message, completed: completed, elapsed: elapsed,
+		code: code, status: status, message: message, completed: completed, elapsed: elapsed, heartbeats: heartbeatCount,
 		handshakes: b.wsHandshakes - startHandshakes,
 		attempts:   append([]attempt(nil), b.attempts[baseline:]...),
 	}
@@ -140,54 +144,52 @@ func runWebSocketDeadlineProduct04382(root string, b *backend, p product) error 
 	return nil
 }
 
-func readDeadlineError04382(reader *bufio.Reader) (string, int, string, error) {
-	for frames := 0; frames < 8; frames++ {
-		payload, err := readDeadlineFrame04382(reader)
-		if err != nil {
-			return "", 0, "", err
-		}
-		var event struct {
-			Type   string `json:"type"`
-			Status int    `json:"status"`
-			Error  struct {
-				Code    string `json:"code"`
-				Message string `json:"message"`
-			} `json:"error"`
-		}
-		if json.Unmarshal(payload, &event) != nil {
-			return "", 0, "", fmt.Errorf("malformed upstream error frame: %s", payload)
-		}
-		if event.Type != "error" {
-			return "", 0, "", fmt.Errorf("hidden precommit frame leaked to client: %s", payload)
-		}
-		return event.Error.Code, event.Status, event.Error.Message, nil
+func readDeadlineError04382(conn net.Conn, reader *bufio.Reader) (string, int, string, int, error) {
+	payloadOpcode, payload, heartbeats, err := readWebSocketLivenessFrame04383(conn, reader)
+	if err != nil {
+		return "", 0, "", heartbeats, err
 	}
-	return "", 0, "", fmt.Errorf("too many precommit frames")
+	if payloadOpcode != 1 {
+		return "", 0, "", heartbeats, fmt.Errorf("expected 504 text frame, got opcode %d", payloadOpcode)
+	}
+	var event struct {
+		Type   string `json:"type"`
+		Status int    `json:"status"`
+		Error  struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(payload, &event) != nil {
+		return "", 0, "", heartbeats, fmt.Errorf("malformed upstream error frame: %s", payload)
+	}
+	if event.Type != "error" {
+		return "", 0, "", heartbeats, fmt.Errorf("hidden precommit frame leaked to client: %s", payload)
+	}
+	return event.Error.Code, event.Status, event.Error.Message, heartbeats, nil
 }
 
-func readDeadlineCompleted04382(reader *bufio.Reader) (string, error) {
-	for frames := 0; frames < 8; frames++ {
-		payload, err := readDeadlineFrame04382(reader)
-		if err != nil {
-			return "", err
-		}
-		var event struct {
-			Type     string `json:"type"`
-			Response struct {
-				ID string `json:"id"`
-			} `json:"response"`
-		}
-		if json.Unmarshal(payload, &event) != nil {
-			return "", fmt.Errorf("malformed followup: %s", payload)
-		}
-		if event.Type == "response.completed" {
-			return event.Response.ID, nil
-		}
-		if event.Type == "error" {
-			return "", fmt.Errorf("local socket lost after timeout: %s", payload)
-		}
+func readDeadlineCompleted04382(conn net.Conn, reader *bufio.Reader) (string, error) {
+	opcode, payload, _, err := readWebSocketLivenessFrame04383(conn, reader)
+	if err != nil {
+		return "", err
 	}
-	return "", fmt.Errorf("too many frames before followup completion")
+	if opcode != 1 {
+		return "", fmt.Errorf("expected followup text frame, got opcode %d", opcode)
+	}
+	var event struct {
+		Type     string `json:"type"`
+		Response struct {
+			ID string `json:"id"`
+		} `json:"response"`
+	}
+	if json.Unmarshal(payload, &event) != nil {
+		return "", fmt.Errorf("malformed followup: %s", payload)
+	}
+	if event.Type == "response.completed" {
+		return event.Response.ID, nil
+	}
+	return "", fmt.Errorf("local socket had incorrect followup: %s", payload)
 }
 
 func readDeadlineFrame04382(reader *bufio.Reader) ([]byte, error) {

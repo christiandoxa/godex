@@ -16,6 +16,7 @@ const committedIdleBody04382 = `{"type":"response.create","mode":"ws-committed-i
 type websocketCommittedIdleResult04382 struct {
 	eventType, delta string
 	closeOpcode      byte
+	heartbeats       int
 	closePayload     []byte
 	elapsed          time.Duration
 	attempts         []attempt
@@ -25,6 +26,9 @@ type websocketCommittedIdleResult04382 struct {
 func verifyWebSocketCommittedIdle04382(result websocketCommittedIdleResult04382) error {
 	if result.eventType != "response.output_text.delta" || result.delta != "visible-idle" {
 		return fmt.Errorf("committed WebSocket delta was mutated/lost: %q/%q", result.eventType, result.delta)
+	}
+	if result.heartbeats < 1 || result.heartbeats > 3 {
+		return fmt.Errorf("0.438.3 missing/excess client Ping heartbeat: %d", result.heartbeats)
 	}
 	if result.closeOpcode != 8 || len(result.closePayload) != 0 {
 		return fmt.Errorf("committed WebSocket stream was not closed gracefully: opcode=%d body=%q", result.closeOpcode, result.closePayload)
@@ -94,19 +98,14 @@ func runWebSocketCommittedIdleProduct04382(root string, b *backend, p product) e
 		return fmt.Errorf("%s: decode committed frame: %w", p.name, err)
 	}
 	start := time.Now()
-	closeFrame, err := websocketframe.ReadHeader(reader)
+	closeOpcode, closePayload, heartbeatCount, err := readWebSocketLivenessFrame04383(conn, reader)
 	if err != nil {
-		return fmt.Errorf("%s: committed stream ended without WebSocket close control: %w", p.name, err)
+		return fmt.Errorf("%s: committed idle close/ping: %w", p.name, err)
 	}
-	closePayload, err := closeFrame.ReadPayload(reader, 125)
-	if err != nil {
-		return fmt.Errorf("%s: read committed close payload: %w", p.name, err)
-	}
-	closeFrame.Unmask(closePayload)
 	b.mu.Lock()
 	observation := websocketCommittedIdleResult04382{
 		eventType: event.Type, delta: event.Delta,
-		closeOpcode: closeFrame.Opcode, closePayload: closePayload,
+		closeOpcode: closeOpcode, closePayload: closePayload, heartbeats: heartbeatCount,
 		elapsed:    time.Since(start),
 		attempts:   append([]attempt(nil), b.attempts[initialAttempts:]...),
 		handshakes: b.wsHandshakes - initialHandshakes,

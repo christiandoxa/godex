@@ -112,6 +112,10 @@ func (proxy *Proxy) forwardResponsesWebSocket(
 		)
 		payload = smart.Body
 
+		stopHeartbeat := func() {}
+		if !websocketRealtimeDuplexPath(request.URL.Path) {
+			stopHeartbeat = tunnel.startHeartbeat04383(sessionContext)
+		}
 		forwarded, err := proxy.router.Forward(sessionContext, proxymodel.Request{
 			RequestID:          messageRequestID,
 			Method:             request.Method,
@@ -128,6 +132,7 @@ func (proxy *Proxy) forwardResponsesWebSocket(
 			},
 		})
 		if err != nil {
+			stopHeartbeat()
 			if sessionContext.Err() != nil {
 				return sessionContext.Err()
 			}
@@ -142,6 +147,7 @@ func (proxy *Proxy) forwardResponsesWebSocket(
 
 		result := forwarded.Result
 		if result.Response == nil {
+			stopHeartbeat()
 			_ = forwarded.Close()
 			return errors.New("websocket routing returned no response")
 		}
@@ -151,6 +157,7 @@ func (proxy *Proxy) forwardResponsesWebSocket(
 		}
 		tunnel.setUpstream(result.Response.Body)
 		if result.Response.WebSocketRealtimeDuplex {
+			stopHeartbeat()
 			duplex, ok := result.Response.Body.(io.ReadWriteCloser)
 			if !ok {
 				_ = forwarded.Close()
@@ -176,6 +183,7 @@ func (proxy *Proxy) forwardResponsesWebSocket(
 				result.Response, result.Prefix, tunnel.toClient,
 			)
 		}
+		stopHeartbeat()
 		closeErr := forwarded.Close()
 		tunnel.clearUpstream()
 		if errors.Is(err, proxymodel.ErrWebSocketCommittedIdleTimeout) {

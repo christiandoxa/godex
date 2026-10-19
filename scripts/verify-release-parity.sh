@@ -606,6 +606,16 @@ if [ "$phase" = 'all' ] || [ "$phase" = 'websocket' ] || [ "$phase" = 'websocket
   --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
   --websocket
 
+# Prodex 0.438.3 sends EMPTY local-client Ping control frames at bounded
+# 1000ms intervals while safely holding precommit metadata or waiting on a
+# quiet committed Responses stream. Pong is masked client-side and must not
+# become model output, renew upstream progress, extend request deadlines or
+# authorize any extra inference. The two-executable WebSocket core/deadline
+# oracles also require these control frames plus the old no-replay/close rules.
+go test -race ./internal/delivery/http/proxy ./tools/continuationparity \
+  -run '^TestProdex04383QuietResponsesTransportPingsBeforeCommitWithoutReplay$|^TestProdex04382(WebSocketDeadlineOracleRejectsMaterialMutations|WebSocketCommittedIdleOracleRejectsWireMutations|LookaheadIdleOracleRejectsMutations)$' \
+  -count=1 -timeout=40s
+
 # Tagged 0.438.3 returns typed precommit connection/read/close failures
 # to the outer affinity-aware owner. A failed turn-state-only request with
 # reconstructable full history may move to a Ready profile ONLY after

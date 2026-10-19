@@ -137,3 +137,42 @@ checks and six-mode native executable matrix are retained; historic names
 with the `_04382` suffix are module/test identifiers, not oracle versions.
 The native macOS/Windows modes must still be **run** on those hosts before
 claiming parity there; retargeting a checksum is not a native test pass.
+
+
+## Quiet Responses WebSocket client heartbeat — bounded 0.438.3 liveness
+
+The first pinned **0.438.3** WebSocket-core run encountered a new official
+control frame, not a model payload: Prodex sent an **empty opcode-9 Ping**
+while a committed upstream Responses stream sat idle. The inherited 0.438.2
+oracle erroneously demanded that the very next client frame be the terminal
+close control. This is expected from the new compiled Mojo
+`websocket_response_tracking::response_wait_plan`: local client Ping
+heartbeats are scheduled every 1,000ms independently of upstream progress.
+They do **not** commit model output, reset the upstream idle clock, extend
+precommit deadline, mutate quota or permit any replay.
+
+The Godex HTTP Responses delivery now emits the same **transport-only**
+empty Pings during an active Responses request, both while the Router is
+waiting for upstream admission/precommit output and while a genuine committed
+stream is waiting for more frames. Heartbeats use the existing frame-writer
+mutex, a bounded socket write deadline and a scoped goroutine that is stopped
+before response teardown. Realtime duplex is deliberately excluded because
+it owns a different committed-session transport contract. Pong replies remain
+standard masked client controls and are absorbed rather than becoming new
+model requests.
+
+`TestProdex04383QuietResponsesTransportPingsBeforeCommitWithoutReplay`
+drives the actual locally upgraded HTTP Responses WebSocket and an
+intentionally quiet synthetic gateway: after ~1s the client receives an
+empty Ping but no application data or second upstream attempt, replies with
+Pong, then receives the exact terminal result and successfully starts another
+turn on the same socket. The pinned executable fixtures now accept ONLY
+validated empty Ping controls, reply with masked Pong and still enforce
+**a real 2-second committed idle close, a real 30-second absolute precommit
+504, unchanged upstream request count and exact output/owner identity**.
+Mandatory negative sentinels reject zero/excess client heartbeats, unexpected
+application frames, early/late close, postcommit replay, owner rotation and
+hidden precommit output leaks. A heartbeat may not convert a terminal idle
+failure into indefinite progress. These changes should be requalified on
+one clean Godex commit against the official Prodex 0.438.3 executable before
+claiming the new liveness differential VERIFIED.

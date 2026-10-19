@@ -9,7 +9,7 @@ import (
 func TestProdex04382LookaheadIdleOracleRejectsMutations(t *testing.T) {
 	baseline := websocketLookaheadIdleResult04382{
 		eventType: "response.in_progress", padding: strings.Repeat("x", lookaheadPadding04382),
-		closeOpcode: 8, elapsed: 2 * time.Second, handshakes: 1,
+		closeOpcode: 8, heartbeats: 1, elapsed: 2 * time.Second, handshakes: 1,
 		attempts: []attempt{{account: "account-a", mode: lookaheadIdleMode04382, body: lookaheadIdleBody04382}},
 	}
 	if err := verifyWebSocketLookaheadIdle04382(baseline); err != nil {
@@ -22,6 +22,8 @@ func TestProdex04382LookaheadIdleOracleRejectsMutations(t *testing.T) {
 		{"hidden content lost", func(r *websocketLookaheadIdleResult04382) { r.padding = "" }},
 		{"wrong hold size", func(r *websocketLookaheadIdleResult04382) { r.padding = r.padding[:4096] }},
 		{"wrong hold kind", func(r *websocketLookaheadIdleResult04382) { r.eventType = "response.completed" }},
+		{"missing client heartbeat", func(r *websocketLookaheadIdleResult04382) { r.heartbeats = 0 }},
+		{"heartbeat floods", func(r *websocketLookaheadIdleResult04382) { r.heartbeats = 7 }},
 		{"abrupt TCP end", func(r *websocketLookaheadIdleResult04382) { r.closeOpcode = 0 }},
 		{"close reason drift", func(r *websocketLookaheadIdleResult04382) { r.closePayload = []byte{3, 232} }},
 		{"old eight second watchdog", func(r *websocketLookaheadIdleResult04382) { r.elapsed = 8 * time.Second }},

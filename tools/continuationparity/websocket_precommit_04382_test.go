@@ -11,7 +11,7 @@ import (
 func TestProdex04382WebSocketDeadlineOracleRejectsMaterialMutations(t *testing.T) {
 	base := websocketDeadlineResult04382{
 		code: "request_timeout", status: 504, message: deadlineMessage04382,
-		elapsed: 30 * time.Second, completed: "resp-after-watchdog", handshakes: 2,
+		elapsed: 30 * time.Second, completed: "resp-after-watchdog", handshakes: 2, heartbeats: 25,
 		attempts: []attempt{
 			{account: "account-a", mode: deadlineMode04382, body: `{"type":"response.create","mode":"ws-hidden-deadline-04382","input":[]}`},
 			{account: "account-a", mode: deadlineFollowupMode04382, body: `{"type":"response.create","mode":"ws-followup-deadline-04382","input":[]}`},
@@ -24,6 +24,8 @@ func TestProdex04382WebSocketDeadlineOracleRejectsMaterialMutations(t *testing.T
 		name   string
 		mutate func(*websocketDeadlineResult04382)
 	}{
+		{"no client heartbeat", func(r *websocketDeadlineResult04382) { r.heartbeats = 0 }},
+		{"unbounded heartbeat frames", func(r *websocketDeadlineResult04382) { r.heartbeats = 100 }},
 		{"missing status", func(r *websocketDeadlineResult04382) { r.status = 0 }},
 		{"quota error masquerade", func(r *websocketDeadlineResult04382) { r.code = "insufficient_quota" }},
 		{"error message drift", func(r *websocketDeadlineResult04382) { r.message = "upstream timed out" }},

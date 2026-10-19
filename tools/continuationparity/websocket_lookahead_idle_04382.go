@@ -17,6 +17,7 @@ const lookaheadPadding04382 = 8192
 type websocketLookaheadIdleResult04382 struct {
 	eventType, padding string
 	closeOpcode        byte
+	heartbeats         int
 	closePayload       []byte
 	elapsed            time.Duration
 	attempts           []attempt
@@ -26,6 +27,9 @@ type websocketLookaheadIdleResult04382 struct {
 func verifyWebSocketLookaheadIdle04382(result websocketLookaheadIdleResult04382) error {
 	if result.eventType != "response.in_progress" || result.padding != strings.Repeat("x", lookaheadPadding04382) {
 		return fmt.Errorf("lookahead hold content or event kind was changed/lost: kind=%q padding_bytes=%d", result.eventType, len(result.padding))
+	}
+	if result.heartbeats < 1 || result.heartbeats > 3 {
+		return fmt.Errorf("0.438.3 missing/excess client Ping heartbeat: %d", result.heartbeats)
 	}
 	if result.closeOpcode != 8 || len(result.closePayload) != 0 {
 		return fmt.Errorf("lookahead committed idle must close WebSocket gracefully: opcode=%d payload=%q", result.closeOpcode, result.closePayload)
@@ -95,18 +99,13 @@ func runWebSocketLookaheadIdleProduct04382(root string, b *backend, p product) e
 		return fmt.Errorf("%s: decode promoted hold: %w", p.name, err)
 	}
 	began := time.Now()
-	closeFrame, err := websocketframe.ReadHeader(reader)
+	closeOpcode, closePayload, heartbeatCount, err := readWebSocketLivenessFrame04383(conn, reader)
 	if err != nil {
-		return fmt.Errorf("%s: promoted hold ended without close frame: %w", p.name, err)
+		return fmt.Errorf("%s: committed idle close/ping: %w", p.name, err)
 	}
-	closePayload, err := closeFrame.ReadPayload(reader, 125)
-	if err != nil {
-		return fmt.Errorf("%s: read close payload: %w", p.name, err)
-	}
-	closeFrame.Unmask(closePayload)
 	b.mu.Lock()
 	observed := websocketLookaheadIdleResult04382{
-		eventType: event.Type, padding: event.Padding, closeOpcode: closeFrame.Opcode,
+		eventType: event.Type, padding: event.Padding, closeOpcode: closeOpcode, heartbeats: heartbeatCount,
 		closePayload: closePayload, elapsed: time.Since(began),
 		handshakes: b.wsHandshakes - initialHandshakes,
 		attempts:   append([]attempt(nil), b.attempts[initialAttempts:]...),
