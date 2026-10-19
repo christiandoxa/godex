@@ -308,3 +308,43 @@ wire, owner, 30-second deadline, and no-replay tests remain mandatory.
 This is a bounded local contention/shutdown regression, **not** proof of all
 Prodex-native client backpressure permutations. It does not reset upstream
 progress, change quota/account selection, or grant a retry after commitment.
+
+## Complete pinned finite release gate — heartbeat writer contention checkpoint
+
+Every original finite release phase exited **PASS on the identical clean
+Godex candidate `9ee52e0ec7960444f3dbd646e771d847a7814104`**, checked
+against official Prodex 0.438.3 tagged source
+`42042d765100fc06895a27e0904ffb64842092e6`, published Linux x86_64
+binary SHA-256
+`5efa06fef57b0026eae7ec3cad23ac76b40c3e5d8a3afaee6c20feaeb5737923`
+and the published release manifest SHA-256
+`300a8f046041a95f9757e4cbdb72917d37927683b6e1af442492254e2f1a37da`.
+The source was clean for every binary-pinned phase. Synthetic credentials
+and independent HOME directories were used throughout; no user credentials
+or external model accounts were read.
+
+| Phase | Result on exact `9ee52e0e` |
+| --- | --- |
+| `--phase=preflight-tests` | PASS, including added advisory heartbeat writer-contention and shutdown race regressions, official Codex 0.163.0 native app-server handshake/compaction controls when its SHA-pinned binary was available, all existing Go/provider regression gates and negative sentinels |
+| `--phase=preflight-oracles-pty` | PASS, official PTY/footer, CLI (14 probes), context and newest-first workspace trust differential with negative controls |
+| `--phase=preflight-oracles-profiles` | PASS, 34 lifecycle stages including auth/quota, real Linux FD pressure, admission/queue wake, and cross-binary state ownership |
+| `--phase=preflight-oracles-history` | PASS, official previous-response/continuation replay and durable affinity fixture |
+| `--phase=deepseek` | PASS **30/30**, `comparison_differences: []`, mutation controls PASS |
+| `--phase=gemini` | PASS **13/13**, `comparison_differences: []`, mutation controls PASS |
+| `--phase=websocket-core` | PASS, 56 historic model upstream attempts plus independently verified idle capacity, committed-idle/8KiB lookahead close, Pong handling, realtime duplex lifecycle and no-replay controls on **both official executables** |
+| `--phase=websocket-deadline` | PASS, Prodex and Godex each report public `504 request_timeout` at the original **30-second** precommit deadline, then complete a fresh request on the same local socket without a replay |
+| `make verify` | PASS on production source: format, file-size guard, vet, shuffled full Go race suite, production Go build |
+| `scripts/check-cross-build.sh` | PASS, Linux amd64/arm64, Darwin amd64/arm64, Windows amd64/arm64 and targeted Darwin/Windows test compilation |
+
+**Qualification boundary:** all listed finite source/synthetic two-executable
+contracts are VERIFIED, including real local client Ping/Pong and complete
+upstream model-frame progress. The new writer-lock shutdown control itself
+is a Go local race fixture; do not count it as a fully independent Prodex
+native backpressure differential. The earlier exploratory full-history
+transport recovery fixture that returned `service_unavailable` from Prodex
+and a TCP timeout from an older Godex candidate was not source-qualified:
+its seeded quota/owner state and readiness were not proved equivalent, and
+it is **not** a passing 0.438.3 replay oracle. That gap, native macOS/Windows
+runtime permutations, live OAuth/real quota reset, and unobserved provider
+faults remain PARTIAL/OPEN. The complete synthetic release gate is not a
+production-wide FULL 1:1 parity certification.
