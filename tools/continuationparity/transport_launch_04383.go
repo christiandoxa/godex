@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/christiandoxa/godex/internal/helper/redact"
 )
 
 // A real managed launch admits multiple profiles. The public gateway command
@@ -39,7 +41,8 @@ func startTransportLaunch04383(p product, upstream string) (string, func(), erro
 	command.Env = append(p.env, "GODEX_CONTINUATION_TRANSPORT_CONTROL="+control.URL,
 		"CODEX_CHATGPT_BASE_URL="+upstream)
 	configureGatewayProcess(command)
-	command.Stdout, command.Stderr = io.Discard, io.Discard
+	var diagnostic transportLaunchDiagnostic04383
+	command.Stdout, command.Stderr = io.Discard, &diagnostic
 	if err := command.Start(); err != nil {
 		close(release)
 		control.Close()
@@ -63,11 +66,26 @@ func startTransportLaunch04383(p product, upstream string) (string, func(), erro
 	case err := <-done:
 		close(release)
 		control.Close()
-		return "", nil, fmt.Errorf("managed launch exited before child endpoint: %v", err)
+		return "", nil, fmt.Errorf("managed launch exited before child endpoint: %v; stderr=%s", err, diagnostic.String())
 	case <-time.After(15 * time.Second):
 		stop()
-		return "", nil, errors.New("managed launch did not publish child endpoint")
+		return "", nil, fmt.Errorf("managed launch did not publish child endpoint; stderr=%s", diagnostic.String())
 	}
+}
+
+// exec.Cmd owns writes; diagnostics are read only after Wait has completed.
+type transportLaunchDiagnostic04383 []byte
+
+func (output *transportLaunchDiagnostic04383) Write(data []byte) (int, error) {
+	remaining := (8 << 10) - len(*output)
+	if remaining > 0 {
+		*output = append(*output, data[:min(len(data), remaining)]...)
+	}
+	return len(data), nil
+}
+
+func (output *transportLaunchDiagnostic04383) String() string {
+	return redact.Secrets(string(*output))
 }
 
 func transportChild04383(control string, arguments []string) error {

@@ -901,3 +901,18 @@ scope. Parent deadlines remain unchanged; original accepted-time budgeting and
 typed local 504 classification retain direct regression coverage. The full
 gate begun on the earlier diagnostic integration was stopped for this change;
 it is not recorded as passing.
+
+## Preserve bounded native managed-launch diagnostics
+
+Native Windows run `39278954754` on clean `39c9cc1b` passed ordinary Go tests
+and the six preceding executable modes, including the watchdog regression.
+The transport slice passed every official Prodex scenario, then Godex exited
+before publishing the first synthetic child endpoint. The harness discarded
+its stderr, so the cause remains **OPEN**; it is not attributed to the watchdog
+fix or to a fixture defect without further evidence.
+
+Managed-launch failures now include at most 8 KiB of captured stderr after
+credential redaction. The child stream is fully drained and diagnostics are
+read only after process completion. The focused regression rejects truncation
+leaks, secret exposure across write boundaries and lost operation context.
+This tooling change does not retry a failed launch or relax any parity check.
