@@ -418,3 +418,34 @@ that exact leak before the fix and passes with all variants removed, while
 preserving unrelated headers and the original request. This is a local
 source-aligned regression and does not qualify the unresolved independent
 full-history transport failure fixture.
+
+## Case-insensitive header replay checkpoint — clean commit `7710f076`
+
+The header-alias replay fix was pushed to `main` at
+`7710f076774890d9782b0eb75349fb5b12a30bd9`, independently of CI status.
+The original per-domain reproduction failed before the patch and passed
+`go test -race ./internal/usecase/routing -run '^TestProdex04383' -count=1`
+afterward. The clean candidate then passed `make verify`, including the full
+shuffled Go race suite, vet, installer smoke checks, cross-build and targeted
+cross-platform test compilation. The SHA/source/manifest-pinned official
+Prodex 0.438.3 release gate was rerun on this **exact commit** for these
+phases, all PASS:
+
+- `--phase=preflight-tests` — all source/local negative controls
+- `--phase=websocket-core` — 56-attempt transport oracle, committed/8KiB
+  idle-close, capacity/reuse, native realtime and no-postcommit-replay fixtures
+- `--phase=websocket-deadline` — matching 30-second original precommit 504
+  and a successful followup turn on the same client socket
+
+Other release phases were previously verified on `b6e91489`, not re-attributed
+to this new commit. The independent *transport full-history* replay proof is
+still **OPEN**: an exploratory two-profile, precommit-upstream-close run on
+Prodex 0.438.3 reported one failed owner and `503 service_unavailable`
+because the synthetic selection had no authenticated Ready alternate
+(`selection_plan: reports=0 ready=0`). Manipulating the active profile instead
+changed the initial selection owner, invalidating the causal comparison. This
+is insufficient evidence of a Godex/Prodex behavior mismatch or successful
+cross-profile recovery. The experimental fixture remains off `main` and out
+of the release gate until Ready-profile evidence and exact owner provenance
+are independently established on both executables. Native Windows/macOS,
+live OAuth, keyring and unbounded production fault coverage remain partial.
