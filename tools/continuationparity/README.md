@@ -34,6 +34,8 @@ The official runtime log must confirm `quota_source=probe_cache` for the alterna
 
 The durable snapshot must retain the recovered response on second, an unrelated
 response on main, no failed turn binding, and the accompanying session conflict.
+The same ownership and exact replay assertions also cover a precommit quota
+failure after hidden metadata, using the official quota-recovery log marker.
 Delta-only input returns the exact terminal 503 without replay. A previous-response
 dependency returns the exact full-context 400 signal without replay. Mutation tests
 reject lost auth evidence, extra requests/handshakes, changed owners, rounded

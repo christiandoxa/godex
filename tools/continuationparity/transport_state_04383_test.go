@@ -6,8 +6,35 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
+
+func TestProdex04383RecoveryLogRequiresMatchingFailureAndReadyCache(t *testing.T) {
+	p := product{name: "prodex", state: t.TempDir()}
+	logs := filepath.Join(p.state, "logs")
+	if err := os.Mkdir(logs, 0700); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(logs, "prodex-runtime-fixture.log")
+	for _, event := range []string{"transport_failure_turn_state_full_context_replay", "quota_blocked_turn_state_full_context_replay"} {
+		log := event + " profile=main affinity_released=true\nselection_keep_current route=websocket profile=second quota_source=probe_cache quota_band=quota_healthy\n"
+		if err := os.WriteFile(path, []byte(log), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if err := verifyTransportReadyLog04383(p, event); err != nil {
+			t.Fatal(err)
+		}
+		for _, field := range []string{event, "profile=main", "affinity_released=true", "profile=second", "quota_source=probe_cache", "quota_band=quota_healthy"} {
+			if err := os.WriteFile(path, []byte(strings.Replace(log, field, "mutated", 1)), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := verifyTransportReadyLog04383(p, event); err == nil {
+				t.Fatalf("%s accepted mutated %s", event, field)
+			}
+		}
+	}
+}
 
 func TestProdex04383TransportWaitsForAppliedQuotaProbes(t *testing.T) {
 	p := product{name: "prodex", state: t.TempDir()}

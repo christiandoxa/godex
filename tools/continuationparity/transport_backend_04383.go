@@ -114,6 +114,9 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		// This metadata stays below the commit threshold; EOF is deterministic.
 		_ = websocketframe.WriteFrame(connection, 1, []byte(`{"type":"response.created","response":{"id":"discarded-transport"}}`), false)
+		if b.scenario == "quota-history" {
+			_ = websocketframe.WriteFrame(connection, 1, []byte(`{"type":"error","status":429,"error":{"code":"insufficient_quota","message":"synthetic quota"}}`), false)
+		}
 		if b.scenario == "postcommit" {
 			_ = websocketframe.WriteFrame(connection, 1, []byte(`{"type":"response.output_text.delta","delta":"visible"}`), false)
 		}

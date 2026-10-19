@@ -608,3 +608,35 @@ The repaired prerequisite still requires clean-candidate executable qualificatio
 That same native run also failed macOS realtime session setup in official
 Prodex and one Godex committed-idle close/Ping observation. These remain
 unresolved native evidence; neither is certified by the passing Linux gate.
+
+The applied-probe repair passed
+`./scripts/verify-release-parity.sh --phase=websocket-transport` on clean
+`714e82f1e53a7f619c9d57437e6e118c4ab30bd5`. All six scenarios matched both
+executables, including durable ownership and the original deadline. That result
+does not establish a repaired native matrix.
+
+## Quota full-history recovery keeps accompanying session ownership
+
+An authenticated two-profile executable experiment on clean `714e82f1`
+replaced the transport close with a precommit `429 insufficient_quota` event.
+Both products attempted main then second and preserved exact request/output
+content, but Godex silently persisted the session on second. Official Prodex
+retained the accompanying session claim, yielding the same hard-owner conflict
+as transport recovery. The unrelated response remained on main in both stores.
+
+`TestProdex04383QuotaTurnRecoveryRetainsAccompanyingSessionOwner` failed before
+the repair in both memory and durable-store variants. The shared routing
+affinity-release operation now retains an accompanying session whenever a hard
+response or turn identity is present. Exact hard-identity bindings still release;
+session-only release still works. This also covers the existing HTTP quota
+consumer without duplicating policy at each call site. The change stays in
+`usecase/routing`; no persistence format, dependency, gateway or helper changes.
+
+The committed transport oracle adds `quota-history` with the same authenticated
+Ready prerequisites, exact wire assertions and durable snapshot requirements.
+Its official log must show the quota recovery event rather than a transport event.
+Clean-candidate qualification of this expanded seven-case slice follows the
+local regression checks. Strict compact-followup remains unverified: even a
+compact-only turn lineage was resolved by the official executable through its
+ordinary turn-owner path, which allowed full-history replay. That experiment
+must not be counted as the strict no-replay control.

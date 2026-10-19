@@ -14,7 +14,7 @@ import (
 )
 
 func runWebSocketTransportProduct04383(root string, p product) error {
-	for _, scenario := range []string{"full-history", "delta-only", "previous-response", "postcommit", "cancellation", "deadline"} {
+	for _, scenario := range []string{"full-history", "quota-history", "delta-only", "previous-response", "postcommit", "cancellation", "deadline"} {
 		if err := runTransportCase04383(filepath.Join(root, scenario), p, scenario); err != nil {
 			return fmt.Errorf("%s: %w", scenario, err)
 		}
@@ -86,7 +86,7 @@ func runTransportCase04383(root string, p product, scenario string) error {
 			return fmt.Errorf("unexpected client opcode %d", opcode)
 		}
 		frames = append(frames, string(payload))
-		if scenario != "full-history" {
+		if scenario != "full-history" && scenario != "quota-history" {
 			b.mu.Lock()
 			err := verifyTransportNegative04383(scenario, body, b.handshakes, b.attempts, string(payload), b.invalid)
 			b.mu.Unlock()
@@ -106,10 +106,14 @@ func runTransportCase04383(root string, p product, scenario string) error {
 	if err != nil {
 		return err
 	}
-	if err := verifyTransportDurable04383(p); err != nil {
+	recoveryEvent := "transport_failure_turn_state_full_context_replay"
+	if scenario == "quota-history" {
+		recoveryEvent = "quota_blocked_turn_state_full_context_replay"
+	}
+	if err := verifyTransportDurable04383(p, recoveryEvent); err != nil {
 		return err
 	}
-	fmt.Printf("%s transport full-history: authenticated Ready owners=2; handshakes=2; requests=account-a,account-b; stale turn removed; exact history/client frames preserved\n", p.name)
+	fmt.Printf("%s %s: authenticated Ready owners=2; handshakes=2; requests=account-a,account-b; stale turn removed; exact history/client frames preserved\n", p.name, scenario)
 	return nil
 }
 

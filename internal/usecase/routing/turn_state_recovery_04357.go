@@ -108,6 +108,10 @@ func (store *affinityStore) releaseOwnedDead(
 	keys affinityKeys,
 	now time.Time,
 ) error {
+	// The tagged release plan preserves session ownership beside a hard identity.
+	if strings.TrimSpace(keys.previous) != "" || strings.TrimSpace(keys.turn) != "" {
+		keys.session = ""
+	}
 	entries := keys.entries()
 	if strings.TrimSpace(accountID) == "" || len(entries) == 0 {
 		return nil

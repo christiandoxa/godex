@@ -54,7 +54,7 @@ func seedTransportAlternate04383(p product) error {
 	return writeJSONFile(path, state)
 }
 
-func verifyTransportDurable04383(p product) error {
+func verifyTransportDurable04383(p product, recoveryEvent string) error {
 	deadline := time.NewTimer(3 * time.Second)
 	defer deadline.Stop()
 	ticker := time.NewTicker(20 * time.Millisecond)
@@ -63,7 +63,7 @@ func verifyTransportDurable04383(p product) error {
 		owners, err := readTransportOwners04383(p)
 		if err == nil && owners["turn"] == "" && owners["response"] == "second" && owners["unrelated"] == "main" && owners["session"] == "__prodex_hard_binding_conflict__" {
 			if p.name == "prodex" {
-				if err := verifyTransportReadyLog04383(p); err != nil {
+				if err := verifyTransportReadyLog04383(p, recoveryEvent); err != nil {
 					return err
 				}
 			}
@@ -145,7 +145,7 @@ func readTransportOwners04383(p product) (map[string]string, error) {
 	return owners, nil
 }
 
-func verifyTransportReadyLog04383(p product) error {
+func verifyTransportReadyLog04383(p product, recoveryEvent string) error {
 	paths, err := filepath.Glob(filepath.Join(p.state, "logs", "prodex-runtime-*.log"))
 	if err != nil {
 		return err
@@ -157,7 +157,7 @@ func verifyTransportReadyLog04383(p product) error {
 		}
 		recovery, ready := false, false
 		for _, line := range strings.Split(string(data), "\n") {
-			recovery = recovery || strings.Contains(line, "transport_failure_turn_state_full_context_replay profile=main affinity_released=true")
+			recovery = recovery || strings.Contains(line, recoveryEvent+" profile=main affinity_released=true")
 			ready = ready || (strings.Contains(line, "selection_keep_current route=websocket profile=second") && strings.Contains(line, "quota_source=probe_cache") && strings.Contains(line, "quota_band=quota_healthy"))
 		}
 		if recovery && ready {

@@ -13,10 +13,21 @@ import (
 )
 
 func TestProdex04383TransportTurnRecoveryRetainsAccompanyingSessionOwner(t *testing.T) {
+	assertProdex04383TurnRecoverySessionOwner(t, func() *proxymodel.Response {
+		return &proxymodel.Response{StatusCode: http.StatusBadGateway, Body: io.NopCloser(strings.NewReader("")), WebSocketFrames: true, PrecommitFailure: &proxymodel.PrecommitFailure{Transport: true}}
+	})
+}
+
+func TestProdex04383QuotaTurnRecoveryRetainsAccompanyingSessionOwner(t *testing.T) {
+	assertProdex04383TurnRecoverySessionOwner(t, websocketQuotaFailureResponse)
+}
+
+func assertProdex04383TurnRecoverySessionOwner(t *testing.T, failure func() *proxymodel.Response) {
+	t.Helper()
 	for _, persisted := range []bool{false, true} {
 		t.Run(map[bool]string{false: "memory", true: "durable"}[persisted], func(t *testing.T) {
 			gateway := &websocketDispatchGateway{responses: []*proxymodel.Response{
-				{StatusCode: http.StatusBadGateway, Body: io.NopCloser(strings.NewReader("")), WebSocketFrames: true, PrecommitFailure: &proxymodel.PrecommitFailure{Transport: true}},
+				failure(),
 				websocketCommittedTestResponse("resp-recovered"),
 			}}
 			config := Config{Gateway: gateway, Accounts: func(context.Context) ([]proxymodel.Account, error) { return websocketQuotaAccounts(), nil }}
@@ -40,7 +51,7 @@ func TestProdex04383TransportTurnRecoveryRetainsAccompanyingSessionOwner(t *test
 			}
 			defer forwarded.Close()
 			if forwarded.Result.AccountID != websocketQuotaOwnerB || strings.Join(gateway.accounts, ",") != websocketQuotaOwnerA+","+websocketQuotaOwnerB {
-				t.Fatalf("full-history transport sequence changed: %v", gateway.accounts)
+				t.Fatalf("full-history recovery sequence changed: %v", gateway.accounts)
 			}
 			store := router.affinity
 			if persisted {
