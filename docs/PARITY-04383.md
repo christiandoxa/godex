@@ -892,3 +892,12 @@ at HTTP or WebSocket commitment. Parent deadlines and cancellation remain in
 force, and admission/body capture/precommit work retain their original budget.
 No retry assertion or capacity-blocker requirement was relaxed. Qualification
 of the combined repairs follows local tests.
+
+The thirteen-case phase passed on clean `a44f67b4`. A subsequent contract audit
+found that its custom context changed `Deadline()` after commitment, contrary
+to Go's stable-context contract. The final implementation uses the standard
+cancel-cause context and keeps only the stoppable application timer in delivery's
+scope. Parent deadlines remain unchanged; original accepted-time budgeting and
+typed local 504 classification retain direct regression coverage. The full
+gate begun on the earlier diagnostic integration was stopped for this change;
+it is not recorded as passing.

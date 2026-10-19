@@ -24,7 +24,7 @@ type requestDeadlineScope struct {
 	parent   context.Context
 	deadline time.Time
 	local    bool
-	watchdog *requestWatchdogContext
+	watchdog *requestWatchdog
 }
 
 func withRequestDeadline(parent context.Context, budget time.Duration) (context.Context, context.CancelFunc) {
@@ -47,11 +47,8 @@ func withRequestDeadline(parent context.Context, budget time.Duration) (context.
 	return newRequestDeadlineContext(parent, scope)
 }
 
-// The local deadline can end at commitment without canceling the upstream body.
-// Parent cancellation and parent deadlines remain owned by the caller.
-type requestWatchdogContext struct {
-	context.Context
-	deadline  time.Time
+// Keep a stoppable application timer outside the context's stable parent deadline.
+type requestWatchdog struct {
 	mu        sync.Mutex
 	timer     *time.Timer
 	committed bool
@@ -59,7 +56,7 @@ type requestWatchdogContext struct {
 
 func newRequestDeadlineContext(parent context.Context, scope requestDeadlineScope) (context.Context, context.CancelFunc) {
 	base, cancel := context.WithCancelCause(parent)
-	watchdog := &requestWatchdogContext{Context: base, deadline: scope.deadline}
+	watchdog := &requestWatchdog{}
 	remaining := time.Until(scope.deadline)
 	if remaining <= 0 {
 		cancel(errLocalRequestDeadline)
@@ -73,36 +70,18 @@ func newRequestDeadlineContext(parent context.Context, scope requestDeadlineScop
 		})
 	}
 	scope.watchdog = watchdog
-	return context.WithValue(watchdog, requestDeadlineContextKey{}, scope), func() {
+	return context.WithValue(base, requestDeadlineContextKey{}, scope), func() {
 		watchdog.disarm()
 		cancel(context.Canceled)
 	}
 }
 
-func (ctx *requestWatchdogContext) Deadline() (time.Time, bool) {
-	ctx.mu.Lock()
-	defer ctx.mu.Unlock()
-	parentDeadline, present := ctx.Context.Deadline()
-	if ctx.committed || present && parentDeadline.Before(ctx.deadline) {
-		return parentDeadline, present
-	}
-	return ctx.deadline, true
-}
-
-func (ctx *requestWatchdogContext) Err() error {
-	err := ctx.Context.Err()
-	if err != nil && errors.Is(context.Cause(ctx.Context), errLocalRequestDeadline) {
-		return context.DeadlineExceeded
-	}
-	return err
-}
-
-func (ctx *requestWatchdogContext) disarm() {
-	ctx.mu.Lock()
-	defer ctx.mu.Unlock()
-	ctx.committed = true
-	if ctx.timer != nil {
-		ctx.timer.Stop()
+func (watchdog *requestWatchdog) disarm() {
+	watchdog.mu.Lock()
+	defer watchdog.mu.Unlock()
+	watchdog.committed = true
+	if watchdog.timer != nil {
+		watchdog.timer.Stop()
 	}
 }
 
@@ -139,7 +118,8 @@ func requestDeadlineScopeFor(ctx context.Context) (requestDeadlineScope, bool) {
 // Classify the caller's error snapshot; a second read can race expiration.
 func requestDeadlineTimedOut(ctx context.Context, contextErr error) bool {
 	scope, ok := requestDeadlineScopeFor(ctx)
-	return ok && scope.local && errors.Is(contextErr, context.DeadlineExceeded)
+	return ok && scope.local && (errors.Is(contextErr, context.DeadlineExceeded) ||
+		contextErr != nil && errors.Is(context.Cause(ctx), errLocalRequestDeadline))
 }
 
 func withoutRequestDeadline(ctx context.Context) context.Context {

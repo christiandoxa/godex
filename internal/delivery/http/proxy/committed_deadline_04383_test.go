@@ -62,6 +62,20 @@ func TestProdex04383CommitKeepsTheParentsDeadline(t *testing.T) {
 	}
 }
 
+func TestProdex04383LocalWatchdogDoesNotChangeTheContextDeadlineAtCommit(t *testing.T) {
+	deadline := time.Now().Add(time.Hour)
+	parent, cancelParent := context.WithDeadline(t.Context(), deadline)
+	defer cancelParent()
+	ctx, cancel := withRequestDeadline(parent, time.Minute)
+	defer cancel()
+	before, presentBefore := ctx.Deadline()
+	disarmRequestDeadline(ctx)
+	after, presentAfter := ctx.Deadline()
+	if !presentBefore || !presentAfter || !before.Equal(after) || !after.Equal(deadline) {
+		t.Fatal("local watchdog violated the stable context deadline contract")
+	}
+}
+
 func TestProdex04383CommittedHTTPStreamOutlivesLocalDeadlineAndKeepsClientCancellation(t *testing.T) {
 	type attempt struct {
 		ctx      context.Context
@@ -71,8 +85,8 @@ func TestProdex04383CommittedHTTPStreamOutlivesLocalDeadlineAndKeepsClientCancel
 	var calls atomic.Int32
 	gateway := gatewayFunc(func(ctx context.Context, _ proxymodel.Request, _ proxymodel.Account) (*proxymodel.Response, error) {
 		calls.Add(1)
-		deadline, _ := ctx.Deadline()
-		started <- attempt{ctx, deadline}
+		scope, _ := requestDeadlineScopeFor(ctx)
+		started <- attempt{ctx, scope.deadline}
 		return &proxymodel.Response{
 			StatusCode: 200, Header: http.Header{"Content-Type": {"text/event-stream"}},
 			Body: &committedDeadlineBody04383{ctx: ctx, closed: make(chan struct{}), prefix: strings.NewReader("data: {\"type\":\"response.created\",\"response\":{\"id\":\"resp-live\"}}\n\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"visible\"}\n\n")},

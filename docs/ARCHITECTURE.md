@@ -436,6 +436,9 @@ and precommit routing. Commitment disarms only that local watchdog, including
 the timer inherited by the upstream response body. Parent cancellation and
 parent deadlines remain active through stream completion. Each request owns
 and stops its timer; no shared helper or background worker is introduced.
+The budget lives in delivery's request scope, outside `Context.Deadline`, whose
+parent deadline remains stable before and after commitment. The timer's own
+cancellation cause distinguishes local expiry from caller cancellation.
 
 A forwarded request starts as **uncommitted**. Rotation is legal only in this state.
 

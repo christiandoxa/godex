@@ -26,7 +26,8 @@ func TestProdex04381RequestDeadlineIncludesAcceptedConnectionTime(t *testing.T) 
 	parent := context.WithValue(context.Background(), requestAcceptedAtContextKey{}, acceptedAt)
 	ctx, cancel := withRequestDeadline(parent, 100*time.Millisecond)
 	defer cancel()
-	deadline, ok := ctx.Deadline()
+	scope, ok := requestDeadlineScopeFor(ctx)
+	deadline := scope.deadline
 	if !ok || deadline.Sub(acceptedAt.Add(100*time.Millisecond)) > time.Millisecond ||
 		deadline.Sub(acceptedAt.Add(100*time.Millisecond)) < -time.Millisecond {
 		t.Fatalf("deadline=%v, want accepted-at deadline near %v", deadline, acceptedAt.Add(100*time.Millisecond))
@@ -232,8 +233,8 @@ func TestProdex04381BodyCaptureUsesRequestDeadline(t *testing.T) {
 
 func (gateway *requestDeadlineGateway04381) Execute(ctx context.Context, _ proxymodel.Request, _ proxymodel.Account) (*proxymodel.Response, error) {
 	gateway.calls.Add(1)
-	_, hasDeadline := ctx.Deadline()
-	gateway.started <- hasDeadline
+	scope, hasDeadline := requestDeadlineScopeFor(ctx)
+	gateway.started <- hasDeadline && !scope.deadline.IsZero()
 	<-ctx.Done()
 	gateway.cancelOnce.Do(func() { close(gateway.canceled) })
 	return nil, ctx.Err()
@@ -268,7 +269,7 @@ func TestProdex04381StandardRequestDeadlineCoversUpstreamAndReturns504(t *testin
 	select {
 	case hasDeadline := <-gateway.started:
 		if !hasDeadline {
-			t.Fatal("upstream context lost request deadline")
+			t.Fatal("upstream context lost the original request watchdog budget")
 		}
 	case <-time.After(time.Second):
 		t.Fatal("upstream request did not start")
