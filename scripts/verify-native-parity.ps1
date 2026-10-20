@@ -40,7 +40,7 @@ try {
     go build -trimpath -o $taskOracle ./tools/continuationparity
     if ($LASTEXITCODE -ne 0) { throw 'build native executable oracle failed' }
     $taskFailures = @()
-    foreach ($taskMode in @('--websocket-realtime', '--websocket', '--websocket-capacity', '--websocket-committed-idle', '--websocket-lookahead-idle', '--websocket-deadline', '--websocket-transport', '--websocket-compact-lineage', '--http-keepalive', '--http-compact', '--http-turn-transport', '--http-session-conflict')) {
+    foreach ($taskMode in @('--websocket-realtime', '--websocket', '--websocket-capacity', '--websocket-committed-idle', '--websocket-lookahead-idle', '--websocket-deadline', '--websocket-transport', '--websocket-compact-lineage', '--http-keepalive', '--http-compact', '--http-turn-transport', '--http-session-conflict', '--http-prompt-cache')) {
         & $taskOracle --prodex $taskProdex --prodex-source $taskOracleSource --godex $taskGodex --godex-source $taskSource --godex-commit $taskCommit $taskMode
         if ($LASTEXITCODE -ne 0) { $taskFailures += $taskMode; Write-Output "FAIL native $taskPlatform parity: $taskMode" }
     }

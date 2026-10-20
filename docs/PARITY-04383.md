@@ -2393,3 +2393,11 @@ unsigned-64 maximum. The oracle checks exact request/response bytes, four
 single owner-directed upstream attempts and all four durable response IDs.
 This finite HTTP selection proof does not substitute for live-model cache
 measurement, provider authentication, or native Windows/macOS fault parity.
+
+The native `scripts/verify-native-parity.ps1` matrix now executes
+`--http-prompt-cache` on the same canonical release pins for each supported
+macOS and Windows host. A targeted repository test prevents the native matrix
+from silently omitting the new executable oracle in subsequent changes. The
+release workflow step label also identifies 0.438.3 consistently with its
+pinned script. Native results must still run on actual native hosts; a Linux
+execution or cross-build cannot be counted as a macOS/Windows PASS.
