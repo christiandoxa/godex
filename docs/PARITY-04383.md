@@ -3205,3 +3205,27 @@ opaque cases. The fixture compares authenticated Ready profiles, exact
 model request and SSE output, precommit inference count and unchanged
 previous-response durable bindings. This is a finite synthetic comparison,
 not a certificate of native-OS or live-provider 1:1 parity.
+
+## SSE quota/rate failure flags outrank a simultaneous invalid previous-ID marker
+
+The tagged 0.438.3 `parse_runtime_sse_event` independently extracts
+`invalid_previous_response_id` and the Mojo STREAM quota/rate/overload
+class. Its `runtime_sse_inspection_step` processes quota, rate and overload
+**before** previous-response failure signals. Godex previously checked
+`invalidPreviousResponseID` first in `classifyStreamError`: an SSE event
+with `type: invalid_request_error`, the exact invalid-backtick-previous-ID
+message, and a valid `code: insufficient_quota` or
+`code: rate_limit_exceeded` wrongly short-circuited on the previous-ID
+marker instead of authorizing a precommit quota/rate retry.
+
+A fail-before regression demonstrates conflicting quota, rate, overload and
+profile classes as well as an unambiguous invalid-ID control. The scoped
+native fix evaluates the structured STREAM class first and then checks the
+invalid-ID fallback, while retaining external provider precedence, the
+exact stream bytes and the separate hard-previous owner fence. The
+source/manifest/executable-pinned `--phase=http-turn-transport` oracle
+adds quota-code, rate-code and quota-reason combinations alongside the
+invalid previous-ID message. Each case uses an independent fresh request
+with two authenticated Ready profiles and checks the exact upstream body,
+precommit attempt count, SSE recovery output and unchanged earlier durable
+response ownership. Full live-provider and cross-OS parity remains open.

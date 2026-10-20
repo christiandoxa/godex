@@ -897,3 +897,11 @@ request the recognized errors authorize a second Ready profile. Ordinary
 metadata without error and opaque aliases remain covered by local tests.
 The two-executable fixture verifies original request bytes, exact recovered
 SSE stream, attempt count and unchanged older durable bindings.
+
+The SSE precommit oracle also pairs conflicting flags: a valid quota or
+rate-limit `code`/`reason` beside an `invalid_request_error` carrying
+`Invalid `previous_response_id`.`. The tagged Mojo inspector checks
+quota/rate/overload flags before previous-response markers, so on a fresh
+unbound request these combinations must retry once on the second
+independently authenticated Ready profile. The original request is forwarded
+unchanged and the recovered SSE bytes and old response owner are checked.

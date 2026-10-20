@@ -18,7 +18,8 @@ func httpSSEInvalidErrorShapes04383() []string {
 	return []string{"high-surrogate", "low-surrogate", "numeric-overflow", "too-deep", "valid-output",
 		"opaque-scalar-quota", "opaque-error-code-quota", "opaque-error-code-rate",
 		"opaque-profile-note", "opaque-profile-message", "kelvin-quota-code",
-		"canonical-quota", "canonical-rate", "created-quota", "inprogress-rate", "keepalive-quota"}
+		"canonical-quota", "canonical-rate", "created-quota", "inprogress-rate", "keepalive-quota",
+		"quota-and-invalid-id", "rate-and-invalid-id", "reason-quota-and-invalid-id"}
 }
 
 func httpSSEInvalidErrorBody04383(shape string) string {
@@ -45,6 +46,12 @@ func httpSSEInvalidErrorBody04383(shape string) string {
 		return "data: " + `{"type":"response.in_progress","response":{"error":{"code":"rate_limit_exceeded"}}}` + "\n\n"
 	case "keepalive-quota":
 		return "data: " + `{"type":"keepalive","error":{"code":"insufficient_quota"}}` + "\n\n"
+	case "quota-and-invalid-id":
+		return "data: " + `{"type":"response.failed","response":{"error":{"code":"insufficient_quota","type":"invalid_request_error","message":"Invalid ` + "`previous_response_id`" + `."}}}` + "\n\n"
+	case "rate-and-invalid-id":
+		return "data: " + `{"type":"response.failed","response":{"error":{"code":"rate_limit_exceeded","type":"invalid_request_error","message":"Invalid ` + "`previous_response_id`" + `."}}}` + "\n\n"
+	case "reason-quota-and-invalid-id":
+		return "data: " + `{"type":"response.failed","response":{"error":{"reason":"insufficient_quota","type":"invalid_request_error","message":"Invalid ` + "`previous_response_id`" + `."}}}` + "\n\n"
 	}
 	if shape == "valid-output" {
 		return "data: " + `{"type":"response.output_text.delta","delta":"ok"}` + "\n\n"
@@ -63,7 +70,8 @@ func httpSSEInvalidErrorBody04383(shape string) string {
 
 func httpSSEInvalidErrorRotates04383(shape string) bool {
 	return shape == "canonical-quota" || shape == "canonical-rate" ||
-		shape == "created-quota" || shape == "inprogress-rate" || shape == "keepalive-quota"
+		shape == "created-quota" || shape == "inprogress-rate" || shape == "keepalive-quota" ||
+		shape == "quota-and-invalid-id" || shape == "rate-and-invalid-id" || shape == "reason-quota-and-invalid-id"
 }
 
 const httpSSERecovered04383 = "data: " + `{"type":"response.output_text.delta","delta":"recovered"}` + "\n\n"

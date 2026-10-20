@@ -130,7 +130,11 @@ func streamOutcome(data []byte, headers http.Header, now time.Time, providerKind
 }
 
 func classifyStreamError(data []byte, headers http.Header, now time.Time, providerKind string) (responseOutcome, bool) {
-	if invalidPreviousResponseID(data) {
+	// The tagged SSE inspection Mojo kernel prioritizes quota/rate/
+	// overload failure flags over an *additional* invalid-previous-ID
+	// marker carried by the same event. Preserve generic provider ordering
+	// on its separate external transport path.
+	if externalProviderKind(providerKind) && invalidPreviousResponseID(data) {
 		return responseOutcome{kind: responsePass, failed: true, invalidPreviousResponseID: true}, false
 	}
 	classification := providerentity.ClassifyError(http.StatusOK, data)
@@ -183,6 +187,9 @@ func classifyStreamError(data []byte, headers http.Header, now time.Time, provid
 			kind: responseRetry, quarantine: retryAfter(headers, now), failed: true, quota: true,
 			quotaResetAt: quotaResetAtFromMessage(data, now), firstEventRetry: true,
 		}, false
+	}
+	if invalidPreviousResponseID(data) {
+		return responseOutcome{kind: responsePass, failed: true, invalidPreviousResponseID: true}, false
 	}
 	if previousResponseNotFound(data) {
 		return responseOutcome{kind: responsePass, failed: true, previousResponseNotFound: true}, false
