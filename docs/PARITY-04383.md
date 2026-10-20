@@ -2352,3 +2352,28 @@ A real `Router.Observe` regression checks full `uint64` precision in the
 runtime event and suppression of a forged raw-provider-only count. These
 are source-aligned and synthetic local checks, not a certificate for every
 stream layout, live provider or native platform.
+
+## Bounded, ordered nested usage scanning and strict JSON framing
+
+The tagged Mojo `runtime_response_raw_scan_usage` inspects the immediate
+`usage` member first, then direct fields, then arbitrary nested object/array
+values. Input JSON object keys are serialized by serde_json in sorted order
+before compiled scanning. Its guard admits no more than 256 nesting levels
+and 2,048 visited values; a further field after the bound cannot contribute
+usage evidence. Godex previously followed only four named wrappers and did
+not scan arrays or unknown wrappers, so it could omit cached-token affinity
+and usage markers carried in otherwise valid nested envelopes.
+
+A single narrowly owned `internal/usecase/routing/usage_scan_04383.go` scanner
+now serves both prompt-cache affinity and terminal usage observations, with
+the same precedence, key ordering, depth and visited-value bounds. Regressions
+fail before this consolidation for unknown wrapper objects, arrays, lexical
+key precedence, valid 255-level nesting and bounded value traversal. The
+scan also uses a complete JSON decode rather than accepting Go Decoder's
+first JSON value when a second object, array or invalid trailing fragment is
+present. The latter could previously promote an invalid upstream payload to
+a cache owner. Positive controls preserve valid trailing whitespace, root
+arrays and all previously qualified native usage fields. Terminal-event
+eligibility remains a separate unchanged Godex lifecycle rule; these tests
+do not certify externally authenticated streaming behavior or native OS
+specifics.

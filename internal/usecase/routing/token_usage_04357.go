@@ -1,9 +1,7 @@
 package routing
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"strconv"
 	"strings"
 
@@ -35,27 +33,21 @@ func (router *Router) observeTokenUsage(ctx context.Context, accountID string, p
 }
 
 func terminalTokenUsage(payload []byte) (runtimemodel.TokenUsageCounts, bool) {
-	decoder := json.NewDecoder(bytes.NewReader(payload))
-	decoder.UseNumber()
-	var value map[string]any
-	if decoder.Decode(&value) != nil {
+	value, valid := decodeNativeUsageJSON(payload)
+	if !valid {
 		return runtimemodel.TokenUsageCounts{}, false
 	}
-
-	eventType, _ := value["type"].(string)
-	if eventType != "" &&
-		eventType != "response.completed" &&
-		eventType != "response.done" &&
-		eventType != "response.failed" &&
-		eventType != "response.incomplete" {
-		return runtimemodel.TokenUsageCounts{}, false
+	if object, ok := value.(map[string]any); ok {
+		eventType, _ := object["type"].(string)
+		if eventType != "" &&
+			eventType != "response.completed" &&
+			eventType != "response.done" &&
+			eventType != "response.failed" &&
+			eventType != "response.incomplete" {
+			return runtimemodel.TokenUsageCounts{}, false
+		}
 	}
-
-	usage := tokenUsageObject(value)
-	if usage == nil {
-		return runtimemodel.TokenUsageCounts{}, false
-	}
-	return nativeTokenUsageCounts(usage)
+	return scanNativeUsage(value)
 }
 
 // Source-aligned 0.438.3 fields: the first *valid* unsigned value wins,
@@ -78,25 +70,6 @@ func nativeTokenUsageCounts(usage map[string]any) (runtimemodel.TokenUsageCounts
 	return runtimemodel.TokenUsageCounts{
 		InputTokens: input, CachedInputTokens: cached, OutputTokens: output, ReasoningTokens: reasoning,
 	}, hasInput || hasCached || hasOutput || hasReasoning
-}
-
-func tokenUsageObject(value map[string]any) map[string]any {
-	if usage, ok := value["usage"].(map[string]any); ok {
-		if _, valid := nativeTokenUsageCounts(usage); valid {
-			return usage
-		}
-	}
-	if _, valid := nativeTokenUsageCounts(value); valid {
-		return value
-	}
-	for _, key := range []string{"response", "data", "result", "payload"} {
-		if nested, ok := value[key].(map[string]any); ok {
-			if usage := tokenUsageObject(nested); usage != nil {
-				return usage
-			}
-		}
-	}
-	return nil
 }
 
 func firstUnsignedUsage(object map[string]any, keys ...string) (uint64, bool) {

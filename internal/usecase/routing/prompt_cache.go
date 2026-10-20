@@ -3,8 +3,6 @@ package routing
 import (
 	"encoding/json"
 	"io"
-	"math"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -135,71 +133,18 @@ func (router *Router) prunePromptCacheBindingsLocked(now time.Time) {
 }
 
 func promptCacheCachedInputTokens(value any) uint64 {
-	object, _ := value.(map[string]any)
-	if object == nil {
+	usage, valid := scanNativeUsage(value)
+	if !valid {
 		return 0
 	}
-	if usage, ok := object["usage"].(map[string]any); ok {
-		// Prodex 0.438.3's compiled response metadata uses the first
-		// *valid* unsigned field, including zero. These are the canonical
-		// OpenAI/compatible shapes, not legacy raw provider counters.
-		if cached, ok := unsignedJSONNumber(usage["cached_input_tokens"]); ok {
-			return cached
-		}
-		if details, ok := usage["input_tokens_details"].(map[string]any); ok {
-			if cached, ok := unsignedJSONNumber(details["cached_tokens"]); ok {
-				return cached
-			}
-			if cached, ok := unsignedJSONNumber(details["cached_input_tokens"]); ok {
-				return cached
-			}
-		}
-		if details, ok := usage["prompt_tokens_details"].(map[string]any); ok {
-			if cached, ok := unsignedJSONNumber(details["cached_tokens"]); ok {
-				return cached
-			}
-		}
-	}
-	for _, key := range []string{"response", "data", "result", "payload"} {
-		if cached := promptCacheCachedInputTokens(object[key]); cached > 0 {
-			return cached
-		}
-	}
-	return 0
-}
-
-func unsignedJSONNumber(value any) (uint64, bool) {
-	switch current := value.(type) {
-	case float64:
-		if current >= 0 && current < math.Exp2(64) && math.Trunc(current) == current {
-			return uint64(current), true
-		}
-	case json.Number:
-		if current.String() == "-0" {
-			return 0, true
-		}
-		parsed, err := strconv.ParseUint(current.String(), 10, 64)
-		if err == nil {
-			return parsed, true
-		}
-	case uint64:
-		return current, true
-	case int:
-		if current >= 0 {
-			return uint64(current), true
-		}
-	}
-	return 0, false
+	return usage.CachedInputTokens
 }
 
 func (router *Router) observePromptCachePayload(accountID, key string, payload []byte) {
 	if key == "" || len(payload) == 0 {
 		return
 	}
-	var value any
-	decoder := json.NewDecoder(strings.NewReader(string(payload)))
-	decoder.UseNumber()
-	if decoder.Decode(&value) == nil {
+	if value, valid := decodeNativeUsageJSON(payload); valid {
 		if cached := promptCacheCachedInputTokens(value); cached > 0 {
 			router.observePromptCacheHit(accountID, key, cached, router.now())
 		}
