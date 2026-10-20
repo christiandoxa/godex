@@ -2983,3 +2983,31 @@ cases, account dispatch alone does not prove their internal class is equal;
 that distinction is separately anchored to the compiled Mojo source and
 local Router-level regression. Full provider and native-OS parity remains
 unproven.
+
+## Structured retry-after advice needs a complete serde-valid SSE error
+
+The exact 0.438.3 `error_policy/stream.rs` first parses the **entire**
+precommit event with `serde_json::from_slice`; the typed value is then
+passed to the Mojo `runtime_retry_after_json` planner. The existing Godex
+`structuredStreamRetryAdvice` helper used a separate permissive
+`json.Unmarshal` on individual `RawMessage` members and could adopt a
+perfectly valid `Retry-After: 5` nested header from an otherwise **invalid**
+JSON event. This bypassed the earlier whole-event SSE inspection guard when
+the retry policy arrived directly through a `PrecommitFailure.RetryAdviceJSON`
+or the buffered bound-turn overload planning path.
+
+Fail-before regressions cover malformed high/low Unicode surrogates,
+invalid UTF-8, overflowing numeric tokens and excessive depth in *unrelated*
+event fields, with valid Unicode, finite exponent and canonical Retry-After
+positive controls. A direct `PrecommitFailure` Router-classification test
+verifies that invalid events cannot override the ordinary rate-limit
+cooldown or set `explicitRetryAdvice`, while the separate bound-overload
+advice test verifies that malformed buffered SSE cannot influence the
+same-owner retry window. The scoped correction reuses the tagged-compatible
+whole-document JSON decoder **before** the existing header and fallback
+precedence, without changing original event bytes or unrelated HTTP headers.
+
+This is a source-aligned local semantic check. Existing official executable
+HTTP transport/SSE regressions are retained, but no new paired native
+Prodex-vs-Godex measurement isolates these malformed `RetryAdviceJSON`
+adapter inputs yet. Full provider and cross-platform parity remains open.

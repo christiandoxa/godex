@@ -18,6 +18,14 @@ func structuredStreamRetryAdvice(data []byte, now time.Time) (time.Duration, boo
 	if len(data) == 0 || len(data) > maxStreamRetryAdviceBytes {
 		return 0, false
 	}
+	// Tagged 0.438.3 decodes the entire SSE/error event with serde_json
+	// before passing its retry-after headers to the compiled Mojo policy.
+	// RawMessage alone accepts malformed surrogate escapes, invalid UTF-8,
+	// overflowing floats and over-depth JSON, none of which can authorize
+	// explicit retry timing on the reference executable.
+	if _, valid := decodeNativeUsageJSON(data); !valid {
+		return 0, false
+	}
 	var root map[string]json.RawMessage
 	if json.Unmarshal(data, &root) != nil || root == nil {
 		return 0, false

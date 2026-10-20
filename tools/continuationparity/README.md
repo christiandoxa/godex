@@ -825,3 +825,12 @@ ID. The corresponding Router classification regression independently checks
 which raw error bodies are quota, transient rate-limit or pass-through;
 otherwise identical account dispatch is not misrepresented as proof of
 identical internal error classes.
+
+Whole-document retry-after validation also applies to the Go internal
+PrecommitFailure and buffered bound-overload adapters. Source-tagged
+Prodex 0.438.3 ignores explicit nested retry-after JSON when any unrelated
+field makes the complete SSE/error event invalid under serde_json. Local
+regressions check invalid Unicode, UTF-8, numeric overflow and depth beside
+valid controls; the existing official transport oracle tests keep the
+broader behavior stable, though those malformed adapter inputs are not
+individually certified by a two-executable oracle.
