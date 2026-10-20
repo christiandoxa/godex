@@ -57,6 +57,10 @@ func seedTransportAlternate04383(p product, scenario string) error {
 			value["session_profile_bindings"].(map[string]any)["http-hard-session"] = binding
 			value["statuses"].(map[string]any)["session_id"].(map[string]any)["http-hard-session"] = map[string]any{"state": "Verified", "confidence": 4, "last_verified_at": time.Now().Unix(), "last_touched_at": time.Now().Unix(), "last_verified_route": "responses", "success_count": 1}
 		}
+		if strings.HasPrefix(scenario, "http-nested-prev-") {
+			value["response_profile_bindings"].(map[string]any)["resp-nested"] = map[string]any{"profile_name": "second", "bound_at": time.Now().Unix()}
+			value["statuses"].(map[string]any)["response"].(map[string]any)["resp-nested"] = map[string]any{"state": "Verified", "confidence": 4, "last_verified_at": time.Now().Unix(), "last_touched_at": time.Now().Unix(), "last_verified_route": "responses", "success_count": 1}
+		}
 		if scenario == "http-session-conflict" {
 			binding := map[string]any{"profile_name": "__prodex_hard_binding_conflict__", "bound_at": time.Now().Unix()}
 			value["session_id_bindings"].(map[string]any)["http-conflict"] = binding
@@ -134,6 +138,10 @@ func seedTransportAlternate04383(p product, scenario string) error {
 				"kind": "session", "key": hex.EncodeToString(key[:]),
 				"account_id": id, "updated_unix": time.Now().Unix(),
 			})
+		}
+		if strings.HasPrefix(scenario, "http-nested-prev-") {
+			key := sha256.Sum256([]byte("previous:resp-nested"))
+			state["bindings"] = append(state["bindings"].([]any), map[string]any{"kind": "previous", "key": hex.EncodeToString(key[:]), "account_id": id, "updated_unix": time.Now().Unix()})
 		}
 		if scenario == "http-session-conflict" {
 			key := sha256.Sum256([]byte("session:http-conflict"))

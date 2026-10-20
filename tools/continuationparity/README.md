@@ -547,3 +547,13 @@ missing-direct control. It checks exact raw HTTP request bytes, one upstream
 attempt, a 200 response, and retained nested-session ownership. Mutation
 controls reject wrong-account selection, omitted/duplicated requests,
 unauthenticated/unqueued readiness, stale turn headers or changed content.
+
+The `--http-session-conflict` phase includes **nested previous-response**
+precedence controls with a verified second-owned `resp-nested`: missing,
+`null` and blank direct previous IDs must select current main, whereas a
+valid direct `previous_response_id` must select second. The nested
+`response.previous_response_id` is preserved verbatim in the forwarded JSON
+but is not a hard HTTP request owner by itself. Authentication and Ready
+receipts, one provider attempt, HTTP status/body, exact opaque request and
+both original/new durable response bindings are required. Mutation tests
+reject forged previous ownership or lost nested payloads.

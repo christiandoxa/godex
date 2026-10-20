@@ -46,7 +46,11 @@ func requestAffinity(request proxymodel.Request, body []byte) affinityKeys {
 		}
 	}
 	keys.previous = objectString(object, "previous_response_id")
-	if keys.previous == "" {
+	// Tagged Prodex's HTTP Responses semantic plan reads only a direct
+	// previous_response_id. Nested response objects are ordinary payload,
+	// not an authorization to adopt another profile's hard continuation.
+	// Preserve the separately tested legacy WebSocket response envelope.
+	if keys.previous == "" && request.WebSocketMessage {
 		if response, ok := nestedAffinityObject("response", object["response"]); ok {
 			keys.previous = objectString(response, "previous_response_id")
 		}

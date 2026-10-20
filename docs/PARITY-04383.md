@@ -2026,3 +2026,41 @@ owner, quota readiness, upstream count, header, input and response integrity.
 Full parity for the remaining provider/OS/keyring scenarios is still OPEN; a
 new phase is VERIFIED only after an exact clean code commit passes the binary
 oracle and the suite's negative mutation checks.
+
+## HTTP Responses ignores nested previous-response identity
+
+The official Prodex 0.438.3 semantic plan reads the request's
+`previous_response_id` from the **direct** JSON member only, not from a
+nested `response.previous_response_id` object. The latter is request payload
+and must never silently pin the request to a different account's verified
+response ID. Godex's generic affinity extractor previously adopted that
+nested member whenever the direct value was absent, `null` or blank,
+converting unrelated payload into hard routing ownership.
+
+The independent 0.438.3 source/binary/manifest-pinned differential on a clean
+pre-fix exploratory candidate `d5deed0` seeded a verified `resp-nested`
+previous response on second, warmed second before main, and proved applied
+authenticated Ready receipts on both profiles. Four otherwise identical HTTP
+Responses requests carried a nested `response.previous_response_id`:
+
+- Direct previous-response **missing**, `null`, or blank: official Prodex
+  selected current main, dispatched once and preserved the second-owned
+  original response binding.
+- Direct previous-response **valid** and equal to the verified nested ID:
+  official Prodex selected second, its actual hard owner.
+
+The exact raw input body, one upstream attempt, HTTP 200 reply and durable
+new/old response owners are compared. Pre-fix Godex incorrectly selected
+second even with the direct field missing. Memory/durable fail-before tests
+reproduced all three invalid/absent direct cases, with a valid-direct
+positive control. A scoped HTTP request-affinity correction disallows the
+nested hard previous-owner fallback for ordinary HTTP Responses. The
+existing legacy WebSocket envelope remains isolated under its previously
+tested WebSocket request boundary; the HTTP fix does not rewrite or remove
+client JSON. Mutation controls reject wrong owners, replay, invalid quota,
+wrong headers, response changes and altered nested/content history.
+
+This is a bounded synthetic HTTP hard-affinity contract, not proof of native
+macOS/Windows runtime or external OAuth/keyring/provider fault parity. Report
+PASS only after the exact final clean Godex commit passes the official two-
+executable oracle and local regression suite.

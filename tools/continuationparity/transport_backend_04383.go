@@ -88,6 +88,13 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusOK, `{"id":"resp-http-hard-previous","object":"response","output":[]}`)
 			return
 		}
+		if strings.HasPrefix(b.scenario, "http-nested-prev-") && strings.Contains(string(body), `"response":{"previous_response_id":"resp-nested"}`) {
+			b.mu.Lock()
+			b.attempts = append(b.attempts, transportAttempt04383{owner: owner, body: string(body), turn: r.Header.Get("x-codex-turn-state"), ready: b.receipts["account-a"] > 0 && b.receipts["account-b"] > 0})
+			b.mu.Unlock()
+			writeJSON(w, http.StatusOK, `{"id":"resp-http-nested-previous","object":"response","output":[]}`)
+			return
+		}
 		if b.scenario == "http-session-conflict" && strings.Contains(string(body), `"session_id":"http-conflict"`) {
 			b.mu.Lock()
 			b.attempts = append(b.attempts, transportAttempt04383{owner: owner, body: string(body),
