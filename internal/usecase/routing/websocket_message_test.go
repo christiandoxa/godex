@@ -11,7 +11,7 @@ import (
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
-func TestWebSocketMessagesBindNestedPreviousResponseToAccount(t *testing.T) {
+func TestWebSocketMessagesBindDirectPreviousResponseToAccount(t *testing.T) {
 	gateway := &websocketMessageRoutingGateway{responses: []*proxymodel.Response{
 		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("first-frame")), WebSocketFrames: true, FirstEventCommitted: true, WebSocketResponseID: "resp_first"},
 		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("second-frame")), WebSocketFrames: true, FirstEventCommitted: true, WebSocketResponseID: "resp_second"},
@@ -30,7 +30,7 @@ func TestWebSocketMessagesBindNestedPreviousResponseToAccount(t *testing.T) {
 	}
 	_ = first.Close()
 
-	second, err := router.Forward(context.Background(), websocketMessageRequest(`{"type":"response.create","response":{"previous_response_id":"resp_first"}}`))
+	second, err := router.Forward(context.Background(), websocketMessageRequest(`{"type":"response.create","previous_response_id":"resp_first"}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestWebSocketContinuationRestoresCachedTurnStateOnOwner(t *testing.T) {
 	owner := first.Result.AccountID
 	_ = first.Close()
 
-	continuation, err := router.Forward(context.Background(), websocketMessageRequest(`{"type":"response.create","response":{"previous_response_id":"resp_turn_owner"}}`))
+	continuation, err := router.Forward(context.Background(), websocketMessageRequest(`{"type":"response.create","previous_response_id":"resp_turn_owner"}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestWebSocketContinuationCachedQuotaSignalsFullContextWhenFallbackExists(t 
 
 	accounts[0].EligibleAfter = now.Add(time.Hour)
 	continuation, err := router.Forward(context.Background(), websocketMessageRequest(
-		`{"type":"response.create","response":{"previous_response_id":"resp_owner"},"input":[{"type":"message","role":"user","content":"continue"}]}`,
+		`{"type":"response.create","previous_response_id":"resp_owner","input":[{"type":"message","role":"user","content":"continue"}]}`,
 	))
 	if err != nil {
 		t.Fatal(err)
@@ -156,7 +156,7 @@ func TestWebSocketReuseFailureDiscoversAndRetriesTurnStateOnSameOwner(t *testing
 	owner := first.Result.AccountID
 	_ = first.Close()
 
-	continuationRequest := websocketMessageRequest(`{"type":"response.create","response":{"previous_response_id":"resp_owner"}}`)
+	continuationRequest := websocketMessageRequest(`{"type":"response.create","previous_response_id":"resp_owner"}`)
 	continuationRequest.WebSocketSessionID = 17
 	continuation, err := router.Forward(context.Background(), continuationRequest)
 	if err != nil {
@@ -190,7 +190,7 @@ func TestWebSocketReuseTransportFailureWithoutTurnStateRetriesOwner(t *testing.T
 	owner := first.Result.AccountID
 	_ = first.Close()
 
-	continuationRequest := websocketMessageRequest(`{"type":"response.create","session_id":"session-owner","response":{"previous_response_id":"resp_owner"}}`)
+	continuationRequest := websocketMessageRequest(`{"type":"response.create","session_id":"session-owner","previous_response_id":"resp_owner"}`)
 	continuationRequest.WebSocketSessionID = 17
 	continuation, err := router.Forward(context.Background(), continuationRequest)
 	if err != nil {
@@ -274,7 +274,7 @@ func TestWebSocketPreviousResponseRetriesFollowBoundedTurnStateSchedule(t *testi
 			owner := first.Result.AccountID
 			_ = first.Close()
 
-			continuation, err := router.Forward(context.Background(), websocketMessageRequest(`{"type":"response.create","response":{"previous_response_id":"resp_retry_owner"}}`))
+			continuation, err := router.Forward(context.Background(), websocketMessageRequest(`{"type":"response.create","previous_response_id":"resp_retry_owner"}`))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -320,7 +320,8 @@ func TestStaleContinuationRequiresARequestedPreviousResponse(t *testing.T) {
 		code string
 		want bool
 	}{
-		{name: "nested previous response", body: `{"response":{"previous_response_id":"resp_old"}}`, code: "previous_response_not_found", want: true},
+		{name: "direct previous response", body: `{"previous_response_id":"resp_old"}`, code: "previous_response_not_found", want: true},
+		{name: "nested previous stays opaque", body: `{"response":{"previous_response_id":"resp_old"}}`, code: "previous_response_not_found", want: false},
 		{name: "new response", body: `{"response":{}}`, code: "previous_response_not_found"},
 		{name: "other upstream error", body: `{"previous_response_id":"resp_old"}`, code: "rate_limit_exceeded"},
 	} {

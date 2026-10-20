@@ -675,3 +675,13 @@ server always returns HTTP 200 with the exact original bytes, but a malformed
 response ID must remain unbound on both official Prodex and Godex. The valid
 control must retain its main owner. Existing mutation sentinels still reject
 forged readiness, response bytes, request counts and account selection.
+
+A separate `nested-previous-only` WebSocket control sends a full-context
+`response.create` whose *only* previous-response reference is nested inside
+`response.previous_response_id`. Although `resp-ready-b` is already verified
+on second, the source-pinned 0.438.3 semantic planner recognizes no hard
+previous ID and selects active main. The fixture records one authenticated
+Ready upstream request, byte-exact body, unchanged foreign owner, new main
+response owner and two client text frames. A pre-fix clean executable
+comparison demonstrated that Godex incorrectly selected second. The
+positive controls for canonical direct previous IDs remain mandatory.

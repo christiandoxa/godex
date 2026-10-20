@@ -2472,3 +2472,35 @@ fixture also checks that a malformed upstream response returns its original
 HTTP body while its response ID remains **unbound**; the valid pair still binds
 on the selected Ready owner. This synthetic fixture is not a claim of complete
 provider, OAuth or native platform parity.
+
+## WebSocket nested previous-response JSON is not hard continuation affinity
+
+Tagged `parse_runtime_websocket_request_metadata` invokes
+`runtime_request_semantic_plan`, which reads the exact direct
+`previous_response_id` member only. Godex preserved an older generic
+`response.previous_response_id` fallback in its WebSocket router, allowing a
+nested JSON field to borrow a foreign profile's verified response owner.
+This became a behavioral mismatch even when request metadata parsing itself
+correctly ignored the nested member.
+
+A source/manifest/executable-pinned exploratory `--phase=websocket-compact-lineage`
+comparison on the clean pre-fix candidate `48eb2619` reproduced the divergence:
+two authenticated Ready managed profiles held `resp-ready-b` on second while
+current main was active. The exact full-history WebSocket request carried only
+`response.previous_response_id: resp-ready-b`. Official Prodex dispatched one
+unchanged request to **main** and completed; Godex incorrectly dispatched
+that request to **second**. The bad candidate was not pushed.
+
+Godex's request-affinity parser now uses only the direct previous-response
+member for WebSocket as well as HTTP Responses, without modifying the request
+bytes, outer HTTP headers, or the separate response-ID extraction policy.
+Memory and durable regressions check missing/null/blank direct fields versus
+an owned nested value, hard-direct positive controls, precise WebSocket policy,
+a single inference and the original foreign/created durable owners. Legacy
+WebSocket tests that intentionally exercised a real continuation now send its
+canonical direct member; an explicit nested-only negative control remains.
+The pinned WebSocket Compact lineage oracle checks the exact upstream request,
+Ready quota evidence, no injected turn header, the original second-owned
+response and successful new main response, with mutation controls for wrong
+owner, lost history, extra inference and missing completion. Passing this
+finite case does not close native socket, live OAuth/provider or all 1:1 gaps.

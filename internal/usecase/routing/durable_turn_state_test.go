@@ -50,7 +50,7 @@ func TestWebSocketTurnStateRestoresAfterRouterRestart(t *testing.T) {
 	}}
 	secondRouter := newDurableTurnStateTestRouter(t, secondGateway, bindings, accounts, other)
 	second, err := secondRouter.Forward(context.Background(), websocketMessageRequest(
-		`{"type":"response.create","response":{"previous_response_id":"`+responseID+`"}}`,
+		`{"type":"response.create","previous_response_id":"`+responseID+`"}`,
 	))
 	if err != nil {
 		t.Fatal(err)

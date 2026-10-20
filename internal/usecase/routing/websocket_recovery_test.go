@@ -139,7 +139,7 @@ func TestWebSocketHardContinuationDoesNotRotateDuringRetryBackoff(t *testing.T) 
 	_ = first.Close()
 	router.quarantineAccount(owner, 3*time.Second)
 
-	continuationRequest := websocketMessageRequest(`{"type":"response.create","session_id":"session-a","response":{"previous_response_id":"resp_owner"}}`)
+	continuationRequest := websocketMessageRequest(`{"type":"response.create","session_id":"session-a","previous_response_id":"resp_owner"}`)
 	continuationRequest.QuotaSelection.RouteKind = quotamodel.RouteKindWebSocket
 	_, err = router.Forward(context.Background(), continuationRequest)
 	var routeError *proxymodel.Error
@@ -182,7 +182,7 @@ func TestWebSocketPreSendQuotaBlockedContinuationSignalsReplayAndRebinds(t *test
 
 	accounts[0].EligibleAfter = now.Add(time.Hour)
 	continuation, err := router.Forward(context.Background(), websocketMessageRequest(
-		`{"type":"response.create","session_id":"session-a","response":{"previous_response_id":"resp_owner"}}`,
+		`{"type":"response.create","session_id":"session-a","previous_response_id":"resp_owner"}`,
 	))
 	if err != nil {
 		t.Fatal(err)

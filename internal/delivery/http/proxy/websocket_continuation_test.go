@@ -61,7 +61,7 @@ func TestProxyWebSocketTranslatesKnownOwnerPreviousResponseFailureToStaleContinu
 
 	for _, request := range []string{
 		`{"type":"response.create","response":{}}`,
-		`{"type":"response.create","response":{"previous_response_id":"resp_original"}}`,
+		`{"type":"response.create","previous_response_id":"resp_original"}`,
 	} {
 		if _, err := connection.Write(maskedWebSocketFrame(1, true, request)); err != nil {
 			t.Fatalf("write client request: %v", err)

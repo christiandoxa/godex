@@ -229,7 +229,7 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	if b.scenario == "fresh-websocket-session" || b.scenario == "compact-lineage" || b.scenario == "compact-turn-conflict" || b.scenario == "compact-previous-conflict" || b.scenario == "compact-unbound" || strings.HasPrefix(b.scenario, "compact-produced") || strings.HasPrefix(b.scenario, "compact-shadow-") || strings.HasPrefix(b.scenario, "session-") || strings.HasPrefix(b.scenario, "compact-session-") {
+	if b.scenario == "nested-previous-only" || b.scenario == "fresh-websocket-session" || b.scenario == "compact-lineage" || b.scenario == "compact-turn-conflict" || b.scenario == "compact-previous-conflict" || b.scenario == "compact-unbound" || strings.HasPrefix(b.scenario, "compact-produced") || strings.HasPrefix(b.scenario, "compact-shadow-") || strings.HasPrefix(b.scenario, "session-") || strings.HasPrefix(b.scenario, "compact-session-") {
 		for _, event := range []string{transportDelta04383, transportCompleted04383} {
 			if websocketframe.WriteFrame(connection, 1, []byte(event), false) != nil {
 				return

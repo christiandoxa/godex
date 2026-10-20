@@ -221,3 +221,35 @@ func TestProdex04383ConflictedSoftSessionFollowupRejectsMutations(t *testing.T) 
 		})
 	}
 }
+
+// The tagged WebSocket request parser never converts a nested
+// response.previous_response_id into a hard continuation owner. The official
+// binary must choose main while an unrelated verified ID stays on second.
+func TestProdex04383WebSocketNestedPreviousOracleRejectsMutations(t *testing.T) {
+	body := nestedPreviousOnlyMessage04383
+	base := transportAttempt04383{owner: "account-a", body: body, ready: true}
+	frames := []string{transportDelta04383, transportCompleted04383}
+	if err := verifyCompactLineageWire04383("main", body, "", []string{"account-a"}, []transportAttempt04383{base}, frames, false); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name     string
+		hello    []string
+		attempts []transportAttempt04383
+		frames   []string
+	}{
+		{"nested owner stole request", []string{"account-b"}, []transportAttempt04383{{owner: "account-b", body: body, ready: true}}, frames},
+		{"unexpected turn", []string{"account-a"}, []transportAttempt04383{{owner: "account-a", turn: "foreign", body: body, ready: true}}, frames},
+		{"missing Ready", []string{"account-a"}, []transportAttempt04383{{owner: "account-a", body: body}}, frames},
+		{"rewritten history", []string{"account-a"}, []transportAttempt04383{{owner: "account-a", body: strings.Replace(body, `"content":"answer"`, `"content":"wrong"`, 1), ready: true}}, frames},
+		{"duplicate inference", []string{"account-a"}, []transportAttempt04383{base, base}, frames},
+		{"unexpected frame", []string{"account-a"}, []transportAttempt04383{base}, []string{`{"type":"error"}`, transportCompleted04383}},
+		{"dropped terminal", []string{"account-a"}, []transportAttempt04383{base}, frames[:1]},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := verifyCompactLineageWire04383("main", body, "", tc.hello, tc.attempts, tc.frames, false); err == nil {
+				t.Fatalf("nested previous oracle missed %s", tc.name)
+			}
+		})
+	}
+}

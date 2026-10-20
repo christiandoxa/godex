@@ -32,8 +32,11 @@ const compactSessionPreviousMessage04383 = `{"type":"response.create","model":"g
 const freshWebSocketSessionMessage04383 = `{"type":"response.create","model":"gpt-6","session_id":"fresh-session","input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
 const previousForeignSessionMessage04383 = `{"type":"response.create","model":"gpt-6","previous_response_id":"resp-main","session_id":"shadow-session","input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
 
+// A nested previous-response field is not a request continuation identity.
+const nestedPreviousOnlyMessage04383 = `{"type":"response.create","model":"gpt-6","response":{"previous_response_id":"resp-ready-b"},"input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
+
 func runWebSocketCompactLineageProduct04383(root string, p product) error {
-	for _, scenario := range []string{"compact-lineage", "compact-turn-conflict", "compact-previous-conflict", "compact-unbound", "compact-shadow-null", "compact-shadow-blank", "compact-shadow-legacy-direct", "compact-shadow-legacy-nested", "compact-shadow-legacy-both", "session-nested", "session-shadow-null", "session-shadow-blank", "session-hard-previous", "compact-session-header", "compact-session-unbound", "compact-session-body", "compact-session-conflict", "compact-session-previous", "fresh-websocket-session", "compact-produced", "compact-produced-long-turn"} {
+	for _, scenario := range []string{"compact-lineage", "compact-turn-conflict", "compact-previous-conflict", "compact-unbound", "compact-shadow-null", "compact-shadow-blank", "compact-shadow-legacy-direct", "compact-shadow-legacy-nested", "compact-shadow-legacy-both", "session-nested", "session-shadow-null", "session-shadow-blank", "session-hard-previous", "compact-session-header", "compact-session-unbound", "compact-session-body", "compact-session-conflict", "compact-session-previous", "fresh-websocket-session", "nested-previous-only", "compact-produced", "compact-produced-long-turn"} {
 		if err := runCompactLineageCase04383(filepath.Join(root, scenario), p, scenario); err != nil {
 			return fmt.Errorf("%s: %w", scenario, err)
 		}
@@ -60,7 +63,7 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 		return err
 	}
 	wantOwner := "second"
-	if scenario == "session-hard-previous" || scenario == "fresh-websocket-session" || scenario == "compact-unbound" || scenario == "compact-produced-long-turn" || (scenario == "compact-session-unbound" || scenario == "compact-session-conflict" || scenario == "compact-session-previous") || strings.HasPrefix(scenario, "compact-shadow-") || strings.HasPrefix(scenario, "session-shadow-") {
+	if scenario == "session-hard-previous" || scenario == "fresh-websocket-session" || scenario == "nested-previous-only" || scenario == "compact-unbound" || scenario == "compact-produced-long-turn" || (scenario == "compact-session-unbound" || scenario == "compact-session-conflict" || scenario == "compact-session-previous") || strings.HasPrefix(scenario, "compact-shadow-") || strings.HasPrefix(scenario, "session-shadow-") {
 		wantOwner = "main"
 	}
 	wantLineage := ""
@@ -212,6 +215,8 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 		message = compactSessionPreviousMessage04383
 	} else if scenario == "fresh-websocket-session" {
 		message = freshWebSocketSessionMessage04383
+	} else if scenario == "nested-previous-only" {
+		message = nestedPreviousOnlyMessage04383
 	}
 	if err := websocketframe.WriteFrame(connection, 1, []byte(message), true); err != nil {
 		return err
@@ -252,7 +257,7 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 	}
 	backend.mu.Lock()
 	header := "compact-turn"
-	if scenario == "fresh-websocket-session" || strings.HasPrefix(scenario, "compact-shadow-") || strings.HasPrefix(scenario, "session-") || strings.HasPrefix(scenario, "compact-session-") {
+	if scenario == "fresh-websocket-session" || scenario == "nested-previous-only" || strings.HasPrefix(scenario, "compact-shadow-") || strings.HasPrefix(scenario, "session-") || strings.HasPrefix(scenario, "compact-session-") {
 		header = ""
 	}
 	err = verifyCompactLineageWire04383(wantOwner, message, header, backend.handshakes, backend.attempts, frames, backend.invalid)
@@ -307,6 +312,12 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 			return fmt.Errorf("Compact lineage durable owner projection: %+v lineage=%q session_ok=%t errors=%v/%v", owners, lineage, sessionOK, err, lineageErr)
 		}
 		time.Sleep(20 * time.Millisecond)
+	}
+	if scenario == "nested-previous-only" {
+		original, originalErr := readHTTPResponseOwner04383(p, "resp-ready-b")
+		if originalErr != nil || original != "second" {
+			return fmt.Errorf("nested previous-only changed original hard owner: %q err=%v", original, originalErr)
+		}
 	}
 	if scenario == "session-hard-previous" {
 		// The tagged runtime has just committed a verified observation of

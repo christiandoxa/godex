@@ -198,7 +198,7 @@ func writeDeadRestartBinding(t *testing.T, router *Router) {
 func readRestartProcessBinding(t *testing.T, router *Router, gateway *websocketMessageRoutingGateway) {
 	t.Helper()
 	exchange, err := router.Forward(t.Context(), websocketMessageRequest(
-		`{"type":"response.create","response":{"previous_response_id":"`+restartProcessID+`"}}`,
+		`{"type":"response.create","previous_response_id":"`+restartProcessID+`"}`,
 	))
 	if err != nil {
 		t.Fatal(err)
@@ -245,7 +245,7 @@ func deadRestartRequest() proxymodel.Request {
 func rejectUnknownRestartProcessBinding(t *testing.T, router *Router, gateway *websocketMessageRoutingGateway) {
 	t.Helper()
 	_, err := router.Forward(t.Context(), websocketMessageRequest(
-		`{"type":"response.create","response":{"previous_response_id":"resp_unknown_after_restart"}}`,
+		`{"type":"response.create","previous_response_id":"resp_unknown_after_restart"}`,
 	))
 	if err == nil || len(gateway.requests) != 0 {
 		t.Fatalf("unknown continuation error/calls = %v/%d", err, len(gateway.requests))

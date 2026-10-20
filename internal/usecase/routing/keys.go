@@ -47,16 +47,10 @@ func requestAffinity(request proxymodel.Request, body []byte) affinityKeys {
 		// field cannot pin a request to another continuation owner.
 		keys.turn = semanticNestedText(object, "x-codex-turn-state", "client_metadata", "x-codex-turn-state")
 	}
+	// Tagged Prodex's HTTP and WebSocket request semantic planner reads
+	// previous_response_id only from the direct JSON member. A nested
+	// response object is opaque request payload, never hard owner evidence.
 	keys.previous = objectString(object, "previous_response_id")
-	// Tagged Prodex's HTTP Responses semantic plan reads only a direct
-	// previous_response_id. Nested response objects are ordinary payload,
-	// not an authorization to adopt another profile's hard continuation.
-	// Preserve the separately tested legacy WebSocket response envelope.
-	if keys.previous == "" && request.WebSocketMessage {
-		if response, ok := nestedAffinityObject("response", object["response"]); ok {
-			keys.previous = objectString(response, "previous_response_id")
-		}
-	}
 	if keys.session == "" {
 		_, direct := object["session_id"]
 		// Tagged Prodex's semantic planner uses direct JSON member presence

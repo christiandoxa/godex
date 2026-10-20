@@ -44,7 +44,7 @@ func TestResponsesWebSocketRoutesEachMessageWithResponseAffinity(t *testing.T) {
 		t.Fatalf("local handshake status = %d", status)
 	}
 	firstRequest := `{"type":"response.create","response":{}}`
-	secondRequest := `{"type":"response.create","response":{"previous_response_id":"resp_1"}}`
+	secondRequest := `{"type":"response.create","previous_response_id":"resp_1"}`
 	frames := append(maskedWebSocketFrame(9, true, "ping"), maskedWebSocketFrame(1, false, firstRequest[:len(firstRequest)/2])...)
 	frames = append(frames, maskedWebSocketFrame(0, true, firstRequest[len(firstRequest)/2:])...)
 	if _, err := connection.Write(frames); err != nil {
