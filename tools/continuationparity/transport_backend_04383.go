@@ -19,8 +19,8 @@ const transportDelta04383 = `{"type":"response.output_text.delta","delta":"recov
 const transportCompleted04383 = `{"type":"response.completed","response":{"id":"resp-transport-recovered"}}`
 
 type transportAttempt04383 struct {
-	owner, turn, body string
-	ready             bool
+	owner, turn, body, metadata string
+	ready                       bool
 }
 
 type transportBackend04383 struct {
@@ -117,7 +117,7 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 			string(body) == httpShadowedSessionBody04383(strings.TrimPrefix(b.scenario, "session-http-shadow-")) {
 			b.mu.Lock()
 			b.attempts = append(b.attempts, transportAttempt04383{owner: owner,
-				body: string(body), turn: r.Header.Get("x-codex-turn-state"),
+				body: string(body), metadata: r.Header.Get("x-codex-turn-metadata"), turn: r.Header.Get("x-codex-turn-state"),
 				ready: b.receipts["account-a"] > 0 && b.receipts["account-b"] > 0})
 			b.mu.Unlock()
 			writeJSON(w, http.StatusOK, `{"id":"resp-http-shadow","object":"response","output":[]}`)

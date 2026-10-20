@@ -2110,3 +2110,26 @@ cases beside the original direct-shadow cases, independently checking two
 Ready authenticated profiles, exactly one upstream request, original opaque
 bytes, HTTP status and the unchanged verified session owner. This is a
 bounded synthetic parity slice, not a claim about all provider or OS paths.
+
+## Turn-metadata header parses nested `client_metadata.session_id`
+
+The pinned 0.438.3 `runtime_request_session_id_from_turn_metadata` calls the
+**same** presence-sensitive semantic planner as a request body. Its parsed
+`x-codex-turn-metadata` JSON header may contain a nested
+`client_metadata.session_id` even without a direct `session_id`; a present
+invalid/blank direct member must shadow that nested field. If the whole
+header yields no session ID, request body session resolution remains available.
+Godex previously read only direct `session_id` from the header, overlooking a
+verified nested session owner and silently routing an otherwise independent
+HTTP request on the current profile. A fail-before memory/durable regression
+reproduces that wrong-account selection. The shared existing
+`semanticNestedText` helper now resolves header session identity consistently
+without changing opaque forwarded headers, body bytes or other route keys.
+
+The official two-executable HTTP session-conflict gate now also covers a
+nested-header positive, direct-header positive, null/blank shadow controls and
+body fallback after a null header. Its synthetic fixtures require authenticated
+Ready evidence on both profiles, a single upstream inference, the exact
+request body and header, HTTP 200 and intact old/new durable ownership.
+Header-mutation tests ensure an erased or rewritten metadata header cannot
+pass unnoticed. The full non-synthetic 1:1 parity conclusion remains OPEN.

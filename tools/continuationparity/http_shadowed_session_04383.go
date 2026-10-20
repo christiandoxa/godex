@@ -16,6 +16,10 @@ func httpShadowedSessionBody04383(shape string) string {
 	prefix := `{"model":"gpt-6",`
 	suffix := `"input":[{"role":"user","content":"independent complete request"}]}`
 	switch shape {
+	case "metadata-nested", "metadata-direct", "metadata-null", "metadata-blank":
+		return prefix + suffix
+	case "metadata-fallback":
+		return prefix + `"session_id":"shadow-session",` + suffix
 	case "conversation":
 		return prefix + `"conversation_id":"shadow-session",` + suffix
 	case "thread":
@@ -35,8 +39,34 @@ func httpShadowedSessionBody04383(shape string) string {
 	return `{"model":"gpt-6",` + field + `"client_metadata":{"session_id":"shadow-session"},"input":[{"role":"user","content":"independent complete request"}]}`
 }
 
+func httpShadowedSessionHeaderMetadata04383(shape string) string {
+	switch shape {
+	case "metadata-nested":
+		return `{"client_metadata":{"session_id":"shadow-session"}}`
+	case "metadata-direct":
+		return `{"session_id":"shadow-session"}`
+	case "metadata-null":
+		return `{"session_id":null,"client_metadata":{"session_id":"shadow-session"}}`
+	case "metadata-blank":
+		return `{"session_id":"  ","client_metadata":{"session_id":"shadow-session"}}`
+	case "metadata-fallback":
+		return `{"session_id":null}`
+	default:
+		return ""
+	}
+}
+
+func httpShadowedSessionExpectSecond04383(shape string) bool {
+	switch shape {
+	case "missing", "direct", "metadata-nested", "metadata-direct", "metadata-fallback":
+		return true
+	default:
+		return false
+	}
+}
+
 func runHTTPShadowedSessionProduct04383(root string, p product) error {
-	for _, shape := range []string{"null", "blank", "missing", "conversation", "thread", "both", "direct"} {
+	for _, shape := range []string{"null", "blank", "missing", "conversation", "thread", "both", "direct", "metadata-nested", "metadata-direct", "metadata-null", "metadata-blank", "metadata-fallback"} {
 		if err := runHTTPShadowedSessionCase04383(filepath.Join(root, shape), p, shape); err != nil {
 			return fmt.Errorf("session_id %s: %w", shape, err)
 		}
@@ -78,7 +108,12 @@ func runHTTPShadowedSessionCase04383(root string, p product, shape string) error
 		time.Sleep(10 * time.Millisecond)
 	}
 	body := httpShadowedSessionBody04383(shape)
-	reply, err := post(client, endpoint+"/responses", body)
+	var reply exchange
+	if header := httpShadowedSessionHeaderMetadata04383(shape); header != "" {
+		reply, err = postContextHeader(client, endpoint+"/responses", body, "x-codex-turn-metadata", header)
+	} else {
+		reply, err = post(client, endpoint+"/responses", body)
+	}
 	if err != nil {
 		return err
 	}
@@ -89,7 +124,7 @@ func runHTTPShadowedSessionCase04383(root string, p product, shape string) error
 		return err
 	}
 	wantOwner := "main"
-	if shape == "missing" || shape == "direct" {
+	if httpShadowedSessionExpectSecond04383(shape) {
 		wantOwner = "second"
 	}
 	deadline := time.Now().Add(3 * time.Second)
@@ -110,12 +145,13 @@ func runHTTPShadowedSessionCase04383(root string, p product, shape string) error
 
 func verifyHTTPShadowedSession04383(shape string, result httpSoftConflictResult04383) error {
 	wantOwner := "account-a"
-	if shape == "missing" || shape == "direct" {
+	if httpShadowedSessionExpectSecond04383(shape) {
 		wantOwner = "account-b"
 	}
 	if result.invalid || result.reply.status != http.StatusOK || result.reply.body != httpShadowedSessionReply04383 ||
 		len(result.attempts) != 1 || !result.attempts[0].ready || result.attempts[0].owner != wantOwner ||
-		result.attempts[0].turn != "" || result.attempts[0].body != httpShadowedSessionBody04383(shape) {
+		result.attempts[0].turn != "" || result.attempts[0].metadata != httpShadowedSessionHeaderMetadata04383(shape) ||
+		result.attempts[0].body != httpShadowedSessionBody04383(shape) {
 		return fmt.Errorf("HTTP direct shadow metadata changed owner/wire: shape=%s invalid=%t status=%d attempts=%+v", shape, result.invalid, result.reply.status, result.attempts)
 	}
 	return nil

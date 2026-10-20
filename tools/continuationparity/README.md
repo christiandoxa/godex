@@ -574,3 +574,11 @@ must handle the request, keeping the independent second-owned session bound.
 A direct canonical `session_id` control must still select second. These
 cases preserve the original HTTP request body and compare both official and
 Godex durable lineage after the authenticated model attempt.
+
+The `x-codex-turn-metadata` header is parsed with Prodex's same
+presence-sensitive session semantic planner as request JSON. Five additional
+cases require the bound nested metadata session, valid direct header session,
+null/blank direct shadow semantics, and fallback to an independent body
+session after invalid metadata. The oracle now records the exact upstream
+header value in addition to the raw request body and durable owners. Tampered
+or deleted metadata headers are rejected by negative controls.

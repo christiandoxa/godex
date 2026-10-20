@@ -7,14 +7,14 @@ import (
 )
 
 func TestProdex04383HTTPDirectShadowOracleRejectsMutations(t *testing.T) {
-	for _, shape := range []string{"null", "blank", "missing", "conversation", "thread", "both", "direct"} {
+	for _, shape := range []string{"null", "blank", "missing", "conversation", "thread", "both", "direct", "metadata-nested", "metadata-direct", "metadata-null", "metadata-blank", "metadata-fallback"} {
 		t.Run(shape, func(t *testing.T) {
 			owner := "account-a"
-			if shape == "missing" || shape == "direct" {
+			if httpShadowedSessionExpectSecond04383(shape) {
 				owner = "account-b"
 			}
 			base := httpSoftConflictResult04383{reply: exchange{status: http.StatusOK, body: httpShadowedSessionReply04383},
-				attempts: []transportAttempt04383{{owner: owner, ready: true, body: httpShadowedSessionBody04383(shape)}}}
+				attempts: []transportAttempt04383{{owner: owner, ready: true, body: httpShadowedSessionBody04383(shape), metadata: httpShadowedSessionHeaderMetadata04383(shape)}}}
 			if err := verifyHTTPShadowedSession04383(shape, base); err != nil {
 				t.Fatal(err)
 			}
@@ -31,6 +31,7 @@ func TestProdex04383HTTPDirectShadowOracleRejectsMutations(t *testing.T) {
 				}},
 				{"unready owner", func(r *httpSoftConflictResult04383) { r.attempts[0].ready = false }},
 				{"unexpected turn header", func(r *httpSoftConflictResult04383) { r.attempts[0].turn = "untrusted" }},
+				{"changed turn metadata header", func(r *httpSoftConflictResult04383) { r.attempts[0].metadata += "tampered" }},
 				{"damaged opaque body", func(r *httpSoftConflictResult04383) {
 					r.attempts[0].body = strings.Replace(r.attempts[0].body, "independent complete request", "changed request", 1)
 				}},
