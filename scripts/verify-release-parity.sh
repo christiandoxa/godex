@@ -818,7 +818,7 @@ if [ "$phase" = 'all' ] || [ "$phase" = 'http-turn-transport' ]; then
   --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
   --http-turn-transport
 go test -race ./tools/continuationparity \
-  -run '^TestProdex04383HTTPResponsesTurnOracleRejectsMutations$' -count=1 -timeout=30s
+  -run '^TestProdex04383HTTP(ResponsesTurn|RecoverySession)OracleRejectsMutations$' -count=1 -timeout=30s
 fi
 
 # HTTP Responses may ignore a deliberately conflicted *soft* session as an

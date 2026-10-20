@@ -115,6 +115,26 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 			_, _ = io.WriteString(w, httpSSETurnLineageWire04383[boundary:])
 			return
 		}
+		if strings.HasPrefix(b.scenario, "http-recovery-session-") {
+			shape := strings.TrimPrefix(b.scenario, "http-recovery-session-")
+			if string(body) == httpRecoverySessionRequest04383(shape) ||
+				sameTransportJSON04383(string(body), httpRecoverySessionReplay04383(shape)) &&
+					strings.Contains(string(body), `"content":"continue"`) &&
+					!strings.Contains(string(body), `"previous_response_id"`) {
+				b.mu.Lock()
+				b.attempts = append(b.attempts, transportAttempt04383{owner: owner, body: string(body),
+					turn: r.Header.Get("x-codex-turn-state"), trace: r.Header.Get("thread-id"),
+					metadata: r.Header.Get("x-codex-turn-metadata"),
+					ready:    b.receipts["account-a"] > 0 && b.receipts["account-b"] > 0})
+				b.mu.Unlock()
+				if strings.Contains(string(body), `"previous_response_id"`) {
+					writeJSON(w, http.StatusBadRequest, httpRecoverySessionError04383)
+				} else {
+					writeJSON(w, http.StatusOK, httpRecoverySessionResponse04383)
+				}
+				return
+			}
+		}
 		if strings.HasPrefix(b.scenario, "http-response-session-") {
 			shape := strings.TrimPrefix(b.scenario, "http-response-session-")
 			if string(body) == httpResponseSessionRequest04383(shape) {

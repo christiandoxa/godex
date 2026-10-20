@@ -2706,3 +2706,35 @@ frame, unchanged durable previous ownership and no unintended turn header.
 A mutation oracle rejects wrong owners, missing Ready evidence, altered
 request, unexpected replay count or forged completion. Native OS and live
 provider faults remain independent parity questions.
+
+## Full-history HTTP recovery respects direct session member presence
+
+Tagged `runtime_request_semantic_plan` resolves the canonical request
+`session_id` by checking whether the *direct* JSON member exists before
+considering `client_metadata.session_id`. A direct null, blank or other
+non-string value shadows the nested field, even though it does not supply a
+usable session ID. The same presence rule applies to JSON from the
+`x-codex-turn-metadata` header. Godex already honored this policy when
+selecting the initial account, but `fullHistoryRecoveryRequest` used a
+separate `sessionIDInMetadata` helper that treated an unusable direct member
+as *absent*. After the upstream rejected a known `previous_response_id`,
+Godex could therefore replay an otherwise independent full history under a
+borrowed nested session.
+
+A fail-before predicate regression covers null/blank/boolean/object direct
+members, valid direct/nested controls, and the corresponding metadata-header
+shadows and overrides. An HTTP Router regression independently verifies that
+null/blank direct members retain the one original upstream rejection rather
+than issuing a second recovery inference, while legitimate nested session
+context still permits a bounded replay with `previous_response_id` removed.
+The scoped correction applies direct-member presence to the recovery helper
+without rewriting the initial request body or relaxing owner checks.
+
+The source/manifest/executable-pinned `--phase=http-turn-transport` oracle now
+includes seven authenticated two-Ready-profile HTTP recovery controls. It
+checks the selected main owner, exact original request, preserved turn-metadata
+header, one versus two upstream attempts, correct terminal response and
+independent durable recovered-response ownership. Its mutation suite rejects
+foreign account selection, lost Ready evidence, altered original input,
+extra/missing replays and forged terminal output. This finite synthetic case
+does not certify every external provider or native macOS/Windows failure mode.

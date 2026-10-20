@@ -152,8 +152,11 @@ func requestHasSessionID(headers http.Header, body map[string]json.RawMessage) b
 }
 
 func sessionIDInMetadata(body map[string]json.RawMessage) bool {
-	if jsonString(body["session_id"]) != "" {
-		return true
+	// Tagged runtime_request_semantic_plan uses member presence. A direct
+	// null, blank or non-string session_id shadows client_metadata and
+	// must not authorize replay of a previous-response-dependent turn.
+	if direct, present := body["session_id"]; present {
+		return jsonString(direct) != ""
 	}
 	var metadata map[string]json.RawMessage
 	return json.Unmarshal(body["client_metadata"], &metadata) == nil && jsonString(metadata["session_id"]) != ""

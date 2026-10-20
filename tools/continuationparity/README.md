@@ -749,3 +749,13 @@ bounded owner retries only for canonical types. The fixture checks two
 applied authenticated Ready receipts, byte-exact input, same-owner attempt
 count, client stale terminal and unchanged original response ownership on
 both Prodex and Godex; negative controls reject forged observations.
+
+The HTTP Responses turn-transport phase also exercises direct session-member
+precedence during invalid-previous full-history recovery. Source-tagged
+Prodex 0.438.3 rejects borrowing `client_metadata.session_id` when the
+direct member exists but is null or blank; a valid direct/nested session
+retains a bounded same-owner replay. The identical rule applies to JSON
+inside `x-codex-turn-metadata`, with a separate positive header-override
+control. The fixture compares exact original bytes, unchanged opaque header,
+1 or 2 authenticated Ready upstream attempts, terminal HTTP status/body and
+durable recovered response owner on both pinned executables.

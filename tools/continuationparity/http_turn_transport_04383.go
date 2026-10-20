@@ -14,7 +14,7 @@ func runHTTPResponsesTurnProduct04383(root string, p product) error {
 			return fmt.Errorf("%s: %w", scenario, err)
 		}
 	}
-	return nil
+	return runHTTPRecoverySessionProduct04383(filepath.Join(root, "session-retry"), p)
 }
 
 func verifyHTTPResponsesTurn04383(scenario string, result httpTransportResult04383) error {
