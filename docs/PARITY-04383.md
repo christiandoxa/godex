@@ -2245,3 +2245,25 @@ the actual persisted response-owner projection, a single authenticated Ready
 upstream request, the exact unmodified response bytes, and the existing
 response-only session protections. Native and live-auth fault equivalence
 remain separate parity work.
+
+## Deterministic ASCII-only JSON response turn-state header matching
+
+Tagged compiled `runtime_response_metadata_json_v1` examines response
+`headers` objects in sorted serde_json key order and scans array entries in
+the original array order. The matching name must have the exact byte length
+of `x-codex-turn-state` and is folded only for ASCII letters; Unicode
+casefold lookalikes such as `ſ` and keys padded with whitespace are not
+accepted. Godex's earlier map iteration was randomized and its
+`strings.EqualFold(strings.TrimSpace(name), ...)` could accept both impostor
+classes. It could thereby verify a different turn-state and later route
+continuations to an incorrect profile.
+
+A fail-before parser regression exercises duplicated-case keys, Unicode
+impostors, padded names, ordered array pairs, array object/name variants and
+nested-response precedence across repeated iterations. The Go observer now
+sorts decoded JSON object keys for this one metadata concern and checks
+exact-length ASCII-compatible header names, while preserving array order.
+The source/executable-pinned response-metadata differential includes six
+binary cases that compare the selected and rejected turn bindings, original
+wire payload, authenticated Ready inference count and persistent response ID.
+No alternate TUI/framework or persistence layout is introduced.

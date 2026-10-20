@@ -617,3 +617,10 @@ three aliases, duplicates, a legacy/root pair, and an ordinary event-root ID
 which must never bind. Every valid alias must persist on main, independent of
 request-scoped session ownership and while the client receives the exact
 unchanged JSON. Native Copilot response-ID semantics have separate tests.
+
+Six turn-state metadata cases validate the tagged compiled JSON header
+scanner against both executables. Object header keys are sorted; array pairs
+retain their supplied order; nested response headers outrank root headers.
+Unicode long-s and whitespace-padded name impostors cannot mint turn
+ownership. The oracle checks both the expected turn owner and every forbidden
+turn alias in persisted state, as well as raw response/request integrity.

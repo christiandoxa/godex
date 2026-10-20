@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	"net/http"
+	"sort"
 	"strings"
 
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
@@ -153,9 +154,16 @@ func responseObjectTurnState(object map[string]any) string {
 func responseHeaderTurnState(headers any) string {
 	switch value := headers.(type) {
 	case map[string]any:
-		for name, raw := range value {
-			if strings.EqualFold(strings.TrimSpace(name), "x-codex-turn-state") {
-				if state := responseHeaderValue(raw); state != "" {
+		// serde_json object maps are sorted by raw key bytes before Mojo's
+		// first-matching-entry metadata scan; Go map iteration is randomized.
+		names := make([]string, 0, len(value))
+		for name := range value {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			if responseTurnHeaderName04383(name) {
+				if state := responseHeaderValue(value[name]); state != "" {
 					return state
 				}
 			}
@@ -179,7 +187,7 @@ func responseHeaderTurnState(headers any) string {
 				}
 			}
 			nameText, _ := name.(string)
-			if strings.EqualFold(strings.TrimSpace(nameText), "x-codex-turn-state") {
+			if responseTurnHeaderName04383(nameText) {
 				if state := responseHeaderValue(value); state != "" {
 					return state
 				}
@@ -187,6 +195,13 @@ func responseHeaderTurnState(headers any) string {
 		}
 	}
 	return ""
+}
+
+// The compiled 0.438.3 JSON metadata scanner accepts only exact-length
+// ASCII-casefolded header names, not Unicode lookalikes or padded names.
+func responseTurnHeaderName04383(name string) bool {
+	const header = "x-codex-turn-state"
+	return len(name) == len(header) && strings.EqualFold(name, header)
 }
 
 func responseHeaderValue(value any) string {

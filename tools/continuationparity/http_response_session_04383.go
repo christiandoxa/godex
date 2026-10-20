@@ -15,6 +15,8 @@ var httpResponseSessionShapes04383 = []string{
 	"body-session", "nested-session", "data-session", "conversation-alias",
 	"thread-alias", "response-header", "request-session",
 	"triple-ids", "duplicate-ids", "legacy-and-root", "ignore-event-root",
+	"turn-sorted-map", "turn-unicode-only", "turn-padded-only", "turn-array-order",
+	"turn-nested-priority", "turn-array-objects",
 }
 
 func httpResponseSessionRequest04383(shape string) string {
@@ -44,6 +46,18 @@ func httpResponseSessionReply04383(shape string) string {
 		return `{"response_id":"resp-response-session","object":"response","id":"resp-alias-outer","output":[]}`
 	case "ignore-event-root":
 		return `{"response_id":"resp-response-session","object":"event","id":"event-unrelated","output":[]}`
+	case "turn-sorted-map":
+		return `{"id":"resp-response-session","object":"response","headers":{"x-codex-turn-state":"lower-turn","X-CODEX-TURN-STATE":"upper-turn"},"output":[]}`
+	case "turn-unicode-only":
+		return `{"id":"resp-response-session","object":"response","headers":{"x-codex-turn-ſtate":"impostor-turn"},"output":[]}`
+	case "turn-padded-only":
+		return `{"id":"resp-response-session","object":"response","headers":{" x-codex-turn-state ":"impostor-turn"},"output":[]}`
+	case "turn-array-order":
+		return `{"id":"resp-response-session","object":"response","headers":[["x-codex-turn-state","lower-turn"],["X-CODEX-TURN-STATE","upper-turn"]],"output":[]}`
+	case "turn-nested-priority":
+		return `{"id":"resp-response-session","object":"response","response":{"headers":{"X-CODEX-TURN-STATE":"nested-turn"}},"headers":{"x-codex-turn-state":"root-turn"},"output":[]}`
+	case "turn-array-objects":
+		return `{"id":"resp-response-session","object":"response","headers":[{"name":"x-codex-turn-ſtate","value":"impostor-turn"},{"key":"X-CODEX-TURN-STATE","values":["  ","real-turn"]}],"output":[]}`
 	default:
 		return `{"id":"resp-response-session","object":"response","output":[]}`
 	}
@@ -114,7 +128,7 @@ func runHTTPResponseSessionCase04383(root string, p product, shape string) error
 		responseOwner, responseErr := readHTTPResponseOwner04383(p, httpResponseSessionID04383)
 		sessionOwner, sessionErr := readCompactBindingOwner04383(p, "session", httpResponseSessionName04383)
 		if responseErr == nil && sessionErr == nil && responseOwner == "main" && sessionOwner == wantSession &&
-			httpResponseIDAliasesMatch04383(p, shape) {
+			httpResponseIDAliasesMatch04383(p, shape) && httpResponseTurnHeadersMatch04383(p, shape) {
 			break
 		}
 		if time.Now().After(deadline) {
@@ -152,6 +166,37 @@ func httpResponseIDAliasesMatch04383(p product, shape string) bool {
 	for _, id := range extraIDs {
 		owner, err := readHTTPResponseOwner04383(p, id)
 		if err != nil || owner != "main" {
+			return false
+		}
+	}
+	return true
+}
+
+// The metadata header walker is strictly ASCII and follows serde_json map
+// ordering, while an explicit JSON array retains its transmitted order.
+func httpResponseTurnHeadersMatch04383(p product, shape string) bool {
+	var expected string
+	switch shape {
+	case "turn-sorted-map":
+		expected = "upper-turn"
+	case "turn-array-order":
+		expected = "lower-turn"
+	case "turn-nested-priority":
+		expected = "nested-turn"
+	case "turn-array-objects":
+		expected = "real-turn"
+	case "turn-unicode-only", "turn-padded-only":
+		// No supplied header is a valid ASCII x-codex-turn-state key.
+	default:
+		return true
+	}
+	for _, turn := range []string{"upper-turn", "lower-turn", "nested-turn", "root-turn", "real-turn", "impostor-turn"} {
+		wantOwner := ""
+		if turn == expected {
+			wantOwner = "main"
+		}
+		owner, err := readCompactBindingOwner04383(p, "turn", turn)
+		if err != nil || owner != wantOwner {
 			return false
 		}
 	}
