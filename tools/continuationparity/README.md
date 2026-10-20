@@ -434,3 +434,14 @@ runs the same mode. This finite fixture proves ownership of **existing**
 Compact lineage; the HTTP producer scenario proves creation for its one
 synthetic successful Compact response, not every alternate output shape or
 live OAuth/provider conditions.
+
+Two additional `--websocket-compact-lineage` controls prove the *presence*
+rule for top-level WebSocket `x-codex-turn-state` members independently of
+in-process parsing. `compact-shadow-null` and `compact-shadow-blank` each
+place a real verified nested `compact-turn` owner on second, leave main active,
+and send a top-level invalid direct turn next to that nested value. Both
+executables must select main with no upstream turn header, leave the nested
+owner unchanged, and return the same two client frames from a single original
+request. Focused mutation tests reject cross-owner selection, token leakage,
+wire corruption and replay. The complete phase currently includes five
+ordered, independent producer/consumer/shadowing scenarios.

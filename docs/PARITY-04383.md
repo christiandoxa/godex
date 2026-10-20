@@ -1538,3 +1538,35 @@ HTTP-to-WebSocket scenarios. The result qualifies this bounded synthetic
 producer/consumer contract, not every live external credential or native
 platform. Complete release/native matrix and macOS realtime parity retain
 their separate verification requirements.
+
+## Independent public WebSocket oracle for shadowed direct turn metadata
+
+The source-pinned Prodex 0.438.3 semantic plan selects a top-level JSON
+member by **presence**, then tries the nested `client_metadata` member only
+when the top-level member is absent. A top-level `x-codex-turn-state` with
+`null` or whitespace does not inherit a nested value that names another
+owner. Earlier Godex parser and routing regressions proved this behavior only
+in-process; no public upgraded WebSocket had confirmed the full policy.
+
+The mandatory `websocket-compact-lineage` executable mode now includes two
+additional authenticated two-profile controls: `compact-shadow-null` and
+`compact-shadow-blank`. Each fixture starts with a verified Compact turn alias
+on second, applies both Ready quota receipts, and warms main last as the active
+profile. The exact unmodified full-history message supplies a *present but
+invalid* direct turn and a nested `compact-turn` token. Both products must
+make exactly one main-owned upstream attempt, send **no** turn-state handshake
+header, forward the exact original model payload and terminal frames, and
+preserve second's pre-existing alias and all unrelated durable ownership.
+Mutation controls independently reject rotation to second, nested token
+leakage, missing Ready evidence, input changes, extra attempts and terminal
+identity changes.
+
+**VERIFIED** on exact clean `606f3cd6a0cf51c165ce67a83f009740124edc10`:
+`./scripts/verify-release-parity.sh --phase=websocket-compact-lineage`
+exited **PASS** across five scenarios (the two original seeded/unbound
+controls, two malformed-direct controls and the real HTTP Compact producer)
+for both release-pinned executables. `make verify` also passed on the same
+candidate, including the complete Go race suite and cross-builds. The
+remaining malformed-direct `session_id` variants, native macOS realtime and
+non-synthetic integrations are **not** claimed VERIFIED by this turn-state
+oracle.
