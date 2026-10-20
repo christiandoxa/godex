@@ -3158,3 +3158,26 @@ official 0.438.3 HTTP profile-status differential remains active as a
 regression gate, but these exact reset-timer token variants have not yet
 been paired against the Prodex executable's internal wall-clock timer.
 Native-OS and live-provider parity remain independently open.
+
+## Native SSE precommit error codes follow the Mojo STREAM classifier
+
+Prodex 0.438.3's `RUNTIME_ERROR_MODE_STREAM` error policy is narrower than
+Godex's generic provider response decoder. It uses recognized `code`,
+`type`, `status`, or `reason` string members (within a bounded JSON tree),
+not arbitrary `error_code` aliases or scalar `error` strings. A message or
+note mentioning `deactivated_workspace`, an `error_code` saying
+`insufficient_quota`, or a Unicode-confusable quota string must not rotate
+OpenAI Responses SSE requests. Valid quota/rate/profile/overload codes still
+retain their tagged actions and no client-visible stream may be rewritten.
+
+A targeted fail-before matrix confirms that the generic classification could
+promote these opaque aliases. The scoped implementation introduces a
+source-derived native STREAM classifier while preserving the independent
+external-provider parser. The `http-turn-transport` differential now compares
+canonical and opaque SSE event errors with two authenticated Ready profiles,
+exact upstream request bytes, unchanged SSE response bytes on passthrough,
+and bounded account attempts on legitimate retry. The SSE classifier fixture
+uses a fresh, unbound request: a *verified previous-response* request has a
+separate fail-closed continuity policy and is not an authorized test of
+cross-profile quota rotation. All provider/OS parity beyond these finite
+cases remains open.

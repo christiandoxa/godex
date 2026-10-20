@@ -123,6 +123,17 @@ func classifyStreamError(data []byte, headers http.Header, now time.Time, provid
 		return responseOutcome{kind: responsePass, failed: true, invalidPreviousResponseID: true}, false
 	}
 	classification := providerentity.ClassifyError(http.StatusOK, data)
+	profileUnavailable := false
+	if !externalProviderKind(providerKind) {
+		parsed, valid := decodeNativeUsageJSON(data)
+		if !valid {
+			return responseOutcome{kind: responsePass, failed: true}, false
+		}
+		// OpenAI's 0.438.3 STREAM classifier is not the generic
+		// provider error decoder: only canonical code/type/status/reason
+		// members in the bounded Mojo tree authorize retry/rotation.
+		classification, profileUnavailable, _ = nativeStreamErrorClass04383(parsed)
+	}
 	switch classification.Class {
 	case providerentity.ErrorQuota:
 		return responseOutcome{
@@ -151,12 +162,12 @@ func classifyStreamError(data []byte, headers http.Header, now time.Time, provid
 		}
 		return outcome, false
 	}
-	if !externalProviderKind(providerKind) && openAIProfileUnavailable(data) {
+	if profileUnavailable {
 		return responseOutcome{
 			kind: responseRetry, failed: true, profileUnavailable: true, firstEventRetry: true,
 		}, false
 	}
-	if isQuotaResponse(data) {
+	if externalProviderKind(providerKind) && isQuotaResponse(data) {
 		return responseOutcome{
 			kind: responseRetry, quarantine: retryAfter(headers, now), failed: true, quota: true,
 			quotaResetAt: quotaResetAtFromMessage(data, now), firstEventRetry: true,

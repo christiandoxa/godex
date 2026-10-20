@@ -9,8 +9,11 @@ import (
 func TestProdex04383HTTPSSEInvalidErrorOracleRejectsMutations(t *testing.T) {
 	for _, shape := range httpSSEInvalidErrorShapes04383() {
 		t.Run(shape, func(t *testing.T) {
-			base := httpSoftConflictResult04383{reply: exchange{status: http.StatusOK, body: httpSSEInvalidErrorBody04383(shape)},
+			base := httpSoftConflictResult04383{reply: exchange{status: http.StatusOK, body: httpSSEInvalidErrorClientBody04383(shape)},
 				attempts: []transportAttempt04383{{owner: "account-a", ready: true, body: httpSSEInvalidErrorRequest04383}}}
+			if httpSSEInvalidErrorRotates04383(shape) {
+				base.attempts = append(base.attempts, transportAttempt04383{owner: "account-b", ready: true, body: httpSSEInvalidErrorRequest04383})
+			}
 			if err := verifyHTTPSSEInvalidError04383(shape, base); err != nil {
 				t.Fatal(err)
 			}

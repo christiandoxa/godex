@@ -878,3 +878,12 @@ controls, only the former is eligible Mojo numeric padding. Local HTTP 403
 and quota quarantine tests guard against artificially long reset windows;
 the official executable status-policy phase remains a broader transport
 regression, not a direct malformed-epoch timer oracle.
+
+The HTTP turn-transport SSE classifier controls use a fresh `stream:true`
+request without a verified previous-response dependency. This isolates the
+native Mojo `STREAM` error-code policy: opaque `error_code` aliases, scalar
+errors, note/message-only profile signals and Unicode-confusable codes must
+pass through one main upstream attempt, whereas canonical quota/rate codes
+may retry once on a second Ready profile. Both profiles have authenticated
+Ready receipts, and the fixture checks the exact request and stream bytes.
+It does not relax the separate hard-previous fail-closed retry fence.

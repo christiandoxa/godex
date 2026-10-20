@@ -9,13 +9,37 @@ import (
 	"time"
 )
 
-const httpSSEInvalidErrorRequest04383 = `{"model":"gpt-6","stream":true,"previous_response_id":"resp-main","input":[{"role":"user","content":"independent invalid SSE"}]}`
+// These are unbound, independent first-turn SSE requests. A hard
+// previous_response_id would forbid cross-profile replay for a different
+// reason and mask the STREAM error-code classifier under test.
+const httpSSEInvalidErrorRequest04383 = `{"model":"gpt-6","stream":true,"input":[{"role":"user","content":"independent invalid SSE"}]}`
 
 func httpSSEInvalidErrorShapes04383() []string {
-	return []string{"high-surrogate", "low-surrogate", "numeric-overflow", "too-deep", "valid-output"}
+	return []string{"high-surrogate", "low-surrogate", "numeric-overflow", "too-deep", "valid-output",
+		"opaque-scalar-quota", "opaque-error-code-quota", "opaque-error-code-rate",
+		"opaque-profile-note", "opaque-profile-message", "kelvin-quota-code",
+		"canonical-quota", "canonical-rate"}
 }
 
 func httpSSEInvalidErrorBody04383(shape string) string {
+	switch shape {
+	case "opaque-scalar-quota":
+		return "data: " + `{"type":"response.failed","response":{"error":"insufficient_quota"}}` + "\n\n"
+	case "opaque-error-code-quota":
+		return "data: " + `{"type":"response.failed","response":{"error":{"error_code":"insufficient_quota"}}}` + "\n\n"
+	case "opaque-error-code-rate":
+		return "data: " + `{"type":"response.failed","response":{"error":{"error_code":"rate_limit_exceeded"}}}` + "\n\n"
+	case "opaque-profile-note":
+		return "data: " + `{"type":"response.failed","response":{"error":{"note":"deactivated_workspace"}}}` + "\n\n"
+	case "opaque-profile-message":
+		return "data: " + `{"type":"response.failed","response":{"error":{"message":"deactivated_workspace"}}}` + "\n\n"
+	case "kelvin-quota-code":
+		return "data: " + `{"type":"response.failed","response":{"error":{"code":"worKspace_member_credits_depleted"}}}` + "\n\n"
+	case "canonical-quota":
+		return "data: " + `{"type":"response.failed","response":{"error":{"code":"insufficient_quota"}}}` + "\n\n"
+	case "canonical-rate":
+		return "data: " + `{"type":"response.failed","response":{"error":{"code":"rate_limit_exceeded"}}}` + "\n\n"
+	}
 	if shape == "valid-output" {
 		return "data: " + `{"type":"response.output_text.delta","delta":"ok"}` + "\n\n"
 	}
@@ -29,6 +53,19 @@ func httpSSEInvalidErrorBody04383(shape string) string {
 		note = strings.Repeat(`{"item":`, 128) + `0` + strings.Repeat(`}`, 128)
 	}
 	return "data: " + `{"type":"response.failed","response":{"error":{"code":"insufficient_quota"}},"unused":` + note + `}` + "\n\n"
+}
+
+func httpSSEInvalidErrorRotates04383(shape string) bool {
+	return shape == "canonical-quota" || shape == "canonical-rate"
+}
+
+const httpSSERecovered04383 = "data: " + `{"type":"response.output_text.delta","delta":"recovered"}` + "\n\n"
+
+func httpSSEInvalidErrorClientBody04383(shape string) string {
+	if httpSSEInvalidErrorRotates04383(shape) {
+		return httpSSERecovered04383
+	}
+	return httpSSEInvalidErrorBody04383(shape)
 }
 
 func runHTTPSSEInvalidErrorProduct04383(root string, p product) error {
@@ -83,16 +120,28 @@ func runHTTPSSEInvalidErrorCase04383(root string, p product, shape string) error
 	if err != nil || owner != "main" {
 		return fmt.Errorf("SSE invalid error changed existing verified previous response owner=%q err=%v", owner, err)
 	}
-	fmt.Printf("%s SSE invalid precommit %s: two applied Ready profiles; one main inference; HTTP 200 exact stream; previous owner retained\n", p.name, shape)
+	fmt.Printf("%s SSE precommit %s: two applied Ready profiles; %d account-specific model attempts; HTTP 200 exact stream; previous owner retained\n", p.name, shape, len(result.attempts))
 	return nil
 }
 
 func verifyHTTPSSEInvalidError04383(shape string, result httpSoftConflictResult04383) error {
-	if result.invalid || result.reply.status != http.StatusOK || result.reply.body != httpSSEInvalidErrorBody04383(shape) ||
-		len(result.attempts) != 1 || !result.attempts[0].ready || result.attempts[0].owner != "account-a" ||
-		result.attempts[0].body != httpSSEInvalidErrorRequest04383 || result.attempts[0].turn != "" ||
-		result.attempts[0].metadata != "" || result.attempts[0].trace != "" {
-		return fmt.Errorf("SSE malformed event changed precommit owner, inference count or stream: %s %+v", shape, result)
+	wantAttempts := 1
+	if httpSSEInvalidErrorRotates04383(shape) {
+		wantAttempts = 2
+	}
+	if result.invalid || result.reply.status != http.StatusOK || result.reply.body != httpSSEInvalidErrorClientBody04383(shape) ||
+		len(result.attempts) != wantAttempts {
+		return fmt.Errorf("SSE precommit %s changed account count or client stream: %+v", shape, result)
+	}
+	for index, attempt := range result.attempts {
+		want := "account-a"
+		if index == 1 {
+			want = "account-b"
+		}
+		if !attempt.ready || attempt.owner != want || attempt.body != httpSSEInvalidErrorRequest04383 ||
+			attempt.turn != "" || attempt.metadata != "" || attempt.trace != "" {
+			return fmt.Errorf("SSE precommit %s wrong owner/Ready/opaque wire on attempt %d: %+v", shape, index, attempt)
+		}
 	}
 	return nil
 }

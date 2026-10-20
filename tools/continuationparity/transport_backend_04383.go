@@ -160,7 +160,11 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 			b.mu.Unlock()
 			w.Header().Set("Content-Type", "text/event-stream")
 			w.WriteHeader(http.StatusOK)
-			_, _ = io.WriteString(w, httpSSEInvalidErrorBody04383(shape))
+			if owner == "account-b" && httpSSEInvalidErrorRotates04383(shape) {
+				_, _ = io.WriteString(w, httpSSERecovered04383)
+			} else {
+				_, _ = io.WriteString(w, httpSSEInvalidErrorBody04383(shape))
+			}
 			return
 		}
 		if strings.HasPrefix(b.scenario, "http-previous-text-") && string(body) == httpPreviousTextRequest04383 {
