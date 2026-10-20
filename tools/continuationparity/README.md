@@ -516,3 +516,14 @@ and durable response ownership while preserving the conflict marker. The
 native matrix includes this phase; a source/manifest/executable-pinned clean
 commit and the mutation suite are required before reporting PASS. A separate
 Router regression proves a healthy owned HTTP session is not demoted to fresh.
+
+The same `--http-session-conflict` phase also checks two hard-previous HTTP
+Responses successors: an **unbound** direct session and a **foreign-owned**
+direct session. Both requests have a verified previous ID on main, and both
+must make one authenticated Ready main-owned upstream request. After a 200,
+the new direct session must become main-owned in the first case and a durable
+hard-binding conflict in the second. The request's hard previous owner and
+resulting response owner must never rotate to second. Mutation controls reject
+changed history, missing previous/session identifiers, replay or forged Ready
+receipts. These subcases are distinct from the soft-conflict-only case where
+either eligible fresh profile may be selected.

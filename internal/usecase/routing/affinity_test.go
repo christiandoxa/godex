@@ -72,8 +72,18 @@ func TestResponsesPreviousOwnerBeatsConflictingSoftSession(t *testing.T) {
 	if exchange.Result.AccountID != ownerA {
 		t.Fatalf("continuation owner = %q, want %q", exchange.Result.AccountID, ownerA)
 	}
-	if owner, err := router.affinity.owner(t.Context(), affinityKeys{session: "session-b"}, router.now()); err != nil || owner != ownerB {
-		t.Fatalf("soft session owner = %q, %v; want %q", owner, err, ownerB)
+	// Tagged 0.438.3 commits a verified session observation on the selected
+	// hard previous-response owner. Because session-b already belonged to
+	// another account, it becomes a durable conflict, not a stale B owner.
+	if owner, err := router.affinity.owner(t.Context(), affinityKeys{session: "session-b"}, router.now()); err == nil || owner != "" {
+		t.Fatalf("conflicting soft session remained owned: owner=%q err=%v", owner, err)
+	}
+	key := affinityKeys{session: "session-b"}.entries()[0].Key
+	router.affinity.mu.Lock()
+	stored := router.affinity.values[key].accountID
+	router.affinity.mu.Unlock()
+	if stored != routingentity.ConflictAccountID {
+		t.Fatalf("verified session mismatch not marked conflicted: owner=%q", stored)
 	}
 }
 

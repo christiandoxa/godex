@@ -1909,3 +1909,48 @@ request may return 200 without clearing the conflict. Opaque previous-response
 or turn-state dependencies and Compact routes retain their no-reset controls.
 This adjustment is based on the pinned executable's actual HTTP response and
 persisted owner, not on a broadening of the lineage repair policy.
+
+## HTTP Responses hard-previous commit creates the direct session (0.438.3)
+
+A successful HTTP `/responses` request can be hard-pinned to an existing
+`previous_response_id` while also carrying a direct `session_id`. The tagged
+Prodex 0.438.3 standard success path calls `remember_runtime_session_id`
+after selecting the hard previous owner, independently of whether the session
+was eligible for candidate selection. Godex used `affinityKeysForRoute` to
+exclude the session during hard previous selection **and during success
+observation**, so no durable direct session was recorded.
+
+The source/binary/manifest-pinned exploratory `http-session-conflict` phase
+on clean pre-fix `c9c2093` now contains two **additional real HTTP requests**
+against authenticated Ready profiles:
+
+- `http-previous-session-new`: previous response verified on main, session
+  previously absent. Official Prodex selects main, returns 200 with exactly
+  one upstream request and binds the new direct session to main.
+- `http-previous-session-foreign`: the same hard previous response, but the
+  direct session is initially verified on second. Official Prodex still
+  selects main, returns 200 with exactly one upstream request, and persists
+  `__prodex_hard_binding_conflict__` instead of stealing the session owner.
+
+Pre-fix Godex kept the new direct session **unbound** after the first case;
+the Router memory/durable regression reproduced missing new ownership and
+missing conflict marking for both cases. The scoped fix records a verified
+session observation on the selected successful HTTP Responses owner only
+when hard `previous_response_id` selection omitted that session from the
+outbound candidate keys. The existing verified merge policy preserves
+foreign ownership as a conflict marker. No new persistence format, auth
+behavior or compact route handling is introduced. The original hard
+previous-response owner and new response ID must remain attached to main.
+
+An inherited previous-response/soft-session test still expected a foreign
+session's original owner after successful HTTP hard affinity; it now checks
+the 0.438.3 conflict marker and unchanged previous-response ownership.
+Focused memory/durable regressions, repeated race runs and complete routing
+tests pass after this change. The expanded pinned differential additionally
+checks exact upstream request JSON, authentication, Ready evidence, HTTP
+response and durable owners, and rejects mutation sentinels for wrong owner,
+missing/duplicated requests or stale fields. Record a release-phase PASS only
+when both executables pass on the final **clean committed** candidate.
+
+Native execution on macOS/Windows and live provider/keyring faults remain
+PARTIAL/OPEN despite cross-compilation and the finite synthetic Linux gate.

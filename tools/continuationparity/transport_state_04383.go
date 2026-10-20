@@ -51,6 +51,12 @@ func seedTransportAlternate04383(p product, scenario string) error {
 			value["turn_state_bindings"].(map[string]any)["compact-turn"] = map[string]any{"profile_name": "main", "bound_at": time.Now().Unix()}
 			value["statuses"].(map[string]any)["turn_state"].(map[string]any)["compact-turn"] = map[string]any{"state": "Verified", "confidence": 4, "last_verified_at": time.Now().Unix(), "last_touched_at": time.Now().Unix(), "last_verified_route": "responses", "success_count": 1}
 		}
+		if scenario == "http-previous-session-foreign" {
+			binding := map[string]any{"profile_name": "second", "bound_at": time.Now().Unix()}
+			value["session_id_bindings"].(map[string]any)["http-hard-session"] = binding
+			value["session_profile_bindings"].(map[string]any)["http-hard-session"] = binding
+			value["statuses"].(map[string]any)["session_id"].(map[string]any)["http-hard-session"] = map[string]any{"state": "Verified", "confidence": 4, "last_verified_at": time.Now().Unix(), "last_touched_at": time.Now().Unix(), "last_verified_route": "responses", "success_count": 1}
+		}
 		if scenario == "http-session-conflict" {
 			binding := map[string]any{"profile_name": "__prodex_hard_binding_conflict__", "bound_at": time.Now().Unix()}
 			value["session_id_bindings"].(map[string]any)["http-conflict"] = binding
@@ -121,6 +127,13 @@ func seedTransportAlternate04383(p product, scenario string) error {
 			}
 			direct := sha256.Sum256([]byte("turn:compact-turn"))
 			state["bindings"] = append(state["bindings"].([]any), map[string]any{"kind": "turn", "key": hex.EncodeToString(direct[:]), "account_id": mainID, "updated_unix": time.Now().Unix()})
+		}
+		if scenario == "http-previous-session-foreign" {
+			key := sha256.Sum256([]byte("session:http-hard-session"))
+			state["bindings"] = append(state["bindings"].([]any), map[string]any{
+				"kind": "session", "key": hex.EncodeToString(key[:]),
+				"account_id": id, "updated_unix": time.Now().Unix(),
+			})
 		}
 		if scenario == "http-session-conflict" {
 			key := sha256.Sum256([]byte("session:http-conflict"))

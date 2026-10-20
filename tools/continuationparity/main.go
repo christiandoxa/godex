@@ -234,7 +234,9 @@ func main() {
 		p := product{name: spec.name, binary: spec.binary}
 		var err error
 		if *httpSessionConflict {
-			err = runHTTPSoftSessionConflictProduct04383(root, p)
+			if err = runHTTPSoftSessionConflictProduct04383(filepath.Join(root, "soft"), p); err == nil {
+				err = runHTTPPreviousSessionProduct04383(filepath.Join(root, "hard-previous"), p)
+			}
 		} else if *httpTurnTransport {
 			err = runHTTPResponsesTurnProduct04383(root, p)
 		} else if *httpCompact {

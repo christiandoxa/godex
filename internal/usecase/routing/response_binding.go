@@ -101,6 +101,19 @@ func (router *Router) bindSuccessfulResponse(
 		result.Response.Body.Close()
 		return err
 	}
+	if selection.RouteKind == quotamodel.RouteKindResponses && keys.previous != "" &&
+		validCompactLineageComponent04383(keys.session) && bindingKeys.session == "" {
+		// Tagged Prodex remembers the successful *HTTP Responses* request's
+		// session even when previous_response_id provided its hard owner.
+		// MergeVerified creates a durable conflict instead of stealing an
+		// existing different account's session. This must not run for failed
+		// attempts, ordinary unowned sessions or the separate Compact route.
+		if err := router.rememberVerifiedAccountBinding(ctx, result.AccountID,
+			affinityKeys{session: keys.session}, router.now()); err != nil {
+			result.Response.Body.Close()
+			return err
+		}
+	}
 	if err := router.Observe(ctx, result.AccountID, result.Response.Header, result.Prefix, stream, result.ProviderKind); err != nil {
 		result.Response.Body.Close()
 		return err

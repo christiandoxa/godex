@@ -76,7 +76,7 @@ func runHTTPSoftSessionConflictProduct04383(root string, p product) error {
 	for {
 		result.sessionOwner, err = readCompactBindingOwner04383(p, "session", "http-conflict")
 		if err == nil {
-			result.responseOwner, err = readHTTPSoftConflictResponseOwner04383(p)
+			result.responseOwner, err = readHTTPResponseOwner04383(p, "resp-http-soft-conflict")
 		}
 		if err == nil && result.sessionOwner == httpSoftConflictOwner04383 && result.responseOwner != "" {
 			break
@@ -106,7 +106,7 @@ func verifyHTTPSoftConflict04383(r httpSoftConflictResult04383) error {
 	return nil
 }
 
-func readHTTPSoftConflictResponseOwner04383(p product) (string, error) {
+func readHTTPResponseOwner04383(p product, responseID string) (string, error) {
 	if p.name == "prodex" {
 		raw, err := os.ReadFile(filepath.Join(p.state, "runtime-continuations.json"))
 		if err != nil {
@@ -122,7 +122,7 @@ func readHTTPSoftConflictResponseOwner04383(p product) (string, error) {
 		if err := json.Unmarshal(raw, &state); err != nil {
 			return "", err
 		}
-		return state.Value.Responses["resp-http-soft-conflict"].Owner, nil
+		return state.Value.Responses[responseID].Owner, nil
 	}
 	raw, err := os.ReadFile(filepath.Join(p.state, "state.json"))
 	if err != nil {
@@ -149,7 +149,7 @@ func readHTTPSoftConflictResponseOwner04383(p product) (string, error) {
 	if err := json.Unmarshal(raw, &routing); err != nil {
 		return "", err
 	}
-	digest := sha256.Sum256([]byte("previous:resp-http-soft-conflict"))
+	digest := sha256.Sum256([]byte("previous:" + responseID))
 	for _, binding := range routing.Bindings {
 		if binding.Key == hex.EncodeToString(digest[:]) {
 			return names[binding.AccountID], nil
