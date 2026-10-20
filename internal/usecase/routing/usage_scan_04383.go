@@ -29,7 +29,7 @@ func decodeNativeUsageJSON(payload []byte) (any, bool) {
 		return nil, false
 	}
 	var trailing any
-	if decoder.Decode(&trailing) != io.EOF || !validNativeJSONNumberRange04383(value) {
+	if decoder.Decode(&trailing) != io.EOF || !validNativeJSONContainerDepth04383(value) || !validNativeJSONNumberRange04383(value) {
 		return nil, false
 	}
 	return value, true

@@ -2536,3 +2536,33 @@ verified larger cache hit to select second. The durable previous-response
 owners of every valid stage are independently checked. This is a bounded
 synthetic parser/selection parity slice, not proof of full live provider or
 native-platform equivalence.
+
+## Enforce the serde_json container recursion limit before Mojo's usage scan
+
+Prodex 0.438.3 pins `serde_json` 1.0.151. Its runtime response extraction
+first parses the **complete** JSON into a Rust `serde_json::Value`, then
+passes it to the compiled Mojo metadata planner. This Rust parser accepts
+127 nested object/array containers but rejects the 128th. The Mojo metadata
+scanner independently has a 256-level / 2,048-node traversal budget; that
+larger budget does **not** authorize an input the outer parser has rejected.
+Go's `encoding/json` previously decoded these deeper documents and could
+therefore mint session/previous-response owners or cache usage from malformed
+request or response data whose unrelated nested field crossed the Rust limit.
+
+A source-version-pinned **offline serde_json 1.0.151 execution** confirmed the
+127/128 boundary for objects and arrays, including an otherwise valid usage
+record preceding the invalid nested field. New fail-before tests demonstrate
+the discrepancy across request affinity, WebSocket message metadata,
+response IDs, prompt-cache keys, and terminal cached usage. A private
+validator now checks container nesting after Go's decoder completes and
+before those semantic projections are applied. The independent Mojo walker
+retains its own node budget, and original transport bytes remain untouched.
+
+The exact source/manifest/executable-pinned `--phase=http-prompt-cache`
+differential now includes a second-owned response with valid cached tokens
+but an unrelated 128th nested container. Both products must forward the
+response, leave its response ID and cached-hit **unrecorded**, then select
+main for the next fresh prompt-cache request. The 127-container positive
+control must record the response ID and select second. All four authenticated
+Ready upstream requests and durable state projections are checked; this
+finite Linux fixture does not prove native macOS/Windows or live model parity.

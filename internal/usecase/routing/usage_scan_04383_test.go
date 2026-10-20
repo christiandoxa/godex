@@ -50,7 +50,9 @@ func TestProdex04383UsageScanBoundsDepthAndVisitedValues(t *testing.T) {
 		want    uint64
 		valid   bool
 	}{
-		{"depth-255", usageDepthFixture04383(255), 81, true},
+		{"depth-125-serde-valid", usageDepthFixture04383(125), 81, true},
+		{"depth-126-serde-overflow", usageDepthFixture04383(126), 0, false},
+		{"depth-255-mojo-alone-would-accept", usageDepthFixture04383(255), 0, false},
 		{"depth-257", usageDepthFixture04383(257), 0, false},
 		{"2048-scan-budget", usageBudgetFixture04383(2046), 0, false},
 		{"within-scan-budget", usageBudgetFixture04383(4), 82, true},

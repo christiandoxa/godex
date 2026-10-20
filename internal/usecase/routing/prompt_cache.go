@@ -27,7 +27,7 @@ func promptCacheKeyFromBody(body []byte) string {
 		return ""
 	}
 	var object map[string]any
-	if json.Unmarshal(body, &object) != nil {
+	if json.Unmarshal(body, &object) != nil || !validNativeJSONContainerDepth04383(object) {
 		return ""
 	}
 	value, _ := object["prompt_cache_key"].(string)

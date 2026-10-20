@@ -696,3 +696,12 @@ underflow `1e-99999` controls are valid JSON and must promote the cached
 owner to second. All four upstream request bytes, authenticated Ready
 receipts, HTTP replies and each expected durable owner are compared for
 both pinned binaries.
+
+The prompt-cache selection phase also compares 127 versus 128 total nested
+JSON containers. Tagged `serde_json` 1.0.151 parses the 127-container
+response but rejects the 128-container one before the compiled Mojo scanner.
+The rejected second-owner response retains exact original HTTP bytes while
+minting neither a response-ID binding nor a cached hit; fresh selection stays
+on main. Its one-level shallower counterpart must permit the larger cache
+hit and select second. This specifically guards against treating Mojo's
+larger independent traversal bound as the Rust outer parser's acceptance rule.

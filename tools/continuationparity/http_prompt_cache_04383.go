@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
 var httpPromptCacheShapes04383 = []string{
 	"direct", "nested", "zero", "legacy", "overflow-fallback", "max-u64",
 	"nonfinite-unrelated", "finite-unrelated", "underflow-unrelated",
+	"overdeep-unrelated", "max-valid-depth",
 }
 
 func httpPromptCacheRequest04383(stage string) string {
@@ -53,9 +55,20 @@ func httpPromptCacheReply04383(shape, stage string) string {
 			return fmt.Sprintf(`{"id":%q,"object":"response","usage":{"cached_input_tokens":50},"ignored":1e308,"output":[]}`, id)
 		case "underflow-unrelated":
 			return fmt.Sprintf(`{"id":%q,"object":"response","usage":{"cached_input_tokens":50},"ignored":1e-99999,"output":[]}`, id)
+		case "overdeep-unrelated":
+			return httpPromptCacheDepthReply04383(id, 127)
+		case "max-valid-depth":
+			return httpPromptCacheDepthReply04383(id, 126)
 		}
 	}
 	return fmt.Sprintf(`{"id":%q,"object":"response","output":[]}`, id)
+}
+
+// The tagged serde_json 1.0.151 wrapper permits 127 nested containers
+// total; the outer response object counts as one.
+func httpPromptCacheDepthReply04383(id string, nested int) string {
+	deep := strings.Repeat(`{"a":`, nested) + `0` + strings.Repeat(`}`, nested)
+	return fmt.Sprintf(`{"id":%q,"object":"response","usage":{"cached_input_tokens":50},"ignored":%s,"output":[]}`, id, deep)
 }
 
 func httpPromptCacheWantOwner04383(shape, stage string) string {
@@ -63,7 +76,7 @@ func httpPromptCacheWantOwner04383(shape, stage string) string {
 	case "seed-second":
 		return "account-b"
 	case "fresh":
-		if shape != "zero" && shape != "legacy" && shape != "nonfinite-unrelated" {
+		if shape != "zero" && shape != "legacy" && shape != "nonfinite-unrelated" && shape != "overdeep-unrelated" {
 			return "account-b"
 		}
 	}
@@ -139,7 +152,7 @@ func runHTTPPromptCacheCase04383(root string, p product, shape string) error {
 			if httpPromptCacheWantOwner04383(shape, stage) == "account-b" {
 				want = "second"
 			}
-			if shape == "nonfinite-unrelated" && stage == "seed-second" {
+			if (shape == "nonfinite-unrelated" || shape == "overdeep-unrelated") && stage == "seed-second" {
 				// A serde_json parse error suppresses the response ID as well
 				// as the cached-token observation, while HTTP 200 is passed on.
 				want = ""

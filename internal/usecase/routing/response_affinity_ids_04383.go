@@ -27,7 +27,7 @@ func responseAffinityWithIDs(headers http.Header, body []byte, stream bool) (aff
 			return
 		}
 		var object map[string]any
-		if json.Unmarshal(data, &object) != nil {
+		if json.Unmarshal(data, &object) != nil || !validNativeJSONContainerDepth04383(object) {
 			return
 		}
 		keys = mergeAffinityKeys(keys, responseObjectAffinity(object))

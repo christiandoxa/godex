@@ -28,7 +28,7 @@ func requestAffinity(request proxymodel.Request, body []byte) affinityKeys {
 	if keys.session == "" {
 		var metadata map[string]any
 		raw := request.Header.Get("x-codex-turn-metadata")
-		if validNativeJSONUnicode04383([]byte(raw)) && json.Unmarshal([]byte(raw), &metadata) == nil {
+		if validNativeJSONUnicode04383([]byte(raw)) && json.Unmarshal([]byte(raw), &metadata) == nil && validNativeJSONContainerDepth04383(metadata) {
 			// The turn-metadata header uses the same direct-member presence
 			// rule as request JSON, including client_metadata fallback.
 			keys.session = semanticNestedText(metadata, "session_id", "client_metadata", "session_id")
@@ -38,7 +38,7 @@ func requestAffinity(request proxymodel.Request, body []byte) affinityKeys {
 		return keys
 	}
 	var object map[string]any
-	if !validNativeJSONUnicode04383(body) || json.Unmarshal(body, &object) != nil {
+	if !validNativeJSONUnicode04383(body) || json.Unmarshal(body, &object) != nil || !validNativeJSONContainerDepth04383(object) {
 		return keys
 	}
 	if keys.turn == "" && request.WebSocketMessage {
