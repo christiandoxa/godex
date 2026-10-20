@@ -813,3 +813,15 @@ An oversized alphabetically earlier JSON subtree exhausts the tagged
 compares resulting 400, 409 and bounded owner-local recovery 200, with
 original wire bytes and durable response lineage rather than only local
 parser return values.
+
+The `--http-429-policy` phase checks the 0.438.3 compiled raw JSON 429 policy
+using two authenticated Ready profiles and eight isolated error variants.
+The fixture covers canonical quota, padded code, an unrelated `1e309`,
+escaped code key, duplicate rate/quota codes, excessive JSON nesting,
+oversized body and invalid UTF-8. Both executables must preserve the exact
+request and recover to Ready second after one original main inference,
+returning byte-identical HTTP 200 output with a second-owned durable response
+ID. The corresponding Router classification regression independently checks
+which raw error bodies are quota, transient rate-limit or pass-through;
+otherwise identical account dispatch is not misrepresented as proof of
+identical internal error classes.

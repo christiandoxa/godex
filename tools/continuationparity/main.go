@@ -191,11 +191,12 @@ func main() {
 	httpTurnTransport := flag.Bool("http-turn-transport", false, "compare owned HTTP Responses turn transport failure without replay")
 	httpSessionConflict := flag.Bool("http-session-conflict", false, "compare HTTP Responses soft session conflict fallback and durable binding")
 	httpPromptCache := flag.Bool("http-prompt-cache", false, "compare 0.438.3 compiled cached-token affinity on authenticated HTTP Responses")
+	http429Policy := flag.Bool("http-429-policy", false, "compare 0.438.3 Mojo raw HTTP 429 policy and authenticated profile selection")
 	godexSource := flag.String("godex-source", "", "clean Godex commit source (required with an isolated fixture)")
 	godexCommit := flag.String("godex-commit", "", "exact 40-character Godex commit (required with an isolated fixture)")
 	flag.Parse()
 	chosen := 0
-	for _, mode := range []bool{*websocket, *websocketCapacity, *websocketDeadline, *websocketCommittedIdle, *websocketLookaheadIdle, *websocketRealtime, *websocketTransport, *websocketTransportCore, *websocketTransportLifecycle, *websocketTransportCapacity, *websocketCompactLineage, *httpKeepAlive, *httpCompact, *httpTurnTransport, *httpSessionConflict, *httpPromptCache} {
+	for _, mode := range []bool{*websocket, *websocketCapacity, *websocketDeadline, *websocketCommittedIdle, *websocketLookaheadIdle, *websocketRealtime, *websocketTransport, *websocketTransportCore, *websocketTransportLifecycle, *websocketTransportCapacity, *websocketCompactLineage, *httpKeepAlive, *httpCompact, *httpTurnTransport, *httpSessionConflict, *httpPromptCache, *http429Policy} {
 		if mode {
 			chosen++
 		}
@@ -234,7 +235,9 @@ func main() {
 	for _, spec := range []struct{ name, binary string }{{"prodex", *prodex}, {"godex", *godex}} {
 		p := product{name: spec.name, binary: spec.binary}
 		var err error
-		if *httpPromptCache {
+		if *http429Policy {
+			err = runHTTP429PolicyProduct04383(filepath.Join(root, "http-429-policy"), p)
+		} else if *httpPromptCache {
 			err = runHTTPPromptCacheProduct04383(filepath.Join(root, "http-prompt-cache"), p)
 		} else if *httpSessionConflict {
 			if err = runHTTPSoftSessionConflictProduct04383(filepath.Join(root, "soft"), p); err == nil {
@@ -298,6 +301,10 @@ func main() {
 			}
 			fatal(spec.name + ": " + err.Error())
 		}
+	}
+	if *http429Policy {
+		fmt.Println("PASS Prodex 0.438.3 Mojo raw HTTP 429 policy across both binaries")
+		return
 	}
 	if *httpPromptCache {
 		fmt.Println("PASS Prodex 0.438.3 HTTP Responses native cached-token affinity across both binaries")

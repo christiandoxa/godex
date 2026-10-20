@@ -2939,3 +2939,47 @@ case verifies authenticated Ready evidence on two accounts, the byte-exact
 initial request, the presence/absence of a bounded same-owner recovery,
 terminal response status/body, and durable recovered-response ownership.
 This verifies a finite 0.438.3 slice rather than every provider/OS path.
+
+## HTTP 429 raw Mojo error policy: exact tags and bounded JSON scanner
+
+The tagged 0.438.3 `runtime_http_error_policy` invokes a **raw-text Mojo
+scanner**, not `serde_json::Value`. Its code-bearing JSON member names
+(`code`, `type`, `status`, `reason`) are exact ASCII tokens and its known code
+values match ASCII case-insensitively **without trimming**. An escaped JSON
+member name or Unicode-escaped code value does not acquire quota affinity;
+duplicate members are inspected in wire order rather than being collapsed
+by a Go map. Mojo's error-body ABI is bounded to 65,536 bytes, requires
+valid raw UTF-8 and scans at most 32 nested container levels. The published
+HTTP Responses candidate loop additionally retains the generic retryable
+429 fallback for an otherwise small invalid-UTF8 response: an initial strict
+pass-through interpretation failed the independent binary oracle, while a
+rate-like fallback matched the official two-Ready-profile selection. Thus a
+broken JSON body does not mint structured quota evidence, but can still
+exercise the unstructured 429 recovery policy. Its raw numeric
+lexer accepts otherwise irrelevant exponent notation such as `1e309` that
+Go's ordinary `json.Unmarshal` rejects after float64 conversion.
+
+Prior Godex classification incorrectly promoted whitespace-padded and
+Unicode-decoded tags to quota, accepted values from an uppercase/escaped
+member name, and missed an exact quota code when an unrelated non-finite
+float made `json.Unmarshal` reject the whole document. Deep/oversized
+responses could also leak partial structured quota evidence. Fail-before
+regressions reproduce the differences, plus competing duplicate codes,
+valid finite controls and hard size/UTF-8 boundaries. The scoped correction
+walks bounded `json.RawMessage` subtrees in the original member order,
+retaining JSON numeric notation and checking exact original key/value
+bytes. Existing 429 text fallback, rate-wins-quota precedence and valid
+SSE data-event classification remain separate.
+
+A second Router-level test verifies actual quota, transient rate and
+pass-through outcomes, not merely a helper return value. The pinned
+`--phase=http-429-policy` oracle warms two authenticated Ready profiles,
+then sends eight independent original HTTP Responses requests into synthetic
+429 bodies. It verifies one main attempt followed by exactly one second
+attempt, unchanged upstream bytes, HTTP 200, no injected turn/session headers
+and durable ownership of the resulting response on second. Because a 429 on
+an unbound fresh request can rotate to second in **both** quota and rate
+cases, account dispatch alone does not prove their internal class is equal;
+that distinction is separately anchored to the compiled Mojo source and
+local Router-level regression. Full provider and native-OS parity remains
+unproven.

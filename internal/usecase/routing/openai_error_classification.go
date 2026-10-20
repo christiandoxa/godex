@@ -1,16 +1,29 @@
 package routing
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	providerentity "github.com/christiandoxa/godex/internal/entity/provider"
 	"github.com/christiandoxa/godex/internal/helper/sse"
 )
 
 func openAI429Classification(body []byte) providerentity.ErrorClassification {
+	// The compiled Mojo HTTP error ABI rejects oversized raw bodies, but
+	// the tagged 0.438.3 *HTTP candidate loop* still takes the generic
+	// retryable-429 fallback for a short invalid-UTF8 error body. The
+	// executable oracle proves this is an eligible second-owner attempt,
+	// not a literal quota code extracted from the broken JSON.
+	if len(body) > prodex04383HTTPErrorMaxBytes {
+		return providerentity.ErrorClassification{Class: providerentity.ErrorOther}
+	}
+	if !utf8.Valid(body) {
+		return providerentity.ErrorClassification{Class: providerentity.ErrorRateLimit, Cooldown: time.Minute}
+	}
 	rate, quota := openAI429StructuredSignals(body)
 	switch {
 	case rate:
@@ -43,46 +56,111 @@ func openAI429HeaderClassification(headers http.Header) (providerentity.ErrorCla
 	return providerentity.ErrorClassification{}, false
 }
 
+const (
+	prodex04383HTTPErrorMaxBytes = 65_536
+	prodex04383HTTPErrorMaxDepth = 32
+)
+
 func openAI429StructuredSignals(body []byte) (rate, quota bool) {
-	var visit func(any)
-	visit = func(current any) {
-		switch typed := current.(type) {
-		case map[string]any:
-			for key, child := range typed {
-				name := strings.ToLower(strings.TrimSpace(key))
-				if name == "code" || name == "type" || name == "status" || name == "reason" {
-					if text, ok := child.(string); ok {
-						switch strings.ToLower(strings.TrimSpace(text)) {
-						case "rate_limit_exceeded", "rate_limit_exceeded_error", "slow_down":
-							rate = true
-						case "insufficient_quota", "credit_balance_exhausted", "organization_spend_limit_exceeded", "project_spend_limit_exceeded", "quota_exhausted", "quota_exceeded", "resource_exhausted", "usage_limit_reached", "usage_not_included", "workspace_member_credits_depleted":
-							quota = true
-						}
-					}
-				}
-				visit(child)
-			}
-		case []any:
-			for _, child := range typed {
-				visit(child)
-			}
-		}
+	// The tagged 0.438.3 HTTP error policy is a bounded *raw JSON* Mojo
+	// scanner, not serde_json::Value. Its raw-number grammar accepts 1e309
+	// outside a relevant error code, but code names/values must have exact
+	// ASCII spellings and the scanner rejects nesting deeper than 32.
+	if len(body) > prodex04383HTTPErrorMaxBytes || !utf8.Valid(body) {
+		return false, false
 	}
-	var value any
-	if json.Unmarshal(body, &value) == nil {
-		visit(value)
+	if openAI429ScanRawMojo04383(body, 0, &rate, &quota) {
 		return rate, quota
 	}
+	// A correctly framed SSE 429 body has its own data: JSON event(s).
+	// Use the same compiled raw-code policy for each complete event.
 	decoder := sse.NewDecoder(len(body) + 1)
 	events := decoder.Feed(body)
 	events = append(events, decoder.Finish()...)
 	for _, data := range events {
-		value = nil
-		if json.Unmarshal(data, &value) == nil {
-			visit(value)
+		var eventRate, eventQuota bool
+		if openAI429ScanRawMojo04383(data, 0, &eventRate, &eventQuota) {
+			rate = rate || eventRate
+			quota = quota || eventQuota
 		}
 	}
 	return rate, quota
+}
+
+func openAI429ScanRawMojo04383(data []byte, depth int, rate, quota *bool) bool {
+	if depth > prodex04383HTTPErrorMaxDepth {
+		return false
+	}
+	data = bytes.TrimSpace(data)
+	if len(data) == 0 || !json.Valid(data) {
+		return false
+	}
+	switch data[0] {
+	case '{':
+		decoder := json.NewDecoder(bytes.NewReader(data))
+		if _, err := decoder.Token(); err != nil {
+			return false
+		}
+		for decoder.More() {
+			// Decoder.InputOffset includes punctuation skipped before the
+			// key. Inspect the ORIGINAL key token to reject escaped or
+			// case-altered spellings and preserve duplicate JSON members.
+			start := int(decoder.InputOffset())
+			key, err := decoder.Token()
+			if err != nil {
+				return false
+			}
+			rawKey := bytes.TrimLeft(data[start:int(decoder.InputOffset())], ", \t\r\n")
+			var child json.RawMessage
+			if err := decoder.Decode(&child); err != nil {
+				return false
+			}
+			if keyName, ok := key.(string); ok &&
+				bytes.Equal(rawKey, []byte(`"`+keyName+`"`)) &&
+				(keyName == "code" || keyName == "type" || keyName == "status" || keyName == "reason") {
+				// Mojo compares original quoted bytes, not Unicode-decoded
+				// error tags. \u-encoded values never qualify as codes.
+				if len(child) >= 2 && child[0] == '"' && child[len(child)-1] == '"' &&
+					!bytes.ContainsRune(child, '\\') {
+					code := string(child[1 : len(child)-1])
+					switch {
+					case previousASCIIEqualFold04383(code, "rate_limit_exceeded"),
+						previousASCIIEqualFold04383(code, "rate_limit_exceeded_error"),
+						previousASCIIEqualFold04383(code, "slow_down"):
+						*rate = true
+					case previousASCIIEqualFold04383(code, "insufficient_quota"),
+						previousASCIIEqualFold04383(code, "credit_balance_exhausted"),
+						previousASCIIEqualFold04383(code, "organization_spend_limit_exceeded"),
+						previousASCIIEqualFold04383(code, "project_spend_limit_exceeded"),
+						previousASCIIEqualFold04383(code, "quota_exhausted"),
+						previousASCIIEqualFold04383(code, "quota_exceeded"),
+						previousASCIIEqualFold04383(code, "resource_exhausted"),
+						previousASCIIEqualFold04383(code, "usage_limit_reached"),
+						previousASCIIEqualFold04383(code, "usage_not_included"),
+						previousASCIIEqualFold04383(code, "workspace_member_credits_depleted"):
+						*quota = true
+					}
+				}
+			}
+			if !openAI429ScanRawMojo04383(child, depth+1, rate, quota) {
+				return false
+			}
+		}
+		if _, err := decoder.Token(); err != nil {
+			return false
+		}
+	case '[':
+		var items []json.RawMessage
+		if json.Unmarshal(data, &items) != nil {
+			return false
+		}
+		for _, item := range items {
+			if !openAI429ScanRawMojo04383(item, depth+1, rate, quota) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func openAIAuthoritativeQuota429(body []byte) bool {

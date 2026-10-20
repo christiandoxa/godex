@@ -77,7 +77,23 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if strings.HasSuffix(r.URL.Path, "/responses") && r.Method == http.MethodPost {
-		body, _ := io.ReadAll(io.LimitReader(r.Body, 4096))
+		body, _ := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+		if strings.HasPrefix(b.scenario, "http-429-policy-") && string(body) == http429PolicyRequest04383 {
+			shape := strings.TrimPrefix(b.scenario, "http-429-policy-")
+			b.mu.Lock()
+			prior := len(b.attempts)
+			b.attempts = append(b.attempts, transportAttempt04383{owner: owner, body: string(body),
+				turn: r.Header.Get("x-codex-turn-state"), trace: r.Header.Get("thread-id"),
+				metadata: r.Header.Get("x-codex-turn-metadata"),
+				ready:    b.receipts["account-a"] > 0 && b.receipts["account-b"] > 0})
+			b.mu.Unlock()
+			if prior == 0 && owner == "account-a" {
+				writeJSON(w, http.StatusTooManyRequests, http429PolicyBody04383(shape))
+			} else {
+				writeJSON(w, http.StatusOK, http429PolicyOK04383)
+			}
+			return
+		}
 		if strings.HasPrefix(b.scenario, "http-prompt-cache-") {
 			shape := strings.TrimPrefix(b.scenario, "http-prompt-cache-")
 			for _, stage := range []string{"seed-main", "seed-second", "restore-main", "fresh"} {
