@@ -26,9 +26,10 @@ const shadowSessionBlankMessage04383 = `{"type":"response.create","model":"gpt-6
 const compactSessionHeaderMessage04383 = `{"type":"response.create","model":"gpt-6","input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
 const compactSessionBodyMessage04383 = `{"type":"response.create","model":"gpt-6","session_id":"session-alias","input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
 const compactSessionPreviousMessage04383 = `{"type":"response.create","model":"gpt-6","previous_response_id":"resp-main","session_id":"session-alias","input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
+const freshWebSocketSessionMessage04383 = `{"type":"response.create","model":"gpt-6","session_id":"fresh-session","input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
 
 func runWebSocketCompactLineageProduct04383(root string, p product) error {
-	for _, scenario := range []string{"compact-lineage", "compact-turn-conflict", "compact-previous-conflict", "compact-unbound", "compact-shadow-null", "compact-shadow-blank", "session-nested", "session-shadow-null", "session-shadow-blank", "compact-session-header", "compact-session-unbound", "compact-session-body", "compact-session-conflict", "compact-session-previous", "compact-produced", "compact-produced-long-turn"} {
+	for _, scenario := range []string{"compact-lineage", "compact-turn-conflict", "compact-previous-conflict", "compact-unbound", "compact-shadow-null", "compact-shadow-blank", "session-nested", "session-shadow-null", "session-shadow-blank", "compact-session-header", "compact-session-unbound", "compact-session-body", "compact-session-conflict", "compact-session-previous", "fresh-websocket-session", "compact-produced", "compact-produced-long-turn"} {
 		if err := runCompactLineageCase04383(filepath.Join(root, scenario), p, scenario); err != nil {
 			return fmt.Errorf("%s: %w", scenario, err)
 		}
@@ -55,7 +56,7 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 		return err
 	}
 	wantOwner := "second"
-	if scenario == "compact-unbound" || scenario == "compact-produced-long-turn" || (scenario == "compact-session-unbound" || scenario == "compact-session-conflict" || scenario == "compact-session-previous") || strings.HasPrefix(scenario, "compact-shadow-") || strings.HasPrefix(scenario, "session-shadow-") {
+	if scenario == "fresh-websocket-session" || scenario == "compact-unbound" || scenario == "compact-produced-long-turn" || (scenario == "compact-session-unbound" || scenario == "compact-session-conflict" || scenario == "compact-session-previous") || strings.HasPrefix(scenario, "compact-shadow-") || strings.HasPrefix(scenario, "session-shadow-") {
 		wantOwner = "main"
 	}
 	wantLineage := ""
@@ -197,6 +198,8 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 		message = compactSessionBodyMessage04383
 	} else if scenario == "compact-session-previous" {
 		message = compactSessionPreviousMessage04383
+	} else if scenario == "fresh-websocket-session" {
+		message = freshWebSocketSessionMessage04383
 	}
 	if err := websocketframe.WriteFrame(connection, 1, []byte(message), true); err != nil {
 		return err
@@ -237,7 +240,7 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 	}
 	backend.mu.Lock()
 	header := "compact-turn"
-	if strings.HasPrefix(scenario, "compact-shadow-") || strings.HasPrefix(scenario, "session-") || strings.HasPrefix(scenario, "compact-session-") {
+	if scenario == "fresh-websocket-session" || strings.HasPrefix(scenario, "compact-shadow-") || strings.HasPrefix(scenario, "session-") || strings.HasPrefix(scenario, "compact-session-") {
 		header = ""
 	}
 	err = verifyCompactLineageWire04383(wantOwner, message, header, backend.handshakes, backend.attempts, frames, backend.invalid)
@@ -250,6 +253,11 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 		owners, err := readTransportOwners04383(p)
 		lineage, lineageErr := readCompactLineageOwner04383(p)
 		sessionOK := true
+		if scenario == "fresh-websocket-session" {
+			freshOwner, freshErr := readCompactBindingOwner04383(p, "session", "fresh-session")
+			aliasOwner, aliasErr := readCompactBindingOwner04383(p, "session", "__compact_session__:fresh-session")
+			sessionOK = freshErr == nil && aliasErr == nil && freshOwner == "main" && aliasOwner == ""
+		}
 		if strings.HasPrefix(scenario, "compact-session-") {
 			aliasOwner, aliasErr := readCompactBindingOwner04383(p, "session", "__compact_session__:session-alias")
 			plainOwner, plainErr := readCompactBindingOwner04383(p, "session", "session-alias")
