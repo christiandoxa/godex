@@ -2426,3 +2426,26 @@ an unrelated JSON field: it must not select the foreign session owner, and
 upstream raw bytes and durable bindings remain unchanged. Other malformed
 Unicode escape permutations and live external-provider behavior remain
 separate parity questions.
+
+## Reject unpaired Unicode surrogate escapes before JSON affinity inspection
+
+The same tagged 0.438.3 `serde_json::from_slice` parser rejects an unpaired
+UTF-16 surrogate escape inside any JSON string or member name. Go's
+`encoding/json` instead accepts `\\ud800` or `\\udc00` by replacing the
+invalid scalar with U+FFFD. Raw byte-level UTF-8 validation alone cannot
+catch these fully ASCII escape sequences, allowing an invalid request to
+claim a verified session/turn/previous-response owner or to supply prompt
+cache and token-usage evidence.
+
+A focused, allocation-free validation scan now checks properly paired
+surrogate escapes in JSON strings before any request/body, WebSocket metadata,
+prompt-cache or native usage semantic extraction. Ordinary JSON decoding
+retains responsibility for all other syntax. Tests reproduce five invalid
+surrogate shapes and unpaired escapes in object keys, then protect valid
+`\\ud83d\\ude00` pairs and literal escaped-backslash text (`\\\\ud800`).
+No invalid request is rewritten; the original upstream wire bytes are still
+preserved. The source/manifest/executable-pinned HTTP session-conflict oracle
+adds lone-high and lone-low invalid-body controls plus valid-pair and literal
+escaped-text controls, verifying the selected owner, untouched HTTP body and
+existing durable bindings on the exact published 0.438.3 binary. This finite
+JSON semantic boundary does not certify every provider and OS integration.

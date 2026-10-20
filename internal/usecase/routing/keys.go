@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"sort"
 	"strings"
-	"unicode/utf8"
 
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
@@ -29,7 +28,7 @@ func requestAffinity(request proxymodel.Request, body []byte) affinityKeys {
 	if keys.session == "" {
 		var metadata map[string]any
 		raw := request.Header.Get("x-codex-turn-metadata")
-		if utf8.ValidString(raw) && json.Unmarshal([]byte(raw), &metadata) == nil {
+		if validNativeJSONUnicode04383([]byte(raw)) && json.Unmarshal([]byte(raw), &metadata) == nil {
 			// The turn-metadata header uses the same direct-member presence
 			// rule as request JSON, including client_metadata fallback.
 			keys.session = semanticNestedText(metadata, "session_id", "client_metadata", "session_id")
@@ -39,7 +38,7 @@ func requestAffinity(request proxymodel.Request, body []byte) affinityKeys {
 		return keys
 	}
 	var object map[string]any
-	if !utf8.Valid(body) || json.Unmarshal(body, &object) != nil {
+	if !validNativeJSONUnicode04383(body) || json.Unmarshal(body, &object) != nil {
 		return keys
 	}
 	if keys.turn == "" && request.WebSocketMessage {

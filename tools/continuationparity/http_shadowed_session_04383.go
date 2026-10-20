@@ -33,6 +33,14 @@ func httpShadowedSessionBody04383(shape string) string {
 		// this *entire* request because an unrelated string is not UTF-8.
 		// Go's encoding/json would otherwise silently repair the payload.
 		return prefix + `"session_id":"shadow-session","note":"` + string([]byte{0xff}) + `",` + suffix
+	case "lone-high-surrogate":
+		return prefix + `"session_id":"shadow-session","note":"\ud800",` + suffix
+	case "lone-low-surrogate":
+		return prefix + `"session_id":"shadow-session","note":"\udc00",` + suffix
+	case "valid-surrogate-pair":
+		return prefix + `"session_id":"shadow-session","note":"\ud83d\ude00",` + suffix
+	case "escaped-surrogate-text":
+		return prefix + `"session_id":"shadow-session","note":"\\ud800",` + suffix
 	}
 	field := `"session_id":null,`
 	switch shape {
@@ -63,7 +71,7 @@ func httpShadowedSessionHeaderMetadata04383(shape string) string {
 
 func httpShadowedSessionExpectSecond04383(shape string) bool {
 	switch shape {
-	case "missing", "direct", "metadata-nested", "metadata-direct", "metadata-fallback":
+	case "missing", "direct", "metadata-nested", "metadata-direct", "metadata-fallback", "valid-surrogate-pair", "escaped-surrogate-text":
 		return true
 	default:
 		return false
@@ -71,7 +79,7 @@ func httpShadowedSessionExpectSecond04383(shape string) bool {
 }
 
 func runHTTPShadowedSessionProduct04383(root string, p product) error {
-	for _, shape := range []string{"null", "blank", "missing", "conversation", "thread", "both", "direct", "metadata-nested", "metadata-direct", "metadata-null", "metadata-blank", "metadata-fallback", "invalid-utf8"} {
+	for _, shape := range []string{"null", "blank", "missing", "conversation", "thread", "both", "direct", "metadata-nested", "metadata-direct", "metadata-null", "metadata-blank", "metadata-fallback", "invalid-utf8", "lone-high-surrogate", "lone-low-surrogate", "valid-surrogate-pair", "escaped-surrogate-text"} {
 		if err := runHTTPShadowedSessionCase04383(filepath.Join(root, shape), p, shape); err != nil {
 			return fmt.Errorf("session_id %s: %w", shape, err)
 		}

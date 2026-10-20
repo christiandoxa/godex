@@ -659,3 +659,11 @@ byte with U+FFFD and otherwise route to second. The synthetic upstream must
 receive exactly those original bytes once on main; the existing verified
 second-owned session must remain untouched. This detects a semantic routing
 difference without requiring an authenticated model request.
+
+Unicode correctness controls extend the same HTTP session-shadow gate:
+requests containing unpaired `\\ud800` or `\\udc00` escapes must not
+inherit a valid session owner from otherwise parseable JSON, whereas a valid
+surrogate pair and an escaped backslash plus `ud800` are ordinary requests
+that retain session affinity. The raw JSON bytes, original Ready account
+receipts, selected owner and durable session/response projections must agree
+with the pinned 0.438.3 Rust executable.
