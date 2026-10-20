@@ -1793,3 +1793,37 @@ The finalized pinned two-executable phase and complete local verification
 must pass on the clean candidate before this expanded finite behavior is
 recorded VERIFIED. Native macOS/Windows and live provider credentials remain
 separate unqualified surfaces.
+
+## Complete 0.438.3 pinned regression checkpoint after soft-session conflict fix
+
+The full code-bearing checkpoint
+`67e995a25224869d47678a5db29a4102800e9bb3` was tested from a **clean
+committed** Godex checkout against the official tagged Prodex 0.438.3 source,
+release manifest and Linux executable with independently verified provenance.
+The following **separate** two-binary phases all exited **PASS** on that exact
+Godex SHA:
+
+| Release parity phase | Exact result |
+| --- | --- |
+| `--phase=websocket-compact-lineage` | PASS: verified Compact turn/session provenance, mixed hard-owner conflict, HTTP Compact production, full-history handoff, conflicting soft-session followup and immutable durable bindings |
+| `--phase=websocket-core` | PASS: response errors/retries, upstream connection reuse, precommit lookahead, committed idle and realtime duplex |
+| `--phase=websocket-transport-core` | PASS: all 17 authenticated precommit transport, quota, ownership and postcommit no-replay controls |
+| `--phase=websocket-transport-lifecycle` | PASS: both cancellation and the original 30-second deadline controls |
+| `--phase=websocket-transport-capacity` | PASS: saturated Ready alternate with no cross-account replay and correct durable snapshot |
+| `--phase=preflight-tests` | PASS: pinned synthetic regression and mutation-test prerequisites |
+| `--phase=http-compact` | PASS: HTTP Compact retry, stale continuation, full-history fallback and durable ownership comparison |
+
+`make verify` also **PASS** on the same source modifications before the
+squashed code commit, including shuffled Go race tests, formatting, vet,
+installer smoke checks, native build and Linux/macOS/Windows cross-compilation.
+The finite WebSocket transport gate thus has a new common-SHA **20/20 PASS**
+(17 core + 2 lifecycle + 1 capacity) after the soft-session conflict fix.
+No phase was accepted based solely on a partial invocation or an earlier
+candidate's SHA.
+
+**Qualification boundary:** the entire default release matrix's other pinned
+phases were not rerun together on this SHA, and native *execution* on macOS or
+Windows, provider OAuth/keyring and live upstream fault combinations remain
+PARTIAL/OPEN. Cross-compilation is not a substitute for native runtime
+observations. The results above are finite source-aligned synthetic parity,
+not a blanket production 1:1 release certificate.
