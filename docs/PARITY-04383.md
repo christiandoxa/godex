@@ -3259,3 +3259,29 @@ against Prodex 0.438.3. It checks the exact upstream request and raw response
 SSE bytes, authenticated Ready evidence on two profiles, one or two model
 attempts according to the classifier, and unchanged earlier durable
 response bindings. Native OS and real-provider combinations remain open.
+
+## SSE wire lines split on LF only; bare CR cannot forge an event boundary
+
+Tagged 0.438.3 `prodex_runtime_sse_chunk_line_offsets_v1` returns positions
+of **LF (`\\n`) only**. The separate `prodex_runtime_sse_line_plan_v1`
+strips CR/LF bytes at a completed line's trailing edge, but a standalone
+CR is **not** another line separator. Godex previously emitted an SSE event
+on any bare CR and skipped a following LF. A malicious or malformed upstream
+stream containing `data: {quota}\\r\\rdata: {output}\\n\\n` could
+therefore become two apparent events on Godex, rotating an account on a
+quota signal that Prodex treats as a single malformed data payload.
+
+A fail-before chunk-boundary regression reproduces this with CR-only wire
+fields and EOF, while preserving ordinary CRLF and repeated trailing-CR
+compatibility. The decoder now terminates lines only on LF and removes
+trailing CR bytes when that line ends; it leaves embedded CR bytes opaque
+inside a data field. An independent native HTTP precommit test confirms
+that bare-CR merging does not create quota evidence, whereas proper CRLF
+and CR padding still recognize canonical quota events.
+
+The source/manifest/executable-pinned `--phase=http-turn-transport`
+oracle checks embedded bare-CR, ordinary CRLF and repeated trailing-CR
+quota cases with two authenticated Ready profiles. It compares exact
+upstream bytes and client SSE output, one versus two model attempts, and
+unchanged earlier durable response ownership. This finite protocol slice
+does not certify every provider stream or native OS environment.

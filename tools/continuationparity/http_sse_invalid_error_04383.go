@@ -20,7 +20,8 @@ func httpSSEInvalidErrorShapes04383() []string {
 		"opaque-profile-note", "opaque-profile-message", "kelvin-quota-code",
 		"canonical-quota", "canonical-rate", "created-quota", "inprogress-rate", "keepalive-quota",
 		"quota-and-invalid-id", "rate-and-invalid-id", "reason-quota-and-invalid-id",
-		"payload-bom-quota", "payload-double-bom-quota", "wire-field-bom-ignored"}
+		"payload-bom-quota", "payload-double-bom-quota", "wire-field-bom-ignored",
+		"bare-cr-embedded-quota", "crlf-quota", "cr-padding-quota"}
 }
 
 func httpSSEInvalidErrorBody04383(shape string) string {
@@ -60,6 +61,13 @@ func httpSSEInvalidErrorBody04383(shape string) string {
 	case "wire-field-bom-ignored":
 		return "\xef\xbb\xbfdata: " + `{"type":"response.failed","response":{"error":{"code":"insufficient_quota"}}}` + "\n\n" +
 			"data: " + `{"type":"response.output_text.delta","delta":"visible"}` + "\n\n"
+	case "bare-cr-embedded-quota":
+		return "data: " + `{"type":"response.failed","response":{"error":{"code":"insufficient_quota"}}}` + "\r\r" +
+			"data: " + `{"type":"response.output_text.delta","delta":"visible"}` + "\n\n"
+	case "crlf-quota":
+		return "data: " + `{"type":"response.failed","response":{"error":{"code":"insufficient_quota"}}}` + "\r\n\r\n"
+	case "cr-padding-quota":
+		return "data: " + `{"type":"response.failed","response":{"error":{"code":"insufficient_quota"}}}` + "\r\r\n\n"
 	}
 	if shape == "valid-output" {
 		return "data: " + `{"type":"response.output_text.delta","delta":"ok"}` + "\n\n"
@@ -80,7 +88,8 @@ func httpSSEInvalidErrorRotates04383(shape string) bool {
 	return shape == "canonical-quota" || shape == "canonical-rate" ||
 		shape == "created-quota" || shape == "inprogress-rate" || shape == "keepalive-quota" ||
 		shape == "quota-and-invalid-id" || shape == "rate-and-invalid-id" || shape == "reason-quota-and-invalid-id" ||
-		shape == "payload-bom-quota" || shape == "payload-double-bom-quota"
+		shape == "payload-bom-quota" || shape == "payload-double-bom-quota" ||
+		shape == "crlf-quota" || shape == "cr-padding-quota"
 }
 
 const httpSSERecovered04383 = "data: " + `{"type":"response.output_text.delta","delta":"recovered"}` + "\n\n"

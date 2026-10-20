@@ -913,3 +913,11 @@ classification. A BOM before the physical field name makes it **not** a
 `data` field; a later valid output event commits without a quota retry.
 Both binaries must preserve all client-visible original SSE bytes, verify
 two Ready profiles and select the same precommit inference count/owner.
+
+SSE wire newline parity also requires a literal LF boundary. A standalone
+CR inside a physical `data:` line is not a separator; `data: {quota}\\r\\rdata:
+{output}\\n\\n` is one malformed JSON event and cannot authorize a
+quota retry. Canonical CRLF and repeated trailing-CR padding still terminate
+valid quota data lines. The pinned official binary differential compares
+account selection, exact SSE bytes and durable previous-response owner for
+all three cases, with authenticated Ready receipts on both profiles.

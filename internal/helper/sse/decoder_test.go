@@ -16,7 +16,7 @@ func TestDecoderFramingAndChunkBoundaries(t *testing.T) {
 				got = append(got, string(data))
 			}
 		}
-		if !reflect.DeepEqual(got, []string{"{\n\"id\":\"late\"}", "second", ""}) {
+		if !reflect.DeepEqual(got, []string{"{\n\"id\":\"late\"}", "second\r\rdata"}) {
 			t.Fatalf("chunk size %d: %q", chunkSize, got)
 		}
 	}

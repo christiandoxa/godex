@@ -8,7 +8,6 @@ type Decoder struct {
 	line      []byte
 	data      []byte
 	oversized bool
-	skipLF    bool
 }
 
 func NewDecoder(limit int) *Decoder {
@@ -20,12 +19,9 @@ func NewDecoder(limit int) *Decoder {
 func (decoder *Decoder) Feed(chunk []byte) [][]byte {
 	var events [][]byte
 	for _, character := range chunk {
-		if decoder.skipLF && character == '\n' {
-			decoder.skipLF = false
-			continue
-		}
-		decoder.skipLF = character == '\r'
-		if character == '\r' || character == '\n' {
+		// Tagged runtime_sse_chunk_line_offsets only ends lines at LF;
+		// a standalone CR stays inside a data field until LF or EOF.
+		if character == '\n' {
 			if data := decoder.endLine(); data != nil {
 				events = append(events, data)
 			}
@@ -45,7 +41,7 @@ func (decoder *Decoder) endLine() []byte {
 	// The tagged SSE line planner does not strip a BOM from a wire field
 	// name. Only the assembled first data value has its BOM removed by
 	// Mojo runtime_sse_payload_join (including repeated prefixes).
-	line := decoder.line
+	line := bytes.TrimRight(decoder.line, "\r")
 	if len(line) == 0 {
 		data := decoder.data
 		decoder.data = nil
@@ -95,6 +91,5 @@ func (decoder *Decoder) Finish() [][]byte {
 		events = append(events, data)
 	}
 	decoder.line = decoder.line[:0]
-	decoder.skipLF = false
 	return events
 }
