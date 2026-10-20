@@ -93,13 +93,14 @@ func responseAffinity(headers http.Header, body []byte, stream bool) affinityKey
 }
 
 func responseObjectAffinity(object map[string]any) affinityKeys {
-	keys := affinityKeys{
+	// The tagged response metadata planner accepts only the direct
+	// response.id, top-level response_id / qualifying id, and response or
+	// root turn-state. Arbitrary data/result/payload wrappers are opaque:
+	// inspecting them as hard continuation metadata can steal an owner.
+	return affinityKeys{
 		previous: responseID(object),
-		session:  objectString(object, "session_id", "conversation_id", "thread_id"),
 		turn:     responseObjectTurnState(object),
 	}
-	collectNestedAffinity(object, &keys, 0)
-	return keys
 }
 
 func responseID(object map[string]any) string {
@@ -201,42 +202,6 @@ func responseHeaderValue(value any) string {
 		}
 	}
 	return ""
-}
-
-func collectNestedAffinity(object map[string]any, keys *affinityKeys, depth int) {
-	if depth >= 3 {
-		return
-	}
-	for name, value := range object {
-		nested, ok := nestedAffinityObject(name, value)
-		if !ok {
-			continue
-		}
-		mergeNestedAffinity(keys, nested)
-		collectNestedAffinity(nested, keys, depth+1)
-	}
-}
-
-func nestedAffinityObject(name string, value any) (map[string]any, bool) {
-	switch name {
-	case "response", "data", "result", "payload":
-		nested, ok := value.(map[string]any)
-		return nested, ok
-	default:
-		return nil, false
-	}
-}
-
-func mergeNestedAffinity(keys *affinityKeys, nested map[string]any) {
-	if keys.previous == "" {
-		keys.previous = objectString(nested, "id", "response_id")
-	}
-	if keys.session == "" {
-		keys.session = objectString(nested, "session_id", "conversation_id", "thread_id")
-	}
-	if keys.turn == "" {
-		keys.turn = objectString(nested, "turn_state")
-	}
 }
 
 func mergeAffinityKeys(first, second affinityKeys) affinityKeys {

@@ -21,6 +21,8 @@ var httpResponseSessionShapes04383 = []string{
 	"turn-nested-priority", "turn-array-objects",
 	"invalid-surrogate-high", "invalid-surrogate-low", "invalid-surrogate-key", "valid-surrogate-pair",
 	"response-id-1024", "response-id-1025", "response-id-control-c0", "response-id-control-c1",
+	"opaque-data-id", "opaque-result-id", "opaque-payload-id", "opaque-data-response-id",
+	"opaque-data-turn", "opaque-result-turn", "opaque-payload-turn", "canonical-nested-response",
 }
 
 func httpResponseSessionRequest04383(shape string) string {
@@ -42,6 +44,22 @@ func httpResponseSessionReply04383(shape string) string {
 		return `{"id":"resp-response-session","object":"response","conversation_id":"payload-only-session","output":[]}`
 	case "thread-alias":
 		return `{"id":"resp-response-session","object":"response","thread_id":"payload-only-session","output":[]}`
+	case "opaque-data-id":
+		return `{"type":"event","data":{"id":"resp-response-session"}}`
+	case "opaque-result-id":
+		return `{"type":"event","result":{"id":"resp-response-session"}}`
+	case "opaque-payload-id":
+		return `{"type":"event","payload":{"id":"resp-response-session"}}`
+	case "opaque-data-response-id":
+		return `{"type":"event","data":{"response_id":"resp-response-session"}}`
+	case "opaque-data-turn":
+		return `{"type":"event","data":{"turn_state":"foreign-turn"}}`
+	case "opaque-result-turn":
+		return `{"type":"event","result":{"turn_state":"foreign-turn"}}`
+	case "opaque-payload-turn":
+		return `{"type":"event","payload":{"turn_state":"foreign-turn"}}`
+	case "canonical-nested-response":
+		return `{"type":"event","response":{"id":"resp-response-session","turn_state":"foreign-turn"}}`
 	case "invalid-surrogate-high":
 		return `{"id":"resp-response-session","object":"response","note":"\ud800","output":[]}`
 	case "invalid-surrogate-low":
@@ -154,7 +172,7 @@ func runHTTPResponseSessionCase04383(root string, p product, shape string) error
 		wantSession = "main"
 	}
 	wantResponse := "main"
-	if strings.HasPrefix(shape, "invalid-surrogate-") || shape == "response-id-1025" ||
+	if strings.HasPrefix(shape, "opaque-") || strings.HasPrefix(shape, "invalid-surrogate-") || shape == "response-id-1025" ||
 		shape == "response-id-control-c0" || shape == "response-id-control-c1" {
 		wantResponse = ""
 	}
@@ -163,7 +181,8 @@ func runHTTPResponseSessionCase04383(root string, p product, shape string) error
 		responseOwner, responseErr := readHTTPResponseOwner04383(p, httpResponseSessionBindingID04383(shape))
 		sessionOwner, sessionErr := readCompactBindingOwner04383(p, "session", httpResponseSessionName04383)
 		if responseErr == nil && sessionErr == nil && responseOwner == wantResponse && sessionOwner == wantSession &&
-			httpResponseIDAliasesMatch04383(p, shape) && httpResponseTurnHeadersMatch04383(p, shape) {
+			httpResponseIDAliasesMatch04383(p, shape) && httpResponseTurnHeadersMatch04383(p, shape) &&
+			httpResponseOpaqueTurnOwner04383(p, shape) {
 			break
 		}
 		if time.Now().After(deadline) {
@@ -208,6 +227,22 @@ func httpResponseIDAliasesMatch04383(p product, shape string) bool {
 		}
 	}
 	return true
+}
+
+// No data/result/payload turn_state is a canonical response turn; only the
+// direct response.turn_state positive control may create a verified owner.
+func httpResponseOpaqueTurnOwner04383(p product, shape string) bool {
+	if !strings.HasPrefix(shape, "opaque-") && shape != "canonical-nested-response" {
+		return true
+	}
+	owner, err := readCompactBindingOwner04383(p, "turn", "foreign-turn")
+	if err != nil {
+		return false
+	}
+	if shape == "canonical-nested-response" {
+		return owner == "main"
+	}
+	return owner == ""
 }
 
 // The metadata header walker is strictly ASCII and follows serde_json map

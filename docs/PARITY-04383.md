@@ -2595,3 +2595,29 @@ two valid JSON strings encoding forbidden C0/C1 characters (must remain
 unbound). Their original HTTP bodies, owner choices and durable ID projections
 are independently checked. It does not establish every live provider or native
 operating system scenario.
+
+## Opaque response wrappers cannot mint response IDs or turn owners
+
+The compiled tagged `mojo/prodex_core/runtime_response_metadata.mojo`
+only extracts the immediate `response.id`, top-level `response_id`, or a
+qualifying top-level `id` as a hard previous-response identity. Turn-state
+comes from immediate response/root headers or their direct `turn_state` /
+`turnState` fields, not from arbitrary `data`, `result`, or `payload` wrappers.
+Godex's generic `collectNestedAffinity` recursively adopted IDs and turns
+from those unrelated wrappers, permitting synthetic provider payloads to
+create new verified account owners. A fail-before Router regression reproduced
+wrongly bound IDs for `data.id`, `result.id`, `payload.id`, nested
+`data.response_id`, and turn-state through all three wrappers in both memory
+and durable stores.
+
+The scoped fix removes that generic nested affinity recursion and uses the
+source-defined response ID and turn-state projections. It retains legitimate
+`response.id`, top-level `response_id`, and nested `response.turn_state`
+positive controls, without changing the original returned JSON. A separate
+SSE event test enforces the same rule after streaming commitment. The exact
+manifest/source/executable-pinned `--phase=http-session-conflict` gate now
+compares eight independent opaque and canonical variants, requiring two
+applied authenticated Ready profiles, one exact upstream dispatch, preserved
+HTTP response bytes, unchanged session lineage, and empty or correctly
+verified durable response/turn owners. This verifies a bounded 0.438.3
+contract, not full live-provider and native-platform parity.

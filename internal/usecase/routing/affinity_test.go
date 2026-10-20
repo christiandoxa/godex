@@ -150,7 +150,7 @@ func TestResponseAffinityReadsNestedResponseIdentifiers(t *testing.T) {
 			"turn_state": "turn-nested",
 		},
 	})
-	want := affinityKeys{previous: "response-nested", session: "session-nested", turn: "turn-nested"}
+	want := affinityKeys{previous: "response-nested", turn: "turn-nested"}
 	if !reflect.DeepEqual(keys, want) {
 		t.Fatalf("nested affinity = %#v, want %#v", keys, want)
 	}

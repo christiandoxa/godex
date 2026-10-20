@@ -713,3 +713,11 @@ are valid JSON escapes. The source-pinned binary oracle checks exact unchanged
 HTTP response bytes and that only the valid component gains a durable previous-
 response owner. This is distinct from Compact's internal prefix-plus-component
 lineage key, which may be longer than 1,024 bytes after encoding.
+
+The response-session phase also rejects hard affinity fabricated inside
+opaque `data`, `result` and `payload` response wrappers. Four negative cases
+carry `id` or `response_id` inside unsupported wrappers; three negative cases
+carry `turn_state`. Neither type may create a durable owner. The positive
+`response: {id, turn_state}` control must still bind both identities to main.
+Each comparison preserves the original HTTP response bytes, quota Ready
+receipts, account selection and independent new/old durable owner projections.
