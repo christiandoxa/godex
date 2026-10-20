@@ -3096,3 +3096,37 @@ nested/direct/scalar positive controls with two authenticated Ready
 profiles, exact original HTTP bytes, terminal 402/403 or HTTP 200,
 inference count and independent durable old/new response owners. Native OS
 and real external-provider permutations remain out of scope.
+
+## Quota-reset epoch requires serde-valid whole JSON and ASCII header keys
+
+Tagged Prodex 0.438.3's `quota_reset_at_from_json_message` parses the
+**entire** input with `serde_json::from_str::<Value>` before handing the
+canonical JSON tree to Mojo's `quota_reset_json_epoch` planner. The earlier
+Godex `quotaResetAtFromJSON` read individual `json.RawMessage` fields and
+could adopt a far-future `resets_at` even when another field contained
+invalid UTF-8, an unpaired Unicode surrogate, non-finite float notation,
+or excessive JSON nesting. Such a fake reset could extend an otherwise
+five-minute quota quarantine far beyond the tagged policy.
+
+Mojo's `quota_json_key_casefold_equal` also compares nested quota header
+names with **ASCII-only** case folding. Go's `strings.EqualFold` had
+accepted U+017F LONG S in `X-Codex-Primary-Uſed-Percent` or
+`X-Codex-Primary-Reſet-At`, allowing a confusable key to change the
+primary/secondary exhausted-window selection.
+
+Fail-before table tests cover malformed whole documents, valid Unicode and
+finite-number controls, ASCII uppercase header names, the LONG S aliases
+and a valid secondary window. An independent HTTP 403 Router test proves
+that invalid JSON cannot add a bogus reset epoch or lengthen quarantine,
+while an invalid primary used-percent alias cannot override a correctly
+exhausted secondary window. The scoped fix reuses the tagged-compatible
+complete JSON decoder before quota epoch extraction and an ASCII-only
+comparator for canonicalized header names; original upstream response bytes
+remain unchanged.
+
+This check is grounded in the pinned 0.438.3 Rust and Mojo source and in
+local end-to-end routing regressions. Existing official two-executable
+HTTP transport/status tests remain part of the release gate, but the exact
+invalid-epoch/quarantine-timer variants are not yet independently compared
+against a live Prodex executable. Full parity on all provider/OS paths
+remains OPEN.

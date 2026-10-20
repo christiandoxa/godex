@@ -861,3 +861,12 @@ mint quota ownership. Canonical nested `code` and direct string `error`
 quota forms remain positive controls. The oracle compares source-pinned
 Prodex 0.438.3 and Godex account dispatch, exact client responses and
 durable owner projections, not merely a local parser return value.
+
+Quota-reset quarantine windows use a separate source-tagged validity fence:
+Prodex first parses the entire quota error JSON with serde_json, and the
+compiled epoch planner only case-folds **ASCII** header-name bytes. Local
+memory and Router regressions protect against unpaired Unicode, invalid
+UTF-8, numeric overflow/depth and U+017F LONG S in quota header names. The
+existing executable oracles still check profile selection and durable
+ownership, but do not yet compare each malformed epoch's wall-clock
+quarantine expiry in both binaries.

@@ -29,6 +29,13 @@ func quotaResetAtFromJSON(message []byte) (int64, bool) {
 	if len(message) == 0 {
 		return 0, false
 	}
+	// Tagged quota_reset_at_from_json_message first parses the COMPLETE
+	// document as serde_json::Value. RawMessage would otherwise accept
+	// unrelated invalid Unicode, overflowing numbers or excess depth and
+	// turn a bogus reset timestamp into a long-lived profile quarantine.
+	if _, valid := decodeNativeUsageJSON(message); !valid {
+		return 0, false
+	}
 	var root map[string]json.RawMessage
 	if err := json.Unmarshal(message, &root); err != nil || root == nil {
 		return 0, false
@@ -86,13 +93,19 @@ func quotaResetAtFromJSON(message []byte) (int64, bool) {
 }
 
 func quotaResetHeaderInt64(headers map[string]json.RawMessage, wanted string) (int64, bool) {
+	// The wanted header names are fixed ASCII constants; normalize only
+	// this comparator literal, never Unicode-fold the untrusted key.
+	wantedLower := strings.ToLower(wanted)
 	keys := make([]string, 0, len(headers))
 	for key := range headers {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
 	for _, key := range keys {
-		if strings.EqualFold(key, wanted) {
+		// The compiled Mojo quota_json_key_casefold_equal folds ASCII
+		// capitals only. Go EqualFold would turn U+017F LONG S into 's'
+		// and accept a forged reset/used-percent header name.
+		if previousASCIIEqualFold04383(key, wantedLower) {
 			return quotaResetJSONInt64(headers[key])
 		}
 	}
