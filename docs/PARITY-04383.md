@@ -2330,3 +2330,25 @@ comparisons. An observation-flow test independently checks that a larger valid
 native cached count can promote a new owner, while smaller or invalid counts
 cannot. This is tagged-source/local-use-case evidence; it does not establish
 live-model cache-hit measurement or complete 1:1 transport parity.
+
+## Native terminal usage markers honor compiled cached/reasoning field order
+
+The same pinned 0.438.3 `runtime_response_raw_usage` parser uses direct
+`usage.cached_input_tokens` ahead of the cache-detail alternatives, and
+`usage.reasoning_tokens` ahead of both reasoning-detail alternatives.
+**Presence**, including a valid zero, determines precedence. The compiled
+usage planner also accepts direct root usage fields and only returns an
+observation when at least one recognized unsigned field is present. A raw
+`prompt_cache_hit_tokens` field by itself does not satisfy that contract.
+
+Godex's terminal usage marker previously missed direct cached/reasoning
+counters, lost an explicit zero against lower-priority fields, emitted an
+all-zero event for empty/unsupported usage, and could not recover a native
+usage record whose fields were at the root. Fail-before table tests document
+all of those differences. The routing use case now shares a single
+presence-sensitive unsigned field reader for its cached, input, output and
+reasoning counters while retaining its established terminal-event gate.
+A real `Router.Observe` regression checks full `uint64` precision in the
+runtime event and suppression of a forged raw-provider-only count. These
+are source-aligned and synthetic local checks, not a certificate for every
+stream layout, live provider or native platform.

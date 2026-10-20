@@ -55,21 +55,39 @@ func terminalTokenUsage(payload []byte) (runtimemodel.TokenUsageCounts, bool) {
 	if usage == nil {
 		return runtimemodel.TokenUsageCounts{}, false
 	}
-	cached := tokenUsageDetail(usage, []string{"input_tokens_details", "prompt_tokens_details"}, []string{"cached_tokens"})
-	if cached == 0 {
-		cached = firstUnsignedUsage(usage, "prompt_cache_hit_tokens")
+	return nativeTokenUsageCounts(usage)
+}
+
+// Source-aligned 0.438.3 fields: the first *valid* unsigned value wins,
+// including zero. A raw provider cache alias is not native Responses usage.
+func nativeTokenUsageCounts(usage map[string]any) (runtimemodel.TokenUsageCounts, bool) {
+	input, hasInput := firstUnsignedUsage(usage, "input_tokens", "prompt_tokens")
+	cached, hasCached := firstUnsignedUsage(usage, "cached_input_tokens")
+	if !hasCached {
+		cached, hasCached = tokenUsageDetail(usage, []string{"input_tokens_details"}, "cached_tokens", "cached_input_tokens")
+	}
+	if !hasCached {
+		cached, hasCached = tokenUsageDetail(usage, []string{"prompt_tokens_details"}, "cached_tokens")
+	}
+	output, hasOutput := firstUnsignedUsage(usage, "output_tokens", "completion_tokens")
+	reasoning, hasReasoning := firstUnsignedUsage(usage, "reasoning_tokens")
+	if !hasReasoning {
+		reasoning, hasReasoning = tokenUsageDetail(usage,
+			[]string{"output_tokens_details", "completion_tokens_details"}, "reasoning_tokens")
 	}
 	return runtimemodel.TokenUsageCounts{
-		InputTokens:       firstUnsignedUsage(usage, "input_tokens", "prompt_tokens"),
-		CachedInputTokens: cached,
-		OutputTokens:      firstUnsignedUsage(usage, "output_tokens", "completion_tokens"),
-		ReasoningTokens:   tokenUsageDetail(usage, []string{"output_tokens_details", "completion_tokens_details"}, []string{"reasoning_tokens"}),
-	}, true
+		InputTokens: input, CachedInputTokens: cached, OutputTokens: output, ReasoningTokens: reasoning,
+	}, hasInput || hasCached || hasOutput || hasReasoning
 }
 
 func tokenUsageObject(value map[string]any) map[string]any {
 	if usage, ok := value["usage"].(map[string]any); ok {
-		return usage
+		if _, valid := nativeTokenUsageCounts(usage); valid {
+			return usage
+		}
+	}
+	if _, valid := nativeTokenUsageCounts(value); valid {
+		return value
 	}
 	for _, key := range []string{"response", "data", "result", "payload"} {
 		if nested, ok := value[key].(map[string]any); ok {
@@ -81,24 +99,22 @@ func tokenUsageObject(value map[string]any) map[string]any {
 	return nil
 }
 
-func firstUnsignedUsage(object map[string]any, keys ...string) uint64 {
+func firstUnsignedUsage(object map[string]any, keys ...string) (uint64, bool) {
 	for _, key := range keys {
 		if value, ok := unsignedJSONNumber(object[key]); ok {
-			return value
+			return value, true
 		}
 	}
-	return 0
+	return 0, false
 }
 
-func tokenUsageDetail(object map[string]any, detailKeys, valueKeys []string) uint64 {
+func tokenUsageDetail(object map[string]any, detailKeys []string, valueKeys ...string) (uint64, bool) {
 	for _, detailKey := range detailKeys {
-		detail, _ := object[detailKey].(map[string]any)
-		if detail == nil {
-			continue
-		}
-		if value := firstUnsignedUsage(detail, valueKeys...); value > 0 {
-			return value
+		if detail, ok := object[detailKey].(map[string]any); ok {
+			if value, valid := firstUnsignedUsage(detail, valueKeys...); valid {
+				return value, true
+			}
 		}
 	}
-	return 0
+	return 0, false
 }
