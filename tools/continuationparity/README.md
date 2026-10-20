@@ -843,3 +843,12 @@ upstream attempt. Exact ASCII and uppercase quota hints override that body
 and authorize a second Ready account. The pinned two-executable oracle
 checks exact request bytes, terminal HTTP 429/200, authenticated Ready
 receipts, inference count and the independent durable response owner.
+
+`--http-profile-status` independently compares 402/403 Mojo profile and
+workspace-quota text policies. It uses authenticated Ready main/second
+profiles, with Unicode KELVIN SIGN inserted into an otherwise canonical
+workspace code/message as a negative control. The reference accepts only
+ASCII-casefolded values, returning unchanged 402/403 with **one** main
+inference; exact ASCII and uppercase versions authorize a second-owner
+inference and HTTP 200. Both products must preserve opaque request/response
+bytes and the durable owner of all original and newly returned response IDs.

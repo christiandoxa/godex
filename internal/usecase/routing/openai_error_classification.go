@@ -196,12 +196,25 @@ func generic429NonRetryable(body []byte) bool {
 	return false
 }
 
+// The tagged Mojo runtime_error_contains folds ASCII uppercase bytes only.
+// Unicode case folding would accept U+212A KELVIN SIGN as the ASCII 'k' in
+// workspace quota/deactivation markers, changing credential rotation.
+func lowerASCIIOnly04383(text string) string {
+	out := []byte(text)
+	for i, c := range out {
+		if c >= 'A' && c <= 'Z' {
+			out[i] = c + ('a' - 'A')
+		}
+	}
+	return string(out)
+}
+
 func openAIProfileUnavailable(body []byte) bool {
-	return strings.Contains(strings.ToLower(string(body)), "deactivated_workspace")
+	return strings.Contains(lowerASCIIOnly04383(string(body)), "deactivated_workspace")
 }
 
 func openAIWorkspaceQuotaResponse(body []byte) bool {
-	text := strings.ToLower(string(body))
+	text := lowerASCIIOnly04383(string(body))
 	return strings.Contains(text, "you've hit your usage limit") ||
 		strings.Contains(text, "you have hit your usage limit") ||
 		strings.Contains(text, "the usage limit has been reached") ||

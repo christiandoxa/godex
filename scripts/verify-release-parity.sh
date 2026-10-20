@@ -28,7 +28,8 @@ case "${1:-}" in
   --phase=http-session-conflict) phase='http-session-conflict' ;;
   --phase=http-prompt-cache) phase='http-prompt-cache' ;;
   --phase=http-429-policy) phase='http-429-policy' ;;
-  *) echo 'usage: verify-release-parity.sh [--phase=preflight|preflight-tests|preflight-oracles|preflight-oracles-pty|preflight-oracles-profiles|preflight-oracles-history|deepseek|gemini|websocket|websocket-core|websocket-deadline|websocket-transport|websocket-transport-core|websocket-transport-lifecycle|websocket-transport-capacity|websocket-compact-lineage|http-keepalive|http-compact|http-turn-transport|http-session-conflict|http-prompt-cache|http-429-policy]' >&2; exit 2 ;;
+  --phase=http-profile-status) phase='http-profile-status' ;;
+  *) echo 'usage: verify-release-parity.sh [--phase=preflight|preflight-tests|preflight-oracles|preflight-oracles-pty|preflight-oracles-profiles|preflight-oracles-history|deepseek|gemini|websocket|websocket-core|websocket-deadline|websocket-transport|websocket-transport-core|websocket-transport-lifecycle|websocket-transport-capacity|websocket-compact-lineage|http-keepalive|http-compact|http-turn-transport|http-session-conflict|http-prompt-cache|http-429-policy|http-profile-status]' >&2; exit 2 ;;
 esac
 if [ "$#" -gt 1 ]; then
   echo 'release parity accepts at most one phase option' >&2
@@ -849,6 +850,19 @@ fi
 # Printed only after all stages *selected for this invocation* succeeded.
 # --phase=... must never be mistaken for the default complete release gate.
 printf 'PASS: Prodex 0.438.3 parity phase %s (Godex %s)\n' "$phase" "$(git rev-parse HEAD)"
+
+# The tagged 402/403 profile/quota text scanner folds ASCII only. Check
+# Kelvin-sign confusables and exact ASCII controls with verified account
+# dispatch and durable new-response ownership on both pinned executables.
+if [ "$phase" = 'all' ] || [ "$phase" = 'http-profile-status' ]; then
+"$tmp/continuationparity" \
+  --prodex "$tmp/prodex" --godex "$tmp/godex" \
+  --prodex-source "$tmp/prodex-source" \
+  --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
+  --http-profile-status
+go test -race ./tools/continuationparity \
+  -run '^TestProdex04383HTTPProfileStatusOracleRejectsMutations$' -count=1 -timeout=30s
+fi
 
 # The tagged raw Mojo 429 error scanner (not serde_json) has distinct
 # key/value matching, 32-level nesting and 64KiB/UTF8 boundaries. Check

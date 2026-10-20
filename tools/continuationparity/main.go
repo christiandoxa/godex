@@ -192,11 +192,12 @@ func main() {
 	httpSessionConflict := flag.Bool("http-session-conflict", false, "compare HTTP Responses soft session conflict fallback and durable binding")
 	httpPromptCache := flag.Bool("http-prompt-cache", false, "compare 0.438.3 compiled cached-token affinity on authenticated HTTP Responses")
 	http429Policy := flag.Bool("http-429-policy", false, "compare 0.438.3 Mojo raw HTTP 429 policy and authenticated profile selection")
+	httpProfileStatus := flag.Bool("http-profile-status", false, "compare 0.438.3 Mojo HTTP 402/403 profile/quota text policy")
 	godexSource := flag.String("godex-source", "", "clean Godex commit source (required with an isolated fixture)")
 	godexCommit := flag.String("godex-commit", "", "exact 40-character Godex commit (required with an isolated fixture)")
 	flag.Parse()
 	chosen := 0
-	for _, mode := range []bool{*websocket, *websocketCapacity, *websocketDeadline, *websocketCommittedIdle, *websocketLookaheadIdle, *websocketRealtime, *websocketTransport, *websocketTransportCore, *websocketTransportLifecycle, *websocketTransportCapacity, *websocketCompactLineage, *httpKeepAlive, *httpCompact, *httpTurnTransport, *httpSessionConflict, *httpPromptCache, *http429Policy} {
+	for _, mode := range []bool{*websocket, *websocketCapacity, *websocketDeadline, *websocketCommittedIdle, *websocketLookaheadIdle, *websocketRealtime, *websocketTransport, *websocketTransportCore, *websocketTransportLifecycle, *websocketTransportCapacity, *websocketCompactLineage, *httpKeepAlive, *httpCompact, *httpTurnTransport, *httpSessionConflict, *httpPromptCache, *http429Policy, *httpProfileStatus} {
 		if mode {
 			chosen++
 		}
@@ -235,7 +236,9 @@ func main() {
 	for _, spec := range []struct{ name, binary string }{{"prodex", *prodex}, {"godex", *godex}} {
 		p := product{name: spec.name, binary: spec.binary}
 		var err error
-		if *http429Policy {
+		if *httpProfileStatus {
+			err = runHTTPProfileStatusProduct04383(filepath.Join(root, "http-profile-status"), p)
+		} else if *http429Policy {
 			err = runHTTP429PolicyProduct04383(filepath.Join(root, "http-429-policy"), p)
 		} else if *httpPromptCache {
 			err = runHTTPPromptCacheProduct04383(filepath.Join(root, "http-prompt-cache"), p)

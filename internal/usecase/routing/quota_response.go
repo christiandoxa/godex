@@ -1,9 +1,6 @@
 package routing
 
-import (
-	"encoding/json"
-	"strings"
-)
+import "encoding/json"
 
 func isQuotaResponse(body []byte) bool {
 	var value any
@@ -42,10 +39,20 @@ func quotaFieldValue(key string, value any) bool {
 }
 
 func quotaCode(value string) bool {
-	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "insufficient_quota", "credit_balance_exhausted", "organization_spend_limit_exceeded",
-		"project_spend_limit_exceeded", "quota_exhausted", "quota_exceeded", "resource_exhausted",
-		"usage_limit_reached", "usage_not_included", "workspace_member_credits_depleted":
+	// 0.438.3's runtime_error_code_class uses exact untrimmed ASCII-only
+	// byte comparison. Unicode lowercasing (e.g. worKspace) would otherwise
+	// invent quota evidence in an untrusted HTTP 402/403 or SSE payload.
+	switch {
+	case previousASCIIEqualFold04383(value, "insufficient_quota"),
+		previousASCIIEqualFold04383(value, "credit_balance_exhausted"),
+		previousASCIIEqualFold04383(value, "organization_spend_limit_exceeded"),
+		previousASCIIEqualFold04383(value, "project_spend_limit_exceeded"),
+		previousASCIIEqualFold04383(value, "quota_exhausted"),
+		previousASCIIEqualFold04383(value, "quota_exceeded"),
+		previousASCIIEqualFold04383(value, "resource_exhausted"),
+		previousASCIIEqualFold04383(value, "usage_limit_reached"),
+		previousASCIIEqualFold04383(value, "usage_not_included"),
+		previousASCIIEqualFold04383(value, "workspace_member_credits_depleted"):
 		return true
 	default:
 		return false

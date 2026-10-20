@@ -3037,3 +3037,31 @@ both authenticated Ready accounts, exact upstream bytes, the absence or
 presence of a fallback response owner and the client-visible terminal
 status/body. This is a finite parity slice; live OAuth/provider and native
 cross-OS behavior remain separately unverified.
+
+## HTTP 402/403 profile/quota text uses ASCII-only matching
+
+The tagged 0.438.3 `mojo/prodex_core/rich_fallback.mojo` defines
+`runtime_error_contains` and `runtime_error_code_class` with **ASCII-only**
+case folding, not Unicode `to_lowercase`. Godex's native 402/403
+`openAIProfileUnavailable` and `openAIWorkspaceQuotaResponse` previously
+used Go's Unicode-aware `strings.ToLower`. U+212A KELVIN SIGN (`K`) in
+`deactivated_worKspace`, `worKspace is out of credits`, or
+`worKspace_member_credits_depleted` therefore became ASCII `k` and
+falsely authorized quota/profile rotation on a 402/403 that the official
+Prodex executable should pass through.
+
+Fail-before regressions demonstrate the incorrect rotations for profile
+and quota messages, with ASCII uppercase and canonical positive controls.
+The scoped parser now lowercases only ASCII bytes and uses exact ASCII
+comparisons for the native structured quota codes. These changes do not
+rewrite the original upstream error bytes or allow Unicode confusables to
+create routing evidence.
+
+A separate source/manifest/executable-pinned `--phase=http-profile-status`
+oracle now compares paired 402/403 conditions with two authenticated
+Ready accounts: canonical ASCII quota/profile conditions must rotate from
+main to second, while Unicode-confusable or unrelated conditions must
+return their exact original HTTP status/body on main without replay. The
+fixture verifies inference count and durable new/old response ownership on
+both binaries, including positive uppercase-ASCII controls. This is a
+finite 0.438.3 synthetic contract, not full live-provider/native OS parity.
