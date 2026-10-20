@@ -537,3 +537,13 @@ become main-owned; a foreign second-owned session must become the durable
 conflict marker, without releasing the main-owned turn. These are distinct
 positive controls from the ordinary soft-conflict fallback and do not
 introduce a new externally accessible setting or route.
+
+The HTTP soft-session gate also runs a direct-field precedence oracle against
+two authenticated Ready profiles: a direct `session_id:null`, a present blank
+session ID, and an *absent* direct session ID, all with nested
+`client_metadata.session_id` bound to second. The official 0.438.3 binary
+selects active main for the present-invalid cases, and second for the
+missing-direct control. It checks exact raw HTTP request bytes, one upstream
+attempt, a 200 response, and retained nested-session ownership. Mutation
+controls reject wrong-account selection, omitted/duplicated requests,
+unauthenticated/unqueued readiness, stale turn headers or changed content.

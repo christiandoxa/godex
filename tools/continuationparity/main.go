@@ -237,6 +237,9 @@ func main() {
 			if err = runHTTPSoftSessionConflictProduct04383(filepath.Join(root, "soft"), p); err == nil {
 				err = runHTTPPreviousSessionProduct04383(filepath.Join(root, "hard-previous"), p)
 			}
+			if err == nil {
+				err = runHTTPShadowedSessionProduct04383(filepath.Join(root, "direct-shadow"), p)
+			}
 		} else if *httpTurnTransport {
 			err = runHTTPResponsesTurnProduct04383(root, p)
 		} else if *httpCompact {

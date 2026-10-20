@@ -1993,3 +1993,36 @@ exact untouched JSON/header, HTTP response and durable owner projection.
 Mutation sentinels also reject stale/missing turn headers, modified bodies,
 wrong provider, missing quota readiness and replay. Native macOS/Windows and
 real OAuth/keyring/provider fault permutations remain separately OPEN/PARTIAL.
+
+## HTTP direct `session_id` shadows nested metadata on malformed values
+
+The tagged 0.438.3 `runtime_request_semantic_plan` chooses a direct JSON
+`session_id` **by presence** before consulting `client_metadata.session_id`.
+A present `null`, blank or otherwise non-string direct field yields no session
+owner; it must not silently borrow a different account's nested identity.
+Earlier 0.438.3 WebSocket tests covered that rule, but Godex's shared affinity
+parser applied the direct-field presence check only to WebSocket messages and
+continued to use nested session metadata for ordinary HTTP Responses.
+
+A source/binary/manifest-pinned independent HTTP differential on the clean
+pre-fix exploratory candidate `07ea56e` seeded a verified `shadow-session`
+on second, warmed second before main and verified both authenticated Ready
+quota receipts. Official Prodex dispatched the original opaque HTTP request
+exactly once to **main** when the direct session was `null` or whitespace,
+returned 200, kept the second-owned session intact and persisted its response
+on main. With the direct field absent, the same Prodex binary selected second
+from `client_metadata`, proving this is a shadowing rule rather than a ban on
+nested sessions. Pre-fix Godex incorrectly dispatched the `null` case to
+second. Memory/durable fail-before regressions independently reproduced the
+wrong owner for six malformed shapes, including blank, `null`, boolean,
+number and object values.
+
+The scoped Go parser correction honors the direct-member presence condition
+for HTTP and WebSocket alike while leaving explicit session headers, missing
+direct-field fallback and opaque request-body bytes unchanged. The new
+`--phase=http-session-conflict` differential includes the three validated
+HTTP direct-field cases (`null`, blank, absent) and mutation controls for
+owner, quota readiness, upstream count, header, input and response integrity.
+Full parity for the remaining provider/OS/keyring scenarios is still OPEN; a
+new phase is VERIFIED only after an exact clean code commit passes the binary
+oracle and the suite's negative mutation checks.

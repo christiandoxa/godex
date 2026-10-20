@@ -53,7 +53,11 @@ func requestAffinity(request proxymodel.Request, body []byte) affinityKeys {
 	}
 	if keys.session == "" {
 		_, direct := object["session_id"]
-		if request.WebSocketMessage && direct {
+		// Tagged Prodex's semantic planner uses direct JSON member presence
+		// on both HTTP Responses and WebSocket requests, not merely whether
+		// its text is nonempty. A null/blank direct member must not select a
+		// foreign session from nested client_metadata.
+		if direct {
 			keys.session = nonblankJSONText(object["session_id"])
 		} else {
 			keys.session = objectString(object, "session_id", "conversation_id", "thread_id")
