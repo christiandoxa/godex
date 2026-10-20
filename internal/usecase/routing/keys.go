@@ -12,8 +12,17 @@ import (
 )
 
 func requestAffinity(request proxymodel.Request, body []byte) affinityKeys {
+	thread := firstHeader(request.Header, "thread-id")
+	// Prodex's HTTP Responses and WebSocket runtimes only use thread-id
+	// for trace attribution. It does not create hard continuation routing
+	// affinity on these lanes. Keep the legacy standard proxy behavior.
+	path := strings.TrimRight(request.Path, "/")
+	if request.WebSocketMessage || request.QuotaSelection.RouteKind != quotamodel.RouteKindStandard ||
+		strings.HasSuffix(path, "/responses") || strings.HasSuffix(path, "/responses/compact") {
+		thread = ""
+	}
 	keys := affinityKeys{
-		thread:  firstHeader(request.Header, "thread-id"),
+		thread:  thread,
 		turn:    strings.TrimSpace(request.Header.Get("x-codex-turn-state")),
 		session: firstHeader(request.Header, "session_id", "session-id", "x-session-id"),
 	}
@@ -78,6 +87,7 @@ func requestAffinity(request proxymodel.Request, body []byte) affinityKeys {
 // Hard continuation keys outrank a soft session preference on Responses and
 // WebSocket routes. Keep the original keys for cleanup and successful rebinding.
 func requestAffinityForRoute(request proxymodel.Request, body []byte, route quotamodel.RouteKind) affinityKeys {
+	request.QuotaSelection.RouteKind = route
 	keys := requestAffinity(request, body)
 	return affinityKeysForRoute(keys, route)
 }

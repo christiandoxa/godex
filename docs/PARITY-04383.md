@@ -2157,3 +2157,34 @@ owner diversion, missing/duplicated upstream calls, absent Ready receipts,
 changed request/header bytes, and modified response or authentication.
 Remaining thread-ID logging and cross-OS/provider behavior are not thereby
 certified as complete parity.
+
+## Canonical HTTP `thread-id` is trace metadata, not a hard request owner
+
+The exact tagged `runtime_request_thread_id` resolves the supported `thread-id`
+header (or the canonical `thread_id` value inside a turn-metadata header) for
+continuation tracing. A trace label alone does **not** grant routing ownership:
+Prodex's Responses candidate selection is governed by previous-response,
+turn-state and session evidence. Godex previously promoted the supported
+`thread-id` header to hard affinity. A three-request source-derived fixture
+reproduces the error: a previous-response-pinned second-owner request bearing
+`thread-id` creates a misleading owner; a separate valid previous-response
+request restores main; the next independent request with the same trace is
+incorrectly routed to second. The identical unsupported `x-codex-thread-id`
+control is retained.
+
+The Godex input parser now excludes thread trace labels from Responses,
+Compact and WebSocket owner selection, including read-only admission probes,
+while retaining existing generic/standard transport behavior and passing
+through the original header for upstream trace attribution. Memory and durable
+regressions cover both header spellings; the official executable oracle checks
+the natural second/main/main HTTP sequence independently for each spelling,
+two authenticated Ready profiles, original wire and three durable response
+owners. Native OS and real external-provider permutations remain separate.
+
+The earlier integration test `TestRotatedConversationSurvivesProxyRestart`
+had accidentally used the trace header `thread-id` as a durable routing key.
+It now exercises the same restart, initial 429 rotation, successful response,
+subsequent HTTP request and private hashed persistence with the canonical
+`session_id` header. The test was not disabled: its real transport and
+process-restart owner assertions are preserved. An unrelated generic routing
+test still covers serialized first-owner selection for legacy commands.

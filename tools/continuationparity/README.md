@@ -591,3 +591,11 @@ owner sequence must be second/main/main for both binaries. This is a real
 multi-request state transition, not an asymmetric pre-seeded thread binding.
 The trace header is forwarded byte-for-byte but does not acquire hard owner
 rights. All three durable response IDs must remain on the expected owners.
+
+The same three-step HTTP trace differential now also runs with **canonical**
+`thread-id`, not just unsupported `x-codex-thread-id`. Both spellings remain
+unmodified upstream request headers, but neither grants routing ownership.
+The independent second/main/main sequence must be observed with applied
+Ready receipts and with all three responses durably owned by the dispatched
+profile. The official Prodex executable, not an inferred Rust refactor,
+is the reference for the negative alias behavior.

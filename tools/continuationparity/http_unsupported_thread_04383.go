@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"time"
 )
 
@@ -27,6 +28,15 @@ var httpUnsupportedThreadSteps04383 = []httpUnsupportedThreadStep04383{
 }
 
 func runHTTPUnsupportedThreadProduct04383(root string, p product) error {
+	for _, headerName := range []string{"x-codex-thread-id", "thread-id"} {
+		if err := runHTTPThreadTraceCase04383(filepath.Join(root, headerName), p, headerName); err != nil {
+			return fmt.Errorf("%s: %w", headerName, err)
+		}
+	}
+	return nil
+}
+
+func runHTTPThreadTraceCase04383(root string, p product, headerName string) error {
 	if err := prepareProduct(root, &p); err != nil {
 		return err
 	}
@@ -34,7 +44,7 @@ func runHTTPUnsupportedThreadProduct04383(root string, p product) error {
 		return err
 	}
 	p.env = append(p.env, "PRODEX_RUNTIME_LOG_RECORD=true")
-	b := newTransportBackend04383("http-unsupported-thread")
+	b := newTransportBackend04383("http-unsupported-thread-" + headerName)
 	defer b.server.Close()
 	endpoint, stop, err := startTransportLaunch04383(p, b.server.URL+"/backend-api")
 	if err != nil {
@@ -58,7 +68,7 @@ func runHTTPUnsupportedThreadProduct04383(root string, p product) error {
 	for _, step := range httpUnsupportedThreadSteps04383 {
 		var reply exchange
 		if step.trace != "" {
-			reply, err = postContextHeader(client, endpoint+"/responses", step.body, "x-codex-thread-id", step.trace)
+			reply, err = postContextHeader(client, endpoint+"/responses", step.body, headerName, step.trace)
 		} else {
 			reply, err = post(client, endpoint+"/responses", step.body)
 		}
@@ -95,7 +105,7 @@ func runHTTPUnsupportedThreadProduct04383(root string, p product) error {
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	fmt.Printf("%s HTTP unsupported x-codex-thread-id: two Ready profiles; owner sequence second/main/main; exact wire; three durable response owners\n", p.name)
+	fmt.Printf("%s HTTP trace %s: two Ready profiles; owner sequence second/main/main; exact wire; three durable response owners\n", p.name, headerName)
 	return nil
 }
 

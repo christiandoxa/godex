@@ -78,14 +78,15 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.HasSuffix(r.URL.Path, "/responses") && r.Method == http.MethodPost {
 		body, _ := io.ReadAll(io.LimitReader(r.Body, 4096))
-		if b.scenario == "http-unsupported-thread" {
+		if strings.HasPrefix(b.scenario, "http-unsupported-thread-") {
+			headerName := strings.TrimPrefix(b.scenario, "http-unsupported-thread-")
 			for _, step := range httpUnsupportedThreadSteps04383 {
 				if string(body) != step.body {
 					continue
 				}
 				b.mu.Lock()
 				b.attempts = append(b.attempts, transportAttempt04383{owner: owner, body: string(body),
-					trace: r.Header.Get("x-codex-thread-id"), turn: r.Header.Get("x-codex-turn-state"),
+					trace: r.Header.Get(headerName), turn: r.Header.Get("x-codex-turn-state"),
 					metadata: r.Header.Get("x-codex-turn-metadata"),
 					ready:    b.receipts["account-a"] > 0 && b.receipts["account-b"] > 0})
 				b.mu.Unlock()

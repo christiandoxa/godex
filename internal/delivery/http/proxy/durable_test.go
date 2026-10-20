@@ -31,17 +31,19 @@ func TestRotatedConversationSurvivesProxyRestart(t *testing.T) {
 	defer upstream.Close()
 
 	first := launchDurableProxy(t, upstream.URL, bindings, accounts)
-	closeProxyResponse(t, doProxyJSON(t, first.URL+"/responses", "{}", map[string]string{"thread-id": "native-thread"}))
+	// Persist a canonical session owner, not a thread-id trace label.
+	// The tagged Prodex HTTP router uses session_id for continuity.
+	closeProxyResponse(t, doProxyJSON(t, first.URL+"/responses", "{}", map[string]string{"session_id": "native-session"}))
 	first.Close()
-	assertDurableOwner(t, bindings, "native-thread", accounts[1].ID)
+	assertDurableOwner(t, bindings, "native-session", accounts[1].ID)
 
 	second := launchDurableProxy(t, upstream.URL, bindings, accounts)
-	response := doProxyJSON(t, second.URL+"/responses", "{\\\"previous_response_id\\\":\\\"response-2\\\"}", map[string]string{"thread-id": "native-thread"})
+	response := doProxyJSON(t, second.URL+"/responses", "{\\\"previous_response_id\\\":\\\"response-2\\\"}", map[string]string{"session_id": "native-session"})
 	closeProxyResponse(t, response)
 	if response.StatusCode != http.StatusOK || calls != 3 {
 		t.Fatalf("restart status/calls = %d/%d", response.StatusCode, calls)
 	}
-	assertRoutingSnapshotHasNoRawData(t, home, "native-thread", "response-2", "token-a", "token-b")
+	assertRoutingSnapshotHasNoRawData(t, home, "native-session", "response-2", "token-a", "token-b")
 }
 
 func durableRotationHandler(t *testing.T, calls *int) http.Handler {
@@ -98,9 +100,9 @@ func closeProxyResponse(t *testing.T, response *http.Response) {
 	}
 }
 
-func assertDurableOwner(t *testing.T, bindings *routingrepo.Store, thread, want string) {
+func assertDurableOwner(t *testing.T, bindings *routingrepo.Store, session, want string) {
 	t.Helper()
-	owner, err := routingusecase.SessionOwner(context.Background(), bindings, thread)
+	owner, err := routingusecase.SessionOwner(context.Background(), bindings, session)
 	if err != nil || owner != want {
 		t.Fatalf("durable upstream owner = %q, want %q: %v", owner, want, err)
 	}

@@ -15,66 +15,79 @@ import (
 // Prodex 0.438.3 runtime_request_thread_id supports the canonical thread-id
 // header for trace metadata, but does not recognize x-codex-thread-id.
 // The unsupported spelling cannot create a foreign hard routing owner.
-func TestProdex04383UnsupportedHTTPThreadHeaderCannotCreateAffinity(t *testing.T) {
-	for _, durable := range []bool{false, true} {
-		name := "memory"
-		if durable {
-			name = "durable"
-		}
-		t.Run(name, func(t *testing.T) {
-			gateway := &standardOnlyRoutingGateway{execute: func() *proxymodel.Response {
-				return &proxymodel.Response{StatusCode: http.StatusOK, Header: make(http.Header),
-					Body: io.NopCloser(strings.NewReader(`{"object":"response","output":[]}`))}
-			}}
-			config := Config{Gateway: gateway, PreferredAccount: websocketQuotaOwnerA,
-				Accounts: func(context.Context) ([]proxymodel.Account, error) { return websocketQuotaAccounts(), nil }}
+func TestProdex04383HTTPThreadTraceHeadersCannotCreateAffinity(t *testing.T) {
+	for _, headerName := range []string{"x-codex-thread-id", "thread-id"} {
+		for _, durable := range []bool{false, true} {
+			name := "memory"
 			if durable {
-				config.Bindings = routingrepository.NewStore(t.TempDir())
+				name = "durable"
 			}
-			router, err := NewRouter(config)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer router.Close()
-			if err := router.affinity.remember(t.Context(), websocketQuotaOwnerB,
-				affinityKeys{previous: "previous-second"}, router.now()); err != nil {
-				t.Fatal(err)
-			}
-			if err := router.affinity.remember(t.Context(), websocketQuotaOwnerA,
-				affinityKeys{previous: "previous-main"}, router.now()); err != nil {
-				t.Fatal(err)
-			}
-			for _, tc := range []struct {
-				name, body, thread, want string
-			}{
-				{"previous-second", `{"previous_response_id":"previous-second","input":[]}`, "trace-only", websocketQuotaOwnerB},
-				{"restore-main", `{"previous_response_id":"previous-main","input":[]}`, "", websocketQuotaOwnerA},
-				{"unsupported-thread-reuse", `{"model":"gpt-6","input":[]}`, "trace-only", websocketQuotaOwnerA},
-			} {
-				header := make(http.Header)
-				if tc.thread != "" {
-					header.Set("x-codex-thread-id", tc.thread)
+			t.Run(headerName+"/"+name, func(t *testing.T) {
+				gateway := &standardOnlyRoutingGateway{execute: func() *proxymodel.Response {
+					return &proxymodel.Response{StatusCode: http.StatusOK, Header: make(http.Header),
+						Body: io.NopCloser(strings.NewReader(`{"object":"response","output":[]}`))}
+				}}
+				config := Config{Gateway: gateway, PreferredAccount: websocketQuotaOwnerA,
+					Accounts: func(context.Context) ([]proxymodel.Account, error) { return websocketQuotaAccounts(), nil }}
+				if durable {
+					config.Bindings = routingrepository.NewStore(t.TempDir())
 				}
-				result, err := router.Forward(t.Context(), proxymodel.Request{
-					Method: http.MethodPost, Path: "/backend-api/codex/responses", Header: header,
-					Body: []byte(tc.body), QuotaSelection: quotamodel.Selection{RouteKind: quotamodel.RouteKindResponses},
-				})
+				router, err := NewRouter(config)
 				if err != nil {
-					t.Fatalf("%s: %v", tc.name, err)
+					t.Fatal(err)
 				}
-				if result.Result.AccountID != tc.want || result.Result.Response.StatusCode != http.StatusOK {
-					t.Fatalf("%s selected=%q want=%q", tc.name, result.Result.AccountID, tc.want)
+				defer router.Close()
+				if err := router.affinity.remember(t.Context(), websocketQuotaOwnerB,
+					affinityKeys{previous: "previous-second"}, router.now()); err != nil {
+					t.Fatal(err)
 				}
-				_ = result.Close()
-			}
-			store := router.affinity
-			if durable {
-				store = newAffinityStore()
-				store.repository = config.Bindings
-			}
-			if owner, err := store.owner(t.Context(), affinityKeys{thread: "trace-only"}, router.now()); err != nil || owner != "" {
-				t.Fatalf("unsupported thread header created binding: owner=%q err=%v", owner, err)
-			}
-		})
+				if err := router.affinity.remember(t.Context(), websocketQuotaOwnerA,
+					affinityKeys{previous: "previous-main"}, router.now()); err != nil {
+					t.Fatal(err)
+				}
+				for _, tc := range []struct {
+					name, body, thread, want string
+				}{
+					{"previous-second", `{"previous_response_id":"previous-second","input":[]}`, "trace-only", websocketQuotaOwnerB},
+					{"restore-main", `{"previous_response_id":"previous-main","input":[]}`, "", websocketQuotaOwnerA},
+					{"unsupported-thread-reuse", `{"model":"gpt-6","input":[]}`, "trace-only", websocketQuotaOwnerA},
+				} {
+					header := make(http.Header)
+					if tc.thread != "" {
+						header.Set(headerName, tc.thread)
+					}
+					result, err := router.Forward(t.Context(), proxymodel.Request{
+						Method: http.MethodPost, Path: "/backend-api/codex/responses", Header: header,
+						Body: []byte(tc.body), QuotaSelection: quotamodel.Selection{RouteKind: quotamodel.RouteKindResponses},
+					})
+					if err != nil {
+						t.Fatalf("%s: %v", tc.name, err)
+					}
+					if result.Result.AccountID != tc.want || result.Result.Response.StatusCode != http.StatusOK {
+						t.Fatalf("%s selected=%q want=%q", tc.name, result.Result.AccountID, tc.want)
+					}
+					_ = result.Close()
+				}
+				store := router.affinity
+				if durable {
+					store = newAffinityStore()
+					store.repository = config.Bindings
+				}
+				if owner, err := store.owner(t.Context(), affinityKeys{thread: "trace-only"}, router.now()); err != nil || owner != "" {
+					t.Fatalf("unsupported thread header created binding: owner=%q err=%v", owner, err)
+				}
+			})
+		}
+	}
+}
+
+func TestProdex04383HTTPThreadTraceDoesNotBypassAdmissionOwner(t *testing.T) {
+	for _, alias := range []string{"thread-id", "x-codex-thread-id"} {
+		header := make(http.Header)
+		header.Set(alias, "verified-trace")
+		keys := requestAffinityForRoute(proxymodel.Request{Header: header}, []byte(`{"model":"gpt-6","input":[]}`), quotamodel.RouteKindResponses)
+		if keys.thread != "" || keys.hasAffinity() {
+			t.Fatalf("HTTP trace %s incorrectly grants owner eligibility: %+v", alias, keys)
+		}
 	}
 }
