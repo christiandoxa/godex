@@ -2089,3 +2089,24 @@ or duplicated model attempts and modified wire evidence. The initial paired
 run caught the missing-direct discrepancy before this correction; a complete
 clean-commit rerun is required before marking the phase VERIFIED. Native
 Windows/macOS and non-synthetic provider behavior remain separately open.
+
+## Do not promote `conversation_id` or `thread_id` into request session ownership
+
+The official 0.438.3 `runtime_request_semantic_plan` resolves request session
+identity from the exact direct JSON `session_id`, or the exact
+`client_metadata.session_id` member when direct is **absent**. Unlike a legacy
+response-output parser, it does not interpret `conversation_id` or `thread_id`
+as alternate session keys. Godex did, so an otherwise independent HTTP
+Responses request mentioning a second-owned session in either unrelated field
+could be hard-routed to the wrong account. A fail-before memory/durable
+regression demonstrates the foreign selection for both aliases separately and
+together; canonical direct and nested session identifiers remain positive
+controls. WebSocket parsing applies the same canonical input shape.
+
+The request-affinity parser now uses only the exact nested session key when
+no direct member exists. Raw JSON and session headers are not changed. The
+pinned `--phase=http-session-conflict` differential adds the alias-only
+cases beside the original direct-shadow cases, independently checking two
+Ready authenticated profiles, exactly one upstream request, original opaque
+bytes, HTTP status and the unchanged verified session owner. This is a
+bounded synthetic parity slice, not a claim about all provider or OS paths.

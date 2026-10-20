@@ -64,13 +64,10 @@ func requestAffinity(request proxymodel.Request, body []byte) affinityKeys {
 		// foreign session from nested client_metadata.
 		if direct {
 			keys.session = nonblankJSONText(object["session_id"])
-		} else {
-			keys.session = objectString(object, "session_id", "conversation_id", "thread_id")
-			if keys.session == "" {
-				if metadata, ok := object["client_metadata"].(map[string]any); ok {
-					keys.session = objectString(metadata, "session_id")
-				}
-			}
+		} else if metadata, ok := object["client_metadata"].(map[string]any); ok {
+			// The canonical request session key has no conversation_id or
+			// thread_id aliases. Those fields are opaque request payload.
+			keys.session = objectString(metadata, "session_id")
 		}
 	}
 	return keys

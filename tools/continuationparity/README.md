@@ -566,3 +566,11 @@ A positive control with the exact `x-codex-turn-state` HTTP header selects its
 verified owner on second. The oracle checks opaque request bytes, propagated
 header, authenticated Ready evidence, single upstream call, HTTP 200 and
 unchanged durable turn ownership plus the actual response owner.
+
+The HTTP session-shadow phase also covers `conversation_id`, `thread_id` and
+both fields together when they contain a second-owned session string. Neither
+field confers request session affinity: the eligible current main profile
+must handle the request, keeping the independent second-owned session bound.
+A direct canonical `session_id` control must still select second. These
+cases preserve the original HTTP request body and compare both official and
+Godex durable lineage after the authenticated model attempt.

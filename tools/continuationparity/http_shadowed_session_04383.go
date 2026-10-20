@@ -11,6 +11,20 @@ import (
 const httpShadowedSessionReply04383 = `{"id":"resp-http-shadow","object":"response","output":[]}`
 
 func httpShadowedSessionBody04383(shape string) string {
+	// Request aliases are untrusted payload, unlike the one canonical
+	// session_id and the documented client_metadata.session_id fallback.
+	prefix := `{"model":"gpt-6",`
+	suffix := `"input":[{"role":"user","content":"independent complete request"}]}`
+	switch shape {
+	case "conversation":
+		return prefix + `"conversation_id":"shadow-session",` + suffix
+	case "thread":
+		return prefix + `"thread_id":"shadow-session",` + suffix
+	case "both":
+		return prefix + `"conversation_id":"shadow-session","thread_id":"shadow-session",` + suffix
+	case "direct":
+		return prefix + `"session_id":"shadow-session",` + suffix
+	}
 	field := `"session_id":null,`
 	switch shape {
 	case "blank":
@@ -22,7 +36,7 @@ func httpShadowedSessionBody04383(shape string) string {
 }
 
 func runHTTPShadowedSessionProduct04383(root string, p product) error {
-	for _, shape := range []string{"null", "blank", "missing"} {
+	for _, shape := range []string{"null", "blank", "missing", "conversation", "thread", "both", "direct"} {
 		if err := runHTTPShadowedSessionCase04383(filepath.Join(root, shape), p, shape); err != nil {
 			return fmt.Errorf("session_id %s: %w", shape, err)
 		}
@@ -75,7 +89,7 @@ func runHTTPShadowedSessionCase04383(root string, p product, shape string) error
 		return err
 	}
 	wantOwner := "main"
-	if shape == "missing" {
+	if shape == "missing" || shape == "direct" {
 		wantOwner = "second"
 	}
 	deadline := time.Now().Add(3 * time.Second)
@@ -96,7 +110,7 @@ func runHTTPShadowedSessionCase04383(root string, p product, shape string) error
 
 func verifyHTTPShadowedSession04383(shape string, result httpSoftConflictResult04383) error {
 	wantOwner := "account-a"
-	if shape == "missing" {
+	if shape == "missing" || shape == "direct" {
 		wantOwner = "account-b"
 	}
 	if result.invalid || result.reply.status != http.StatusOK || result.reply.body != httpShadowedSessionReply04383 ||

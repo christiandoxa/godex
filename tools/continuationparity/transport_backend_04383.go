@@ -114,7 +114,7 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if strings.HasPrefix(b.scenario, "session-http-shadow-") &&
-			strings.Contains(string(body), `"client_metadata":{"session_id":"shadow-session"}`) {
+			string(body) == httpShadowedSessionBody04383(strings.TrimPrefix(b.scenario, "session-http-shadow-")) {
 			b.mu.Lock()
 			b.attempts = append(b.attempts, transportAttempt04383{owner: owner,
 				body: string(body), turn: r.Header.Get("x-codex-turn-state"),

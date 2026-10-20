@@ -7,10 +7,10 @@ import (
 )
 
 func TestProdex04383HTTPDirectShadowOracleRejectsMutations(t *testing.T) {
-	for _, shape := range []string{"null", "blank", "missing"} {
+	for _, shape := range []string{"null", "blank", "missing", "conversation", "thread", "both", "direct"} {
 		t.Run(shape, func(t *testing.T) {
 			owner := "account-a"
-			if shape == "missing" {
+			if shape == "missing" || shape == "direct" {
 				owner = "account-b"
 			}
 			base := httpSoftConflictResult04383{reply: exchange{status: http.StatusOK, body: httpShadowedSessionReply04383},
