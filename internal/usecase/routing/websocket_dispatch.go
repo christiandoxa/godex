@@ -50,6 +50,18 @@ func (router *Router) executeRouted(
 	}
 
 	metadata := parseWebSocketRequestMetadata(request)
+	// Prodex's message loop passes the resolved body turn-state as a
+	// per-message upstream handshake override. It applies even to an
+	// unbound turn; strict Compact lineage changes the *owner*, not this
+	// opaque token. Keep it isolated from the caller's handshake headers.
+	if metadata.turnState != "" && len(metadata.turnState) <= maxAffinityValue &&
+		!strings.ContainsAny(metadata.turnState, "\r\n") {
+		request.Header = request.Header.Clone()
+		if request.Header == nil {
+			request.Header = make(http.Header)
+		}
+		request.Header.Set("x-codex-turn-state", metadata.turnState)
+	}
 	routingAffinity := requestRoutingAffinity(request)
 	if metadata.previousResponseID == "" {
 		metadata.previousResponseID = routingAffinity.previous

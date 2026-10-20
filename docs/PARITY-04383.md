@@ -1447,3 +1447,50 @@ synthetic phases. Full live OAuth, OS keyring and external-provider fault
 parity, native macOS realtime, strict public Compact-followup WebSocket
 lineage and the malformed direct WebSocket metadata network oracle remain
 PARTIAL/OPEN.
+
+## WebSocket selects a verified Compact turn lineage across quota routes
+
+The tagged 0.438.3 source (`runtime_proxy/affinity.rs`,
+`runtime_proxy/continuation.rs` and `runtime_state/lineage.rs`) resolves the
+distinct `__compact_turn_state__:` lineage owner even when the inbound request
+is routed through a **WebSocket** socket. That must not be confused with the
+HTTP Compact quota route, nor may a missing lineage arbitrarily select second.
+The upstream WebSocket handshake also carries the resolved body
+`x-codex-turn-state` token whether or not the turn has a bound owner.
+
+A new two-binary differential fixture seeds a verified synthetic Compact
+turn lineage on **second**, then warms second *before* main. The order is a
+strict control: main is the active profile immediately before the test and
+both quota caches have applied authenticated Ready receipts. On exact clean
+exploratory `b991e86`, official Prodex chose second for the lineage case and
+main for the unbound control. Godex incorrectly chose main for the bound case
+and omitted the upstream turn-state header. Both products received the same
+opaque full history. Earlier exploratory attempts failed their own fixture
+constraints (missing official handshake turn override and last-active second)
+and are not counted as behavioral mismatches.
+
+The scoped fix consults Compact's separate turn alias only when the direct
+WebSocket turn owner is absent and no previous-response dependency is present.
+It never turns the WebSocket quota route into Compact. It also copies the
+resolved, bounded body turn-state into a cloned upstream handshake header,
+without modifying the inbound request. Four memory/durable positive/negative
+routing tests fail before the fix; the entire routing suite, repeated focused
+race checks and `make verify` pass after the fix.
+
+**Independent executable oracle PASS** on exact clean exploratory candidate
+`caedf329fdc5c7536c56af98087083d2bd1fb306`:
+
+- Lineage present: Prodex and Godex each dispatch once to second, retain the
+  authenticated Ready evidence, exact input, `compact-turn` header and terminal
+  frames, and persist the new response on second without moving the alias.
+- Lineage absent: both dispatch once to active main, keep the same exact
+  header/body/client frames, leave the Compact alias absent and retain the
+  unrelated owner.
+- The source/tag, release manifest, official executable digest and clean
+  candidate binary commit are pinned. Oracle mutation tests reject wrong
+  owner, stale header, missing Ready evidence, input changes, duplication,
+  changed client frames and missing terminal output.
+
+The native parity matrix now includes this finite scenario. Native execution
+on macOS/Windows and production creation of every Compact lineage alias are
+still unqualified independently; this bounded pass is **not** FULL 1:1 parity.

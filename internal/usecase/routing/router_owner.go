@@ -13,6 +13,26 @@ func (router *Router) resolveOwner(
 	selection quotamodel.Selection,
 ) (string, func() error, error) {
 	ownerKeys := keys
+	if selection.RouteKind == quotamodel.RouteKindWebSocket && ownerKeys.previous == "" && ownerKeys.turn != "" {
+		// Tagged Prodex 0.438.3 resolves Compact's separate turn lineage
+		// even while the receiving socket retains the WebSocket quota route.
+		// A known direct turn owner remains authoritative; only an unbound
+		// turn may consult the Compact namespace on this route.
+		directOwner, err := router.affinity.owner(ctx, affinityKeys{turn: ownerKeys.turn}, router.now())
+		if err != nil {
+			return "", nil, &proxymodel.Error{StatusCode: 409, Message: "request contains conflicting conversation affinity"}
+		}
+		if directOwner == "" {
+			alias := "__compact_turn_state__:" + ownerKeys.turn
+			aliasOwner, err := router.affinity.owner(ctx, affinityKeys{turn: alias}, router.now())
+			if err != nil {
+				return "", nil, &proxymodel.Error{StatusCode: 409, Message: "request contains conflicting conversation affinity"}
+			}
+			if aliasOwner != "" {
+				ownerKeys.turn = alias
+			}
+		}
+	}
 	if selection.RouteKind == quotamodel.RouteKindCompact {
 		if ownerKeys.previous != "" {
 			ownerKeys.session = ""

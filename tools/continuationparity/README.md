@@ -398,3 +398,27 @@ runs the complete `TestProdex04383Transport*` mutation suite in either phase.
 duplicated or reordered cases. **A single slice is not a release certificate**;
 full source, native-platform and external-credential parity must still be
 qualified independently.
+
+### Strict WebSocket Compact turn lineage — executable oracle
+
+The pinned 0.438.3 runtime stores a distinct `__compact_turn_state__:` binding
+for Compact-produced continuations, and the WebSocket message selector reads
+this binding without changing its WebSocket quota route into a Compact route.
+`--websocket-compact-lineage` supplies **two** authenticated, Ready profiles,
+a verified lineage owned by second and a deliberately active main profile.
+It compares the exact one-attempt owner decision, the model input and
+turn-state handshake override, two client frames, preserved unrelated owner,
+and durable Compact/response bindings on **both** executables. The unbound
+negative control uses the same warmup order and request without the lineage,
+so both products must select active main. Warm second **before** main; otherwise
+the positive result could be explained entirely by the active profile.
+
+```sh
+./scripts/verify-release-parity.sh --phase=websocket-compact-lineage
+```
+
+The phase requires a clean committed candidate and the exact official tag,
+release manifest and executable SHA pin. The native cross-platform gate also
+runs the same mode. This finite fixture proves ownership of **existing**
+Compact lineage; it does not yet prove creation of Compact lineage by every
+supported HTTP Compact response or live OAuth/provider conditions.

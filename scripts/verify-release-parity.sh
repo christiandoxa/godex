@@ -21,10 +21,11 @@ case "${1:-}" in
   --phase=websocket-transport-core) phase='websocket-transport-core' ;;
   --phase=websocket-transport-lifecycle) phase='websocket-transport-lifecycle' ;;
   --phase=websocket-transport-capacity) phase='websocket-transport-capacity' ;;
+  --phase=websocket-compact-lineage) phase='websocket-compact-lineage' ;;
   --phase=http-keepalive) phase='http-keepalive' ;;
   --phase=http-compact) phase='http-compact' ;;
   --phase=http-turn-transport) phase='http-turn-transport' ;;
-  *) echo 'usage: verify-release-parity.sh [--phase=preflight|preflight-tests|preflight-oracles|preflight-oracles-pty|preflight-oracles-profiles|preflight-oracles-history|deepseek|gemini|websocket|websocket-core|websocket-deadline|websocket-transport|websocket-transport-core|websocket-transport-lifecycle|websocket-transport-capacity|http-keepalive|http-compact|http-turn-transport]' >&2; exit 2 ;;
+  *) echo 'usage: verify-release-parity.sh [--phase=preflight|preflight-tests|preflight-oracles|preflight-oracles-pty|preflight-oracles-profiles|preflight-oracles-history|deepseek|gemini|websocket|websocket-core|websocket-deadline|websocket-transport|websocket-transport-core|websocket-transport-lifecycle|websocket-transport-capacity|websocket-compact-lineage|http-keepalive|http-compact|http-turn-transport]' >&2; exit 2 ;;
 esac
 if [ "$#" -gt 1 ]; then
   echo 'release parity accepts at most one phase option' >&2
@@ -773,6 +774,19 @@ fi
   "$transport_mode"
 go test -race ./tools/continuationparity \
   -run '^TestProdex04383(Transport|WebSocketTransportSlices)' -count=1 -timeout=40s
+fi
+
+# Strict Compact provenance is independent of the quota route used by the
+# socket. A verified Compact turn lineage on second must override the active
+# main profile, while the unbound negative control must not rotate.
+if [ "$phase" = 'all' ] || [ "$phase" = 'websocket-compact-lineage' ]; then
+"$tmp/continuationparity" \
+  --prodex "$tmp/prodex" --godex "$tmp/godex" \
+  --prodex-source "$tmp/prodex-source" \
+  --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
+  --websocket-compact-lineage
+go test -race ./tools/continuationparity \
+  -run '^TestProdex04383WebSocketCompactLineageOracleRejectsMutations$' -count=1 -timeout=30s
 fi
 
 if [ "$phase" = 'all' ] || [ "$phase" = 'http-keepalive' ]; then
