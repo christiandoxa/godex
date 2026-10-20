@@ -759,3 +759,14 @@ inside `x-codex-turn-metadata`, with a separate positive header-override
 control. The fixture compares exact original bytes, unchanged opaque header,
 1 or 2 authenticated Ready upstream attempts, terminal HTTP status/body and
 durable recovered response owner on both pinned executables.
+
+The HTTP turn-transport full-history recovery fixture also protects the
+**whole-document** serde_json validity requirement. A valid session, previous
+response and full history must not trigger an extra model request when an
+unrelated JSON field contains invalid UTF-8, an unpaired surrogate, `1e309`
+or excessive container nesting. Invalid JSON in `x-codex-turn-metadata`
+likewise cannot authorize replay. Valid surrogate pairs, finite float values
+and valid metadata header sessions remain positive controls. The oracle
+preserves byte-exact original upstream requests and checks that only valid
+cases issue one additional bounded recovery inference, with authenticated
+Ready evidence and durable response bindings on both executables.

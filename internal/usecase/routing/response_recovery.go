@@ -115,6 +115,12 @@ func inspectablePreviousResponse(response *proxymodel.Response) bool {
 }
 
 func fullHistoryRecoveryRequest(request proxymodel.Request) (proxymodel.Request, bool) {
+	// The tagged runtime computes recovery shape from a complete
+	// serde_json::Value. Go's RawMessage alone admits invalid Unicode,
+	// non-finite floats and too-deep JSON; none may enable a replay.
+	if _, valid := decodeNativeUsageJSON(request.Body); !valid {
+		return proxymodel.Request{}, false
+	}
 	var body map[string]json.RawMessage
 	if json.Unmarshal(request.Body, &body) != nil || !requestHasSessionID(request.Header, body) {
 		return proxymodel.Request{}, false
@@ -145,7 +151,9 @@ func requestHasSessionID(headers http.Header, body map[string]json.RawMessage) b
 		return true
 	}
 	var turnMetadata map[string]json.RawMessage
-	if json.Unmarshal([]byte(headers.Get("x-codex-turn-metadata")), &turnMetadata) == nil {
+	rawMetadata := []byte(headers.Get("x-codex-turn-metadata"))
+	if _, valid := decodeNativeUsageJSON(rawMetadata); valid &&
+		json.Unmarshal(rawMetadata, &turnMetadata) == nil {
 		return sessionIDInMetadata(turnMetadata)
 	}
 	return false
@@ -193,6 +201,9 @@ func exactJSONTag(raw json.RawMessage, expected string) bool {
 }
 
 func requestPreviousResponseID(body []byte) string {
+	if _, valid := decodeNativeUsageJSON(body); !valid {
+		return ""
+	}
 	var request map[string]json.RawMessage
 	if json.Unmarshal(body, &request) != nil {
 		return ""

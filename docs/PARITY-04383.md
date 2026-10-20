@@ -2738,3 +2738,37 @@ independent durable recovered-response ownership. Its mutation suite rejects
 foreign account selection, lost Ready evidence, altered original input,
 extra/missing replays and forged terminal output. This finite synthetic case
 does not certify every external provider or native macOS/Windows failure mode.
+
+## No full-history HTTP replay from a malformed complete request document
+
+Prodex 0.438.3 builds its previous-response/full-history replay plan only
+after successful `serde_json::from_slice::<Value>` of the **entire** inbound
+request. A valid `session_id`, `previous_response_id` and reconstructable
+`input` do not make an otherwise malformed JSON document replayable.
+Godex's recovery path separately used `json.RawMessage`; Go's decoder
+accepted unpaired Unicode-surrogate escapes, invalid raw UTF-8, an unrelated
+out-of-range `1e309` numeric literal, and a 128th nested container without
+rejecting the complete request. On a stale previous-response error, it could
+incorrectly reserialize the request and issue a second inference that the
+published Prodex planner forbids.
+
+A fail-before regression demonstrates these mismatches alongside valid
+Unicode, finite exponential notation and max-unsigned-integer controls.
+A second Router regression checks that a malformed request forwarded to a
+known previous-response owner preserves the original HTTP bytes and never
+sends a recovery replay. Godex now reuses the existing tagged-source complete
+JSON validation—UTF-8, Unicode surrogate pairing, numeric range, container
+depth and EOF—before extracting stale previous IDs or attempting a full
+history rewrite. The same guard rejects malformed JSON in the
+`x-codex-turn-metadata` header as session evidence without blocking an
+otherwise valid explicit source.
+
+The source/manifest/executable-pinned `--phase=http-turn-transport`
+comparison now extends the prior HTTP full-history replay gate with raw
+invalid UTF-8, unpaired surrogate, non-finite float, over-depth JSON,
+malformed metadata header, and valid Unicode/finite-number positives. It
+verifies two applied authenticated Ready profiles, one exact original model
+request, one or no valid bounded recovery attempt, unchanged header bytes,
+terminal 400/200 and independent durable response ownership on both official
+Prodex 0.438.3 and Godex. This is a bounded synthetic HTTP recovery slice,
+not a claim about all OAuth/provider errors or native OS integrations.

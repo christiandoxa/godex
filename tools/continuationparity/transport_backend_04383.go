@@ -117,10 +117,12 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		if strings.HasPrefix(b.scenario, "http-recovery-session-") {
 			shape := strings.TrimPrefix(b.scenario, "http-recovery-session-")
+			// Capture every relevant recovery attempt, including a replay
+			// that changes JSON serialization. The oracle verifies content
+			// independently rather than letting an unknown replay silently
+			// fall through as a generic warmup success.
 			if string(body) == httpRecoverySessionRequest04383(shape) ||
-				sameTransportJSON04383(string(body), httpRecoverySessionReplay04383(shape)) &&
-					strings.Contains(string(body), `"content":"continue"`) &&
-					!strings.Contains(string(body), `"previous_response_id"`) {
+				strings.Contains(string(body), `"content":"continue"`) {
 				b.mu.Lock()
 				b.attempts = append(b.attempts, transportAttempt04383{owner: owner, body: string(body),
 					turn: r.Header.Get("x-codex-turn-state"), trace: r.Header.Get("thread-id"),

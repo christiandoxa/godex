@@ -7,7 +7,8 @@ import (
 )
 
 func TestProdex04383HTTPRecoverySessionOracleRejectsMutations(t *testing.T) {
-	for _, shape := range []string{"null", "blank", "nested", "direct", "metadata-null", "metadata-nested", "header-override"} {
+	for _, shape := range []string{"null", "blank", "nested", "direct", "metadata-null", "metadata-nested", "header-override",
+		"invalid-utf8", "invalid-surrogate", "invalid-number", "invalid-depth", "valid-unicode", "valid-finite", "metadata-invalid", "metadata-valid"} {
 		t.Run(shape, func(t *testing.T) {
 			status, response := http.StatusBadRequest, httpRecoverySessionError04383
 			if httpRecoverySessionExpectRetry04383(shape) {

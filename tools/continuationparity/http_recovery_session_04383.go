@@ -23,12 +23,29 @@ func httpRecoverySessionRequest04383(shape string) string {
 		field = `"client_metadata":{"session_id":"verified-session"},`
 	case "direct":
 		field = `"session_id":"verified-session",`
-	case "metadata-null", "metadata-nested":
+	case "metadata-null", "metadata-nested", "metadata-invalid", "metadata-valid":
 		field = ""
+	case "invalid-utf8", "invalid-surrogate", "invalid-number", "invalid-depth", "valid-unicode", "valid-finite":
+		field = `"session_id":"verified-session",`
 	case "header-override":
 		field = `"session_id":null,`
 	}
-	return `{"model":"gpt-6","previous_response_id":"resp-main",` + field + httpRecoverySessionHistory04383 + `}`
+	note := ""
+	switch shape {
+	case "invalid-utf8":
+		note = `,"unrelated":"bad-` + string([]byte{0xff}) + `"`
+	case "invalid-surrogate":
+		note = `,"unrelated":"\ud800"`
+	case "invalid-number":
+		note = `,"unrelated":1e309`
+	case "invalid-depth":
+		note = `,"unrelated":` + strings.Repeat(`{"child":`, 128) + `0` + strings.Repeat(`}`, 128)
+	case "valid-unicode":
+		note = `,"unrelated":"\ud83d\ude00"`
+	case "valid-finite":
+		note = `,"unrelated":1e308`
+	}
+	return `{"model":"gpt-6","previous_response_id":"resp-main",` + field + httpRecoverySessionHistory04383 + note + `}`
 }
 
 func httpRecoverySessionMetadata04383(shape string) string {
@@ -37,12 +54,17 @@ func httpRecoverySessionMetadata04383(shape string) string {
 		return `{"session_id":null,"client_metadata":{"session_id":"verified-session"}}`
 	case "metadata-nested", "header-override":
 		return `{"client_metadata":{"session_id":"verified-session"}}`
+	case "metadata-invalid":
+		return `{"session_id":"verified-session","note":"\ud800"}`
+	case "metadata-valid":
+		return `{"session_id":"verified-session","note":"\ud83d\ude00"}`
 	}
 	return ""
 }
 
 func httpRecoverySessionExpectRetry04383(shape string) bool {
-	return shape == "nested" || shape == "direct" || shape == "metadata-nested" || shape == "header-override"
+	return shape == "nested" || shape == "direct" || shape == "metadata-nested" || shape == "header-override" ||
+		shape == "valid-unicode" || shape == "valid-finite" || shape == "metadata-valid"
 }
 
 func httpRecoverySessionReplay04383(shape string) string {
@@ -59,7 +81,8 @@ func httpRecoverySessionReplay04383(shape string) string {
 }
 
 func runHTTPRecoverySessionProduct04383(root string, p product) error {
-	for _, shape := range []string{"null", "blank", "nested", "direct", "metadata-null", "metadata-nested", "header-override"} {
+	for _, shape := range []string{"null", "blank", "nested", "direct", "metadata-null", "metadata-nested", "header-override",
+		"invalid-utf8", "invalid-surrogate", "invalid-number", "invalid-depth", "valid-unicode", "valid-finite", "metadata-invalid", "metadata-valid"} {
 		if err := runHTTPRecoverySessionCase04383(filepath.Join(root, shape), p, shape); err != nil {
 			return fmt.Errorf("HTTP full-history recovery %s: %w", shape, err)
 		}
@@ -146,8 +169,24 @@ func verifyHTTPRecoverySession04383(shape string, result httpSoftConflictResult0
 		if index == 1 {
 			reference = httpRecoverySessionReplay04383(shape)
 		}
+		matchesWire := attempt.body == reference
+		if index == 1 {
+			// Recovery reserializes valid JSON. Preserve semantic equality
+			// while requiring byte-exact forwarding of the original request,
+			// including malformed JSON which must never be rewritten.
+			matchesWire = sameTransportJSON04383(attempt.body, reference)
+			if shape == "valid-finite" && !matchesWire {
+				// serde_json 1.0.151 prints the *same* finite floating
+				// exponent with an explicit positive exponent sign (1e+308),
+				// whereas Go RawMessage retains its original text (1e308).
+				// Only this one known numeric token may be normalized; all
+				// other numeric/string fields stay exact under UseNumber.
+				matchesWire = sameTransportJSON04383(
+					strings.ReplaceAll(attempt.body, `"unrelated":1e+308`, `"unrelated":1e308`), reference)
+			}
+		}
 		if attempt.owner != "account-a" || !attempt.ready || attempt.turn != "" || attempt.metadata != httpRecoverySessionMetadata04383(shape) ||
-			attempt.trace != "" || !sameTransportJSON04383(attempt.body, reference) {
+			attempt.trace != "" || !matchesWire {
 			return fmt.Errorf("HTTP recovery %s changed account/Ready/replay wire: attempt=%d %+v", shape, index, attempt)
 		}
 		if index == 0 && attempt.body != httpRecoverySessionRequest04383(shape) {
