@@ -4,6 +4,7 @@ import (
 	"context"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
+	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
 
 func (router *Router) rotateTurnOrSessionOnlyWebSocketPreviousResponse(
@@ -14,7 +15,10 @@ func (router *Router) rotateTurnOrSessionOnlyWebSocketPreviousResponse(
 	outcome responseOutcome,
 	pending *pendingResponse,
 ) (proxymodel.Forwarded, bool, error) {
-	if !outcome.previousResponseNotFound {
+	// A strict Compact followup has an existing continuation owner. Unlike
+	// an ordinary turn-only Responses request, a missing upstream response
+	// does not authorize replaying its input on another profile.
+	if !outcome.previousResponseNotFound || request.QuotaSelection.RouteKind == quotamodel.RouteKindCompact {
 		return proxymodel.Forwarded{}, false, nil
 	}
 	metadata := routedWebSocketRequestMetadata(request)

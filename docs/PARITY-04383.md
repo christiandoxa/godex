@@ -1332,3 +1332,29 @@ twenty official controls pass: the old executable substitutes the known-owner
 400 frame. The complete default gate passed separately on exact clean
 `16f3eefb`; it predates the WebSocket mixed-ID and application-failure additions
 and does not qualify those newer cases.
+
+## Strict Compact WebSocket missing-response keeps its original owner
+
+The 0.438.3 WebSocket `previous_response_not_found` handling may rotate an
+ordinary turn-only Responses request to a different Ready owner while keeping
+its verified turn identity. The same retry is **not** legal for a strict
+Compact-followup: it is a continuity-bound request whose input must remain on
+its original profile. The prior routing helper applied the ordinary turn-only
+rule even when `QuotaSelection.RouteKind` was Compact, and incorrectly
+forwarded a missing-response failure to an alternate profile.
+
+`TestProdex04383CompactFollowupMissingResponseCannotRotate` failed **before**
+the scoped routing fix for both memory and durable affinity stores: each
+fixture dispatched on owner A and then unexpectedly inferred on owner B. The
+fix excludes Compact from that single previous-response rotation helper,
+without changing the Responses path, release policy, provider, retry budget,
+model, persistence format, or repository boundary. The regression asserts one
+owner-only dispatch, the original classified precommit error, unchanged input,
+and retained turn/session bindings. The existing ordinary turn-only recovery
+tests remain in force.
+
+This is tagged-source-aligned **local policy proof**. It does not resolve the
+separate strict cross-executable Compact-followup WebSocket fixture, which
+remains **OPEN** until an official 0.438.3 binary differential confirms the
+same user-visible terminal frame, attempt count and durable owner on both
+products. A passing unit test must not be substituted for that oracle.
