@@ -17,7 +17,10 @@ func runHTTPResponsesTurnProduct04383(root string, p product) error {
 	if err := runHTTPRecoverySessionProduct04383(filepath.Join(root, "session-retry"), p); err != nil {
 		return err
 	}
-	return runHTTPSSEInvalidErrorProduct04383(filepath.Join(root, "invalid-sse-error"), p)
+	if err := runHTTPSSEInvalidErrorProduct04383(filepath.Join(root, "invalid-sse-error"), p); err != nil {
+		return err
+	}
+	return runHTTPPreviousTextProduct04383(filepath.Join(root, "previous-text"), p)
 }
 
 func verifyHTTPResponsesTurn04383(scenario string, result httpTransportResult04383) error {

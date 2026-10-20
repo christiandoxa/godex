@@ -14,7 +14,9 @@ import (
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
 
-func TestProdex04355ResponsesPreviousNotFoundRotatesSameRequest(t *testing.T) {
+// Tagged 0.438.3 fails closed when the verified previous-response owner
+// rejects a chain. A second managed account cannot safely replay it.
+func TestProdex04383ResponsesPreviousNotFoundFailsClosedWithoutCrossOwnerReplay(t *testing.T) {
 	const body = `{"previous_response_id":"resp-dead","input":[{"type":"message","role":"user","content":"continue"}],"client_metadata":{"session_id":"session-a"}}`
 	const notFound = `{"error":{"type":"invalid_request_error","code":"previous_response_not_found","message":"previous response not found"}}`
 	now := time.Unix(5_000_000, 0)
@@ -46,11 +48,11 @@ func TestProdex04355ResponsesPreviousNotFoundRotatesSameRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer exchange.Close()
-	if exchange.Result.AccountID != "account-b" || exchange.Result.Failed {
-		t.Fatalf("same-request result = account %q failed=%t", exchange.Result.AccountID, exchange.Result.Failed)
+	if exchange.Result.AccountID != "account-a" || !exchange.Result.Failed || exchange.Result.Response.StatusCode != http.StatusConflict {
+		t.Fatalf("locked previous result = account %q failed=%t status=%d", exchange.Result.AccountID, exchange.Result.Failed, exchange.Result.Response.StatusCode)
 	}
-	if !reflect.DeepEqual(gateway.accounts, []string{"account-a", "account-b"}) {
-		t.Fatalf("same-request attempts = %v", gateway.accounts)
+	if !reflect.DeepEqual(gateway.accounts, []string{"account-a"}) {
+		t.Fatalf("verified response was replayed across owners: %v", gateway.accounts)
 	}
 	for index, upstream := range gateway.requests {
 		if got := requestPreviousResponseID(upstream.Body); got != "resp-dead" {
@@ -60,8 +62,8 @@ func TestProdex04355ResponsesPreviousNotFoundRotatesSameRequest(t *testing.T) {
 	if score := router.previousResponseFailureScore("account-a", "resp-dead", request.QuotaSelection, now); score != 1 {
 		t.Fatalf("owner negative-cache score = %d, want 1", score)
 	}
-	if owner, err := router.affinity.owner(t.Context(), affinityKeys{previous: "resp-dead"}, now); err == nil || owner != "" {
-		t.Fatalf("cross-owner verified binding = owner %q err=%v, want conflict", owner, err)
+	if owner, err := router.affinity.owner(t.Context(), affinityKeys{previous: "resp-dead"}, now); err != nil || owner != "account-a" {
+		t.Fatalf("failed first recognition changed verified owner: %q err=%v", owner, err)
 	}
 }
 
@@ -148,7 +150,7 @@ func (gateway *responsesTurnStateRecoveryGateway) Execute(
 	}, nil
 }
 
-func TestProdex04355ResponsesPreviousNotFoundRetriesReturnedTurnStateThenRotates(t *testing.T) {
+func TestProdex04383ResponsesPreviousNotFoundRetriesReturnedTurnStateThenFailsClosed(t *testing.T) {
 	now := time.Unix(5_200_000, 0)
 	gateway := &responsesTurnStateRecoveryGateway{}
 	var waits []time.Duration
@@ -176,15 +178,15 @@ func TestProdex04355ResponsesPreviousNotFoundRetriesReturnedTurnStateThenRotates
 		t.Fatal(err)
 	}
 	defer exchange.Close()
-	if exchange.Result.AccountID != "account-b" || exchange.Result.Failed {
-		t.Fatalf("turn-state recovery result = account %q failed=%t", exchange.Result.AccountID, exchange.Result.Failed)
+	if exchange.Result.AccountID != "account-a" || !exchange.Result.Failed || exchange.Result.Response.StatusCode != http.StatusConflict {
+		t.Fatalf("bounded turn-state recovery incorrectly replayed: account=%q failed=%t status=%d", exchange.Result.AccountID, exchange.Result.Failed, exchange.Result.Response.StatusCode)
 	}
 	wantWaits := []time.Duration{75 * time.Millisecond, 200 * time.Millisecond, 500 * time.Millisecond}
 	if !reflect.DeepEqual(waits, wantWaits) {
 		t.Fatalf("turn-state waits = %v, want %v", waits, wantWaits)
 	}
-	if !reflect.DeepEqual(gateway.accounts, []string{"account-a", "account-a", "account-a", "account-a", "account-b"}) {
-		t.Fatalf("turn-state attempts = %v", gateway.accounts)
+	if !reflect.DeepEqual(gateway.accounts, []string{"account-a", "account-a", "account-a", "account-a"}) {
+		t.Fatalf("turn-state attempts escaped verified owner: %v", gateway.accounts)
 	}
 	for index, want := range []string{"turn-state-1", "turn-state-2", "turn-state-3"} {
 		if got := gateway.requests[index+1].Header.Get("x-codex-turn-state"); got != want {
@@ -196,7 +198,7 @@ func TestProdex04355ResponsesPreviousNotFoundRetriesReturnedTurnStateThenRotates
 	}
 }
 
-func TestProdex04355ResponsesPreviousNotFoundRotatesAcrossMultipleOwners(t *testing.T) {
+func TestProdex04383ResponsesPreviousNotFoundRejectsCrossOwnerOnMultipleReadyProfiles(t *testing.T) {
 	const notFound = `{"error":{"type":"invalid_request_error","code":"previous_response_not_found","message":"previous response not found"}}`
 	now := time.Unix(5_300_000, 0)
 	gateway := &responseRecoveryGateway{replies: []responseRecoveryReply{
@@ -228,18 +230,22 @@ func TestProdex04355ResponsesPreviousNotFoundRotatesAcrossMultipleOwners(t *test
 		t.Fatal(err)
 	}
 	defer exchange.Close()
-	if exchange.Result.AccountID != "account-c" || exchange.Result.Failed {
-		t.Fatalf("multi-owner result = account %q failed=%t", exchange.Result.AccountID, exchange.Result.Failed)
+	if exchange.Result.AccountID != "account-a" || !exchange.Result.Failed || exchange.Result.Response.StatusCode != http.StatusConflict {
+		t.Fatalf("multi-owner previous response was not fail-closed: account=%q failed=%t status=%d", exchange.Result.AccountID, exchange.Result.Failed, exchange.Result.Response.StatusCode)
 	}
-	if !reflect.DeepEqual(gateway.accounts, []string{"account-a", "account-b", "account-c"}) {
-		t.Fatalf("multi-owner attempts = %v", gateway.accounts)
+	if !reflect.DeepEqual(gateway.accounts, []string{"account-a"}) {
+		t.Fatalf("verified chain escaped owner on multi-profile pool: %v", gateway.accounts)
 	}
 	for _, accountID := range []string{"account-a", "account-b"} {
-		if score := router.previousResponseFailureScore(accountID, "resp-dead", request.QuotaSelection, now); score != 1 {
-			t.Fatalf("negative cache %s = %d, want 1", accountID, score)
+		wantScore := uint8(0)
+		if accountID == "account-a" {
+			wantScore = 1
+		}
+		if score := router.previousResponseFailureScore(accountID, "resp-dead", request.QuotaSelection, now); score != wantScore {
+			t.Fatalf("negative cache %s = %d, want %d", accountID, score, wantScore)
 		}
 	}
-	if owner, err := router.affinity.owner(t.Context(), affinityKeys{previous: "resp-dead"}, now); err == nil || owner != "" {
-		t.Fatalf("multi-owner verified binding = owner %q err=%v, want conflict", owner, err)
+	if owner, err := router.affinity.owner(t.Context(), affinityKeys{previous: "resp-dead"}, now); err != nil || owner != "account-a" {
+		t.Fatalf("multi-owner fallback changed original binding: owner=%q err=%v", owner, err)
 	}
 }

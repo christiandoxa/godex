@@ -789,3 +789,16 @@ precommit event. A valid `response.output_text.delta` control remains
 commit-ready. The oracle checks authenticated Ready receipts, exact client
 SSE bytes, a single main owner-directed attempt and preserved durable
 previous-response ownership on both binaries.
+
+The HTTP turn-transport gate includes an independent plain-text
+previous-response error matrix. With an already verified hard previous ID
+on main, standalone text markers recognized by the tagged Mojo classifier
+must fail closed with HTTP 409 `stale_continuation` after one main
+attempt; unrelated text and malformed whole JSON must pass through as the
+original HTTP 400. The source-pinned executable comparison checks the exact
+byte-preserved upstream request, terminal HTTP body, authenticated Ready
+receipts on both profiles, single dispatch and the unchanged durable owner
+of the original previous response. An otherwise complete user/assistant/user
+history with a valid session is not permission to replay a missing chain
+on a foreign Ready profile. A separate mutation suite rejects false-success results that
+would be hidden by a status-only assertion.

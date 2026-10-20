@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
+	"unicode/utf8"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
@@ -34,6 +36,19 @@ func (router *Router) recoverInvalidPreviousResponse(
 		return response, false, false, nil
 	}
 	if outcome.previousResponseNotFound {
+		// The tagged 0.438.3 HTTP planner fails closed when a verified
+		// response chain is rejected by its owner. A fresh alternate cannot
+		// safely use the same previous_response_id: that would silently
+		// replay an unavailable chain on another managed account.
+		verifiedOwner := false
+		if request.QuotaSelection.RouteKind == quotamodel.RouteKindResponses {
+			owner, lookupErr := router.affinity.owner(ctx, affinityKeys{previous: previous}, router.now())
+			if lookupErr != nil {
+				pending.close()
+				return nil, false, false, lookupErr
+			}
+			verifiedOwner = owner == account.ID
+		}
 		response, outcome, pending, rotate, err := router.handleResponsesPreviousResponseNotFound(
 			ctx, request, account, response, outcome, pending, keys,
 		)
@@ -41,6 +56,10 @@ func (router *Router) recoverInvalidPreviousResponse(
 			return nil, false, false, err
 		}
 		if rotate {
+			if verifiedOwner {
+				pending.close()
+				return staleResponsesContinuationResponse(), true, false, nil
+			}
 			restoreResponsePrefix(response, pending)
 			return response, true, true, nil
 		}
@@ -229,28 +248,81 @@ func invalidPreviousResponseID(body []byte) bool {
 }
 
 func previousResponseNotFound(body []byte) bool {
-	var value any
-	if json.Unmarshal(body, &value) != nil {
+	// Tagged extract_runtime_proxy_previous_response_message tries the
+	// complete serde_json::Value first, then falls back to a narrowly
+	// recognized *plain-text* previous-response error. Malformed JSON
+	// cannot manufacture structured ownership evidence, but a literal
+	// `previous_response_not_found` upstream text error remains meaningful.
+	if value, valid := decodeNativeUsageJSON(body); valid && previousResponseMessageInJSON04383(value) {
+		return true
+	}
+	if !utf8.Valid(body) {
 		return false
 	}
-	return responseHasCode(value, "previous_response_not_found")
+	return previousResponseMessageInText04383(strings.TrimSpace(string(body)))
 }
 
-func responseHasCode(value any, wanted string) bool {
-	switch value := value.(type) {
-	case map[string]any:
-		if code, _ := value["code"].(string); strings.EqualFold(strings.TrimSpace(code), wanted) {
-			return true
-		}
-		for _, child := range value {
-			if responseHasCode(child, wanted) {
+func previousResponseMessageInText04383(value string) bool {
+	lower := strings.ToLower(value)
+	if lower == "invalid `previous_response_id`." || strings.HasPrefix(lower, "previous_response_not_found") {
+		return true
+	}
+	if strings.HasPrefix(lower, "previous response") && strings.Contains(lower, "not found") {
+		return true
+	}
+	if (strings.Contains(lower, "no tool call found") || strings.Contains(lower, "no function call found")) &&
+		(strings.HasPrefix(lower, "invalid_request_error:") || strings.HasPrefix(lower, "no tool call found") ||
+			strings.HasPrefix(lower, "no function call found")) {
+		return true
+	}
+	return false
+}
+
+const previousResponseJSONScanLimit04383 = 2048
+
+func previousResponseMessageInJSON04383(value any) bool {
+	// Rust runtime_json_find searches no more than 2048 JSON nodes and
+	// serde_json::Map visits keys lexically. Preserve its first-candidate
+	// traversal rather than scanning an unbounded randomized Go map.
+	stack := []any{value}
+	for visited := 0; len(stack) > 0 && visited < previousResponseJSONScanLimit04383; visited++ {
+		index := len(stack) - 1
+		current := stack[index]
+		stack = stack[:index]
+		switch current := current.(type) {
+		case map[string]any:
+			code, _ := current["code"].(string)
+			if strings.EqualFold(code, "previous_response_not_found") {
 				return true
 			}
-		}
-	case []any:
-		for _, child := range value {
-			if responseHasCode(child, wanted) {
+			errorType, _ := current["type"].(string)
+			parameter, _ := current["param"].(string)
+			message, _ := current["message"].(string)
+			if _, ok := current["message"].(string); !ok {
+				message, _ = current["detail"].(string)
+				if _, ok := current["detail"].(string); !ok {
+					message, _ = current["error"].(string)
+				}
+			}
+			if strings.EqualFold(errorType, "invalid_request_error") && strings.EqualFold(strings.TrimSpace(message), "invalid `previous_response_id`.") {
 				return true
+			}
+			lower := strings.ToLower(message)
+			if (strings.Contains(lower, "no tool call found") || strings.Contains(lower, "no function call found")) &&
+				(strings.EqualFold(errorType, "invalid_request_error") || strings.EqualFold(parameter, "input")) {
+				return true
+			}
+			keys := make([]string, 0, len(current))
+			for key := range current {
+				keys = append(keys, key)
+			}
+			sort.Strings(keys)
+			for i := len(keys) - 1; i >= 0; i-- {
+				stack = append(stack, current[keys[i]])
+			}
+		case []any:
+			for i := len(current) - 1; i >= 0; i-- {
+				stack = append(stack, current[i])
 			}
 		}
 	}

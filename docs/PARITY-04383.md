@@ -2863,3 +2863,45 @@ exact HTTP 200 event bytes, no cross-profile replay, and unchanged durable
 previous ownership. Mutation tests reject forged Ready evidence, changed
 request/event bytes, additional inference and incorrect terminal status.
 This synthetic comparison is not an all-provider or native-OS certificate.
+
+## Plain-text previous-response errors and malformed JSON do not share affinity semantics
+
+The tagged Prodex 0.438.3 `extract_runtime_proxy_previous_response_message`
+first searches a complete `serde_json::Value`, then uses the compiled Mojo
+**text** classifier on the full UTF-8 response if structured extraction has
+no match. Standalone `previous_response_not_found`, its explanatory prefix,
+`Previous response ... not found`, exact invalid-backtick-previous-ID text,
+and the narrow `no tool/function call found` cases therefore remain meaningful
+precommit errors even when the upstream HTTP 400 is not JSON. Godex
+previously inspected only JSON object `code` fields, and silently missed
+these literal text errors; a verified previous-response owner would keep the
+raw 400 response rather than triggering the tagged **stale-continuation**
+contract. The exact pinned 0.438.3 binary revealed a second important rule:
+when a verified previous-response owner reports that its chain is missing,
+Prodex returns one HTTP **409** `stale_continuation` and refuses to submit
+that chain to a different Ready profile—even if the request includes a
+reconstructable-looking user/assistant/user history and a valid session.
+
+The same parser must not promote otherwise matching **malformed structured
+JSON** to previous-response evidence. The source rejects unmatched UTF-8,
+surrogate escapes, overflowing numbers and excessive container nesting, and
+its text fallback cannot interpret a JSON body starting with `{` as a
+standalone previous-response message. A fail-before regression covers both
+directions, using a bounded 2,048-node depth-first, key-sorted traversal that
+mirrors the tagged `runtime_json_find` walk for valid structured errors.
+An independent HTTP Router test verifies selected owners, an unchanged
+original request body, **one** model inference on its verified owner,
+and the untouched upstream 400 body when no stale signal is recognized.
+Pre-0.438.3 cross-owner rotation expectations were updated to enforce this
+observed fail-closed contract, while retained bounded turn-state retry
+tests still verify the three same-owner delays before a terminal 409.
+
+The pinned `--phase=http-turn-transport` oracle now also checks multiple
+standalone plain-text previous-response variants and invalid structured
+JSON cases with two authenticated Ready accounts, byte-exact source and
+downstream 409 stale-continuation (or preserved 400 for unrelated text),
+and independently verified existing response ownership. Negative mutation
+sentinels reject injected readiness, owner diversion, changed error payload,
+missing/replayed inference and forged successful completion. This adds a
+finite synthetic behavior slice; full external-provider and cross-OS parity
+remain open.
