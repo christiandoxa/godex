@@ -76,7 +76,7 @@ func clearMissingStandardHeaders(destination, source http.Header) {
 }
 
 func (proxy *Proxy) finishCommittedStream(ctx context.Context, writer http.ResponseWriter, response *proxymodel.Response, prefix []byte, accountID string, lifecycle *requestLifecycle, providerKind string) {
-	complete := proxy.forwardStream(ctx, writer, response.Body, prefix, accountID, response.Header, providerKind)
+	complete := proxy.forwardStream(ctx, writer, response.Body, prefix, accountID, response.Header, providerKind, response.RequestPreviousResponseID)
 	copyTrailers(writer.Header(), response.Header, response.Trailer)
 	if complete {
 		lifecycle.complete()
@@ -101,10 +101,10 @@ func (proxy *Proxy) finishCommittedBody(writer http.ResponseWriter, response *pr
 	lifecycle.complete()
 }
 
-func (proxy *Proxy) forwardStream(ctx context.Context, writer http.ResponseWriter, body io.Reader, prefix []byte, accountID string, headers http.Header, providerKind string) bool {
+func (proxy *Proxy) forwardStream(ctx context.Context, writer http.ResponseWriter, body io.Reader, prefix []byte, accountID string, headers http.Header, providerKind string, originalPrevious ...string) bool {
 	var lineage *routingusecase.SSELineageTracker04383
 	if proxy.router != nil && accountID != "" {
-		lineage = proxy.router.NewSSELineageTracker04383(accountID, providerKind, headers)
+		lineage = proxy.router.NewSSELineageTracker04383(accountID, providerKind, headers, originalPrevious...)
 	}
 	forwarder := streamForwarder{
 		proxy:        proxy,

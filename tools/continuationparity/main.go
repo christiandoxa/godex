@@ -264,6 +264,9 @@ func main() {
 			if err == nil {
 				err = runHTTPSSETurnLineageProduct04383(filepath.Join(root, "sse-turn-lineage"), p)
 			}
+			if err == nil {
+				err = runHTTPSSEDeadProduct04383(filepath.Join(root, "sse-dead-chain"), p)
+			}
 		} else if *httpTurnTransport {
 			err = runHTTPResponsesTurnProduct04383(root, p)
 		} else if *httpCompact {

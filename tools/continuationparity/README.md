@@ -939,3 +939,13 @@ turn and be durably bound on main. This checks that a committed observation
 is not silently dropped because the event exceeded the independent 64KiB
 precommit lookahead budget. The Go observer retains a conservative 1MiB
 minimum per-event cap rather than allowing unbounded allocations.
+
+The HTTP session-conflict phase additionally checks an SSE
+`previous_response_not_found` **after commitment**: `response.output_text.delta`
+is flushed before the later failed event. A successful committed stream may
+not be replayed or replaced by an HTTP 409. Instead, the source's original
+verified previous-response ID plus all IDs seen in the stream must lose their
+durable response owners, while an independently verified second-owned
+response remains intact. Prodex and Godex must return identical SSE bytes
+with exactly one authenticated Ready main inference. Per-response Godex
+turn-state sidecar removal is also asserted by the local proxy regression.

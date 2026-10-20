@@ -3344,3 +3344,39 @@ It compares the full SSE response, a single authenticated Ready main
 inference, and the inherited durable response/turn association on both
 Prodex 0.438.3 and Godex. Events larger than the configured committed
 observation budget remain outside this finite parity guarantee.
+
+## Clear dead response-chain ownership after committed SSE previous-response failure
+
+The tagged 0.438.3 `RuntimeSseTapState` records SSE output IDs as a single
+request-local stream state. Once output has committed, a subsequent event
+containing a valid structured `previous_response_not_found` must emit a
+`ClearDeadResponseBindings` effect for **all** response IDs already
+observed in that stream, plus the original request's previous-response ID.
+The native Rust release function marks those response IDs dead and clears
+their old owner/response-turn lineage, without touching a different
+account's response bindings. Because the signal arrives **after** client
+output, it is not permission to restart the model request or send an HTTP
+409 in place of the already-committed SSE bytes.
+
+Godex previously forwarded the failure SSE event without cleaning up those
+verified old response owners, leaving later continuations able to resolve a
+known-dead chain. A fail-before HTTP proxy test reproduces the stale-prefix
+owner. The scoped fix propagates the source request's canonical previous ID
+as **internal-only** `Response.RequestPreviousResponseID` and extends the
+request-local SSE lineage tracker with source-derived postcommit dead-chain
+cleanup. The tracker observes the failed event's own IDs before releasing
+them, sorts the affected IDs deterministically, and invokes the existing
+owner-checked durable `forgetDeadResponse` path, including removal of
+private per-response turn-state sidecars. Foreign-owned bindings and the
+original SSE response bytes are preserved. The request metadata is never
+serialized or exposed to clients.
+
+The source/manifest/executable-pinned `--phase=http-session-conflict` oracle
+includes a flushed output-delta event followed by a postcommit
+`previous_response_not_found`. It compares one authenticated Ready main
+inference, the full HTTP 200 SSE bytes, removal of the original previous
+response and both stream-local output/terminal response owners, and
+continued ownership of a separately verified second-account response.
+The local integration also verifies private sidecar deletion. Other
+unreferenced hard turn-state cleanup and native/external-provider modes
+remain separate parity boundaries, not globally certified by this slice.

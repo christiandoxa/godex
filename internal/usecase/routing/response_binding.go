@@ -102,6 +102,15 @@ func (router *Router) bindSuccessfulResponse(
 		return nil
 	}
 	stream := strings.Contains(strings.ToLower(result.Response.Header.Get("Content-Type")), "text/event-stream")
+	if selection.RouteKind == quotamodel.RouteKindResponses &&
+		(stream || result.Response.RequestedStreaming &&
+			strings.TrimSpace(result.Response.Header.Get("Content-Type")) == "" &&
+			result.Response.Header.Get("Content-Encoding") == "") {
+		// The tagged SSE tap retains the original requested previous ID
+		// so a committed previous_response_not_found can clear that dead
+		// chain as well as any response IDs observed in the SSE prelude.
+		result.Response.RequestPreviousResponseID = keys.previous
+	}
 	if result.Prefix == nil && !stream {
 		prefix, _, err := inspectResponse(result.Response.Body, router.maxInspect)
 		if err != nil {

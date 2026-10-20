@@ -14,18 +14,22 @@ import (
 // The precommit prefix is already observed by Router.bindSuccessfulResponse;
 // Seed reconstructs its state without executing its effects a second time.
 type SSELineageTracker04383 struct {
-	router                                     *Router
-	accountID, providerKind, profileHome, turn string
-	headers                                    http.Header
-	seen, withTurn                             map[string]bool
+	router                                                       *Router
+	accountID, providerKind, profileHome, turn, originalPrevious string
+	headers                                                      http.Header
+	seen, withTurn                                               map[string]bool
 }
 
-func (router *Router) NewSSELineageTracker04383(accountID, providerKind string, headers http.Header) *SSELineageTracker04383 {
+func (router *Router) NewSSELineageTracker04383(accountID, providerKind string, headers http.Header, requestPrevious ...string) *SSELineageTracker04383 {
 	turn := strings.TrimSpace(headers.Get("x-codex-turn-state"))
 	if !validHardBindingComponent04383(turn) {
 		turn = ""
 	}
-	return &SSELineageTracker04383{router: router, accountID: accountID,
+	previous := ""
+	if len(requestPrevious) > 0 && validHardBindingComponent04383(requestPrevious[0]) {
+		previous = strings.TrimSpace(requestPrevious[0])
+	}
+	return &SSELineageTracker04383{router: router, accountID: accountID, originalPrevious: previous,
 		providerKind: providerKind, profileHome: router.accountHome(accountID),
 		headers: headers, turn: turn, seen: make(map[string]bool), withTurn: make(map[string]bool)}
 }
@@ -45,7 +49,28 @@ func (state *SSELineageTracker04383) Observe(ctx context.Context, data []byte) e
 	if err := state.router.Observe(ctx, state.accountID, state.headers, data, false, state.providerKind); err != nil {
 		return err
 	}
-	return state.advance(data, ctx)
+	if err := state.advance(data, ctx); err != nil {
+		return err
+	}
+	if !externalProviderKind(state.providerKind) && previousResponseNotFound(data) {
+		// Tagged RuntimeSseTapState first observes this event's IDs,
+		// then clears the now-dead chain from its owning profile only.
+		// Its request previous ID may precede the SSE prelude entirely.
+		dead := make([]string, 0, len(state.seen)+1)
+		for id := range state.seen {
+			dead = append(dead, id)
+		}
+		if state.originalPrevious != "" && !state.seen[state.originalPrevious] {
+			dead = append(dead, state.originalPrevious)
+		}
+		sort.Strings(dead)
+		for _, id := range dead {
+			if err := state.router.affinity.forgetDeadResponse(ctx, id, state.accountID, state.profileHome); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (state *SSELineageTracker04383) advance(data []byte, ctx context.Context) error {

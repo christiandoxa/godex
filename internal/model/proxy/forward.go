@@ -53,7 +53,11 @@ type Response struct {
 	// Responses request. It prevents a missing upstream Content-Type from
 	// bypassing the precommit SSE inspector. Never serialize this field.
 	RequestedStreaming bool `json:"-"`
-	PrecommitFailure   *PrecommitFailure
+	// RequestPreviousResponseID carries a verified, source-owned Responses
+	// request identifier only within the committed HTTP stream observer.
+	// It is never forwarded or serialized to clients.
+	RequestPreviousResponseID string `json:"-"`
+	PrecommitFailure          *PrecommitFailure
 }
 
 // WebSocketEvent is borrowed parser output, valid until the next body Read.

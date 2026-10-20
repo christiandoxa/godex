@@ -129,6 +129,23 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+		if b.scenario == "http-sse-dead-chain" && string(body) == httpSSEDeadRequest04383 {
+			b.mu.Lock()
+			b.attempts = append(b.attempts, transportAttempt04383{owner: owner, body: string(body),
+				turn: r.Header.Get("x-codex-turn-state"), trace: r.Header.Get("thread-id"),
+				metadata: r.Header.Get("x-codex-turn-metadata"),
+				ready:    b.receipts["account-a"] > 0 && b.receipts["account-b"] > 0})
+			b.mu.Unlock()
+			w.Header().Set("Content-Type", "text/event-stream")
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, httpSSEDeadPrelude04383)
+			if flusher, ok := w.(http.Flusher); ok {
+				flusher.Flush()
+			}
+			time.Sleep(150 * time.Millisecond)
+			_, _ = io.WriteString(w, httpSSEDeadFailure04383)
+			return
+		}
 		if strings.HasPrefix(b.scenario, "http-sse-turn-lineage-") && string(body) == httpSSETurnLineageRequest04383 {
 			shape := strings.TrimPrefix(b.scenario, "http-sse-turn-lineage-")
 			b.mu.Lock()
