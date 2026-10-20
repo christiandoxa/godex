@@ -14,6 +14,26 @@ func (router *Router) resolveOwner(
 	selection quotamodel.Selection,
 ) (string, func() error, error) {
 	ownerKeys := keys
+	if selection.RouteKind == quotamodel.RouteKindWebSocket &&
+		ownerKeys.previous != "" && ownerKeys.turn != "" {
+		// Tagged 0.438.3 combines previous-response and Compact-origin turn
+		// lineage evidence. A direct previous owner must not authorize an
+		// inference when another profile owns the verified Compact turn.
+		previousOwner, err := router.affinity.owner(ctx, affinityKeys{previous: ownerKeys.previous}, router.now())
+		if err != nil {
+			return "", nil, &proxymodel.Error{StatusCode: 409, Message: "request contains conflicting conversation affinity"}
+		}
+		aliasOwner, err := router.affinity.owner(ctx,
+			affinityKeys{turn: "__compact_turn_state__:" + ownerKeys.turn}, router.now())
+		if err != nil {
+			return "", nil, &proxymodel.Error{StatusCode: 409, Message: "request contains conflicting conversation affinity"}
+		}
+		if previousOwner != "" && aliasOwner != "" && previousOwner != aliasOwner {
+			return "", nil, &proxymodel.Error{
+				StatusCode: http.StatusServiceUnavailable, Message: upstreamTransportFailureMessage,
+			}
+		}
+	}
 	if selection.RouteKind == quotamodel.RouteKindWebSocket && ownerKeys.previous == "" && ownerKeys.turn != "" {
 		// Tagged Prodex 0.438.3 resolves Compact's separate turn lineage
 		// even while the receiving socket retains the WebSocket quota route.

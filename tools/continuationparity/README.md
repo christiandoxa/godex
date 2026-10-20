@@ -472,3 +472,13 @@ conflict (which fails closed). Successful session-only WebSocket responses
 then materialize a direct binding on the selected owner; the oracle waits for
 that durable transition before declaring PASS. It must not incorrectly assume
 that no raw session binding will be created by the committed response.
+
+The WebSocket Compact lineage oracle also checks a hard **mixed-ID conflict**:
+`previous_response_id: resp-main` belongs to main, while the accompanying
+`x-codex-turn-state: compact-turn` has a verified Compact lineage on second.
+Unlike a reconstructable full-history request with only one failed owner,
+this input must produce the official single `503 service_unavailable` error
+frame, zero upstream WebSocket handshakes, and unchanged durable owners. Both
+valid accounts have applied authenticated Ready receipts, so exhaustion cannot
+be explained by missing quota evidence. Paired Router tests enforce the same
+boundary for memory and durable stores, with a same-owner positive control.

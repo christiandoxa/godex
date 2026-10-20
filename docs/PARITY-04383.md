@@ -1663,3 +1663,31 @@ all existing cases plus the direct-session conflict and post-commit durable
 controls on clean exploratory candidate `51504a0e173c85d4c72df6ec252288795259af68`.
 This finite session precedence result does not independently qualify live
 provider login, keyrings or native macOS realtime behavior.
+
+## Previous-response owner versus Compact turn lineage on WebSocket
+
+The tagged Prodex 0.438.3 hard-binding resolver considers a verified
+`previous_response_id` owner **together with** verified Compact-origin turn
+lineage (`__compact_turn_state__:`), even though the request's quota route is
+WebSocket. A previous response on main and a Compact lineage on second are
+conflicting hard evidence: neither profile is permitted to infer on that
+request.
+
+A clean source/binary/manifest-pinned differential on pre-fix exploratory
+`92c3401` produced the exact same authenticated Ready profiles and synthetic
+full-history request on both executables. Official Prodex emitted one canonical
+`503 service_unavailable` WebSocket error frame with **zero upstream model
+attempts**. Godex instead sent the original request to main and forwarded
+model output. This is a genuine cross-profile isolation discrepancy, not a
+fixture failure.
+
+The scoped usecase fix checks the previous-response binding and the matching
+Compact turn alias before choosing an owner. Only when **both** are verified
+and distinct does it return the tagged 503 recovery-exhausted error before
+any model dispatch. A missing alias retains the existing previous-response
+policy, while matching previous and Compact owners remain usable. New memory
+and durable regressions failed before the patch, then passed, including exact
+local status/message, zero upstream attempts, immutable original owners and a
+same-owner control. Full native and live-provider parity remain separately
+unverified; a finite differential PASS must be recorded on the clean final
+candidate, not inferred from those local tests alone.
