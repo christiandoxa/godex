@@ -2772,3 +2772,34 @@ request, one or no valid bounded recovery attempt, unchanged header bytes,
 terminal 400/200 and independent durable response ownership on both official
 Prodex 0.438.3 and Godex. This is a bounded synthetic HTTP recovery slice,
 not a claim about all OAuth/provider errors or native OS integrations.
+
+## WebSocket/turn-state recovery requires valid complete JSON before scrub/replay
+
+The tagged 0.438.3 `runtime_request_has_reconstructable_full_history`
+first parses the **entire** request as `serde_json::Value`; invalid JSON
+cannot establish a complete-history replay shape. The related
+`runtime_request_without_turn_state` removes stale turn-state handshake
+headers, but only re-serializes the request body when full serde parsing
+succeeds. In contrast, Go's `json.RawMessage` accepted otherwise malformed
+requests with unpaired Unicode surrogates, invalid raw UTF-8, non-finite
+numeric literals and excessive container nesting. Before this correction,
+Godex could classify such a message as reconstructable, rotate it on a quota
+failure, or transform its invalid original JSON into different bytes while
+scrubbing obsolete turn-state metadata.
+
+A fail-before table regression reuses the independent Rust 1.0.151
+compatibility fixtures from HTTP previous-response recovery and checks both
+reconstructable-history classification and unchanged invalid body bytes.
+Positive controls preserve valid escaped Unicode, finite exponents and full
+unsigned-64 precision. A separate WebSocket Router test verifies that an
+owned turn-state request carrying an invalid surrogate/overflow does **not**
+use the quota-based alternate, whereas fully valid history still makes the
+original bounded owner-to-alternate recovery. The scoped Go correction reuses
+the already audited whole-document JSON validator, and keeps the tagged
+outbound turn-state header removal independent of body re-serialization.
+
+These are pinned-source and local end-to-end tests. Although the general
+`--phase=websocket-transport` oracle remains part of the 0.438.3 release
+matrix, the exact malformed-turn recovery variants are not yet paired across
+native Prodex and Godex executables; this case is **source-aligned**, not a
+cross-binary certificate for the entire recovery stack.

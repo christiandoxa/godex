@@ -11,6 +11,11 @@ import (
 )
 
 func requestHasReconstructableFullHistory(request proxymodel.Request) bool {
+	// Tagged runtime_request_has_reconstructable_full_history parses the
+	// whole request as serde_json::Value before evaluating its input shape.
+	if _, valid := decodeNativeUsageJSON(request.Body); !valid {
+		return false
+	}
 	var body map[string]json.RawMessage
 	if json.Unmarshal(request.Body, &body) != nil {
 		return false
@@ -36,6 +41,11 @@ func requestWithoutTurnState(request proxymodel.Request) proxymodel.Request {
 	// Keep the client's input and unknown fields opaque: decoding into
 	// map[string]any would round large JSON integers through float64 and
 	// silently rewrite full-history tool arguments during 0.438.3 recovery.
+	// Tagged runtime_request_without_turn_state leaves the original body
+	// untouched when serde_json cannot parse the complete JSON document.
+	if _, valid := decodeNativeUsageJSON(request.Body); !valid {
+		return request
+	}
 	var body map[string]json.RawMessage
 	if json.Unmarshal(request.Body, &body) != nil {
 		return request
