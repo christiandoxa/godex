@@ -3229,3 +3229,33 @@ invalid previous-ID message. Each case uses an independent fresh request
 with two authenticated Ready profiles and checks the exact upstream body,
 precommit attempt count, SSE recovery output and unchanged earlier durable
 response ownership. Full live-provider and cross-OS parity remains open.
+
+## SSE BOM normalization applies to payload data, not wire field names
+
+Tagged Prodex 0.438.3 implements SSE framing through
+`prodex_runtime_sse_line_plan_v1` and `prodex_runtime_sse_payload_join_v1`.
+The wire line planner requires the literal ASCII `data` field name and does
+**not** ignore a BOM at the beginning of the physical line; such a field
+remains opaque. Separately, the payload assembler strips **all repeated
+UTF-8 BOM prefixes** from the first `data:` value of **each event**, before
+`serde_json` parsing and precommit quota classification. Godex's SSE decoder
+had the opposite behavior in part: it stripped a BOM from the first *wire
+line* but preserved BOMs inside the actual first `data:` value. A fake quota
+error with a BOM-prefixed wire field could therefore authorize an incorrect
+profile rotation, while a valid quota event prefixed with one or two BOMs
+inside its payload would be missed.
+
+Fail-before decoder regressions reproduce both differences across byte-wise,
+three-byte and whole-chunk input, with positive multi-event and second-data
+line controls. The scoped decoder fix recognizes only literal `data:` wire
+fields, removes repeated BOMs from the first payload segment of each event,
+and keeps original raw event byte-count limits and client-visible SSE bytes.
+An independent native Router classifier test verifies quota rotation versus
+ordinary event commitment for both BOM positions.
+
+The source/manifest/executable-pinned `--phase=http-turn-transport` oracle
+adds payload-BOM-once, payload-BOM-twice, and wire-field-BOM-ignored controls
+against Prodex 0.438.3. It checks the exact upstream request and raw response
+SSE bytes, authenticated Ready evidence on two profiles, one or two model
+attempts according to the classifier, and unchanged earlier durable
+response bindings. Native OS and real-provider combinations remain open.

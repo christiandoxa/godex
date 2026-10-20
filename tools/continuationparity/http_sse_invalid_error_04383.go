@@ -19,7 +19,8 @@ func httpSSEInvalidErrorShapes04383() []string {
 		"opaque-scalar-quota", "opaque-error-code-quota", "opaque-error-code-rate",
 		"opaque-profile-note", "opaque-profile-message", "kelvin-quota-code",
 		"canonical-quota", "canonical-rate", "created-quota", "inprogress-rate", "keepalive-quota",
-		"quota-and-invalid-id", "rate-and-invalid-id", "reason-quota-and-invalid-id"}
+		"quota-and-invalid-id", "rate-and-invalid-id", "reason-quota-and-invalid-id",
+		"payload-bom-quota", "payload-double-bom-quota", "wire-field-bom-ignored"}
 }
 
 func httpSSEInvalidErrorBody04383(shape string) string {
@@ -52,6 +53,13 @@ func httpSSEInvalidErrorBody04383(shape string) string {
 		return "data: " + `{"type":"response.failed","response":{"error":{"code":"rate_limit_exceeded","type":"invalid_request_error","message":"Invalid ` + "`previous_response_id`" + `."}}}` + "\n\n"
 	case "reason-quota-and-invalid-id":
 		return "data: " + `{"type":"response.failed","response":{"error":{"reason":"insufficient_quota","type":"invalid_request_error","message":"Invalid ` + "`previous_response_id`" + `."}}}` + "\n\n"
+	case "payload-bom-quota":
+		return "data: " + "\xef\xbb\xbf" + `{"type":"response.failed","response":{"error":{"code":"insufficient_quota"}}}` + "\n\n"
+	case "payload-double-bom-quota":
+		return "data: " + "\xef\xbb\xbf\xef\xbb\xbf" + `{"type":"response.failed","response":{"error":{"code":"insufficient_quota"}}}` + "\n\n"
+	case "wire-field-bom-ignored":
+		return "\xef\xbb\xbfdata: " + `{"type":"response.failed","response":{"error":{"code":"insufficient_quota"}}}` + "\n\n" +
+			"data: " + `{"type":"response.output_text.delta","delta":"visible"}` + "\n\n"
 	}
 	if shape == "valid-output" {
 		return "data: " + `{"type":"response.output_text.delta","delta":"ok"}` + "\n\n"
@@ -71,7 +79,8 @@ func httpSSEInvalidErrorBody04383(shape string) string {
 func httpSSEInvalidErrorRotates04383(shape string) bool {
 	return shape == "canonical-quota" || shape == "canonical-rate" ||
 		shape == "created-quota" || shape == "inprogress-rate" || shape == "keepalive-quota" ||
-		shape == "quota-and-invalid-id" || shape == "rate-and-invalid-id" || shape == "reason-quota-and-invalid-id"
+		shape == "quota-and-invalid-id" || shape == "rate-and-invalid-id" || shape == "reason-quota-and-invalid-id" ||
+		shape == "payload-bom-quota" || shape == "payload-double-bom-quota"
 }
 
 const httpSSERecovered04383 = "data: " + `{"type":"response.output_text.delta","delta":"recovered"}` + "\n\n"

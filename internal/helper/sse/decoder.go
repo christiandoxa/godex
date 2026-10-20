@@ -9,11 +9,10 @@ type Decoder struct {
 	data      []byte
 	oversized bool
 	skipLF    bool
-	firstLine bool
 }
 
 func NewDecoder(limit int) *Decoder {
-	return &Decoder{limit: max(1, limit), firstLine: true}
+	return &Decoder{limit: max(1, limit)}
 }
 
 // Feed returns complete data fields, joining multiline data with newlines.
@@ -43,11 +42,10 @@ func (decoder *Decoder) Feed(chunk []byte) [][]byte {
 }
 
 func (decoder *Decoder) endLine() []byte {
+	// The tagged SSE line planner does not strip a BOM from a wire field
+	// name. Only the assembled first data value has its BOM removed by
+	// Mojo runtime_sse_payload_join (including repeated prefixes).
 	line := decoder.line
-	if decoder.firstLine {
-		line = bytes.TrimPrefix(line, []byte("\xef\xbb\xbf"))
-		decoder.firstLine = false
-	}
 	if len(line) == 0 {
 		data := decoder.data
 		decoder.data = nil
@@ -70,6 +68,14 @@ func (decoder *Decoder) endLine() []byte {
 		decoder.oversized = true
 		decoder.data = nil
 		return nil
+	}
+	if len(decoder.data) == 0 {
+		// Source runtime_sse_payload_join consumes every leading BOM from
+		// the first data value, even when the physical field starts after
+		// ordinary comments. Subsequent data lines keep their literal BOMs.
+		for bytes.HasPrefix(value, []byte("\xef\xbb\xbf")) {
+			value = value[3:]
+		}
 	}
 	decoder.data = append(decoder.data, value...)
 	decoder.data = append(decoder.data, '\n')

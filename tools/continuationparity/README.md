@@ -905,3 +905,11 @@ quota/rate/overload flags before previous-response markers, so on a fresh
 unbound request these combinations must retry once on the second
 independently authenticated Ready profile. The original request is forwarded
 unchanged and the recovered SSE bytes and old response owner are checked.
+
+The SSE precommit oracle checks BOM placement explicitly. A BOM (including
+repeated BOMs) at the start of the *first `data:` payload* is stripped by
+Prodex's compiled payload assembler and must preserve native quota
+classification. A BOM before the physical field name makes it **not** a
+`data` field; a later valid output event commits without a quota retry.
+Both binaries must preserve all client-visible original SSE bytes, verify
+two Ready profiles and select the same precommit inference count/owner.
