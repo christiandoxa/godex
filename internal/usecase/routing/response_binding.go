@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/christiandoxa/godex/internal/helper/sse"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
@@ -96,7 +97,7 @@ func (router *Router) bindSuccessfulResponse(
 		// HTTP Compact commits successfully. These durable aliases are used
 		// by later WebSocket messages without changing their quota route.
 		compact := affinityKeys{}
-		if keys.session != "" {
+		if validCompactLineageComponent04383(keys.session) {
 			// A successful Compact request records session lineage even if
 			// selection was hard-pinned by a previous response and therefore
 			// excluded its session from the outbound selection keys.
@@ -109,7 +110,7 @@ func (router *Router) bindSuccessfulResponse(
 			}
 			compact.session = "__compact_session__:" + keys.session
 		}
-		if turn := responseTurnStateValue(result.Response); turn != "" {
+		if turn := responseTurnStateValue(result.Response); validCompactLineageComponent04383(turn) {
 			compact.turn = "__compact_turn_state__:" + turn
 		}
 		if compact.hasAffinity() {
@@ -157,4 +158,20 @@ func (router *Router) responseBindingKeys(
 		}
 	}
 	return bindingKeys, nil
+}
+
+// Tagged 0.438.3 uses the RuntimeHardBindingIdentity Mojo component
+// classifier before minting Compact lineage. Validate only this namespace:
+// ordinary response headers and cached turn-state tokens have separate policy.
+func validCompactLineageComponent04383(value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" || len(value) > 1024 || !utf8.ValidString(value) {
+		return false
+	}
+	for _, r := range value {
+		if r <= 31 || (r >= 127 && r <= 159) {
+			return false
+		}
+	}
+	return true
 }

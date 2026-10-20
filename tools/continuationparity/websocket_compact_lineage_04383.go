@@ -23,7 +23,7 @@ const shadowSessionNullMessage04383 = `{"type":"response.create","model":"gpt-6"
 const shadowSessionBlankMessage04383 = `{"type":"response.create","model":"gpt-6","session_id":" ","client_metadata":{"session_id":"shadow-session"},"input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
 
 func runWebSocketCompactLineageProduct04383(root string, p product) error {
-	for _, scenario := range []string{"compact-lineage", "compact-unbound", "compact-shadow-null", "compact-shadow-blank", "session-nested", "session-shadow-null", "session-shadow-blank", "compact-produced"} {
+	for _, scenario := range []string{"compact-lineage", "compact-unbound", "compact-shadow-null", "compact-shadow-blank", "session-nested", "session-shadow-null", "session-shadow-blank", "compact-produced", "compact-produced-long-turn"} {
 		if err := runCompactLineageCase04383(filepath.Join(root, scenario), p, scenario); err != nil {
 			return fmt.Errorf("%s: %w", scenario, err)
 		}
@@ -47,7 +47,7 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 		return err
 	}
 	wantOwner := "second"
-	if scenario == "compact-unbound" || strings.HasPrefix(scenario, "compact-shadow-") || strings.HasPrefix(scenario, "session-shadow-") {
+	if scenario == "compact-unbound" || scenario == "compact-produced-long-turn" || strings.HasPrefix(scenario, "compact-shadow-") || strings.HasPrefix(scenario, "session-shadow-") {
 		wantOwner = "main"
 	}
 	wantLineage := ""
@@ -77,7 +77,7 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 	// Compact commit creates the lineage, then return current to main.
 	// Synthetic controls warm second first and main last directly.
 	warmups := []string{"resp-ready-b", "resp-main"}
-	if scenario == "compact-produced" {
+	if strings.HasPrefix(scenario, "compact-produced") {
 		warmups = []string{"resp-main", "resp-ready-b"}
 	}
 	for _, previous := range warmups {
@@ -93,7 +93,7 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	if scenario == "compact-produced" {
+	if strings.HasPrefix(scenario, "compact-produced") {
 		// Use a previously verified second-owned response as the Compact
 		// producer's independent hard owner. This avoids relying on the
 		// products' different fresh-pool/active-profile heuristics.
@@ -109,16 +109,21 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 			return fmt.Errorf("HTTP Compact producer changed verified owner: attempts=%v invalid=%t", compactOwners, invalid)
 		}
 		producedDeadline := time.Now().Add(3 * time.Second)
+		wantProducedLineage := "second"
+		if scenario == "compact-produced-long-turn" {
+			wantProducedLineage = ""
+		}
 		for {
 			lineage, lineageErr := readCompactLineageOwner04383(p)
+			longAlias, longAliasErr := readCompactBindingOwner04383(p, "turn", "__compact_turn_state__:"+strings.Repeat("L", 1025))
 			session, sessionErr := readCompactSessionOwner04383(p)
 			direct, directErr := readCompactDirectSessionOwner04383(p)
-			if lineageErr == nil && sessionErr == nil && directErr == nil &&
-				lineage == "second" && session == "second" && direct == "second" {
+			if lineageErr == nil && longAliasErr == nil && sessionErr == nil && directErr == nil &&
+				lineage == wantProducedLineage && longAlias == "" && session == "second" && direct == "second" {
 				break
 			}
 			if time.Now().After(producedDeadline) {
-				return fmt.Errorf("successful HTTP Compact did not produce durable lineage/session: turn=%q session=%q direct=%q errors=%v/%v/%v", lineage, session, direct, lineageErr, sessionErr, directErr)
+				return fmt.Errorf("successful HTTP Compact produced wrong bounded durable lineage: short=%q long=%q session=%q direct=%q errors=%v/%v/%v/%v", lineage, longAlias, session, direct, lineageErr, longAliasErr, sessionErr, directErr)
 			}
 			time.Sleep(20 * time.Millisecond)
 		}
@@ -128,7 +133,7 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 		if err != nil || main.status != http.StatusOK {
 			return fmt.Errorf("restore main after Compact production: status=%d err=%v", main.status, err)
 		}
-		wantLineage = "second"
+		wantLineage = wantProducedLineage
 	}
 	connection, reader, err := wsConnectHeaders04383(endpoint+"/responses", "")
 	if err != nil {
@@ -181,11 +186,12 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 			shadowOwner, shadowErr := readCompactBindingOwner04383(p, "session", "shadow-session")
 			sessionOK = shadowErr == nil && shadowOwner == "second"
 		}
-		if scenario == "compact-produced" {
+		if strings.HasPrefix(scenario, "compact-produced") {
 			aliasSession, aliasErr := readCompactSessionOwner04383(p)
 			directSession, directErr := readCompactDirectSessionOwner04383(p)
-			sessionOK = aliasErr == nil && directErr == nil &&
-				aliasSession == "second" && directSession == "second"
+			longAlias, longAliasErr := readCompactBindingOwner04383(p, "turn", "__compact_turn_state__:"+strings.Repeat("L", 1025))
+			sessionOK = aliasErr == nil && directErr == nil && longAliasErr == nil &&
+				aliasSession == "second" && directSession == "second" && longAlias == ""
 		}
 		if err == nil && lineageErr == nil && sessionOK && lineage == wantLineage && owners["response"] == wantOwner &&
 			owners["turn"] == "main" && owners["session"] == "main" && owners["unrelated"] == "main" {
