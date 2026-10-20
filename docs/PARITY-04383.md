@@ -1424,3 +1424,26 @@ finite Linux/synthetic WebSocket transport parity, **not** FULL production
 1:1: the independent malformed-direct-field network oracle, strict public
 Compact-followup lineage, native macOS realtime and untested OS/OAuth/provider
 failure permutations remain PARTIAL/OPEN.
+
+## Pinned 0.438.3 regression gates after the 20-case split
+
+Following the clean-commit transport qualification at `cf8aafc`, the
+unchanged production candidate was requalified on clean documentation
+revision `e19c04c708befb7eb0a80352eff2e3e567fbbaa4` through two
+additional official 0.438.3 source/binary/manifest-pinned phases:
+
+| Release phase | Result on exact `e19c04c` |
+| --- | --- |
+| `--phase=websocket-core` | PASS; historical 56-attempt response suite, idle capacity, committed idle close, 8KiB promotion and native Linux realtime lifecycle on both executables |
+| `--phase=preflight-tests` | PASS; scoped regressions, mutation sentinels and provider/CLI test prerequisites |
+
+The transport's three-part 17+2+1 differential and its source-pinned mutation
+suite **already passed** on the common clean `cf8aafc` candidate. Neither a
+partial/timeout invocation nor compilation for a different operating system
+has been counted as an executable pass. The complete default release gate
+across *every* provider and native/macOS/Windows runtime mode has not been
+rerun on `e19c04c`, so the qualified result is limited to the recorded finite
+synthetic phases. Full live OAuth, OS keyring and external-provider fault
+parity, native macOS realtime, strict public Compact-followup WebSocket
+lineage and the malformed direct WebSocket metadata network oracle remain
+PARTIAL/OPEN.
