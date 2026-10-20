@@ -13,8 +13,29 @@ import (
 	"github.com/christiandoxa/godex/internal/helper/websocketframe"
 )
 
-func runWebSocketTransportProduct04383(root string, p product) error {
-	for _, scenario := range []string{"full-history", "unbound-history", "quota-history", "unbound-quota-history", "turn-missing", "delta-only", "unbound-delta", "unbound-quota-delta", "previous-response", "unknown-previous", "previous-quota", "unknown-quota", "previous-rate", "unknown-rate", "previous-overload", "unknown-overload", "postcommit", "cancellation", "deadline", "busy-history"} {
+// The independent release phases partition one unchanged 20-case oracle.
+// The default and native --websocket-transport mode still runs both halves.
+var websocketTransportCoreCases04383 = []string{
+	"full-history", "unbound-history", "quota-history", "unbound-quota-history",
+	"turn-missing", "delta-only", "unbound-delta", "unbound-quota-delta",
+	"previous-response", "unknown-previous", "previous-quota", "unknown-quota",
+	"previous-rate", "unknown-rate", "previous-overload", "unknown-overload", "postcommit",
+}
+var websocketTransportLifecycleCases04383 = []string{"cancellation", "deadline", "busy-history"}
+
+func websocketTransportCases04383(scope string) []string {
+	cases := make([]string, 0, len(websocketTransportCoreCases04383)+len(websocketTransportLifecycleCases04383))
+	if scope != "lifecycle" {
+		cases = append(cases, websocketTransportCoreCases04383...)
+	}
+	if scope != "core" {
+		cases = append(cases, websocketTransportLifecycleCases04383...)
+	}
+	return cases
+}
+
+func runWebSocketTransportProduct04383(root string, p product, scope string) error {
+	for _, scenario := range websocketTransportCases04383(scope) {
 		if err := runTransportCase04383(filepath.Join(root, scenario), p, scenario); err != nil {
 			return fmt.Errorf("%s: %w", scenario, err)
 		}

@@ -182,6 +182,8 @@ func main() {
 	websocketLookaheadIdle := flag.Bool("websocket-lookahead-idle", false, "compare 8KiB precommit hold promotion into committed stream idle against both binaries")
 	websocketRealtime := flag.Bool("websocket-realtime", false, "compare realtime duplex permit retention, admission and session closure")
 	websocketTransport := flag.Bool("websocket-transport", false, "compare authenticated full-history precommit transport recovery in a rotating managed launch")
+	websocketTransportCore := flag.Bool("websocket-transport-core", false, "compare the original transport retry/error cases without the long-lived lifecycle cases")
+	websocketTransportLifecycle := flag.Bool("websocket-transport-lifecycle", false, "compare authenticated cancellation, absolute deadline and busy-profile recovery")
 	httpKeepAlive := flag.Bool("http-keepalive", false, "compare request-local deadlines across a reused HTTP connection")
 	httpCompact := flag.Bool("http-compact", false, "compare Compact precommit transport recovery and durable ownership")
 	httpTurnTransport := flag.Bool("http-turn-transport", false, "compare owned HTTP Responses turn transport failure without replay")
@@ -189,7 +191,7 @@ func main() {
 	godexCommit := flag.String("godex-commit", "", "exact 40-character Godex commit (required with an isolated fixture)")
 	flag.Parse()
 	chosen := 0
-	for _, mode := range []bool{*websocket, *websocketCapacity, *websocketDeadline, *websocketCommittedIdle, *websocketLookaheadIdle, *websocketRealtime, *websocketTransport, *httpKeepAlive, *httpCompact, *httpTurnTransport} {
+	for _, mode := range []bool{*websocket, *websocketCapacity, *websocketDeadline, *websocketCommittedIdle, *websocketLookaheadIdle, *websocketRealtime, *websocketTransport, *websocketTransportCore, *websocketTransportLifecycle, *httpKeepAlive, *httpCompact, *httpTurnTransport} {
 		if mode {
 			chosen++
 		}
@@ -234,8 +236,14 @@ func main() {
 			err = runHTTPCompactProduct04383(root, p)
 		} else if *httpKeepAlive {
 			err = runHTTPKeepAliveProduct04383(root, p)
-		} else if *websocketTransport {
-			err = runWebSocketTransportProduct04383(root, p)
+		} else if *websocketTransport || *websocketTransportCore || *websocketTransportLifecycle {
+			scope := "all"
+			if *websocketTransportCore {
+				scope = "core"
+			} else if *websocketTransportLifecycle {
+				scope = "lifecycle"
+			}
+			err = runWebSocketTransportProduct04383(root, p, scope)
 		} else if *websocketRealtime {
 			err = runWebSocketRealtimeProduct04382(root, p)
 		} else if *websocketLookaheadIdle {
@@ -273,6 +281,14 @@ func main() {
 	}
 	if *websocketTransport {
 		fmt.Println("PASS Prodex 0.438.3 authenticated full-history WebSocket transport recovery across both binaries")
+		return
+	}
+	if *websocketTransportCore || *websocketTransportLifecycle {
+		scope := "core"
+		if *websocketTransportLifecycle {
+			scope = "lifecycle"
+		}
+		fmt.Printf("PASS Prodex 0.438.3 authenticated full-history WebSocket transport %s oracle across both binaries\n", scope)
 		return
 	}
 	if chosen > 0 && !*websocketRealtime {

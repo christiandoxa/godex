@@ -372,3 +372,27 @@ those reference files after import; Godex output is not normalized. This
 qualifies runtime behavior only and does not certify native CLI import privacy.
 All six native modes and negative controls run even if an earlier mode fails;
 any failed mode still makes the script fail.
+
+### Scoped 0.438.3 WebSocket transport release phases
+
+The full `--websocket-transport` native/default oracle continues to run all
+**20** authenticated two-executable cases, including the original 30-second
+deadline and post-commit no-replay controls. For bounded synchronous Linux
+release-gate calls, run **both** independent source/binary/manifest-pinned
+phases on the *same clean Godex commit*:
+
+```sh
+./scripts/verify-release-parity.sh --phase=websocket-transport-core
+./scripts/verify-release-parity.sh --phase=websocket-transport-lifecycle
+```
+
+The core slice runs the first 17 retry, ownership, quota/application-error and
+postcommit scenarios; the lifecycle slice runs cancellation, the original
+30-second deadline and saturated profile-capacity recovery. Every case retains
+the exact upstream owner, authenticated Ready, raw request/history, client
+frame, durable-state and negative mutation assertions. The release script also
+runs the complete `TestProdex04383Transport*` mutation suite in either phase.
+`TestProdex04383WebSocketTransportSlicesExhaustive` rejects omitted,
+duplicated or reordered cases. **A single slice is not a release certificate**;
+full source, native-platform and external-credential parity must still be
+qualified independently.
