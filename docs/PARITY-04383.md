@@ -1856,3 +1856,56 @@ Only docs changed between those two SHAs. Collectively this is a broad set
 of **finite synthetic Linux differential results**, not a release-wide claim
 of perfect production 1:1. Native macOS/Windows execution, live OAuth/keyring
 and external-provider fault combinations retain **PARTIAL/OPEN** status.
+
+## HTTP Responses conflict marker is a soft session preference (0.438.3)
+
+The tagged 0.438.3 affinity planner explicitly filters the
+`__prodex_hard_binding_conflict__` sentinel when deriving a **soft** session
+preference for ordinary HTTP Responses and WebSocket. In contrast, verified
+previous-response/turn hard conflicts retain their fail-closed guarantees.
+Godex's WebSocket path already handled this distinction, but ordinary HTTP
+Responses still passed the conflict marker to the general hard-affinity
+resolver and returned local `409` before reaching an upstream.
+
+An independent **authenticated two-executable** differential uses a real
+managed launch with main and second, applied Ready quota receipts, and a
+synthetically persisted `http-conflict` direct session marker on both products.
+It then sends the same self-contained HTTP `/responses` body and compares
+route, response status/body, upstream identity, exact opaque input, attempt
+count and the durable conflict/response bindings. On the clean exploratory
+`972ddec` fixture the official Prodex 0.438.3 binary selected a Ready profile,
+returned HTTP **200** with one upstream request and retained the original
+conflict marker. Pre-fix Godex instead returned HTTP **409** with zero
+upstream requests, proving the discrepancy independently of Rust source.
+
+The scoped `resolveOwner` fix excludes the deliberate verified conflict only
+while selecting a *session-only* HTTP Responses request. It keeps the original
+session value available for post-commit verified observations and leaves
+ordinary owned sessions, previous-response/turn hard affinity and HTTP Compact
+selection rules unchanged. Dedicated fail-before memory/durable regressions
+cover both the conflict fallback and the positive control where a healthy
+existing session still routes to its original account. The fixture's mutation
+controls reject a local 409, missing/duplicate/unready/unauthenticated model
+attempts, changed history, wrong owner class or altered response.
+
+The `--phase=http-session-conflict` release gate is pinned to the exact official
+0.438.3 executable digest, manifest and source tag. The native parity matrix
+includes the same case, but native macOS/Windows **execution** and live
+OAuth/provider fault parity must still be qualified independently. Do not
+mark this phase VERIFIED until the complete differential passes on the clean
+final code commit; a source-aligned local unit test alone is insufficient.
+
+### Single-turn eligibility versus durable session repair
+
+The inherited `TestProdex043711FullHistoryRepairsOnlyConflictingSoftSession`
+used to treat a single-turn conflicted Responses request as a terminal routing
+error. The official **0.438.3 binary** instead accepts a self-contained
+single-turn request on a fresh eligible profile, while its durable session
+remains **conflicted**. This is distinct from releasing and rebinding the
+conflict marker, which is allowed only for a proved reconstructable complete
+history. The historical regression now independently asserts both dimensions:
+full-history requests may repair durable ownership, while a single-turn
+request may return 200 without clearing the conflict. Opaque previous-response
+or turn-state dependencies and Compact routes retain their no-reset controls.
+This adjustment is based on the pinned executable's actual HTTP response and
+persisted owner, not on a broadening of the lineage repair policy.

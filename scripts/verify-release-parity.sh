@@ -25,7 +25,8 @@ case "${1:-}" in
   --phase=http-keepalive) phase='http-keepalive' ;;
   --phase=http-compact) phase='http-compact' ;;
   --phase=http-turn-transport) phase='http-turn-transport' ;;
-  *) echo 'usage: verify-release-parity.sh [--phase=preflight|preflight-tests|preflight-oracles|preflight-oracles-pty|preflight-oracles-profiles|preflight-oracles-history|deepseek|gemini|websocket|websocket-core|websocket-deadline|websocket-transport|websocket-transport-core|websocket-transport-lifecycle|websocket-transport-capacity|websocket-compact-lineage|http-keepalive|http-compact|http-turn-transport]' >&2; exit 2 ;;
+  --phase=http-session-conflict) phase='http-session-conflict' ;;
+  *) echo 'usage: verify-release-parity.sh [--phase=preflight|preflight-tests|preflight-oracles|preflight-oracles-pty|preflight-oracles-profiles|preflight-oracles-history|deepseek|gemini|websocket|websocket-core|websocket-deadline|websocket-transport|websocket-transport-core|websocket-transport-lifecycle|websocket-transport-capacity|websocket-compact-lineage|http-keepalive|http-compact|http-turn-transport|http-session-conflict]' >&2; exit 2 ;;
 esac
 if [ "$#" -gt 1 ]; then
   echo 'release parity accepts at most one phase option' >&2
@@ -817,6 +818,18 @@ if [ "$phase" = 'all' ] || [ "$phase" = 'http-turn-transport' ]; then
   --http-turn-transport
 go test -race ./tools/continuationparity \
   -run '^TestProdex04383HTTPResponsesTurnOracleRejectsMutations$' -count=1 -timeout=30s
+fi
+
+# HTTP Responses may ignore a deliberately conflicted *soft* session as an
+# owner preference. Do not confuse this with hard turn/response conflicts.
+if [ "$phase" = 'all' ] || [ "$phase" = 'http-session-conflict' ]; then
+"$tmp/continuationparity" \
+  --prodex "$tmp/prodex" --godex "$tmp/godex" \
+  --prodex-source "$tmp/prodex-source" \
+  --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
+  --http-session-conflict
+go test -race ./tools/continuationparity \
+  -run '^TestProdex04383HTTPSoftSessionConflictOracleRejectsMutations$' -count=1 -timeout=30s
 fi
 
 # Printed only after all stages *selected for this invocation* succeeded.

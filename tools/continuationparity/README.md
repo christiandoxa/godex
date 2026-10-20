@@ -505,3 +505,14 @@ Ready owner (main or second). The fixture checks both delta/completion frames, e
 two total authenticated upstream attempts, the intact original request and
 continued durable conflict marker. This must not weaken the independently
 pinned hard turn/previous-response conflict cases, which fail before dispatch.
+
+### HTTP Responses conflicted soft-session differential
+
+`--http-session-conflict` checks a verified conflict-marker session on the
+ordinary HTTP Responses route with both managed profiles authenticated Ready.
+It must **not** yield a local `409` or silently erase the conflict. It compares
+one allowed eligible upstream attempt, exact original JSON, HTTP 200 response,
+and durable response ownership while preserving the conflict marker. The
+native matrix includes this phase; a source/manifest/executable-pinned clean
+commit and the mutation suite are required before reporting PASS. A separate
+Router regression proves a healthy owned HTTP session is not demoted to fresh.

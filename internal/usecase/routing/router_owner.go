@@ -90,6 +90,20 @@ func (router *Router) resolveOwner(
 			}
 		}
 	}
+	if selection.RouteKind == quotamodel.RouteKindResponses &&
+		ownerKeys.previous == "" && ownerKeys.turn == "" &&
+		ownerKeys.thread == "" && ownerKeys.session != "" {
+		// Tagged Prodex 0.438.3 filters the conflict sentinel from the
+		// *soft* Responses session preference. A fresh eligible account may
+		// handle a self-contained request; preserve the original session key
+		// for verified post-commit observations and durable conflict state.
+		_, err := router.affinity.owner(ctx, affinityKeys{session: ownerKeys.session}, router.now())
+		if errors.Is(err, errConflictingAccountAffinity) {
+			ownerKeys.session = ""
+		} else if err != nil {
+			return "", nil, &proxymodel.Error{StatusCode: 409, Message: "request contains conflicting conversation affinity"}
+		}
+	}
 	if selection.RouteKind == quotamodel.RouteKindCompact {
 		if ownerKeys.previous != "" {
 			ownerKeys.session = ""

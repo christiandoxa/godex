@@ -18,15 +18,15 @@ func TestProdex043711FullHistoryRepairsOnlyConflictingSoftSession(t *testing.T) 
 	const ownerB = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	fullHistory := `{"model":"gpt-5.6","session_id":"sess-conflicted","input":[{"role":"user","content":"first"},{"role":"assistant","content":"reply"},{"role":"user","content":"retry full history"}]}`
 	for _, tc := range []struct {
-		name, body string
-		route      quotamodel.RouteKind
-		wantOK     bool
+		name, body         string
+		route              quotamodel.RouteKind
+		wantOK, wantRepair bool
 	}{
-		{"full history repairs soft session", fullHistory, quotamodel.RouteKindResponses, true},
-		{"single turn cannot reset", `{"session_id":"sess-conflicted","input":[{"role":"user","content":"continue"}]}`, quotamodel.RouteKindResponses, false},
-		{"opaque previous cannot reset", `{"previous_response_id":"resp-hard","session_id":"sess-conflicted","input":[{"role":"user"},{"role":"assistant"},{"role":"user"}]}`, quotamodel.RouteKindResponses, false},
-		{"opaque turn cannot reset", `{"x-codex-turn-state":"turn-hard","session_id":"sess-conflicted","input":[{"role":"user"},{"role":"assistant"},{"role":"user"}]}`, quotamodel.RouteKindResponses, false},
-		{"compact session must not reset", fullHistory, quotamodel.RouteKindCompact, false},
+		{"full history repairs soft session", fullHistory, quotamodel.RouteKindResponses, true, true},
+		{"single turn may route but cannot reset", `{"session_id":"sess-conflicted","input":[{"role":"user","content":"continue"}]}`, quotamodel.RouteKindResponses, true, false},
+		{"opaque previous cannot reset", `{"previous_response_id":"resp-hard","session_id":"sess-conflicted","input":[{"role":"user"},{"role":"assistant"},{"role":"user"}]}`, quotamodel.RouteKindResponses, false, false},
+		{"opaque turn cannot reset", `{"x-codex-turn-state":"turn-hard","session_id":"sess-conflicted","input":[{"role":"user"},{"role":"assistant"},{"role":"user"}]}`, quotamodel.RouteKindResponses, false, false},
+		{"compact session must not reset", fullHistory, quotamodel.RouteKindCompact, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			repo := routingrepo.NewStore(t.TempDir())
@@ -72,21 +72,28 @@ func TestProdex043711FullHistoryRepairsOnlyConflictingSoftSession(t *testing.T) 
 			exchange, err := router.Forward(t.Context(), request)
 			if tc.wantOK {
 				if err != nil {
-					t.Fatalf("valid full-history reset failed: %v", err)
+					t.Fatalf("eligible HTTP session request failed: %v", err)
 				}
 				defer exchange.Close()
 				if exchange.Result.Failed || exchange.Result.AccountID != ownerA || len(gateway.calls) != 1 {
 					t.Fatalf("reset output owner=%q failed=%v upstream=%v", exchange.Result.AccountID, exchange.Result.Failed, gateway.calls)
 				}
-				if _, err := repo.Merge(t.Context(), []routingentity.Binding{{
-					Kind: "session", Key: affinityDigest("session", session),
-					AccountID: ownerB, UpdatedUnix: 100,
-				}}); err != nil {
-					t.Fatalf("stale worker poisoned repaired owner: %v", err)
+				if tc.wantRepair {
+					if _, err := repo.Merge(t.Context(), []routingentity.Binding{{
+						Kind: "session", Key: affinityDigest("session", session),
+						AccountID: ownerB, UpdatedUnix: 100,
+					}}); err != nil {
+						t.Fatalf("stale worker poisoned repaired owner: %v", err)
+					}
 				}
+				wantOwner := routingentity.ConflictAccountID
+				if tc.wantRepair {
+					wantOwner = ownerA
+				}
+
 				owner, err := SessionOwner(t.Context(), repo, session)
-				if err != nil || owner != ownerA {
-					t.Fatalf("repaired session owner not durably rebound: owner=%q err=%v", owner, err)
+				if err != nil || owner != wantOwner {
+					t.Fatalf("session repair owner=%q want=%q err=%v", owner, wantOwner, err)
 				}
 			} else {
 				if exchange != nil {
