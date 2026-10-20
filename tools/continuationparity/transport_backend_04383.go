@@ -78,6 +78,22 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.HasSuffix(r.URL.Path, "/responses") && r.Method == http.MethodPost {
 		body, _ := io.ReadAll(io.LimitReader(r.Body, 4096))
+		if strings.HasPrefix(b.scenario, "http-response-session-") {
+			shape := strings.TrimPrefix(b.scenario, "http-response-session-")
+			if string(body) == httpResponseSessionRequest04383(shape) {
+				b.mu.Lock()
+				b.attempts = append(b.attempts, transportAttempt04383{owner: owner, body: string(body),
+					turn: r.Header.Get("x-codex-turn-state"), trace: r.Header.Get("thread-id"),
+					metadata: r.Header.Get("x-codex-turn-metadata"),
+					ready:    b.receipts["account-a"] > 0 && b.receipts["account-b"] > 0})
+				b.mu.Unlock()
+				if header := httpResponseSessionHeader04383(shape); header != "" {
+					w.Header().Set("session-id", header)
+				}
+				writeJSON(w, http.StatusOK, httpResponseSessionReply04383(shape))
+				return
+			}
+		}
 		if strings.HasPrefix(b.scenario, "http-unsupported-thread-") {
 			headerName := strings.TrimPrefix(b.scenario, "http-unsupported-thread-")
 			for _, step := range httpUnsupportedThreadSteps04383 {

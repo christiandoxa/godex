@@ -9,6 +9,10 @@ import (
 func (router *Router) Observe(ctx context.Context, accountID string, headers http.Header, body []byte, stream bool, providerKinds ...string) error {
 	router.observeTokenUsage(ctx, accountID, body)
 	keys := responseAffinity(headers, body, stream)
+	// Prodex 0.438.3 verifies session ownership from request semantics on
+	// successful attempts. A response body, SSE event or upstream header
+	// cannot mint a new session/thread owner simply by naming one.
+	keys.session, keys.thread = "", ""
 	var extraIDs []string
 	if len(providerKinds) > 0 && strings.EqualFold(strings.TrimSpace(providerKinds[0]), "copilot") {
 		// Copilot accepts native responseId and message.id shapes as well as

@@ -249,6 +249,9 @@ func main() {
 			if err == nil {
 				err = runHTTPUnsupportedThreadProduct04383(filepath.Join(root, "unsupported-thread-header"), p)
 			}
+			if err == nil {
+				err = runHTTPResponseSessionProduct04383(filepath.Join(root, "response-session-owner"), p)
+			}
 		} else if *httpTurnTransport {
 			err = runHTTPResponsesTurnProduct04383(root, p)
 		} else if *httpCompact {

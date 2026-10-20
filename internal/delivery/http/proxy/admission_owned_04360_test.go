@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
+	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 	routingusecase "github.com/christiandoxa/godex/internal/usecase/routing"
 )
 
@@ -38,9 +39,10 @@ func admissionOwner04360Setup(t *testing.T) (*activeRequestHandler, *admissionOw
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { router.Close() })
-	if err = router.Observe(t.Context(), "a", make(http.Header), []byte(`{"response":{"id":"owned-response"},"session_id":"owned-session"}`), false); err != nil {
+	if err = router.Observe(t.Context(), "a", make(http.Header), []byte(`{"response":{"id":"owned-response"}}`), false); err != nil {
 		t.Fatal(err)
 	}
+	seedAdmissionOwnedSession04383(t, router, gateway)
 	proxy, err := NewProxy(Config{Router: router, MaxInspectBytes: 4096, MaxRequestBytes: 4096})
 	if err != nil {
 		t.Fatal(err)
@@ -118,4 +120,23 @@ func TestProdex04360AdmissionPeekIsBoundedAndDoesNotConsumeBody(t *testing.T) {
 	if err != nil || !bytes.Equal(got, body) {
 		t.Fatalf("bounded peek destroyed request body: %v bytes=%d", err, len(got))
 	}
+}
+
+// Establish the verified session from the inbound request, not a forged
+// response-origin session field. Reset the test count after the setup turn.
+func seedAdmissionOwnedSession04383(t *testing.T, router *routingusecase.Router, gateway *admissionOwner04360Gateway) {
+	t.Helper()
+	exchange, err := router.Forward(t.Context(), proxymodel.Request{
+		Method: http.MethodPost, Path: "/backend-api/codex/responses",
+		Header:         make(http.Header),
+		Body:           []byte(`{"session_id":"owned-session","input":[]}`),
+		QuotaSelection: quotamodel.Selection{RouteKind: quotamodel.RouteKindResponses},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := exchange.Close(); err != nil {
+		t.Fatal(err)
+	}
+	gateway.calls.Store(0)
 }

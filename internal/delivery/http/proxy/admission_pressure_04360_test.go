@@ -63,9 +63,10 @@ func TestProdex04360FreshCompactPressureShedProtectsOwnedContinuation(t *testing
 				t.Fatal(err)
 			}
 			defer router.Close()
-			if err = router.Observe(t.Context(), "a", nil, []byte(`{"response":{"id":"owned-response"},"session_id":"owned-session"}`), false); err != nil {
+			if err = router.Observe(t.Context(), "a", nil, []byte(`{"response":{"id":"owned-response"}}`), false); err != nil {
 				t.Fatal(err)
 			}
+			seedAdmissionOwnedSession04383(t, router, gateway)
 			proxy, err := NewProxy(Config{Router: router, PressureSnapshot: func() AdmissionPressure { return tc.pressure }})
 			if err != nil {
 				t.Fatal(err)

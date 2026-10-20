@@ -599,3 +599,13 @@ The independent second/main/main sequence must be observed with applied
 Ready receipts and with all three responses durably owned by the dispatched
 profile. The official Prodex executable, not an inferred Rust refactor,
 is the reference for the negative alias behavior.
+
+Seven `--http-session-conflict` response-origin session controls verify that
+successful HTTP Responses persist **request** session identity and response
+IDs independently. Top-level, nested response/data, conversation/thread
+aliases, and upstream session headers cannot mint a session binding on their
+own; a canonical request `session_id` must. The oracle checks authenticated
+Ready receipts, exact original upstream request body, one inference, intact
+client response and the independent response/session durable projection.
+Each mutation sentinel rejects changed bytes, account, readiness, output or
+request count rather than accepting a status-only coincidence.

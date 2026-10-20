@@ -2188,3 +2188,35 @@ subsequent HTTP request and private hashed persistence with the canonical
 `session_id` header. The test was not disabled: its real transport and
 process-restart owner assertions are preserved. An unrelated generic routing
 test still covers serialized first-owner selection for legacy commands.
+
+## HTTP Responses must not mint session owners from upstream response payloads
+
+The tagged Prodex 0.438.3 `response_forwarding.rs` records
+`remember_runtime_session_id` from the successful **request** session
+semantics, then extracts only response IDs and turn-state from response
+framing. Godex's shared response observer previously promoted a session-like
+field from the response body, nested `response` or `data` object, legacy
+`conversation_id`/`thread_id` alias, or upstream `session-id` header to a
+new **verified** session owner. This could make an unrelated later request
+select an attacker- or provider-supplied foreign session lineage.
+
+The source/binary/manifest-pinned exploratory HTTP differential on a clean
+pre-fix commit confirmed that Prodex 0.438.3 leaves all six response-only
+session shapes unbound while persisting the genuine response ID on main. A
+positive control shows that an identical session string explicitly supplied
+by the **request** does become main-owned. The pre-fix Go Router failed all
+six negative memory/durable variants; its response observer now discards
+session and thread ownership extracted only from upstream output. The
+existing request-owned success path and response-ID/turn-state/usage
+observation are preserved, including committed SSE and WebSocket event
+observation. Admission fixture setup now seeds its real `session_id` using a
+successful independent request instead of an artificial response annotation.
+
+The mandatory `--phase=http-session-conflict` oracle compares seven synthetic
+response variations per product, with two independently authenticated Ready
+profiles, one exact unchanged inference, HTTP output/status and durable
+response/session projections. Its negative controls reject wrong account,
+forged readiness, duplicated inference, changed request/response, injected
+metadata, and invalid synthetic auth. As with the other finite fixture
+slices, native cross-OS runtime and live OAuth/provider permutations remain
+outside this verified contract.
