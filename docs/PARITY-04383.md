@@ -1636,3 +1636,30 @@ matching owners, preserving both conflicting bindings and zero model dispatch.
 The executable fixture independently rejects any extra dispatch, changed
 503 frame, altered owner or missing terminal. This finite conflict policy is
 not a complete certification of provider identity/keyring semantics.
+
+## Direct WebSocket session owner outranks Compact session alias
+
+The pinned 0.438.3 executable now has an additional positive/negative
+session-precedence oracle. It seeds a verified direct `session-alias` binding
+on main and a verified `__compact_session__:session-alias` lineage binding on
+second. With both profiles authenticated Ready and main active, the original
+request with an explicit `session_id` header must select main, forward exactly
+one opaque input, and preserve both original owners. This is distinct from the
+already-verified alias-only case (second) and unbound case (main). The Router's
+memory and durable owner-precedence regression remains active.
+
+The official executable additionally confirmed that **a successful WebSocket
+session-only message persists a direct session binding** on the selected
+profile. An earlier exploratory oracle asserted that the direct binding must
+remain absent after a successful alias-selected turn. That assertion could
+fail solely because Prodex's asynchronous persistence completed before the
+snapshot check. The fixture now requires the correct direct session owner
+(`main` or `second`, according to the exact case) in its post-commit durable
+projection, while continuing to verify the unchanged Compact alias and
+unrelated hard owners. This strengthens, rather than relaxes, the oracle.
+
+The full source/binary/manifest-pinned `websocket-compact-lineage` phase passed
+all existing cases plus the direct-session conflict and post-commit durable
+controls on clean exploratory candidate `51504a0e173c85d4c72df6ec252288795259af68`.
+This finite session precedence result does not independently qualify live
+provider login, keyrings or native macOS realtime behavior.

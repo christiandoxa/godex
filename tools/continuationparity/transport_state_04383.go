@@ -34,6 +34,12 @@ func seedTransportAlternate04383(p product, scenario string) error {
 		}
 		value["response_profile_bindings"].(map[string]any)["resp-ready-b"] = map[string]any{"profile_name": "second", "bound_at": time.Now().Unix()}
 		value["statuses"].(map[string]any)["response"].(map[string]any)["resp-ready-b"] = map[string]any{"state": "Verified", "confidence": 4, "last_verified_at": time.Now().Unix(), "last_touched_at": time.Now().Unix(), "last_verified_route": "responses", "success_count": 1}
+		if scenario == "compact-session-conflict" {
+			binding := map[string]any{"profile_name": "main", "bound_at": time.Now().Unix()}
+			value["session_id_bindings"].(map[string]any)["session-alias"] = binding
+			value["session_profile_bindings"].(map[string]any)["session-alias"] = binding
+			value["statuses"].(map[string]any)["session_id"].(map[string]any)["session-alias"] = map[string]any{"state": "Verified", "confidence": 4, "last_verified_at": time.Now().Unix(), "last_touched_at": time.Now().Unix(), "last_verified_route": "responses", "success_count": 1}
+		}
 		if strings.HasPrefix(scenario, "compact-session-") && scenario != "compact-session-unbound" {
 			// A *Compact* session lineage exists independently from a plain
 			// session binding and must be usable by explicit WebSocket headers.
@@ -79,6 +85,19 @@ func seedTransportAlternate04383(p product, scenario string) error {
 		if scenario == "compact-lineage" || scenario == "compact-turn-conflict" || strings.HasPrefix(scenario, "compact-shadow-") {
 			alias := sha256.Sum256([]byte("turn:__compact_turn_state__:compact-turn"))
 			state["bindings"] = append(state["bindings"].([]any), map[string]any{"kind": "turn", "key": hex.EncodeToString(alias[:]), "account_id": id, "updated_unix": time.Now().Unix()})
+		}
+		if scenario == "compact-session-conflict" {
+			var mainID string
+			for _, account := range accounts.Accounts {
+				if account.Name == "main" {
+					mainID = account.ID
+				}
+			}
+			if mainID == "" {
+				return errors.New("missing synthetic main profile")
+			}
+			key := sha256.Sum256([]byte("session:session-alias"))
+			state["bindings"] = append(state["bindings"].([]any), map[string]any{"kind": "session", "key": hex.EncodeToString(key[:]), "account_id": mainID, "updated_unix": time.Now().Unix()})
 		}
 		if strings.HasPrefix(scenario, "compact-session-") && scenario != "compact-session-unbound" {
 			key := sha256.Sum256([]byte("session:__compact_session__:session-alias"))

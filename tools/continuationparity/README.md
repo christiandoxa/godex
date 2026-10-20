@@ -464,3 +464,11 @@ frame with no upstream WebSocket request, keeping both durable owners. A
 successful inference by either profile is a parity failure even if all
 response bytes happen to look valid. Router regression tests also require
 same-owner aliases to remain dispatchable.
+
+The Compact session slice also verifies an explicit-header case where a
+direct raw session binding belongs to main but the typed Compact alias belongs
+to second. Tagged Prodex selects the direct owner, unlike the hard *turn*
+conflict (which fails closed). Successful session-only WebSocket responses
+then materialize a direct binding on the selected owner; the oracle waits for
+that durable transition before declaring PASS. It must not incorrectly assume
+that no raw session binding will be created by the committed response.
