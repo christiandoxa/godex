@@ -482,3 +482,10 @@ frame, zero upstream WebSocket handshakes, and unchanged durable owners. Both
 valid accounts have applied authenticated Ready receipts, so exhaustion cannot
 be explained by missing quota evidence. Paired Router tests enforce the same
 boundary for memory and durable stores, with a same-owner positive control.
+
+A WebSocket request hard-pinned by `previous_response_id: resp-main` but
+carrying `session_id: session-alias` also has a durable post-commit effect:
+main acquires the direct session binding, while a previously verified
+`__compact_session__:session-alias` lineage stays on second. The fixture now
+checks this owner projection in addition to upstream frame count, exact
+history and original alias persistence. A routing-only PASS is insufficient.

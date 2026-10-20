@@ -122,6 +122,7 @@ func TestProdex04383WebSocketCompactSessionLineageOracleRejectsMutations(t *test
 		{"no-alias", "main", compactSessionHeaderMessage04383},
 		{"body-only", "second", compactSessionBodyMessage04383},
 		{"direct-owner-precedence", "main", compactSessionHeaderMessage04383},
+		{"previous-response-precedence", "main", compactSessionPreviousMessage04383},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			account := "account-a"

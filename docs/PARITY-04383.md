@@ -1691,3 +1691,33 @@ local status/message, zero upstream attempts, immutable original owners and a
 same-owner control. Full native and live-provider parity remain separately
 unverified; a finite differential PASS must be recorded on the clean final
 candidate, not inferred from those local tests alone.
+
+## WebSocket hard previous response commits direct session ownership
+
+A pinned Prodex 0.438.3 differential now covers a WebSocket request with a
+verified `previous_response_id` on main, a `session_id` in the body, and a
+verified `__compact_session__:` lineage belonging to second. The tagged
+executable selects main (hard previous-response affinity), sends one full
+request, and commits the new response and direct session binding on main. It
+retains the typed Compact session alias on second. This direct session
+persistence is observable in the official continuation journal after the
+response commits, independent of the account-routing outcome.
+
+The pre-fix exploratory candidate `fa3eb98` routed the request to main and
+emitted correct client frames, but **did not persist its direct session owner**.
+It therefore failed the exact durable owner projection on the Godex side of
+the independent oracle, while Prodex passed. Memory and persisted usecase
+regressions reproduced the missing direct session owner before the patch.
+The scoped fix preserves the request's original previous-response affinity
+before recording its new WebSocket response ID. After a genuinely committed
+WebSocket turn, it records a valid, previously unbound direct session on the
+successful owner even though hard previous-response affinity excluded that
+session from candidate selection. It leaves a separately verified Compact
+session alias, and any pre-existing direct session owner, untouched; HTTP
+response and Compact-lineage creation paths remain unchanged. Full routing
+regressions and repeated focused race checks pass after the patch.
+
+The native/source-pinned differential must be rerun on the final clean commit
+before calling this finite HTTP-to-WebSocket direct-session persistence gate
+VERIFIED. It does not prove external-provider OAuth or native macOS/Windows
+runtime equivalence.

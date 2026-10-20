@@ -33,6 +33,7 @@ func (router *Router) bindSuccessfulResponse(
 	router.clearPreviousResponseFailures(ctx, result.AccountID, keys.previous)
 	router.rememberPromptCacheOwner(result.AccountID, promptCacheKey, router.now())
 	if websocketMessage {
+		previousBound := keys.previous != ""
 		if result.Response.WebSocketResponseID != "" {
 			keys.previous = result.Response.WebSocketResponseID
 			if turnState := responseTurnStateValue(result.Response); turnState != "" {
@@ -46,6 +47,23 @@ func (router *Router) bindSuccessfulResponse(
 		now := router.now()
 		if err := router.rememberVerifiedAccountBinding(ctx, result.AccountID, bindingKeys, now); err != nil {
 			return err
+		}
+		// The tagged 0.438.3 WebSocket runtime commits the successful
+		// request's direct session on its resolved owner, even when a
+		// previous-response hard binding excluded session from selection.
+		// Never take over an existing direct session on another profile.
+		if previousBound && result.Response.FirstEventCommitted &&
+			validCompactLineageComponent04383(keys.session) && bindingKeys.session == "" {
+			sessionOwner, err := router.affinity.owner(ctx, affinityKeys{session: keys.session}, now)
+			if err != nil {
+				return err
+			}
+			if sessionOwner == "" {
+				if err := router.rememberVerifiedAccountBinding(ctx, result.AccountID,
+					affinityKeys{session: keys.session}, now); err != nil {
+					return err
+				}
+			}
 		}
 		router.rememberAccountTurnState(
 			ctx, keys.previous, result.AccountID, responseTurnStateHome(accounts, result.AccountID), keys.turn, now,
