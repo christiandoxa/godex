@@ -1494,3 +1494,47 @@ race checks and `make verify` pass after the fix.
 The native parity matrix now includes this finite scenario. Native execution
 on macOS/Windows and production creation of every Compact lineage alias are
 still unqualified independently; this bounded pass is **not** FULL 1:1 parity.
+
+## HTTP Compact producer persists both typed lineage aliases and direct session
+
+The preceding WebSocket oracle originally **seeded** an existing Compact turn
+alias. It could not establish that Godex creates that alias from a successful
+HTTP Compact response. Tagged Prodex 0.438.3
+(`runtime_proxy/standard/attempts/success.rs` and
+`runtime_proxy/lineage/remember/compact.rs`) calls
+`remember_runtime_compact_lineage` after a committed Compact response, using
+the request's session ID and the upstream `x-codex-turn-state` response header.
+It also preserves the direct session identity even if a previous-response ID
+had hard-pinned the Compact request's route to a known owner.
+
+Godex's general response observer initially bound the raw turn but **neither**
+Compact alias. A fail-before regression reproduced missing Compact session
+and turn aliases in memory and durable stores. A second positive control with
+a verified previous response then showed a missing **direct session** binding,
+despite the already-correct previous-response owner. The scoped production
+repair records both typed aliases only for successful HTTP Compact responses,
+using the existing `rememberVerifiedAccountBinding` boundary. When the hard
+previous response excluded session identity during selection, successful
+Compact commitment additionally records that direct session. Ordinary
+Responses do not create Compact aliases, failed requests do not acquire
+lineage, and no profile authentication or state schema is changed.
+
+The independent two-executable `websocket-compact-lineage` release phase now
+includes `compact-produced` in addition to the two seeded/unbound controls.
+It sends a **real** HTTP Compact request whose upstream return contains a
+synthetic turn-state header. An already-verified previous-response ID pins the
+producer to second on **both** products; the first fresh-owner experiment
+showed different ordinary rotation choices and could not isolate the producer.
+After the HTTP commit, the harness waits for **all three** durable projections
+(turn alias, Compact session alias, and direct session) before returning main
+to active status and sending the subsequent WebSocket request. The exact
+response, upstream attempt count, history bytes, frame sequence and final
+owners are compared and mutation sentinels remain enabled.
+
+**Source/binary/manifest-pinned differential PASS** on clean exploratory
+`35c2c3b3fefc25f99a218ab71b1b17c78b74bfdb`: Prodex and Godex each
+passed the seeded-lineage, unbound-control, and real Compact-produced
+HTTP-to-WebSocket scenarios. The result qualifies this bounded synthetic
+producer/consumer contract, not every live external credential or native
+platform. Complete release/native matrix and macOS realtime parity retain
+their separate verification requirements.

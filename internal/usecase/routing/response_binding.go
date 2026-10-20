@@ -91,6 +91,34 @@ func (router *Router) bindSuccessfulResponse(
 		result.Response.Body.Close()
 		return err
 	}
+	if selection.RouteKind == quotamodel.RouteKindCompact {
+		// Tagged 0.438.3 records distinct Compact-origin lineage only after
+		// HTTP Compact commits successfully. These durable aliases are used
+		// by later WebSocket messages without changing their quota route.
+		compact := affinityKeys{}
+		if keys.session != "" {
+			// A successful Compact request records session lineage even if
+			// selection was hard-pinned by a previous response and therefore
+			// excluded its session from the outbound selection keys.
+			if bindingKeys.session == "" {
+				if err := router.rememberVerifiedAccountBinding(ctx, result.AccountID,
+					affinityKeys{session: keys.session}, router.now()); err != nil {
+					result.Response.Body.Close()
+					return err
+				}
+			}
+			compact.session = "__compact_session__:" + keys.session
+		}
+		if turn := responseTurnStateValue(result.Response); turn != "" {
+			compact.turn = "__compact_turn_state__:" + turn
+		}
+		if compact.hasAffinity() {
+			if err := router.rememberVerifiedAccountBinding(ctx, result.AccountID, compact, router.now()); err != nil {
+				result.Response.Body.Close()
+				return err
+			}
+		}
+	}
 	if promptCacheKey != "" {
 		if len(result.Prefix) > 0 {
 			if stream {

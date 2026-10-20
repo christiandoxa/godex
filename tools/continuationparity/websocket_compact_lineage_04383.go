@@ -1,15 +1,12 @@
 package main
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/christiandoxa/godex/internal/helper/websocketframe"
@@ -21,7 +18,7 @@ import (
 const compactLineageMessage04383 = `{"type":"response.create","model":"gpt-6","x-codex-turn-state":"compact-turn","input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
 
 func runWebSocketCompactLineageProduct04383(root string, p product) error {
-	for _, scenario := range []string{"compact-lineage", "compact-unbound"} {
+	for _, scenario := range []string{"compact-lineage", "compact-unbound", "compact-produced"} {
 		if err := runCompactLineageCase04383(filepath.Join(root, scenario), p, scenario); err != nil {
 			return fmt.Errorf("%s: %w", scenario, err)
 		}
@@ -65,10 +62,14 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 	}
 	defer stop()
 	client := &http.Client{Timeout: 5 * time.Second}
-	// Warm second first and main last: without a Compact alias the active
-	// profile must be main. This makes a second-profile decision attributable
-	// to the explicit Compact lineage, not to last-writer/active selection.
-	for _, previous := range []string{"resp-ready-b", "resp-main"} {
+	// For source-derived production, leave second active so its HTTP
+	// Compact commit creates the lineage, then return current to main.
+	// Synthetic controls warm second first and main last directly.
+	warmups := []string{"resp-ready-b", "resp-main"}
+	if scenario == "compact-produced" {
+		warmups = []string{"resp-main", "resp-ready-b"}
+	}
+	for _, previous := range warmups {
 		warmup, err := post(client, endpoint+"/responses", fmt.Sprintf(`{"previous_response_id":%q,"input":[]}`, previous))
 		if err != nil || warmup.status != http.StatusOK {
 			return fmt.Errorf("Compact owner warmup %s: status=%d err=%v", previous, warmup.status, err)
@@ -80,6 +81,43 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 			return errors.New("Compact lineage fixture has no applied authenticated Ready quota receipts")
 		}
 		time.Sleep(10 * time.Millisecond)
+	}
+	if scenario == "compact-produced" {
+		// Use a previously verified second-owned response as the Compact
+		// producer's independent hard owner. This avoids relying on the
+		// products' different fresh-pool/active-profile heuristics.
+		response, err := post(client, endpoint+"/responses/compact", `{"previous_response_id":"resp-ready-b","model":"gpt-6","session_id":"compact-produced-session","input":[]}`)
+		if err != nil || response.status != http.StatusOK || !strings.Contains(response.body, "resp-compact-produced") {
+			return fmt.Errorf("live HTTP Compact producer: status=%d err=%v response=%s", response.status, err, response.body)
+		}
+		backend.mu.Lock()
+		compactOwners := append([]string(nil), backend.compactOwners...)
+		invalid := backend.invalid
+		backend.mu.Unlock()
+		if invalid || !reflect.DeepEqual(compactOwners, []string{"account-b"}) {
+			return fmt.Errorf("HTTP Compact producer changed verified owner: attempts=%v invalid=%t", compactOwners, invalid)
+		}
+		producedDeadline := time.Now().Add(3 * time.Second)
+		for {
+			lineage, lineageErr := readCompactLineageOwner04383(p)
+			session, sessionErr := readCompactSessionOwner04383(p)
+			direct, directErr := readCompactDirectSessionOwner04383(p)
+			if lineageErr == nil && sessionErr == nil && directErr == nil &&
+				lineage == "second" && session == "second" && direct == "second" {
+				break
+			}
+			if time.Now().After(producedDeadline) {
+				return fmt.Errorf("successful HTTP Compact did not produce durable lineage/session: turn=%q session=%q direct=%q errors=%v/%v/%v", lineage, session, direct, lineageErr, sessionErr, directErr)
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+		// Only the Compact-produced lineage may justify selecting second.
+		// Restore main as the current account before the WebSocket request.
+		main, err := post(client, endpoint+"/responses", `{"previous_response_id":"resp-main","input":[]}`)
+		if err != nil || main.status != http.StatusOK {
+			return fmt.Errorf("restore main after Compact production: status=%d err=%v", main.status, err)
+		}
+		wantLineage = "second"
 	}
 	connection, reader, err := wsConnectHeaders04383(endpoint+"/responses", "")
 	if err != nil {
@@ -111,7 +149,14 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 	for {
 		owners, err := readTransportOwners04383(p)
 		lineage, lineageErr := readCompactLineageOwner04383(p)
-		if err == nil && lineageErr == nil && lineage == wantLineage && owners["response"] == wantOwner &&
+		sessionOK := true
+		if scenario == "compact-produced" {
+			aliasSession, aliasErr := readCompactSessionOwner04383(p)
+			directSession, directErr := readCompactDirectSessionOwner04383(p)
+			sessionOK = aliasErr == nil && directErr == nil &&
+				aliasSession == "second" && directSession == "second"
+		}
+		if err == nil && lineageErr == nil && sessionOK && lineage == wantLineage && owners["response"] == wantOwner &&
 			owners["turn"] == "main" && owners["session"] == "main" && owners["unrelated"] == "main" {
 			break
 		}
@@ -133,63 +178,4 @@ func verifyCompactLineage04383(wantOwner string, handshakes []string, attempts [
 		return fmt.Errorf("Compact lineage owner/provenance/frame mismatch: want=%s handshakes=%v attempts=%+v invalid=%t frames=%q", wantAccount, handshakes, attempts, invalid, frames)
 	}
 	return nil
-}
-
-func readCompactLineageOwner04383(p product) (string, error) {
-	const alias = "__compact_turn_state__:compact-turn"
-	if p.name == "prodex" {
-		raw, err := os.ReadFile(filepath.Join(p.state, "runtime-continuations.json"))
-		if err != nil {
-			return "", err
-		}
-		var state struct {
-			Value struct {
-				Turns map[string]struct {
-					Owner string `json:"profile_name"`
-				} `json:"turn_state_bindings"`
-			} `json:"value"`
-		}
-		if err := json.Unmarshal(raw, &state); err != nil {
-			return "", err
-		}
-		return state.Value.Turns[alias].Owner, nil
-	}
-	raw, err := os.ReadFile(filepath.Join(p.state, "state.json"))
-	if err != nil {
-		return "", err
-	}
-	var accounts struct {
-		Accounts []struct{ ID, Name string }
-	}
-	if err := json.Unmarshal(raw, &accounts); err != nil {
-		return "", err
-	}
-	names := make(map[string]string, len(accounts.Accounts))
-	for _, account := range accounts.Accounts {
-		names[account.ID] = account.Name
-	}
-	raw, err = os.ReadFile(filepath.Join(p.state, "routing.json"))
-	if err != nil {
-		return "", err
-	}
-	var bindings struct {
-		Bindings []struct {
-			Key   string
-			Owner string `json:"account_id"`
-		}
-	}
-	if err := json.Unmarshal(raw, &bindings); err != nil {
-		return "", err
-	}
-	key := sha256.Sum256([]byte("turn:" + alias))
-	for _, binding := range bindings.Bindings {
-		if binding.Key == hex.EncodeToString(key[:]) {
-			owner, valid := names[binding.Owner]
-			if !valid {
-				return "", errors.New("unregistered Compact lineage owner")
-			}
-			return owner, nil
-		}
-	}
-	return "", nil
 }

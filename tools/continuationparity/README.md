@@ -413,6 +413,17 @@ negative control uses the same warmup order and request without the lineage,
 so both products must select active main. Warm second **before** main; otherwise
 the positive result could be explained entirely by the active profile.
 
+A third, **end-to-end producer** scenario starts without a seeded Compact
+lineage. It uses a verified second-owned previous response to hard-pin an
+actual HTTP `/responses/compact` request. The upstream then returns a
+synthetic `x-codex-turn-state` header. Both binaries must persist the
+`__compact_turn_state__:` binding, `__compact_session__:` binding and direct
+session binding on second *before* any WebSocket request can run. The harness
+then commits a main-owned warmup to restore active main and checks that the
+new WebSocket turn still selects second, preserves exact history/frames and
+leaves those three durable owners intact. The prior-response pin prevents
+fresh rotation heuristics from masquerading as Compact lineage creation.
+
 ```sh
 ./scripts/verify-release-parity.sh --phase=websocket-compact-lineage
 ```
@@ -420,5 +431,6 @@ the positive result could be explained entirely by the active profile.
 The phase requires a clean committed candidate and the exact official tag,
 release manifest and executable SHA pin. The native cross-platform gate also
 runs the same mode. This finite fixture proves ownership of **existing**
-Compact lineage; it does not yet prove creation of Compact lineage by every
-supported HTTP Compact response or live OAuth/provider conditions.
+Compact lineage; the HTTP producer scenario proves creation for its one
+synthetic successful Compact response, not every alternate output shape or
+live OAuth/provider conditions.

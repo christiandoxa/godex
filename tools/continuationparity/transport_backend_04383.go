@@ -24,17 +24,18 @@ type transportAttempt04383 struct {
 }
 
 type transportBackend04383 struct {
-	server     *httptest.Server
-	scenario   string
-	mu         sync.Mutex
-	receipts   map[string]int
-	handshakes []string
-	attempts   []transportAttempt04383
-	invalid    bool
-	warmups    int
-	canceled   chan struct{}
-	busy       chan struct{}
-	occupied   bool
+	server        *httptest.Server
+	scenario      string
+	mu            sync.Mutex
+	receipts      map[string]int
+	handshakes    []string
+	attempts      []transportAttempt04383
+	compactOwners []string
+	invalid       bool
+	warmups       int
+	canceled      chan struct{}
+	busy          chan struct{}
+	occupied      bool
 }
 
 func newTransportBackend04383(scenario string) *transportBackend04383 {
@@ -59,6 +60,16 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 		b.receipts[owner]++
 		b.mu.Unlock()
 		writeJSON(w, 200, `{"plan_type":"plus","rate_limit":{"primary_window":{"used_percent":10,"reset_at":4102444800,"limit_window_seconds":18000},"secondary_window":{"used_percent":10,"reset_at":4102444800,"limit_window_seconds":604800}}}`)
+		return
+	}
+	if b.scenario == "compact-produced" && strings.HasSuffix(r.URL.Path, "/responses/compact") && r.Method == http.MethodPost {
+		body, _ := io.ReadAll(io.LimitReader(r.Body, 4096))
+		b.mu.Lock()
+		b.compactOwners = append(b.compactOwners, owner)
+		b.invalid = b.invalid || owner != "account-b" || !strings.Contains(string(body), `"session_id":"compact-produced-session"`) || !strings.Contains(string(body), `"previous_response_id":"resp-ready-b"`)
+		b.mu.Unlock()
+		w.Header().Set("x-codex-turn-state", "compact-turn")
+		writeJSON(w, http.StatusOK, `{"id":"resp-compact-produced","object":"response","output":[]}`)
 		return
 	}
 	if strings.HasSuffix(r.URL.Path, "/responses") && r.Method == http.MethodPost {
@@ -104,7 +115,7 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 	b.invalid = b.invalid || frame.Opcode != 1 || !frame.Masked()
 	b.attempts = append(b.attempts, transportAttempt04383{owner: owner, turn: r.Header.Get("x-codex-turn-state"), body: string(payload), ready: b.receipts["account-a"] > 0 && b.receipts["account-b"] > 0})
 	b.mu.Unlock()
-	if b.scenario == "compact-lineage" || b.scenario == "compact-unbound" {
+	if b.scenario == "compact-lineage" || b.scenario == "compact-unbound" || b.scenario == "compact-produced" {
 		for _, event := range []string{transportDelta04383, transportCompleted04383} {
 			if websocketframe.WriteFrame(connection, 1, []byte(event), false) != nil {
 				return
