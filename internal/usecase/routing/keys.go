@@ -13,7 +13,7 @@ import (
 
 func requestAffinity(request proxymodel.Request, body []byte) affinityKeys {
 	keys := affinityKeys{
-		thread:  firstHeader(request.Header, "thread-id", "x-codex-thread-id"),
+		thread:  firstHeader(request.Header, "thread-id"),
 		turn:    strings.TrimSpace(request.Header.Get("x-codex-turn-state")),
 		session: firstHeader(request.Header, "session_id", "session-id", "x-session-id"),
 	}

@@ -2133,3 +2133,27 @@ Ready evidence on both profiles, a single upstream inference, the exact
 request body and header, HTTP 200 and intact old/new durable ownership.
 Header-mutation tests ensure an erased or rewritten metadata header cannot
 pass unnoticed. The full non-synthetic 1:1 parity conclusion remains OPEN.
+
+## Unsupported `x-codex-thread-id` HTTP header must not pin an owner
+
+The tagged `runtime_request_thread_id` accepts the exact `thread-id`
+header (for request tracing) or `thread_id` in the JSON
+`x-codex-turn-metadata` header; it does **not** accept
+`x-codex-thread-id`. Godex previously treated the unsupported header as a
+hard routing key. A synthetic three-request regression demonstrates how a
+successfully routed second-owned previous response could create a spurious
+`thread` binding; after an independently pinned main response restored the
+current profile, reuse of that unsupported header would wrongly reroute an
+independent HTTP request back to second. The memory and durable regressions
+fail before the fix.
+
+Godex now excludes only the unsupported request-header spelling from the
+routing parser, leaving valid `thread-id`, request body bytes and upstream
+headers intact. An official source/binary/manifest-pinned three-request
+fixture builds its thread context naturally from a previous-response-owned
+request on second, restores main, and checks the subsequent independent
+`x-codex-thread-id` request stays on main. Its negative oracle rejects
+owner diversion, missing/duplicated upstream calls, absent Ready receipts,
+changed request/header bytes, and modified response or authentication.
+Remaining thread-ID logging and cross-OS/provider behavior are not thereby
+certified as complete parity.

@@ -19,8 +19,8 @@ const transportDelta04383 = `{"type":"response.output_text.delta","delta":"recov
 const transportCompleted04383 = `{"type":"response.completed","response":{"id":"resp-transport-recovered"}}`
 
 type transportAttempt04383 struct {
-	owner, turn, body, metadata string
-	ready                       bool
+	owner, turn, body, metadata, trace string
+	ready                              bool
 }
 
 type transportBackend04383 struct {
@@ -78,6 +78,21 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.HasSuffix(r.URL.Path, "/responses") && r.Method == http.MethodPost {
 		body, _ := io.ReadAll(io.LimitReader(r.Body, 4096))
+		if b.scenario == "http-unsupported-thread" {
+			for _, step := range httpUnsupportedThreadSteps04383 {
+				if string(body) != step.body {
+					continue
+				}
+				b.mu.Lock()
+				b.attempts = append(b.attempts, transportAttempt04383{owner: owner, body: string(body),
+					trace: r.Header.Get("x-codex-thread-id"), turn: r.Header.Get("x-codex-turn-state"),
+					metadata: r.Header.Get("x-codex-turn-metadata"),
+					ready:    b.receipts["account-a"] > 0 && b.receipts["account-b"] > 0})
+				b.mu.Unlock()
+				writeJSON(w, http.StatusOK, httpUnsupportedThreadReply04383(step.responseID))
+				return
+			}
+		}
 		if (strings.HasPrefix(b.scenario, "http-previous-session-") ||
 			strings.HasPrefix(b.scenario, "http-turn-session-")) &&
 			strings.Contains(string(body), `"session_id":"http-hard-session"`) {

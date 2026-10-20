@@ -582,3 +582,12 @@ null/blank direct shadow semantics, and fallback to an independent body
 session after invalid metadata. The oracle now records the exact upstream
 header value in addition to the raw request body and durable owners. Tampered
 or deleted metadata headers are rejected by negative controls.
+
+The phase also tests the unsupported `x-codex-thread-id` header. The trace
+identifier is first emitted on a second-owned previous-response request,
+then main is restored via a separate verified previous response, and the
+trace identifier is repeated on an independent request. The exact upstream
+owner sequence must be second/main/main for both binaries. This is a real
+multi-request state transition, not an asymmetric pre-seeded thread binding.
+The trace header is forwarded byte-for-byte but does not acquire hard owner
+rights. All three durable response IDs must remain on the expected owners.

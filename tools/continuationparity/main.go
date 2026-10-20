@@ -246,6 +246,9 @@ func main() {
 			if err == nil {
 				err = runHTTPShadowedTurnProduct04383(filepath.Join(root, "direct-turn-shadow"), p)
 			}
+			if err == nil {
+				err = runHTTPUnsupportedThreadProduct04383(filepath.Join(root, "unsupported-thread-header"), p)
+			}
 		} else if *httpTurnTransport {
 			err = runHTTPResponsesTurnProduct04383(root, p)
 		} else if *httpCompact {
