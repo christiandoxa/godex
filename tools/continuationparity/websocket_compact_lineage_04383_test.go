@@ -75,3 +75,38 @@ func TestProdex04383WebSocketShadowedDirectMetadataOracleRejectsMutations(t *tes
 		})
 	}
 }
+
+func TestProdex04383WebSocketDirectSessionShadowsNestedOracleRejectsMutations(t *testing.T) {
+	for _, tc := range []struct {
+		name, body, owner, account string
+	}{
+		{"nested-control", nestedSessionMessage04383, "second", "account-b"},
+		{"direct-null", shadowSessionNullMessage04383, "main", "account-a"},
+		{"direct-whitespace", shadowSessionBlankMessage04383, "main", "account-a"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			base := transportAttempt04383{owner: tc.account, ready: true, body: tc.body}
+			frames := []string{transportDelta04383, transportCompleted04383}
+			if err := verifyCompactLineageWire04383(tc.owner, tc.body, "", []string{tc.account}, []transportAttempt04383{base}, frames, false); err != nil {
+				t.Fatalf("valid session-provenance control rejected: %v", err)
+			}
+			for _, mutation := range []struct {
+				name     string
+				attempts []transportAttempt04383
+				frames   []string
+			}{
+				{"leaked turn header", []transportAttempt04383{{owner: tc.account, turn: "foreign-turn", ready: true, body: tc.body}}, frames},
+				{"changed history", []transportAttempt04383{{owner: tc.account, ready: true, body: strings.Replace(tc.body, `"content":"answer"`, `"content":"changed"`, 1)}}, frames},
+				{"replayed model", []transportAttempt04383{base, base}, frames},
+				{"missing Ready evidence", []transportAttempt04383{{owner: tc.account, body: tc.body}}, frames},
+				{"wrong terminal identity", []transportAttempt04383{base}, []string{transportDelta04383, `{"type":"response.completed","response":{"id":"incorrect"}}`}},
+			} {
+				t.Run(mutation.name, func(t *testing.T) {
+					if err := verifyCompactLineageWire04383(tc.owner, tc.body, "", []string{tc.account}, mutation.attempts, mutation.frames, false); err == nil {
+						t.Fatalf("session mutation escaped: %s", mutation.name)
+					}
+				})
+			}
+		})
+	}
+}

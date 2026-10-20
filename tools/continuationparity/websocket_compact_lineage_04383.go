@@ -18,9 +18,12 @@ import (
 const compactLineageMessage04383 = `{"type":"response.create","model":"gpt-6","x-codex-turn-state":"compact-turn","input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
 const compactShadowNullMessage04383 = `{"type":"response.create","model":"gpt-6","x-codex-turn-state":null,"client_metadata":{"x-codex-turn-state":"compact-turn"},"input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
 const compactShadowBlankMessage04383 = `{"type":"response.create","model":"gpt-6","x-codex-turn-state":" ","client_metadata":{"x-codex-turn-state":"compact-turn"},"input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
+const nestedSessionMessage04383 = `{"type":"response.create","model":"gpt-6","client_metadata":{"session_id":"shadow-session"},"input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
+const shadowSessionNullMessage04383 = `{"type":"response.create","model":"gpt-6","session_id":null,"client_metadata":{"session_id":"shadow-session"},"input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
+const shadowSessionBlankMessage04383 = `{"type":"response.create","model":"gpt-6","session_id":" ","client_metadata":{"session_id":"shadow-session"},"input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
 
 func runWebSocketCompactLineageProduct04383(root string, p product) error {
-	for _, scenario := range []string{"compact-lineage", "compact-unbound", "compact-shadow-null", "compact-shadow-blank", "compact-produced"} {
+	for _, scenario := range []string{"compact-lineage", "compact-unbound", "compact-shadow-null", "compact-shadow-blank", "session-nested", "session-shadow-null", "session-shadow-blank", "compact-produced"} {
 		if err := runCompactLineageCase04383(filepath.Join(root, scenario), p, scenario); err != nil {
 			return fmt.Errorf("%s: %w", scenario, err)
 		}
@@ -44,7 +47,7 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 		return err
 	}
 	wantOwner := "second"
-	if scenario == "compact-unbound" || strings.HasPrefix(scenario, "compact-shadow-") {
+	if scenario == "compact-unbound" || strings.HasPrefix(scenario, "compact-shadow-") || strings.HasPrefix(scenario, "session-shadow-") {
 		wantOwner = "main"
 	}
 	wantLineage := ""
@@ -54,6 +57,12 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 	if initialLineage != wantLineage || initial["turn"] != "main" || initial["unrelated"] != "main" || initial["session"] != "main" {
 		return fmt.Errorf("invalid initial Compact lineage fixture: lineage=%q main_turn=%q main_response=%q session=%q",
 			initialLineage, initial["turn"], initial["unrelated"], initial["session"])
+	}
+	if strings.HasPrefix(scenario, "session-") {
+		owner, err := readCompactBindingOwner04383(p, "session", "shadow-session")
+		if err != nil || owner != "second" {
+			return fmt.Errorf("invalid source-verified nested session fixture: owner=%q err=%v", owner, err)
+		}
 	}
 	p.env = append(p.env, "PRODEX_RUNTIME_LOG_RECORD=true")
 	backend := newTransportBackend04383(scenario)
@@ -132,6 +141,12 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 		message = compactShadowNullMessage04383
 	} else if scenario == "compact-shadow-blank" {
 		message = compactShadowBlankMessage04383
+	} else if scenario == "session-nested" {
+		message = nestedSessionMessage04383
+	} else if scenario == "session-shadow-null" {
+		message = shadowSessionNullMessage04383
+	} else if scenario == "session-shadow-blank" {
+		message = shadowSessionBlankMessage04383
 	}
 	if err := websocketframe.WriteFrame(connection, 1, []byte(message), true); err != nil {
 		return err
@@ -149,7 +164,7 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 	}
 	backend.mu.Lock()
 	header := "compact-turn"
-	if strings.HasPrefix(scenario, "compact-shadow-") {
+	if strings.HasPrefix(scenario, "compact-shadow-") || strings.HasPrefix(scenario, "session-") {
 		header = ""
 	}
 	err = verifyCompactLineageWire04383(wantOwner, message, header, backend.handshakes, backend.attempts, frames, backend.invalid)
@@ -162,6 +177,10 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 		owners, err := readTransportOwners04383(p)
 		lineage, lineageErr := readCompactLineageOwner04383(p)
 		sessionOK := true
+		if strings.HasPrefix(scenario, "session-") {
+			shadowOwner, shadowErr := readCompactBindingOwner04383(p, "session", "shadow-session")
+			sessionOK = shadowErr == nil && shadowOwner == "second"
+		}
 		if scenario == "compact-produced" {
 			aliasSession, aliasErr := readCompactSessionOwner04383(p)
 			directSession, directErr := readCompactDirectSessionOwner04383(p)

@@ -34,6 +34,11 @@ func seedTransportAlternate04383(p product, scenario string) error {
 		}
 		value["response_profile_bindings"].(map[string]any)["resp-ready-b"] = map[string]any{"profile_name": "second", "bound_at": time.Now().Unix()}
 		value["statuses"].(map[string]any)["response"].(map[string]any)["resp-ready-b"] = map[string]any{"state": "Verified", "confidence": 4, "last_verified_at": time.Now().Unix(), "last_touched_at": time.Now().Unix(), "last_verified_route": "responses", "success_count": 1}
+		if strings.HasPrefix(scenario, "session-") {
+			value["session_id_bindings"].(map[string]any)["shadow-session"] = map[string]any{"profile_name": "second", "bound_at": time.Now().Unix()}
+			value["session_profile_bindings"].(map[string]any)["shadow-session"] = map[string]any{"profile_name": "second", "bound_at": time.Now().Unix()}
+			value["statuses"].(map[string]any)["session_id"].(map[string]any)["shadow-session"] = map[string]any{"state": "Verified", "confidence": 4, "last_verified_at": time.Now().Unix(), "last_touched_at": time.Now().Unix(), "last_verified_route": "responses", "success_count": 1}
+		}
 		if scenario == "compact-lineage" || strings.HasPrefix(scenario, "compact-shadow-") {
 			// Compact provenance is distinct from a plain turn-state binding.
 			// The tagged 0.438.3 Mojo key builder uses this exact namespace.
@@ -63,6 +68,10 @@ func seedTransportAlternate04383(p product, scenario string) error {
 		if scenario == "compact-lineage" || strings.HasPrefix(scenario, "compact-shadow-") {
 			alias := sha256.Sum256([]byte("turn:__compact_turn_state__:compact-turn"))
 			state["bindings"] = append(state["bindings"].([]any), map[string]any{"kind": "turn", "key": hex.EncodeToString(alias[:]), "account_id": id, "updated_unix": time.Now().Unix()})
+		}
+		if strings.HasPrefix(scenario, "session-") {
+			session := sha256.Sum256([]byte("session:shadow-session"))
+			state["bindings"] = append(state["bindings"].([]any), map[string]any{"kind": "session", "key": hex.EncodeToString(session[:]), "account_id": id, "updated_unix": time.Now().Unix()})
 		}
 		if strings.HasPrefix(scenario, "unbound-") {
 			turn := sha256.Sum256([]byte("turn:turn-a"))

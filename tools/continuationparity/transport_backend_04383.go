@@ -115,7 +115,7 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 	b.invalid = b.invalid || frame.Opcode != 1 || !frame.Masked()
 	b.attempts = append(b.attempts, transportAttempt04383{owner: owner, turn: r.Header.Get("x-codex-turn-state"), body: string(payload), ready: b.receipts["account-a"] > 0 && b.receipts["account-b"] > 0})
 	b.mu.Unlock()
-	if b.scenario == "compact-lineage" || b.scenario == "compact-unbound" || b.scenario == "compact-produced" || strings.HasPrefix(b.scenario, "compact-shadow-") {
+	if b.scenario == "compact-lineage" || b.scenario == "compact-unbound" || b.scenario == "compact-produced" || strings.HasPrefix(b.scenario, "compact-shadow-") || strings.HasPrefix(b.scenario, "session-") {
 		for _, event := range []string{transportDelta04383, transportCompleted04383} {
 			if websocketframe.WriteFrame(connection, 1, []byte(event), false) != nil {
 				return
