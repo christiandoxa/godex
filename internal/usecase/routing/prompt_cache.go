@@ -35,6 +35,7 @@ func promptCacheKeyFromBody(body []byte) string {
 }
 
 func (router *Router) promptCacheOwner(key string, now time.Time) string {
+	now = time.Unix(now.Unix(), 0)
 	key = strings.TrimSpace(key)
 	if key == "" {
 		return ""
@@ -46,6 +47,7 @@ func (router *Router) promptCacheOwner(key string, now time.Time) string {
 }
 
 func (router *Router) rememberPromptCacheOwner(accountID, key string, now time.Time) {
+	now = time.Unix(now.Unix(), 0)
 	accountID, key = strings.TrimSpace(accountID), strings.TrimSpace(key)
 	if accountID == "" || key == "" {
 		return
@@ -76,6 +78,7 @@ func (router *Router) rememberPromptCacheOwner(accountID, key string, now time.T
 }
 
 func (router *Router) observePromptCacheHit(accountID, key string, cachedInputTokens uint64, now time.Time) {
+	now = time.Unix(now.Unix(), 0)
 	accountID, key = strings.TrimSpace(accountID), strings.TrimSpace(key)
 	if accountID == "" || key == "" || cachedInputTokens == 0 {
 		return
@@ -108,8 +111,10 @@ func (router *Router) observePromptCacheHit(accountID, key string, cachedInputTo
 	router.prunePromptCacheBindingsLocked(now)
 }
 
+// Prodex records bound_at in Unix seconds; subsecond clocks must not
+// expire a binding early or reorder equal-epoch eviction candidates.
 func (router *Router) prunePromptCacheBindingsLocked(now time.Time) {
-	oldestAllowed := now.Add(-promptCacheRetention)
+	oldestAllowed := time.Unix(now.Unix(), 0).Add(-promptCacheRetention)
 	for key, binding := range router.promptCacheBindings {
 		if binding.boundAt.Before(oldestAllowed) {
 			delete(router.promptCacheBindings, key)

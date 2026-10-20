@@ -2267,3 +2267,20 @@ The source/executable-pinned response-metadata differential includes six
 binary cases that compare the selected and rejected turn bindings, original
 wire payload, authenticated Ready inference count and persistent response ID.
 No alternate TUI/framework or persistence layout is introduced.
+
+## Prompt-cache affinity uses whole Unix seconds at the retention boundary
+
+The tagged `affinity/prompt_cache.rs` stores `bound_at` as an `i64` epoch from
+`Local::now().timestamp()` and prunes only entries strictly older than
+`now - 6 * 60 * 60`. The oldest-to-newest eviction of an over-capacity
+`BTreeMap` is stable for equal epochs, so equal-age entries use lexical key
+order. Godex previously kept fractional `time.Time` values, causing an
+otherwise valid binding to expire up to one second earlier, and allowing
+subsecond ordering to discard a different key when the 2,048-binding cap
+was exceeded. The local regression reproduces both differences before the
+fix, with an inclusive six-hour boundary, a just-expired control, and two
+bindings in the same epoch competing for the final slot. Godex now normalizes
+prompt-cache timestamps to Unix seconds before any lookup, update or pruning.
+This is a clock-source and bounded-memory policy comparison with the exact
+published 0.438.3 implementation; it does not assert a new live-provider or
+cross-binary network differential for subsecond timing.
