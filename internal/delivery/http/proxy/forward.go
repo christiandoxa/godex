@@ -112,8 +112,13 @@ func (proxy *Proxy) forwardStream(ctx context.Context, writer http.ResponseWrite
 		accountID:    accountID,
 		providerKind: providerKind,
 		headers:      headers,
-		decoder:      sse.NewDecoder(int(proxy.maxInspect)),
-		lineage:      lineage,
+		// Precommit metadata has a much smaller byte budget than a
+		// committed response event. Tagged Prodex keeps observing SSE
+		// response IDs after the commit boundary, including large valid
+		// events that exceed the 64KiB lookahead buffer. Preserve a
+		// separate bounded 1MiB observation budget for these events.
+		decoder: sse.NewDecoder(max(int(proxy.maxInspect), 1<<20)),
+		lineage: lineage,
 	}
 	return forwarder.forward(ctx, body, prefix)
 }

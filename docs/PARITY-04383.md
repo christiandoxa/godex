@@ -3320,3 +3320,27 @@ distinct-turn SSE fixture, with two authenticated Ready profiles, one exact
 upstream inference, streamed output and pairwise positive/negative durable
 response/turn associations. This verifies a bounded synthetic lineage slice;
 native OS and live provider permutations remain separately open.
+
+## Committed SSE observation must not inherit the precommit byte limit
+
+The tagged 0.438.3 `RuntimeSseTapReader` continues parsing and recording
+completed response events **after** the first output commits, separately
+from `max_buffered_bytes` used to bound precommit lookahead. Godex's HTTP
+proxy reused its 64KiB `MaxInspectBytes` as the total allowed length of
+**each** committed SSE event. A valid 72KiB `response.completed` event
+appearing after a small committed output delta was forwarded verbatim but
+silently discarded by the observation decoder. That lost the response ID,
+its durable previous-response owner and the inherited turn-state sidecar.
+
+A fail-before HTTP proxy regression reproduces this exact mismatch and
+asserts the original client SSE bytes, prior response and new durable
+response-turn pairing. The committed stream observer now keeps a separate,
+conservative **1MiB minimum per-event inspection budget** (or a larger
+explicitly configured maximum), preserving bounded memory without changing
+the smaller precommit retry/rotation budget. The source/manifest/executable-
+pinned `--phase=http-session-conflict` oracle now includes a fourth SSE
+lineage case with a 72KiB committed event after a flushed output delta.
+It compares the full SSE response, a single authenticated Ready main
+inference, and the inherited durable response/turn association on both
+Prodex 0.438.3 and Godex. Events larger than the configured committed
+observation budget remain outside this finite parity guarantee.

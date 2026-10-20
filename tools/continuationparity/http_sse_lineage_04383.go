@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -28,12 +29,14 @@ func httpSSETurnLineageWireFor04383(shape string) string {
 		second = `{"type":"response.completed","response":{"id":"resp-sse-two"}}`
 	case "late":
 		first = `{"type":"response.output_text.delta","delta":"first","response":{"id":"resp-sse-one"}}`
+	case "large-committed":
+		second = `{"type":"response.completed","response":{"id":"resp-sse-two"},"padding":"` + strings.Repeat("x", 72<<10) + `"}`
 	}
 	return "data: " + first + "\n\n" + "data: " + second + "\n\n"
 }
 
 func httpSSETurnLineageExpected04383(shape, responseID string) string {
-	if shape == "inherit" || shape == "partial" {
+	if shape == "inherit" || shape == "partial" || shape == "large-committed" {
 		return "state-one"
 	}
 	if shape == "late" {
@@ -46,7 +49,7 @@ func httpSSETurnLineageExpected04383(shape, responseID string) string {
 }
 
 func runHTTPSSETurnLineageProduct04383(root string, p product) error {
-	for _, shape := range []string{"distinct", "inherit", "late"} {
+	for _, shape := range []string{"distinct", "inherit", "late", "large-committed"} {
 		if err := runHTTPSSETurnLineageCase04383(filepath.Join(root, shape), p, shape); err != nil {
 			return fmt.Errorf("SSE lineage %s: %w", shape, err)
 		}

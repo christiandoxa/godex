@@ -43,6 +43,11 @@ func TestProdex04383ProxySSEPreservesTurnLineageAcrossChunks(t *testing.T) {
 			"data: " + `{"type":"response.completed","response":{"id":"resp-later","turn_state":"state-later"}}` + "\n\n",
 			map[string]string{"resp-prefix": "state-prefix", "resp-later": "state-later"},
 		},
+		{"large-postcommit-event",
+			"data: " + `{"type":"response.output_text.delta","response":{"id":"resp-prefix","turn_state":"state-prefix"},"delta":"ok"}` + "\n\n",
+			"data: " + `{"type":"response.completed","response":{"id":"resp-later"},"padding":"` + strings.Repeat("x", 72<<10) + `"}` + "\n\n",
+			map[string]string{"resp-prefix": "state-prefix", "resp-later": "state-prefix"},
+		},
 		{"partial-precommit-line",
 			"data: " + `{"type":"response.output_text.delta","response":{"id":"resp-prefix","turn_state":"state-prefix"},`,
 			`"delta":"ok"}` + "\n\n" + "data: " + `{"type":"response.completed","response":{"id":"resp-later"}}` + "\n\n",
@@ -85,7 +90,7 @@ func TestProdex04383ProxySSEPreservesTurnLineageAcrossChunks(t *testing.T) {
 			if err := router.Observe(t.Context(), account, headers, []byte(tc.prefix), true, "openai"); err != nil {
 				t.Fatal(err)
 			}
-			proxy := &Proxy{router: router, maxInspect: 1 << 20}
+			proxy := &Proxy{router: router, maxInspect: 64 << 10}
 			output := httptest.NewRecorder()
 			if !proxy.forwardStream(t.Context(), output, io.NopCloser(strings.NewReader(tc.rest)), []byte(tc.prefix), account, headers, "openai") {
 				t.Fatal("committed HTTP stream unexpectedly aborted")

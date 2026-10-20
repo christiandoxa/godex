@@ -48,7 +48,7 @@ func TestProdex04383HTTPSSETurnLineageOracleRejectsMutations(t *testing.T) {
 // may inherit an earlier stream turn or be backfilled after the first output
 // chunk already committed. A 200 alone does not prove the lineage contract.
 func TestProdex04383HTTPSSETurnLineageCrossChunkOracleRejectsMutations(t *testing.T) {
-	for _, shape := range []string{"distinct", "inherit", "late"} {
+	for _, shape := range []string{"distinct", "inherit", "late", "large-committed"} {
 		t.Run(shape, func(t *testing.T) {
 			base := httpSoftConflictResult04383{
 				reply:    exchange{status: http.StatusOK, body: httpSSETurnLineageWireFor04383(shape)},

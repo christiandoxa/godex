@@ -930,3 +930,12 @@ The first event is a flushed output delta crossing precommit before the
 second frame arrives. Official Prodex and Godex must show identical output
 bytes and independent durable response/turn pairings on main, with both
 profile quota receipts Ready and exactly one upstream model inference.
+
+An additional **large-committed** SSE lineage case emits an output delta
+that crosses the precommit boundary and then a valid `response.completed`
+event containing a 72KiB unrelated padding field. The entire event is
+forwarded byte-for-byte; its new response ID must still inherit the earlier
+turn and be durably bound on main. This checks that a committed observation
+is not silently dropped because the event exceeded the independent 64KiB
+precommit lookahead budget. The Go observer retains a conservative 1MiB
+minimum per-event cap rather than allowing unbounded allocations.
