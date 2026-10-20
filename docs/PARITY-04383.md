@@ -2905,3 +2905,37 @@ sentinels reject injected readiness, owner diversion, changed error payload,
 missing/replayed inference and forged successful completion. This adds a
 finite synthetic behavior slice; full external-provider and cross-OS parity
 remain open.
+
+## Structured previous-response tags require exact bytes and a bounded walker
+
+The tagged 0.438.3 `previous_response_structured_class` Mojo kernel compares
+`code`, `type` and `param` **without trimming or case-folding**: an exact
+`code: previous_response_not_found` takes priority over other tag fields,
+and only `type: invalid_request_error` plus the recognized invalid-ID
+message produces the distinct invalid-ID class. The message permits only
+**ASCII** whitespace trimming and ASCII case folding. Go's older recursive
+`invalidPreviousResponseValue` instead trimmed/code-folded tags and used
+Unicode-aware `strings.EqualFold`, which could mistake `INPUT`, an uppercase
+or space-padded type, or a Unicode long-s token for a valid structured tag.
+It also descended an unbounded JSON tree, while the tagged Rust
+`runtime_json_find` scans at most 2,048 nodes in depth-first lexical-key
+order. Those mismatches could cause an unnecessary same-owner HTTP replay,
+miss an authorized invalid-ID replay, or route a missing chain incorrectly.
+
+Godex now shares one bounded, deterministic structured-error walker for
+previous-not-found and invalid-ID detection. The two classifiers derive
+separate actions from the same exact-byte class: NOT_FOUND must fail closed
+for a verified owner, INVALID_ID may make one bounded same-owner recovery
+with a valid complete history, and unrelated JSON is forwarded untouched.
+Fail-before regressions prove exact code precedence, leading/trailing
+whitespace, Unicode case-fold traps and the 2,048-node limit. A separate
+Router regression verifies actual inference count and HTTP 400/409/200
+outcomes alongside unchanged upstream request bytes.
+
+The manifest/source/executable-pinned `--phase=http-turn-transport` oracle
+adds structured response errors with padded/uppercase/unicode tags, exact
+NOT_FOUND precedence, an over-budget JSON search and valid controls. Each
+case verifies authenticated Ready evidence on two accounts, the byte-exact
+initial request, the presence/absence of a bounded same-owner recovery,
+terminal response status/body, and durable recovered-response ownership.
+This verifies a finite 0.438.3 slice rather than every provider/OS path.

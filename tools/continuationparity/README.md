@@ -802,3 +802,14 @@ of the original previous response. An otherwise complete user/assistant/user
 history with a valid session is not permission to replay a missing chain
 on a foreign Ready profile. A separate mutation suite rejects false-success results that
 would be hidden by a status-only assertion.
+
+The previous-response structured-error gate also compares exact Mojo tag
+matching. `code`, `type` and `param` are case-sensitive and not trimmed;
+invalid-ID messages alone permit ASCII whitespace/case normalization.
+`previous_response_not_found` has precedence over a simultaneous invalid-ID
+message; padded or Unicode long-s tags cannot borrow the canonical class.
+An oversized alphabetically earlier JSON subtree exhausts the tagged
+2,048-node scan budget before later error tags. The pinned binary oracle
+compares resulting 400, 409 and bounded owner-local recovery 200, with
+original wire bytes and durable response lineage rather than only local
+parser return values.

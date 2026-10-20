@@ -7,9 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sort"
 	"strings"
-	"unicode/utf8"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
@@ -236,129 +234,6 @@ func jsonString(raw json.RawMessage) string {
 		return ""
 	}
 	return strings.TrimSpace(value)
-}
-
-func invalidPreviousResponseID(body []byte) bool {
-	// Tagged runtime_proxy_body_is_invalid_previous_response_id only
-	// accepts structured error evidence from a complete serde_json::Value.
-	// Go's json.Unmarshal otherwise silently repairs invalid Unicode and
-	// admits over-depth JSON before releasing a hard previous owner.
-	value, valid := decodeNativeUsageJSON(body)
-	return valid && invalidPreviousResponseValue(value)
-}
-
-func previousResponseNotFound(body []byte) bool {
-	// Tagged extract_runtime_proxy_previous_response_message tries the
-	// complete serde_json::Value first, then falls back to a narrowly
-	// recognized *plain-text* previous-response error. Malformed JSON
-	// cannot manufacture structured ownership evidence, but a literal
-	// `previous_response_not_found` upstream text error remains meaningful.
-	if value, valid := decodeNativeUsageJSON(body); valid && previousResponseMessageInJSON04383(value) {
-		return true
-	}
-	if !utf8.Valid(body) {
-		return false
-	}
-	return previousResponseMessageInText04383(strings.TrimSpace(string(body)))
-}
-
-func previousResponseMessageInText04383(value string) bool {
-	lower := strings.ToLower(value)
-	if lower == "invalid `previous_response_id`." || strings.HasPrefix(lower, "previous_response_not_found") {
-		return true
-	}
-	if strings.HasPrefix(lower, "previous response") && strings.Contains(lower, "not found") {
-		return true
-	}
-	if (strings.Contains(lower, "no tool call found") || strings.Contains(lower, "no function call found")) &&
-		(strings.HasPrefix(lower, "invalid_request_error:") || strings.HasPrefix(lower, "no tool call found") ||
-			strings.HasPrefix(lower, "no function call found")) {
-		return true
-	}
-	return false
-}
-
-const previousResponseJSONScanLimit04383 = 2048
-
-func previousResponseMessageInJSON04383(value any) bool {
-	// Rust runtime_json_find searches no more than 2048 JSON nodes and
-	// serde_json::Map visits keys lexically. Preserve its first-candidate
-	// traversal rather than scanning an unbounded randomized Go map.
-	stack := []any{value}
-	for visited := 0; len(stack) > 0 && visited < previousResponseJSONScanLimit04383; visited++ {
-		index := len(stack) - 1
-		current := stack[index]
-		stack = stack[:index]
-		switch current := current.(type) {
-		case map[string]any:
-			code, _ := current["code"].(string)
-			if strings.EqualFold(code, "previous_response_not_found") {
-				return true
-			}
-			errorType, _ := current["type"].(string)
-			parameter, _ := current["param"].(string)
-			message, _ := current["message"].(string)
-			if _, ok := current["message"].(string); !ok {
-				message, _ = current["detail"].(string)
-				if _, ok := current["detail"].(string); !ok {
-					message, _ = current["error"].(string)
-				}
-			}
-			if strings.EqualFold(errorType, "invalid_request_error") && strings.EqualFold(strings.TrimSpace(message), "invalid `previous_response_id`.") {
-				return true
-			}
-			lower := strings.ToLower(message)
-			if (strings.Contains(lower, "no tool call found") || strings.Contains(lower, "no function call found")) &&
-				(strings.EqualFold(errorType, "invalid_request_error") || strings.EqualFold(parameter, "input")) {
-				return true
-			}
-			keys := make([]string, 0, len(current))
-			for key := range current {
-				keys = append(keys, key)
-			}
-			sort.Strings(keys)
-			for i := len(keys) - 1; i >= 0; i-- {
-				stack = append(stack, current[keys[i]])
-			}
-		case []any:
-			for i := len(current) - 1; i >= 0; i-- {
-				stack = append(stack, current[i])
-			}
-		}
-	}
-	return false
-}
-
-func invalidPreviousResponseValue(value any) bool {
-	switch value := value.(type) {
-	case map[string]any:
-		code, _ := value["code"].(string)
-		errorType, _ := value["type"].(string)
-		message, hasMessage := value["message"].(string)
-		if !hasMessage {
-			message, hasMessage = value["detail"].(string)
-		}
-		if !hasMessage {
-			message, _ = value["error"].(string)
-		}
-		if !strings.EqualFold(strings.TrimSpace(code), "previous_response_not_found") &&
-			strings.EqualFold(strings.TrimSpace(errorType), "invalid_request_error") &&
-			strings.EqualFold(strings.TrimSpace(message), "invalid `previous_response_id`.") {
-			return true
-		}
-		for _, child := range value {
-			if invalidPreviousResponseValue(child) {
-				return true
-			}
-		}
-	case []any:
-		for _, child := range value {
-			if invalidPreviousResponseValue(child) {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func restoreResponsePrefix(response *proxymodel.Response, pending *pendingResponse) {

@@ -9,11 +9,16 @@ import (
 func TestProdex04383HTTPRecoverySessionOracleRejectsMutations(t *testing.T) {
 	for _, shape := range []string{"null", "blank", "nested", "direct", "metadata-null", "metadata-nested", "header-override",
 		"invalid-utf8", "invalid-surrogate", "invalid-number", "invalid-depth", "valid-unicode", "valid-finite", "metadata-invalid", "metadata-valid",
-		"response-invalid-surrogate", "response-invalid-utf8", "response-invalid-depth"} {
+		"response-invalid-surrogate", "response-invalid-utf8", "response-invalid-depth",
+		"response-type-space", "response-type-upper", "response-type-unicode", "response-code-space",
+		"response-code-upper", "response-code-exact", "response-code-unicode", "response-tool-param-upper",
+		"response-message-unicode-space", "response-node-budget"} {
 		t.Run(shape, func(t *testing.T) {
 			status, response := http.StatusBadRequest, httpRecoverySessionErrorForShape04383(shape)
 			if httpRecoverySessionExpectRetry04383(shape) {
 				status, response = http.StatusOK, httpRecoverySessionResponse04383
+			} else if shape == "response-code-exact" {
+				status, response = http.StatusConflict, httpPreviousTextStale04383
 			}
 			base := httpSoftConflictResult04383{reply: exchange{status: status, body: response},
 				attempts: []transportAttempt04383{{owner: "account-a", ready: true,

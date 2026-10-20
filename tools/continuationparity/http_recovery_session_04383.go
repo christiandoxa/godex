@@ -25,6 +25,10 @@ func httpRecoverySessionRequest04383(shape string) string {
 		field = `"session_id":"verified-session",`
 	case "metadata-null", "metadata-nested", "metadata-invalid", "metadata-valid":
 		field = ""
+	case "response-type-space", "response-type-upper", "response-type-unicode", "response-code-space",
+		"response-code-upper", "response-code-exact", "response-code-unicode", "response-tool-param-upper",
+		"response-message-unicode-space", "response-node-budget":
+		field = `"session_id":"verified-session",`
 	case "invalid-utf8", "invalid-surrogate", "invalid-number", "invalid-depth", "valid-unicode", "valid-finite",
 		"response-invalid-surrogate", "response-invalid-depth", "response-invalid-utf8":
 		field = `"session_id":"verified-session",`
@@ -66,6 +70,28 @@ func httpRecoverySessionMetadata04383(shape string) string {
 // Match Prodex's whole-document serde_json boundary for structured
 // invalid-previous-response signals in upstream HTTP 400 bodies.
 func httpRecoverySessionErrorForShape04383(shape string) string {
+	switch shape {
+	case "response-type-space":
+		return "{\"error\":{\"type\":\"invalid_request_error \",\"message\":\"Invalid `previous_response_id`.\"}}"
+	case "response-type-upper":
+		return "{\"error\":{\"type\":\"INVALID_REQUEST_ERROR\",\"message\":\"Invalid `previous_response_id`.\"}}"
+	case "response-type-unicode":
+		return `{"error":{"type":"invalid_requeſt_error","message":"Invalid ` + "`previous_response_id`" + `."}}`
+	case "response-code-space":
+		return "{\"error\":{\"code\":\"previous_response_not_found \",\"type\":\"invalid_request_error\",\"message\":\"Invalid `previous_response_id`.\"}}"
+	case "response-code-upper":
+		return "{\"error\":{\"code\":\"PREVIOUS_RESPONSE_NOT_FOUND\",\"type\":\"invalid_request_error\",\"message\":\"Invalid `previous_response_id`.\"}}"
+	case "response-code-exact":
+		return "{\"error\":{\"code\":\"previous_response_not_found\",\"type\":\"invalid_request_error\",\"message\":\"Invalid `previous_response_id`.\"}}"
+	case "response-code-unicode":
+		return `{"error":{"code":"previous_reſponse_not_found","type":"invalid_request_error","message":"Invalid ` + "`previous_response_id`" + `."}}`
+	case "response-tool-param-upper":
+		return `{"error":{"param":"INPUT","message":"no tool call found"}}`
+	case "response-message-unicode-space":
+		return `{"error":{"type":"invalid_request_error","message":"\u00a0Invalid ` + "`previous_response_id`" + `."}}`
+	case "response-node-budget":
+		return `{"a":[` + strings.Repeat(`0,`, 2100) + `0],"z":{"type":"invalid_request_error","message":"Invalid ` + "`previous_response_id`" + `."}}`
+	}
 	if !strings.HasPrefix(shape, "response-invalid-") {
 		return httpRecoverySessionError04383
 	}
@@ -83,7 +109,8 @@ func httpRecoverySessionErrorForShape04383(shape string) string {
 
 func httpRecoverySessionExpectRetry04383(shape string) bool {
 	return shape == "nested" || shape == "direct" || shape == "metadata-nested" || shape == "header-override" ||
-		shape == "valid-unicode" || shape == "valid-finite" || shape == "metadata-valid"
+		shape == "valid-unicode" || shape == "valid-finite" || shape == "metadata-valid" ||
+		shape == "response-code-space" || shape == "response-code-upper" || shape == "response-code-unicode"
 }
 
 func httpRecoverySessionReplay04383(shape string) string {
@@ -102,7 +129,10 @@ func httpRecoverySessionReplay04383(shape string) string {
 func runHTTPRecoverySessionProduct04383(root string, p product) error {
 	for _, shape := range []string{"null", "blank", "nested", "direct", "metadata-null", "metadata-nested", "header-override",
 		"invalid-utf8", "invalid-surrogate", "invalid-number", "invalid-depth", "valid-unicode", "valid-finite", "metadata-invalid", "metadata-valid",
-		"response-invalid-surrogate", "response-invalid-utf8", "response-invalid-depth"} {
+		"response-invalid-surrogate", "response-invalid-utf8", "response-invalid-depth",
+		"response-type-space", "response-type-upper", "response-type-unicode", "response-code-space",
+		"response-code-upper", "response-code-exact", "response-code-unicode", "response-tool-param-upper",
+		"response-message-unicode-space", "response-node-budget"} {
 		if err := runHTTPRecoverySessionCase04383(filepath.Join(root, shape), p, shape); err != nil {
 			return fmt.Errorf("HTTP full-history recovery %s: %w", shape, err)
 		}
@@ -180,6 +210,8 @@ func verifyHTTPRecoverySession04383(shape string, result httpSoftConflictResult0
 	if httpRecoverySessionExpectRetry04383(shape) {
 		want = 2
 		wantStatus, wantBody = http.StatusOK, httpRecoverySessionResponse04383
+	} else if shape == "response-code-exact" {
+		wantStatus, wantBody = http.StatusConflict, httpPreviousTextStale04383
 	}
 	if result.invalid || result.reply.status != wantStatus || result.reply.body != wantBody || len(result.attempts) != want {
 		return fmt.Errorf("HTTP full-history recovery wrong replay/status: shape=%s invalid=%t status=%d response=%q attempts=%+v", shape, result.invalid, result.reply.status, result.reply.body, result.attempts)
