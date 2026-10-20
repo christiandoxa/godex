@@ -153,3 +153,30 @@ func TestProdex04383WebSocketCompactSessionLineageOracleRejectsMutations(t *test
 		})
 	}
 }
+
+func TestProdex04383WebSocketCompactTurnConflictRejectsAllDispatches(t *testing.T) {
+	if err := verifyCompactTurnConflict04383(nil, nil, []string{compactTurnConflictTerminal04383}, false); err != nil {
+		t.Fatal(err)
+	}
+	attempt := transportAttempt04383{owner: "account-a", ready: true, body: compactLineageMessage04383}
+	for _, tc := range []struct {
+		name       string
+		handshakes []string
+		attempts   []transportAttempt04383
+		frames     []string
+		invalid    bool
+	}{
+		{"main was contacted", []string{"account-a"}, []transportAttempt04383{attempt}, []string{compactTurnConflictTerminal04383}, false},
+		{"second was contacted", []string{"account-b"}, nil, []string{compactTurnConflictTerminal04383}, false},
+		{"wrong status", nil, nil, []string{strings.ReplaceAll(compactTurnConflictTerminal04383, `"status":503`, `"status":409`)}, false},
+		{"missing terminal", nil, nil, nil, false},
+		{"forged success", nil, nil, []string{transportCompleted04383}, false},
+		{"unauthenticated", nil, nil, []string{compactTurnConflictTerminal04383}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := verifyCompactTurnConflict04383(tc.handshakes, tc.attempts, tc.frames, tc.invalid); err == nil {
+				t.Fatalf("Compact owner conflict mutation accepted: %s", tc.name)
+			}
+		})
+	}
+}

@@ -16,6 +16,7 @@ import (
 // 0.438.3 WebSocket selector honors that lineage even though its request's
 // quota route remains WebSocket. The unbound control must stay on main.
 const compactLineageMessage04383 = `{"type":"response.create","model":"gpt-6","x-codex-turn-state":"compact-turn","input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
+const compactTurnConflictTerminal04383 = `{"error":{"code":"service_unavailable","message":"Runtime proxy could not secure a healthy upstream profile before the pre-commit retry budget was exhausted. Retry the request."},"status":503,"type":"error"}`
 const compactShadowNullMessage04383 = `{"type":"response.create","model":"gpt-6","x-codex-turn-state":null,"client_metadata":{"x-codex-turn-state":"compact-turn"},"input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
 const compactShadowBlankMessage04383 = `{"type":"response.create","model":"gpt-6","x-codex-turn-state":" ","client_metadata":{"x-codex-turn-state":"compact-turn"},"input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
 const nestedSessionMessage04383 = `{"type":"response.create","model":"gpt-6","client_metadata":{"session_id":"shadow-session"},"input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
@@ -25,7 +26,7 @@ const compactSessionHeaderMessage04383 = `{"type":"response.create","model":"gpt
 const compactSessionBodyMessage04383 = `{"type":"response.create","model":"gpt-6","session_id":"session-alias","input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
 
 func runWebSocketCompactLineageProduct04383(root string, p product) error {
-	for _, scenario := range []string{"compact-lineage", "compact-unbound", "compact-shadow-null", "compact-shadow-blank", "session-nested", "session-shadow-null", "session-shadow-blank", "compact-session-header", "compact-session-unbound", "compact-session-body", "compact-produced", "compact-produced-long-turn"} {
+	for _, scenario := range []string{"compact-lineage", "compact-turn-conflict", "compact-unbound", "compact-shadow-null", "compact-shadow-blank", "session-nested", "session-shadow-null", "session-shadow-blank", "compact-session-header", "compact-session-unbound", "compact-session-body", "compact-produced", "compact-produced-long-turn"} {
 		if err := runCompactLineageCase04383(filepath.Join(root, scenario), p, scenario); err != nil {
 			return fmt.Errorf("%s: %w", scenario, err)
 		}
@@ -53,12 +54,18 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 		wantOwner = "main"
 	}
 	wantLineage := ""
-	if scenario == "compact-lineage" || strings.HasPrefix(scenario, "compact-shadow-") {
+	if scenario == "compact-lineage" || scenario == "compact-turn-conflict" || strings.HasPrefix(scenario, "compact-shadow-") {
 		wantLineage = "second"
 	}
 	if initialLineage != wantLineage || initial["turn"] != "main" || initial["unrelated"] != "main" || initial["session"] != "main" {
 		return fmt.Errorf("invalid initial Compact lineage fixture: lineage=%q main_turn=%q main_response=%q session=%q",
 			initialLineage, initial["turn"], initial["unrelated"], initial["session"])
+	}
+	if scenario == "compact-turn-conflict" {
+		owner, err := readCompactBindingOwner04383(p, "turn", "compact-turn")
+		if err != nil || owner != "main" {
+			return fmt.Errorf("invalid direct Compact turn conflict fixture: owner=%q err=%v", owner, err)
+		}
 	}
 	if strings.HasPrefix(scenario, "compact-session-") {
 		aliasOwner, aliasErr := readCompactBindingOwner04383(p, "session", "__compact_session__:session-alias")
@@ -157,7 +164,11 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 		return err
 	}
 	defer connection.Close()
-	_ = connection.SetDeadline(time.Now().Add(12 * time.Second))
+	deadlineSeconds := 12 * time.Second
+	if scenario == "compact-turn-conflict" {
+		deadlineSeconds = 36 * time.Second
+	}
+	_ = connection.SetDeadline(time.Now().Add(deadlineSeconds))
 	message := compactLineageMessage04383
 	if scenario == "compact-shadow-null" {
 		message = compactShadowNullMessage04383
@@ -187,6 +198,25 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 			return fmt.Errorf("unexpected Compact lineage client opcode %d", opcode)
 		}
 		frames = append(frames, string(payload))
+		if scenario == "compact-turn-conflict" {
+			backend.mu.Lock()
+			check := verifyCompactTurnConflict04383(backend.handshakes, backend.attempts, frames, backend.invalid)
+			backend.mu.Unlock()
+			if check != nil {
+				return check
+			}
+			aliasOwner, aliasErr := readCompactLineageOwner04383(p)
+			directOwner, directErr := readCompactBindingOwner04383(p, "turn", "compact-turn")
+			owners, ownersErr := readTransportOwners04383(p)
+			if aliasErr != nil || directErr != nil || ownersErr != nil ||
+				aliasOwner != "second" || directOwner != "main" ||
+				owners["turn"] != "main" || owners["unrelated"] != "main" ||
+				owners["response"] != "" || owners["session"] != "main" {
+				return fmt.Errorf("conflicting Compact turn owner mutated: direct=%q lineage=%q owners=%v errors=%v/%v/%v", directOwner, aliasOwner, owners, directErr, aliasErr, ownersErr)
+			}
+			fmt.Printf("%s compact-turn-conflict: verified conflicting owners; 503 service_unavailable; zero WebSocket upstream attempts; durable bindings unchanged\n", p.name)
+			return nil
+		}
 	}
 	backend.mu.Lock()
 	header := "compact-turn"
@@ -232,6 +262,14 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 		time.Sleep(20 * time.Millisecond)
 	}
 	fmt.Printf("%s %s: applied Ready profiles; exact full-history input; one WebSocket handshake/attempt on %s; unchanged Compact lineage and durable response owner\n", p.name, scenario, wantOwner)
+	return nil
+}
+
+func verifyCompactTurnConflict04383(handshakes []string, attempts []transportAttempt04383, frames []string, invalid bool) error {
+	if invalid || len(handshakes) != 0 || len(attempts) != 0 ||
+		!reflect.DeepEqual(frames, []string{compactTurnConflictTerminal04383}) {
+		return fmt.Errorf("unsafe conflicting Compact turn ownership: handshakes=%v attempts=%+v invalid=%t frames=%q", handshakes, attempts, invalid, frames)
+	}
 	return nil
 }
 

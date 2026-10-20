@@ -455,3 +455,12 @@ from the actual continuation binding rather than warmup order. The body-only
 expectation is based on the executable's observed selection, not on an
 assumption about the handshake header. Existing direct session and
 previous-response precedence is exercised by Router memory/durable tests.
+
+The Compact-lineage oracle now includes a strict **turn-owner conflict**
+negative control. A verified raw `compact-turn` belongs to main while its
+verified `__compact_turn_state__:compact-turn` alias belongs to second. The
+reference executable must produce a single canonical `503 service_unavailable`
+frame with no upstream WebSocket request, keeping both durable owners. A
+successful inference by either profile is a parity failure even if all
+response bytes happen to look valid. Router regression tests also require
+same-owner aliases to remain dispatchable.

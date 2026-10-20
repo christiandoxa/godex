@@ -41,12 +41,16 @@ func seedTransportAlternate04383(p product, scenario string) error {
 			value["session_id_bindings"].(map[string]any)[alias] = map[string]any{"profile_name": "second", "bound_at": time.Now().Unix()}
 			value["statuses"].(map[string]any)["session_id"].(map[string]any)[alias] = map[string]any{"state": "Verified", "confidence": 4, "last_verified_at": time.Now().Unix(), "last_touched_at": time.Now().Unix(), "last_verified_route": "compact", "success_count": 1}
 		}
+		if scenario == "compact-turn-conflict" {
+			value["turn_state_bindings"].(map[string]any)["compact-turn"] = map[string]any{"profile_name": "main", "bound_at": time.Now().Unix()}
+			value["statuses"].(map[string]any)["turn_state"].(map[string]any)["compact-turn"] = map[string]any{"state": "Verified", "confidence": 4, "last_verified_at": time.Now().Unix(), "last_touched_at": time.Now().Unix(), "last_verified_route": "responses", "success_count": 1}
+		}
 		if strings.HasPrefix(scenario, "session-") {
 			value["session_id_bindings"].(map[string]any)["shadow-session"] = map[string]any{"profile_name": "second", "bound_at": time.Now().Unix()}
 			value["session_profile_bindings"].(map[string]any)["shadow-session"] = map[string]any{"profile_name": "second", "bound_at": time.Now().Unix()}
 			value["statuses"].(map[string]any)["session_id"].(map[string]any)["shadow-session"] = map[string]any{"state": "Verified", "confidence": 4, "last_verified_at": time.Now().Unix(), "last_touched_at": time.Now().Unix(), "last_verified_route": "responses", "success_count": 1}
 		}
-		if scenario == "compact-lineage" || strings.HasPrefix(scenario, "compact-shadow-") {
+		if scenario == "compact-lineage" || scenario == "compact-turn-conflict" || strings.HasPrefix(scenario, "compact-shadow-") {
 			// Compact provenance is distinct from a plain turn-state binding.
 			// The tagged 0.438.3 Mojo key builder uses this exact namespace.
 			value["turn_state_bindings"].(map[string]any)["__compact_turn_state__:compact-turn"] = map[string]any{"profile_name": "second", "bound_at": time.Now().Unix()}
@@ -72,13 +76,26 @@ func seedTransportAlternate04383(p product, scenario string) error {
 		}
 		digest := sha256.Sum256([]byte("previous:resp-ready-b"))
 		state["bindings"] = append(state["bindings"].([]any), map[string]any{"kind": "previous", "key": hex.EncodeToString(digest[:]), "account_id": id, "updated_unix": time.Now().Unix()})
-		if scenario == "compact-lineage" || strings.HasPrefix(scenario, "compact-shadow-") {
+		if scenario == "compact-lineage" || scenario == "compact-turn-conflict" || strings.HasPrefix(scenario, "compact-shadow-") {
 			alias := sha256.Sum256([]byte("turn:__compact_turn_state__:compact-turn"))
 			state["bindings"] = append(state["bindings"].([]any), map[string]any{"kind": "turn", "key": hex.EncodeToString(alias[:]), "account_id": id, "updated_unix": time.Now().Unix()})
 		}
 		if strings.HasPrefix(scenario, "compact-session-") && scenario != "compact-session-unbound" {
 			key := sha256.Sum256([]byte("session:__compact_session__:session-alias"))
 			state["bindings"] = append(state["bindings"].([]any), map[string]any{"kind": "session", "key": hex.EncodeToString(key[:]), "account_id": id, "updated_unix": time.Now().Unix()})
+		}
+		if scenario == "compact-turn-conflict" {
+			var mainID string
+			for _, account := range accounts.Accounts {
+				if account.Name == "main" {
+					mainID = account.ID
+				}
+			}
+			if mainID == "" {
+				return errors.New("missing synthetic main profile")
+			}
+			direct := sha256.Sum256([]byte("turn:compact-turn"))
+			state["bindings"] = append(state["bindings"].([]any), map[string]any{"kind": "turn", "key": hex.EncodeToString(direct[:]), "account_id": mainID, "updated_unix": time.Now().Unix()})
 		}
 		if strings.HasPrefix(scenario, "session-") {
 			session := sha256.Sum256([]byte("session:shadow-session"))

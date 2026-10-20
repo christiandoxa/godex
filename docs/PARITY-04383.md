@@ -1607,3 +1607,32 @@ The synthetic differential establishes only the bounded session owner policy;
 it does not establish full live OAuth, macOS realtime or all possible native
 Compact producer shapes. Record an executable pass only on a clean committed
 candidate with exact official source/binary/manifest provenance.
+
+## Conflicting direct WebSocket turn and Compact lineage must never dispatch
+
+The tagged Prodex 0.438.3 hard-binding resolver inspects both a direct
+turn-state owner and its `__compact_turn_state__:` lineage owner. If both
+verified bindings point at different profiles, the result is a **hard
+binding conflict**, not precedence for either owner. On a WebSocket request
+this must fail closed before any upstream connection or model invocation.
+
+A new source/binary-pinned differential case seeds the direct `compact-turn`
+on main and its typed Compact lineage on second. Both profiles retain
+applied authenticated Ready evidence; main is current immediately before
+the request. Official Prodex returns the exact single
+`503 service_unavailable` client frame with the precommit recovery message,
+**zero** upstream WebSocket handshakes and model requests, and unchanged
+durable owners. The pre-fix Godex executable instead dispatched the exact
+opaque history to main, proving an observable cross-profile ownership bug.
+
+The scoped routing change considers both verified owners before selecting a
+WebSocket turn owner. Different registered owners return the existing
+`503 service_unavailable` precommit terminal error at the usecase boundary;
+matched owners still select that same account, and an unbound direct turn may
+continue using its verified Compact alias. Neither the WebSocket quota route
+nor any stored keys/credential records are rewritten. Memory and durable
+regressions failed before the patch and passed after it, with controls for
+matching owners, preserving both conflicting bindings and zero model dispatch.
+The executable fixture independently rejects any extra dispatch, changed
+503 frame, altered owner or missing terminal. This finite conflict policy is
+not a complete certification of provider identity/keyring semantics.

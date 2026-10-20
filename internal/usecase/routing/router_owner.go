@@ -2,6 +2,7 @@ package routing
 
 import (
 	"context"
+	"net/http"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
@@ -16,21 +17,27 @@ func (router *Router) resolveOwner(
 	if selection.RouteKind == quotamodel.RouteKindWebSocket && ownerKeys.previous == "" && ownerKeys.turn != "" {
 		// Tagged Prodex 0.438.3 resolves Compact's separate turn lineage
 		// even while the receiving socket retains the WebSocket quota route.
-		// A known direct turn owner remains authoritative; only an unbound
-		// turn may consult the Compact namespace on this route.
+		// A known direct owner and a different verified lineage owner
+		// conflict; only an unbound turn may adopt the Compact namespace.
 		directOwner, err := router.affinity.owner(ctx, affinityKeys{turn: ownerKeys.turn}, router.now())
 		if err != nil {
 			return "", nil, &proxymodel.Error{StatusCode: 409, Message: "request contains conflicting conversation affinity"}
 		}
-		if directOwner == "" {
-			alias := "__compact_turn_state__:" + ownerKeys.turn
-			aliasOwner, err := router.affinity.owner(ctx, affinityKeys{turn: alias}, router.now())
-			if err != nil {
-				return "", nil, &proxymodel.Error{StatusCode: 409, Message: "request contains conflicting conversation affinity"}
+		alias := "__compact_turn_state__:" + ownerKeys.turn
+		aliasOwner, err := router.affinity.owner(ctx, affinityKeys{turn: alias}, router.now())
+		if err != nil {
+			return "", nil, &proxymodel.Error{StatusCode: 409, Message: "request contains conflicting conversation affinity"}
+		}
+		if directOwner != "" && aliasOwner != "" && directOwner != aliasOwner {
+			// Tagged 0.438.3 resolves this as a hard binding conflict.
+			// Fail before dispatch; neither owner may infer on the other's
+			// durable continuation, even with reconstructable full history.
+			return "", nil, &proxymodel.Error{
+				StatusCode: http.StatusServiceUnavailable, Message: upstreamTransportFailureMessage,
 			}
-			if aliasOwner != "" {
-				ownerKeys.turn = alias
-			}
+		}
+		if directOwner == "" && aliasOwner != "" {
+			ownerKeys.turn = alias
 		}
 	}
 	if selection.RouteKind == quotamodel.RouteKindWebSocket && ownerKeys.previous == "" &&
