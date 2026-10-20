@@ -233,6 +233,10 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 	b.invalid = b.invalid || frame.Opcode != 1 || !frame.Masked()
 	b.attempts = append(b.attempts, transportAttempt04383{owner: owner, turn: r.Header.Get("x-codex-turn-state"), body: string(payload), ready: b.receipts["account-a"] > 0 && b.receipts["account-b"] > 0})
 	b.mu.Unlock()
+	if strings.HasPrefix(b.scenario, "tool-suffix-") {
+		_ = websocketframe.WriteFrame(connection, 1, []byte(`{"type":"error","status":400,"error":{"code":"previous_response_not_found","message":"synthetic missing response"}}`), false)
+		return
+	}
 	if b.scenario == "compact-bound-transport" && owner == "account-b" {
 		// The verified Compact owner closes before any client-visible model
 		// event. A reconstructable full history can recover on Ready main.

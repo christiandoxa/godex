@@ -2675,3 +2675,34 @@ per-response turn-state provenance without cross-assignment. Negative controls
 reject altered response events, forged Ready evidence, wrong account, extra
 inference, and lost terminal output. This finite synthetic oracle is not a
 certificate for every live provider or native OS stream/fault permutation.
+
+## WebSocket tool-output type suffix must preserve trailing whitespace
+
+The tagged `runtime_proxy_input_item_is_tool_output` compiler checks the
+**decoded, untrimmed** item `type` for its exact `_call_output` suffix,
+while checking `call_id` separately for nonblank text. A trailing space or
+tab after `function_call_output` invalidates this suffix; a leading space
+alone does not. Godex's WebSocket request-metadata decoder previously
+applied `strings.TrimSpace(type)` before checking the suffix, which
+incorrectly converted a non-tool input into a hard previous-response
+dependency and could spend the three locked-owner retry attempts on a
+stale `previous_response_id`.
+
+A fail-before table regression exercises canonical/custom types, trailing
+space/tab, leading whitespace, blank call IDs and legitimate IDs. An
+independent memory/durable Router regression verifies actual behavior after
+`previous_response_not_found`: canonical or leading-space tool-output
+messages spend the tagged bounded owner retry schedule, whereas trailing
+space/tab messages report stale continuation after one exact upstream
+attempt. No user JSON is trimmed or rewritten.
+
+The source/manifest/executable-pinned `--phase=websocket-compact-lineage`
+fixture additionally compares four tool-suffix variants against the
+published Prodex 0.438.3 executable. Two authenticated Ready profiles are
+warmed and the same response ID is verified on main. The synthetic upstream
+returns a precommit `previous_response_not_found` for each request; the gate
+checks owner, exact input bytes, number of upstream attempts, client terminal
+frame, unchanged durable previous ownership and no unintended turn header.
+A mutation oracle rejects wrong owners, missing Ready evidence, altered
+request, unexpected replay count or forged completion. Native OS and live
+provider faults remain independent parity questions.

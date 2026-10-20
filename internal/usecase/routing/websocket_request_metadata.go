@@ -77,7 +77,10 @@ func requestInputHasToolOutput(value any) bool {
 		if !ok {
 			continue
 		}
-		kind := nonblankJSONText(object["type"])
+		// The tagged Mojo runtime input planner requires the exact
+		// decoded type suffix, without trimming the type's trailing spaces.
+		// A call ID is independently accepted only when nonblank.
+		kind, _ := object["type"].(string)
 		callID := nonblankJSONText(object["call_id"])
 		if callID != "" && strings.HasSuffix(kind, "_call_output") {
 			return true

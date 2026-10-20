@@ -44,6 +44,9 @@ func runWebSocketCompactLineageProduct04383(root string, p product) error {
 	if err := runCompactBoundTransportCase04383(filepath.Join(root, "compact-bound-transport"), p); err != nil {
 		return fmt.Errorf("compact-bound-transport: %w", err)
 	}
+	if err := runWebSocketToolTypeProduct04383(filepath.Join(root, "tool-type-suffix"), p); err != nil {
+		return err
+	}
 	return nil
 }
 

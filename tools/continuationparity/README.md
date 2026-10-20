@@ -739,3 +739,13 @@ must have authenticated Ready quota receipts. Prodex and Godex must forward
 identical SSE bytes and record each response ID on main with its **own**
 turn-state lineage, without creating reversed ID/turn combinations. This is
 an independently checked durable-state contract, not a status-only smoke test.
+
+The WebSocket Compact lineage phase also tests the request input `type`
+suffix on a verified main-owned previous response. The canonical
+`function_call_output` and leading-space type remain tool-dependent; adding
+trailing space or tab makes `_call_output` no longer an exact suffix. A
+precommit `previous_response_not_found` must therefore produce the tagged
+bounded owner retries only for canonical types. The fixture checks two
+applied authenticated Ready receipts, byte-exact input, same-owner attempt
+count, client stale terminal and unchanged original response ownership on
+both Prodex and Godex; negative controls reject forged observations.

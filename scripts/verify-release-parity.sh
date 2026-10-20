@@ -788,7 +788,7 @@ if [ "$phase" = 'all' ] || [ "$phase" = 'websocket-compact-lineage' ]; then
   --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
   --websocket-compact-lineage
 go test -race ./tools/continuationparity \
-  -run '^TestProdex04383WebSocket(CompactLineageOracleRejectsMutations|ShadowedDirectMetadataOracleRejectsMutations)$' -count=1 -timeout=30s
+  -run '^TestProdex04383WebSocket(CompactLineageOracleRejectsMutations|ShadowedDirectMetadataOracleRejectsMutations|ToolSuffixOracleRejectsMutations)$' -count=1 -timeout=30s
 fi
 
 if [ "$phase" = 'all' ] || [ "$phase" = 'http-keepalive' ]; then
