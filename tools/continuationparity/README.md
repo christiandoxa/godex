@@ -634,3 +634,19 @@ exact original full input, send no injected turn header, and complete once.
 The existing canonical `x-codex-turn-state` owner-control and null/blank
 shadow controls stay mandatory; negative mutation fixtures reject rerouting,
 replay or rewritten upstream history.
+
+### Compiled prompt-cache hit owner differential (`--http-prompt-cache`)
+
+The official 0.438.3 executable and the clean Godex candidate each receive
+six independent synthetic two-profile runs. In each run the current main
+profile first acquires a verified cached-input hit for a shared prompt key.
+A hard-previous request sends the same cache key to second, whose usage
+contains a different canonical/invalid token shape. An unrelated hard
+previous response then restores current main; a final fresh request must
+select the retained or newly promoted prompt-cache owner. Controls cover
+native direct and nested hit fields, zero shadowing, raw legacy aliases,
+invalid-uint64 fallback, and valid maximum-uint64 hits. The oracle rejects
+wrong account, missing quota receipts, extra inference, changed request or
+response, injected metadata and invalid auth. Four response IDs per run are
+checked independently in durable continuation state. This is credential-free
+and runs only against SHA-256/source/manifest-pinned executables.

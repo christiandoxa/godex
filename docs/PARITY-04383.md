@@ -2377,3 +2377,19 @@ arrays and all previously qualified native usage fields. Terminal-event
 eligibility remains a separate unchanged Godex lifecycle rule; these tests
 do not certify externally authenticated streaming behavior or native OS
 specifics.
+
+## Paired executable cache-affinity selection after native usage observations
+
+A new source/manifest/executable-pinned `--phase=http-prompt-cache` gate
+checks whether the compiled cached-token parser affects actual account
+selection rather than only Go parsing. Each isolated scenario applies Ready
+quota receipts to two authenticated synthetic managed profiles, records a
+cached hit on previous-response-pinned main, sends the same prompt key to a hard-pinned second profile,
+restores the active main profile, and issues one fresh prompt-key request.
+The selected profile for the fourth request must follow the source's cached
+hit comparison, including canonical direct/nested fields, zero/legacy
+negative controls, checked overlarge input with fallback, and the full
+unsigned-64 maximum. The oracle checks exact request/response bytes, four
+single owner-directed upstream attempts and all four durable response IDs.
+This finite HTTP selection proof does not substitute for live-model cache
+measurement, provider authentication, or native Windows/macOS fault parity.

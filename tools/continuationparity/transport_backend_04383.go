@@ -78,6 +78,22 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.HasSuffix(r.URL.Path, "/responses") && r.Method == http.MethodPost {
 		body, _ := io.ReadAll(io.LimitReader(r.Body, 4096))
+		if strings.HasPrefix(b.scenario, "http-prompt-cache-") {
+			shape := strings.TrimPrefix(b.scenario, "http-prompt-cache-")
+			for _, stage := range []string{"seed-main", "seed-second", "restore-main", "fresh"} {
+				if string(body) != httpPromptCacheRequest04383(stage) {
+					continue
+				}
+				b.mu.Lock()
+				b.attempts = append(b.attempts, transportAttempt04383{owner: owner, body: string(body),
+					turn: r.Header.Get("x-codex-turn-state"), trace: r.Header.Get("thread-id"),
+					metadata: r.Header.Get("x-codex-turn-metadata"),
+					ready:    b.receipts["account-a"] > 0 && b.receipts["account-b"] > 0})
+				b.mu.Unlock()
+				writeJSON(w, http.StatusOK, httpPromptCacheReply04383(shape, stage))
+				return
+			}
+		}
 		if strings.HasPrefix(b.scenario, "http-response-session-") {
 			shape := strings.TrimPrefix(b.scenario, "http-response-session-")
 			if string(body) == httpResponseSessionRequest04383(shape) {

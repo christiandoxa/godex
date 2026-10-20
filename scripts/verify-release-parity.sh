@@ -26,7 +26,8 @@ case "${1:-}" in
   --phase=http-compact) phase='http-compact' ;;
   --phase=http-turn-transport) phase='http-turn-transport' ;;
   --phase=http-session-conflict) phase='http-session-conflict' ;;
-  *) echo 'usage: verify-release-parity.sh [--phase=preflight|preflight-tests|preflight-oracles|preflight-oracles-pty|preflight-oracles-profiles|preflight-oracles-history|deepseek|gemini|websocket|websocket-core|websocket-deadline|websocket-transport|websocket-transport-core|websocket-transport-lifecycle|websocket-transport-capacity|websocket-compact-lineage|http-keepalive|http-compact|http-turn-transport|http-session-conflict]' >&2; exit 2 ;;
+  --phase=http-prompt-cache) phase='http-prompt-cache' ;;
+  *) echo 'usage: verify-release-parity.sh [--phase=preflight|preflight-tests|preflight-oracles|preflight-oracles-pty|preflight-oracles-profiles|preflight-oracles-history|deepseek|gemini|websocket|websocket-core|websocket-deadline|websocket-transport|websocket-transport-core|websocket-transport-lifecycle|websocket-transport-capacity|websocket-compact-lineage|http-keepalive|http-compact|http-turn-transport|http-session-conflict|http-prompt-cache]' >&2; exit 2 ;;
 esac
 if [ "$#" -gt 1 ]; then
   echo 'release parity accepts at most one phase option' >&2
@@ -830,6 +831,18 @@ if [ "$phase" = 'all' ] || [ "$phase" = 'http-session-conflict' ]; then
   --http-session-conflict
 go test -race ./tools/continuationparity \
   -run '^TestProdex04383(HTTP(SoftSessionConflict|PreviousSession|DirectShadow|NestedPrevious|DirectTurnShadow|UnsupportedThread|ResponseSession)|HTTPTurnSession)OracleRejectsMutations$' -count=1 -timeout=30s
+fi
+
+# Native cached-token affinity must prefer the highest verified cache-hit
+# owner, without accepting legacy-only, zero-shadowed, or invalid cache usage.
+if [ "$phase" = 'all' ] || [ "$phase" = 'http-prompt-cache' ]; then
+"$tmp/continuationparity" \
+  --prodex "$tmp/prodex" --godex "$tmp/godex" \
+  --prodex-source "$tmp/prodex-source" \
+  --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
+  --http-prompt-cache
+go test -race ./tools/continuationparity \
+  -run '^TestProdex04383HTTPPromptCacheOracleRejectsMutations$' -count=1 -timeout=30s
 fi
 
 # Printed only after all stages *selected for this invocation* succeeded.
