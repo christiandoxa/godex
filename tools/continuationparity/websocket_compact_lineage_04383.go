@@ -16,9 +16,11 @@ import (
 // 0.438.3 WebSocket selector honors that lineage even though its request's
 // quota route remains WebSocket. The unbound control must stay on main.
 const compactLineageMessage04383 = `{"type":"response.create","model":"gpt-6","x-codex-turn-state":"compact-turn","input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
+const compactShadowNullMessage04383 = `{"type":"response.create","model":"gpt-6","x-codex-turn-state":null,"client_metadata":{"x-codex-turn-state":"compact-turn"},"input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
+const compactShadowBlankMessage04383 = `{"type":"response.create","model":"gpt-6","x-codex-turn-state":" ","client_metadata":{"x-codex-turn-state":"compact-turn"},"input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
 
 func runWebSocketCompactLineageProduct04383(root string, p product) error {
-	for _, scenario := range []string{"compact-lineage", "compact-unbound", "compact-produced"} {
+	for _, scenario := range []string{"compact-lineage", "compact-unbound", "compact-shadow-null", "compact-shadow-blank", "compact-produced"} {
 		if err := runCompactLineageCase04383(filepath.Join(root, scenario), p, scenario); err != nil {
 			return fmt.Errorf("%s: %w", scenario, err)
 		}
@@ -42,11 +44,11 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 		return err
 	}
 	wantOwner := "second"
-	if scenario == "compact-unbound" {
+	if scenario == "compact-unbound" || strings.HasPrefix(scenario, "compact-shadow-") {
 		wantOwner = "main"
 	}
 	wantLineage := ""
-	if scenario == "compact-lineage" {
+	if scenario == "compact-lineage" || strings.HasPrefix(scenario, "compact-shadow-") {
 		wantLineage = "second"
 	}
 	if initialLineage != wantLineage || initial["turn"] != "main" || initial["unrelated"] != "main" || initial["session"] != "main" {
@@ -125,7 +127,13 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 	}
 	defer connection.Close()
 	_ = connection.SetDeadline(time.Now().Add(12 * time.Second))
-	if err := websocketframe.WriteFrame(connection, 1, []byte(compactLineageMessage04383), true); err != nil {
+	message := compactLineageMessage04383
+	if scenario == "compact-shadow-null" {
+		message = compactShadowNullMessage04383
+	} else if scenario == "compact-shadow-blank" {
+		message = compactShadowBlankMessage04383
+	}
+	if err := websocketframe.WriteFrame(connection, 1, []byte(message), true); err != nil {
 		return err
 	}
 	frames := make([]string, 0, 2)
@@ -140,7 +148,11 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 		frames = append(frames, string(payload))
 	}
 	backend.mu.Lock()
-	err = verifyCompactLineage04383(wantOwner, backend.handshakes, backend.attempts, frames, backend.invalid)
+	header := "compact-turn"
+	if strings.HasPrefix(scenario, "compact-shadow-") {
+		header = ""
+	}
+	err = verifyCompactLineageWire04383(wantOwner, message, header, backend.handshakes, backend.attempts, frames, backend.invalid)
 	backend.mu.Unlock()
 	if err != nil {
 		return err
@@ -170,10 +182,14 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 }
 
 func verifyCompactLineage04383(wantOwner string, handshakes []string, attempts []transportAttempt04383, frames []string, invalid bool) error {
+	return verifyCompactLineageWire04383(wantOwner, compactLineageMessage04383, "compact-turn", handshakes, attempts, frames, invalid)
+}
+
+func verifyCompactLineageWire04383(wantOwner, wantBody, wantTurn string, handshakes []string, attempts []transportAttempt04383, frames []string, invalid bool) error {
 	wantAccount := map[string]string{"main": "account-a", "second": "account-b"}[wantOwner]
 	if invalid || wantAccount == "" || !reflect.DeepEqual(handshakes, []string{wantAccount}) || len(attempts) != 1 ||
-		!attempts[0].ready || attempts[0].owner != wantAccount || attempts[0].turn != "compact-turn" ||
-		!sameTransportJSON04383(attempts[0].body, compactLineageMessage04383) ||
+		!attempts[0].ready || attempts[0].owner != wantAccount || attempts[0].turn != wantTurn ||
+		!sameTransportJSON04383(attempts[0].body, wantBody) ||
 		!reflect.DeepEqual(frames, []string{transportDelta04383, transportCompleted04383}) {
 		return fmt.Errorf("Compact lineage owner/provenance/frame mismatch: want=%s handshakes=%v attempts=%+v invalid=%t frames=%q", wantAccount, handshakes, attempts, invalid, frames)
 	}

@@ -41,3 +41,37 @@ func TestProdex04383WebSocketCompactLineageOracleRejectsMutations(t *testing.T) 
 		}
 	}
 }
+
+func TestProdex04383WebSocketShadowedDirectMetadataOracleRejectsMutations(t *testing.T) {
+	for name, body := range map[string]string{
+		"null":  compactShadowNullMessage04383,
+		"blank": compactShadowBlankMessage04383,
+	} {
+		t.Run(name, func(t *testing.T) {
+			base := transportAttempt04383{owner: "account-a", body: body, ready: true}
+			hello := []string{"account-a"}
+			frames := []string{transportDelta04383, transportCompleted04383}
+			if err := verifyCompactLineageWire04383("main", body, "", hello, []transportAttempt04383{base}, frames, false); err != nil {
+				t.Fatal(err)
+			}
+			for _, mutation := range []struct {
+				name     string
+				attempts []transportAttempt04383
+				frames   []string
+			}{
+				{"incorrect nested owner", []transportAttempt04383{{owner: "account-b", body: body, ready: true}}, frames},
+				{"leaked nested token", []transportAttempt04383{{owner: "account-a", turn: "compact-turn", body: body, ready: true}}, frames},
+				{"lost Ready receipt", []transportAttempt04383{{owner: "account-a", body: body}}, frames},
+				{"damaged user request", []transportAttempt04383{{owner: "account-a", body: strings.Replace(body, `"content":"answer"`, `"content":"lost"`, 1), ready: true}}, frames},
+				{"duplicated request", []transportAttempt04383{base, base}, frames},
+				{"wrong terminal", []transportAttempt04383{base}, []string{transportDelta04383, `{"type":"response.completed","response":{"id":"wrong"}}`}},
+			} {
+				t.Run(mutation.name, func(t *testing.T) {
+					if err := verifyCompactLineageWire04383("main", body, "", hello, mutation.attempts, mutation.frames, false); err == nil {
+						t.Fatalf("shadowed metadata material mutation escaped: %s", mutation.name)
+					}
+				})
+			}
+		})
+	}
+}

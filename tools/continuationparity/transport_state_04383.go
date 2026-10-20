@@ -34,7 +34,7 @@ func seedTransportAlternate04383(p product, scenario string) error {
 		}
 		value["response_profile_bindings"].(map[string]any)["resp-ready-b"] = map[string]any{"profile_name": "second", "bound_at": time.Now().Unix()}
 		value["statuses"].(map[string]any)["response"].(map[string]any)["resp-ready-b"] = map[string]any{"state": "Verified", "confidence": 4, "last_verified_at": time.Now().Unix(), "last_touched_at": time.Now().Unix(), "last_verified_route": "responses", "success_count": 1}
-		if scenario == "compact-lineage" {
+		if scenario == "compact-lineage" || strings.HasPrefix(scenario, "compact-shadow-") {
 			// Compact provenance is distinct from a plain turn-state binding.
 			// The tagged 0.438.3 Mojo key builder uses this exact namespace.
 			value["turn_state_bindings"].(map[string]any)["__compact_turn_state__:compact-turn"] = map[string]any{"profile_name": "second", "bound_at": time.Now().Unix()}
@@ -60,7 +60,7 @@ func seedTransportAlternate04383(p product, scenario string) error {
 		}
 		digest := sha256.Sum256([]byte("previous:resp-ready-b"))
 		state["bindings"] = append(state["bindings"].([]any), map[string]any{"kind": "previous", "key": hex.EncodeToString(digest[:]), "account_id": id, "updated_unix": time.Now().Unix()})
-		if scenario == "compact-lineage" {
+		if scenario == "compact-lineage" || strings.HasPrefix(scenario, "compact-shadow-") {
 			alias := sha256.Sum256([]byte("turn:__compact_turn_state__:compact-turn"))
 			state["bindings"] = append(state["bindings"].([]any), map[string]any{"kind": "turn", "key": hex.EncodeToString(alias[:]), "account_id": id, "updated_unix": time.Now().Unix()})
 		}
