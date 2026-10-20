@@ -779,3 +779,13 @@ Prodex parser requires serde_json success, these responses may not authorize
 a previous-response replay. The oracle verifies exact unchanged response
 bytes, one authenticated Ready main upstream inference, no forged response
 owner and intact previous-response binding on both products.
+
+The HTTP turn-transport phase additionally rejects partial structured SSE
+error evidence from malformed JSON. A single `response.failed` event with a
+recognizable `insufficient_quota` code plus invalid Unicode surrogate,
+non-finite float or excessive nested value must not cause a second upstream
+request; source-pinned Prodex's whole-document parser treats it as an opaque
+precommit event. A valid `response.output_text.delta` control remains
+commit-ready. The oracle checks authenticated Ready receipts, exact client
+SSE bytes, a single main owner-directed attempt and preserved durable
+previous-response ownership on both binaries.

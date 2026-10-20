@@ -80,6 +80,13 @@ func streamOutcome(data []byte, headers http.Header, now time.Time, providerKind
 	if !utf8.Valid(data) {
 		return responseOutcome{}, true
 	}
+	// Tagged parse_runtime_sse_payload must parse the complete event as
+	// serde_json::Value before a structured precommit error can rotate an
+	// owner. encoding/json repairs lone surrogates and accepts excessive
+	// nesting; neither is legitimate quota/rate-limit evidence.
+	if _, valid := decodeNativeUsageJSON(data); !valid {
+		return responseOutcome{kind: responsePass}, false
+	}
 	var event struct {
 		Type  string          `json:"type"`
 		Error json.RawMessage `json:"error"`

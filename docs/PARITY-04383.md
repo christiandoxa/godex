@@ -2833,3 +2833,33 @@ a second model inference from invalid structured error evidence. The fixture
 checks applied authenticated Ready receipts, original request/response bytes,
 terminal HTTP status and durable binding projections. This is a bounded
 synthetic protocol comparison rather than a claim about all live providers.
+
+## Invalid whole SSE JSON cannot forge quota or rate-limit precommit signals
+
+The tagged 0.438.3 `parse_runtime_sse_payload` parses the complete SSE event
+with `serde_json::from_str`; malformed JSON returns the neutral/default
+inspection event, not its partially readable `response.failed` quota/rate
+signal. The compiled `runtime_sse_inspection_step_v1` then treats that
+unrecognized event as commit-ready rather than rotating a Ready upstream
+profile. Godex's `streamOutcome` previously used Go's permissive
+`json.Unmarshal`, allowing an otherwise recognizable `response.failed`
+message with an unrelated unpaired surrogate or excess JSON container depth
+to falsely trigger a quota/rate-limit rotation.
+
+Fail-before parser regressions reproduce the fake precommit retry on
+unpaired high/low surrogates and over-depth SSE JSON; they also cover
+non-finite floats and valid structured quota/rate-limit controls. An
+independent end-to-end HTTP Router regression ensures malformed quota events
+are forwarded as their original SSE bytes from the first selected account
+without replay. Godex now validates complete serde-compatible JSON before
+applying structured SSE error signals, preserving its previously distinct
+raw-invalid-UTF8 handling and upstream bytes.
+
+The source/manifest/executable-pinned `--phase=http-turn-transport` oracle
+adds paired valid-output and malformed-SSE controls. Each case holds an
+independently verified main previous-response owner, applies authenticated
+Ready quota receipts to two profiles, and verifies one original main attempt,
+exact HTTP 200 event bytes, no cross-profile replay, and unchanged durable
+previous ownership. Mutation tests reject forged Ready evidence, changed
+request/event bytes, additional inference and incorrect terminal status.
+This synthetic comparison is not an all-provider or native-OS certificate.

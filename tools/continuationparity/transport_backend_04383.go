@@ -115,6 +115,19 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 			_, _ = io.WriteString(w, httpSSETurnLineageWire04383[boundary:])
 			return
 		}
+		if strings.HasPrefix(b.scenario, "http-sse-invalid-error-") && string(body) == httpSSEInvalidErrorRequest04383 {
+			shape := strings.TrimPrefix(b.scenario, "http-sse-invalid-error-")
+			b.mu.Lock()
+			b.attempts = append(b.attempts, transportAttempt04383{owner: owner, body: string(body),
+				turn: r.Header.Get("x-codex-turn-state"), trace: r.Header.Get("thread-id"),
+				metadata: r.Header.Get("x-codex-turn-metadata"),
+				ready:    b.receipts["account-a"] > 0 && b.receipts["account-b"] > 0})
+			b.mu.Unlock()
+			w.Header().Set("Content-Type", "text/event-stream")
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, httpSSEInvalidErrorBody04383(shape))
+			return
+		}
 		if strings.HasPrefix(b.scenario, "http-recovery-session-") {
 			shape := strings.TrimPrefix(b.scenario, "http-recovery-session-")
 			// Capture every relevant recovery attempt, including a replay
