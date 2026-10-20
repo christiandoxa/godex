@@ -1827,3 +1827,32 @@ Windows, provider OAuth/keyring and live upstream fault combinations remain
 PARTIAL/OPEN. Cross-compilation is not a substitute for native runtime
 observations. The results above are finite source-aligned synthetic parity,
 not a blanket production 1:1 release certificate.
+
+## Expanded pinned multi-domain 0.438.3 gate on clean `799081d`
+
+The exact clean documentation checkpoint
+`799081d16ea7691de95b256d343769c9907c9580` was independently run
+against the source-tag/binary/manifest-pinned official Prodex 0.438.3 Linux
+executable. All of the following **additional** release-parity phases exited
+**PASS** on this exact commit; none is inferred from a neighboring SHA:
+
+| Phase | Observed scope |
+| --- | --- |
+| `--phase=preflight-oracles-pty` | PASS: CLI/PTY and workspace trust, including deduplicated trusted workspaces and negative controls |
+| `--phase=preflight-oracles-profiles` | PASS: profile lifecycle, quota/auth startup and restart snapshots |
+| `--phase=preflight-oracles-history` | PASS: durable history/continuation fixture and negative controls |
+| `--phase=deepseek` | PASS: pinned DeepSeek response and CLI parity fixtures |
+| `--phase=gemini` | PASS: Gemini native/chat SSE, tools, token usage, route/auth/error and negative mutation controls |
+| `--phase=http-keepalive` | PASS: fresh absolute request budget on one reused TCP connection, two 200 responses after ~31 seconds on both binaries |
+| `--phase=http-turn-transport` | PASS: owned HTTP Responses turn/session/previous-response transport errors and unchanged durable owners |
+| `--phase=websocket-deadline` | PASS: absolute ~30-second precommit deadline, 504 `request_timeout`, followed by a successful new turn on the same client socket |
+
+The same code candidate `67e995a25224869d47678a5db29a4102800e9bb3`
+preceding this documentation commit was separately verified for all of
+`websocket-compact-lineage`, `websocket-core`, 17-case
+`websocket-transport-core`, 2-case `websocket-transport-lifecycle`, 1-case
+`websocket-transport-capacity`, `preflight-tests` and `http-compact`.
+Only docs changed between those two SHAs. Collectively this is a broad set
+of **finite synthetic Linux differential results**, not a release-wide claim
+of perfect production 1:1. Native macOS/Windows execution, live OAuth/keyring
+and external-provider fault combinations retain **PARTIAL/OPEN** status.
