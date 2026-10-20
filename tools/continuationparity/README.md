@@ -624,3 +624,13 @@ retain their supplied order; nested response headers outrank root headers.
 Unicode long-s and whitespace-padded name impostors cannot mint turn
 ownership. The oracle checks both the expected turn owner and every forbidden
 turn alias in persisted state, as well as raw response/request integrity.
+
+The tagged WebSocket request semantic planner does **not** accept legacy
+`turn_state` as a hard owner key. Three `compact-shadow-legacy-*` scenarios
+cover the direct JSON field, the nested client_metadata field, and both
+present together. A separately verified Compact-origin `compact-turn` belongs
+to second, yet the legacy-only request must remain on Ready main, retain the
+exact original full input, send no injected turn header, and complete once.
+The existing canonical `x-codex-turn-state` owner-control and null/blank
+shadow controls stay mandatory; negative mutation fixtures reject rerouting,
+replay or rewritten upstream history.

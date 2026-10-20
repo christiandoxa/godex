@@ -44,8 +44,11 @@ func TestProdex04383WebSocketCompactLineageOracleRejectsMutations(t *testing.T) 
 
 func TestProdex04383WebSocketShadowedDirectMetadataOracleRejectsMutations(t *testing.T) {
 	for name, body := range map[string]string{
-		"null":  compactShadowNullMessage04383,
-		"blank": compactShadowBlankMessage04383,
+		"null":          compactShadowNullMessage04383,
+		"blank":         compactShadowBlankMessage04383,
+		"legacy-direct": compactShadowLegacyDirectMessage04383,
+		"legacy-nested": compactShadowLegacyNestedMessage04383,
+		"legacy-both":   compactShadowLegacyBothMessage04383,
 	} {
 		t.Run(name, func(t *testing.T) {
 			base := transportAttempt04383{owner: "account-a", body: body, ready: true}

@@ -2284,3 +2284,26 @@ prompt-cache timestamps to Unix seconds before any lookup, update or pruning.
 This is a clock-source and bounded-memory policy comparison with the exact
 published 0.438.3 implementation; it does not assert a new live-provider or
 cross-binary network differential for subsecond timing.
+
+## WebSocket input `turn_state` is not a hard continuation alias
+
+The tagged 0.438.3 `runtime_request_semantic_plan` accepts an exact
+`x-codex-turn-state` JSON member, or `client_metadata.x-codex-turn-state` when
+the direct member is **absent**. A separate `turn_state` field is valid in
+**response** metadata, not as a WebSocket request continuation identity.
+Godex's general-purpose request decoder formerly promoted direct or nested
+`turn_state` into hard-affinity, permitting unrelated JSON to select the
+wrong profile. A two-account memory/durable fail-before test reproduces the
+foreign owner selection for both legacy locations and their combination;
+canonical direct/nested turn and direct-null shadowing are positive controls.
+
+The scoped correction reuses the same presence-aware metadata parser already
+used by the WebSocket dispatcher. It neither modifies original JSON bytes nor
+adds a handshake turn-state header from the unsupported aliases. The pinned
+`--phase=websocket-compact-lineage` differential includes three independent
+legacy-alias negative cases: a verified Compact-origin turn on second cannot
+steal a self-contained request from active main, and must not be rebound or
+released. The oracle checks authenticated Ready evidence, one exact WebSocket
+upstream message, original history, no injected turn header, visible output,
+and durable Compact/response owners. This finite parity slice does not certify
+native socket fault behavior on macOS/Windows or live OAuth integrations.

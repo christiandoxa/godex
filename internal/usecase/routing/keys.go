@@ -41,20 +41,10 @@ func requestAffinity(request proxymodel.Request, body []byte) affinityKeys {
 		return keys
 	}
 	if keys.turn == "" && request.WebSocketMessage {
-		// Tagged HTTP Responses/Compact use only the turn-state header.
-		// WebSocket messages allow a direct JSON turn-state member to
-		// shadow nested client_metadata even when its value is invalid.
-		_, direct := object["x-codex-turn-state"]
-		if direct {
-			keys.turn = nonblankJSONText(object["x-codex-turn-state"])
-		} else {
-			keys.turn = objectString(object, "x-codex-turn-state", "turn_state")
-			if keys.turn == "" {
-				if metadata, ok := object["client_metadata"].(map[string]any); ok {
-					keys.turn = objectString(metadata, "x-codex-turn-state", "turn_state")
-				}
-			}
-		}
+		// Tagged WebSocket request semantics accept only this exact member
+		// or its client_metadata counterpart. The response-only turn_state
+		// field cannot pin a request to another continuation owner.
+		keys.turn = semanticNestedText(object, "x-codex-turn-state", "client_metadata", "x-codex-turn-state")
 	}
 	keys.previous = objectString(object, "previous_response_id")
 	// Tagged Prodex's HTTP Responses semantic plan reads only a direct

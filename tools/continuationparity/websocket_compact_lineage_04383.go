@@ -20,6 +20,9 @@ const compactPreviousConflictMessage04383 = `{"type":"response.create","model":"
 const compactTurnConflictTerminal04383 = `{"error":{"code":"service_unavailable","message":"Runtime proxy could not secure a healthy upstream profile before the pre-commit retry budget was exhausted. Retry the request."},"status":503,"type":"error"}`
 const compactShadowNullMessage04383 = `{"type":"response.create","model":"gpt-6","x-codex-turn-state":null,"client_metadata":{"x-codex-turn-state":"compact-turn"},"input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
 const compactShadowBlankMessage04383 = `{"type":"response.create","model":"gpt-6","x-codex-turn-state":" ","client_metadata":{"x-codex-turn-state":"compact-turn"},"input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
+const compactShadowLegacyDirectMessage04383 = `{"type":"response.create","model":"gpt-6","turn_state":"compact-turn","input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
+const compactShadowLegacyNestedMessage04383 = `{"type":"response.create","model":"gpt-6","client_metadata":{"turn_state":"compact-turn"},"input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
+const compactShadowLegacyBothMessage04383 = `{"type":"response.create","model":"gpt-6","turn_state":"compact-turn","client_metadata":{"turn_state":"compact-turn"},"input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
 const nestedSessionMessage04383 = `{"type":"response.create","model":"gpt-6","client_metadata":{"session_id":"shadow-session"},"input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
 const shadowSessionNullMessage04383 = `{"type":"response.create","model":"gpt-6","session_id":null,"client_metadata":{"session_id":"shadow-session"},"input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
 const shadowSessionBlankMessage04383 = `{"type":"response.create","model":"gpt-6","session_id":" ","client_metadata":{"session_id":"shadow-session"},"input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
@@ -30,7 +33,7 @@ const freshWebSocketSessionMessage04383 = `{"type":"response.create","model":"gp
 const previousForeignSessionMessage04383 = `{"type":"response.create","model":"gpt-6","previous_response_id":"resp-main","session_id":"shadow-session","input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
 
 func runWebSocketCompactLineageProduct04383(root string, p product) error {
-	for _, scenario := range []string{"compact-lineage", "compact-turn-conflict", "compact-previous-conflict", "compact-unbound", "compact-shadow-null", "compact-shadow-blank", "session-nested", "session-shadow-null", "session-shadow-blank", "session-hard-previous", "compact-session-header", "compact-session-unbound", "compact-session-body", "compact-session-conflict", "compact-session-previous", "fresh-websocket-session", "compact-produced", "compact-produced-long-turn"} {
+	for _, scenario := range []string{"compact-lineage", "compact-turn-conflict", "compact-previous-conflict", "compact-unbound", "compact-shadow-null", "compact-shadow-blank", "compact-shadow-legacy-direct", "compact-shadow-legacy-nested", "compact-shadow-legacy-both", "session-nested", "session-shadow-null", "session-shadow-blank", "session-hard-previous", "compact-session-header", "compact-session-unbound", "compact-session-body", "compact-session-conflict", "compact-session-previous", "fresh-websocket-session", "compact-produced", "compact-produced-long-turn"} {
 		if err := runCompactLineageCase04383(filepath.Join(root, scenario), p, scenario); err != nil {
 			return fmt.Errorf("%s: %w", scenario, err)
 		}
@@ -185,6 +188,12 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 		message = compactShadowNullMessage04383
 	} else if scenario == "compact-shadow-blank" {
 		message = compactShadowBlankMessage04383
+	} else if scenario == "compact-shadow-legacy-direct" {
+		message = compactShadowLegacyDirectMessage04383
+	} else if scenario == "compact-shadow-legacy-nested" {
+		message = compactShadowLegacyNestedMessage04383
+	} else if scenario == "compact-shadow-legacy-both" {
+		message = compactShadowLegacyBothMessage04383
 	} else if scenario == "compact-previous-conflict" {
 		message = compactPreviousConflictMessage04383
 	} else if scenario == "session-nested" {
