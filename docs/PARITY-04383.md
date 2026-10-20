@@ -2504,3 +2504,35 @@ Ready quota evidence, no injected turn header, the original second-owned
 response and successful new main response, with mutation controls for wrong
 owner, lost history, extra inference and missing completion. Passing this
 finite case does not close native socket, live OAuth/provider or all 1:1 gaps.
+
+## Reject non-finite JSON numbers before native usage observation
+
+The exact 0.438.3 `Cargo.lock` pins `serde_json` **1.0.151**. Its
+`serde_json::from_slice::<Value>` rejects a non-finite floating literal
+such as `1e309`, `-1e100000`, or a nested `1.5e999` **anywhere** in the
+JSON document. Godex's whole-response usage scanner used
+`json.Decoder.UseNumber` to preserve full unsigned-64 cached-token counts,
+but that Go decoder also accepted otherwise out-of-range numeric syntax.
+Consequently an unrelated overflowing numeric field could incorrectly
+promote prompt-cache affinity or emit a terminal usage marker from another
+field in the same invalid upstream response.
+
+An isolated offline Rust probe using the **exact pinned serde_json 1.0.151**
+confirms that `1e309` and negative overflow are invalid, while `1e308`,
+`1e-99999` (finite underflow) and unsigned-overflow integer literals remain
+valid JSON. Fail-before routing tests cover overflow before, after, and
+inside an arbitrary nested object alongside legitimate cached-token usage.
+The response scanner now verifies every decoded `json.Number` is finite
+before yielding any usage evidence. It retains `Decoder.UseNumber` for exact
+`uint64` cached counters and accepts finite/underflow numeric controls.
+
+The source/manifest/executable-pinned `--phase=http-prompt-cache`
+comparison now includes a four-request authenticated Ready fixture for a
+second-owned malformed response with valid cached tokens plus an unrelated
+`1e309`. Both binaries must preserve the exact HTTP 200 body, leave its
+response ID unbound, reject the cached hit, and keep the fresh prompt-key
+request on main. Separate `1e308` and `1e-99999` controls must allow a
+verified larger cache hit to select second. The durable previous-response
+owners of every valid stage are independently checked. This is a bounded
+synthetic parser/selection parity slice, not proof of full live provider or
+native-platform equivalence.

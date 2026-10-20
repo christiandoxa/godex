@@ -29,10 +29,34 @@ func decodeNativeUsageJSON(payload []byte) (any, bool) {
 		return nil, false
 	}
 	var trailing any
-	if decoder.Decode(&trailing) != io.EOF {
+	if decoder.Decode(&trailing) != io.EOF || !validNativeJSONNumberRange04383(value) {
 		return nil, false
 	}
 	return value, true
+}
+
+// serde_json::Value rejects non-finite numeric literals anywhere in the
+// document, even when Mojo would find usage before encountering them.
+// Decoder.UseNumber preserves U64 precision but needs this extra range gate.
+func validNativeJSONNumberRange04383(value any) bool {
+	switch typed := value.(type) {
+	case json.Number:
+		parsed, _ := strconv.ParseFloat(string(typed), 64)
+		return !math.IsInf(parsed, 0)
+	case map[string]any:
+		for _, member := range typed {
+			if !validNativeJSONNumberRange04383(member) {
+				return false
+			}
+		}
+	case []any:
+		for _, item := range typed {
+			if !validNativeJSONNumberRange04383(item) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // Prodex 0.438.3's compiled response metadata scans usage under arbitrary

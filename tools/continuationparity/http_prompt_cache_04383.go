@@ -10,6 +10,7 @@ import (
 
 var httpPromptCacheShapes04383 = []string{
 	"direct", "nested", "zero", "legacy", "overflow-fallback", "max-u64",
+	"nonfinite-unrelated", "finite-unrelated", "underflow-unrelated",
 }
 
 func httpPromptCacheRequest04383(stage string) string {
@@ -46,6 +47,12 @@ func httpPromptCacheReply04383(shape, stage string) string {
 			return fmt.Sprintf(`{"id":%q,"object":"response","usage":{"cached_input_tokens":18446744073709551616,"input_tokens_details":{"cached_tokens":60}},"output":[]}`, id)
 		case "max-u64":
 			return fmt.Sprintf(`{"id":%q,"object":"response","usage":{"cached_input_tokens":18446744073709551615},"output":[]}`, id)
+		case "nonfinite-unrelated":
+			return fmt.Sprintf(`{"id":%q,"object":"response","usage":{"cached_input_tokens":50},"ignored":1e309,"output":[]}`, id)
+		case "finite-unrelated":
+			return fmt.Sprintf(`{"id":%q,"object":"response","usage":{"cached_input_tokens":50},"ignored":1e308,"output":[]}`, id)
+		case "underflow-unrelated":
+			return fmt.Sprintf(`{"id":%q,"object":"response","usage":{"cached_input_tokens":50},"ignored":1e-99999,"output":[]}`, id)
 		}
 	}
 	return fmt.Sprintf(`{"id":%q,"object":"response","output":[]}`, id)
@@ -56,7 +63,7 @@ func httpPromptCacheWantOwner04383(shape, stage string) string {
 	case "seed-second":
 		return "account-b"
 	case "fresh":
-		if shape != "zero" && shape != "legacy" {
+		if shape != "zero" && shape != "legacy" && shape != "nonfinite-unrelated" {
 			return "account-b"
 		}
 	}
@@ -132,6 +139,11 @@ func runHTTPPromptCacheCase04383(root string, p product, shape string) error {
 			if httpPromptCacheWantOwner04383(shape, stage) == "account-b" {
 				want = "second"
 			}
+			if shape == "nonfinite-unrelated" && stage == "seed-second" {
+				// A serde_json parse error suppresses the response ID as well
+				// as the cached-token observation, while HTTP 200 is passed on.
+				want = ""
+			}
 			if err != nil || owner != want {
 				ready = false
 				break
@@ -145,7 +157,7 @@ func runHTTPPromptCacheCase04383(root string, p product, shape string) error {
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	fmt.Printf("%s prompt-cache %s: authenticated Ready accounts; four exact attempts; fresh owner=%s; four durable response IDs\n", p.name, shape, httpPromptCacheWantOwner04383(shape, "fresh"))
+	fmt.Printf("%s prompt-cache %s: authenticated Ready accounts; four exact attempts; fresh owner=%s; expected durable response owners verified\n", p.name, shape, httpPromptCacheWantOwner04383(shape, "fresh"))
 	return nil
 }
 

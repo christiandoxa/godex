@@ -685,3 +685,14 @@ Ready upstream request, byte-exact body, unchanged foreign owner, new main
 response owner and two client text frames. A pre-fix clean executable
 comparison demonstrated that Godex incorrectly selected second. The
 positive controls for canonical direct previous IDs remain mandatory.
+
+The `--http-prompt-cache` gate also tests entire-document `serde_json`
+number validity, using the exact tagged version 1.0.151. A second-owned
+response carrying valid `usage.cached_input_tokens: 50` but an unrelated
+`1e309` must be forwarded unchanged yet create **neither** a verified
+response ID **nor** a cached-hit observation. The subsequent fresh request
+stays on main (whose valid cached hit was 10). Finite `1e308` and
+underflow `1e-99999` controls are valid JSON and must promote the cached
+owner to second. All four upstream request bytes, authenticated Ready
+receipts, HTTP replies and each expected durable owner are compared for
+both pinned binaries.
