@@ -23,6 +23,8 @@ var httpResponseSessionShapes04383 = []string{
 	"response-id-1024", "response-id-1025", "response-id-control-c0", "response-id-control-c1",
 	"opaque-data-id", "opaque-result-id", "opaque-payload-id", "opaque-data-response-id",
 	"opaque-data-turn", "opaque-result-turn", "opaque-payload-turn", "canonical-nested-response",
+	"turn-null-name", "turn-null-value", "turn-null-name-then-real", "turn-null-value-then-real",
+	"turn-absent-name-control", "turn-absent-value-control",
 }
 
 func httpResponseSessionRequest04383(shape string) string {
@@ -91,6 +93,18 @@ func httpResponseSessionReply04383(shape string) string {
 		return `{"id":"resp-response-session","object":"response","response":{"headers":{"X-CODEX-TURN-STATE":"nested-turn"}},"headers":{"x-codex-turn-state":"root-turn"},"output":[]}`
 	case "turn-array-objects":
 		return `{"id":"resp-response-session","object":"response","headers":[{"name":"x-codex-turn-ſtate","value":"impostor-turn"},{"key":"X-CODEX-TURN-STATE","values":["  ","real-turn"]}],"output":[]}`
+	case "turn-null-name":
+		return `{"id":"resp-response-session","object":"response","headers":[{"name":null,"key":"x-codex-turn-state","value":"foreign-turn"}],"output":[]}`
+	case "turn-null-value":
+		return `{"id":"resp-response-session","object":"response","headers":[{"name":"x-codex-turn-state","value":null,"values":["foreign-turn"]}],"output":[]}`
+	case "turn-null-name-then-real":
+		return `{"id":"resp-response-session","object":"response","headers":[{"name":null,"key":"x-codex-turn-state","value":"foreign-turn"},{"name":"x-codex-turn-state","value":"real-turn"}],"output":[]}`
+	case "turn-null-value-then-real":
+		return `{"id":"resp-response-session","object":"response","headers":[{"name":"x-codex-turn-state","value":null,"values":["foreign-turn"]},{"key":"x-codex-turn-state","values":["real-turn"]}],"output":[]}`
+	case "turn-absent-name-control":
+		return `{"id":"resp-response-session","object":"response","headers":[{"key":"x-codex-turn-state","value":"real-turn"}],"output":[]}`
+	case "turn-absent-value-control":
+		return `{"id":"resp-response-session","object":"response","headers":[{"name":"x-codex-turn-state","values":["real-turn"]}],"output":[]}`
 	default:
 		return `{"id":"resp-response-session","object":"response","output":[]}`
 	}
@@ -258,12 +272,16 @@ func httpResponseTurnHeadersMatch04383(p product, shape string) bool {
 		expected = "nested-turn"
 	case "turn-array-objects":
 		expected = "real-turn"
+	case "turn-null-name", "turn-null-value":
+		// Explicit null shadows the alternate key/value: neither token binds.
+	case "turn-null-name-then-real", "turn-null-value-then-real", "turn-absent-name-control", "turn-absent-value-control":
+		expected = "real-turn"
 	case "turn-unicode-only", "turn-padded-only":
 		// No supplied header is a valid ASCII x-codex-turn-state key.
 	default:
 		return true
 	}
-	for _, turn := range []string{"upper-turn", "lower-turn", "nested-turn", "root-turn", "real-turn", "impostor-turn"} {
+	for _, turn := range []string{"upper-turn", "lower-turn", "nested-turn", "root-turn", "real-turn", "impostor-turn", "foreign-turn"} {
 		wantOwner := ""
 		if turn == expected {
 			wantOwner = "main"

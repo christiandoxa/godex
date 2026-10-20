@@ -163,12 +163,16 @@ func responseHeaderTurnState(headers any) string {
 					name, value = entry[0], entry[1]
 				}
 			case map[string]any:
-				name = entry["name"]
-				if name == nil {
+				// In the tagged Mojo metadata planner, a present JSON null
+				// shadows the fallback field; only ABSENT name/value members
+				// may borrow key/values from this header entry.
+				var found bool
+				name, found = entry["name"]
+				if !found {
 					name = entry["key"]
 				}
-				value = entry["value"]
-				if value == nil {
+				value, found = entry["value"]
+				if !found {
 					value = entry["values"]
 				}
 			}

@@ -2621,3 +2621,29 @@ applied authenticated Ready profiles, one exact upstream dispatch, preserved
 HTTP response bytes, unchanged session lineage, and empty or correctly
 verified durable response/turn owners. This verifies a bounded 0.438.3
 contract, not full live-provider and native-platform parity.
+
+## Embedded response headers: `null` shadows alternate key/value members
+
+The tagged Mojo `runtime_response_raw_headers_state` walks each object in a
+JSON `headers` array by looking up `name` first, then `key` **only if name is
+absent**. Similarly, it selects `value` first, then `values` **only if value
+is absent**. A present JSON `null` is a valid member-presence marker but an
+invalid header name/value; it cannot be replaced by the alternate field.
+Godex previously used `entry["name"] == nil` and `entry["value"] == nil`,
+which conflated missing and explicit `null` and could silently bind an
+upstream-supplied foreign `x-codex-turn-state` token.
+
+Deterministic fail-before regressions reproduce this for null names and
+values, with subsequent valid entries and genuinely absent-member fallback
+as positive controls. Separate memory/durable Router observations prove that
+null-shadowed tokens cannot mint turn owners while the actual response ID
+and later legitimate turn token retain their ownership. The scoped parser
+correction uses Go's map `(value, present)` lookup, matching the source's
+member-presence rule without modifying response bodies or HTTP headers.
+
+The source/manifest/executable-pinned `--phase=http-session-conflict` gate
+now compares six header-array variants (null name/value, subsequent real
+entries, and missing-name/value controls) in both binaries. It checks one
+correct Ready upstream attempt, the original response bytes, and the exact
+durable response/turn owners, including absence of the forged `foreign-turn`
+owner. This does not by itself certify every live provider or native OS path.

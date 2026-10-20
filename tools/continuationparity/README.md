@@ -721,3 +721,12 @@ carry `turn_state`. Neither type may create a durable owner. The positive
 `response: {id, turn_state}` control must still bind both identities to main.
 Each comparison preserves the original HTTP response bytes, quota Ready
 receipts, account selection and independent new/old durable owner projections.
+
+The response-session oracle also covers JSON header-array objects with
+`name: null` beside a valid `key`, or `value: null` beside a valid `values`.
+Prodex's compiled member lookup uses presence, so null shadows its fallback
+and cannot mint a turn-state owner. Cases with a later real header and cases
+where the primary field is genuinely missing prove legitimate fallback still
+works. The unchanged client response, inferred Ready account, original
+response ID and both valid and forged turn-state bindings are independently
+checked for Prodex and Godex.
