@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/christiandoxa/godex/internal/helper/sse"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
+	routingusecase "github.com/christiandoxa/godex/internal/usecase/routing"
 	"io"
 	"net/http"
 	"strings"
@@ -101,6 +102,10 @@ func (proxy *Proxy) finishCommittedBody(writer http.ResponseWriter, response *pr
 }
 
 func (proxy *Proxy) forwardStream(ctx context.Context, writer http.ResponseWriter, body io.Reader, prefix []byte, accountID string, headers http.Header, providerKind string) bool {
+	var lineage *routingusecase.SSELineageTracker04383
+	if proxy.router != nil && accountID != "" {
+		lineage = proxy.router.NewSSELineageTracker04383(accountID, providerKind, headers)
+	}
 	forwarder := streamForwarder{
 		proxy:        proxy,
 		writer:       writer,
@@ -108,6 +113,7 @@ func (proxy *Proxy) forwardStream(ctx context.Context, writer http.ResponseWrite
 		providerKind: providerKind,
 		headers:      headers,
 		decoder:      sse.NewDecoder(int(proxy.maxInspect)),
+		lineage:      lineage,
 	}
 	return forwarder.forward(ctx, body, prefix)
 }
@@ -119,9 +125,16 @@ type streamForwarder struct {
 	providerKind string
 	headers      http.Header
 	decoder      *sse.Decoder
+	lineage      *routingusecase.SSELineageTracker04383
 }
 
 func (forwarder *streamForwarder) forward(ctx context.Context, body io.Reader, prefix []byte) bool {
+	// The prefix already established precommit IDs. Seed the same stream
+	// metadata once, and keep partial SSE lines for subsequent read chunks.
+	prelude := forwarder.decoder.Feed(prefix)
+	if forwarder.lineage != nil {
+		forwarder.lineage.Seed(prelude)
+	}
 	if forwarder.writeChunk(ctx, prefix, false) != nil {
 		return false
 	}
@@ -173,7 +186,9 @@ func (forwarder *streamForwarder) rememberEvents(ctx context.Context, events [][
 		}
 		// The response is already committed. Affinity/usage observation is
 		// best-effort and must not reorder or truncate client-visible bytes.
-		_ = forwarder.proxy.router.Observe(ctx, forwarder.accountID, forwarder.headers, data, false, forwarder.providerKind)
+		if forwarder.lineage != nil {
+			_ = forwarder.lineage.Observe(ctx, data)
+		}
 	}
 }
 

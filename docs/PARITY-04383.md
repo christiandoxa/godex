@@ -3285,3 +3285,38 @@ quota cases with two authenticated Ready profiles. It compares exact
 upstream bytes and client SSE output, one versus two model attempts, and
 unchanged earlier durable response ownership. This finite protocol slice
 does not certify every provider stream or native OS environment.
+
+## Preserve HTTP SSE continuation lineage across precommit and later body reads
+
+The source-pinned `RuntimeSseTapState` (0.438.3) maintains one stream-local
+`turn_state`, response-ID set and "already has turn" set throughout the
+precommit prefix **and** subsequent committed SSE chunks. A later ID with
+no turn token inherits the active turn; when a first turn arrives after
+an already-committed output ID, the tagged Mojo planner backfills that
+unbound ID once. Later turn changes must not overwrite an earlier ID's
+verified turn-state association.
+
+Godex's HTTP streaming bridge previously discarded the prefix bytes from its
+SSE framing decoder, then observed each subsequent event independently via
+`Router.Observe(..., stream=false)`. That lost both partial SSE lines crossing
+the prefix/body boundary and the active stream turn-state. A fail-before
+memory/durable regression demonstrates that a subsequent response ID can be
+correctly owned yet lack its required turn-state sidecar. The scoped fix
+introduces a **request-local SSE lineage tracker** seeded from the existing
+precommit prefix without repeating its side effects. The forwarder now also
+feeds that prefix into the same incremental SSE decoder used for later reads.
+New event IDs inherit the stream's turn, missing earlier associations are
+backfilled in deterministic lexical response-ID order, and already-bound IDs
+are not overwritten. All forwarded SSE bytes remain unchanged. No tracker
+state is shared globally between unrelated HTTP requests or account owners.
+
+A full HTTP proxy integration test verifies inherited turns, delayed first
+turn, distinct successive turns and a partial first SSE event spanning the
+prefix/body boundary. It asserts the exact client-visible wire, managed
+profile-scoped durable turn-state sidecars and both previous-response owners.
+The pinned two-executable `--phase=http-session-conflict` oracle now adds
+independent **inherit** and **late-backfill** cases to its already verified
+distinct-turn SSE fixture, with two authenticated Ready profiles, one exact
+upstream inference, streamed output and pairwise positive/negative durable
+response/turn associations. This verifies a bounded synthetic lineage slice;
+native OS and live provider permutations remain separately open.

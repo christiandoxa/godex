@@ -921,3 +921,12 @@ quota retry. Canonical CRLF and repeated trailing-CR padding still terminate
 valid quota data lines. The pinned official binary differential compares
 account selection, exact SSE bytes and durable previous-response owner for
 all three cases, with authenticated Ready receipts on both profiles.
+
+The HTTP session-conflict SSE lineage phase now checks **three independent
+committed two-event streams**: a different turn per response ID, a second ID
+that inherits the first event's turn without repeating it, and a first
+response ID that receives its turn only on the later event (late backfill).
+The first event is a flushed output delta crossing precommit before the
+second frame arrives. Official Prodex and Godex must show identical output
+bytes and independent durable response/turn pairings on main, with both
+profile quota receipts Ready and exactly one upstream model inference.

@@ -129,7 +129,8 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		if b.scenario == "http-sse-turn-lineage" && string(body) == httpSSETurnLineageRequest04383 {
+		if strings.HasPrefix(b.scenario, "http-sse-turn-lineage-") && string(body) == httpSSETurnLineageRequest04383 {
+			shape := strings.TrimPrefix(b.scenario, "http-sse-turn-lineage-")
 			b.mu.Lock()
 			b.attempts = append(b.attempts, transportAttempt04383{owner: owner, body: string(body),
 				turn: r.Header.Get("x-codex-turn-state"), trace: r.Header.Get("thread-id"),
@@ -141,13 +142,14 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 			// The first output delta crosses the tagged SSE precommit
 			// lookahead boundary. Only the second, later terminal event may
 			// update subsequent response-turn lineage.
-			boundary := strings.Index(httpSSETurnLineageWire04383, "\n\n") + 2
-			_, _ = io.WriteString(w, httpSSETurnLineageWire04383[:boundary])
+			wire := httpSSETurnLineageWireFor04383(shape)
+			boundary := strings.Index(wire, "\n\n") + 2
+			_, _ = io.WriteString(w, wire[:boundary])
 			if flusher, ok := w.(http.Flusher); ok {
 				flusher.Flush()
 			}
 			time.Sleep(150 * time.Millisecond)
-			_, _ = io.WriteString(w, httpSSETurnLineageWire04383[boundary:])
+			_, _ = io.WriteString(w, wire[boundary:])
 			return
 		}
 		if strings.HasPrefix(b.scenario, "http-sse-invalid-error-") && string(body) == httpSSEInvalidErrorRequest04383 {
