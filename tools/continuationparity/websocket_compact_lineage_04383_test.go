@@ -110,3 +110,46 @@ func TestProdex04383WebSocketDirectSessionShadowsNestedOracleRejectsMutations(t 
 		})
 	}
 }
+
+// A Compact session alias is only an eligible WebSocket preference when the
+// session ID was explicit on the upgrade handshake. Body-only session context
+// must not acquire a strict alias merely because an unrelated profile owns it.
+func TestProdex04383WebSocketCompactSessionLineageOracleRejectsMutations(t *testing.T) {
+	for _, tc := range []struct {
+		name, owner, message string
+	}{
+		{"handshake-alias", "second", compactSessionHeaderMessage04383},
+		{"no-alias", "main", compactSessionHeaderMessage04383},
+		{"body-only", "second", compactSessionBodyMessage04383},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			account := "account-a"
+			if tc.owner == "second" {
+				account = "account-b"
+			}
+			base := transportAttempt04383{owner: account, body: tc.message, ready: true}
+			hello := []string{account}
+			frames := []string{transportDelta04383, transportCompleted04383}
+			if err := verifyCompactLineageWire04383(tc.owner, tc.message, "", hello, []transportAttempt04383{base}, frames, false); err != nil {
+				t.Fatal(err)
+			}
+			for _, mutation := range []struct {
+				name     string
+				attempts []transportAttempt04383
+				frames   []string
+			}{
+				{"wrong-owner", []transportAttempt04383{{owner: "foreign", body: tc.message, ready: true}}, frames},
+				{"leaked-turn", []transportAttempt04383{{owner: account, turn: "compact-turn", body: tc.message, ready: true}}, frames},
+				{"unready", []transportAttempt04383{{owner: account, body: tc.message}}, frames},
+				{"extra-inference", []transportAttempt04383{base, base}, frames},
+				{"lost-terminal", []transportAttempt04383{base}, frames[:1]},
+			} {
+				t.Run(mutation.name, func(t *testing.T) {
+					if err := verifyCompactLineageWire04383(tc.owner, tc.message, "", hello, mutation.attempts, mutation.frames, false); err == nil {
+						t.Fatalf("Compact session oracle accepted %s", mutation.name)
+					}
+				})
+			}
+		})
+	}
+}

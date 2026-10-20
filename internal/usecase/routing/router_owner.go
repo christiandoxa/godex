@@ -33,6 +33,26 @@ func (router *Router) resolveOwner(
 			}
 		}
 	}
+	if selection.RouteKind == quotamodel.RouteKindWebSocket && ownerKeys.previous == "" &&
+		ownerKeys.turn == "" && ownerKeys.thread == "" && ownerKeys.session != "" {
+		// Prodex 0.438.3 also consults verified Compact *session*
+		// lineage on a WebSocket request. Existing direct session owners
+		// outrank this alias; the WebSocket route remains quota-soft.
+		directOwner, err := router.affinity.owner(ctx, affinityKeys{session: ownerKeys.session}, router.now())
+		if err != nil {
+			return "", nil, &proxymodel.Error{StatusCode: 409, Message: "request contains conflicting conversation affinity"}
+		}
+		if directOwner == "" {
+			alias := "__compact_session__:" + ownerKeys.session
+			aliasOwner, err := router.affinity.owner(ctx, affinityKeys{session: alias}, router.now())
+			if err != nil {
+				return "", nil, &proxymodel.Error{StatusCode: 409, Message: "request contains conflicting conversation affinity"}
+			}
+			if aliasOwner != "" {
+				ownerKeys.session = alias
+			}
+		}
+	}
 	if selection.RouteKind == quotamodel.RouteKindCompact {
 		if ownerKeys.previous != "" {
 			ownerKeys.session = ""

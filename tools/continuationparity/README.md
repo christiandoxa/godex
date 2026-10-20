@@ -445,3 +445,13 @@ owner unchanged, and return the same two client frames from a single original
 request. Focused mutation tests reject cross-owner selection, token leakage,
 wire corruption and replay. The complete phase currently includes five
 ordered, independent producer/consumer/shadowing scenarios.
+
+The strict WebSocket Compact oracle additionally compares three synthetic
+**session-lineage** controls against the pinned official binary: a verified
+`__compact_session__:` alias with an explicit upgrade `session_id`, an unbound
+alias control and a body-only session ID with the same verified alias. They
+keep main active and both profiles Ready, so the selected owner must come
+from the actual continuation binding rather than warmup order. The body-only
+expectation is based on the executable's observed selection, not on an
+assumption about the handshake header. Existing direct session and
+previous-response precedence is exercised by Router memory/durable tests.

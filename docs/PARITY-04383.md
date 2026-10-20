@@ -1570,3 +1570,40 @@ candidate, including the complete Go race suite and cross-builds. The
 remaining malformed-direct `session_id` variants, native macOS realtime and
 non-synthetic integrations are **not** claimed VERIFIED by this turn-state
 oracle.
+
+## WebSocket resolves verified Compact session lineage across explicit and body sessions
+
+In the tagged Prodex 0.438.3 WebSocket affinity plan, an existing Compact
+session lineage (`__compact_session__:`) is eligible to select its original
+profile even when no direct session binding exists and the quota route remains
+**WebSocket**. The already-verified Compact turn lineage handles a different
+continuation surface. Godex previously considered only the raw `session_id`
+binding and incorrectly selected current main when the Compact alias belonged
+to second.
+
+An independent source/binary-pinned differential added three controlled cases
+with both profiles authenticated Ready and main restored as the current profile:
+
+- `compact-session-header`: the client provides `session_id: session-alias` on
+  the WebSocket upgrade, with only the typed Compact alias owned by second
+- `compact-session-unbound`: the same explicit header without the alias, so
+  current main must handle the request
+- `compact-session-body`: the typed alias belongs to second and the session ID
+  appears only in the JSON message; the official 0.438.3 executable also
+  selects second here, without an explicit upgrade header
+
+The official executable independently established all three expected owner
+choices before any Godex implementation change. The clean candidate with no
+Compact session resolver dispatched `compact-session-header` on main; the
+independent oracle rejects this wrong owner. The scoped routing fix consults
+the typed alias only for WebSocket session-only messages after checking that a
+direct session owner is unbound. Verified previous-response/turn identities
+continue to outrank session affinity, and the alias never changes the
+WebSocket quota route. Memory and persisted routing regressions failed before
+this fix for both header and body aliases and passed after it; direct-session,
+previous-response, unbound and unchanged-opaque-input controls remain active.
+
+The synthetic differential establishes only the bounded session owner policy;
+it does not establish full live OAuth, macOS realtime or all possible native
+Compact producer shapes. Record an executable pass only on a clean committed
+candidate with exact official source/binary/manifest provenance.
