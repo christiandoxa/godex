@@ -119,6 +119,23 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 	b.invalid = b.invalid || frame.Opcode != 1 || !frame.Masked()
 	b.attempts = append(b.attempts, transportAttempt04383{owner: owner, turn: r.Header.Get("x-codex-turn-state"), body: string(payload), ready: b.receipts["account-a"] > 0 && b.receipts["account-b"] > 0})
 	b.mu.Unlock()
+	if b.scenario == "compact-bound-transport" && owner == "account-b" {
+		// The verified Compact owner closes before any client-visible model
+		// event. A reconstructable full history can recover on Ready main.
+		_ = websocketframe.WriteFrame(connection, 1, []byte(`{"type":"response.created","response":{"id":"discarded-compact-precommit"}}`), false)
+		return
+	}
+	if b.scenario == "compact-bound-transport" && owner == "account-a" {
+		// After a failed second-owned precommit socket, the Ready main
+		// alternate completes the full-history request. This separates
+		// safe replay from the independently tested double-EOF deadline.
+		for _, event := range []string{transportDelta04383, transportCompleted04383} {
+			if websocketframe.WriteFrame(connection, 1, []byte(event), false) != nil {
+				return
+			}
+		}
+		return
+	}
 	if b.scenario == "compact-lineage" || b.scenario == "compact-turn-conflict" || b.scenario == "compact-unbound" || strings.HasPrefix(b.scenario, "compact-produced") || strings.HasPrefix(b.scenario, "compact-shadow-") || strings.HasPrefix(b.scenario, "session-") || strings.HasPrefix(b.scenario, "compact-session-") {
 		for _, event := range []string{transportDelta04383, transportCompleted04383} {
 			if websocketframe.WriteFrame(connection, 1, []byte(event), false) != nil {
