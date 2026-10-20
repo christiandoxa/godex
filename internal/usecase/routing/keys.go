@@ -2,11 +2,9 @@ package routing
 
 import (
 	"encoding/json"
-	"github.com/christiandoxa/godex/internal/helper/sse"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	"net/http"
 	"strings"
-	"unicode/utf8"
 
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
@@ -104,33 +102,7 @@ func affinityKeysForRoute(keys affinityKeys, route quotamodel.RouteKind) affinit
 }
 
 func responseAffinity(headers http.Header, body []byte, stream bool) affinityKeys {
-	keys := affinityKeys{
-		thread:  firstHeader(headers, "thread-id", "x-codex-thread-id"),
-		turn:    strings.TrimSpace(headers.Get("x-codex-turn-state")),
-		session: firstHeader(headers, "session_id", "session-id", "x-session-id"),
-	}
-	if len(body) == 0 {
-		return keys
-	}
-	if stream {
-		decoder := sse.NewDecoder(len(body))
-		events := decoder.Feed(body)
-		events = append(events, decoder.Finish()...)
-		for _, data := range events {
-			if !utf8.Valid(data) {
-				continue
-			}
-			var object map[string]any
-			if json.Unmarshal(data, &object) == nil {
-				keys = mergeAffinityKeys(keys, responseObjectAffinity(object))
-			}
-		}
-		return keys
-	}
-	var object map[string]any
-	if json.Unmarshal(body, &object) == nil {
-		return mergeAffinityKeys(keys, responseObjectAffinity(object))
-	}
+	keys, _ := responseAffinityWithIDs(headers, body, stream)
 	return keys
 }
 

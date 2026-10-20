@@ -609,3 +609,11 @@ Ready receipts, exact original upstream request body, one inference, intact
 client response and the independent response/session durable projection.
 Each mutation sentinel rejects changed bytes, account, readiness, output or
 request count rather than accepting a status-only coincidence.
+
+Response-ID alias qualification uses the tagged Mojo metadata ordering:
+`response.id`, `response_id`, and a qualifying response object's `id`, with
+up to three distinct IDs per payload. The response-origin fixture covers
+three aliases, duplicates, a legacy/root pair, and an ordinary event-root ID
+which must never bind. Every valid alias must persist on main, independent of
+request-scoped session ownership and while the client receives the exact
+unchanged JSON. Native Copilot response-ID semantics have separate tests.

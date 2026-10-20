@@ -2220,3 +2220,28 @@ forged readiness, duplicated inference, changed request/response, injected
 metadata, and invalid synthetic auth. As with the other finite fixture
 slices, native cross-OS runtime and live OAuth/provider permutations remain
 outside this verified contract.
+
+## Record every supported response ID alias, not only the first
+
+Prodex 0.438.3's compiled Mojo `runtime_response_metadata_json_v1` extracts
+up to three distinct IDs from a JSON response: `response.id`, top-level
+`response_id`, and top-level `id` when `object` is `response` or ends in
+`.response`. It deduplicates values but does not treat arbitrary event-root
+IDs as continuations. The HTTP Responses success path remembers the full
+ordered set. Godex's response parser selected only the first, so a later
+continuation referencing another valid ID could lose its verified owner.
+
+The new memory/durable Router regression failed before the fix for second
+and third aliases, including duplicate and event controls. The response
+observer now retains all IDs (bounded by the existing affinity limit) while
+still preserving the single-ID public parser contract, byte-exact downstream
+responses, and Copilot's separate native ID policy. Complete SSE metadata
+batches also retain every supported ID; the original response-owner path
+continues to associate the response turn-state with each verified alias.
+
+The source/binary/manifest-pinned HTTP differential now adds triple-ID,
+duplicate-ID, legacy/root-ID, and event-root negative controls. It checks
+the actual persisted response-owner projection, a single authenticated Ready
+upstream request, the exact unmodified response bytes, and the existing
+response-only session protections. Native and live-auth fault equivalence
+remain separate parity work.

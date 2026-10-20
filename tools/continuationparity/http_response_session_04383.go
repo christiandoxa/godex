@@ -14,6 +14,7 @@ const httpResponseSessionName04383 = "payload-only-session"
 var httpResponseSessionShapes04383 = []string{
 	"body-session", "nested-session", "data-session", "conversation-alias",
 	"thread-alias", "response-header", "request-session",
+	"triple-ids", "duplicate-ids", "legacy-and-root", "ignore-event-root",
 }
 
 func httpResponseSessionRequest04383(shape string) string {
@@ -35,6 +36,14 @@ func httpResponseSessionReply04383(shape string) string {
 		return `{"id":"resp-response-session","object":"response","conversation_id":"payload-only-session","output":[]}`
 	case "thread-alias":
 		return `{"id":"resp-response-session","object":"response","thread_id":"payload-only-session","output":[]}`
+	case "triple-ids":
+		return `{"response":{"id":"resp-response-session"},"response_id":"resp-alias-middle","object":"response","id":"resp-alias-outer","output":[]}`
+	case "duplicate-ids":
+		return `{"response":{"id":"resp-response-session"},"response_id":"resp-response-session","object":"response","id":"resp-alias-outer","output":[]}`
+	case "legacy-and-root":
+		return `{"response_id":"resp-response-session","object":"response","id":"resp-alias-outer","output":[]}`
+	case "ignore-event-root":
+		return `{"response_id":"resp-response-session","object":"event","id":"event-unrelated","output":[]}`
 	default:
 		return `{"id":"resp-response-session","object":"response","output":[]}`
 	}
@@ -104,7 +113,8 @@ func runHTTPResponseSessionCase04383(root string, p product, shape string) error
 	for {
 		responseOwner, responseErr := readHTTPResponseOwner04383(p, httpResponseSessionID04383)
 		sessionOwner, sessionErr := readCompactBindingOwner04383(p, "session", httpResponseSessionName04383)
-		if responseErr == nil && sessionErr == nil && responseOwner == "main" && sessionOwner == wantSession {
+		if responseErr == nil && sessionErr == nil && responseOwner == "main" && sessionOwner == wantSession &&
+			httpResponseIDAliasesMatch04383(p, shape) {
 			break
 		}
 		if time.Now().After(deadline) {
@@ -124,4 +134,26 @@ func verifyHTTPResponseSession04383(shape string, result httpSoftConflictResult0
 		return fmt.Errorf("response-only session fixture changed wire/owner: shape=%s invalid=%t status=%d attempts=%+v", shape, result.invalid, result.reply.status, result.attempts)
 	}
 	return nil
+}
+
+// A tagged Responses payload may present three distinct response IDs. The
+// IDs are independently usable for later continuation, not just display IDs.
+func httpResponseIDAliasesMatch04383(p product, shape string) bool {
+	var extraIDs []string
+	switch shape {
+	case "triple-ids":
+		extraIDs = []string{"resp-alias-middle", "resp-alias-outer"}
+	case "duplicate-ids", "legacy-and-root":
+		extraIDs = []string{"resp-alias-outer"}
+	case "ignore-event-root":
+		owner, err := readHTTPResponseOwner04383(p, "event-unrelated")
+		return err == nil && owner == ""
+	}
+	for _, id := range extraIDs {
+		owner, err := readHTTPResponseOwner04383(p, id)
+		if err != nil || owner != "main" {
+			return false
+		}
+	}
+	return true
 }
