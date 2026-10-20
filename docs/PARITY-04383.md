@@ -2647,3 +2647,31 @@ entries, and missing-name/value controls) in both binaries. It checks one
 correct Ready upstream attempt, the original response bytes, and the exact
 durable response/turn owners, including absence of the forged `foreign-turn`
 owner. This does not by itself certify every live provider or native OS path.
+
+## Preserve per-event response/turn-state association in batched SSE
+
+Prodex 0.438.3's tagged `RuntimeSseTapState::observe_stream_event` updates its
+current turn token as SSE events arrive, then records each **new** response ID
+with that current state. Previously bound IDs are not rewritten when a later
+event changes the turn; when the first turn arrives late, IDs without a turn
+are backfilled once. Godex's batched SSE observer instead merged all response
+IDs with the **first** observed turn-state, so a two-event stream with
+`resp-first / turn-first` and `resp-second / turn-second` could give both
+responses the `turn-first` lineage.
+
+A fail-before memory/durable Router regression demonstrates the drift and
+protects both same-turn inheritance and late-turn backfill. The scoped
+`observeSSEBindings04383` routine now processes complete SSE events in order,
+retains already-bound ID-turn pairs, and applies each event's own native usage
+observation. Copilot's provider-specific response ID policy remains on its
+existing route. The original SSE response bytes and downstream framing are
+unchanged, with profile-home sidecars still available only to the owning
+managed profile.
+
+The source/manifest/executable-pinned HTTP session-conflict oracle includes an
+authenticated two-Ready-profile SSE response: one upstream request on main,
+two exact client-visible events, two durable response IDs, and the correct
+per-response turn-state provenance without cross-assignment. Negative controls
+reject altered response events, forged Ready evidence, wrong account, extra
+inference, and lost terminal output. This finite synthetic oracle is not a
+certificate for every live provider or native OS stream/fault permutation.

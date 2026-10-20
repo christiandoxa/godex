@@ -7,6 +7,13 @@ import (
 )
 
 func (router *Router) Observe(ctx context.Context, accountID string, headers http.Header, body []byte, stream bool, providerKinds ...string) error {
+	// The tagged SSE tap processes each event sequentially. A later turn
+	// state applies to new IDs (and backfills unbound old IDs), never
+	// overwriting an already-verified earlier event's turn. Preserve the
+	// provider-specific Copilot extraction on its existing path.
+	if stream && (len(providerKinds) == 0 || !strings.EqualFold(strings.TrimSpace(providerKinds[0]), "copilot")) {
+		return router.observeSSEBindings04383(ctx, accountID, headers, body)
+	}
 	router.observeTokenUsage(ctx, accountID, body)
 	keys, responseIDs := responseAffinityWithIDs(headers, body, stream)
 	// Prodex 0.438.3 verifies session ownership from request semantics on

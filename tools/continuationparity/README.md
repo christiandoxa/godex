@@ -730,3 +730,12 @@ where the primary field is genuinely missing prove legitimate fallback still
 works. The unchanged client response, inferred Ready account, original
 response ID and both valid and forged turn-state bindings are independently
 checked for Prodex and Godex.
+
+The HTTP session-conflict phase additionally checks a two-event SSE
+turn-state lineage. `response.created` declares `resp-sse-one/state-one`,
+then `response.completed` declares `resp-sse-two/state-two`. The model request
+is pinned by a separate verified previous response to main; both profiles
+must have authenticated Ready quota receipts. Prodex and Godex must forward
+identical SSE bytes and record each response ID on main with its **own**
+turn-state lineage, without creating reversed ID/turn combinations. This is
+an independently checked durable-state contract, not a status-only smoke test.
