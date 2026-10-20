@@ -130,7 +130,7 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 					ready:    b.receipts["account-a"] > 0 && b.receipts["account-b"] > 0})
 				b.mu.Unlock()
 				if strings.Contains(string(body), `"previous_response_id"`) {
-					writeJSON(w, http.StatusBadRequest, httpRecoverySessionError04383)
+					writeJSON(w, http.StatusBadRequest, httpRecoverySessionErrorForShape04383(shape))
 				} else {
 					writeJSON(w, http.StatusOK, httpRecoverySessionResponse04383)
 				}

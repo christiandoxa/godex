@@ -25,7 +25,8 @@ func httpRecoverySessionRequest04383(shape string) string {
 		field = `"session_id":"verified-session",`
 	case "metadata-null", "metadata-nested", "metadata-invalid", "metadata-valid":
 		field = ""
-	case "invalid-utf8", "invalid-surrogate", "invalid-number", "invalid-depth", "valid-unicode", "valid-finite":
+	case "invalid-utf8", "invalid-surrogate", "invalid-number", "invalid-depth", "valid-unicode", "valid-finite",
+		"response-invalid-surrogate", "response-invalid-depth", "response-invalid-utf8":
 		field = `"session_id":"verified-session",`
 	case "header-override":
 		field = `"session_id":null,`
@@ -62,6 +63,24 @@ func httpRecoverySessionMetadata04383(shape string) string {
 	return ""
 }
 
+// Match Prodex's whole-document serde_json boundary for structured
+// invalid-previous-response signals in upstream HTTP 400 bodies.
+func httpRecoverySessionErrorForShape04383(shape string) string {
+	if !strings.HasPrefix(shape, "response-invalid-") {
+		return httpRecoverySessionError04383
+	}
+	var suffix string
+	switch shape {
+	case "response-invalid-surrogate":
+		suffix = `,"unused":"\ud800"`
+	case "response-invalid-utf8":
+		suffix = `,"unused":"bad-` + string([]byte{0xff}) + `"`
+	case "response-invalid-depth":
+		suffix = `,"unused":` + strings.Repeat(`{"entry":`, 128) + `0` + strings.Repeat(`}`, 128)
+	}
+	return strings.TrimSuffix(httpRecoverySessionError04383, "}") + suffix + "}"
+}
+
 func httpRecoverySessionExpectRetry04383(shape string) bool {
 	return shape == "nested" || shape == "direct" || shape == "metadata-nested" || shape == "header-override" ||
 		shape == "valid-unicode" || shape == "valid-finite" || shape == "metadata-valid"
@@ -82,7 +101,8 @@ func httpRecoverySessionReplay04383(shape string) string {
 
 func runHTTPRecoverySessionProduct04383(root string, p product) error {
 	for _, shape := range []string{"null", "blank", "nested", "direct", "metadata-null", "metadata-nested", "header-override",
-		"invalid-utf8", "invalid-surrogate", "invalid-number", "invalid-depth", "valid-unicode", "valid-finite", "metadata-invalid", "metadata-valid"} {
+		"invalid-utf8", "invalid-surrogate", "invalid-number", "invalid-depth", "valid-unicode", "valid-finite", "metadata-invalid", "metadata-valid",
+		"response-invalid-surrogate", "response-invalid-utf8", "response-invalid-depth"} {
 		if err := runHTTPRecoverySessionCase04383(filepath.Join(root, shape), p, shape); err != nil {
 			return fmt.Errorf("HTTP full-history recovery %s: %w", shape, err)
 		}
@@ -156,7 +176,7 @@ func runHTTPRecoverySessionCase04383(root string, p product, shape string) error
 
 func verifyHTTPRecoverySession04383(shape string, result httpSoftConflictResult04383) error {
 	want := 1
-	wantStatus, wantBody := http.StatusBadRequest, httpRecoverySessionError04383
+	wantStatus, wantBody := http.StatusBadRequest, httpRecoverySessionErrorForShape04383(shape)
 	if httpRecoverySessionExpectRetry04383(shape) {
 		want = 2
 		wantStatus, wantBody = http.StatusOK, httpRecoverySessionResponse04383

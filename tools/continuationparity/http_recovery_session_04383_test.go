@@ -8,9 +8,10 @@ import (
 
 func TestProdex04383HTTPRecoverySessionOracleRejectsMutations(t *testing.T) {
 	for _, shape := range []string{"null", "blank", "nested", "direct", "metadata-null", "metadata-nested", "header-override",
-		"invalid-utf8", "invalid-surrogate", "invalid-number", "invalid-depth", "valid-unicode", "valid-finite", "metadata-invalid", "metadata-valid"} {
+		"invalid-utf8", "invalid-surrogate", "invalid-number", "invalid-depth", "valid-unicode", "valid-finite", "metadata-invalid", "metadata-valid",
+		"response-invalid-surrogate", "response-invalid-utf8", "response-invalid-depth"} {
 		t.Run(shape, func(t *testing.T) {
-			status, response := http.StatusBadRequest, httpRecoverySessionError04383
+			status, response := http.StatusBadRequest, httpRecoverySessionErrorForShape04383(shape)
 			if httpRecoverySessionExpectRetry04383(shape) {
 				status, response = http.StatusOK, httpRecoverySessionResponse04383
 			}

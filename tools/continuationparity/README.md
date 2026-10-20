@@ -770,3 +770,12 @@ and valid metadata header sessions remain positive controls. The oracle
 preserves byte-exact original upstream requests and checks that only valid
 cases issue one additional bounded recovery inference, with authenticated
 Ready evidence and durable response bindings on both executables.
+
+Three additional HTTP turn-transport controls return a synthetic 400
+`invalid_request_error` whose **whole JSON** is malformed despite a valid
+inner previous-response error message. Cases cover invalid raw UTF-8,
+unpaired Unicode surrogate and over-depth nested JSON. Because the tagged
+Prodex parser requires serde_json success, these responses may not authorize
+a previous-response replay. The oracle verifies exact unchanged response
+bytes, one authenticated Ready main upstream inference, no forged response
+owner and intact previous-response binding on both products.

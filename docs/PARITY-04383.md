@@ -2803,3 +2803,33 @@ These are pinned-source and local end-to-end tests. Although the general
 matrix, the exact malformed-turn recovery variants are not yet paired across
 native Prodex and Godex executables; this case is **source-aligned**, not a
 cross-binary certificate for the entire recovery stack.
+
+## Reject invalid structured previous-response errors before stale owner recovery
+
+The tagged `prodex-runtime-proxy/src/payload_detection/error_messages.rs`
+implements `runtime_proxy_body_is_invalid_previous_response_id` by first
+parsing the entire upstream HTTP response as `serde_json::Value`. An
+otherwise matching `invalid_request_error` and exact
+``Invalid `previous_response_id`.`` message cannot be trusted if an unrelated
+field contains malformed UTF-8, an unpaired Unicode surrogate, or excessive
+JSON nesting. Go's `encoding/json` previously accepted those invalid shapes
+and caused `invalidPreviousResponseID` to trigger the owned-history replay
+and release an otherwise verified previous-response owner.
+
+A fail-before classification regression reproduces incorrect positives for
+invalid UTF-8, surrogate pairs and over-depth documents, with normal error,
+valid Unicode and finite-number controls. A response-recovery Router test
+independently checks that an invalid 400 error does not send an additional
+upstream model inference; a canonical valid error still permits one bounded
+same-owner full-history replay. The scoped correction shares the audited
+whole-document serde-compatible decoder used for native response usage and
+request semantics, and retains the original response status and bytes.
+
+The source/manifest/executable-pinned `--phase=http-turn-transport` fixture
+now includes three synthetic malformed **upstream error response** bodies
+alongside the existing request-recovery cases. Both Prodex 0.438.3 and Godex
+must retain the response and its original verified ownership, not manufacture
+a second model inference from invalid structured error evidence. The fixture
+checks applied authenticated Ready receipts, original request/response bytes,
+terminal HTTP status and durable binding projections. This is a bounded
+synthetic protocol comparison rather than a claim about all live providers.

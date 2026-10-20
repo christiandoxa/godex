@@ -220,11 +220,12 @@ func jsonString(raw json.RawMessage) string {
 }
 
 func invalidPreviousResponseID(body []byte) bool {
-	var value any
-	if json.Unmarshal(body, &value) != nil {
-		return false
-	}
-	return invalidPreviousResponseValue(value)
+	// Tagged runtime_proxy_body_is_invalid_previous_response_id only
+	// accepts structured error evidence from a complete serde_json::Value.
+	// Go's json.Unmarshal otherwise silently repairs invalid Unicode and
+	// admits over-depth JSON before releasing a hard previous owner.
+	value, valid := decodeNativeUsageJSON(body)
+	return valid && invalidPreviousResponseValue(value)
 }
 
 func previousResponseNotFound(body []byte) bool {
