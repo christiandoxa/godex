@@ -19,9 +19,12 @@ func TestProdex04383WebSocketTransportSlicesExhaustive(t *testing.T) {
 	all := websocketTransportCases04383("all")
 	core := websocketTransportCases04383("core")
 	lifecycle := websocketTransportCases04383("lifecycle")
-	if !reflect.DeepEqual(all, want) || len(core) != 17 || len(lifecycle) != 3 ||
-		!reflect.DeepEqual(append(append([]string(nil), core...), lifecycle...), all) {
-		t.Fatalf("transport fixture lost/moved cases: all=%v core=%v lifecycle=%v", all, core, lifecycle)
+	capacity := websocketTransportCases04383("capacity")
+	joined := append(append(append([]string(nil), core...), lifecycle...), capacity...)
+	if !reflect.DeepEqual(all, want) || len(core) != 17 || len(lifecycle) != 2 || len(capacity) != 1 ||
+		!reflect.DeepEqual(joined, all) ||
+		len(websocketTransportCases04383("unsupported")) != 0 {
+		t.Fatalf("transport fixture lost/moved cases: all=%v core=%v lifecycle=%v capacity=%v", all, core, lifecycle, capacity)
 	}
 	seen := make(map[string]bool, len(all))
 	for _, name := range all {

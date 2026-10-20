@@ -20,10 +20,11 @@ case "${1:-}" in
   --phase=websocket-transport) phase='websocket-transport' ;;
   --phase=websocket-transport-core) phase='websocket-transport-core' ;;
   --phase=websocket-transport-lifecycle) phase='websocket-transport-lifecycle' ;;
+  --phase=websocket-transport-capacity) phase='websocket-transport-capacity' ;;
   --phase=http-keepalive) phase='http-keepalive' ;;
   --phase=http-compact) phase='http-compact' ;;
   --phase=http-turn-transport) phase='http-turn-transport' ;;
-  *) echo 'usage: verify-release-parity.sh [--phase=preflight|preflight-tests|preflight-oracles|preflight-oracles-pty|preflight-oracles-profiles|preflight-oracles-history|deepseek|gemini|websocket|websocket-core|websocket-deadline|websocket-transport|websocket-transport-core|websocket-transport-lifecycle|http-keepalive|http-compact|http-turn-transport]' >&2; exit 2 ;;
+  *) echo 'usage: verify-release-parity.sh [--phase=preflight|preflight-tests|preflight-oracles|preflight-oracles-pty|preflight-oracles-profiles|preflight-oracles-history|deepseek|gemini|websocket|websocket-core|websocket-deadline|websocket-transport|websocket-transport-core|websocket-transport-lifecycle|websocket-transport-capacity|http-keepalive|http-compact|http-turn-transport]' >&2; exit 2 ;;
 esac
 if [ "$#" -gt 1 ]; then
   echo 'release parity accepts at most one phase option' >&2
@@ -750,7 +751,8 @@ fi
 if [ "$phase" = 'all' ] || [ "$phase" = 'websocket' ] ||
    [ "$phase" = 'websocket-transport' ] ||
    [ "$phase" = 'websocket-transport-core' ] ||
-   [ "$phase" = 'websocket-transport-lifecycle' ]; then
+   [ "$phase" = 'websocket-transport-lifecycle' ] ||
+   [ "$phase" = 'websocket-transport-capacity' ]; then
 # Managed run admits both authenticated profiles; public gateway fixes its
 # pool to the active owner. Check the actual Ready fallback, opaque history,
 # stale token removal, exact client frames and durable owner snapshot.
@@ -761,6 +763,8 @@ if [ "$phase" = 'websocket-transport-core' ]; then
   transport_mode='--websocket-transport-core'
 elif [ "$phase" = 'websocket-transport-lifecycle' ]; then
   transport_mode='--websocket-transport-lifecycle'
+elif [ "$phase" = 'websocket-transport-capacity' ]; then
+  transport_mode='--websocket-transport-capacity'
 fi
 "$tmp/continuationparity" \
   --prodex "$tmp/prodex" --godex "$tmp/godex" \

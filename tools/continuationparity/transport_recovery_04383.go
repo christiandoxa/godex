@@ -21,15 +21,19 @@ var websocketTransportCoreCases04383 = []string{
 	"previous-response", "unknown-previous", "previous-quota", "unknown-quota",
 	"previous-rate", "unknown-rate", "previous-overload", "unknown-overload", "postcommit",
 }
-var websocketTransportLifecycleCases04383 = []string{"cancellation", "deadline", "busy-history"}
+var websocketTransportLifecycleCases04383 = []string{"cancellation", "deadline"}
+var websocketTransportCapacityCases04383 = []string{"busy-history"}
 
 func websocketTransportCases04383(scope string) []string {
-	cases := make([]string, 0, len(websocketTransportCoreCases04383)+len(websocketTransportLifecycleCases04383))
-	if scope != "lifecycle" {
+	cases := make([]string, 0, len(websocketTransportCoreCases04383)+len(websocketTransportLifecycleCases04383)+len(websocketTransportCapacityCases04383))
+	if scope == "all" || scope == "core" {
 		cases = append(cases, websocketTransportCoreCases04383...)
 	}
-	if scope != "core" {
+	if scope == "all" || scope == "lifecycle" {
 		cases = append(cases, websocketTransportLifecycleCases04383...)
+	}
+	if scope == "all" || scope == "capacity" {
+		cases = append(cases, websocketTransportCapacityCases04383...)
 	}
 	return cases
 }
