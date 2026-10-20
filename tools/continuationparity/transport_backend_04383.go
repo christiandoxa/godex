@@ -78,10 +78,11 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.HasSuffix(r.URL.Path, "/responses") && r.Method == http.MethodPost {
 		body, _ := io.ReadAll(io.LimitReader(r.Body, 4096))
-		if strings.HasPrefix(b.scenario, "http-previous-session-") &&
+		if (strings.HasPrefix(b.scenario, "http-previous-session-") ||
+			strings.HasPrefix(b.scenario, "http-turn-session-")) &&
 			strings.Contains(string(body), `"session_id":"http-hard-session"`) {
 			b.mu.Lock()
-			b.attempts = append(b.attempts, transportAttempt04383{owner: owner, body: string(body),
+			b.attempts = append(b.attempts, transportAttempt04383{owner: owner, body: string(body), turn: r.Header.Get("x-codex-turn-state"),
 				ready: b.receipts["account-a"] > 0 && b.receipts["account-b"] > 0})
 			b.mu.Unlock()
 			writeJSON(w, http.StatusOK, `{"id":"resp-http-hard-previous","object":"response","output":[]}`)

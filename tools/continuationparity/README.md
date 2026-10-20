@@ -527,3 +527,13 @@ resulting response owner must never rotate to second. Mutation controls reject
 changed history, missing previous/session identifiers, replay or forged Ready
 receipts. These subcases are distinct from the soft-conflict-only case where
 either eligible fresh profile may be selected.
+
+Hard-turn `--http-session-conflict` controls extend the hard-previous producer
+checks: a verified `x-codex-turn-state: turn-a` pins Responses to main while
+the body independently names `http-hard-session`. Both binary adapters must
+forward the exact original turn-state **header and body**, make one authorized
+Ready upstream request and bind the new response to main. A new session must
+become main-owned; a foreign second-owned session must become the durable
+conflict marker, without releasing the main-owned turn. These are distinct
+positive controls from the ordinary soft-conflict fallback and do not
+introduce a new externally accessible setting or route.

@@ -101,10 +101,12 @@ func (router *Router) bindSuccessfulResponse(
 		result.Response.Body.Close()
 		return err
 	}
-	if selection.RouteKind == quotamodel.RouteKindResponses && keys.previous != "" &&
+	if selection.RouteKind == quotamodel.RouteKindResponses &&
+		(keys.previous != "" || keys.turn != "") &&
 		validCompactLineageComponent04383(keys.session) && bindingKeys.session == "" {
 		// Tagged Prodex remembers the successful *HTTP Responses* request's
-		// session even when previous_response_id provided its hard owner.
+		// session even when previous_response_id or turn_state supplied its
+		// hard owner. Existing foreign ownership becomes a durable conflict.
 		// MergeVerified creates a durable conflict instead of stealing an
 		// existing different account's session. This must not run for failed
 		// attempts, ordinary unowned sessions or the separate Compact route.

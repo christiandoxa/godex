@@ -829,7 +829,7 @@ if [ "$phase" = 'all' ] || [ "$phase" = 'http-session-conflict' ]; then
   --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
   --http-session-conflict
 go test -race ./tools/continuationparity \
-  -run '^TestProdex04383HTTP(SoftSessionConflict|PreviousSession)OracleRejectsMutations$' -count=1 -timeout=30s
+  -run '^TestProdex04383(HTTP(SoftSessionConflict|PreviousSession)|HTTPTurnSession)OracleRejectsMutations$' -count=1 -timeout=30s
 fi
 
 # Printed only after all stages *selected for this invocation* succeeded.

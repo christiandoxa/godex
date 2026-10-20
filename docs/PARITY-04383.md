@@ -1954,3 +1954,42 @@ when both executables pass on the final **clean committed** candidate.
 
 Native execution on macOS/Windows and live provider/keyring faults remain
 PARTIAL/OPEN despite cross-compilation and the finite synthetic Linux gate.
+
+## HTTP Responses hard turn-state commits direct session ownership (0.438.3)
+
+The tagged standard Responses success path remembers request session IDs
+independently from the hard owner used for candidate selection. The preceding
+`http-previous-session` fixture covered `previous_response_id` but not an
+otherwise identical request pinned by `x-codex-turn-state`. Both continuation
+shapes intentionally exclude session IDs from candidate-owner selection to
+avoid crossing upstream histories. That exclusion must **not** suppress
+post-success verification of the request's direct session owner.
+
+A source/binary/manifest-pinned exploratory extension of the
+`--phase=http-session-conflict` gate ran two independent hard-turn fixtures on
+clean pre-fix `8e2d1be`: each had two applied authenticated Ready accounts, a
+verified `turn-a` on main, exact original JSON with the top-level token, and
+an upstream HTTP `x-codex-turn-state` header. Official Prodex returned HTTP
+200 on main with **one** request and correctly persisted both the new response
+and the session. For a previously **absent** session, the session became
+main-owned; for a session previously verified on **second**, the direct
+session became `__prodex_hard_binding_conflict__` while preserving the original
+turn owner. Pre-fix Godex sent the right request to main and returned 200 but
+left the previously absent direct session unbound, establishing a durable
+parity mismatch.
+
+The minimal routing correction extends the already-source-qualified HTTP
+hard-previous success observation to the **hard turn-state** shape, only when
+the ordinary HTTP Responses route excluded an otherwise valid request session
+from its candidate keys. It reuses the verified affinity merger, which
+preserves existing other-account ownership as a conflict marker. Memory and
+durable regressions failed before the fix for both absent/foreign sessions and
+passed after it; focused race and full routing controls are retained.
+
+The pinned oracle now checks five scenarios in one bounded HTTP gate:
+soft-session conflict, hard-previous new/foreign session, and hard-turn
+new/foreign session, each with one authenticated Ready upstream request,
+exact untouched JSON/header, HTTP response and durable owner projection.
+Mutation sentinels also reject stale/missing turn headers, modified bodies,
+wrong provider, missing quota readiness and replay. Native macOS/Windows and
+real OAuth/keyring/provider fault permutations remain separately OPEN/PARTIAL.
