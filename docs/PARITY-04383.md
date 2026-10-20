@@ -2064,3 +2064,28 @@ This is a bounded synthetic HTTP hard-affinity contract, not proof of native
 macOS/Windows runtime or external OAuth/keyring/provider fault parity. Report
 PASS only after the exact final clean Godex commit passes the official two-
 executable oracle and local regression suite.
+
+## HTTP turn-state uses headers, not request JSON (0.438.3)
+
+The tagged `runtime_request_turn_state` reads the `x-codex-turn-state` HTTP
+**header**. The separate JSON semantic planner is used for WebSocket request
+messages; applying its direct-member precedence to HTTP was an incomplete
+source inference. The exact official 0.438.3 Linux binary exposed a larger
+pre-existing Godex mismatch: HTTP Responses with an absent direct turn-state
+member still ignored a *verified* nested `client_metadata` turn and selected
+active main, while Godex incorrectly pinned the request to second.
+
+Godex now limits JSON turn-state extraction to WebSocket messages. The HTTP
+header stays authoritative for Responses and Compact; no request body bytes
+or previous-response/session metadata are rewritten. Memory and durable
+Router regressions cover six malformed direct values, missing-direct JSON
+and a positive verified header-affinity control. The source, manifest and
+executable-pinned `--phase=http-session-conflict` oracle now independently
+runs `null`, blank, absent, and header-present cases with two authenticated
+Ready profiles. It checks the exact request body, preserved header, single
+upstream dispatch, HTTP 200 and both durable response and turn ownership.
+A negative oracle suite rejects changed owners, forged readiness, dropped
+or duplicated model attempts and modified wire evidence. The initial paired
+run caught the missing-direct discrepancy before this correction; a complete
+clean-commit rerun is required before marking the phase VERIFIED. Native
+Windows/macOS and non-synthetic provider behavior remain separately open.

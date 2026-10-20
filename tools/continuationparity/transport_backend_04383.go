@@ -103,6 +103,16 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusOK, `{"id":"resp-http-soft-conflict","object":"response","output":[]}`)
 			return
 		}
+		if strings.HasPrefix(b.scenario, "turn-http-shadow-") &&
+			strings.Contains(string(body), `"client_metadata":{"x-codex-turn-state":"shadow-turn"}`) {
+			b.mu.Lock()
+			b.attempts = append(b.attempts, transportAttempt04383{owner: owner,
+				body: string(body), turn: r.Header.Get("x-codex-turn-state"),
+				ready: b.receipts["account-a"] > 0 && b.receipts["account-b"] > 0})
+			b.mu.Unlock()
+			writeJSON(w, http.StatusOK, `{"id":"resp-http-turn-shadow","object":"response","output":[]}`)
+			return
+		}
 		if strings.HasPrefix(b.scenario, "session-http-shadow-") &&
 			strings.Contains(string(body), `"client_metadata":{"session_id":"shadow-session"}`) {
 			b.mu.Lock()

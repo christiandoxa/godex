@@ -67,6 +67,10 @@ func seedTransportAlternate04383(p product, scenario string) error {
 			value["session_profile_bindings"].(map[string]any)["http-conflict"] = binding
 			value["statuses"].(map[string]any)["session_id"].(map[string]any)["http-conflict"] = map[string]any{"state": "Verified", "confidence": 4, "last_verified_at": time.Now().Unix(), "last_touched_at": time.Now().Unix(), "last_verified_route": "responses", "success_count": 1}
 		}
+		if strings.HasPrefix(scenario, "turn-http-shadow-") {
+			value["turn_state_bindings"].(map[string]any)["shadow-turn"] = map[string]any{"profile_name": "second", "bound_at": time.Now().Unix()}
+			value["statuses"].(map[string]any)["turn_state"].(map[string]any)["shadow-turn"] = map[string]any{"state": "Verified", "confidence": 4, "last_verified_at": time.Now().Unix(), "last_touched_at": time.Now().Unix(), "last_verified_route": "responses", "success_count": 1}
+		}
 		if strings.HasPrefix(scenario, "session-") {
 			value["session_id_bindings"].(map[string]any)["shadow-session"] = map[string]any{"profile_name": "second", "bound_at": time.Now().Unix()}
 			value["session_profile_bindings"].(map[string]any)["shadow-session"] = map[string]any{"profile_name": "second", "bound_at": time.Now().Unix()}
@@ -149,6 +153,10 @@ func seedTransportAlternate04383(p product, scenario string) error {
 				"kind": "session", "key": hex.EncodeToString(key[:]),
 				"account_id": "__prodex_hard_binding_conflict__", "updated_unix": time.Now().Unix(),
 			})
+		}
+		if strings.HasPrefix(scenario, "turn-http-shadow-") {
+			turn := sha256.Sum256([]byte("turn:shadow-turn"))
+			state["bindings"] = append(state["bindings"].([]any), map[string]any{"kind": "turn", "key": hex.EncodeToString(turn[:]), "account_id": id, "updated_unix": time.Now().Unix()})
 		}
 		if strings.HasPrefix(scenario, "session-") {
 			session := sha256.Sum256([]byte("session:shadow-session"))

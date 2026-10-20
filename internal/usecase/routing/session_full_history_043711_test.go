@@ -60,6 +60,9 @@ func TestProdex043711FullHistoryRepairsOnlyConflictingSoftSession(t *testing.T) 
 				Header: make(http.Header), Body: []byte(tc.body),
 				QuotaSelection: quotamodel.Selection{RouteKind: tc.route},
 			}
+			if tc.name == "opaque turn cannot reset" {
+				request.Header.Set("x-codex-turn-state", "turn-hard")
+			}
 			if strings.HasPrefix(tc.name, "opaque") {
 				if err := router.repairConflictedFullHistorySession043711(t.Context(), request, requestRoutingAffinity(request)); err != nil {
 					t.Fatal(err)
@@ -115,7 +118,7 @@ func TestProdex043711FullHistoryRepairsOnlyConflictingSoftSession(t *testing.T) 
 	}
 }
 
-func TestProdex043711FullHistoryRejectsOpaqueTurnStateInBodyMetadataAndHeader(t *testing.T) {
+func TestProdex04383HTTPOnlyHeaderCreatesOpaqueTurnAffinity(t *testing.T) {
 	body := []byte(`{"session_id":"sess-conflicted","input":[{"role":"user"},{"role":"assistant"},{"role":"user"}],"client_metadata":{"x-codex-turn-state":"turn-meta"}}`)
 	for _, tc := range []struct {
 		name   string
@@ -132,11 +135,12 @@ func TestProdex043711FullHistoryRejectsOpaqueTurnStateInBodyMetadataAndHeader(t 
 				QuotaSelection: quotamodel.Selection{RouteKind: quotamodel.RouteKindResponses},
 			}
 			keys := requestRoutingAffinity(request)
-			if keys.turn == "" {
-				t.Fatal("opaque turn token was not detected")
-			}
-			if keys.hasSoftSessionAffinity(request.QuotaSelection) {
-				t.Fatal("opaque turn token misclassified as repairable soft session")
+			if tc.name != "header" {
+				if keys.turn != "" || !keys.hasSoftSessionAffinity(request.QuotaSelection) {
+					t.Fatalf("body-only HTTP turn incorrectly becomes hard affinity: %+v", keys)
+				}
+			} else if keys.turn != "turn-head" || keys.hasSoftSessionAffinity(request.QuotaSelection) {
+				t.Fatalf("verified HTTP header turn not treated as hard affinity: %+v", keys)
 			}
 		})
 	}

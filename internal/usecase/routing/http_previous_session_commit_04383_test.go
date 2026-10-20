@@ -151,6 +151,7 @@ func TestProdex04383HTTPTurnStateCommitPersistsSessionOwner(t *testing.T) {
 				body := `{"model":"gpt-6","x-codex-turn-state":"turn-a","session_id":"http-hard-session","input":[{"role":"user","content":"followup"}]}`
 				request := proxymodel.Request{Method: http.MethodPost, Path: "/backend-api/codex/responses",
 					Header: make(http.Header), Body: []byte(body), QuotaSelection: quotamodel.Selection{RouteKind: quotamodel.RouteKindResponses}}
+				request.Header.Set("x-codex-turn-state", "turn-a")
 				result, err := router.Forward(t.Context(), request)
 				if err != nil {
 					t.Fatal(err)

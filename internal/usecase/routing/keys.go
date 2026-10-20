@@ -30,11 +30,12 @@ func requestAffinity(request proxymodel.Request, body []byte) affinityKeys {
 	if json.Unmarshal(body, &object) != nil {
 		return keys
 	}
-	if keys.turn == "" {
-		// An existing but invalid direct WebSocket turn key shadows nested
-		// client_metadata, as in the tagged Prodex request semantic plan.
+	if keys.turn == "" && request.WebSocketMessage {
+		// Tagged HTTP Responses/Compact use only the turn-state header.
+		// WebSocket messages allow a direct JSON turn-state member to
+		// shadow nested client_metadata even when its value is invalid.
 		_, direct := object["x-codex-turn-state"]
-		if request.WebSocketMessage && direct {
+		if direct {
 			keys.turn = nonblankJSONText(object["x-codex-turn-state"])
 		} else {
 			keys.turn = objectString(object, "x-codex-turn-state", "turn_state")

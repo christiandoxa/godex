@@ -557,3 +557,12 @@ but is not a hard HTTP request owner by itself. Authentication and Ready
 receipts, one provider attempt, HTTP status/body, exact opaque request and
 both original/new durable response bindings are required. Mutation tests
 reject forged previous ownership or lost nested payloads.
+
+The same phase verifies that HTTP Responses turn-state affinity is sourced
+from the **HTTP header**, not JSON body metadata. Tagged 0.438.3 ignores both
+present `null`/blank direct body turn-state values and missing direct values
+beside `client_metadata.x-codex-turn-state`, retaining the active main profile.
+A positive control with the exact `x-codex-turn-state` HTTP header selects its
+verified owner on second. The oracle checks opaque request bytes, propagated
+header, authenticated Ready evidence, single upstream call, HTTP 200 and
+unchanged durable turn ownership plus the actual response owner.

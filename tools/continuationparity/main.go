@@ -243,6 +243,9 @@ func main() {
 			if err == nil {
 				err = runHTTPNestedPreviousProduct04383(filepath.Join(root, "nested-previous"), p)
 			}
+			if err == nil {
+				err = runHTTPShadowedTurnProduct04383(filepath.Join(root, "direct-turn-shadow"), p)
+			}
 		} else if *httpTurnTransport {
 			err = runHTTPResponsesTurnProduct04383(root, p)
 		} else if *httpCompact {
