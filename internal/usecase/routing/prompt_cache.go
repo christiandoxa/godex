@@ -3,6 +3,8 @@ package routing
 import (
 	"encoding/json"
 	"io"
+	"math"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -138,13 +140,24 @@ func promptCacheCachedInputTokens(value any) uint64 {
 		return 0
 	}
 	if usage, ok := object["usage"].(map[string]any); ok {
+		// Prodex 0.438.3's compiled response metadata uses the first
+		// *valid* unsigned field, including zero. These are the canonical
+		// OpenAI/compatible shapes, not legacy raw provider counters.
+		if cached, ok := unsignedJSONNumber(usage["cached_input_tokens"]); ok {
+			return cached
+		}
 		if details, ok := usage["input_tokens_details"].(map[string]any); ok {
 			if cached, ok := unsignedJSONNumber(details["cached_tokens"]); ok {
 				return cached
 			}
+			if cached, ok := unsignedJSONNumber(details["cached_input_tokens"]); ok {
+				return cached
+			}
 		}
-		if cached, ok := unsignedJSONNumber(usage["prompt_cache_hit_tokens"]); ok {
-			return cached
+		if details, ok := usage["prompt_tokens_details"].(map[string]any); ok {
+			if cached, ok := unsignedJSONNumber(details["cached_tokens"]); ok {
+				return cached
+			}
 		}
 	}
 	for _, key := range []string{"response", "data", "result", "payload"} {
@@ -158,13 +171,16 @@ func promptCacheCachedInputTokens(value any) uint64 {
 func unsignedJSONNumber(value any) (uint64, bool) {
 	switch current := value.(type) {
 	case float64:
-		if current >= 0 && current == float64(uint64(current)) {
+		if current >= 0 && current < math.Exp2(64) && math.Trunc(current) == current {
 			return uint64(current), true
 		}
 	case json.Number:
-		parsed, err := current.Int64()
-		if err == nil && parsed >= 0 {
-			return uint64(parsed), true
+		if current.String() == "-0" {
+			return 0, true
+		}
+		parsed, err := strconv.ParseUint(current.String(), 10, 64)
+		if err == nil {
+			return parsed, true
 		}
 	case uint64:
 		return current, true

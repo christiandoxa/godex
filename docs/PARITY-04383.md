@@ -2307,3 +2307,26 @@ released. The oracle checks authenticated Ready evidence, one exact WebSocket
 upstream message, original history, no injected turn header, visible output,
 and durable Compact/response owners. This finite parity slice does not certify
 native socket fault behavior on macOS/Windows or live OAuth integrations.
+
+## Accept compiled cached-token fields and the full unsigned-64 count
+
+The tagged Mojo `runtime_response_raw_usage` chooses the first valid unsigned
+cached-token count in this exact precedence: `cached_input_tokens`, then
+`input_tokens_details.cached_tokens`, then
+`input_tokens_details.cached_input_tokens`, then
+`prompt_tokens_details.cached_tokens`. An explicit zero blocks the lower
+priority fields. The raw `prompt_cache_hit_tokens` provider alias is not part
+of this canonical extraction (provider translators separately normalize it).
+The parser accepts the full `0..18446744073709551615` unsigned range plus
+negative zero; decimal, negative and overflow values do not qualify.
+
+Godex's prompt-cache observation previously handled only the first nested
+field plus a raw provider alias, omitted three official field forms, and
+rejected valid counts above signed 64-bit range. Source-derived table tests
+reproduce all positive, precedence and invalid-value cases before the fix.
+The scoped routing parser now implements the canonical order and uses checked
+unsigned parsing, preserving the exact returned count for prompt-cache owner
+comparisons. An observation-flow test independently checks that a larger valid
+native cached count can promote a new owner, while smaller or invalid counts
+cannot. This is tagged-source/local-use-case evidence; it does not establish
+live-model cache-hit measurement or complete 1:1 transport parity.
