@@ -3130,3 +3130,31 @@ HTTP transport/status tests remain part of the release gate, but the exact
 invalid-epoch/quarantine-timer variants are not yet independently compared
 against a live Prodex executable. Full parity on all provider/OS paths
 remains OPEN.
+
+## Quoted quota reset epoch does not trim decoded escape whitespace
+
+The tagged 0.438.3 quota epoch parser first canonicalizes complete JSON
+through `serde_json::to_string`, then Mojo `quota_json_i64` reads a quoted
+integer token and strips only raw ASCII spacing. JSON tabs and line breaks
+inside quoted numeric strings remain escaped (`\\t`, `\\n`, `\\r`) in
+that canonical serialization; Unicode EM SPACE and NBSP are not ASCII
+padding either. Go's former `quotaResetJSONInt64` used `json.Unmarshal`
+followed by Unicode-aware `strings.TrimSpace`, which silently converted
+`"\\t2000\\t"` or `"\\u20032000"` into the valid epoch `2000`.
+That could overwrite the ordinary five-minute quota fallback with an
+incorrect long quarantine despite no accepted native quota reset epoch.
+
+Fail-before unit regressions cover top-level, nested-error and quota-header
+reset strings, escaped control whitespace, Unicode whitespace and canonical
+ASCII-space or escaped-digit positive controls. A separate HTTP 403 Router
+test verifies that quota-blocked profiles keep the tagged five-minute
+fallback for invalid reset tokens and still use a valid epoch for legitimate
+ASCII-spaced numeric values. The scoped change trims only literal ASCII
+space in decoded JSON numeric strings, leaving raw upstream messages,
+source retry markers and other provider parsing unchanged.
+
+This is a pinned-source/local end-to-end parity correction. The existing
+official 0.438.3 HTTP profile-status differential remains active as a
+regression gate, but these exact reset-timer token variants have not yet
+been paired against the Prodex executable's internal wall-clock timer.
+Native-OS and live-provider parity remain independently open.

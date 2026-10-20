@@ -122,7 +122,11 @@ func quotaResetJSONInt64(raw json.RawMessage) (int64, bool) {
 		if json.Unmarshal(raw, &value) != nil {
 			return 0, false
 		}
-		text = strings.TrimSpace(value)
+		// Tagged quota_reset_at_from_json_message canonicalizes through
+		// serde_json before the Mojo numeric string walker. Tabs/newlines
+		// remain escaped inside canonical strings, and Unicode spaces are
+		// never ASCII padding. Only a literal ASCII SPACE is valid here.
+		text = strings.Trim(value, " ")
 	}
 	if text == "" {
 		return 0, false

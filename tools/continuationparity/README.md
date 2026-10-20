@@ -870,3 +870,11 @@ UTF-8, numeric overflow/depth and U+017F LONG S in quota header names. The
 existing executable oracles still check profile selection and durable
 ownership, but do not yet compare each malformed epoch's wall-clock
 quarantine expiry in both binaries.
+
+Quota-reset epoch parsing distinguishes literal ASCII spaces inside a JSON
+number-string from escaped TAB/LF/CR or Unicode whitespace. Because the
+tagged serde_json canonical serialization preserves escape spelling for
+controls, only the former is eligible Mojo numeric padding. Local HTTP 403
+and quota quarantine tests guard against artificially long reset windows;
+the official executable status-policy phase remains a broader transport
+regression, not a direct malformed-epoch timer oracle.
