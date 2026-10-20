@@ -46,8 +46,11 @@ func semanticNestedText(
 	value map[string]any,
 	directName, nestedObjectName, nestedName string,
 ) string {
-	if direct := nonblankJSONText(value[directName]); direct != "" {
-		return direct
+	// Tagged Prodex's runtime_request_semantic_plan selects a direct JSON
+	// member by presence, not by whether its value is a usable string.
+	// A present empty/invalid member must not resurrect a nested affinity.
+	if direct, present := value[directName]; present {
+		return nonblankJSONText(direct)
 	}
 	nested, ok := value[nestedObjectName].(map[string]any)
 	if !ok {

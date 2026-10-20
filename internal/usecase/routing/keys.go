@@ -31,10 +31,17 @@ func requestAffinity(request proxymodel.Request, body []byte) affinityKeys {
 		return keys
 	}
 	if keys.turn == "" {
-		keys.turn = objectString(object, "x-codex-turn-state", "turn_state")
-		if keys.turn == "" {
-			if metadata, ok := object["client_metadata"].(map[string]any); ok {
-				keys.turn = objectString(metadata, "x-codex-turn-state", "turn_state")
+		// An existing but invalid direct WebSocket turn key shadows nested
+		// client_metadata, as in the tagged Prodex request semantic plan.
+		_, direct := object["x-codex-turn-state"]
+		if request.WebSocketMessage && direct {
+			keys.turn = nonblankJSONText(object["x-codex-turn-state"])
+		} else {
+			keys.turn = objectString(object, "x-codex-turn-state", "turn_state")
+			if keys.turn == "" {
+				if metadata, ok := object["client_metadata"].(map[string]any); ok {
+					keys.turn = objectString(metadata, "x-codex-turn-state", "turn_state")
+				}
 			}
 		}
 	}
@@ -45,10 +52,15 @@ func requestAffinity(request proxymodel.Request, body []byte) affinityKeys {
 		}
 	}
 	if keys.session == "" {
-		keys.session = objectString(object, "session_id", "conversation_id", "thread_id")
-		if keys.session == "" {
-			if metadata, ok := object["client_metadata"].(map[string]any); ok {
-				keys.session = objectString(metadata, "session_id")
+		_, direct := object["session_id"]
+		if request.WebSocketMessage && direct {
+			keys.session = nonblankJSONText(object["session_id"])
+		} else {
+			keys.session = objectString(object, "session_id", "conversation_id", "thread_id")
+			if keys.session == "" {
+				if metadata, ok := object["client_metadata"].(map[string]any); ok {
+					keys.session = objectString(metadata, "session_id")
+				}
 			}
 		}
 	}

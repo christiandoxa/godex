@@ -1358,3 +1358,32 @@ separate strict cross-executable Compact-followup WebSocket fixture, which
 remains **OPEN** until an official 0.438.3 binary differential confirms the
 same user-visible terminal frame, attempt count and durable owner on both
 products. A passing unit test must not be substituted for that oracle.
+
+## WebSocket direct JSON fields shadow invalid nested metadata
+
+The tagged Prodex 0.438.3 source (`prodex-runtime-proxy/src/lib.rs`,
+`runtime_request_semantic_plan`) chooses an existing top-level `session_id`
+or `x-codex-turn-state` JSON member **before** inspecting `client_metadata`.
+An empty, whitespace-only, null, boolean, numeric, or object-valued direct
+member yields no string and must **not** borrow the nested session/turn
+identity. Godex's WebSocket metadata parser previously fell back to nested
+values whenever the direct member was not a nonblank string. Its shared HTTP
+affinity parser independently resurrected the same discarded keys, allowing
+a caller-supplied malformed field to select a different existing owner.
+
+`TestProdex04383WebSocketDirectMetadataShadowsNestedEvenWhenInvalid` failed
+before the fix for all six direct-value shapes. The real Router owner-selection
+regression `TestProdex04383WebSocketInvalidDirectDoesNotSelectNestedOwner`
+also failed in both memory and durable stores: its preferred Ready owner B
+was incorrectly replaced by owner A from shadowed nested metadata. A scoped
+change preserves the direct-member presence rule in both WebSocket metadata
+and generic affinity extraction, without changing HTTP requests or the
+historical nested response.previous_response_id recovery contract. Missing
+direct members still use genuine nested metadata, and explicit handshake
+session/turn headers still take precedence. No new public setting, persisted
+field, helper package or dependency was introduced.
+
+These are **source-aligned local regressions**, not yet a pinned two-executable
+network oracle of malformed direct metadata. Independently qualify the exact
+client-visible frames and owner/durable effects before marking this boundary
+FULL 1:1; retain all previous continuation oracles and no-replay controls.
