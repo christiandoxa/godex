@@ -1387,3 +1387,40 @@ These are **source-aligned local regressions**, not yet a pinned two-executable
 network oracle of malformed direct metadata. Independently qualify the exact
 client-visible frames and owner/durable effects before marking this boundary
 FULL 1:1; retain all previous continuation oracles and no-replay controls.
+
+## Complete authenticated 20-case WebSocket transport gate — clean `cf8aafc`
+
+The full original authenticated WebSocket transport fixture was qualified in
+three **non-overlapping** synchronous release phases on the **same clean Godex
+commit** `cf8aafcee1e3876fc0fd8da0fd8bbe0dea37cc75`. Each phase verified
+the published Prodex 0.438.3 source tag, Linux x86_64 executable SHA-256,
+published release manifest and candidate's clean Go VCS provenance before
+comparing the two executables. Each exited **PASS**:
+
+| Release phase | Original scenarios | Exact result |
+| --- | ---: | --- |
+| `--phase=websocket-transport-core` | 17 | PASS; authenticated Ready full-history, quota/error precedence, continuation ownership and no-postcommit-replay controls |
+| `--phase=websocket-transport-lifecycle` | 2 | PASS; cancellation and original 30-second precommit deadline with no replay |
+| `--phase=websocket-transport-capacity` | 1 | PASS; occupied healthy alternate, unchanged original deadline and persisted owner |
+
+The tooling test `TestProdex04383WebSocketTransportSlicesExhaustive` enforces
+that these phases concatenate to the *unchanged* twenty-case canonical suite
+without omissions, duplication or reorder. Both official executables executed
+identical fixture cases with the original authenticated receipts, owner,
+request/history, client-frame and durable-state checks. The exact
+`TestProdex04383Transport*` mutation suite was also executed under the race
+detector in every phase. The original unsliced `--websocket-transport` mode,
+the default release gate and native portable fixture retain **all 20 cases**;
+none of their assertions or duration windows was reduced.
+
+The unsliced fixture exceeded the synchronous connector execution window,
+and an initial two-part run likewise exceeded it after both binaries reached
+the 30-second deadline and the final capacity case. These **partial runs were
+not claimed as passes**; the three completed clean-commit runs above supply
+the new finite oracle proof. `make verify` also passed locally on the exact
+source modifications before the commit, including full race tests, vet,
+installer checks, cross-compilation and production build. This establishes
+finite Linux/synthetic WebSocket transport parity, **not** FULL production
+1:1: the independent malformed-direct-field network oracle, strict public
+Compact-followup lineage, native macOS realtime and untested OS/OAuth/provider
+failure permutations remain PARTIAL/OPEN.
