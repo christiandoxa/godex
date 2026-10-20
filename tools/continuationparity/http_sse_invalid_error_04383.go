@@ -18,7 +18,7 @@ func httpSSEInvalidErrorShapes04383() []string {
 	return []string{"high-surrogate", "low-surrogate", "numeric-overflow", "too-deep", "valid-output",
 		"opaque-scalar-quota", "opaque-error-code-quota", "opaque-error-code-rate",
 		"opaque-profile-note", "opaque-profile-message", "kelvin-quota-code",
-		"canonical-quota", "canonical-rate"}
+		"canonical-quota", "canonical-rate", "created-quota", "inprogress-rate", "keepalive-quota"}
 }
 
 func httpSSEInvalidErrorBody04383(shape string) string {
@@ -39,6 +39,12 @@ func httpSSEInvalidErrorBody04383(shape string) string {
 		return "data: " + `{"type":"response.failed","response":{"error":{"code":"insufficient_quota"}}}` + "\n\n"
 	case "canonical-rate":
 		return "data: " + `{"type":"response.failed","response":{"error":{"code":"rate_limit_exceeded"}}}` + "\n\n"
+	case "created-quota":
+		return "data: " + `{"type":"response.created","response":{"error":{"code":"insufficient_quota"}}}` + "\n\n"
+	case "inprogress-rate":
+		return "data: " + `{"type":"response.in_progress","response":{"error":{"code":"rate_limit_exceeded"}}}` + "\n\n"
+	case "keepalive-quota":
+		return "data: " + `{"type":"keepalive","error":{"code":"insufficient_quota"}}` + "\n\n"
 	}
 	if shape == "valid-output" {
 		return "data: " + `{"type":"response.output_text.delta","delta":"ok"}` + "\n\n"
@@ -56,7 +62,8 @@ func httpSSEInvalidErrorBody04383(shape string) string {
 }
 
 func httpSSEInvalidErrorRotates04383(shape string) bool {
-	return shape == "canonical-quota" || shape == "canonical-rate"
+	return shape == "canonical-quota" || shape == "canonical-rate" ||
+		shape == "created-quota" || shape == "inprogress-rate" || shape == "keepalive-quota"
 }
 
 const httpSSERecovered04383 = "data: " + `{"type":"response.output_text.delta","delta":"recovered"}` + "\n\n"

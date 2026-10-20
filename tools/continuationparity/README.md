@@ -887,3 +887,13 @@ pass through one main upstream attempt, whereas canonical quota/rate codes
 may retry once on a second Ready profile. Both profiles have authenticated
 Ready receipts, and the fixture checks the exact request and stream bytes.
 It does not relax the separate hard-previous fail-closed retry fence.
+
+SSE precommit hold kinds do **not** mask authoritative error signals. The
+HTTP turn-transport fixture additionally returns `response.created` with an
+`insufficient_quota` code, `response.in_progress` with a
+`rate_limit_exceeded` code, and `keepalive` with an `insufficient_quota` code.
+Mojo's failure flags precede its hold-kind predicate; on the fresh unbound
+request the recognized errors authorize a second Ready profile. Ordinary
+metadata without error and opaque aliases remain covered by local tests.
+The two-executable fixture verifies original request bytes, exact recovered
+SSE stream, attempt count and unchanged older durable bindings.

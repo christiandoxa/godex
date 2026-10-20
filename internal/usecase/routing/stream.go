@@ -95,6 +95,17 @@ func streamOutcome(data []byte, headers http.Header, now time.Time, providerKind
 		return responseOutcome{kind: responsePass}, false
 	}
 	event.Type = strings.TrimSpace(event.Type)
+	if !externalProviderKind(providerKind) {
+		// Tagged 0.438.3 runtime_sse_inspection_step checks terminal
+		// quota/rate/overload/previous-response flags before precommit_hold.
+		// A response.created, in_progress, keepalive or metadata event can
+		// therefore expose an authoritative error code without output.
+		// Preserve the hold behavior for ordinary metadata without a signal.
+		classified, _ := classifyStreamError(data, headers, now, providerKind)
+		if classified.kind == responseRetry || classified.invalidPreviousResponseID || classified.previousResponseNotFound {
+			return classified, false
+		}
+	}
 	switch event.Type {
 	case "keepalive":
 		return responseOutcome{}, true

@@ -3181,3 +3181,27 @@ uses a fresh, unbound request: a *verified previous-response* request has a
 separate fail-closed continuity policy and is not an authorized test of
 cross-profile quota rotation. All provider/OS parity beyond these finite
 cases remains open.
+
+## SSE failure flags take precedence over precommit metadata/keepalive holds
+
+The tagged `runtime_sse_inspection_step` Mojo kernel evaluates
+quota/rate/overload/previous-response failure signals **before** applying
+the `precommit_hold` event-kind rule. Godex previously held native
+`keepalive`, `response.created`, `response.in_progress` and other metadata
+kinds before inspecting their recognized nested error codes. An event
+carrying a legitimate quota/rate signal could therefore suppress a safe
+precommit rotation instead of sending its byte-exact request to the next
+eligible Ready account. A fail-before regression confirms that behavior,
+with ordinary metadata and opaque `error_code` controls still held.
+
+The scoped correction inspects the native tagged STREAM class first and
+short-circuits only on recognized quota/rate/overload or previous-response
+failure evidence. It leaves normal hold events, external provider handling,
+raw SSE bytes and the previously hardened whole-document JSON validity
+boundary unchanged. The pinned `--phase=http-turn-transport` oracle adds
+`response.created` quota, `response.in_progress` rate-limit and `keepalive`
+quota controls on independent fresh SSE requests, alongside canonical and
+opaque cases. The fixture compares authenticated Ready profiles, exact
+model request and SSE output, precommit inference count and unchanged
+previous-response durable bindings. This is a finite synthetic comparison,
+not a certificate of native-OS or live-provider 1:1 parity.
