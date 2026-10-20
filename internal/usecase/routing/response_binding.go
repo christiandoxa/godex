@@ -27,6 +27,18 @@ func (router *Router) bindSuccessfulResponse(
 	if result.Failed || result.Response.StatusCode >= 400 {
 		return nil
 	}
+	// The exact Mojo hard-binding component classifier applies to raw
+	// request/response identifiers before any derived Compact alias is
+	// constructed. Keep the original wire request unchanged.
+	if !validHardBindingComponent04383(keys.previous) {
+		keys.previous = ""
+	}
+	if !validHardBindingComponent04383(keys.turn) {
+		keys.turn = ""
+	}
+	if !validHardBindingComponent04383(keys.session) {
+		keys.session = ""
+	}
 	if keys.turn != "" && router.affinity.deadTurnStateContext(ctx, keys.turn, router.now()) {
 		keys.turn = ""
 	}
@@ -36,6 +48,9 @@ func (router *Router) bindSuccessfulResponse(
 		previousBound := keys.previous != ""
 		if result.Response.WebSocketResponseID != "" {
 			keys.previous = result.Response.WebSocketResponseID
+			if !validHardBindingComponent04383(keys.previous) {
+				keys.previous = ""
+			}
 			if turnState := responseTurnStateValue(result.Response); turnState != "" {
 				keys.turn = turnState
 			}
@@ -54,7 +69,7 @@ func (router *Router) bindSuccessfulResponse(
 		// different owner as a durable conflict marker, never silently
 		// taking over that profile's verified session or Compact alias.
 		if previousBound && result.Response.FirstEventCommitted &&
-			validCompactLineageComponent04383(keys.session) && bindingKeys.session == "" {
+			validHardBindingComponent04383(keys.session) && bindingKeys.session == "" {
 			if err := router.rememberVerifiedAccountBinding(ctx, result.AccountID,
 				affinityKeys{session: keys.session}, now); err != nil {
 				return err
@@ -67,6 +82,9 @@ func (router *Router) bindSuccessfulResponse(
 	}
 	if result.Response.StatusCode == http.StatusSwitchingProtocols {
 		keys.previous = result.Response.WebSocketResponseID
+		if !validHardBindingComponent04383(keys.previous) {
+			keys.previous = ""
+		}
 		if turnState := responseTurnStateValue(result.Response); turnState != "" {
 			keys.turn = turnState
 		}
@@ -103,7 +121,7 @@ func (router *Router) bindSuccessfulResponse(
 	}
 	if selection.RouteKind == quotamodel.RouteKindResponses &&
 		(keys.previous != "" || keys.turn != "") &&
-		validCompactLineageComponent04383(keys.session) && bindingKeys.session == "" {
+		validHardBindingComponent04383(keys.session) && bindingKeys.session == "" {
 		// Tagged Prodex remembers the successful *HTTP Responses* request's
 		// session even when previous_response_id or turn_state supplied its
 		// hard owner. Existing foreign ownership becomes a durable conflict.
@@ -125,7 +143,7 @@ func (router *Router) bindSuccessfulResponse(
 		// HTTP Compact commits successfully. These durable aliases are used
 		// by later WebSocket messages without changing their quota route.
 		compact := affinityKeys{}
-		if validCompactLineageComponent04383(keys.session) {
+		if validHardBindingComponent04383(keys.session) {
 			// A successful Compact request records session lineage even if
 			// selection was hard-pinned by a previous response and therefore
 			// excluded its session from the outbound selection keys.
@@ -138,7 +156,7 @@ func (router *Router) bindSuccessfulResponse(
 			}
 			compact.session = "__compact_session__:" + keys.session
 		}
-		if turn := responseTurnStateValue(result.Response); validCompactLineageComponent04383(turn) {
+		if turn := responseTurnStateValue(result.Response); validHardBindingComponent04383(turn) {
 			compact.turn = "__compact_turn_state__:" + turn
 		}
 		if compact.hasAffinity() {
@@ -188,10 +206,11 @@ func (router *Router) responseBindingKeys(
 	return bindingKeys, nil
 }
 
-// Tagged 0.438.3 uses the RuntimeHardBindingIdentity Mojo component
-// classifier before minting Compact lineage. Validate only this namespace:
-// ordinary response headers and cached turn-state tokens have separate policy.
-func validCompactLineageComponent04383(value string) bool {
+// Prodex 0.438.3's RuntimeHardBindingIdentity Mojo component classifier
+// applies the same strict UTF-8, length and control rules to response,
+// session and turn bindings as to Compact lineage aliases. Ordinary
+// upstream transport headers remain byte-preserved independently.
+func validHardBindingComponent04383(value string) bool {
 	value = strings.TrimSpace(value)
 	if value == "" || len(value) > 1024 || !utf8.ValidString(value) {
 		return false

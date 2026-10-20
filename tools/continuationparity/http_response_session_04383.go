@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -19,6 +20,7 @@ var httpResponseSessionShapes04383 = []string{
 	"turn-sorted-map", "turn-unicode-only", "turn-padded-only", "turn-array-order",
 	"turn-nested-priority", "turn-array-objects",
 	"invalid-surrogate-high", "invalid-surrogate-low", "invalid-surrogate-key", "valid-surrogate-pair",
+	"response-id-1024", "response-id-1025", "response-id-control-c0", "response-id-control-c1",
 }
 
 func httpResponseSessionRequest04383(shape string) string {
@@ -48,6 +50,9 @@ func httpResponseSessionReply04383(shape string) string {
 		return `{"id":"resp-response-session","object":"response","note\ud800":"x","output":[]}`
 	case "valid-surrogate-pair":
 		return `{"id":"resp-response-session","object":"response","note":"\ud83d\ude00","output":[]}`
+	case "response-id-1024", "response-id-1025", "response-id-control-c0", "response-id-control-c1":
+		encoded, _ := json.Marshal(httpResponseSessionBindingID04383(shape))
+		return `{"id":` + string(encoded) + `,"object":"response","output":[]}`
 	case "triple-ids":
 		return `{"response":{"id":"resp-response-session"},"response_id":"resp-alias-middle","object":"response","id":"resp-alias-outer","output":[]}`
 	case "duplicate-ids":
@@ -70,6 +75,21 @@ func httpResponseSessionReply04383(shape string) string {
 		return `{"id":"resp-response-session","object":"response","headers":[{"name":"x-codex-turn-ſtate","value":"impostor-turn"},{"key":"X-CODEX-TURN-STATE","values":["  ","real-turn"]}],"output":[]}`
 	default:
 		return `{"id":"resp-response-session","object":"response","output":[]}`
+	}
+}
+
+func httpResponseSessionBindingID04383(shape string) string {
+	switch shape {
+	case "response-id-1024":
+		return strings.Repeat("R", 1024)
+	case "response-id-1025":
+		return strings.Repeat("R", 1025)
+	case "response-id-control-c0":
+		return "bad\u0001id"
+	case "response-id-control-c1":
+		return "bad\u0085id"
+	default:
+		return httpResponseSessionID04383
 	}
 }
 
@@ -134,12 +154,13 @@ func runHTTPResponseSessionCase04383(root string, p product, shape string) error
 		wantSession = "main"
 	}
 	wantResponse := "main"
-	if strings.HasPrefix(shape, "invalid-surrogate-") {
+	if strings.HasPrefix(shape, "invalid-surrogate-") || shape == "response-id-1025" ||
+		shape == "response-id-control-c0" || shape == "response-id-control-c1" {
 		wantResponse = ""
 	}
 	deadline := time.Now().Add(3 * time.Second)
 	for {
-		responseOwner, responseErr := readHTTPResponseOwner04383(p, httpResponseSessionID04383)
+		responseOwner, responseErr := readHTTPResponseOwner04383(p, httpResponseSessionBindingID04383(shape))
 		sessionOwner, sessionErr := readCompactBindingOwner04383(p, "session", httpResponseSessionName04383)
 		if responseErr == nil && sessionErr == nil && responseOwner == wantResponse && sessionOwner == wantSession &&
 			httpResponseIDAliasesMatch04383(p, shape) && httpResponseTurnHeadersMatch04383(p, shape) {
@@ -175,6 +196,9 @@ func httpResponseIDAliasesMatch04383(p product, shape string) bool {
 		extraIDs = []string{"resp-alias-outer"}
 	case "ignore-event-root":
 		owner, err := readHTTPResponseOwner04383(p, "event-unrelated")
+		return err == nil && owner == ""
+	case "response-id-1024", "response-id-1025", "response-id-control-c0", "response-id-control-c1":
+		owner, err := readHTTPResponseOwner04383(p, httpResponseSessionID04383)
 		return err == nil && owner == ""
 	}
 	for _, id := range extraIDs {

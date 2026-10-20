@@ -2566,3 +2566,32 @@ main for the next fresh prompt-cache request. The 127-container positive
 control must record the response ID and select second. All four authenticated
 Ready upstream requests and durable state projections are checked; this
 finite Linux fixture does not prove native macOS/Windows or live model parity.
+
+## Verify hard binding components before persisting response/session ownership
+
+Prodex 0.438.3's tagged `RuntimeHardBindingIdentity::response`, `::session`
+and `::turn_state` share compiled Mojo's component classifier: a normalized
+identity must contain at most **1,024 UTF-8 bytes**, be valid UTF-8, and
+contain no C0/C1 control characters. The separate **4,096-byte composed key**
+limit is not the component limit. Godex previously permitted 4,096-byte
+binding components and control-bearing strings, so a successful HTTP request
+or response could mint a verified hard owner that the pinned Rust runtime
+rejects. The larger limit still has uses for internal composed Compact aliases;
+blindly reducing the global key limit would corrupt valid 1,024-byte aliases.
+
+Memory and durable fail-before tests demonstrate wrongly persisted response
+IDs at 1,025 bytes and both control classes, with valid 1,024-byte and
+Unicode controls. A second independent test asserts the same boundary on
+canonical **request-owned session IDs**. The narrow correction reuses the
+already-source-audited Compact `RuntimeHardBindingIdentity` component check
+before successful request/response ownership observations, including additional
+response ID aliases. It deliberately leaves internal namespaced Compact keys,
+request wire bytes and upstream transport headers unchanged.
+
+The pinned two-executable `--phase=http-session-conflict` oracle now also
+compares a successful authenticated Ready request receiving a 1,024-byte
+response ID (must bind), a 1,025-byte response ID (must remain unbound), and
+two valid JSON strings encoding forbidden C0/C1 characters (must remain
+unbound). Their original HTTP bodies, owner choices and durable ID projections
+are independently checked. It does not establish every live provider or native
+operating system scenario.

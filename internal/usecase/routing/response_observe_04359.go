@@ -28,12 +28,24 @@ func (router *Router) Observe(ctx context.Context, accountID string, headers htt
 			keys.previous, extraIDs = ids[0], ids[1:]
 		}
 	}
+	// Record only tagged RuntimeHardBindingIdentity components; a large
+	// or control-bearing upstream ID cannot mint a verified owner or
+	// create a cross-turn state sidecar.
+	if !validHardBindingComponent04383(keys.previous) {
+		keys.previous = ""
+	}
+	if !validHardBindingComponent04383(keys.turn) {
+		keys.turn = ""
+	}
 	now := router.now()
 	if err := router.rememberVerifiedAccountBinding(ctx, accountID, keys, now); err != nil {
 		return err
 	}
 	router.rememberAccountTurnState(ctx, keys.previous, accountID, router.accountHome(accountID), keys.turn, now)
 	for _, id := range extraIDs {
+		if !validHardBindingComponent04383(id) {
+			continue
+		}
 		if err := router.rememberVerifiedAccountBinding(ctx, accountID, affinityKeys{previous: id}, now); err != nil {
 			return err
 		}

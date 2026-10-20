@@ -705,3 +705,11 @@ minting neither a response-ID binding nor a cached hit; fresh selection stays
 on main. Its one-level shallower counterpart must permit the larger cache
 hit and select second. This specifically guards against treating Mojo's
 larger independent traversal bound as the Rust outer parser's acceptance rule.
+
+The response-observation phase adds hard binding component boundary cases.
+The tagged Rust `RuntimeHardBindingIdentity` allows a response ID of exactly
+1,024 bytes but rejects 1,025 bytes and C0/C1 control characters even if they
+are valid JSON escapes. The source-pinned binary oracle checks exact unchanged
+HTTP response bytes and that only the valid component gains a durable previous-
+response owner. This is distinct from Compact's internal prefix-plus-component
+lineage key, which may be longer than 1,024 bytes after encoding.
