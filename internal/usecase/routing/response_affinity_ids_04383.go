@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"slices"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/christiandoxa/godex/internal/helper/sse"
 )
@@ -24,7 +23,7 @@ func responseAffinityWithIDs(headers http.Header, body []byte, stream bool) (aff
 	}
 	var ids []string
 	addEvent := func(data []byte) {
-		if !utf8.Valid(data) {
+		if !validNativeJSONUnicode04383(data) {
 			return
 		}
 		var object map[string]any

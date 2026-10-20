@@ -2449,3 +2449,26 @@ adds lone-high and lone-low invalid-body controls plus valid-pair and literal
 escaped-text controls, verifying the selected owner, untouched HTTP body and
 existing durable bindings on the exact published 0.438.3 binary. This finite
 JSON semantic boundary does not certify every provider and OS integration.
+
+## Invalid Unicode response metadata must not create continuation owners
+
+The tagged `prodex-runtime-proxy/src/payload_detection/response_metadata.rs`
+extracts response IDs, turn-state and token usage only after a successful
+`serde_json::from_slice` of the **entire** upstream response or SSE event.
+Godex's response-ID observer already rejected raw invalid UTF-8, but its
+`encoding/json` parser still accepted unpaired `\\ud800`/`\\udc00` escapes,
+including malformed member names. A fake upstream could therefore cause a
+malformed response to mint a verified `previous_response_id` owner that the
+published Prodex executable leaves unbound.
+
+A memory/durable Router regression first reproduced the missing boundary for
+malformed high/low surrogates and invalid JSON keys, with valid pair and
+escaped-backslash positive controls. An independent SSE event regression
+checks the same policy after commitment. The response metadata observer now
+reuses the existing scoped JSON Unicode validator, leaving header handling,
+original response bytes, successful canonical aliases and usage accounting
+unchanged. The source/manifest/executable-pinned `--phase=http-session-conflict`
+fixture also checks that a malformed upstream response returns its original
+HTTP body while its response ID remains **unbound**; the valid pair still binds
+on the selected Ready owner. This synthetic fixture is not a claim of complete
+provider, OAuth or native platform parity.

@@ -667,3 +667,11 @@ surrogate pair and an escaped backslash plus `ud800` are ordinary requests
 that retain session affinity. The raw JSON bytes, original Ready account
 receipts, selected owner and durable session/response projections must agree
 with the pinned 0.438.3 Rust executable.
+
+Upstream response JSON must itself be valid before its IDs become hard
+continuation owners. The HTTP response-session phase now includes malformed
+surrogate values and member names beside a valid surrogate pair. The synthetic
+server always returns HTTP 200 with the exact original bytes, but a malformed
+response ID must remain unbound on both official Prodex and Godex. The valid
+control must retain its main owner. Existing mutation sentinels still reject
+forged readiness, response bytes, request counts and account selection.

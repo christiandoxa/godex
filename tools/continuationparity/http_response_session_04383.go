@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -17,6 +18,7 @@ var httpResponseSessionShapes04383 = []string{
 	"triple-ids", "duplicate-ids", "legacy-and-root", "ignore-event-root",
 	"turn-sorted-map", "turn-unicode-only", "turn-padded-only", "turn-array-order",
 	"turn-nested-priority", "turn-array-objects",
+	"invalid-surrogate-high", "invalid-surrogate-low", "invalid-surrogate-key", "valid-surrogate-pair",
 }
 
 func httpResponseSessionRequest04383(shape string) string {
@@ -38,6 +40,14 @@ func httpResponseSessionReply04383(shape string) string {
 		return `{"id":"resp-response-session","object":"response","conversation_id":"payload-only-session","output":[]}`
 	case "thread-alias":
 		return `{"id":"resp-response-session","object":"response","thread_id":"payload-only-session","output":[]}`
+	case "invalid-surrogate-high":
+		return `{"id":"resp-response-session","object":"response","note":"\ud800","output":[]}`
+	case "invalid-surrogate-low":
+		return `{"id":"resp-response-session","object":"response","note":"\udc00","output":[]}`
+	case "invalid-surrogate-key":
+		return `{"id":"resp-response-session","object":"response","note\ud800":"x","output":[]}`
+	case "valid-surrogate-pair":
+		return `{"id":"resp-response-session","object":"response","note":"\ud83d\ude00","output":[]}`
 	case "triple-ids":
 		return `{"response":{"id":"resp-response-session"},"response_id":"resp-alias-middle","object":"response","id":"resp-alias-outer","output":[]}`
 	case "duplicate-ids":
@@ -123,20 +133,24 @@ func runHTTPResponseSessionCase04383(root string, p product, shape string) error
 	if shape == "request-session" {
 		wantSession = "main"
 	}
+	wantResponse := "main"
+	if strings.HasPrefix(shape, "invalid-surrogate-") {
+		wantResponse = ""
+	}
 	deadline := time.Now().Add(3 * time.Second)
 	for {
 		responseOwner, responseErr := readHTTPResponseOwner04383(p, httpResponseSessionID04383)
 		sessionOwner, sessionErr := readCompactBindingOwner04383(p, "session", httpResponseSessionName04383)
-		if responseErr == nil && sessionErr == nil && responseOwner == "main" && sessionOwner == wantSession &&
+		if responseErr == nil && sessionErr == nil && responseOwner == wantResponse && sessionOwner == wantSession &&
 			httpResponseIDAliasesMatch04383(p, shape) && httpResponseTurnHeadersMatch04383(p, shape) {
 			break
 		}
 		if time.Now().After(deadline) {
-			return fmt.Errorf("response/session ownership mismatch: response=%q session=%q want_session=%q errors=%v/%v", responseOwner, sessionOwner, wantSession, responseErr, sessionErr)
+			return fmt.Errorf("response/session ownership mismatch: response=%q want_response=%q session=%q want_session=%q errors=%v/%v", responseOwner, wantResponse, sessionOwner, wantSession, responseErr, sessionErr)
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	fmt.Printf("%s response %s: one Ready main attempt, unchanged response, response owner main, session owner %q\n", p.name, shape, wantSession)
+	fmt.Printf("%s response %s: one Ready main attempt, exact response, response owner %q, session owner %q\n", p.name, shape, wantResponse, wantSession)
 	return nil
 }
 
