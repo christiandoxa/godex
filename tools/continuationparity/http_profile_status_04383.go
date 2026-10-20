@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -16,12 +17,14 @@ func httpProfileStatusShapes04383() []string {
 		"profile-ascii-403", "profile-uppercase-403", "profile-kelvin-403",
 		"quota-text-ascii-403", "quota-text-kelvin-403",
 		"quota-code-ascii-402", "quota-code-kelvin-402", "quota-text-uppercase-402", "unrelated-403",
+		"quota-escaped-key-402", "quota-escaped-value-402", "quota-raw-depth-403", "quota-nested-control-403",
+		"quota-scalar-error-402", "quota-escaped-scalar-error-402",
 	}
 }
 
 func httpProfileStatusCode04383(shape string) int {
 	switch shape {
-	case "quota-code-ascii-402", "quota-code-kelvin-402", "quota-text-uppercase-402":
+	case "quota-code-ascii-402", "quota-code-kelvin-402", "quota-text-uppercase-402", "quota-escaped-key-402", "quota-escaped-value-402", "quota-scalar-error-402", "quota-escaped-scalar-error-402":
 		return http.StatusPaymentRequired
 	default:
 		return http.StatusForbidden
@@ -46,6 +49,18 @@ func httpProfileStatusBody04383(shape string) string {
 		return `{"error":{"code":"worKspace_member_credits_depleted"}}`
 	case "quota-text-uppercase-402":
 		return `{"error":{"message":"YOUR WORKSPACE IS OUT OF CREDITS"}}`
+	case "quota-escaped-key-402":
+		return `{"error":{"\u0063ode":"insufficient_quota"}}`
+	case "quota-escaped-value-402":
+		return `{"error":{"code":"insufficient_\u0071uota"}}`
+	case "quota-scalar-error-402":
+		return `{"error":"insufficient_quota"}`
+	case "quota-escaped-scalar-error-402":
+		return `{"error":"insufficient_\u0071uota"}`
+	case "quota-raw-depth-403":
+		return strings.Repeat(`{"wrapper":`, 34) + `{"code":"insufficient_quota"}` + strings.Repeat(`}`, 34)
+	case "quota-nested-control-403":
+		return strings.Repeat(`{"wrapper":`, 4) + `{"code":"insufficient_quota"}` + strings.Repeat(`}`, 4)
 	default:
 		return `{"error":{"message":"unrelated profile denial"}}`
 	}
@@ -53,7 +68,7 @@ func httpProfileStatusBody04383(shape string) string {
 
 func httpProfileStatusShouldRotate04383(shape string) bool {
 	switch shape {
-	case "profile-ascii-403", "profile-uppercase-403", "quota-text-ascii-403", "quota-code-ascii-402", "quota-text-uppercase-402":
+	case "profile-ascii-403", "profile-uppercase-403", "quota-text-ascii-403", "quota-code-ascii-402", "quota-text-uppercase-402", "quota-nested-control-403", "quota-scalar-error-402":
 		return true
 	default:
 		return false

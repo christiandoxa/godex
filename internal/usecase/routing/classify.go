@@ -137,7 +137,15 @@ func (proxy *Router) classifyResponse(response *proxymodel.Response, providerKin
 			openAIProfileUnavailable(prefix) {
 			return responseOutcome{kind: responseRetry, profileUnavailable: true}, pending, nil
 		}
-		if complete && (isQuotaResponse(prefix) ||
+		quotaEvidence := isQuotaResponse(prefix)
+		if !externalProviderKind(providerKind) &&
+			(response.StatusCode == http.StatusPaymentRequired || response.StatusCode == http.StatusForbidden) {
+			// Native 402/403 responses retain the tagged raw Mojo member and
+			// depth bounds. Go's decoded object scanner is still appropriate
+			// for other provider or committed SSE payloads.
+			quotaEvidence = openAI402403RawQuota04383(prefix)
+		}
+		if complete && (quotaEvidence ||
 			(!externalProviderKind(providerKind) &&
 				(response.StatusCode == http.StatusPaymentRequired || response.StatusCode == http.StatusForbidden) &&
 				openAIWorkspaceQuotaResponse(prefix))) {

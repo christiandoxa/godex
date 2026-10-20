@@ -3065,3 +3065,34 @@ return their exact original HTTP status/body on main without replay. The
 fixture verifies inference count and durable new/old response ownership on
 both binaries, including positive uppercase-ASCII controls. This is a
 finite 0.438.3 synthetic contract, not full live-provider/native OS parity.
+
+## HTTP 402/403 raw quota JSON must not promote decoded escape aliases
+
+The 0.438.3 `rich_fallback.mojo` HTTP 402/403 scanner reads original JSON
+member and string-token bytes, with a maximum recursive depth of 32. It
+recognizes an exact `code`, `type`, `status` or `reason` quota token, and
+also a direct string `error` quota code on 402/403. The Go native route
+previously called `isQuotaResponse`, whose `encoding/json.Unmarshal`
+decoded `\\u0063ode` to `code` and `insufficient_\\u0071uota` to
+`insufficient_quota`, then recursively inspected arbitrarily deep
+payloads. These decoded aliases could authorize a second credential
+attempt even when the official 0.438.3 executable returns the original
+402/403 without rotation.
+
+An exploratory source/manifest/executable-pinned
+`--phase=http-profile-status` comparison reproduced this mismatch:
+Prodex kept the first HTTP 402/403 and left the new response unbound for
+escaped key/value and over-depth inputs, whereas the pre-fix Godex
+selected a second owner. A fail-before native Router test covers escaped
+keys, escaped string values, over-depth rejection, normal nesting and a
+correct direct string `error: insufficient_quota` control.
+
+The correction applies the already validated bounded Mojo-compatible raw
+scanner **only** to the native OpenAI 402/403 path, with explicit support
+for that route's scalar error code. Other providers' decoded JSON quota
+policy and post-parse SSE semantics remain untouched. The same pinned
+HTTP profile-status oracle now checks these negative cases and valid
+nested/direct/scalar positive controls with two authenticated Ready
+profiles, exact original HTTP bytes, terminal 402/403 or HTTP 200,
+inference count and independent durable old/new response owners. Native OS
+and real external-provider permutations remain out of scope.

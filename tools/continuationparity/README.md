@@ -852,3 +852,12 @@ ASCII-casefolded values, returning unchanged 402/403 with **one** main
 inference; exact ASCII and uppercase versions authorize a second-owner
 inference and HTTP 200. Both products must preserve opaque request/response
 bytes and the durable owner of all original and newly returned response IDs.
+
+The HTTP profile-status oracle also probes the raw Mojo JSON boundary:
+`\\u0063ode` is not the original `code` member, and the escaped value
+`insufficient_\\u0071uota` does not match a literal quota code before raw
+parsing. Excessive JSON nesting beyond the Mojo limit likewise cannot
+mint quota ownership. Canonical nested `code` and direct string `error`
+quota forms remain positive controls. The oracle compares source-pinned
+Prodex 0.438.3 and Godex account dispatch, exact client responses and
+durable owner projections, not merely a local parser return value.

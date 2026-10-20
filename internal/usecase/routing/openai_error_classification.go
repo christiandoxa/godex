@@ -95,7 +95,11 @@ func openAI429StructuredSignals(body []byte) (rate, quota bool) {
 	return rate, quota
 }
 
-func openAI429ScanRawMojo04383(data []byte, depth int, rate, quota *bool) bool {
+// Optional includeErrorScalar models the extra 402/403 native Mojo path
+// that accepts a direct raw `"error":"insufficient_quota"` JSON member;
+// HTTP 429 itself still uses the original code/type/status/reason scanner.
+func openAI429ScanRawMojo04383(data []byte, depth int, rate, quota *bool, includeErrorScalar ...bool) bool {
+	allowErrorScalar := len(includeErrorScalar) > 0 && includeErrorScalar[0]
 	if depth > prodex04383HTTPErrorMaxDepth {
 		return false
 	}
@@ -125,7 +129,8 @@ func openAI429ScanRawMojo04383(data []byte, depth int, rate, quota *bool) bool {
 			}
 			if keyName, ok := key.(string); ok &&
 				bytes.Equal(rawKey, []byte(`"`+keyName+`"`)) &&
-				(keyName == "code" || keyName == "type" || keyName == "status" || keyName == "reason") {
+				(keyName == "code" || keyName == "type" || keyName == "status" || keyName == "reason" ||
+					(allowErrorScalar && keyName == "error")) {
 				// Mojo compares original quoted bytes, not Unicode-decoded
 				// error tags. \u-encoded values never qualify as codes.
 				if len(child) >= 2 && child[0] == '"' && child[len(child)-1] == '"' &&
@@ -150,7 +155,7 @@ func openAI429ScanRawMojo04383(data []byte, depth int, rate, quota *bool) bool {
 					}
 				}
 			}
-			if !openAI429ScanRawMojo04383(child, depth+1, rate, quota) {
+			if !openAI429ScanRawMojo04383(child, depth+1, rate, quota, allowErrorScalar) {
 				return false
 			}
 		}
@@ -163,12 +168,24 @@ func openAI429ScanRawMojo04383(data []byte, depth int, rate, quota *bool) bool {
 			return false
 		}
 		for _, item := range items {
-			if !openAI429ScanRawMojo04383(item, depth+1, rate, quota) {
+			if !openAI429ScanRawMojo04383(item, depth+1, rate, quota, allowErrorScalar) {
 				return false
 			}
 		}
 	}
 	return true
+}
+
+// Tagged 0.438.3 HTTP 402/403 quota codes come from a bounded raw JSON
+// scanner: decoded Unicode escapes do NOT turn \u0063ode into "code" or
+// a JSON string's \u0071 into an authoritative quota token. Keep the
+// separately defined provider-generic and decoded-SSE quota policies intact.
+func openAI402403RawQuota04383(body []byte) bool {
+	if len(body) > prodex04383HTTPErrorMaxBytes || !utf8.Valid(body) {
+		return false
+	}
+	var rate, quota bool
+	return openAI429ScanRawMojo04383(body, 0, &rate, &quota, true) && quota
 }
 
 func openAIAuthoritativeQuota429(body []byte) bool {
