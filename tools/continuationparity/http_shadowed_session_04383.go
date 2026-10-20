@@ -28,6 +28,11 @@ func httpShadowedSessionBody04383(shape string) string {
 		return prefix + `"conversation_id":"shadow-session","thread_id":"shadow-session",` + suffix
 	case "direct":
 		return prefix + `"session_id":"shadow-session",` + suffix
+	case "invalid-utf8":
+		// The canonical session member is valid, but serde_json rejects
+		// this *entire* request because an unrelated string is not UTF-8.
+		// Go's encoding/json would otherwise silently repair the payload.
+		return prefix + `"session_id":"shadow-session","note":"` + string([]byte{0xff}) + `",` + suffix
 	}
 	field := `"session_id":null,`
 	switch shape {
@@ -66,7 +71,7 @@ func httpShadowedSessionExpectSecond04383(shape string) bool {
 }
 
 func runHTTPShadowedSessionProduct04383(root string, p product) error {
-	for _, shape := range []string{"null", "blank", "missing", "conversation", "thread", "both", "direct", "metadata-nested", "metadata-direct", "metadata-null", "metadata-blank", "metadata-fallback"} {
+	for _, shape := range []string{"null", "blank", "missing", "conversation", "thread", "both", "direct", "metadata-nested", "metadata-direct", "metadata-null", "metadata-blank", "metadata-fallback", "invalid-utf8"} {
 		if err := runHTTPShadowedSessionCase04383(filepath.Join(root, shape), p, shape); err != nil {
 			return fmt.Errorf("session_id %s: %w", shape, err)
 		}

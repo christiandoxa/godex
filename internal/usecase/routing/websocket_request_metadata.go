@@ -3,6 +3,7 @@ package routing
 import (
 	"encoding/json"
 	"strings"
+	"unicode/utf8"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
@@ -17,7 +18,7 @@ type websocketRequestMetadata struct {
 func parseWebSocketRequestMetadata(request proxymodel.Request) websocketRequestMetadata {
 	var metadata websocketRequestMetadata
 	var value map[string]any
-	if json.Unmarshal(request.Body, &value) == nil {
+	if utf8.Valid(request.Body) && json.Unmarshal(request.Body, &value) == nil {
 		metadata.previousResponseID = nonblankJSONText(value["previous_response_id"])
 		metadata.sessionID = semanticNestedText(value, "session_id", "client_metadata", "session_id")
 		metadata.turnState = semanticNestedText(value, "x-codex-turn-state", "client_metadata", "x-codex-turn-state")

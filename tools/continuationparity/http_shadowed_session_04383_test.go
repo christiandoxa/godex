@@ -7,7 +7,7 @@ import (
 )
 
 func TestProdex04383HTTPDirectShadowOracleRejectsMutations(t *testing.T) {
-	for _, shape := range []string{"null", "blank", "missing", "conversation", "thread", "both", "direct", "metadata-nested", "metadata-direct", "metadata-null", "metadata-blank", "metadata-fallback"} {
+	for _, shape := range []string{"null", "blank", "missing", "conversation", "thread", "both", "direct", "metadata-nested", "metadata-direct", "metadata-null", "metadata-blank", "metadata-fallback", "invalid-utf8"} {
 		t.Run(shape, func(t *testing.T) {
 			owner := "account-a"
 			if httpShadowedSessionExpectSecond04383(shape) {

@@ -7,6 +7,7 @@ import (
 	"math"
 	"sort"
 	"strconv"
+	"unicode/utf8"
 
 	runtimemodel "github.com/christiandoxa/godex/internal/model/runtime"
 )
@@ -19,6 +20,9 @@ const (
 // The Rust response parser requires exactly one complete JSON value.
 // Go's Decoder permits concatenated values unless we verify EOF explicitly.
 func decodeNativeUsageJSON(payload []byte) (any, bool) {
+	if !utf8.Valid(payload) {
+		return nil, false
+	}
 	decoder := json.NewDecoder(bytes.NewReader(payload))
 	decoder.UseNumber()
 	var value any

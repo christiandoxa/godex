@@ -650,3 +650,12 @@ wrong account, missing quota receipts, extra inference, changed request or
 response, injected metadata and invalid auth. Four response IDs per run are
 checked independently in durable continuation state. This is credential-free
 and runs only against SHA-256/source/manifest-pinned executables.
+
+The HTTP direct-session shadowing oracle also sends an opaque request with
+valid `session_id: shadow-session` but invalid raw UTF-8 inside an unrelated
+JSON string. Tagged Prodex's `serde_json` cannot derive a session owner from
+this invalid request, even though Go's permissive decoder would replace the
+byte with U+FFFD and otherwise route to second. The synthetic upstream must
+receive exactly those original bytes once on main; the existing verified
+second-owned session must remain untouched. This detects a semantic routing
+difference without requiring an authenticated model request.

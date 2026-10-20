@@ -2401,3 +2401,28 @@ from silently omitting the new executable oracle in subsequent changes. The
 release workflow step label also identifies 0.438.3 consistently with its
 pinned script. Native results must still run on actual native hosts; a Linux
 execution or cross-build cannot be counted as a macOS/Windows PASS.
+
+## Reject raw invalid UTF-8 before deriving JSON request/usage identity
+
+The exact 0.438.3 Rust `runtime_request_semantic_plan` is reached through
+`serde_json::from_slice` and rejects malformed UTF-8. Go's `encoding/json`
+instead replaces invalid string bytes with U+FFFD; before this correction, an
+invalid Responses body containing a would-be `session_id` or
+`previous_response_id` could borrow a verified owner corresponding to that
+replacement string. The same decoder difference could promote a malformed
+WebSocket `response.create` message's turn/session/previous identity or give
+an invalid request a prompt-cache affinity or cached-token usage marker.
+
+Memory and durable Router regressions demonstrate the foreign-owner risk
+before the fix; the WebSocket parser test independently covers all three
+message identifiers. Godex now rejects raw invalid UTF-8 from **semantic
+inspection** of request bodies, WebSocket message metadata and
+prompt-cache/usage JSON, while preserving upstream request bytes and valid
+HTTP header-based continuation identity. A deliberate well-formed U+FFFD
+string remains valid, ensuring this does not reject legitimate Unicode.
+The source/manifest/executable-pinned `http-session-conflict` oracle now also
+includes an otherwise canonical session request containing invalid UTF-8 in
+an unrelated JSON field: it must not select the foreign session owner, and
+upstream raw bytes and durable bindings remain unchanged. Other malformed
+Unicode escape permutations and live external-provider behavior remain
+separate parity questions.

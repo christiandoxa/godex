@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/christiandoxa/godex/internal/helper/sse"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
@@ -23,7 +24,7 @@ type promptCacheBinding struct {
 }
 
 func promptCacheKeyFromBody(body []byte) string {
-	if len(body) == 0 {
+	if len(body) == 0 || !utf8.Valid(body) {
 		return ""
 	}
 	var object map[string]any
