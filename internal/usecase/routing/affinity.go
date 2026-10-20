@@ -20,6 +20,11 @@ const (
 	maxAffinityValue  = 4096
 )
 
+// Keep conflict identity distinguishable from repository/IO failures, so
+// a WebSocket soft-session preference may fall back without hiding failures
+// or relaxing hard turn/previous-response ownership.
+var errConflictingAccountAffinity = errors.New("request contains conflicting account affinity")
+
 type affinityKeys struct {
 	previous string
 	turn     string
@@ -185,10 +190,10 @@ func (store *affinityStore) ownerLocked(keys affinityKeys) (string, error) {
 			continue
 		}
 		if binding.accountID == routingentity.ConflictAccountID {
-			return "", errors.New("request contains conflicting account affinity")
+			return "", errConflictingAccountAffinity
 		}
 		if owner != "" && owner != binding.accountID {
-			return "", errors.New("request contains conflicting account affinity")
+			return "", errConflictingAccountAffinity
 		}
 		owner = binding.accountID
 	}

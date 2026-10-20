@@ -2,6 +2,7 @@ package routing
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
@@ -65,14 +66,23 @@ func (router *Router) resolveOwner(
 		// Prodex 0.438.3 also consults verified Compact *session*
 		// lineage on a WebSocket request. Existing direct session owners
 		// outrank this alias; the WebSocket route remains quota-soft.
-		directOwner, err := router.affinity.owner(ctx, affinityKeys{session: ownerKeys.session}, router.now())
-		if err != nil {
+		sessionID := ownerKeys.session
+		directOwner, err := router.affinity.owner(ctx, affinityKeys{session: sessionID}, router.now())
+		if errors.Is(err, errConflictingAccountAffinity) {
+			// A verified conflict is not a usable *soft* session preference.
+			// Keep the original key for post-commit verified observations, but
+			// select from Ready profiles rather than returning hard-affinity 409.
+			directOwner = ""
+			ownerKeys.session = ""
+		} else if err != nil {
 			return "", nil, &proxymodel.Error{StatusCode: 409, Message: "request contains conflicting conversation affinity"}
 		}
 		if directOwner == "" {
-			alias := "__compact_session__:" + ownerKeys.session
+			alias := "__compact_session__:" + sessionID
 			aliasOwner, err := router.affinity.owner(ctx, affinityKeys{session: alias}, router.now())
-			if err != nil {
+			if errors.Is(err, errConflictingAccountAffinity) {
+				aliasOwner = ""
+			} else if err != nil {
 				return "", nil, &proxymodel.Error{StatusCode: 409, Message: "request contains conflicting conversation affinity"}
 			}
 			if aliasOwner != "" {

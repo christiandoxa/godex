@@ -48,21 +48,16 @@ func (router *Router) bindSuccessfulResponse(
 		if err := router.rememberVerifiedAccountBinding(ctx, result.AccountID, bindingKeys, now); err != nil {
 			return err
 		}
-		// The tagged 0.438.3 WebSocket runtime commits the successful
-		// request's direct session on its resolved owner, even when a
-		// previous-response hard binding excluded session from selection.
-		// Never take over an existing direct session on another profile.
+		// Tagged 0.438.3 commits the direct session after a successful
+		// WebSocket turn even when a previous-response hard owner excluded it
+		// from candidate selection. MergeVerified preserves an existing
+		// different owner as a durable conflict marker, never silently
+		// taking over that profile's verified session or Compact alias.
 		if previousBound && result.Response.FirstEventCommitted &&
 			validCompactLineageComponent04383(keys.session) && bindingKeys.session == "" {
-			sessionOwner, err := router.affinity.owner(ctx, affinityKeys{session: keys.session}, now)
-			if err != nil {
+			if err := router.rememberVerifiedAccountBinding(ctx, result.AccountID,
+				affinityKeys{session: keys.session}, now); err != nil {
 				return err
-			}
-			if sessionOwner == "" {
-				if err := router.rememberVerifiedAccountBinding(ctx, result.AccountID,
-					affinityKeys{session: keys.session}, now); err != nil {
-					return err
-				}
 			}
 		}
 		router.rememberAccountTurnState(

@@ -7,6 +7,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+
+	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
 )
 
 func readCompactLineageOwner04383(p product) (string, error) {
@@ -59,6 +61,9 @@ func readCompactBindingOwner04383(p product, kind, alias string) (string, error)
 	for _, account := range accounts.Accounts {
 		names[account.ID] = account.Name
 	}
+	// Verified session observations with different owners produce the
+	// official hard-binding conflict sentinel, not an unknown account.
+	names[routingentity.ConflictAccountID] = routingentity.ConflictAccountID
 	raw, err = os.ReadFile(filepath.Join(p.state, "routing.json"))
 	if err != nil {
 		return "", err

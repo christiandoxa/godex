@@ -1710,14 +1710,86 @@ the independent oracle, while Prodex passed. Memory and persisted usecase
 regressions reproduced the missing direct session owner before the patch.
 The scoped fix preserves the request's original previous-response affinity
 before recording its new WebSocket response ID. After a genuinely committed
-WebSocket turn, it records a valid, previously unbound direct session on the
+WebSocket turn, it records a valid direct session observation on the
 successful owner even though hard previous-response affinity excluded that
-session from candidate selection. It leaves a separately verified Compact
-session alias, and any pre-existing direct session owner, untouched; HTTP
-response and Compact-lineage creation paths remain unchanged. Full routing
+session from candidate selection. A previously unbound direct session becomes
+owned by the successful profile. If it was already verified on another
+profile, the durable owner becomes the tagged hard-binding conflict marker,
+not a silent takeover or a stale single-owner binding. The separately verified
+Compact session alias remains untouched; HTTP response and Compact-lineage
+creation paths remain unchanged. Full routing
 regressions and repeated focused race checks pass after the patch.
 
 The native/source-pinned differential must be rerun on the final clean commit
 before calling this finite HTTP-to-WebSocket direct-session persistence gate
 VERIFIED. It does not prove external-provider OAuth or native macOS/Windows
 runtime equivalence.
+
+## Hard previous-response commit marks an already-foreign direct session conflicted
+
+A further pinned 0.438.3 differential covers a WebSocket request where
+`previous_response_id: resp-main` is verified on main, while its ordinary
+`session_id: shadow-session` is already verified on second. Both products
+select main from the hard previous-response constraint, perform one upstream
+request and emit the same client frames. However, the official Prodex journal
+**changes the direct session binding to**
+`__prodex_hard_binding_conflict__` after the successful turn, while preserving
+the unrelated previous-response bindings. The exploratory pre-fix Godex
+candidate `0b25f90` left the stale single-owner `shadow-session` binding on
+second. A different previous-response+unbound-session case was already fixed;
+this foreign-owner transition needs the verified merge conflict policy, not a
+conditional skip.
+
+New memory and durable regressions reproduce that mismatch before the
+correction and check the *exact* conflict sentinel after a successful
+WebSocket turn. The scoped production change always calls the existing
+`rememberVerifiedAccountBinding` on a valid committed session when hard
+previous-response selection omitted it. `MergeVerified` already converts a
+second, disagreeing verified profile observation into a durable conflict
+sentinel; no state schema change or forced owner reassignment is needed.
+The test also requires the original previous owner, newly committed response
+owner and separate Compact session lineage to remain unchanged. The pinned
+oracle's synthetic state reader now recognizes the official conflict sentinel
+as an intentional ownership outcome and checks it for the
+`session-hard-previous` case, while continuing to require a normal owner in
+all other session-only controls. This is a finite synthetic continuation
+safety proof, not a claim about all live credentials or native OS runtimes.
+
+## Conflicted WebSocket session remains a soft preference, not hard error
+
+A direct session made conflicting by two verified owner observations is
+**not** a hard previous-response/turn-state continuity key. Tagged Prodex
+0.438.3 discards that session as an owner preference and chooses an eligible
+fresh profile for the next session-only WebSocket message. The official
+`session-hard-previous` differential first commits a main-owned response
+against an existing second-owned `shadow-session`, confirms the durable
+`__prodex_hard_binding_conflict__` marker, and sends a second session-only
+message on the **same client WebSocket**. Official Prodex dispatches the second
+message exactly once on an eligible Ready account, returns the complete
+response delta/completed frame pair, and retains the conflict marker. Pre-fix Godex returned a local
+`409 stale_continuation` before any second upstream attempt.
+
+The routing fix gives the affinity store's deliberate conflict an identifiable
+internal error value (without changing its external wording), then treats
+that error as **unbound** only while evaluating a WebSocket session-only
+*soft* preference. Any separately verified Compact session alias is still
+eligible; an unrelated I/O/storage error remains fatal. Hard previous/turn
+conflicts remain fail-closed. Session IDs remain available for verified
+post-commit observations, and `MergeVerified` keeps the durable conflict
+marker. Memory/durable regressions failed before and passed after this fix.
+
+An inherited public test named `TestProdex04379PublicWebSocketHardPreviousOutranksConflictingSession`
+previously expected the old soft session owner to remain routable after a
+hard-owned turn. The tagged 0.438.3 executable instead persists a conflict
+marker and selects one eligible fresh Ready owner (main or second). That
+regression now checks a valid response, exactly one eligible selected account
+and the durable conflict marker.
+The independent followup oracle rejects the original 409, extra inference,
+unknown/unready accounts, malformed frames and altered input as mutations;
+selection of either authenticated Ready account is allowed by the tagged
+reference and must not be mistaken for a deterministic preference.
+
+The finalized pinned two-executable phase and complete local verification
+must pass on the clean candidate before this expanded finite behavior is
+recorded VERIFIED. Native macOS/Windows and live provider credentials remain
+separate unqualified surfaces.

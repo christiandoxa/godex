@@ -134,9 +134,13 @@ func TestProdex04379PublicWebSocketHardPreviousOutranksConflictingSession(t *tes
 		!strings.Contains(unknownTurn, "resp-session-b") {
 		t.Fatalf("unbound turn-state discovery was blocked before upstream: %s", unknownTurn)
 	}
+	// Tagged Prodex 0.438.3 records a hard conflict for the direct
+	// session after main successfully handles a previous-response-bound
+	// turn. A later session-only request must ignore that *soft* conflict
+	// as an owner preference and discover an available Ready profile.
 	last := send(`{"type":"response.create","session_id":"sess-conflict","input":[]}`)
-	if !strings.Contains(last, "resp-session-b") {
-		t.Fatalf("session-only continuation lost its rightful owner: %s", last)
+	if !strings.Contains(last, "resp-main-resumed") && !strings.Contains(last, "resp-session-b") {
+		t.Fatalf("conflicted soft session did not route freshly: %s", last)
 	}
 	gateway.mu.Lock()
 	owners := append([]string(nil), gateway.owners...)
@@ -148,8 +152,8 @@ func TestProdex04379PublicWebSocketHardPreviousOutranksConflictingSession(t *tes
 		owners[2] != websocketHardOwner04379 ||
 		owners[3] != websocketHardOwner04379 ||
 		(owners[4] != websocketHardOwner04379 && owners[4] != websocketSoftOwner04379) ||
-		owners[5] != websocketSoftOwner04379 {
-		t.Fatalf("upstream attempt owners=%v, want hard owners on A, one eligible turn-state discovery, then soft session B", owners)
+		(owners[5] != websocketHardOwner04379 && owners[5] != websocketSoftOwner04379) {
+		t.Fatalf("upstream attempt owners=%v, want hard owners on A, one eligible turn-state discovery, then one eligible fresh session", owners)
 	}
 	for _, route := range routes {
 		if route != quotamodel.RouteKindWebSocket {
@@ -166,7 +170,7 @@ func TestProdex04379PublicWebSocketHardPreviousOutranksConflictingSession(t *tes
 			originalSessionOwner = binding.AccountID
 		}
 	}
-	if originalSessionOwner != websocketSoftOwner04379 {
-		t.Fatalf("soft session ownership overwritten by harder predecessor: %s", originalSessionOwner)
+	if originalSessionOwner != routingentity.ConflictAccountID {
+		t.Fatalf("verified conflicting direct session did not persist the tagged conflict marker: %s", originalSessionOwner)
 	}
 }

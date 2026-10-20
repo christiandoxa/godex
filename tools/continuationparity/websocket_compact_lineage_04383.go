@@ -27,9 +27,10 @@ const compactSessionHeaderMessage04383 = `{"type":"response.create","model":"gpt
 const compactSessionBodyMessage04383 = `{"type":"response.create","model":"gpt-6","session_id":"session-alias","input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
 const compactSessionPreviousMessage04383 = `{"type":"response.create","model":"gpt-6","previous_response_id":"resp-main","session_id":"session-alias","input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
 const freshWebSocketSessionMessage04383 = `{"type":"response.create","model":"gpt-6","session_id":"fresh-session","input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
+const previousForeignSessionMessage04383 = `{"type":"response.create","model":"gpt-6","previous_response_id":"resp-main","session_id":"shadow-session","input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
 
 func runWebSocketCompactLineageProduct04383(root string, p product) error {
-	for _, scenario := range []string{"compact-lineage", "compact-turn-conflict", "compact-previous-conflict", "compact-unbound", "compact-shadow-null", "compact-shadow-blank", "session-nested", "session-shadow-null", "session-shadow-blank", "compact-session-header", "compact-session-unbound", "compact-session-body", "compact-session-conflict", "compact-session-previous", "fresh-websocket-session", "compact-produced", "compact-produced-long-turn"} {
+	for _, scenario := range []string{"compact-lineage", "compact-turn-conflict", "compact-previous-conflict", "compact-unbound", "compact-shadow-null", "compact-shadow-blank", "session-nested", "session-shadow-null", "session-shadow-blank", "session-hard-previous", "compact-session-header", "compact-session-unbound", "compact-session-body", "compact-session-conflict", "compact-session-previous", "fresh-websocket-session", "compact-produced", "compact-produced-long-turn"} {
 		if err := runCompactLineageCase04383(filepath.Join(root, scenario), p, scenario); err != nil {
 			return fmt.Errorf("%s: %w", scenario, err)
 		}
@@ -56,7 +57,7 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 		return err
 	}
 	wantOwner := "second"
-	if scenario == "fresh-websocket-session" || scenario == "compact-unbound" || scenario == "compact-produced-long-turn" || (scenario == "compact-session-unbound" || scenario == "compact-session-conflict" || scenario == "compact-session-previous") || strings.HasPrefix(scenario, "compact-shadow-") || strings.HasPrefix(scenario, "session-shadow-") {
+	if scenario == "session-hard-previous" || scenario == "fresh-websocket-session" || scenario == "compact-unbound" || scenario == "compact-produced-long-turn" || (scenario == "compact-session-unbound" || scenario == "compact-session-conflict" || scenario == "compact-session-previous") || strings.HasPrefix(scenario, "compact-shadow-") || strings.HasPrefix(scenario, "session-shadow-") {
 		wantOwner = "main"
 	}
 	wantLineage := ""
@@ -192,6 +193,8 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 		message = shadowSessionNullMessage04383
 	} else if scenario == "session-shadow-blank" {
 		message = shadowSessionBlankMessage04383
+	} else if scenario == "session-hard-previous" {
+		message = previousForeignSessionMessage04383
 	} else if scenario == "compact-session-header" || scenario == "compact-session-unbound" || scenario == "compact-session-conflict" {
 		message = compactSessionHeaderMessage04383
 	} else if scenario == "compact-session-body" {
@@ -274,7 +277,11 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 		}
 		if strings.HasPrefix(scenario, "session-") {
 			shadowOwner, shadowErr := readCompactBindingOwner04383(p, "session", "shadow-session")
-			sessionOK = shadowErr == nil && shadowOwner == "second"
+			wantSession := "second"
+			if scenario == "session-hard-previous" {
+				wantSession = "__prodex_hard_binding_conflict__"
+			}
+			sessionOK = shadowErr == nil && shadowOwner == wantSession
 		}
 		if strings.HasPrefix(scenario, "compact-produced") {
 			aliasSession, aliasErr := readCompactSessionOwner04383(p)
@@ -292,7 +299,50 @@ func runCompactLineageCase04383(root string, p product, scenario string) error {
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
+	if scenario == "session-hard-previous" {
+		// The tagged runtime has just committed a verified observation of
+		// a session whose previous owner was a different profile. Probe the
+		// next session-only turn on this same public WebSocket connection.
+		followup := `{"type":"response.create","model":"gpt-6","session_id":"shadow-session","input":[{"role":"user","content":"continue"}]}`
+		if err := websocketframe.WriteFrame(connection, 1, []byte(followup), true); err != nil {
+			return fmt.Errorf("conflicted session followup send: %w", err)
+		}
+		followupFrames := make([]string, 0, 2)
+		for len(followupFrames) < 2 {
+			opcode, payload, _, err := readWebSocketLivenessFrame04383(connection, reader)
+			if err != nil || opcode != 1 {
+				return fmt.Errorf("conflicted session followup frame=%d err=%v frames=%q", opcode, err, followupFrames)
+			}
+			followupFrames = append(followupFrames, string(payload))
+		}
+		backend.mu.Lock()
+		attempts := append([]transportAttempt04383(nil), backend.attempts...)
+		backend.mu.Unlock()
+		if err := verifyConflictedSessionFollowup04383(attempts, followup, followupFrames); err != nil {
+			return err
+		}
+		// The post-commit write may be asynchronous; verify the durable
+		// conflict remains after the followup's journal interval.
+		time.Sleep(250 * time.Millisecond)
+		direct, err := readCompactBindingOwner04383(p, "session", "shadow-session")
+		if err != nil || direct != "__prodex_hard_binding_conflict__" {
+			return fmt.Errorf("conflicted soft session followup lost durable marker: owner=%q err=%v", direct, err)
+		}
+		fmt.Printf("%s session-hard-previous followup: conflicting soft session selected one eligible Ready owner; two exact upstream attempts; complete client frames; durable conflict preserved\n", p.name)
+	}
 	fmt.Printf("%s %s: applied Ready profiles; exact full-history input; one WebSocket handshake/attempt on %s; unchanged Compact lineage and durable response owner\n", p.name, scenario, wantOwner)
+	return nil
+}
+
+func verifyConflictedSessionFollowup04383(attempts []transportAttempt04383, followup string, frames []string) error {
+	if len(attempts) != 2 || attempts[0].owner != "account-a" || !attempts[0].ready ||
+		!sameTransportJSON04383(attempts[0].body, previousForeignSessionMessage04383) ||
+		(attempts[1].owner != "account-a" && attempts[1].owner != "account-b") ||
+		!attempts[1].ready || attempts[1].turn != "" ||
+		!sameTransportJSON04383(attempts[1].body, followup) ||
+		!reflect.DeepEqual(frames, []string{transportDelta04383, transportCompleted04383}) {
+		return fmt.Errorf("conflicted soft session must route on one eligible Ready profile without replay: attempts=%+v frames=%q", attempts, frames)
+	}
 	return nil
 }
 

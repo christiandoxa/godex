@@ -124,6 +124,7 @@ func TestProdex04383WebSocketCompactSessionLineageOracleRejectsMutations(t *test
 		{"direct-owner-precedence", "main", compactSessionHeaderMessage04383},
 		{"previous-response-precedence", "main", compactSessionPreviousMessage04383},
 		{"fresh-session", "main", freshWebSocketSessionMessage04383},
+		{"hard-previous-foreign-session", "main", previousForeignSessionMessage04383},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			account := "account-a"
@@ -179,6 +180,40 @@ func TestProdex04383WebSocketCompactTurnConflictRejectsAllDispatches(t *testing.
 		t.Run(tc.name, func(t *testing.T) {
 			if err := verifyCompactTurnConflict04383(tc.handshakes, tc.attempts, tc.frames, tc.invalid); err == nil {
 				t.Fatalf("Compact owner conflict mutation accepted: %s", tc.name)
+			}
+		})
+	}
+}
+
+func TestProdex04383ConflictedSoftSessionFollowupRejectsMutations(t *testing.T) {
+	followup := `{"type":"response.create","model":"gpt-6","session_id":"shadow-session","input":[{"role":"user","content":"continue"}]}`
+	first := transportAttempt04383{owner: "account-a", ready: true, body: previousForeignSessionMessage04383}
+	second := transportAttempt04383{owner: "account-a", ready: true, body: followup}
+	frames := []string{transportDelta04383, transportCompleted04383}
+	if err := verifyConflictedSessionFollowup04383([]transportAttempt04383{first, second}, followup, frames); err != nil {
+		t.Fatal(err)
+	}
+	secondOwner := second
+	secondOwner.owner = "account-b"
+	if err := verifyConflictedSessionFollowup04383([]transportAttempt04383{first, secondOwner}, followup, frames); err != nil {
+		t.Fatalf("tagged fresh selection on second also valid: %v", err)
+	}
+	for _, tc := range []struct {
+		name     string
+		attempts []transportAttempt04383
+		frames   []string
+	}{
+		{"blocked as hard conflict", []transportAttempt04383{first}, frames},
+		{"unknown account", []transportAttempt04383{first, {owner: "account-c", ready: true, body: followup}}, frames},
+		{"three model attempts", []transportAttempt04383{first, second, second}, frames},
+		{"stale turn header", []transportAttempt04383{first, {owner: "account-a", ready: true, turn: "compact-turn", body: followup}}, frames},
+		{"altered client history", []transportAttempt04383{first, {owner: "account-a", ready: true, body: `{"type":"response.create","session_id":"shadow-session","input":[]}`}}, frames},
+		{"unready alternate", []transportAttempt04383{first, {owner: "account-a", body: followup}}, frames},
+		{"lost completion", []transportAttempt04383{first, second}, frames[:1]},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := verifyConflictedSessionFollowup04383(tc.attempts, followup, tc.frames); err == nil {
+				t.Fatalf("conflicted soft-session mutation escaped: %s", tc.name)
 			}
 		})
 	}

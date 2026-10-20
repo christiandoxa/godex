@@ -489,3 +489,19 @@ main acquires the direct session binding, while a previously verified
 `__compact_session__:session-alias` lineage stays on second. The fixture now
 checks this owner projection in addition to upstream frame count, exact
 history and original alias persistence. A routing-only PASS is insufficient.
+
+For `session-hard-previous`, a verified previous response pins main while a
+plain session ID still belongs to second. The official 0.438.3 runtime first
+selects main, then records the newly committed direct-session observation as
+`__prodex_hard_binding_conflict__`; retaining the stale second-only owner
+would be incorrect. The reader maps this conflict sentinel explicitly and
+requires it after commit without changing other verified ownership records.
+
+`session-hard-previous` also sends a session-only **second turn on the same
+public WebSocket** after the first main-owned response commits a conflicting
+direct session observation. Tagged Prodex treats that conflict as an unusable
+*soft* preference, not a hard 409, and dispatches once on an eligible fresh
+Ready owner (main or second). The fixture checks both delta/completion frames, exact owner,
+two total authenticated upstream attempts, the intact original request and
+continued durable conflict marker. This must not weaken the independently
+pinned hard turn/previous-response conflict cases, which fail before dispatch.
