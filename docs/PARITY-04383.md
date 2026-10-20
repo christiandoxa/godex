@@ -3011,3 +3011,29 @@ This is a source-aligned local semantic check. Existing official executable
 HTTP transport/SSE regressions are retained, but no new paired native
 Prodex-vs-Godex measurement isolates these malformed `RetryAdviceJSON`
 adapter inputs yet. Full provider and cross-platform parity remains open.
+
+## HTTP 429 quota hint must use raw ASCII-only case folding
+
+Prodex 0.438.3 `error_policy/rate_limit_header.rs` delegates
+`X-Codex-Rate-Limit-Reached-Type` interpretation to the Mojo
+`rate_limit_header_matches` kernel, which folds ASCII uppercase letters
+only. The Go `openAI429HeaderClassification` previously used Unicode-aware
+`strings.ToLower` before comparing to workspace quota codes. For example,
+U+212A KELVIN SIGN (`K`) in `worKspace_owner_credits_depleted` becomes
+ASCII `k` in Go but **must not** match the tagged Mojo's literal
+`workspace_owner_credits_depleted`. That mismatch could turn an otherwise
+nonretryable `invalid_prompt` HTTP 429 into a quota rotation to another
+account, incorrectly replaying an unrelated request.
+
+Fail-before tests cover canonical ASCII, uppercase and padded values,
+Kelvin-sign variants and an actual HTTP 429 candidate-classification
+control. The scoped fix uses the existing tested byte-exact ASCII-fold
+matcher, preserving the first nonblank header's precedence and the
+unchanged raw header/body bytes. The source/manifest/executable-pinned
+`--phase=http-429-policy` oracle now includes Kelvin plus nonretryable
+`invalid_prompt` as a **one-attempt passthrough** control, and recognized
+ASCII/uppercase quota hints as **two-attempt quota overrides**. It verifies
+both authenticated Ready accounts, exact upstream bytes, the absence or
+presence of a fallback response owner and the client-visible terminal
+status/body. This is a finite parity slice; live OAuth/provider and native
+cross-OS behavior remain separately unverified.

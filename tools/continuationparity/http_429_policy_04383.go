@@ -16,6 +16,7 @@ var http429PolicyShapes04383 = []string{
 	"canonical-quota", "padded-code-rate", "overflow-unrelated-quota",
 	"escaped-code-key-rate", "duplicate-rate-quota", "overdeep-rate",
 	"oversized-pass", "invalid-utf8-pass",
+	"kelvin-hint-nonretryable", "ascii-quota-hint-override", "uppercase-quota-hint-override",
 }
 
 func http429PolicyBody04383(shape string) string {
@@ -34,9 +35,27 @@ func http429PolicyBody04383(shape string) string {
 		return `{"error":{"code":"insufficient_quota"},"padding":"` + strings.Repeat("x", 65536) + `"}`
 	case "invalid-utf8-pass":
 		return `{"error":{"code":"insufficient_quota"},"unused":"` + string([]byte{0xff}) + `"}`
+	case "kelvin-hint-nonretryable", "ascii-quota-hint-override", "uppercase-quota-hint-override":
+		return `{"error":{"code":"invalid_prompt"}}`
 	default:
 		return `{"error":{"code":"insufficient_quota"}}`
 	}
+}
+
+func http429PolicyHint04383(shape string) string {
+	switch shape {
+	case "kelvin-hint-nonretryable":
+		return "worKspace_owner_credits_depleted"
+	case "ascii-quota-hint-override":
+		return "workspace_owner_credits_depleted"
+	case "uppercase-quota-hint-override":
+		return "WORKSPACE_OWNER_CREDITS_DEPLETED"
+	}
+	return ""
+}
+
+func http429PolicyPassThrough04383(shape string) bool {
+	return shape == "kelvin-hint-nonretryable"
 }
 
 func runHTTP429PolicyProduct04383(root string, p product) error {
@@ -88,14 +107,18 @@ func runHTTP429PolicyCase04383(root string, p product, shape string) error {
 	if err := verifyHTTP429Policy04383(shape, reply, attempts, invalid); err != nil {
 		return err
 	}
+	wantOwner := "second"
+	if http429PolicyPassThrough04383(shape) {
+		wantOwner = ""
+	}
 	deadline := time.Now().Add(3 * time.Second)
 	for {
 		owner, err := readHTTPResponseOwner04383(p, "resp-429-policy")
-		if err == nil && owner == "second" {
+		if err == nil && owner == wantOwner {
 			break
 		}
 		if time.Now().After(deadline) {
-			return fmt.Errorf("429 policy new response owner=%q want second err=%v", owner, err)
+			return fmt.Errorf("429 policy new response owner=%q want=%q err=%v", owner, wantOwner, err)
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
@@ -104,7 +127,13 @@ func runHTTP429PolicyCase04383(root string, p product, shape string) error {
 }
 
 func verifyHTTP429Policy04383(shape string, reply exchange, attempts []transportAttempt04383, invalid bool) error {
-	if invalid || len(attempts) != 2 || reply.status != http.StatusOK || reply.body != http429PolicyOK04383 {
+	wantCount := 2
+	wantStatus, wantBody := http.StatusOK, http429PolicyOK04383
+	if http429PolicyPassThrough04383(shape) {
+		wantCount = 1
+		wantStatus, wantBody = http.StatusTooManyRequests, http429PolicyBody04383(shape)
+	}
+	if invalid || len(attempts) != wantCount || reply.status != wantStatus || reply.body != wantBody {
 		return fmt.Errorf("429 policy unexpected response/attempt count: shape=%s invalid=%t status=%d attempts=%+v body=%q", shape, invalid, reply.status, attempts, reply.body)
 	}
 	for index, attempt := range attempts {

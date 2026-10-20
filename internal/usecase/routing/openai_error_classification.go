@@ -40,16 +40,24 @@ func openAI429Classification(body []byte) providerentity.ErrorClassification {
 }
 
 func openAI429HeaderClassification(headers http.Header) (providerentity.ErrorClassification, bool) {
-	for _, value := range headers.Values("X-Codex-Rate-Limit-Reached-Type") {
-		switch strings.ToLower(strings.TrimSpace(value)) {
-		case "rate_limit_reached":
-			return providerentity.ErrorClassification{Class: providerentity.ErrorRateLimit, Cooldown: time.Minute}, true
-		case "workspace_owner_credits_depleted", "workspace_member_credits_depleted",
-			"workspace_owner_usage_limit_reached", "workspace_member_usage_limit_reached":
-			return providerentity.ErrorClassification{Class: providerentity.ErrorQuota, Cooldown: 5 * time.Minute}, true
-		case "":
+	for _, raw := range headers.Values("X-Codex-Rate-Limit-Reached-Type") {
+		value := strings.TrimSpace(raw)
+		if value == "" {
 			continue
+		}
+		// The tagged 0.438.3 rate_limit_header_matches kernel folds only
+		// ASCII capitals. strings.ToLower would also turn Unicode U+212A
+		// (KELVIN SIGN) into 'k', forging a workspace quota code.
+		switch {
+		case previousASCIIEqualFold04383(value, "rate_limit_reached"):
+			return providerentity.ErrorClassification{Class: providerentity.ErrorRateLimit, Cooldown: time.Minute}, true
+		case previousASCIIEqualFold04383(value, "workspace_owner_credits_depleted"),
+			previousASCIIEqualFold04383(value, "workspace_member_credits_depleted"),
+			previousASCIIEqualFold04383(value, "workspace_owner_usage_limit_reached"),
+			previousASCIIEqualFold04383(value, "workspace_member_usage_limit_reached"):
+			return providerentity.ErrorClassification{Class: providerentity.ErrorQuota, Cooldown: 5 * time.Minute}, true
 		default:
+			// An unknown first nonblank hint cannot borrow a later value.
 			return providerentity.ErrorClassification{}, false
 		}
 	}

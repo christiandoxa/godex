@@ -88,6 +88,9 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 				ready:    b.receipts["account-a"] > 0 && b.receipts["account-b"] > 0})
 			b.mu.Unlock()
 			if prior == 0 && owner == "account-a" {
+				if hint := http429PolicyHint04383(shape); hint != "" {
+					w.Header().Set("X-Codex-Rate-Limit-Reached-Type", hint)
+				}
 				writeJSON(w, http.StatusTooManyRequests, http429PolicyBody04383(shape))
 			} else {
 				writeJSON(w, http.StatusOK, http429PolicyOK04383)

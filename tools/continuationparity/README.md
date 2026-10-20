@@ -834,3 +834,12 @@ regressions check invalid Unicode, UTF-8, numeric overflow and depth beside
 valid controls; the existing official transport oracle tests keep the
 broader behavior stable, though those malformed adapter inputs are not
 individually certified by a two-executable oracle.
+
+The HTTP 429 policy phase also checks the compiled Mojo ASCII-only
+`X-Codex-Rate-Limit-Reached-Type` matcher. A valid Unicode `K` in the
+workspace quota spelling is **not** a valid ASCII quota code, so a
+nonretryable `invalid_prompt` body must pass through unchanged after one
+upstream attempt. Exact ASCII and uppercase quota hints override that body
+and authorize a second Ready account. The pinned two-executable oracle
+checks exact request bytes, terminal HTTP 429/200, authenticated Ready
+receipts, inference count and the independent durable response owner.
