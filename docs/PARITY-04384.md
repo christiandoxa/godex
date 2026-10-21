@@ -251,3 +251,23 @@ JSON size accounting and the Kiro cost projector. The accepted numeric
 value is unchanged; only its exact serialized representation is corrected.
 The optional null key is also always retained. This is source/dependency-
 aligned local JSON parity, not a full Kiro CLI 2.33.0 runtime oracle.
+
+## Kiro ACP stop reason uses first-present member precedence
+
+The tagged compiled `KIRO_ACP_STOP_REASON` kernel searches the prompt-result
+object in this order: `stopReason`, `stop_reason`, then `status`. Its rule is
+**first-present key**, not first member with a string value: a present
+`stopReason:null`, number or object yields `null` and does not borrow a
+later `"max_tokens"`, `"refusal"`, or `"cancelled"` alias. A real empty
+string likewise blocks fallback. Godex previously searched for the first
+*string-typed* member and could incorrectly mark a successful Kiro turn
+`incomplete` on malformed but higher-priority stop metadata.
+
+Fail-before regressions exercise canonical, snake-case and status-only
+controls as well as null, numeric, object, Boolean and empty-string
+precedence, including the resulting Kiro incomplete-response classification.
+The scoped parser now stops at the first present member and returns an empty
+reason when that member is not a string. It does not change the original
+ACP prompt-result bytes or the independent Kiro cost/tool-activity policy.
+This source-aligned synthetic case is not a claim of live Kiro CLI 2.33.0
+end-to-end certification.

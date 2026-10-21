@@ -311,8 +311,12 @@ func kiroStopReason(envelope acpEnvelope) string {
 		return ""
 	}
 	for _, key := range []string{"stopReason", "stop_reason", kiroFieldStatus} {
-		if value, ok := result[key].(string); ok {
-			return value
+		// Tagged Mojo KIRO_ACP_STOP_REASON selects the first PRESENT member.
+		// A non-string value returns null; it does not authorize falling
+		// back to a lower-priority alias and fabricating an incomplete turn.
+		if value, present := result[key]; present {
+			text, _ := value.(string)
+			return text
 		}
 	}
 	return ""
