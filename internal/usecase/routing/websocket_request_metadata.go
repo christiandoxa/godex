@@ -1,7 +1,6 @@
 package routing
 
 import (
-	"encoding/json"
 	"strings"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
@@ -16,8 +15,12 @@ type websocketRequestMetadata struct {
 
 func parseWebSocketRequestMetadata(request proxymodel.Request) websocketRequestMetadata {
 	var metadata websocketRequestMetadata
-	var value map[string]any
-	if validNativeJSONUnicode04383(request.Body) && json.Unmarshal(request.Body, &value) == nil && validNativeJSONContainerDepth04383(value) {
+	decoded, valid := decodeNativeUsageJSON(request.Body)
+	if value, ok := decoded.(map[string]any); valid && ok {
+		// Tagged parse_runtime_websocket_request_metadata starts from a
+		// full serde_json::Value. Go's json.Unmarshal would accept a near-
+		// maximum f64 that the source rejects, falsely pinning tool-output
+		// to another verified previous-response owner.
 		metadata.previousResponseID = nonblankJSONText(value["previous_response_id"])
 		metadata.sessionID = semanticNestedText(value, "session_id", "client_metadata", "session_id")
 		metadata.turnState = semanticNestedText(value, "x-codex-turn-state", "client_metadata", "x-codex-turn-state")

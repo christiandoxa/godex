@@ -6,15 +6,19 @@ import (
 )
 
 func TestProdex04383WebSocketToolSuffixOracleRejectsMutations(t *testing.T) {
-	for _, shape := range []string{"canonical", "trailing-space", "trailing-tab", "leading-space"} {
+	for _, shape := range []string{"canonical", "trailing-space", "trailing-tab", "leading-space", "serde-max-invalid", "serde-long-valid"} {
 		t.Run(shape, func(t *testing.T) {
 			body := websocketToolTypeMessage04383(shape)
 			attempt := transportAttempt04383{owner: "account-a", ready: true, body: body}
 			var attempts []transportAttempt04383
 			var handshakes []string
-			for range websocketToolTypeAttempts04383(shape) {
-				attempts = append(attempts, attempt)
-				handshakes = append(handshakes, "account-a")
+			for index := range websocketToolTypeAttempts04383(shape) {
+				item := attempt
+				if shape == "serde-max-invalid" && index%2 == 1 {
+					item.owner = "account-b"
+				}
+				attempts = append(attempts, item)
+				handshakes = append(handshakes, item.owner)
 			}
 			frames := []string{`{"type":"error","status":409,"error":{"code":"stale_continuation"}}`}
 			if err := verifyWebSocketToolType04383(shape, body, handshakes, attempts, frames, false); err != nil {

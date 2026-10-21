@@ -186,6 +186,7 @@ func main() {
 	websocketTransportLifecycle := flag.Bool("websocket-transport-lifecycle", false, "compare authenticated cancellation and original 30-second deadline")
 	websocketTransportCapacity := flag.Bool("websocket-transport-capacity", false, "compare no-replay while the alternate Ready profile is busy")
 	websocketCompactLineage := flag.Bool("websocket-compact-lineage", false, "compare WebSocket strict Compact turn lineage and unbound selection against 0.438.3")
+	websocketSerdeFloat := flag.Bool("websocket-serde-float", false, "compare serde JSON whole-document validity for WebSocket tool-output affinity")
 	httpKeepAlive := flag.Bool("http-keepalive", false, "compare request-local deadlines across a reused HTTP connection")
 	httpCompact := flag.Bool("http-compact", false, "compare Compact precommit transport recovery and durable ownership")
 	httpTurnTransport := flag.Bool("http-turn-transport", false, "compare owned HTTP Responses turn transport failure without replay")
@@ -200,7 +201,7 @@ func main() {
 	godexCommit := flag.String("godex-commit", "", "exact 40-character Godex commit (required with an isolated fixture)")
 	flag.Parse()
 	chosen := 0
-	for _, mode := range []bool{*websocket, *websocketCapacity, *websocketDeadline, *websocketCommittedIdle, *websocketLookaheadIdle, *websocketRealtime, *websocketTransport, *websocketTransportCore, *websocketTransportLifecycle, *websocketTransportCapacity, *websocketCompactLineage, *httpKeepAlive, *httpCompact, *httpTurnTransport, *httpSessionConflict, *httpSSEDeadOnly, *httpResponseKind, *httpSerdeFloat, *httpPromptCache, *http429Policy, *httpProfileStatus} {
+	for _, mode := range []bool{*websocket, *websocketCapacity, *websocketDeadline, *websocketCommittedIdle, *websocketLookaheadIdle, *websocketRealtime, *websocketTransport, *websocketTransportCore, *websocketTransportLifecycle, *websocketTransportCapacity, *websocketCompactLineage, *websocketSerdeFloat, *httpKeepAlive, *httpCompact, *httpTurnTransport, *httpSessionConflict, *httpSSEDeadOnly, *httpResponseKind, *httpSerdeFloat, *httpPromptCache, *http429Policy, *httpProfileStatus} {
 		if mode {
 			chosen++
 		}
@@ -284,6 +285,8 @@ func main() {
 			err = runHTTPKeepAliveProduct04383(root, p)
 		} else if *websocketCompactLineage {
 			err = runWebSocketCompactLineageProduct04383(root, p)
+		} else if *websocketSerdeFloat {
+			err = runWebSocketSerdeFloatProduct04383(filepath.Join(root, "websocket-serde-float"), p)
 		} else if *websocketTransport || *websocketTransportCore || *websocketTransportLifecycle || *websocketTransportCapacity {
 			scope := "all"
 			if *websocketTransportCore {
@@ -362,6 +365,10 @@ func main() {
 	}
 	if *websocketCompactLineage {
 		fmt.Println("PASS Prodex 0.438.3 strict WebSocket Compact turn lineage across both binaries")
+		return
+	}
+	if *websocketSerdeFloat {
+		fmt.Println("PASS Prodex 0.438.3 WebSocket serde numeric whole-document affinity across both binaries")
 		return
 	}
 	if *websocketTransport {

@@ -22,20 +22,42 @@ func websocketToolTypeMessage04383(shape string) string {
 	case "leading-space":
 		kind = " " + kind
 	}
-	return `{"type":"response.create","model":"gpt-6","previous_response_id":"resp-main","input":[{"type":"` + kind + `","call_id":"call-tool-suffix","output":"done"}]}`
+	message := `{"type":"response.create","model":"gpt-6","previous_response_id":"resp-main","input":[{"type":"` + kind + `","call_id":"call-tool-suffix","output":"done"}]`
+	switch shape {
+	case "serde-max-invalid":
+		message += `,"unused":1.7976931348623158e308`
+	case "serde-long-valid":
+		message += `,"unused":1.79769313486231580e308`
+	}
+	return message + `}`
 }
 
 func websocketToolTypeAttempts04383(shape string) int {
 	switch shape {
 	case "trailing-space", "trailing-tab":
 		return 1
+	case "serde-max-invalid":
+		return 12 // Tagged 0.438.3 unbound precommit attempt budget.
 	default:
 		return 4
 	}
 }
 
+// The focused malformed-serde slice compares whether the WebSocket
+// planner is allowed to claim a verified previous-response owner from an
+// otherwise malformed tool-output request. The entire tool-suffix matrix
+// remains independently mandatory for the full compact-lineage phase.
+func runWebSocketSerdeFloatProduct04383(root string, p product) error {
+	for _, shape := range []string{"serde-max-invalid", "serde-long-valid"} {
+		if err := runWebSocketToolTypeCase04383(filepath.Join(root, shape), p, shape); err != nil {
+			return fmt.Errorf("WebSocket serde-float %s: %w", shape, err)
+		}
+	}
+	return nil
+}
+
 func runWebSocketToolTypeProduct04383(root string, p product) error {
-	for _, shape := range []string{"canonical", "trailing-space", "trailing-tab", "leading-space"} {
+	for _, shape := range []string{"canonical", "trailing-space", "trailing-tab", "leading-space", "serde-max-invalid", "serde-long-valid"} {
 		if err := runWebSocketToolTypeCase04383(filepath.Join(root, shape), p, shape); err != nil {
 			return fmt.Errorf("WebSocket tool-type %s: %w", shape, err)
 		}
@@ -104,6 +126,7 @@ func runWebSocketToolTypeCase04383(root string, p product, shape string) error {
 	handshakes := append([]string(nil), backend.handshakes...)
 	invalid := backend.invalid
 	backend.mu.Unlock()
+
 	if err := verifyWebSocketToolType04383(shape, body, handshakes, attempts, frames, invalid); err != nil {
 		return err
 	}
@@ -120,16 +143,28 @@ func verifyWebSocketToolType04383(shape, body string, handshakes []string, attem
 	if invalid || len(attempts) != want || len(handshakes) != want || len(frames) == 0 {
 		return fmt.Errorf("WebSocket suffix wrong attempt count: shape=%s want=%d invalid=%t handshakes=%v attempts=%+v frames=%v", shape, want, invalid, handshakes, attempts, frames)
 	}
-	if !reflect.DeepEqual(handshakes, []string{"account-a", "account-a", "account-a", "account-a"}[:want]) {
-		return fmt.Errorf("WebSocket suffix escaped previous owner: %v", handshakes)
+	wantOwners := make([]string, want)
+	for i := range wantOwners {
+		wantOwners[i] = "account-a"
+		if shape == "serde-max-invalid" && i%2 == 1 {
+			wantOwners[i] = "account-b"
+		}
 	}
-	for _, attempt := range attempts {
-		if attempt.owner != "account-a" || !attempt.ready || attempt.body != body || attempt.turn != "" {
+	if !reflect.DeepEqual(handshakes, wantOwners) {
+		return fmt.Errorf("WebSocket suffix escaped tagged candidate budget: got=%v want=%v", handshakes, wantOwners)
+	}
+	for index, attempt := range attempts {
+		if attempt.owner != wantOwners[index] || !attempt.ready || attempt.body != body || attempt.turn != "" {
 			return fmt.Errorf("WebSocket suffix changed attempt/Ready/opaque request: %+v", attempt)
 		}
 	}
-	if !strings.Contains(strings.Join(frames, "\n"), `"stale_continuation"`) &&
-		!strings.Contains(strings.Join(frames, "\n"), `"previous_response_not_found"`) {
+	terminal := strings.Join(frames, "\n")
+	if shape == "serde-max-invalid" {
+		if !strings.Contains(terminal, `"stale_continuation"`) {
+			return fmt.Errorf("serde-invalid unbound WebSocket did not fail stale after 12 candidate attempts: %q", frames)
+		}
+	} else if !strings.Contains(terminal, `"stale_continuation"`) &&
+		!strings.Contains(terminal, `"previous_response_not_found"`) {
 		return fmt.Errorf("WebSocket suffix did not yield previous-response terminal: %q", frames)
 	}
 	return nil

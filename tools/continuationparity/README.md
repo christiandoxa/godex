@@ -1088,3 +1088,23 @@ Each fixture uses two authenticated Ready accounts, exact upstream bytes,
 one model attempt, unchanged client HTTP response and a checked durable
 response owner. Both cases also remain in the comprehensive HTTP
 session-conflict matrix.
+
+A focused `--websocket-serde-float` phase covers whole-document JSON validity
+of WebSocket `response.create` tool-output requests. The exact tagged
+serde-invalid literal `1.7976931348623158e308` cannot pin an owned previous
+response; the longer-mantissa valid control
+`1.79769313486231580e308` retains hard-owner retry behavior. The fixture
+checks two authenticated Ready profiles, exact original text-frame bytes,
+account selection, bounded upstream attempts and terminal error frames
+on both pinned executables. These controls are also retained by
+`--websocket-compact-lineage`.
+
+The `--websocket-serde-float` oracle enforces **different** retry policies
+for the two near-f64-maximum JSON shapes. The serde-invalid frame has no
+verified continuation owner: a precommit `previous_response_not_found`
+rotates through two authenticated Ready profiles under the published
+12-attempt unbound candidate budget, followed by a generic stale 409. The
+serde-valid long-mantissa control retains four bounded retries exclusively
+on its verified previous-response owner. The oracle checks every attempt's
+owner and byte-exact message and the previous owner's durable binding; it
+never skips verification in diagnostic mode.

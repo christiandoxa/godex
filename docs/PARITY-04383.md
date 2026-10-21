@@ -3804,3 +3804,62 @@ legitimate longer-mantissa control does. Local request-affinity regressions
 ensure neither a previous-response ID nor a session hint from malformed
 JSON may borrow a foreign account. The existing broader HTTP fixture also
 retains those controls.
+
+## WebSocket tool-output hard affinity also requires a complete serde JSON
+
+Prodex 0.438.3 `parse_runtime_websocket_request_metadata` first parses
+an entire `response.create` text frame with `serde_json::Value`. If
+parsing fails, the semantic planner returns default metadata; a syntactically
+present `previous_response_id`, session, turn token, and tool-output input
+cannot claim another verified owner. Go's separate WebSocket metadata parser
+previously used `json.Unmarshal`, so a frame containing an unrelated
+`1.7976931348623158e308` could be misclassified as a tool-output hard
+continuation request with additional same-owner retry attempts. A fail-before
+regression proves this mismatch. The scoped fix reuses the complete
+serde-compatible decoder, retaining the already verified untrimmed `_call_output`
+suffix policy, original outbound text bytes and separately supplied handshake
+headers. A valid `1.79769313486231580e308` control preserves legitimate
+hard-affinity behavior.
+
+The new focused `--websocket-serde-float` source/manifest/executable-pinned
+oracle compares both numeric cases with two authenticated Ready managed
+profiles, an independently verified previous-response owner, exact upstream
+WebSocket text requests, precommit previous-response-not-found feedback and
+the resulting bounded retry count. The same controls are included in the
+broader `--websocket-compact-lineage` fixture. This remains a finite 0.438.3
+contract rather than full provider/native-OS parity.
+
+## Serde-invalid WebSocket requests use unbound precommit candidate budget
+
+The initial 0.438.3 WebSocket serde-float differential exposed an important
+routing difference in addition to parser validity. When a complete text
+`response.create` document contains the serde-invalid
+`1.7976931348623158e308`, the tagged planner extracts no hard previous,
+turn or session affinity—even when the opaque original frame includes
+`previous_response_id` and a tool-output item. Upstream
+`previous_response_not_found` then follows the **unbound candidate**
+precommit planner, not the verified hard-owner retry sequence. The official
+Prodex executable made **12** model attempts alternating two authenticated
+Ready profiles, then emitted one generic 409 `stale_continuation`. The
+initial Godex candidate forwarded the first upstream error after one
+attempt; this was a real parity mismatch and not a successful oracle check.
+
+The scoped correction preserves the existing full-serde request parser and
+adds a request-local unbound WebSocket precommit retry budget: at most 12
+upstream attempts and the published three-second window, using eligible
+accounts, existing profile-inflight admission and exact opaque request
+bytes. Repeated missing-response errors rotate across candidates; a
+committed result or unrelated error stops immediately. No continuation
+owner is derived from invalid JSON, and the original already-verified
+response ID remains on its previous account. A fail-before routing
+regression covers memory/durable bindings, 12 exact alternating attempts,
+the terminal 409, and positive one-attempt controls.
+
+The `--websocket-serde-float` source/manifest/executable-pinned oracle no
+longer contains a diagnostic bypass. For malformed serde it asserts the
+12-attempt account order, each authenticated Ready receipt, unchanged
+upstream WebSocket text payload, generic stale terminal and unchanged
+original response owner. A legitimate long-mantissa serde-positive control
+retains four bounded same-owner tool-output retries. These are finite
+synthetic conditions; native provider and platform permutations are not
+fully certified.

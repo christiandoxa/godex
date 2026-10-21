@@ -190,6 +190,19 @@ func (router *Router) routeRequest(
 		return router.forwardBound(ctx, request, accounts, owner, keys)
 	}
 	if request.WebSocketMessage && keys != nil &&
+		keys.previous == "" && keys.turn == "" && keys.session == "" &&
+		len(request.Body) != 0 {
+		// Tagged WebSocket requests whose complete JSON is invalid have
+		// NO verifiable previous/turn/session owner, even if Go's parser
+		// would accept individual fields. A precommit upstream
+		// previous_response_not_found in that unbound mode rotates through
+		// eligible profiles under the finite precommit attempt budget.
+		// This differs from a valid, locked tool-output continuation.
+		if _, valid := decodeNativeUsageJSON(request.Body); !valid {
+			return router.forwardWebSocketInvalidSerdeUnbound04383(ctx, request, accounts)
+		}
+	}
+	if request.WebSocketMessage && keys != nil &&
 		allowsUnboundWebSocketDiscovery(*keys, request.QuotaSelection) {
 		return router.forwardUnboundWebSocketDiscovery(ctx, request, accounts, keys)
 	}
