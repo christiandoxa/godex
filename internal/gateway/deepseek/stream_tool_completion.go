@@ -1,12 +1,18 @@
 package deepseek
 
 func (state *deepSeekChatStreamState) validateToolCalls() error {
+	var failure error
+	var failedIndex uint64
 	for index, call := range state.toolCalls {
+		// Prodex's ordered tool map reports the lowest invalid index.
+		if failure != nil && index > failedIndex {
+			continue
+		}
 		if err := deepSeekValidateStreamToolCall(index, call); err != nil {
-			return err
+			failure, failedIndex = err, index
 		}
 	}
-	return nil
+	return failure
 }
 
 func (state *deepSeekChatStreamState) completeToolEvents(items []deepSeekCompletedStreamTool) [][]byte {

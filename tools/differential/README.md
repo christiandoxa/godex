@@ -386,6 +386,14 @@ oracle now exercises thirteen Gemini cases, including all earlier eight fixtures
 
 ### Bounded full DeepSeek oracle
 
+`sse-tool-order-finish` and `sse-tool-order-done` send sixteen invalid tools
+in descending index order followed by one valid tool at index zero. Both
+require the complete 36-event byte trace and the error at index three, the
+lowest invalid index, whether validation begins at finish or DONE. No tool
+completion or later response completion may follow. Mutation controls reject
+matching wrong error indices, altered sequence numbers, tool indices, terminal
+events and error codes. Both scenarios are included in `--scenario all`.
+
 `tool-search-canonical` and `sse-tool-search-canonical` compare complete
 buffered and three-event SSE bytes for structured tool-search arguments.
 The fixture includes nested u64::MAX, integers above 2^53, exponent input,

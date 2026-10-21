@@ -2647,3 +2647,48 @@ shuffled race suite. Logs: `/tmp/gdx-04384-provider-stream-cancel-race.log`,
 `/tmp/gdx-04384-provider-stream-cancel-final-test-all.log` and
 `/tmp/gdx-04384-provider-stream-cancel-final-verify.log`. Clean-commit
 released-executable regression and the broader release gate follow this commit.
+
+## Deterministic DeepSeek stream tool validation failures
+
+Clean cancellation commit `9a7e8e9283244e3535da02fa07fac54653bb7eb1`
+passed 51/51 DeepSeek and 44/44 Gemini released-executable cases, including
+their mutation controls, before its fast-forward push to `origin/main`.
+Reports: `/tmp/gdx-04384-provider-stream-cancel-oracle.json` and
+`/tmp/gdx-04384-provider-stream-cancel-gemini-oracle.json`. The complete
+`rtk proxy bash scripts/verify-release-parity.sh` gate is running against that
+same clean commit; no final outcome is claimed here.
+
+The tagged `deepseek_sse.rs` owns tools in `BTreeMap<usize, ...>` and
+`tool_calls.rs::validate_tool_call_arguments` reports the first invalid
+entry by ascending index. Godex iterated its unordered map and could report
+a different tool. The existing private gateway validator now retains the
+lowest invalid index in one bounded pass without a sort or another helper.
+Both finish-string and DONE paths already share this validator. No new
+package, exported API, dependency, goroutine, option or persisted format is
+introduced; protocol validation stays in the owning DeepSeek gateway.
+
+Fail-before `/tmp/gdx-04384-tool-validation-order-before.log` passes the
+valid/single-failure control and fails all six multi-failure subcases.
+Actual-pump regressions cover named malformed arguments, absent names,
+ordinary/empty finish strings and DONE, with a valid lower-index tool and
+u64::MAX. Repeated independent stream lifetimes require one stable failure,
+no completed tools and no terminal success.
+
+Both released-executable fail-before cases independently satisfy the full
+36-event contract on Prodex. Godex reports index six at finish and index
+eight at DONE; the reference reports index three in both. Reports:
+`/tmp/gdx-04384-tool-validation-order-finish-before-oracle.json` and
+`/tmp/gdx-04384-tool-validation-order-done-before-oracle.json`.
+The extended differential includes a valid tool at index zero and sixteen
+invalid tools arriving in reverse order, checks every response byte, and
+rejects matching wrong errors or terminal sequences through mutation controls.
+
+`rtk go test -race ./internal/gateway/deepseek ./tools/differential -count=1`
+passes 709 tests. `rtk go test ./...` passes 9,080 tests across 81 packages.
+`rtk proxy make verify` passes formatting, source-size, cross-platform build
+and test compilation, installer checks, vet, the full shuffled race suite,
+and the build. Logs: `/tmp/gdx-04384-tool-validation-order-race.log`,
+`/tmp/gdx-04384-tool-validation-order-test-all.log` and
+`/tmp/gdx-04384-tool-validation-order-verify.log`. Clean-commit executable
+validation follows this commit. Buffered malformed-argument diagnostics,
+broader apply-patch argument canonicalization and global parity remain open.
