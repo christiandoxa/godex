@@ -1038,3 +1038,11 @@ marker and avoids truncated time suffixes when multi-byte Unicode precedes
 a real marker. Local tests exercise both recognized reset times and the
 five-minute quota-quarantine fallback; these examples are source-aligned,
 not separately counted as a timed two-executable differential result.
+
+Local 0.438.3 quota reset-time regressions now additionally match pinned
+`chrono 0.4.45` parsing after Mojo candidate tokenization: lower/mixed AM/PM,
+one-digit minutes, and short absolute years are accepted, while hour `0`
+is not valid with `%I`. These cases were reproduced with a standalone pinned
+Rust chrono probe and checked against actual Go quota quarantine duration.
+The full native timezone/DST permutation space is not inferred from this
+local semantic test or from an unrelated broad transport differential.

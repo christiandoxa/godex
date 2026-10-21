@@ -164,8 +164,8 @@ func quotaResetAtFromText(message string, now time.Time) (int64, bool) {
 	}
 	parts := strings.FieldsFunc(candidate, quotaRetryASCIIWhitespace)
 	if len(parts) >= 2 {
-		if parsed, err := time.ParseInLocation("3:04 PM", strings.Join(parts[:2], " "), now.Location()); err == nil {
-			when := time.Date(now.Year(), now.Month(), now.Day(), parsed.Hour(), parsed.Minute(), 0, 0, now.Location())
+		if hour, minute, ok := quotaChronoClock04383(parts[0], parts[1]); ok {
+			when := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, now.Location())
 			if !when.After(now) {
 				when = when.AddDate(0, 0, 1)
 			}
@@ -175,21 +175,75 @@ func quotaResetAtFromText(message string, now time.Time) (int64, bool) {
 	if len(parts) < 5 {
 		return 0, false
 	}
+	// The pinned Mojo candidate parser normalizes ordinal suffixes, then
+	// chrono 0.4.45 accepts month/day/year and an ASCII-insensitive 12h
+	// clock. Go time.ParseInLocation("... 3:04 PM") rejects lower/mixed
+	// case AM/PM and one-digit minutes, yet accepts hour 0, which chrono
+	// rejects. Preserve the strict chrono field ranges before constructing
+	// a local date instead of attempting Go's permissive 12h parser.
 	day := strings.TrimSuffix(parts[1], ",")
 	end := 0
 	for end < len(day) && day[end] >= '0' && day[end] <= '9' {
 		end++
 	}
-	if end == 0 {
+	if end == 0 || end > 2 || len(parts[2]) == 0 || len(parts[2]) > 4 || !quotaASCIIDigits04383(parts[2]) {
 		return 0, false
 	}
-	parts[1] = day[:end] + ","
-	normalized := strings.Join(parts[:5], " ")
-	parsed, err := time.ParseInLocation("Jan 2, 2006 3:04 PM", normalized, now.Location())
+	d, _ := strconv.Atoi(day[:end])
+	year, _ := strconv.Atoi(parts[2])
+	month, err := time.Parse("Jan", parts[0])
 	if err != nil {
 		return 0, false
 	}
+	hour, minute, ok := quotaChronoClock04383(parts[3], parts[4])
+	if !ok {
+		return 0, false
+	}
+	parsed := time.Date(year, month.Month(), d, hour, minute, 0, 0, now.Location())
+	if parsed.Year() != year || parsed.Month() != month.Month() || parsed.Day() != d {
+		return 0, false
+	}
 	return parsed.Unix(), true
+}
+
+// chrono 0.4.45's "%I:%M %p" expects 1..12 (never zero) hours,
+// 1- or 2-digit minutes, and ASCII-case-insensitive AM/PM. The tagged
+// Mojo planner has already collapsed its first two whitespace tokens.
+func quotaChronoClock04383(clock, period string) (int, int, bool) {
+	colon := strings.IndexByte(clock, ':')
+	if colon < 1 || colon > 2 || len(clock)-colon-1 < 1 || len(clock)-colon-1 > 2 ||
+		!quotaASCIIDigits04383(clock[:colon]) || !quotaASCIIDigits04383(clock[colon+1:]) {
+		return 0, 0, false
+	}
+	hour, _ := strconv.Atoi(clock[:colon])
+	minute, _ := strconv.Atoi(clock[colon+1:])
+	if hour < 1 || hour > 12 || minute > 59 {
+		return 0, 0, false
+	}
+	isAM := previousASCIIEqualFold04383(period, "am")
+	isPM := previousASCIIEqualFold04383(period, "pm")
+	if !isAM && !isPM {
+		return 0, 0, false
+	}
+	if hour == 12 {
+		hour = 0
+	}
+	if isPM {
+		hour += 12
+	}
+	return hour, minute, true
+}
+
+func quotaASCIIDigits04383(value string) bool {
+	if value == "" {
+		return false
+	}
+	for at := 0; at < len(value); at++ {
+		if value[at] < '0' || value[at] > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func quotaASCIICasefoldIndex04383(source, literal string) int {

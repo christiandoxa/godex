@@ -3632,3 +3632,35 @@ binary's broader HTTP retry/429 oracles remain regression gates, but these
 particular Unicode timing variants have not yet been measured with a new
 paired real-time Prodex-vs-Godex oracle. Cross-platform local-clock and live
 provider permutations are not claimed certified.
+
+## Quota retry clock and absolute-date text use pinned chrono parsing
+
+Prodex 0.438.3 delegates the candidate tokens following `try again at `
+from its compiled Mojo `quota_retry_time_plan_v1` to Rust `chrono 0.4.45`.
+For clocks its parser is `%I:%M %p`; the absolute local datetime uses
+`%b %d, %Y %I:%M %p`. Those format strings **accept** ASCII lower/mixed-case
+AM/PM, a one-digit minute, and a short calendar year such as `26` in `%Y`.
+They **reject** hour 0 in a 12-hour clock. Go's `time.ParseInLocation`
+previously did the opposite for these cases: rejecting otherwise legitimate
+`5:08 pm`, `1:8 PM`, and `Mar 24th, 26 2:04 AM`, but interpreting `0:08 PM`
+as noon. This silently replaced a real multi-hour quota reset time with the
+five-minute fallback, or accepted an invalid reset marker as a longer block.
+
+A standalone **offline pinned chrono 0.4.45 probe** compared clock and date
+parsing against the corresponding Go layouts. Fail-before tests record the
+observed divergences beside canonical 12 AM/PM, mixed casing, leap-day and
+invalid-calendar controls. The scoped Godex decoder now applies the source
+Mojo candidate tokenization unchanged, parses only ASCII 1–2 digit 12-hour
+clock fields with an hour range of 1..12 and case-insensitive AM/PM, and
+constructs a calendar-validated local datetime from the candidate's
+normalized month/day/year. Absolute years one to four digits include short
+years such as `26`, preserving the tagged chrono result rather than rejecting
+it. An observable quarantine-policy test verifies longer or fallback
+cooldowns, not just a parser return value. No upstream request, session
+or client-visible response is rewritten.
+
+This is tagged-source and dependency-aligned local parity. The official
+pinned HTTP transport regression is retained as a broad no-regression check;
+these exact clock strings have **not** been asserted as independently timed
+binary-to-binary comparisons across timezone/DST boundaries. Live provider
+and native OS clock semantics remain unverified beyond this finite slice.
