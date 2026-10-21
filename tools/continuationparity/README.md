@@ -1061,3 +1061,14 @@ ambiguous time resolves to the standard-offset occurrence selected by
 absolute retry dates and clock-only messages, including the actual quota
 quarantine fallback. Independent native/OS timezone data parity is not
 inferred from these finite cases.
+
+Quota reset JSON canonical-size checks use the published source's strict
+16MiB `rich_view_valid` limit **after** `serde_json::Value` serialization.
+Local regressions cover boundary equality, raw 17MiB whitespace or decimal
+values that canonicalize smaller, Unicode line separators, and oversized
+canonical strings. The numeric size estimator ports the pinned
+serde_json 1.0.151 default u64-significand/f64-power-of-ten parsing semantics;
+a 15,000-literal offline comparison against the exact Rust crate matched
+canonical lengths and spellings with zero mismatches. These cases are
+source/dependency-verified rather than incorrectly labeled a standalone
+HTTP executable quota-reset oracle.

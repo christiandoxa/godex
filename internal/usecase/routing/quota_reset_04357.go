@@ -33,7 +33,8 @@ func quotaResetAtFromJSON(message []byte) (int64, bool) {
 	// document as serde_json::Value. RawMessage would otherwise accept
 	// unrelated invalid Unicode, overflowing numbers or excess depth and
 	// turn a bogus reset timestamp into a long-lived profile quarantine.
-	if _, valid := decodeNativeUsageJSON(message); !valid {
+	value, valid := decodeNativeUsageJSON(message)
+	if !valid || !quotaCanonicalJSONWithinLimit04383(value) {
 		return 0, false
 	}
 	var root map[string]json.RawMessage

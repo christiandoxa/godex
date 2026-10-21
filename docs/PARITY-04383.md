@@ -3725,3 +3725,50 @@ Sydney DST cases only. Cross-OS timezone database versions, historical
 political changes, and live quota-provider scheduling remain explicitly
 open; a broad HTTP transport executable gate is not a certificate for
 those untested local-time cases.
+
+## Quota reset JSON uses canonical serde bytes for the Mojo 16MiB limit
+
+Tagged `prodex-quota/src/render/windows.rs` first parses the **entire** quota
+error as `serde_json::Value` and passes `serde_json::to_string(&value)` to
+`prodex_quota_reset_json_epoch_v1`. The compiled Mojo
+`rich_view_valid(view, 16 * 1024 * 1024)` gate checks the length of that
+**canonical** JSON, inclusive of exactly 16MiB, not the raw input length.
+Godex previously validated the JSON but always allowed quota reset tokens
+regardless of the canonical size. This could mint a long-lived quota
+quarantine from a rejected, over-budget provider payload.
+
+A fail-before regression confirms that an unrelated 16MiB+ JSON string was
+incorrectly allowed to supply a `resets_at` timestamp. The inverse is also
+critical: raw input larger than 16MiB can be completely valid because
+serde serialization removes insignificant whitespace or collapses a huge
+`1.000000...` numeric literal to just `1.0`. Unicode U+2028/U+2029 must
+remain raw UTF-8 in canonical serde strings; Go's JSON serializer escapes
+those codepoints and HTML-related bytes by default, so it cannot be used
+as-is for this quota admission limit.
+
+The scoped fix validates the complete JSON exactly as before and measures
+the canonical `serde_json::Value` tree without constructing a second huge
+serialized payload. It counts the escaped JSON strings and the parsed
+numeric **value**, not the original `json.Number` spelling, and stops once
+a subtree has already exceeded the Mojo cap. Floats are significant here:
+`serde_json 1.0.151` is built without `float_roundtrip` and forms f64 using
+a bounded u64 significand and compile-time nearest-f64 powers of ten.
+Neither Go `strconv.ParseFloat` nor `math.Pow10` produces those same bits
+for every decimal. A source/dependency-pinned offline differential of
+**15,000 generated numeric literals** initially showed thousands of
+canonical size/representation mismatches. After reproducing the tagged
+Rust significand/exponent algorithm and using the same precisely rounded
+power-of-ten constants, the comparison yielded **zero** mismatches in both
+canonical length and text across those 15,000 literals. Embedded fixtures
+protect representative hard-rounding cases, maximum u64, fractional
+scientific values, and negative zero.
+
+Additional fail-before tests cover exactly 16MiB, one byte above/below,
+large canonical strings, huge raw whitespace, raw Unicode line separators,
+and a 17MiB raw float that canonically serializes to a tiny value. The
+original request bytes and other quota-header selection rules are
+unchanged. This is a tagged-source, dependency-pinned parser and local
+quota-policy parity result; the standard executable HTTP429 regression
+is retained as a no-regression check, but the full-size synthetic JSON
+boundary cases are not yet certified against an independent timed
+Prodex/Godex HTTP executable interaction.
