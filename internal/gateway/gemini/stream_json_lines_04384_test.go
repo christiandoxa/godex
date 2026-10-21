@@ -95,7 +95,7 @@ func TestProdex04384GeminiSSESeparateValuesValidateBeforeEmission(t *testing.T) 
 				state := &geminiChatCompatibleStream043711{id: "resp-fixture", created: 1}
 				err = state.accept(&output, []byte(first+"\n"+invalid))
 			}
-			if err == nil || output.Len() != 0 {
+			if err != nil || output.Len() != 0 {
 				t.Errorf("invalid second JSON line emitted first candidate: native=%v invalid=%q err=%v output=%s", native, invalid, err, output.String())
 			}
 		}

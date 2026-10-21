@@ -1975,3 +1975,59 @@ suite. Logs: `/tmp/gdx-04384-gemini-sse-lines-final2-race.log`,
 `/tmp/gdx-04384-gemini-sse-lines-final2-test-all.log` and
 `/tmp/gdx-04384-gemini-sse-lines-final2-verify.log`. Clean candidate
 executable validation follows the commit.
+
+The released separate-line baseline on
+`e4dca175ae040161e54cc311ad23822b2a8759a0` matched 42/43 cases and
+failed only Godex's `stream-chat-data-lines` case. Mutation controls
+passed. Clean commit `c6091b1b318222212161e82792c455ee9d88c40b` then
+passed all 43 Gemini executable cases and controls before its fast-forward
+push to `origin/main`. Logs:
+`/tmp/gdx-04384-gemini-sse-lines-before-oracle.json` and
+`/tmp/gdx-04384-gemini-sse-lines-oracle.json`.
+
+## Gemini SSE reassembles partial JSON across events
+
+After joined and separate JSON parsing both fail, the tagged provider
+reader appends the trimmed fragment to its retained JSON buffer and tries
+the combined value. Complete incoming values keep priority and do not
+consume an earlier partial fragment. The pinned source's buffer limit is
+4 MiB (`core_constants.rs`), independent of Godex's other response/tool
+budgets. DONE or EOF with an invalid retained segment fails with
+`incomplete JSON segment`; an accumulation overflow fails explicitly and
+leaves the bounded state intact. Invalid UTF-8 is rejected before buffering.
+
+Godex previously failed on the first partial packet. Both Gemini adapters
+now retain bounded partial JSON, emit only after complete serde-valid
+reassembly, and retain joined/separate precedence. Their pump owners close
+the upstream body after terminal completion/failure, releasing retained
+state without reading another packet. Native EOF now uses the shared
+reader's exact `unexpected end of stream` message when no fragment remains.
+
+The state remains private to `gateway/gemini/stream_data.go` and belongs to
+each stream. No shared helper package, dependency, public model, option,
+persistence or goroutine is introduced. Source per-line/event framing
+limits and broader native output lifecycle remain separate audit areas.
+
+Fail-before logs: `/tmp/gdx-04384-gemini-sse-fragments-before.log` and
+`/tmp/gdx-04384-gemini-sse-close-before.log`. Regressions prove reassembly
+in both adapters, no output from a partial packet, one final completion,
+partial EOF/DONE failure, exact 4 MiB admission/overflow, complete-packet
+priority and one upstream read before terminal shutdown. The synchronized
+read/close fixture uses no sleep. Existing invalid-serde tests now assert
+no leaked candidate text and exactly one failed event by DONE, preserving
+their Unicode/overflow checks under the reference reader's buffering contract.
+
+The new `stream-chat-json-fragments` executable case splits text in the
+middle of a JSON string across two SSE events. It must still produce the
+existing exact six-event client trace and exact large usage counters.
+The Gemini matrix now contains 44 cases. Local source evidence and released
+executable evidence remain separate until that oracle finishes.
+
+`rtk go test -race ./internal/gateway/gemini ./tools/differential -count=1`
+passes 871 tests. Log: `/tmp/gdx-04384-gemini-sse-fragments-final-race.log`.
+
+`rtk go test ./...` passes 8,910 tests across 81 packages. Full-test log:
+`/tmp/gdx-04384-gemini-sse-fragments-final-test-all.log`.
+`rtk proxy make verify` passes all local gates, including the full race
+suite. Gate log: `/tmp/gdx-04384-gemini-sse-fragments-final-verify.log`.
+Exact clean-commit executable validation follows the commit.

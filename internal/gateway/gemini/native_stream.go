@@ -28,6 +28,7 @@ type geminiStreamState struct {
 	finish     string
 	sequence   uint64
 	completed  bool
+	json       geminiStreamJSON04384
 }
 
 func translateGeminiNativeStream(response *http.Response, requestMetadata map[string]any) *proxymodel.Response {
@@ -56,6 +57,10 @@ func pumpGeminiNativeStream(body io.ReadCloser, writer *io.PipeWriter, requestMe
 					return
 				}
 			}
+			if state.completed {
+				_ = writer.Close()
+				return
+			}
 		}
 		if err != nil {
 			if err == io.EOF {
@@ -70,7 +75,10 @@ func pumpGeminiNativeStream(body io.ReadCloser, writer *io.PipeWriter, requestMe
 			if !state.completed {
 				message := "Gemini stream failed"
 				if err == io.EOF {
-					message = "unexpected end of Gemini stream"
+					message = "unexpected end of stream"
+					if len(state.json.pending) > 0 {
+						message = "incomplete JSON segment"
+					}
 				}
 				_ = state.failed(writer, "provider_stream_error", message)
 			}
@@ -100,13 +108,16 @@ func (state *geminiStreamState) consume(writer io.Writer, data []byte, requestMe
 		return nil
 	}
 	if geminiSSEDone04384(data) {
+		if len(state.json.pending) > 0 {
+			return state.failed(writer, "provider_stream_error", "incomplete JSON segment")
+		}
 		return state.complete(writer, requestMetadata)
 	}
 	root, valid := geminiSerdeResponseObject04384(data)
 	if !valid {
-		values, separate := geminiSeparateSSEValues04384(data)
-		if !separate {
-			return fmt.Errorf("failed to parse Gemini SSE JSON")
+		values, err := state.json.observe(data)
+		if err != nil {
+			return state.failed(writer, "provider_stream_error", err.Error())
 		}
 		for _, value := range values {
 			if err := state.consume(writer, value, requestMetadata); err != nil {

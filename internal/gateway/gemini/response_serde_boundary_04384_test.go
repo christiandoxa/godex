@@ -79,11 +79,22 @@ func TestProdex04384GeminiSSEChunkRequiresCompleteSerdeJSON(t *testing.T) {
 			state := &geminiStreamState{responseID: "resp-fixture"}
 			var writer bytes.Buffer
 			err := state.consume(&writer, chunk, nil)
-			if accepted := err == nil; accepted != tc.valid {
-				t.Fatalf("serde-invalid Gemini SSE chunk accepted=%t want=%t error=%v wire=%q", accepted, tc.valid, err, writer.String())
+			if err != nil {
+				t.Fatal(err)
 			}
 			if tc.valid && !strings.Contains(writer.String(), "stream-ok") {
 				t.Fatalf("valid Gemini SSE lost text: %q", writer.String())
+			}
+			if !tc.valid {
+				if strings.Contains(writer.String(), "stream-ok") || state.text.Len() != 0 {
+					t.Fatalf("serde-invalid Gemini SSE emitted candidate text: %q", writer.String())
+				}
+				if err := state.consume(&writer, []byte("[DONE]"), nil); err != nil {
+					t.Fatal(err)
+				}
+				if !state.completed || strings.Count(writer.String(), "event: response.failed") != 1 || strings.Contains(writer.String(), "event: response.completed") {
+					t.Fatalf("serde-invalid Gemini SSE did not fail exactly once at DONE: %q", writer.String())
+				}
 			}
 		})
 	}

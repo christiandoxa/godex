@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 )
@@ -112,7 +113,11 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 		if mock.scenario == "stream-chat-data-lines" {
 			separator = "\n"
 		}
-		_, _ = io.WriteString(w, "data: "+`{"id":"chat-synthetic","model":"gemini-3.1-pro-preview","choices":[{"delta":{"content":"synthetic-"},"finish_reason":null}]}`+separator)
+		first := `{"id":"chat-synthetic","model":"gemini-3.1-pro-preview","choices":[{"delta":{"content":"synthetic-"},"finish_reason":null}]}`
+		if mock.scenario == "stream-chat-json-fragments" {
+			first = strings.Replace(first, "synthetic-", "synthe\n\ndata: tic-", 1)
+		}
+		_, _ = io.WriteString(w, "data: "+first+separator)
 		_, _ = io.WriteString(w, "data: "+`{"id":"chat-synthetic","model":"gemini-3.1-pro-preview","choices":[{"delta":{"content":"ok<>&/🌍\u2028\u2029"},"finish_reason":null}]}`+"\n\n")
 		_, _ = io.WriteString(w, "data: "+`{"id":"chat-synthetic","model":"gemini-3.1-pro-preview","choices":[{"delta":{},"finish_reason":"stop"}]}`+"\n\n")
 		_, _ = io.WriteString(w, "data: "+`{"choices":[],"usage":{"prompt_tokens":9007199254740993,"completion_tokens":1,"total_tokens":9007199254740994}}`+"\n\n")
@@ -215,6 +220,7 @@ func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit string
 			"stream-chat-eof",
 			"stream-chat-error",
 			"stream-chat-data-lines",
+			"stream-chat-json-fragments",
 			"multi-turn-tool",
 			"quota-plain-429",
 			"quota-structured-429",
@@ -436,7 +442,7 @@ func geminiCompare(scenario string, prodex, godex geminiCandidateResult) []strin
 		if !geminiChatEOFWireValid04384(prodex.Client.Body) || !geminiChatEOFWireValid04384(godex.Client.Body) {
 			differences = append(differences, "client Gemini Chat EOF failure bytes differ")
 		}
-	} else if scenario == "stream-chat" || scenario == "stream-chat-data-lines" {
+	} else if scenario == "stream-chat" || scenario == "stream-chat-data-lines" || scenario == "stream-chat-json-fragments" {
 		left, leftErr := geminiChatSSEProjection043711(prodex.Client.Body)
 		right, rightErr := geminiChatSSEProjection043711(godex.Client.Body)
 		if leftErr != nil || rightErr != nil || !reflect.DeepEqual(left, right) {
