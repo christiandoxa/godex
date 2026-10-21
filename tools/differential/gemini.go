@@ -102,13 +102,15 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	if mock.scenario == "stream-chat" {
+	if geminiChatStreamScenario04384(mock.scenario) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		_, _ = io.WriteString(w, "data: "+`{"id":"chat-synthetic","model":"gemini-3.1-pro-preview","choices":[{"delta":{"content":"synthetic-"},"finish_reason":null}]}`+"\n\n")
 		_, _ = io.WriteString(w, "data: "+`{"id":"chat-synthetic","model":"gemini-3.1-pro-preview","choices":[{"delta":{"content":"ok<>&/🌍\u2028\u2029"},"finish_reason":null}]}`+"\n\n")
 		_, _ = io.WriteString(w, "data: "+`{"id":"chat-synthetic","model":"gemini-3.1-pro-preview","choices":[{"delta":{},"finish_reason":"stop"}]}`+"\n\n")
 		_, _ = io.WriteString(w, "data: "+`{"choices":[],"usage":{"prompt_tokens":9007199254740993,"completion_tokens":1,"total_tokens":9007199254740994}}`+"\n\n")
-		_, _ = io.WriteString(w, "data: [DONE]\n\n")
+		if mock.scenario != "stream-chat-eof" {
+			_, _ = io.WriteString(w, "data: [DONE]\n\n")
+		}
 		return
 	}
 	if mock.scenario == "stream-native" {
@@ -202,6 +204,7 @@ func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit string
 			"wrapped-response-trace",
 			"stream-native",
 			"stream-chat",
+			"stream-chat-eof",
 			"multi-turn-tool",
 			"quota-plain-429",
 			"quota-structured-429",
@@ -336,7 +339,7 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	if fixture, yes := geminiModelCase04384For(scenario); yes {
 		env = append(env, "DIFFERENTIAL_GEMINI_MODEL_QUERY="+fixture.query)
 	}
-	if scenario == "stream-native" || scenario == "stream-chat" {
+	if scenario == "stream-native" || geminiChatStreamScenario04384(scenario) {
 		env = append(env, "DIFFERENTIAL_STREAM=1")
 	}
 	cmd.Env = env
@@ -415,7 +418,11 @@ func geminiCompare(scenario string, prodex, godex geminiCandidateResult) []strin
 		}
 		return differences
 	}
-	if scenario == "stream-chat" {
+	if scenario == "stream-chat-eof" {
+		if !geminiChatEOFWireValid04384(prodex.Client.Body) || !geminiChatEOFWireValid04384(godex.Client.Body) {
+			differences = append(differences, "client Gemini Chat EOF failure bytes differ")
+		}
+	} else if scenario == "stream-chat" {
 		left, leftErr := geminiChatSSEProjection043711(prodex.Client.Body)
 		right, rightErr := geminiChatSSEProjection043711(godex.Client.Body)
 		if leftErr != nil || rightErr != nil || !reflect.DeepEqual(left, right) {
@@ -491,7 +498,7 @@ func geminiFixtureInvariant(scenario string, result geminiCandidateResult) error
 		return errors.New("Gemini API-key authentication missing from synthetic upstream request")
 	}
 	if attempt.Body["model"] != "gemini-3.1-pro-preview" ||
-		attempt.Body["stream"] != (scenario == "stream-native" || scenario == "stream-chat") {
+		attempt.Body["stream"] != (scenario == "stream-native" || geminiChatStreamScenario04384(scenario)) {
 		return fmt.Errorf("Gemini model or stream flag rewritten: %+v", attempt.Body)
 	}
 	messages, _ := attempt.Body["messages"].([]any)
@@ -506,11 +513,15 @@ func geminiFixtureInvariant(scenario string, result geminiCandidateResult) error
 	if first["role"] != "user" || first["content"] != "same request" {
 		return fmt.Errorf("user conversation was dropped or changed: %+v", messages)
 	}
-	if scenario == "stream-chat" {
+	if geminiChatStreamScenario04384(scenario) {
 		if options, ok := attempt.Body["stream_options"].(map[string]any); !ok || options["include_usage"] != true {
 			return fmt.Errorf("Gemini valid Chat SSE request omitted usage: %+v", attempt.Body)
 		}
-		if _, err := geminiChatSSEProjection043711(result.Client.Body); err != nil {
+		if scenario == "stream-chat-eof" {
+			if !geminiChatEOFWireValid04384(result.Client.Body) {
+				return errors.New("Gemini Chat EOF client trace lost canonical failure bytes")
+			}
+		} else if _, err := geminiChatSSEProjection043711(result.Client.Body); err != nil {
 			return fmt.Errorf("Gemini Chat SSE client lifecycle failed canonical oracle: %w", err)
 		}
 		return nil

@@ -1754,3 +1754,50 @@ Logs: `/tmp/gdx-04384-chat-sse-finish-race.log`,
 `/tmp/gdx-04384-chat-sse-finish-final-test-all.log` and
 `/tmp/gdx-04384-chat-sse-finish-final-verify.log`. Clean candidate executable
 differential validation follows the commit.
+
+The released-executable fail-before run for trailing usage failed only
+Godex's `stream-chat` case on commit
+`ace591890358886b92ed9af119f858b5952c7c24`: Prodex retained the final
+usage-only chunk, while Godex's completed response omitted usage. The
+other 39 cases and mutation controls passed. Log:
+`/tmp/gdx-04384-chat-sse-finish-before-oracle.json`.
+
+Clean commit `8527a718d6d17833c10116cc921e2ad6f4ca04ea` passed all 40
+final Gemini executable cases and mutation controls before its
+fast-forward push to `origin/main`. Log:
+`/tmp/gdx-04384-chat-sse-finish-oracle.json`.
+
+## API-key Gemini EOF failure carries the creation epoch
+
+The tagged Chat-compatible runtime emits failure events through
+`runtime_provider_sse_failed_event`, including the same `created_at` as
+the response-created event. Godex's API-key event builder omitted that
+field. The failure payload now includes the stream's existing creation
+epoch; no new state, clock, helper, dependency, public API or retry policy
+is introduced.
+
+The exact-byte regression in
+`/tmp/gdx-04384-chat-sse-eof-before.log` fails before the one-field fix and
+also checks that a failure cannot emit another terminal event. The new
+`stream-chat-eof` executable case retains committed text, sends a normal
+finish and trailing usage, then ends without DONE. It requires HTTP 200,
+one upstream attempt, four consistent created/item/text events followed by
+one exact canonical failure frame, with no item-done or completed response.
+The matrix now has 41 cases.
+
+The independent EOF fixture and mutation controls verify creation epoch,
+response/item identity, terminal kind, sequence, code, message and CRLF
+bytes. Missing/mismatched failure timestamps, a success event, altered
+errors and framing mutations are rejected. These controls join the
+executable oracle's existing mutation gate.
+
+`rtk go test -race ./internal/gateway/gemini ./tools/differential -count=1`
+passes 841 tests. Source-derived/local tests and released executable
+evidence remain distinct; full parity is not established.
+
+`rtk go test ./...` passes 8,846 tests across 81 packages.
+`rtk proxy make verify` passes all local gates, including full race tests.
+Logs: `/tmp/gdx-04384-chat-sse-eof-race.log`,
+`/tmp/gdx-04384-chat-sse-eof-final-test-all.log` and
+`/tmp/gdx-04384-chat-sse-eof-final-verify.log`. Clean candidate executable
+differential validation follows the commit.

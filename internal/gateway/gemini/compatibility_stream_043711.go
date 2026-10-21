@@ -121,6 +121,7 @@ func (state *geminiChatCompatibleStream043711) failure(writer io.Writer, message
 	}
 	state.done = true
 	_ = state.send(writer, "response.failed", map[string]any{
+		"created_at": state.created,
 		"response": map[string]any{
 			"id": state.id,
 			"error": map[string]any{

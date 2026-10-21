@@ -82,6 +82,7 @@ func geminiNegativeControl() bool {
 		return false
 	}
 	return geminiNativeSSESentinel043711() && geminiChatSSESentinel043711() &&
+		geminiChatEOFSentinel04384() &&
 		geminiMultiTurnSentinel043711() && geminiQuotaNegativeControl043711() &&
 		geminiBufferedArgsNegativeControl04384()
 }
