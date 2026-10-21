@@ -514,3 +514,29 @@ This is a source-pinned local semantics check; the official Gemini
 executable differential remains a broader no-regression fixture rather
 than a guarantee that every extreme usage number has been tested through
 a live API-key service.
+
+## Gemini response media uses first-present branch precedence
+
+Prodex 0.438.4 `gemini_response_media.mojo` first selects the **present**
+`inlineData`/`inline_data` member, then `fileData`/`file_data`, then a
+`text` data URL. Once a higher-priority member is present, the Mojo kernel
+validates its type and required fields but does **not** fall back to a lower
+priority field if that value is null or malformed. The separate special
+media projector likewise chooses `executableCode` before
+`codeExecutionResult` before `videoMetadata` by presence, not by Go map
+cast success. Godex formerly cast each optional object before selecting its
+branch; a present `inlineData:null` with a valid `fileData` or present
+`executableCode:null` with `codeExecutionResult` could emit visible media or
+code output that tagged Prodex suppresses.
+
+Fail-before regressions reproduce invalid/null/scalar primary members,
+invalid primary members before valid aliases or later media, and the native
+completed-response envelope with no fabricated image/tool output. Valid
+inline images, valid file URI output, code-execution results, and actual
+code text remain positive controls. The scoped fix retains member presence
+until the selected branch is processed and moves the media projection into
+its own module, bringing the original native-response file below the
+repository's 400-line source-size default. The obsolete source-size baseline
+entry is removed. These synthetic cases establish source-backed internal
+parity, not live provider authentication, while the official Gemini
+executable differential remains a broad no-regression gate.
