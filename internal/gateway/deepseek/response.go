@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
+	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 )
 
 const (
@@ -16,6 +17,13 @@ const (
 )
 
 func deepSeekChatResponse(body []byte, now time.Time) ([]byte, error) {
+	// The published 0.438.4 DeepSeek response_transform.rs first parses
+	// the WHOLE upstream ChatCompletion as serde_json::Value. Otherwise
+	// Go might emit valid-looking assistant output from a response whose
+	// unused members contain invalid UTF-8, surrogates or serde f64 data.
+	if jsonutil.CheckSerdeBoundary(string(body)) != nil || !jsonutil.CheckSerdeNumberTokens(body) {
+		return nil, errors.New("failed to parse DeepSeek response JSON")
+	}
 	translated, err := chatcompat.ChatResponseWithOptions(body, now, deepSeekResponseOptions())
 	if err != nil {
 		return nil, err

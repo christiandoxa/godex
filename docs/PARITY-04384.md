@@ -799,3 +799,29 @@ is emitted and no malformed history is trusted. This is a local semantic
 regression from the published Rust source; the official DeepSeek executable
 matrix serves as an independent transport no-regression gate, not a claim
 that each malformed payload reached a live provider.
+
+## DeepSeek buffered and streamed response values require whole serde-valid JSON
+
+The published `prodex-provider-core` DeepSeek 0.438.4
+`response_transform.rs` calls `serde_json::from_slice::<Value>` before
+projecting a buffered ChatCompletion into a Responses output. Its SSE
+`stream.rs` likewise parses each complete `data:` chunk as a serde JSON
+value before extracting deltas and tool calls. Godex previously used Go's
+`encoding/json` without checking serde-specific Unicode, depth and numeric
+boundaries on these response paths. Consequently a valid assistant message
+could be emitted even when an unrelated member contained a lone surrogate,
+invalid UTF-8, nested arrays beyond the serde recursion limit, or a
+near-f64-maximum decimal that the tagged serde decoder rejects.
+
+Fail-before tests cover buffered DeepSeek completion output, direct SSE
+chunk projection and an actual translated live stream with a later `[DONE]`.
+The scoped fix rejects those invalid complete values using the shared
+source-matched serde Unicode/depth and numeric validators **before** emitting
+any user-visible assistant text. A malformed stream now produces its
+existing `provider_stream_error` terminal event, not a fabricated successful
+completion; paired Unicode escapes and the serde-valid longer-mantissa
+numeric control still complete normally. The helper for SSE validation is
+separate from the 486-line stream-state file, with the source-size baseline
+reduced to match the shorter implementation. Broader real-provider parity
+and exact Rust error diagnostic strings are not inferred from the local
+semantic tests or the official 30-case transport differential.

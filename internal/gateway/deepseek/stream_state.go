@@ -67,6 +67,9 @@ func (state *deepSeekChatStreamState) observe(data []byte) ([]byte, bool, error)
 	if string(data) == "[DONE]" {
 		return state.complete()
 	}
+	if !deepSeekValidStreamValue04384(data) {
+		return nil, false, fmt.Errorf("failed to parse DeepSeek SSE JSON")
+	}
 	var root map[string]any
 	if err := json.Unmarshal(data, &root); err != nil || root == nil {
 		return nil, false, fmt.Errorf("failed to parse DeepSeek SSE JSON")
@@ -480,13 +483,4 @@ func (state *deepSeekChatStreamState) nextSequenceNumber() uint64 {
 	current := state.sequenceNumber
 	state.sequenceNumber++
 	return current
-}
-
-func firstDeepSeekStreamChoice(root map[string]any) map[string]any {
-	choices, _ := root["choices"].([]any)
-	if len(choices) == 0 {
-		return nil
-	}
-	choice, _ := choices[0].(map[string]any)
-	return choice
 }
