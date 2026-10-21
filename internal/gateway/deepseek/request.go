@@ -8,6 +8,8 @@ import (
 	"io"
 	"strings"
 	"time"
+
+	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 )
 
 const requestMaxBytes = 16 << 20
@@ -87,6 +89,13 @@ func parseResponsesObject(body []byte) (map[string]any, error) {
 func parseResponsesObjectWithoutValidation(body []byte) (map[string]any, error) {
 	if len(body) > requestMaxBytes {
 		return nil, fmt.Errorf("DeepSeek Responses request exceeds %d bytes", requestMaxBytes)
+	}
+	// Tagged 0.438.4 DeepSeek request_transform.rs parses the ENTIRE raw
+	// value with serde_json before using input, model, tools or history.
+	// Invalid unused Unicode, excessive nesting and near-f64-maximum
+	// numbers must not be silently discarded and then replayed as valid.
+	if jsonutil.CheckSerdeBoundary(string(body)) != nil || !jsonutil.CheckSerdeNumberTokens(body) {
+		return nil, errors.New("failed to parse DeepSeek Responses request JSON")
 	}
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.UseNumber()

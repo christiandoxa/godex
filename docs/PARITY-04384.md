@@ -774,3 +774,28 @@ behavior for normal JSON. This semantic slice is established by source and
 local tests; the pinned executable Gemini oracle provides an additional
 transport no-regression check, not real-provider testing of these malformed
 fixtures.
+
+## DeepSeek Responses request translation requires complete serde-valid JSON
+
+The official 0.438.4 `prodex-provider-core` DeepSeek request transformer
+calls `serde_json::from_slice::<Value>` on the complete OpenAI Responses
+input before inspecting its user message, tool calls, reasoning controls or
+model identifier. Godex's `parseResponsesObjectWithoutValidation` previously
+accepted all JSON that Go's `encoding/json` could decode, even when serde
+would reject an otherwise unrelated unpaired Unicode surrogate, invalid
+UTF-8, excessive container nesting, `1e309`, or the near-f64-maximum
+`1.7976931348623158e308`. The invalid extra member was then silently
+lost while Godex forwarded a valid-looking user request. The same decoder
+was used to extract context/history, allowing the malformed request to
+supply replayable user/tool content.
+
+Fail-before tests cover the actual translated upstream request as well as
+the lower-level history parser. A genuine paired surrogate and the pinned
+serde-valid longer-mantissa float remain positive controls. The scoped
+change runs the project's shared, source-matched serde Unicode/depth and
+number-token validators before the usual Go decoder, preserving existing
+model/policy checks and ordinary request bytes. No invalid provider request
+is emitted and no malformed history is trusted. This is a local semantic
+regression from the published Rust source; the official DeepSeek executable
+matrix serves as an independent transport no-regression gate, not a claim
+that each malformed payload reached a live provider.
