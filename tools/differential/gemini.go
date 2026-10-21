@@ -104,6 +104,10 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	if geminiChatStreamScenario04384(mock.scenario) {
 		w.Header().Set("Content-Type", "text/event-stream")
+		if mock.scenario == "stream-chat-error" {
+			_, _ = io.WriteString(w, "data: "+`{"error":{"type":null,"code":"must-not-borrow","message":null,"detail":"must-not-borrow"},"choices":[{"delta":{"content":"must-not-emit"}}]}`+"\n\ndata: [DONE]\n\n")
+			return
+		}
 		_, _ = io.WriteString(w, "data: "+`{"id":"chat-synthetic","model":"gemini-3.1-pro-preview","choices":[{"delta":{"content":"synthetic-"},"finish_reason":null}]}`+"\n\n")
 		_, _ = io.WriteString(w, "data: "+`{"id":"chat-synthetic","model":"gemini-3.1-pro-preview","choices":[{"delta":{"content":"ok<>&/🌍\u2028\u2029"},"finish_reason":null}]}`+"\n\n")
 		_, _ = io.WriteString(w, "data: "+`{"id":"chat-synthetic","model":"gemini-3.1-pro-preview","choices":[{"delta":{},"finish_reason":"stop"}]}`+"\n\n")
@@ -205,6 +209,7 @@ func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit string
 			"stream-native",
 			"stream-chat",
 			"stream-chat-eof",
+			"stream-chat-error",
 			"multi-turn-tool",
 			"quota-plain-429",
 			"quota-structured-429",
@@ -418,7 +423,11 @@ func geminiCompare(scenario string, prodex, godex geminiCandidateResult) []strin
 		}
 		return differences
 	}
-	if scenario == "stream-chat-eof" {
+	if scenario == "stream-chat-error" {
+		if !geminiChatErrorWireValid04384(prodex.Client.Body) || !geminiChatErrorWireValid04384(godex.Client.Body) {
+			differences = append(differences, "client Gemini embedded error precedence or failure bytes differ")
+		}
+	} else if scenario == "stream-chat-eof" {
 		if !geminiChatEOFWireValid04384(prodex.Client.Body) || !geminiChatEOFWireValid04384(godex.Client.Body) {
 			differences = append(differences, "client Gemini Chat EOF failure bytes differ")
 		}
@@ -517,7 +526,11 @@ func geminiFixtureInvariant(scenario string, result geminiCandidateResult) error
 		if options, ok := attempt.Body["stream_options"].(map[string]any); !ok || options["include_usage"] != true {
 			return fmt.Errorf("Gemini valid Chat SSE request omitted usage: %+v", attempt.Body)
 		}
-		if scenario == "stream-chat-eof" {
+		if scenario == "stream-chat-error" {
+			if !geminiChatErrorWireValid04384(result.Client.Body) {
+				return errors.New("Gemini embedded error leaked creation/content or incorrect error fields")
+			}
+		} else if scenario == "stream-chat-eof" {
 			if !geminiChatEOFWireValid04384(result.Client.Body) {
 				return errors.New("Gemini Chat EOF client trace lost canonical failure bytes")
 			}

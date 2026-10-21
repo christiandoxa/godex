@@ -3,7 +3,8 @@ package deepseek
 import (
 	"bytes"
 	"encoding/json"
-	"strconv"
+
+	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 )
 
 func deepSeekEmbeddedStreamError(root map[string]any, data []byte) (string, string, bool) {
@@ -15,31 +16,7 @@ func deepSeekEmbeddedStreamError(root map[string]any, data []byte) (string, stri
 	if err != nil {
 		return "provider_stream_error", "Provider stream returned an embedded error", true
 	}
-	if message, ok := raw.(string); ok {
-		return "provider_stream_error", message, true
-	}
-	failure, _ := raw.(map[string]any)
-	value, exists := failure["type"]
-	if !exists {
-		value = failure["code"]
-	}
-	code := "provider_stream_error"
-	switch value := value.(type) {
-	case string:
-		code = value
-	case json.Number:
-		if integer, err := value.Int64(); err == nil && value != "-0" {
-			code = strconv.FormatInt(integer, 10)
-		}
-	}
-	value, exists = failure["message"]
-	if !exists {
-		value = failure["detail"]
-	}
-	message, ok := value.(string)
-	if !ok {
-		message = "Provider stream returned an embedded error"
-	}
+	code, message := chatcompat.ChatStreamError(raw)
 	return code, message, true
 }
 

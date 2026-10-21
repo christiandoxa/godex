@@ -232,6 +232,10 @@ transport and credential; a runtime pool exposes only accounts whose private
 Claude auth-status probe with provider credential environment variables removed.
 gateway/chatcompat owns the reusable Responses-to-Chat request transform and Chat
 JSON/SSE-to-Responses transform. It contains no credential or routing policy.
+Its shared Chat Completions stream-error classifier owns exact field-presence
+and numeric-kind rules for the DeepSeek and Gemini adapters. Each adapter
+acquires its own input, preserves JSON number types, and controls response
+commitment and redaction; the classifier performs no I/O or retry decisions.
 entity/provider owns provider error classification and static fallback-chain
 policy, so bare 429, structured quota/rate errors, auth failures, model-not-found,
 and transient failures are interpreted consistently by Anthropic and Copilot.

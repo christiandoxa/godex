@@ -14,6 +14,7 @@ import (
 
 	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 	"github.com/christiandoxa/godex/internal/helper/jsonutil"
+	"github.com/christiandoxa/godex/internal/helper/redact"
 	"github.com/christiandoxa/godex/internal/helper/sse"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	"github.com/google/uuid"
@@ -39,6 +40,7 @@ type geminiChatCompatibleStream043711 struct {
 	itemID       string
 	created      int64
 	sequence     int
+	started      bool
 	done         bool
 	itemOpened   bool
 	text         strings.Builder
@@ -115,29 +117,23 @@ func (state *geminiChatCompatibleStream043711) complete(writer io.Writer) error 
 	})
 }
 
-func (state *geminiChatCompatibleStream043711) failure(writer io.Writer, message string) {
+func (state *geminiChatCompatibleStream043711) failure(writer io.Writer, code, message string) error {
 	if state.done {
-		return
+		return nil
 	}
 	state.done = true
-	_ = state.send(writer, "response.failed", map[string]any{
+	return state.send(writer, "response.failed", map[string]any{
 		"created_at": state.created,
 		"response": map[string]any{
 			"id": state.id,
 			"error": map[string]any{
-				"code": "provider_stream_error", "message": message,
+				"code": code, "message": redact.Secrets(message),
 			},
 		},
 	})
 }
 
-func (state *geminiChatCompatibleStream043711) observeChatChunk(data []byte) {
-	var chunk map[string]any
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.UseNumber()
-	if err := decoder.Decode(&chunk); err != nil {
-		return
-	}
+func (state *geminiChatCompatibleStream043711) observeChatChunk(chunk map[string]any) {
 	if model, ok := chunk["model"].(string); ok && model != "" {
 		state.model = model
 	}
@@ -161,9 +157,26 @@ func (state *geminiChatCompatibleStream043711) accept(writer io.Writer, data []b
 	if state.done {
 		return nil
 	}
-	if !bytes.Equal(bytes.TrimSpace(data), []byte("[DONE]")) {
-		state.observeChatChunk(data)
+	if bytes.Equal(bytes.TrimSpace(data), []byte("[DONE]")) {
+		return state.complete(writer)
 	}
+	root, valid := geminiSerdeResponseObject04384(data)
+	if !valid {
+		return errors.New("failed to parse Gemini chat completions SSE JSON")
+	}
+	if value, present := root["error"]; present {
+		code, message := chatcompat.ChatStreamError(value)
+		return state.failure(writer, code, message)
+	}
+	if !state.started {
+		state.started = true
+		if err := state.send(writer, "response.created", map[string]any{
+			"created_at": state.created, "response": map[string]any{"id": state.id},
+		}); err != nil {
+			return err
+		}
+	}
+	state.observeChatChunk(root)
 	translated, supported, err := chatcompat.TranslateChatSSEData(bytes.TrimSpace(data))
 	if err != nil {
 		return err
@@ -221,12 +234,6 @@ func pumpGeminiChatCompatibleStream043711(source io.ReadCloser, writer *io.PipeW
 	state := &geminiChatCompatibleStream043711{
 		id: responseID, created: time.Now().Unix(),
 	}
-	if err := state.send(writer, "response.created", map[string]any{
-		"created_at": state.created,
-		"response":   map[string]any{"id": state.id},
-	}); err != nil {
-		return
-	}
 	decoder := sse.NewDecoder(1 << 20)
 	buffer := make([]byte, 32<<10)
 	for {
@@ -234,7 +241,7 @@ func pumpGeminiChatCompatibleStream043711(source io.ReadCloser, writer *io.PipeW
 		if n > 0 {
 			for _, payload := range decoder.Feed(buffer[:n]) {
 				if failure := state.accept(writer, payload); failure != nil {
-					state.failure(writer, "provider stream failed")
+					_ = state.failure(writer, "provider_stream_error", "provider stream failed")
 					return
 				}
 			}
@@ -243,15 +250,15 @@ func pumpGeminiChatCompatibleStream043711(source io.ReadCloser, writer *io.PipeW
 			if errors.Is(err, io.EOF) {
 				for _, payload := range decoder.Finish() {
 					if failure := state.accept(writer, payload); failure != nil {
-						state.failure(writer, "provider stream failed")
+						_ = state.failure(writer, "provider_stream_error", "provider stream failed")
 						return
 					}
 				}
 				if !state.done {
-					state.failure(writer, "unexpected end of stream")
+					_ = state.failure(writer, "provider_stream_error", "unexpected end of stream")
 				}
 			} else {
-				state.failure(writer, "provider stream failed")
+				_ = state.failure(writer, "provider_stream_error", "provider stream failed")
 			}
 			return
 		}

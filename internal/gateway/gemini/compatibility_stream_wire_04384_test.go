@@ -37,8 +37,10 @@ func TestProdex04384GeminiAPIKeySSEKeepsIntegerUsageTokens(t *testing.T) {
 	for _, number := range []string{"2", "9007199254740993", "18446744073709551615"} {
 		t.Run(number, func(t *testing.T) {
 			state := &geminiChatCompatibleStream043711{id: "resp-fixture", created: 1}
-			state.observeChatChunk([]byte(`{"usage":{"prompt_tokens":` + number + `,"completion_tokens":1,"total_tokens":` + number + `}}`))
 			var output bytes.Buffer
+			if err := state.accept(&output, []byte(`{"usage":{"prompt_tokens":`+number+`,"completion_tokens":1,"total_tokens":`+number+`}}`)); err != nil {
+				t.Fatal(err)
+			}
 			if err := state.complete(&output); err != nil {
 				t.Fatal(err)
 			}

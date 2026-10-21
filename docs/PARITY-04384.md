@@ -1868,3 +1868,52 @@ suite, formatting, source size, vet and build. The final local
 verification log is `/tmp/gdx-04384-deepseek-sse-error-final2-verify.log`;
 the full-test log is `/tmp/gdx-04384-deepseek-sse-error-final2-test-all.log`.
 The exact clean-commit executable differential follows the commit.
+
+Clean commit `dfb50c7fcdca02a63d1819be77902f19e992463a` passed all 33
+DeepSeek executable scenarios and mutation controls before its fast-forward
+push to `origin/main`. The full matrix includes the three new embedded-error
+cases. Log: `/tmp/gdx-04384-deepseek-sse-error-oracle.json`.
+
+## API-key Gemini embedded errors precede response creation
+
+The tagged API-key Gemini stream uses the same Chat Completions error codec
+as DeepSeek. `observe_chat_chunk` checks a present error before acquiring
+metadata, emitting response-created, or processing any candidate content.
+Failures retain field-presence semantics, numeric kinds and the owned
+response ID, redact provider-message credentials and suppress later DONE.
+
+Godex's Gemini adapter ignored embedded errors and eagerly emitted creation
+before inspecting its first packet. The stream now checks errors before
+creation/content and emits created once for the first valid non-error packet.
+The established native-Gemini error codec remains separate because its
+status/message rules differ from Chat Completions. Valid scalar/array
+packets and the bounded framing/parser behavior retain their own contracts;
+partial-JSON accumulation and broader tool/reasoning parity are separate work.
+
+The existing DeepSeek Chat Completions classifier moves unchanged into
+`gateway/chatcompat/stream_error.go`, with focused tests and two real
+consumers. DeepSeek keeps its failure-path numeric acquisition; Gemini
+reuses its complete serde-valid JSON acquisition and passes decoded metadata
+directly, avoiding another decode. This is an existing protocol ownership
+boundary, not a generic helper or application policy. No dependency,
+persisted field, credential-selection policy or goroutine is added.
+
+Fail-before log: `/tmp/gdx-04384-gemini-chat-error-before.log`. Local pump
+coverage checks null/string errors, primary null fields, empty strings, the
+signed maximum, integral floats, Unicode, no leaked created/text/completed
+events, retained committed identity and synthetic bearer redaction. The
+`stream-chat-error` executable fixture sends a primary-null error plus
+conflicting fallback fields and text, followed by DONE. It requires a single
+exact failure frame with sequence zero, an owned UUIDv7 and creation epoch,
+HTTP 200, one upstream attempt and successful child exit. Its independent
+mutation gate rejects secondary-field borrowing, creation/content leaks,
+terminal/sequence changes and noncanonical framing. The Gemini matrix now
+contains 42 cases.
+
+`rtk go test -race ./internal/gateway/gemini ./internal/gateway/chatcompat ./internal/gateway/deepseek ./tools/differential -count=1`
+passes 1,271 tests. `rtk go test ./...` passes 8,894 across 81 packages.
+Logs: `/tmp/gdx-04384-gemini-chat-error-final-race.log` and
+`/tmp/gdx-04384-gemini-chat-error-final-test-all.log`. The complete local
+`rtk proxy make verify` passes all local gates, including the full race
+suite. Gate log: `/tmp/gdx-04384-gemini-chat-error-final-verify.log`.
+Exact clean-commit executable validation follows the commit.
