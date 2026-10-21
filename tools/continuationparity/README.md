@@ -994,3 +994,20 @@ even though the separate HTTP 400 text classifier recognizes that message.
 Both controls compare full client-visible SSE bytes, authenticated Ready
 receipts, a single upstream inference and independent durable owner/turn
 projections on Prodex and Godex.
+
+The HTTP response-session oracle also tests that a root `id` is a verified
+continuation response only for `object:"response"` or a literal `.response`
+suffix. A padded `" response"`, `"response "`, `"provider.response "`, or
+tab-suffixed kind must not mint a response binding, even though Go's usual
+whitespace-trimming helper would make those kinds look equivalent. The
+published Prodex Mojo planner compares the canonical kind without trimming.
+Two positive exact-kind controls preserve normal ownership. The oracle
+checks the full returned JSON, authenticated Ready upstream request and
+independent durable ID ownership on both binaries.
+
+For a quick, source/manifest-pinned differential of the six untrimmed
+`object`-kind response-ID controls, use `--http-response-kind` with the
+same `--prodex`, `--prodex-source`, `--godex`, `--godex-source` and
+`--godex-commit` arguments. This focused mode is also included unchanged
+in the comprehensive `--http-session-conflict` release matrix; it avoids
+rerunning unrelated long-lived SSE tests when iterating on root-ID parsing.

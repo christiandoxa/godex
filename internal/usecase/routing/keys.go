@@ -112,11 +112,19 @@ func responseID(object map[string]any) string {
 	if id := objectString(object, "response_id"); id != "" {
 		return id
 	}
-	objectKind := objectString(object, "object")
-	if objectKind == "response" || strings.HasSuffix(objectKind, ".response") {
+	if responseKindAdmitsRootID04383(object) {
 		return objectString(object, "id")
 	}
 	return ""
+}
+
+// The compiled response metadata planner matches the serde_json-decoded
+// `object` text exactly: "response" or an untrimmed ".response" suffix.
+// Unlike an identifier value, whitespace here changes the event kind and
+// must never turn an opaque root id into a hard continuation owner.
+func responseKindAdmitsRootID04383(object map[string]any) bool {
+	kind, _ := object["object"].(string)
+	return kind == "response" || strings.HasSuffix(kind, ".response")
 }
 
 func responseObjectTurnState(object map[string]any) string {

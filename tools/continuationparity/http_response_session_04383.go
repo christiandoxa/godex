@@ -25,6 +25,8 @@ var httpResponseSessionShapes04383 = []string{
 	"opaque-data-turn", "opaque-result-turn", "opaque-payload-turn", "canonical-nested-response",
 	"turn-null-name", "turn-null-value", "turn-null-name-then-real", "turn-null-value-then-real",
 	"turn-absent-name-control", "turn-absent-value-control",
+	"root-object-space-leading", "root-object-space-trailing", "root-object-suffix-space",
+	"root-object-suffix-tab", "root-object-exact-response", "root-object-exact-suffix",
 }
 
 func httpResponseSessionRequest04383(shape string) string {
@@ -38,6 +40,18 @@ func httpResponseSessionReply04383(shape string) string {
 	switch shape {
 	case "body-session":
 		return `{"id":"resp-response-session","object":"response","session_id":"payload-only-session","output":[]}`
+	case "root-object-space-leading":
+		return `{"object":" response","id":"resp-response-session","output":[]}`
+	case "root-object-space-trailing":
+		return `{"object":"response ","id":"resp-response-session","output":[]}`
+	case "root-object-suffix-space":
+		return `{"object":"provider.response ","id":"resp-response-session","output":[]}`
+	case "root-object-suffix-tab":
+		return `{"object":"provider.response\t","id":"resp-response-session","output":[]}`
+	case "root-object-exact-response":
+		return `{"object":"response","id":"resp-response-session","output":[]}`
+	case "root-object-exact-suffix":
+		return `{"object":"provider.response","id":"resp-response-session","output":[]}`
 	case "nested-session":
 		return `{"id":"resp-response-session","object":"response","response":{"session_id":"payload-only-session"},"output":[]}`
 	case "data-session":
@@ -132,6 +146,23 @@ func httpResponseSessionHeader04383(shape string) string {
 	return ""
 }
 
+// A focused, source-pinned diagnostic slice avoids rerunning the entire
+// multi-minute HTTP session suite for six response metadata-kind controls.
+// The broad --http-session-conflict fixture still includes every one.
+func httpResponseKindShapes04383() []string {
+	return []string{"root-object-space-leading", "root-object-space-trailing", "root-object-suffix-space",
+		"root-object-suffix-tab", "root-object-exact-response", "root-object-exact-suffix"}
+}
+
+func runHTTPResponseKindProduct04383(root string, p product) error {
+	for _, shape := range httpResponseKindShapes04383() {
+		if err := runHTTPResponseSessionCase04383(filepath.Join(root, shape), p, shape); err != nil {
+			return fmt.Errorf("response object kind %s: %w", shape, err)
+		}
+	}
+	return nil
+}
+
 func runHTTPResponseSessionProduct04383(root string, p product) error {
 	for _, shape := range httpResponseSessionShapes04383 {
 		if err := runHTTPResponseSessionCase04383(filepath.Join(root, shape), p, shape); err != nil {
@@ -186,7 +217,9 @@ func runHTTPResponseSessionCase04383(root string, p product, shape string) error
 		wantSession = "main"
 	}
 	wantResponse := "main"
-	if strings.HasPrefix(shape, "opaque-") || strings.HasPrefix(shape, "invalid-surrogate-") || shape == "response-id-1025" ||
+	if strings.HasPrefix(shape, "opaque-") || strings.HasPrefix(shape, "invalid-surrogate-") ||
+		strings.HasPrefix(shape, "root-object-space-") || shape == "root-object-suffix-space" || shape == "root-object-suffix-tab" ||
+		shape == "response-id-1025" ||
 		shape == "response-id-control-c0" || shape == "response-id-control-c1" {
 		wantResponse = ""
 	}

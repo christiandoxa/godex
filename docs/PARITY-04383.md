@@ -3510,3 +3510,29 @@ request, two authenticated Ready profiles, and either the correct removal
 (structured) or retention (plain text) of original and streamed response
 owners and the associated turn-state binding. Full provider/OS parity
 remains separately open.
+
+## Root `object` kind must match untrimmed response identity syntax
+
+The tagged 0.438.3 `runtime_response_metadata_json_v1` Mojo planner admits
+an otherwise top-level `id` as a verified response identity only when its
+`object` member is exactly `"response"` or the raw decoded type text ends
+with the exact `.response` suffix. Whitespace before/after `"response"`, or
+following a qualified `.response` suffix, changes that match. Godex had
+called `objectString(object, "object")`, which trims Unicode whitespace;
+this could convert an upstream opaque `{ "object": "response ", "id": ... }`
+into a hard continuation response owned by the selected account.
+
+Fail-before tests cover leading/trailing/both-side whitespace, padded
+qualified suffixes, trailing tab, and canonical literal/suffix positive
+controls. Both the single-ID projector and the independent three-ID
+response alias collector now use one exact untrimmed object-kind helper;
+other actual ID normalization and client bytes remain unchanged. A second
+memory/durable Router regression proves invalid root kinds cannot persist
+a foreign previous-response owner while valid kinds continue to bind.
+
+The pinned Prodex 0.438.3 `--phase=http-session-conflict` oracle now includes
+six corresponding HTTP response-body variants. Each executable must choose
+main with authenticated Ready evidence on two profiles, return exactly the
+upstream response, and either leave the root ID unbound or persist main
+for the exact valid kind. The finite test does not claim complete provider
+or native-platform 1:1 parity.

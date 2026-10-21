@@ -52,8 +52,7 @@ func appendResponseObjectIDs04383(ids []string, object map[string]any) []string 
 		objectString(response, "id"),
 		objectString(object, "response_id"),
 	}
-	kind := objectString(object, "object")
-	if kind == "response" || strings.HasSuffix(kind, ".response") {
+	if responseKindAdmitsRootID04383(object) {
 		candidates[2] = objectString(object, "id")
 	}
 	for _, candidate := range candidates {
