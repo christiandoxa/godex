@@ -187,3 +187,24 @@ These are isolated source- and dependency-aligned semantic regressions on
 synthetic Kiro envelopes; they **do not** claim a live authenticated Kiro
 CLI 2.33.0 handshake or full provider parity. Actual private credentials
 and the installed older Kiro CLI are not exercised.
+
+## Kiro tool activity labels and statuses require bytewise ASCII case folding
+
+The published `kiro.mojo` `kiro_activity_contains` checks sensitive activity
+labels with **ASCII A–Z byte folding only**, and
+`kiro_activity_status_code` uses the same rule after trimming status
+whitespace. Go's `strings.ToLower` performs Unicode case conversion instead:
+U+212A KELVIN SIGN (`K`) becomes ASCII `k`, and U+0130 dotted capital I
+(`İ`) becomes ASCII `i`. This made names such as `toKen report` or
+`credentİal report` falsely match the secret-name denylist, and accepted
+`FAİLED` as a recognized `failed` status when the pinned kernel considers
+it `unknown`. Both mismatches were reproduced as fail-before local tests.
+
+Godex now folds only ASCII capital bytes for both sensitive-label scanning
+and known activity statuses, retaining all non-ASCII UTF-8 bytes unchanged.
+Canonical `TOKEN`, `Authorization`, `RUNNING`, `FAILED` and padded ASCII
+controls remain correctly redacted or classified; Unicode confusables no
+longer steal those identities. The normalization is limited to internal
+synthetic activity metadata, not credentials or the original ACP wire.
+This is source-pinned Kiro 0.438.4 parity, not an authenticated 2.33.0
+Kiro CLI binary experiment.

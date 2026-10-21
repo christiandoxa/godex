@@ -73,8 +73,24 @@ func kiroActivityField(value string, maximum int) string {
 	return truncateActivityUTF8(value, maximum)
 }
 
+// Kiro's compiled activity kernel folds only ASCII capital letters.
+// Keep all non-ASCII UTF-8 bytes byte-for-byte rather than normalizing or
+// Unicode-casefolding potentially meaningful activity names.
+func kiroASCIIOnlyLower04384(value string) string {
+	buffer := []byte(value)
+	for i := range buffer {
+		if buffer[i] >= 'A' && buffer[i] <= 'Z' {
+			buffer[i] += 'a' - 'A'
+		}
+	}
+	return string(buffer)
+}
+
 func kiroActivityUnsafe(value string) bool {
-	lower := strings.ToLower(value)
+	// Tagged kiro.mojo compares forbidden labels after ASCII-only byte
+	// folding. Unicode lowercase could collapse Kelvin K into ASCII k or
+	// dotted İ into i, incorrectly hiding a distinct non-ASCII label.
+	lower := kiroASCIIOnlyLower04384(value)
 	for _, term := range kiroActivitySensitiveTerms {
 		if strings.Contains(lower, term) {
 			return true
@@ -84,10 +100,13 @@ func kiroActivityUnsafe(value string) bool {
 }
 
 func kiroActivityStatus(value string) string {
-	switch strings.ToLower(strings.TrimSpace(value)) {
+	// Mojo rich_view_matches_literal(..., True) folds A-Z bytes only.
+	// An uppercase Unicode lookalike is not a recognized ASCII status.
+	lower := kiroASCIIOnlyLower04384(strings.TrimSpace(value))
+	switch lower {
 	case "pending", "in_progress", "running", kiroStatusCompleted,
 		kiroStatusFailed, "error", kiroStatusCancelled, kiroStatusTruncated:
-		return strings.ToLower(strings.TrimSpace(value))
+		return lower
 	default:
 		return "unknown"
 	}
