@@ -26,7 +26,7 @@ func TestProdex043713GeminiAPIKeyBufferedAlwaysReplacesProviderID(t *testing.T) 
 				StatusCode: http.StatusOK,
 				Header:     http.Header{"Content-Type": []string{"application/json"}},
 				Body:       io.NopCloser(strings.NewReader(string(body))),
-			})
+			}, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

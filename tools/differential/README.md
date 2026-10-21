@@ -361,6 +361,14 @@ metadata. These scenarios are included in `--scenario all`.
 
 ## Gemini wrapped native response oracle (0.438.2)
 
+The active 0.438.4 oracle also checks original top-level `id` type presence.
+When it is a string (including empty), the API-key bridge retains the native
+`responseId`/trace identity produced by the Gemini transform. Otherwise it
+generates the `resp_deepseek_` UUIDv7 used by the wrapped fixtures below.
+The original `id` is never borrowed as a native identity alias. Canonical
+wire cases compare every response byte except the validated random UUID;
+non-object envelope cases require the exact failed empty-response contract.
+
 The full `--gemini` differential includes two additional buffered native
 GenerateContent cases with a nested `response` envelope: with a string
 `traceId` and with no `traceId`. Both independently require visible text,

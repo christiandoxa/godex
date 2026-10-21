@@ -118,6 +118,10 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	if response, ok := geminiSourceIDResponse04384(mock.scenario); ok {
+		_, _ = io.WriteString(w, response)
+		return
+	}
 	if response, ok := geminiEnvelopeFixture04384(mock.scenario); ok {
 		_, _ = io.WriteString(w, response)
 		return
@@ -181,7 +185,7 @@ func (mock *geminiMock) recorded() []geminiCapturedRequest {
 
 func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit string) error {
 	return runGeminiDifferentialCases04384(prodexBin, godexBin, prodexCommit, godexCommit,
-		[]string{"chat-request", "orphan-tool", "chat-response", "wrapped-response-no-trace", "wrapped-response-trace", "stream-native", "stream-chat", "multi-turn-tool", "quota-plain-429", "quota-structured-429", "invalid-wrapped-tool-parameters", "invalid-flat-tool-parameters", "buffered-null-tool-text", "buffered-media-invalid-inline", "buffered-media-invalid-code", "buffered-media-suppressed-code", "buffered-grounding-null-status", "buffered-args-null", "buffered-args-absent", "buffered-args-empty", "buffered-args-wrapped-null", "buffered-args-canonical-wire", "buffered-args-patch-fallback", "buffered-envelope-null", "buffered-envelope-array", "buffered-envelope-scalar", "buffered-value-array", "buffered-value-number"})
+		[]string{"chat-request", "orphan-tool", "chat-response", "wrapped-response-no-trace", "wrapped-response-trace", "stream-native", "stream-chat", "multi-turn-tool", "quota-plain-429", "quota-structured-429", "invalid-wrapped-tool-parameters", "invalid-flat-tool-parameters", "buffered-null-tool-text", "buffered-media-invalid-inline", "buffered-media-invalid-code", "buffered-media-suppressed-code", "buffered-grounding-null-status", "buffered-args-null", "buffered-args-absent", "buffered-args-empty", "buffered-args-wrapped-null", "buffered-args-canonical-wire", "buffered-args-patch-fallback", "buffered-envelope-null", "buffered-envelope-array", "buffered-envelope-scalar", "buffered-value-array", "buffered-value-number", "buffered-source-id-string", "buffered-source-id-empty", "buffered-source-id-wrapped", "buffered-source-id-null"})
 }
 
 func runGeminiDifferentialCases04384(prodexBin, godexBin, prodexCommit, godexCommit string, cases []string) error {
@@ -498,7 +502,12 @@ func geminiFixtureInvariant(scenario string, result geminiCandidateResult) error
 		}
 		return nil
 	}
-	if err := geminiBufferedIdentityInvariant043711(body); err != nil {
+	_, _, sourceIDFixture := geminiSourceIDFixture04384(scenario)
+	if sourceIDFixture {
+		if err := geminiSourceIDInvariant04384(scenario, body); err != nil {
+			return err
+		}
+	} else if err := geminiBufferedIdentityInvariant043711(body); err != nil {
 		return err
 	}
 	if body["model"] != "gemini-3.1-pro-preview" || len(output) == 0 {

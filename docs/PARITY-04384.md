@@ -1112,3 +1112,42 @@ account or credential is involved.
 `rtk go test ./...` passes 8,639 tests across 81 packages. The final
 `rtk proxy make verify` passes formatting, source size, framework,
 cross-build/test compilation, installers, vet, full race and build checks.
+
+## API-key Gemini typed fallback identity respects original string IDs
+
+The preceding clean envelope commit
+`b81f3e782aaa626fa47e1daecd8b16227a26cede` passed all 28 Gemini and all 30
+DeepSeek executable scenarios, including negative controls, before its
+fast-forward push to `origin/main`.
+
+Prodex 0.438.4's `runtime_deepseek_chat_buffered_response_parts` first
+accepts the Gemini provider transform, then calls
+`runtime_deepseek_apply_typed_fallback_ids` with the original upstream value.
+That function generates a `resp_deepseek_` UUIDv7 only when the original
+top-level `id` is not a string. An explicit string, including an empty one,
+preserves the provider transform's identity selected from `responseId` or
+`traceId`; it does not make the original `id` a response-ID alias. Godex
+previously generated a UUID unconditionally and discarded that distinction.
+
+Fail-before HTTP regressions on `b81f3e7` cover string/empty original IDs,
+with missing/null/numeric IDs as UUID-generation controls. Both direct and
+wrapped native payloads are exercised through the API-key response path.
+The existing identity rewriter now receives the original source map and
+uses the same type-presence decision before UUID generation. It retains
+timestamp omission, canonical JSON output, header handling, and strict
+translated-object validation. Existing direct helper tests explicitly use
+an absent original source and retain their full UUID assertions. The
+protocol decision stays private to `gateway/gemini`; no account ownership,
+continuation store, shared helper, or persistence contract changes.
+
+The executable oracle adds four source-ID cases: normal string, empty
+string, wrapped string and null. Their independent guards require the exact
+preserved provider ID or a valid generated UUIDv7 as appropriate, while
+retaining request, output, usage, status and attempt comparisons. Mutation
+tests reject borrowing the original source ID or emitting a native
+timestamp. Clean candidate executable validation follows local gates and
+commit; source-derived unit coverage alone is not binary evidence.
+
+`rtk go test ./internal/gateway/gemini ./tools/differential -count=1` passes
+685 tests; `rtk go test ./...` passes 8,641 across 81 packages.
+`rtk proxy make verify` passes its full local gate, including race tests.

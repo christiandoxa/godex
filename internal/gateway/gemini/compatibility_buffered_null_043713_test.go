@@ -18,7 +18,7 @@ func TestProdex043713GeminiAPIKeyRejectsNonObjectBufferedEnvelope(t *testing.T) 
 				StatusCode: http.StatusOK,
 				Header:     http.Header{"Content-Type": []string{"application/json"}},
 				Body:       io.NopCloser(strings.NewReader(payload)),
-			})
+			}, nil)
 			if err == nil {
 				t.Fatal("non-object Gemini API-key upstream body accepted")
 			}

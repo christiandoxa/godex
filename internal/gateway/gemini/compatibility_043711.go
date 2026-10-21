@@ -149,5 +149,5 @@ func translateGeminiChatOrNativeResponse043711(
 	if err != nil {
 		return nil, err
 	}
-	return normalizeGeminiAPIKeyBufferedIdentity043711(translated)
+	return normalizeGeminiAPIKeyBufferedIdentity043711(translated, root)
 }
