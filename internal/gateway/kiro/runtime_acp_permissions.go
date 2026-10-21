@@ -20,19 +20,29 @@ func permissionACPServerResponse(id, params json.RawMessage) map[string]any {
 }
 
 func acpPermissionOption(params json.RawMessage) string {
-	var value struct {
-		Options []struct {
-			OptionID string `json:"optionId"`
-			Kind     string `json:"kind"`
-		} `json:"options"`
-	}
+	// Tagged Rust reads params/options as serde_json::Value. It skips
+	// unrelated scalars/objects with invalid types instead of rejecting
+	// the entire options list through typed []struct unmarshalling.
+	var value map[string]any
 	if json.Unmarshal(params, &value) != nil {
 		return ""
 	}
+	options, ok := value["options"].([]any)
+	if !ok {
+		return ""
+	}
 	for _, kind := range []string{"allow_once", "allow_always"} {
-		for _, option := range value.Options {
-			if option.Kind == kind {
-				return option.OptionID
+		for _, raw := range options {
+			option, ok := raw.(map[string]any)
+			if !ok {
+				continue
+			}
+			if option["kind"] == kind {
+				// Do not skip a selected allow_once with missing/non-string
+				// optionId to borrow a later option. Rust selects the first
+				// matching kind then requires its id to be a string.
+				id, _ := option["optionId"].(string)
+				return id
 			}
 		}
 	}

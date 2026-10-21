@@ -34,13 +34,12 @@ func TestProdex04384KiroACPUsageCostCanonicalF64MatchesSerde(t *testing.T) {
 	}
 }
 
-// Rust's provider core always passes {"cost": null} as the extra field when
-// the Option<RuntimeKiroAcpCost> is None. Missing and explicit null cost
-// therefore carry the same explicit key rather than silently omitting it.
+// Rust's provider core always serializes the *output* {"cost":null}
+// when there is no cost. Only ABSENT cost at the ACP update input is
+// accepted as None; explicitly PRESENT null is a serde Cost parse failure.
 func TestProdex04384KiroACPUsageWithoutCostRetainsNullField(t *testing.T) {
 	for _, tc := range []struct{ name, extra string }{
 		{"missing-cost", ""},
-		{"explicit-null-cost", `,"cost":null`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			params := `{"sessionId":"s","update":{"sessionUpdate":"usage_update","used":1,"size":9` + tc.extra + `}}`

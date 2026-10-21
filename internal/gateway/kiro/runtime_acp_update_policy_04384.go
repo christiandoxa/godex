@@ -50,7 +50,10 @@ func kiroACPValidatedUpdate04384(envelope acpEnvelope) (map[string]any, bool) {
 	case "usage_update":
 		ok = kiroACPUint64Value04384(update["used"]) && kiroACPUint64Value04384(update["size"])
 		if ok {
-			if cost, present := update["cost"]; present && cost != nil {
+			// Tagged Rust uses get("cost").cloned().map(from_value::<Cost>)
+			// .transpose(): ABSENT is None, but PRESENT JSON null is a
+			// failed deserialize, never an accepted missing cost.
+			if cost, present := update["cost"]; present {
 				ok = kiroACPCost04384(cost)
 			}
 		}

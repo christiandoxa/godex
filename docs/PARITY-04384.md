@@ -271,3 +271,45 @@ reason when that member is not a string. It does not change the original
 ACP prompt-result bytes or the independent Kiro cost/tool-activity policy.
 This source-aligned synthetic case is not a claim of live Kiro CLI 2.33.0
 end-to-end certification.
+
+## Kiro ACP sub-agent permissions select from heterogeneous JSON values
+
+The tagged Rust `runtime_kiro_acp_reject_unsupported_server_request`
+handles `session/request_permission` in sub-agent mode by reading
+`params.options` as a generic `serde_json::Value` array. It looks for the
+first `kind:"allow_once"` (or, if none, the first `"allow_always"`), then
+checks **only that chosen option's** `optionId` as a string. Unrelated
+options can have null, numeric, array or malformed field types and are
+simply skipped. An already selected `allow_once` with a missing/non-string
+ID instead produces the cancelled outcome; it must not silently borrow
+another option.
+
+Godex previously parsed all options into a strict `[]struct` and cancelled
+the entire permission request when an unrelated option contained a number
+or an array, even if a valid one-time choice followed it. Fail-before tests
+cover those heterogeneous lists and the actual JSON-RPC response map,
+including allow-once precedence, the allow-always fallback, malformed
+selected IDs, empty IDs, and non-array options. The scoped correction uses
+a typed outer JSON map with generic option objects, preserving the exact
+Rust precedence and fail-closed selected-ID behavior. No real Kiro
+permission, account, process or credential was exercised.
+
+## Kiro `usage_update.cost: null` is a malformed PRESENT input
+
+The released Rust `RuntimeKiroAcpSessionUpdate::parse_value` parses cost as
+`value.get("cost").cloned().map(serde_json::from_value::<Cost>).transpose()`.
+This is **not** a serde `Option<Cost>` decode: an absent cost is `None`,
+whereas a present JSON `null` becomes `Some(Null)` and fails to deserialize
+the required `Cost { amount: f64, currency: String }` struct. In contrast,
+the *output* metadata always serializes the accepted `None` as an explicit
+`"cost": null`. Godex previously conflated those stages and accepted a
+present null, silently overwriting previously valid quota usage.
+
+A pinned serde_json 1.0.151 offline probe confirmed `Some(Null).map(...)
+.transpose()` returns a parse error while serde's ordinary `Option<Cost>`
+would instead accept null. Fail-before buffered and live Kiro usage tests
+cover absent, valid present, malformed present null, empty-object and
+non-object cost, preserving the last valid usage and its canonical f64 cost.
+The scoped update now validates all **present** cost values, including null,
+before updating the turn. Synthetic source/dependency tests are not a live
+Kiro CLI 2.33.0 provider run.
