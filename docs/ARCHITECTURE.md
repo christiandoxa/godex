@@ -242,8 +242,10 @@ recognition. Provider state, response events and terminal handling remain in
 each gateway. The helper performs no I/O or application policy.
 Those gateways select the strict SSE decoder with the tagged 4 MiB wire
 bounds and handle its terminal error. Other transports retain their existing
-decoder contract. DeepSeek's private stream body owns upstream closure once
-across pump completion and client cancellation.
+decoder contract. `helper/sse.PipeBody` gives DeepSeek and Gemini explicit
+upstream closure ownership once across pump completion and client cancellation.
+Each gateway owns its producer goroutine and defers source closure separately
+from consumer reader closure, preserving a successful drain to EOF.
 entity/provider owns provider error classification and static fallback-chain
 policy, so bare 429, structured quota/rate errors, auth failures, model-not-found,
 and transient failures are interpreted consistently by Anthropic and Copilot.

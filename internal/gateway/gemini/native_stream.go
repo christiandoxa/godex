@@ -33,17 +33,20 @@ type geminiStreamState struct {
 
 func translateGeminiNativeStream(response *http.Response, requestMetadata map[string]any) *proxymodel.Response {
 	reader, writer := io.Pipe()
-	go pumpGeminiNativeStream(response.Body, writer, requestMetadata)
+	body := sse.NewPipeBody(reader, response.Body)
+	go func() {
+		defer body.CloseSource()
+		pumpGeminiNativeStream(response.Body, writer, requestMetadata)
+	}()
 	return &proxymodel.Response{
 		StatusCode: response.StatusCode,
 		Header:     translatedHeaders(response.Header, "text/event-stream"),
-		Body:       reader,
+		Body:       body,
 		Trailer:    response.Trailer,
 	}
 }
 
 func pumpGeminiNativeStream(body io.ReadCloser, writer *io.PipeWriter, requestMetadata map[string]any) {
-	defer body.Close()
 	state := &geminiStreamState{responseID: "resp_gemini_" + uuid.NewString(), createdAt: time.Now().Unix()}
 	decoder := sse.NewStrictDecoder(4 << 20)
 	buffer := make([]byte, 32<<10)

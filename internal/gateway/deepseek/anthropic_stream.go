@@ -24,9 +24,9 @@ func deepSeekAnthropicSSEWithConversation(
 	conversationMessages []any,
 ) io.ReadCloser {
 	reader, writer := io.Pipe()
-	stream := &streamBody{reader: reader, source: body}
+	stream := sse.NewPipeBody(reader, body)
 	go func() {
-		defer stream.closeSource()
+		defer stream.CloseSource()
 		pumpDeepSeekAnthropicSSE(
 			body, writer, requestMetadata, requestID, conversations, conversationMessages,
 		)

@@ -26,11 +26,15 @@ import (
 // cannot materialize output_text delta events.
 func translateGeminiChatCompatibleStream043711(response *http.Response) *proxymodel.Response {
 	reader, writer := io.Pipe()
-	go pumpGeminiChatCompatibleStream043711(response.Body, writer)
+	body := sse.NewPipeBody(reader, response.Body)
+	go func() {
+		defer body.CloseSource()
+		pumpGeminiChatCompatibleStream043711(response.Body, writer)
+	}()
 	return &proxymodel.Response{
 		StatusCode: response.StatusCode,
 		Header:     translatedHeaders(response.Header, "text/event-stream"),
-		Body:       reader,
+		Body:       body,
 		Trailer:    response.Trailer,
 	}
 }
@@ -238,7 +242,6 @@ func (state *geminiChatCompatibleStream043711) accept(writer io.Writer, data []b
 }
 
 func pumpGeminiChatCompatibleStream043711(source io.ReadCloser, writer *io.PipeWriter) {
-	defer source.Close()
 	defer writer.Close()
 	responseID := "resp_deepseek_" + uuid.NewString()
 	if value, err := uuid.NewV7(); err == nil {

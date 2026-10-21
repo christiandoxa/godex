@@ -2602,3 +2602,48 @@ shuffled race suite. Logs:
 `/tmp/gdx-04384-deepseek-tool-search-final-test-all.log` and
 `/tmp/gdx-04384-deepseek-tool-search-final-verify.log`. Clean-commit
 released-executable validation follows this commit.
+
+## Gemini client cancellation closes its owned upstream stream
+
+Both Gemini adapters still returned bare pipe readers. Closing the client
+body released pending writes but could leave the owning pump blocked in
+upstream Read. The tagged Rust provider SSE reader owns its upstream reader
+for the response lifetime. DeepSeek already implemented explicit Go pipe/
+source ownership, so the same invariant now has two real gateway consumers.
+
+The existing DeepSeek wrapper moves into `helper/sse/pipe_body.go` with a
+small explicit lifecycle API. `Close` cancels the reader and source;
+`CloseSource` lets the producer close upstream after completion without
+closing a reader that is still draining. Both share one `sync.Once`, including
+the original source-close error. Four existing pumps across DeepSeek and
+Gemini use it. The superseded private DeepSeek wrapper is removed. The helper
+uses only standard-library I/O/synchronization and contains no provider,
+request, retry, routing or persistence policy. Architecture ownership is
+updated in `docs/ARCHITECTURE.md`. No new dependency, option, model, goroutine
+or persistence format is introduced.
+
+Fail-before `/tmp/gdx-04384-provider-stream-cancel-before.log` passes the
+normal completion control and fails client cancellation for both Gemini
+adapters. Channel-based actual-pump tests prove upstream closure without
+sleeps and preserve one close after completion and repeated client Close.
+DeepSeek's original lifecycle regressions remain unchanged. Helper tests race
+20 producer/client closers, require one source close and the same returned
+error, and ensure successful producer completion still drains to EOF.
+
+This is source ownership and local lifecycle evidence. Existing released
+Gemini/DeepSeek matrices are regression gates, not a new executable proof
+that isolates post-response body Close from HTTP request-context cancellation.
+Broader native Gemini lifecycle and transport ownership remain open.
+
+Clean tool-argument commit `4e91bd488579f9f8584bdc26b20a0d83a1dd039f`
+passed all 51 DeepSeek released scenarios and runtime mutation controls before
+its fast-forward push to `origin/main`. Report:
+`/tmp/gdx-04384-deepseek-tool-search-oracle.json`.
+
+`rtk go test -race ./internal/helper/sse ./internal/gateway/deepseek ./internal/gateway/gemini ./tools/differential -count=1`
+passes 1,434 tests. `rtk go test ./...` passes 9,071 tests across 81 packages.
+`rtk proxy make verify` passes every local gate, including the complete
+shuffled race suite. Logs: `/tmp/gdx-04384-provider-stream-cancel-race.log`,
+`/tmp/gdx-04384-provider-stream-cancel-final-test-all.log` and
+`/tmp/gdx-04384-provider-stream-cancel-final-verify.log`. Clean-commit
+released-executable regression and the broader release gate follow this commit.
