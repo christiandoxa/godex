@@ -3000,3 +3000,50 @@ suite and cross-platform build/test compilation. Logs:
 `/tmp/gdx-04384-stream-tool-name-verify.log`. Clean-commit released DeepSeek
 and Gemini validation follows this commit. Raw-key binding persistence and
 restart identity matching remain the next separate audit target.
+
+
+## Raw-key continuation persistence audit
+
+Clean stream-name candidate `c18c799a829397708d67ff6493f9d9d86faed742`
+passes 46/46 Gemini executable cases, but its 63-case DeepSeek gate fails
+`sse-large-packet.prodex.state_integrity`: the reference background save can
+write raw-key response bindings after a longer stream. Reports:
+`/tmp/gdx-04384-stream-tool-name-oracle.json` and
+`/tmp/gdx-04384-stream-tool-name-gemini-oracle.json`. The failed DeepSeek gate
+was retained and the candidate was withheld from `origin/main`.
+
+The short-run assumption that every raw-key binding is volatile was incomplete.
+The pinned continuation journal rewrites the unavailable `local` profile as the
+existing hard-binding conflict sentinel. Dispatch also compares a raw-key
+binding with its selected local-profile identity before credential selection.
+The released executable rejects this workflow even with unchanged keys and
+endpoint; matching key material alone does not authorize continuation.
+
+The differential now checks exact observed response IDs, credential-slot
+identity digests and the canonical synthetic loopback endpoint digest in each
+reference state/continuation/journal snapshot and recovery copy. Godex snapshots
+may contain only the existing conflict sentinel for those observed response
+hashes. Unknown owners, profiles, keys, providers, endpoints, fields and corrupt
+snapshots remain failures. The original no-evidence audit still rejects every
+nonempty affinity snapshot. Backoff, health, history, secret and file checks
+remain enforced. These checks compare durable ownership semantics, not private
+Rust/Go file-layout equality; the production normalization policy is not copied
+into the test oracle.
+
+Two synthetic executable scenarios cover same-process continuation and six
+restart phases: rotated seed, same-key resume, changed-key resume,
+changed-endpoint resume, fresh request and unknown-response discovery. Seed
+waits for an observed durable binding, bounded at 15 seconds; a timeout is not
+persistence evidence. The restart oracle requires that evidence, exact HTTP
+503/code/message/exit 2 and zero attempts for all three known continuations,
+plus successful fresh/discovery controls. Independent mutations reject altered
+responses, ownership, attempt counts, state and missing persistence.
+
+Fail-before reports on clean `c18c799`:
+`/tmp/gdx-04384-raw-key-confirmed-before-oracle.json` and
+`/tmp/gdx-04384-raw-key-in-process-confirmed-before-oracle.json`.
+All reference phases satisfy the stricter state and behavior contracts. Godex
+instead returns 200 and attempts a credential after every restart resume, and
+makes a third upstream attempt within the original process where Prodex stops
+after the two seed attempts. These are confirmed routing mismatches, beyond
+file-layout differences. Production repair and clean-commit gates follow.

@@ -66,22 +66,23 @@ type fileState struct {
 }
 
 type productRun struct {
-	Name           string            `json:"name"`
-	Binary         string            `json:"binary"`
-	Version        string            `json:"version"`
-	Commit         string            `json:"commit"`
-	SHA256         string            `json:"sha256"`
-	Command        []string          `json:"command"`
-	ExitStatus     int               `json:"exit_status"`
-	Stdout         string            `json:"stdout"`
-	Stderr         string            `json:"stderr"`
-	Client         exchange          `json:"client_exchange"`
-	Upstream       []upstreamRequest `json:"upstream_requests"`
-	Events         []upstreamEvent   `json:"events"`
-	Retries        int               `json:"retry_attempts"`
-	Cancelled      bool              `json:"cancelled"`
-	Files          []fileState       `json:"durable_files"`
-	StateIntegrity []string          `json:"state_integrity_errors,omitempty"`
+	Name                  string            `json:"name"`
+	Binary                string            `json:"binary"`
+	Version               string            `json:"version"`
+	Commit                string            `json:"commit"`
+	SHA256                string            `json:"sha256"`
+	Command               []string          `json:"command"`
+	ExitStatus            int               `json:"exit_status"`
+	Stdout                string            `json:"stdout"`
+	Stderr                string            `json:"stderr"`
+	Client                exchange          `json:"client_exchange"`
+	Upstream              []upstreamRequest `json:"upstream_requests"`
+	Events                []upstreamEvent   `json:"events"`
+	Retries               int               `json:"retry_attempts"`
+	Cancelled             bool              `json:"cancelled"`
+	Files                 []fileState       `json:"durable_files"`
+	StateIntegrity        []string          `json:"state_integrity_errors,omitempty"`
+	ContinuationPersisted bool              `json:"continuation_persisted,omitempty"`
 }
 
 type scenarioResult struct {
@@ -118,12 +119,15 @@ type mockPlan struct {
 }
 
 type runOptions struct {
-	retry        bool
-	cancel       bool
-	rotate       bool
-	stream       bool
-	userID       bool
-	invalidInput string
+	continuationProbe string
+	priorBindings     map[string]fixtureContinuationOwner
+	endpointPath      string
+	retry             bool
+	cancel            bool
+	rotate            bool
+	stream            bool
+	userID            bool
+	invalidInput      string
 }
 
 type mockServer struct {
@@ -164,7 +168,7 @@ func run() error {
 	gemini := flags.Bool("gemini", false, "run isolated Gemini generateContent executable differential")
 	geminiModels := flags.Bool("gemini-models", false, "compare Gemini provider models catalog identity and aliases across two pinned binaries")
 	scenarioWorkers := flags.Int("scenario-workers", 1, "isolated DeepSeek scenario workers, 1-4 (parallel only for --scenario all)")
-	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, tool-search-canonical, sse-tool-search-canonical, sse-apply-patch-canonical, deepseek-unsupported-message-role, deepseek-null-message-content, deepseek-request-over-kernel-limit, deepseek-input-type-null, deepseek-input-type-number, deepseek-input-type-empty, deepseek-empty-top-level-tool-name, deepseek-invalid-nested-shell-command, sse-stream, sse-rate-limit, sse-terminal-close, sse-json-fragments, sse-data-lines, sse-large-packet, sse-line-limit, sse-event-limit, sse-comment-utf8, sse-metadata-u64, deepseek-sse-error-presence, deepseek-sse-error-i64, deepseek-sse-error-float, deepseek-usage-u64, deepseek-sse-usage-u64, deepseek-usage-null, deepseek-sse-usage-null, deepseek-empty-identity, deepseek-sse-empty-identity, sse-tool-surrogate, sse-tool-depth, sse-tool-overflow, sse-tool-paired, sse-tool-finish-error, sse-tool-empty-finish-error, sse-tool-order-finish, sse-tool-order-done, sse-tool-signature, sse-tool-id-missing, sse-tool-id-empty, sse-tool-id-padded, sse-tool-name-padded, sse-tool-name-blank-namespace, sse-tool-name-blank-late, sse-payload-bom, sse-payload-bom-repeat, retry, deepseek-sse-terminal, single-key-401, single-key-403, single-key-429, single-key-503, single-key-500, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
+	scenarioName := flags.String("scenario", "all", "scenario to run: all, raw-key-continuation-probe, raw-key-in-process-probe, success, tool-call, tool-search-canonical, sse-tool-search-canonical, sse-apply-patch-canonical, deepseek-unsupported-message-role, deepseek-null-message-content, deepseek-request-over-kernel-limit, deepseek-input-type-null, deepseek-input-type-number, deepseek-input-type-empty, deepseek-empty-top-level-tool-name, deepseek-invalid-nested-shell-command, sse-stream, sse-rate-limit, sse-terminal-close, sse-json-fragments, sse-data-lines, sse-large-packet, sse-line-limit, sse-event-limit, sse-comment-utf8, sse-metadata-u64, deepseek-sse-error-presence, deepseek-sse-error-i64, deepseek-sse-error-float, deepseek-usage-u64, deepseek-sse-usage-u64, deepseek-usage-null, deepseek-sse-usage-null, deepseek-empty-identity, deepseek-sse-empty-identity, sse-tool-surrogate, sse-tool-depth, sse-tool-overflow, sse-tool-paired, sse-tool-finish-error, sse-tool-empty-finish-error, sse-tool-order-finish, sse-tool-order-done, sse-tool-signature, sse-tool-id-missing, sse-tool-id-empty, sse-tool-id-padded, sse-tool-name-padded, sse-tool-name-blank-namespace, sse-tool-name-blank-late, sse-payload-bom, sse-payload-bom-repeat, retry, deepseek-sse-terminal, single-key-401, single-key-403, single-key-429, single-key-503, single-key-500, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		return err
 	}
@@ -214,6 +218,12 @@ func run() error {
 	}
 	defer os.RemoveAll(root)
 	specs := []differentialScenario043713{
+		{"raw-key-in-process-probe", func(mock *mockServer) (scenarioResult, error) {
+			return runPair(root, mock, "raw-key-in-process-probe", mockPlan{RotateKeys: true}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{rotate: true, continuationProbe: "same-process", priorBindings: rawKeyProbeSeedOwner(mock.baseURL() + "/v1")})
+		}},
+		{"raw-key-continuation-probe", func(mock *mockServer) (scenarioResult, error) {
+			return runRawKeyContinuationProbe(root, mock, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit)
+		}},
 		{"success", func(mock *mockServer) (scenarioResult, error) {
 			return runPair(root, mock, "success", mockPlan{}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{})
 		}},
@@ -602,7 +612,11 @@ func runProduct(root string, mock *mockServer, name, binary, commit string, plan
 	if !options.rotate {
 		args = append(args, "--api-key", apiKey)
 	}
-	args = append(args, "--base-url", mock.baseURL()+"/v1", "--no-presidio", "--no-sub-agent", "exec", "synthetic differential probe")
+	endpoint := mock.baseURL() + "/v1"
+	if options.endpointPath != "" {
+		endpoint = mock.baseURL() + options.endpointPath
+	}
+	args = append(args, "--base-url", endpoint, "--no-presidio", "--no-sub-agent", "exec", "synthetic differential probe")
 	stdout, stderr := &limitedBuffer{}, &limitedBuffer{}
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
@@ -632,17 +646,19 @@ func runProduct(root string, mock *mockServer, name, binary, commit string, plan
 		clientExchange = exchange{}
 	}
 	upstream := mock.since(requestStart)
-	if len(upstream) == 0 && !isKnownDeepSeekInvalidInput(options.invalidInput) {
+	if len(upstream) == 0 && !isKnownDeepSeekInvalidInput(options.invalidInput) && !strings.HasPrefix(options.continuationProbe, "resume") {
 		return productRun{}, fmt.Errorf("%s produced no upstream requests", name)
 	}
 	events := mock.eventsSince(eventStart)
+	expectedBindings := fixtureContinuationOwners(clientExchange, upstream, endpoint, options.priorBindings)
 	return productRun{
 		Name: name, Binary: resolved, Version: version, Commit: commit, SHA256: digest,
 		Command:    redactedScenarioCommand(name, options.rotate),
 		ExitStatus: exit, Stdout: redact(stdout.String()), Stderr: redact(stderr.String()),
 		Client: clientExchange, Upstream: upstream, Events: events,
 		Retries: max(0, len(upstream)-1), Cancelled: options.cancel && hasEvent(events, "upstream.cancelled"),
-		Files: snapshot(productRoot), StateIntegrity: auditFixtureDurableState(productRoot),
+		Files: snapshot(productRoot), StateIntegrity: auditFixtureDurableStateWithBindings(productRoot, expectedBindings),
+		ContinuationPersisted: options.continuationProbe != "" && rawKeyProbeBindingExists(stateHome, isProdex(name)),
 	}, nil
 }
 
@@ -668,6 +684,9 @@ func productEnv(name, stateHome, codexHome, userHome, shim, childResult string, 
 	}
 	if options.retry {
 		env = append(env, "DIFFERENTIAL_RETRY=1")
+	}
+	if options.continuationProbe != "" {
+		env = append(env, "DIFFERENTIAL_CONTINUATION_PHASE="+options.continuationProbe, "DIFFERENTIAL_STATE_HOME="+stateHome)
 	}
 	if options.rotate {
 		env = append(env, "DEEPSEEK_API_KEYS="+rotationPrimaryKey+","+rotationSecondaryKey)
@@ -814,6 +833,9 @@ func (mock *mockServer) serveHTTP(writer http.ResponseWriter, request *http.Requ
 		status = http.StatusOK
 	}
 	responseBody := `{"id":"chatcmpl-differential","object":"chat.completion","created":1,"model":"deepseek-v4-pro","choices":[{"index":0,"message":{"role":"assistant","content":"synthetic-ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":2,"completion_tokens":1,"total_tokens":3}}`
+	if plan.SSEFraming == "raw-key-fresh" {
+		responseBody = strings.Replace(responseBody, "chatcmpl-differential", "chatcmpl-fresh", 1)
+	}
 	if plan.ToolCall && status == http.StatusOK {
 		responseBody = `{"id":"chatcmpl-differential-tool","object":"chat.completion","created":1,"model":"deepseek-v4-pro","choices":[{"index":0,"message":{"role":"assistant","content":null,"tool_calls":[{"id":"call-differential","type":"function","function":{"name":"lookup","arguments":"{\"key\":\"alpha\"}"}}]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":2,"completion_tokens":1,"total_tokens":3}}`
 	}
@@ -1037,6 +1059,12 @@ func runCodexShim(arguments []string) int {
 			return shimFailure("synthetic Codex shim received an unknown invalid-input fixture")
 		}
 	}
+	if strings.HasPrefix(os.Getenv("DIFFERENTIAL_CONTINUATION_PHASE"), "resume") {
+		requestBody = []byte(strings.TrimSuffix(string(requestBody), "}") + `,"previous_response_id":"chatcmpl-differential"}`)
+	}
+	if os.Getenv("DIFFERENTIAL_CONTINUATION_PHASE") == "unknown" {
+		requestBody = []byte(strings.TrimSuffix(string(requestBody), "}") + `,"previous_response_id":"chatcmpl-unknown"}`)
+	}
 	timeout := 8 * time.Second
 	if os.Getenv("DIFFERENTIAL_CANCEL") == "1" {
 		timeout = 1 * time.Second
@@ -1044,6 +1072,9 @@ func runCodexShim(arguments []string) int {
 	client := &http.Client{Timeout: timeout}
 	maxAttempts := 1
 	if os.Getenv("DIFFERENTIAL_RETRY") == "1" {
+		maxAttempts = 2
+	}
+	if os.Getenv("DIFFERENTIAL_CONTINUATION_PHASE") == "same-process" {
 		maxAttempts = 2
 	}
 	var clientResult exchange
@@ -1070,6 +1101,10 @@ func runCodexShim(arguments []string) int {
 			return shimFailure("synthetic Codex shim response exceeded its bound")
 		}
 		clientResult = exchange{Status: response.StatusCode, Headers: response.Header.Clone(), Body: string(body)}
+		if os.Getenv("DIFFERENTIAL_CONTINUATION_PHASE") == "same-process" && attempt == 0 && response.StatusCode == http.StatusOK {
+			requestBody = []byte(strings.TrimSuffix(string(requestBody), "}") + `,"previous_response_id":"chatcmpl-differential"}`)
+			continue
+		}
 		if response.StatusCode != http.StatusTooManyRequests || attempt+1 == maxAttempts {
 			break
 		}
@@ -1077,6 +1112,9 @@ func runCodexShim(arguments []string) int {
 	encoded, err := json.Marshal(clientResult)
 	if err != nil {
 		return shimFailure("synthetic Codex shim could not encode response")
+	}
+	if os.Getenv("DIFFERENTIAL_CONTINUATION_PHASE") == "seed" {
+		waitRawKeyProbePersistence(os.Getenv("DIFFERENTIAL_STATE_HOME"), os.Getenv("PRODEX_HOME") != "")
 	}
 	if resultPath := os.Getenv("DIFFERENTIAL_CHILD_RESULT"); resultPath != "" {
 		if err := os.WriteFile(resultPath, encoded, 0o600); err != nil {
@@ -1151,6 +1189,12 @@ func shimFailure(message string) int {
 // product failures, skipped upstream calls, and missing cancellations must not
 // turn into parity successes just because both implementations behave alike.
 func scenarioInvariants(scenario scenarioResult) []string {
+	if scenario.Name == "raw-key-continuation-probe" {
+		return rawKeyContinuationProbeInvariants(scenario)
+	}
+	if scenario.Name == "raw-key-in-process-probe" {
+		return rawKeyInProcessProbeInvariants(scenario)
+	}
 	var failures []string
 	wantRuns := 2
 	if scenario.Name == "restart" || scenario.Name == "recover-after-429" || scenario.Name == "recover-after-503" || scenario.Name == "key-rotation-restart" {

@@ -19,6 +19,10 @@ const maxFixtureStateFileBytes = 8 << 20
 // provider workflow. It checks independent safety/integrity invariants, not
 // private Rust-versus-Go runtime bookkeeping layout equality.
 func auditFixtureDurableState(root string) []string {
+	return auditFixtureDurableStateWithBindings(root, nil)
+}
+
+func auditFixtureDurableStateWithBindings(root string, expected map[string]fixtureContinuationOwner) []string {
 	var violations []string
 	var routing, lastGood []byte
 	routingSnapshots := make(map[string][]byte)
@@ -81,11 +85,18 @@ func auditFixtureDurableState(root string) []string {
 			}
 		case "state/routing.json":
 			routing = data
-			if !emptyFixtureRoutingBindings(data) {
+			if !validFixtureRoutingBindings(data, expected) {
 				violations = append(violations, "unexpected_ephemeral_affinity_binding")
 			}
 		case "state/routing.json.last-good":
 			lastGood = data
+		case "state/state.json", "state/state.json.last-good",
+			"state/runtime-continuations.json", "state/runtime-continuations.json.last-good",
+			"state/runtime-continuation-journal.json", "state/runtime-continuation-journal.json.last-good":
+			routingSnapshots[relative] = data
+			if !validFixtureProdexContinuations(relative, data, expected) {
+				violations = append(violations, "invalid_prodex_continuation_state:"+relative)
+			}
 		case "state/retry-backoff.json", "state/retry-backoff.json.last-good",
 			"state/route-memory.json", "state/route-memory.json.last-good",
 			"state/route-health.json", "state/route-health.json.last-good",
@@ -217,6 +228,11 @@ func allowedFixtureStateFile(name string) bool {
 		"state/continuation-status.json", "state/continuation-status.json.last-good",
 		"state/previous-response-failures.json", "state/previous-response-failures.json.last-good",
 		"state/state.guard", "state/state.json.lock",
+		"state/state.json", "state/state.json.last-good",
+		"state/runtime-continuations.json", "state/runtime-continuations.json.last-good",
+		"state/runtime-continuations.json.lock",
+		"state/runtime-continuation-journal.json", "state/runtime-continuation-journal.json.last-good",
+		"state/runtime-continuation-journal.json.lock",
 		"state/runtime-scores.json", "state/runtime-scores.json.lock",
 		"state/runtime-scores.json.last-good",
 		"state/runtime-backoffs.json", "state/runtime-backoffs.json.lock",
@@ -336,21 +352,7 @@ func validEmptyProdexHealthScoreSnapshot(data []byte) bool {
 	return len(scores) == 0
 }
 
-// The isolated API-key test has no managed profile sessions to persist.
-// A serialized affinity would change credential selection after restart,
-// as seen in the previous key-rotation bug.
+// Without observed response evidence, every durable credential owner is forbidden.
 func emptyFixtureRoutingBindings(data []byte) bool {
-	var payload map[string]json.RawMessage
-	if json.Unmarshal(data, &payload) != nil || len(payload) != 2 {
-		return false
-	}
-	var version int
-	if json.Unmarshal(payload["version"], &version) != nil || version != 1 {
-		return false
-	}
-	var bindings []json.RawMessage
-	if json.Unmarshal(payload["bindings"], &bindings) != nil || string(payload["bindings"]) == "null" {
-		return false
-	}
-	return len(bindings) == 0
+	return validFixtureRoutingBindings(data, nil)
 }
