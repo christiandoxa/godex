@@ -20,8 +20,10 @@ func firstPresentNativeWithPresence04384(object map[string]any, keys ...string) 
 func geminiSpecialPartText(part map[string]any) string {
 	if raw, present := part["executableCode"]; present {
 		code, _ := raw.(map[string]any)
-		language := nativeString(code["language"])
-		if language == "" {
+		language, provided := code["language"].(string)
+		// Tagged media_put_special_text defaults only when no string
+		// exists. A present empty string remains an explicit label.
+		if !provided {
 			language = "text"
 		}
 		body := nativeString(code["code"])
@@ -32,8 +34,8 @@ func geminiSpecialPartText(part map[string]any) string {
 	}
 	if raw, present := part["codeExecutionResult"]; present {
 		result, _ := raw.(map[string]any)
-		outcome := nativeString(result["outcome"])
-		if outcome == "" {
+		outcome, provided := result["outcome"].(string)
+		if !provided {
 			outcome = "OUTCOME_UNSPECIFIED"
 		}
 		return fmt.Sprintf("Gemini code execution result (%s):\n```text\n%s\n```", outcome, nativeString(result["output"]))

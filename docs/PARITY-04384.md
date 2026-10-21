@@ -540,3 +540,20 @@ repository's 400-line source-size default. The obsolete source-size baseline
 entry is removed. These synthetic cases establish source-backed internal
 parity, not live provider authentication, while the official Gemini
 executable differential remains a broad no-regression gate.
+
+## Gemini executable labels preserve explicit empty strings
+
+The same `gemini_response_media.mojo` `media_put_special_text` retrieves
+`executableCode.language` and `codeExecutionResult.outcome` with
+`pj_string_field`. Only a *missing or non-string* value triggers the
+`"text"` or `"OUTCOME_UNSPECIFIED"` default. An explicit empty string is
+valid metadata and is written into the client-visible display text as an
+empty label. Godex previously compared the decoded string to `""`,
+incorrectly turning explicit empty language/outcome into those defaults.
+
+A fail-before matrix checks empty, missing and wrong-type fields on both
+executable code and execution-result branches. The corrected projection
+uses string-type presence rather than non-empty value to select defaults;
+no unrelated media or executable payload changes. This is a tagged-source
+synthetic parity test, with the official Gemini 0.438.4 executable suite
+retained as the broader transport no-regression gate.
