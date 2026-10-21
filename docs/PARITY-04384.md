@@ -2242,3 +2242,19 @@ shuffled race suite. Logs:
 `/tmp/gdx-04384-deepseek-terminal-close-final-test-all.log` and
 `/tmp/gdx-04384-deepseek-terminal-close-final-verify.log`. Clean-commit
 released-executable validation follows this commit.
+
+Clean commit `8e3b0cf9e06b7da1da1523e96ae5ae405f74fb84` passed the
+held-connection `--scenario sse-terminal-close` oracle, then all 40 released
+DeepSeek scenarios and runtime mutation controls before its fast-forward
+push to `origin/main`. Reports:
+`/tmp/gdx-04384-deepseek-terminal-close-focused-oracle.json` and
+`/tmp/gdx-04384-deepseek-terminal-close-oracle.json`.
+The successful held-connection run compares both pinned executables and
+independently requires HTTP 200, the exact complete five-event client trace,
+one authenticated upstream attempt, normal child exit and valid durable state.
+
+This remains bounded parity evidence. Native OS/live-provider coverage and
+the unclosed reader/framing/numeric areas above are not certified by these
+mock-based executable matrices. The last Gemini executable regression remains
+44/44 PASS on `8d675af9c0d671d2fb3d3c43485f60ecc14899c4`; the later
+DeepSeek-only commits did not repeat that separate matrix.
