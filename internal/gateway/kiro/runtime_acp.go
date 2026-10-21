@@ -253,17 +253,6 @@ func collectACPOutput(ctx context.Context, scanner *bufio.Scanner, writer *bufio
 	return nil
 }
 
-func decodeACPLine(line []byte) (acpEnvelope, bool, error) {
-	if len(strings.TrimSpace(string(line))) == 0 {
-		return acpEnvelope{}, true, nil
-	}
-	var envelope acpEnvelope
-	if err := json.Unmarshal(line, &envelope); err != nil || envelope.JSONRPC != "2.0" {
-		return acpEnvelope{}, false, errors.New("failed to parse Kiro ACP JSON-RPC line")
-	}
-	return envelope, false, nil
-}
-
 func (collector *acpCollector) accept(writer *bufio.Writer, envelope acpEnvelope) (bool, error) {
 	if handled, err := handleACPServerRequest(writer, envelope); handled || err != nil {
 		if handled {

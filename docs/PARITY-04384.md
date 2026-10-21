@@ -158,3 +158,32 @@ safe redacted label. The resulting synthetic tool-activity text contains
 only sanitized names, not raw tool arguments. This is supported by the
 published 0.438.4 Mojo/Rust source and local tests; no actual CLI provider
 sessions or secrets were read.
+
+## Kiro ACP typed-envelope serde boundaries
+
+`RuntimeKiroAcpEnvelope::parse` in tagged Rust deserializes directly to a
+**typed serde struct** before any notification is considered. The Go
+`json.Unmarshal` of that struct accepted duplicate known top-level fields,
+which serde rejects even if the duplicate values are equal. The same typed
+constraint also applies to nested `RuntimeKiroAcpError` (`code`, `message`,
+`data`) and its required non-null `code: i64` and `message: string`. By
+contrast, repeated *unknown* fields and repeated fields inside the generic
+`params: Value` are allowed and use the last map value. A fail-before suite
+now verifies that precise boundary, not a blanket duplicate-key ban.
+
+Serde also rejects malformed UTF-8, lone Unicode surrogate escapes, excess
+container nesting, and its own floating-point overflow boundary. Go's
+standard decoder can replace invalid Unicode or accept numbers like
+`1.7976931348623158e308` that the pinned serde default rejects. Independent
+offline tests using the release's Rust `serde 1.0.228` and `serde_json
+1.0.151` dependencies confirmed the typed duplicate, Unicode, recursive
+and near-f64-maximum cases. Godex now checks those invariants before the
+normal ACP JSON-RPC decoder can turn an invalid notification into Kiro
+output, tool activity or usage. The source-matched serde-f64 parser was
+moved into `internal/helper/jsonutil` and is shared with its existing
+Responses/usage validation, avoiding divergent numeric acceptance rules.
+
+These are isolated source- and dependency-aligned semantic regressions on
+synthetic Kiro envelopes; they **do not** claim a live authenticated Kiro
+CLI 2.33.0 handshake or full provider parity. Actual private credentials
+and the installed older Kiro CLI are not exercised.
