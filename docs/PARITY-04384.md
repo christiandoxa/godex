@@ -18,6 +18,14 @@ across all providers and platforms.
   the official 0.438.4 `SHA256SUMS`; the native platform runner must verify
   each binary and manifest independently before running local tests.
 
+The pinned source's root `Cargo.lock` resolves `serde 1.0.229` and
+`serde_json 1.0.154`. Earlier entries below that mention 1.0.228/1.0.151
+describe historical probes, not the locked dependencies of this release.
+Those probes alone do not certify 0.438.4 numeric or typed-serde behavior;
+new source checks must use the actual lockfile versions. The native-stream
+error goldens below were regenerated with the correct versions and were
+byte-identical to the earlier probe's 32 fixtures.
+
 Downloaded artifacts are checked against the official SHA256SUMS and manifest;
 Prodex reports `prodex 0.438.4`. The pin was migrated coherently in the
 release gate, workspace, differential, profile, context, CLI, footer and
@@ -1495,3 +1503,64 @@ differential validation follows the commit.
 Response-created/text/reasoning/media lifecycle, embedded provider errors
 and prompt-block precedence remain separate audit areas; this slice is not
 a claim of full native SSE parity.
+
+Clean commit `cac81c0935ab939fe456b9bb32db155ce83f5ec7` passed all 40
+official Gemini executable cases and mutation controls before its
+fast-forward push to `origin/main`. Log:
+`/tmp/gdx-04384-stream-lifecycle-oracle.json`. The native tool lifecycle
+and finish barriers are covered by tagged-source regressions, separately
+from that API-key executable differential.
+
+## Native Gemini embedded errors and prompt-block precedence
+
+The tagged runtime checks the presence of `error` before acquiring chunk
+metadata or candidate content. Every present value, including null and
+non-objects, is terminal. Within an error object, a present `status` takes
+precedence over `code` even when null or incorrectly typed. Strings retain
+their exact bytes, while numeric codes require serde's signed-i64 grammar;
+floats, negative zero and integers beyond i64 use `provider_stream_error`.
+Only a string message is eligible, including the empty string.
+
+After metadata acquisition, a nonblank string `promptFeedback.blockReason`
+must fail before any text or tool from the same chunk is emitted. Its raw
+whitespace and Unicode remain in the diagnostic. Embedded errors win over
+prompt blocking and cannot acquire a response ID from that rejected chunk.
+Both failure kinds suppress all later chunks and DONE completion.
+
+Godex previously ignored embedded errors and processed candidate content
+before noticing prompt blocking. The native SSE boundary now follows that
+ordering. Failed events carry the stream's creation epoch and reuse the
+existing `helper/redact.Secrets` for provider-message credential shapes.
+Prompt classification is shared privately with the existing buffered
+classifier in `gateway/gemini`; no new helper package, dependency, public
+model, persistence format, retry policy or goroutine is introduced.
+
+Unmodified pinned `gemini_value_policy.mojo` was compiled with local
+Mojo 1.1.0:
+
+```bash
+rtk proxy mojo build --emit shared-lib -O0 -I mojo/prodex_core -o /tmp/gdx-04384-gemini-value-policy.so mojo/prodex_core/gemini_value_policy.mojo
+```
+
+The source's exported ABI, fed values canonicalized with the pinned default
+`serde_json 1.0.154` and `serde 1.0.229`, generated 32 deterministic fixtures in
+`testdata/native_stream_error_04384.json`. They cover status presence,
+signed limits, unsigned overflow, decimal/exponent tokens, negative zero,
+duplicate keys, empty strings and Unicode. These are compiled tagged-source
+goldens, not released-executable native-OAuth evidence. The fail-before
+suite in `/tmp/gdx-04384-stream-error-before.log` also demonstrates blocked
+candidate suppression and synthetic credential redaction failures.
+
+The focused final
+`rtk go test -race ./internal/gateway/gemini ./internal/helper/redact ./tools/differential -count=1`
+passes 809 tests. An HTTP-response/SSE-pump regression also verifies that an
+embedded failure after committed text preserves the original response ID,
+emits exactly one failure and suppresses later text and completion. Broader
+native lifecycle and redaction equivalence remain outside this slice.
+
+`rtk go test ./...` passes 8,764 tests across 81 packages.
+`rtk proxy make verify` passes all local gates, including full race tests.
+Logs: `/tmp/gdx-04384-stream-error-final-race.log`,
+`/tmp/gdx-04384-stream-error-final-test-all.log` and
+`/tmp/gdx-04384-stream-error-final-verify.log`. Clean candidate executable
+differential validation follows the commit.

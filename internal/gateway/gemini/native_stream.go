@@ -7,8 +7,10 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/christiandoxa/godex/internal/helper/jsonutil"
+	"github.com/christiandoxa/godex/internal/helper/redact"
 	"github.com/christiandoxa/godex/internal/helper/sse"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	"github.com/google/uuid"
@@ -16,6 +18,7 @@ import (
 
 type geminiStreamState struct {
 	responseID string
+	createdAt  int64
 	model      string
 	text       strings.Builder
 	reasoning  strings.Builder
@@ -41,7 +44,7 @@ func translateGeminiNativeStream(response *http.Response, requestMetadata map[st
 
 func pumpGeminiNativeStream(body io.ReadCloser, writer *io.PipeWriter, requestMetadata map[string]any) {
 	defer body.Close()
-	state := &geminiStreamState{responseID: "resp_gemini_" + uuid.NewString()}
+	state := &geminiStreamState{responseID: "resp_gemini_" + uuid.NewString(), createdAt: time.Now().Unix()}
 	decoder := sse.NewDecoder(1 << 20)
 	buffer := make([]byte, 32<<10)
 	for {
@@ -85,9 +88,10 @@ func (state *geminiStreamState) failed(writer io.Writer, code, message string) e
 	state.completed = true
 	return writeGeminiSSEEvent(writer, "response.failed", map[string]any{
 		"type": "response.failed", "sequence_number": state.nextSequence(),
+		"created_at": state.createdAt,
 		"response": map[string]any{
 			"id":    state.responseID,
-			"error": map[string]any{"code": code, "message": message},
+			"error": map[string]any{"code": code, "message": redact.Secrets(message)},
 		},
 	})
 }
@@ -103,7 +107,13 @@ func (state *geminiStreamState) consume(writer io.Writer, data []byte, requestMe
 	if !valid {
 		return fmt.Errorf("failed to parse Gemini SSE JSON")
 	}
+	if code, message, failed := geminiNativeStreamError(root); failed {
+		return state.failed(writer, code, message)
+	}
 	state.applyChunkMetadata(root)
+	if message, blocked := geminiNativePromptFailure(root); blocked {
+		return state.failed(writer, "gemini_prompt_blocked", message)
+	}
 	candidate := firstNativeCandidate(root)
 	parts := nativeCandidateParts(candidate)
 	if parts != nil {

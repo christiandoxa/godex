@@ -167,15 +167,10 @@ func geminiNativeResponseMetadata(root, candidate map[string]any) map[string]any
 }
 
 func geminiApplyNativeStatus(result, root, candidate map[string]any, hasOutput bool) {
-	if feedback, ok := root["promptFeedback"].(map[string]any); ok {
-		if reason := nativeNonblank(feedback["blockReason"]); reason != "" {
-			result["status"] = "failed"
-			result["error"] = map[string]any{
-				"code":    "gemini_prompt_blocked",
-				"message": "Gemini blocked the prompt: " + reason,
-			}
-			return
-		}
+	if message, blocked := geminiNativePromptFailure(root); blocked {
+		result["status"] = "failed"
+		result["error"] = map[string]any{"code": "gemini_prompt_blocked", "message": message}
+		return
 	}
 	reason := nativeNonblank(candidate["finishReason"])
 	switch reason {
