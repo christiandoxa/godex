@@ -3,12 +3,12 @@ package gemini
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 
+	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 	"github.com/christiandoxa/godex/internal/helper/sse"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	"github.com/google/uuid"
@@ -135,11 +135,19 @@ func (state *geminiStreamState) consume(writer io.Writer, data []byte, requestMe
 				if strings.TrimSpace(callID) == "" {
 					callID = "call_gemini_" + uuid.NewString()
 				}
-				args := call["args"]
-				if args == nil {
+				args, exists := call["args"]
+				if !exists {
 					args = map[string]any{}
 				}
-				encoded, _ := json.Marshal(args)
+				// Published stream/shaping.rs serializes the serde JSON args
+				// before Mojo projects function-call delta source. A present
+				// null is distinct from absent args ("null" versus "{}").
+				// Go json.Marshal would also re-escape HTML/U+2028 and retain
+				// raw decimal spellings, changing delta and completed history.
+				encoded, encodeErr := jsonutil.MarshalSerdeValue04384(args)
+				if encodeErr != nil {
+					return encodeErr
+				}
 				signature := geminiNativeThoughtSignature(part, call)
 				tool := map[string]any{
 					"type": "function_call", "call_id": callID, "name": name, "arguments": string(encoded),
@@ -257,7 +265,9 @@ func (state *geminiStreamState) complete(writer io.Writer, requestMetadata map[s
 }
 
 func writeGeminiSSEEvent(writer io.Writer, event string, payload map[string]any) error {
-	encoded, err := json.Marshal(payload)
+	// Prodex emits the translated event through serde_json's canonical
+	// serializer. Do not introduce Go-only HTML or JavaScript escapes.
+	encoded, err := jsonutil.MarshalSerdeValue04384(payload)
 	if err != nil {
 		return err
 	}

@@ -970,3 +970,30 @@ This is a finite source-derived Gemini 3 request-shape parity result. The
 released two-executable Gemini differential is retained as a no-regression
 gate; it does not certify every schema corner (notably compiled Mojo panic
 behavior on invalid nested patch schema nodes) or a live Gemini API call.
+
+## Gemini streamed function-call JSON uses canonical serde serialization
+
+Prodex 0.438.4's `gemini_provider_core_stream_function_call_delta` serializes
+upstream `serde_json::Value` to canonical JSON before the Mojo
+`GEMINI_STREAM_FUNCTION_CALL_DELTA` projector selects the `args` member.
+The projector distinguishes a missing `args` (default `"{}"`) from a
+present `args:null` (literal `"null"`). The resulting argument string is
+used both by the SSE `response.function_call_arguments.delta` and the
+completed function-call history. The published Rust SSE event path also
+serializes JSON through serde, without Go's optional HTML/Unicode escapes.
+
+Godex's streaming adapter had a separate `json.Marshal` path even after
+buffered Gemini function calls were corrected. It escaped `<>&` and
+U+2028/U+2029, preserved original `1e-5` and `1.000000` spellings, and
+collapsed an explicit null argument to `{}`. Fail-before tests reproduce
+all three mismatches, including the exact original SSE event bytes and the
+completed `response.output` tool item. The scoped correction shares the
+already pinned serde-compatible writer for function-call arguments and
+emitted SSE JSON, defaults to `{}` only when the `args` key is **absent**,
+and preserves explicit JSON null and normal Unicode. Other stream IDs,
+provider selection, and unrelated tool-call metadata remain unchanged.
+
+This source/dependency-pinned slice covers synthetic streamed tool calls.
+The official 0.438.4 Gemini executable differential remains an independent
+regression gate, not a claim of live-provider coverage for every nested
+argument/value type.
