@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -141,13 +142,12 @@ func nativeUint(value any) uint64 {
 func nativeUintPresent(value any) (uint64, bool) {
 	switch value := value.(type) {
 	case json.Number:
-		parsed, err := value.Int64()
-		if err == nil && parsed >= 0 {
-			return uint64(parsed), true
-		}
-	case float64:
-		if value >= 0 && value == float64(uint64(value)) {
-			return uint64(value), true
+		// Tagged gemini_raw_u64 parses unsigned decimal *integer*
+		// digits through all 64 bits. Int64() discards legitimate
+		// [2^63,2^64-1] token usage, while Go float64 values correspond
+		// to serde JSON numbers with a decimal point and are not valid.
+		if parsed, err := strconv.ParseUint(string(value), 10, 64); err == nil {
+			return parsed, true
 		}
 	case uint64:
 		return value, true

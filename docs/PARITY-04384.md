@@ -488,3 +488,29 @@ canonical model IDs. This is a finite tagged source and local policy slice;
 the official Gemini executable differential is a broader no-regression
 check rather than an assertion that each synthetic mixed-case model was
 sent through the provider gateway.
+
+## Gemini native usage accepts full unsigned 64-bit JSON integer values
+
+Prodex 0.438.4 `gemini_response.mojo` `gemini_raw_u64` parses only ASCII
+`0`–`9` digits and checks overflow against the **full `uint64` maximum**;
+when an input/output count is invalid, it uses zero, and an absent or
+invalid `totalTokenCount` falls back to the saturating sum of valid prompt
+and candidate tokens. `gemini_responses_usage` from the pinned provider-core
+uses that kernel. Godex's `nativeUintPresent` previously used
+`json.Number.Int64()`, which discarded valid token counts in the range
+`[2^63,2^64−1]`. It also accepted integral-looking Go `float64` values,
+where serde's canonical JSON contains a decimal point and is rejected by
+the source digit-only parser. Both cases could change displayed usage and
+its total-token saturation semantics.
+
+Fail-before tests cover ordinary integers, the maximum `uint64`, values
+above signed `int64`, overflow beyond `uint64`, decimal and exponent
+literals, negative integers, explicitly zero total, valid large cached
+and reasoning token details, and saturating sums. The native usage decoder
+now uses `strconv.ParseUint(..., 10, 64)` for JSON numeric literals and
+does not project floating-point values into integers. All previously valid
+small token counts and the original provider response bytes are retained.
+This is a source-pinned local semantics check; the official Gemini
+executable differential remains a broader no-regression fixture rather
+than a guarantee that every extreme usage number has been tested through
+a live API-key service.
