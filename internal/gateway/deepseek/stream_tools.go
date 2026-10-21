@@ -92,8 +92,8 @@ func deepSeekValidateStreamToolCall(index uint64, call *deepSeekChatStreamToolCa
 }
 
 func deepSeekStreamApplyPatchInput(arguments string) string {
-	var value any
-	if json.Unmarshal([]byte(arguments), &value) != nil {
+	value, err := deepSeekToolArgumentValue(arguments)
+	if err != nil {
 		return arguments
 	}
 	if input, ok := deepSeekExplicitApplyPatchInput(value); ok {
@@ -107,7 +107,7 @@ func deepSeekStreamApplyPatchInput(arguments string) string {
 			return deepSeekNormalizeApplyPatchInput(content)
 		}
 	}
-	encoded, err := json.Marshal(value)
+	encoded, err := jsonutil.MarshalSerdeValue04384(value)
 	if err != nil {
 		return arguments
 	}

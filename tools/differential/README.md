@@ -386,6 +386,13 @@ oracle now exercises thirteen Gemini cases, including all earlier eight fixtures
 
 ### Bounded full DeepSeek oracle
 
+`sse-apply-patch-canonical` compares all four Responses SSE events for an
+apply-patch tool whose arguments use the same nested u64::MAX, large integer,
+decimal/exponent, negative-zero and null fixture as tool-search. The canonical
+JSON input string must appear unchanged in both the completed item and final
+response. Independent mutation controls reject rounded numbers, altered empty
+added input, changed tool type and incorrect event sequence numbers.
+
 `sse-tool-order-finish` and `sse-tool-order-done` send sixteen invalid tools
 in descending index order followed by one valid tool at index zero. Both
 require the complete 36-event byte trace and the error at index three, the

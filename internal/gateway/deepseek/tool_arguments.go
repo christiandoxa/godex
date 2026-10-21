@@ -9,6 +9,15 @@ import (
 )
 
 func deepSeekToolSearchArguments(arguments string) (json.RawMessage, error) {
+	value, err := deepSeekToolArgumentValue(arguments)
+	if err != nil {
+		return nil, err
+	}
+	// Keep canonical serde number tokens through the outer Go JSON envelope.
+	return jsonutil.MarshalSerdeValue04384(value)
+}
+
+func deepSeekToolArgumentValue(arguments string) (any, error) {
 	if err := jsonutil.CheckSerdeBoundary(arguments); err != nil {
 		return nil, err
 	}
@@ -21,6 +30,5 @@ func deepSeekToolSearchArguments(arguments string) (json.RawMessage, error) {
 	if err := decoder.Decode(&value); err != nil {
 		return nil, err
 	}
-	// Keep canonical serde number tokens through the outer Go JSON envelope.
-	return jsonutil.MarshalSerdeValue04384(value)
+	return value, nil
 }

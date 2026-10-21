@@ -2692,3 +2692,47 @@ and the build. Logs: `/tmp/gdx-04384-tool-validation-order-race.log`,
 `/tmp/gdx-04384-tool-validation-order-verify.log`. Clean-commit executable
 validation follows this commit. Buffered malformed-argument diagnostics,
 broader apply-patch argument canonicalization and global parity remain open.
+
+## Canonical numeric fallback input for streamed apply-patch tools
+
+Clean tool-order commit `50170d3543a28e3537b5c6567164e002da612a6e`
+passed 53/53 released DeepSeek scenarios and mutation controls before its
+fast-forward push to `origin/main`. Report:
+`/tmp/gdx-04384-tool-validation-order-oracle.json`.
+
+The tagged stream shaper calls the Gemini custom-tool input converter, whose
+fallback serializes a parsed `serde_json::Value`. Godex instead decoded through
+float64 and ordinary Go JSON serialization, rounding integers and losing serde
+float kinds. The existing private structured argument decoder now serves both
+tool-search and apply-patch under `gateway/deepseek/tool_arguments.go`.
+Apply-patch's fallback uses the existing locked-serde writer. Explicit patch
+strings, aliases, edit paths and patch normalization retain their own existing
+conversion. Architecture documentation records the private ownership; generic
+number rules remain in `helper/jsonutil`. No new package, exported identifier,
+dependency, goroutine, option or state format is introduced.
+
+Fail-before `/tmp/gdx-04384-apply-patch-json-before.log` passes seven controls
+and fails eight tests, including the actual-pump completion and malformed
+surrogate fallback. The fallback rejection tests are local source-aligned
+evidence, not a new executable diagnostic oracle. The released buffered
+DeepSeek path still preserves original apply-patch argument strings and is
+unchanged by this stream-only conversion.
+
+On clean baseline `50170d3543a28e3537b5c6567164e002da612a6e`, Prodex
+independently satisfies the entire four-event canonical contract. Godex emits
+18446744073709552000 and 9007199254740992, and loses the reference's 100.0
+and -0.0 spellings. Fail-before report:
+`/tmp/gdx-04384-apply-patch-json-before-oracle.json`. The differential checks
+the completed item and final output byte for byte, without decoding their
+numbers through float64. Matching wrong numeric values, item types or event
+sequences are rejected by independent mutation controls.
+
+`rtk go test -race ./internal/gateway/deepseek ./tools/differential -count=1`
+passes 725 tests. `rtk go test ./...` passes 9,096 tests across 81 packages.
+`rtk proxy make verify` passes all local gates, including the full shuffled
+race suite and cross-platform build/test compilation. Logs:
+`/tmp/gdx-04384-apply-patch-json-race.log`,
+`/tmp/gdx-04384-apply-patch-json-test-all.log` and
+`/tmp/gdx-04384-apply-patch-json-verify.log`. Clean-commit executable
+validation follows this commit. Buffered malformed diagnostics and broader
+provider SSE BOM/whitespace semantics remain open audit areas.

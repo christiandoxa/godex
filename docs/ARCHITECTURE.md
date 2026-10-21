@@ -297,6 +297,9 @@ are carried as provider metadata rather than rereading files in the HTTP gateway
 Models/Compact routes, and owns the advanced Responses request translator
 (reasoning, primitive controls, strict tools/schema, JSON mode, replay/tool
 history). Shared RTK argument shaping stays in `gateway/chatcompat`.
+Private `gateway/deepseek/tool_arguments.go` owns structured tool-search and
+streamed apply-patch argument decoding; generic serde number serialization
+stays in `helper/jsonutil`.
 `gateway/deepseek` also owns Responses/SSE output shaping, web-search modes,
 beta-base routing, and the partial native Anthropic Messages bridge. Exact
 0.435.1 parity for that bridge remains open; delivery and generic routing do not
