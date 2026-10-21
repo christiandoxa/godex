@@ -3687,3 +3687,41 @@ The same selected local timezone is used for ordinary runtime parsing.
 These extreme-date tests establish the source parser behavior; they do not
 certify future local time-zone or DST rules in every OS, nor real quota
 provider messages containing such years.
+
+## Quota retry reset must follow chrono::Local DST gap and overlap resolution
+
+The pinned 0.438.3 `prodex-quota/src/render/windows.rs` converts a parsed
+quota retry clock or absolute date using
+`chrono::Local.from_local_datetime(&naive).single().or_else(earliest)`.
+This differs from Go `time.Date` at daylight-saving transitions. On the
+spring-forward day in `America/New_York`, civil `2026-03-08 02:30` never
+occurs: chrono returns **None**, while Go silently normalizes it to 01:30
+EST. For an ordinary `try again at 2:30 AM` message, that normalization
+could advance the resulting retry to the **following** civil day and
+wrongly quarantine an account for almost 24 hours. In the fall overlap,
+chrono 0.4.45's `LocalResult::earliest` selects the standard-offset
+occurrence: 01:30 EST (-05:00) in New York, 02:30 CET (+01:00) in Berlin,
+and 02:30 AEST (+10:00) in Sydney. Go `time.Date` may select the earlier
+DST occurrence instead, shifting the retry reset by an hour.
+
+An offline pinned `chrono 0.4.45` Local probe with actual IANA timezone
+settings confirmed the gap and overlap decisions across New York, Berlin,
+and Sydney. A fail-before suite covers spring gaps for both clock and
+absolute-date forms, valid neighboring times, fall overlap selection,
+from-within-earlier-fold comparison and next-day re-resolution into a
+spring gap. A quarantine-policy regression verifies that nonexistent clock
+times produce the normal five-minute fallback rather than an invented
+next-day wait. Godex now resolves local civil time by examining the zone's
+nearby offset candidates, requiring the selected instant to round-trip to
+all original civil fields. When two offsets are valid, it uses the
+standard/smaller-offset occurrence observed in the tagged chrono runtime.
+The `Try again` clock's next-day branch also advances **civil** date and
+resolves local time again rather than calling Go `AddDate` on an already
+normalized instant. Ordinary, non-transition dates and original request
+or response bytes are unchanged.
+
+These source/dependency-aligned tests establish finite New York/Berlin/
+Sydney DST cases only. Cross-OS timezone database versions, historical
+political changes, and live quota-provider scheduling remain explicitly
+open; a broad HTTP transport executable gate is not a certificate for
+those untested local-time cases.

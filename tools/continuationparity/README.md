@@ -1052,3 +1052,12 @@ The local pinned-chrono quota reset parser also covers signed proleptic
 or out-of-range values. The source `chrono::Local` conversion was validated
 separately with `TZ=UTC`; these extreme dates are not live-provider timing
 or cross-OS certificates.
+
+Quota reset-date tests additionally preserve pinned `chrono::Local` DST
+semantics for New York, Berlin and Sydney. A spring-forward nonexistent
+civil time returns no reset, not an invented future date, and a fall-back
+ambiguous time resolves to the standard-offset occurrence selected by
+`chrono 0.4.45::LocalResult::earliest`. Local regressions cover both
+absolute retry dates and clock-only messages, including the actual quota
+quarantine fallback. Independent native/OS timezone data parity is not
+inferred from these finite cases.

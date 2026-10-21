@@ -165,9 +165,19 @@ func quotaResetAtFromText(message string, now time.Time) (int64, bool) {
 	parts := strings.FieldsFunc(candidate, quotaRetryASCIIWhitespace)
 	if len(parts) >= 2 {
 		if hour, minute, ok := quotaChronoClock04383(parts[0], parts[1]); ok {
-			when := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, now.Location())
+			when, exists := quotaChronoLocalDateTime04383(now.Year(), now.Month(), now.Day(), hour, minute, now.Location())
+			if !exists {
+				return 0, false
+			}
 			if !when.After(now) {
-				when = when.AddDate(0, 0, 1)
+				// Source chrono advances the NAIVE calendar day and resolves
+				// it again. Go AddDate on a DST-normalized instant can retain
+				// the wrong civil hour or accept a nonexistent next-day time.
+				civil := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, time.UTC)
+				when, exists = quotaChronoLocalDateTime04383(civil.Year(), civil.Month(), civil.Day(), hour, minute, now.Location())
+				if !exists {
+					return 0, false
+				}
 			}
 			return when.Unix(), true
 		}
@@ -202,11 +212,46 @@ func quotaResetAtFromText(message string, now time.Time) (int64, bool) {
 	if !ok {
 		return 0, false
 	}
-	parsed := time.Date(year, month.Month(), d, hour, minute, 0, 0, now.Location())
-	if parsed.Year() != year || parsed.Month() != month.Month() || parsed.Day() != d {
+	parsed, valid := quotaChronoLocalDateTime04383(year, month.Month(), d, hour, minute, now.Location())
+	if !valid {
 		return 0, false
 	}
 	return parsed.Unix(), true
+}
+
+// Tagged chrono::Local.from_local_datetime(...).single().or_else(earliest)
+// rejects civil times lost at a spring DST jump. On an ambiguous fall-back
+// wall time its pinned LocalResult::earliest selects the standard-time
+// offset first (confirmed against chrono 0.4.45 for New York, Berlin and
+// Sydney), even when Go time.Date selects the other DST occurrence.
+// Enumerate the zone's nearby valid offsets and accept only actual instants
+// that reproduce the requested civil fields. Never normalize a DST gap.
+func quotaChronoLocalDateTime04383(year int, month time.Month, day, hour, minute int, location *time.Location) (time.Time, bool) {
+	wallUTC := time.Date(year, month, day, hour, minute, 0, 0, time.UTC)
+	if wallUTC.Year() != year || wallUTC.Month() != month || wallUTC.Day() != day {
+		return time.Time{}, false
+	}
+	wallSeconds := wallUTC.Unix()
+	seenOffsets := make(map[int]struct{}, 4)
+	var chosen time.Time
+	chosenOffset := 0
+	found := false
+	for hours := -36; hours <= 36; hours += 6 {
+		_, offset := time.Unix(wallSeconds+int64(hours)*3600, 0).In(location).Zone()
+		if _, seen := seenOffsets[offset]; seen {
+			continue
+		}
+		seenOffsets[offset] = struct{}{}
+		candidate := time.Unix(wallSeconds-int64(offset), 0).In(location)
+		if candidate.Year() != year || candidate.Month() != month || candidate.Day() != day ||
+			candidate.Hour() != hour || candidate.Minute() != minute {
+			continue
+		}
+		if !found || offset < chosenOffset {
+			chosen, chosenOffset, found = candidate, offset, true
+		}
+	}
+	return chosen, found
 }
 
 // chrono 0.4.45's "%I:%M %p" expects 1..12 (never zero) hours,
