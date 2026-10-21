@@ -2736,3 +2736,50 @@ race suite and cross-platform build/test compilation. Logs:
 `/tmp/gdx-04384-apply-patch-json-verify.log`. Clean-commit executable
 validation follows this commit. Buffered malformed diagnostics and broader
 provider SSE BOM/whitespace semantics remain open audit areas.
+
+## Preserve BOM bytes at provider SSE JSON boundaries
+
+Clean apply-patch commit `71bbd547b7f65705124499a6ec729ed6dd7bdc88`
+passed 54/54 DeepSeek released-executable scenarios and mutation controls
+before its fast-forward push to `origin/main`. Report:
+`/tmp/gdx-04384-apply-patch-json-oracle.json`.
+
+The tagged `provider_sse_reader.rs` collects data lines and joins them in Rust
+before serde validation; it never calls the generic Mojo payload joiner that
+strips initial BOMs. Godex reused that generic normalization even in its
+strict provider decoder. A provider's leading BOM therefore became acceptable
+JSON and emitted text/completion where Prodex retained an incomplete fragment.
+The existing strict decoder now preserves provider payload BOMs; the generic
+decoder keeps its existing Mojo-compatible BOM behavior. No new decoder mode,
+API, dependency or package is added. The three existing strict consumers are
+DeepSeek Chat, Gemini Chat-compatible and native Gemini. Framing remains in
+`helper/sse`, provider state/events remain in each gateway, and architecture
+documentation describes this boundary. Limits, UTF-8 rejection, credential
+handling, retry and persistence behavior are unchanged.
+
+Fail-before `/tmp/gdx-04384-provider-bom-before.log` fails both strict-decoder
+and actual DeepSeek pump regressions. The Gemini actual-pump regression also
+fails before the fix for native and Chat-compatible single/repeated BOMs:
+`/tmp/gdx-04384-provider-bom-gemini-before.log`. Normal streams and generic
+BOM normalization retain their existing positive controls.
+
+On clean baseline `71bbd547b7f65705124499a6ec729ed6dd7bdc88`, the pinned
+Prodex executable independently satisfies one exact failure event with
+`incomplete JSON segment`; Godex instead creates a response, emits the fixture
+text, and completes successfully. Report:
+`/tmp/gdx-04384-provider-bom-before-oracle.json`. New DeepSeek and Gemini
+cases test one/repeated BOMs. They validate generated UUIDv7 and timestamp
+before comparing every remaining byte, and reject changed failure text,
+sequence numbers, frame endings, duplicate events and borrowed upstream IDs.
+Native Gemini coverage is local/source-aligned; the released Gemini API-key
+oracle exercises the Chat-compatible provider reader.
+
+`rtk go test -race ./internal/helper/sse ./internal/gateway/deepseek ./internal/gateway/gemini ./tools/differential -count=1`
+passes 1,463 tests. `rtk go test ./...` passes 9,100 tests across 81 packages.
+`rtk proxy make verify` passes all local gates, including the shuffled race
+suite and cross-platform build/test compilation. Logs:
+`/tmp/gdx-04384-provider-bom-race.log`,
+`/tmp/gdx-04384-provider-bom-test-all.log` and
+`/tmp/gdx-04384-provider-bom-verify.log`. Clean-commit executable validation
+follows this commit. Broader provider whitespace/EOF and malformed buffered
+argument diagnostics remain unproven.

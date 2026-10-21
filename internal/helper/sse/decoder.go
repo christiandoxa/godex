@@ -18,7 +18,8 @@ type Decoder struct {
 	err        error
 }
 
-// NewStrictDecoder fails on oversized wire lines/events and invalid UTF-8.
+// NewStrictDecoder preserves provider payload BOMs and fails on oversized
+// wire lines/events and invalid UTF-8.
 // Wire line bounds include CR/LF; event bounds include one byte per data line.
 func NewStrictDecoder(limit int) *Decoder {
 	return &Decoder{limit: max(1, limit), strict: true}
@@ -66,9 +67,7 @@ func (decoder *Decoder) endLine() []byte {
 		decoder.err = errors.New("stream did not contain valid UTF-8")
 		return nil
 	}
-	// The tagged SSE line planner does not strip a BOM from a wire field
-	// name. Only the assembled first data value has its BOM removed by
-	// Mojo runtime_sse_payload_join (including repeated prefixes).
+	// The tagged SSE line planner does not strip a BOM from a wire field name.
 	line := bytes.TrimRight(decoder.line, "\r")
 	if len(line) == 0 {
 		data := decoder.data
@@ -100,10 +99,9 @@ func (decoder *Decoder) endLine() []byte {
 		return nil
 	}
 	decoder.eventBytes += len(value) + 1
-	if len(decoder.data) == 0 {
-		// Source runtime_sse_payload_join consumes every leading BOM from
-		// the first data value, even when the physical field starts after
-		// ordinary comments. Subsequent data lines keep their literal BOMs.
+	if !decoder.strict && len(decoder.data) == 0 {
+		// Generic runtime_sse_payload_join removes leading BOMs; the provider
+		// JSON reader instead preserves its data lines before serde parsing.
 		for bytes.HasPrefix(value, []byte("\xef\xbb\xbf")) {
 			value = value[3:]
 		}

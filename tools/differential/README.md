@@ -386,6 +386,15 @@ oracle now exercises thirteen Gemini cases, including all earlier eight fixtures
 
 ### Bounded full DeepSeek oracle
 
+`sse-payload-bom` and `sse-payload-bom-repeat` exercise one or two BOMs at
+the start of a provider data field. The provider JSON reader preserves those
+bytes, so the exact output is one `provider_stream_error` with `incomplete
+JSON segment`, without response creation, text or success. The Gemini matrix
+includes corresponding `stream-chat-bom` and `stream-chat-bom-repeat` cases.
+Only validated generated UUIDv7 and current timestamps vary; all remaining
+failure bytes must match. Mutations reject altered errors, sequence numbers,
+framing, duplicate failures and borrowed upstream identities.
+
 `sse-apply-patch-canonical` compares all four Responses SSE events for an
 apply-patch tool whose arguments use the same nested u64::MAX, large integer,
 decimal/exponent, negative-zero and null fixture as tool-search. The canonical

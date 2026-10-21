@@ -241,7 +241,9 @@ Gemini gateways: joined/separate precedence, bounded partial JSON and DONE
 recognition. Provider state, response events and terminal handling remain in
 each gateway. The helper performs no I/O or application policy.
 Those gateways select the strict SSE decoder with the tagged 4 MiB wire
-bounds and handle its terminal error. Other transports retain their existing
+bounds and handle its terminal error. Provider data lines retain BOM bytes
+for serde validation; generic SSE payload joining keeps its own BOM contract.
+Other transports retain their existing
 decoder contract. `helper/sse.PipeBody` gives DeepSeek and Gemini explicit
 upstream closure ownership once across pump completion and client cancellation.
 Each gateway owns its producer goroutine and defers source closure separately

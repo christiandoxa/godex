@@ -105,6 +105,10 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	if geminiChatStreamScenario04384(mock.scenario) {
 		w.Header().Set("Content-Type", "text/event-stream")
+		if geminiProviderBOMScenario04384(mock.scenario) {
+			_, _ = io.WriteString(w, providerBOMUpstream04384(mock.scenario == "stream-chat-bom-repeat"))
+			return
+		}
 		if mock.scenario == "stream-chat-error" {
 			_, _ = io.WriteString(w, "data: "+`{"error":{"type":null,"code":"must-not-borrow","message":null,"detail":"must-not-borrow"},"choices":[{"delta":{"content":"must-not-emit"}}]}`+"\n\ndata: [DONE]\n\n")
 			return
@@ -219,6 +223,8 @@ func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit string
 			"stream-chat",
 			"stream-chat-eof",
 			"stream-chat-error",
+			"stream-chat-bom",
+			"stream-chat-bom-repeat",
 			"stream-chat-data-lines",
 			"stream-chat-json-fragments",
 			"multi-turn-tool",
@@ -434,7 +440,11 @@ func geminiCompare(scenario string, prodex, godex geminiCandidateResult) []strin
 		}
 		return differences
 	}
-	if scenario == "stream-chat-error" {
+	if geminiProviderBOMScenario04384(scenario) {
+		if !equivalentProviderBOMSSE04384(prodex.Client.Body, godex.Client.Body) {
+			differences = append(differences, "client Gemini provider payload BOM failure differs")
+		}
+	} else if scenario == "stream-chat-error" {
 		if !geminiChatErrorWireValid04384(prodex.Client.Body) || !geminiChatErrorWireValid04384(godex.Client.Body) {
 			differences = append(differences, "client Gemini embedded error precedence or failure bytes differ")
 		}
@@ -537,7 +547,11 @@ func geminiFixtureInvariant(scenario string, result geminiCandidateResult) error
 		if options, ok := attempt.Body["stream_options"].(map[string]any); !ok || options["include_usage"] != true {
 			return fmt.Errorf("Gemini valid Chat SSE request omitted usage: %+v", attempt.Body)
 		}
-		if scenario == "stream-chat-error" {
+		if geminiProviderBOMScenario04384(scenario) {
+			if !validProviderBOMWire04384(result.Client.Body) {
+				return errors.New("Gemini provider payload BOM was accepted as JSON whitespace")
+			}
+		} else if scenario == "stream-chat-error" {
 			if !geminiChatErrorWireValid04384(result.Client.Body) {
 				return errors.New("Gemini embedded error leaked creation/content or incorrect error fields")
 			}
