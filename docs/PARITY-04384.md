@@ -89,3 +89,29 @@ and is exercised by local and race-enabled Kiro package tests. A local
 `kiro-cli` reports version 2.13.0; the release's Kiro CLI 2.33.0 smoke
 qualification has **not** been reproduced with that live binary, and no
 personal Kiro credential, conversation, or provider session was accessed.
+
+## Kiro ACP optional-field presence and clearing semantics
+
+Tagged Rust `runtime_kiro_acp/turn_state.rs` models plans, available
+commands, current mode and session title/timestamp as `Option` values.
+Its compiled `kiro.mojo` `AcpMetadata` serializer checks whether each
+field is **present**, rather than whether the value contains any elements
+or non-whitespace text. Thus a valid `plan` update containing `entries: []`
+produces `"plan": []`, not an absent field; `availableCommands: []`
+produces an empty array; an explicit `currentModeId: ""` emits an empty
+string. A later `session_info_update` with `title: ""` or `updatedAt: ""`
+overwrites an earlier value. Missing optional title/timestamp keys leave
+the earlier values untouched. Exact Unicode and leading/trailing whitespace
+in these optional strings must be preserved.
+
+Godex previously dropped empty plans and commands with `len` checks,
+normalized mode/title using `runtimeString` and omitted all-empty session
+metadata. Fail-before tests reproduced lost empty fields, stale previous
+entries following a clear update, and silently trimmed session titles.
+The new projection keeps explicit presence for current-mode and optional
+session title/timestamp, distinguishes unset from a present empty slice,
+and sends nil only for truly absent optional members. This changes no
+client request bytes, and uses synthetic ACP notifications without loading
+real Kiro CLI credentials. Source/compiled-Mojo alignment and local
+race-enabled regression tests have passed; real Kiro 2.33.0 interaction
+remains outside this bounded proof.

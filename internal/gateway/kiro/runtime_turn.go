@@ -17,8 +17,11 @@ type kiroTurnState struct {
 	plan              []any
 	availableCommands []any
 	currentModeID     string
+	currentModeSet    bool
 	sessionTitle      string
+	sessionTitleSet   bool
 	sessionUpdatedAt  string
+	sessionUpdatedSet bool
 	toolActivities    []any
 	toolLabels        map[string]toolLabel
 	truncatedTools    bool
@@ -105,13 +108,18 @@ func (state *kiroTurnState) applyUpdate(update map[string]any) {
 	case "available_commands_update":
 		state.availableCommands = sanitizeArray(update["availableCommands"])
 	case "current_mode_update":
-		state.currentModeID = runtimeString(update["currentModeId"], "")
+		// Tagged Rust stores Some("") as a real update; the Mojo
+		// metadata kernel serializes an explicit empty mode as "".
+		state.currentModeID, _ = update["currentModeId"].(string)
+		state.currentModeSet = true
 	case "session_info_update":
-		if title := runtimeString(update[kiroFieldTitle], ""); title != "" {
+		if title, present := update[kiroFieldTitle].(string); present {
 			state.sessionTitle = title
+			state.sessionTitleSet = true
 		}
-		if updated := runtimeString(update["updatedAt"], ""); updated != "" {
+		if updated, present := update["updatedAt"].(string); present {
 			state.sessionUpdatedAt = updated
+			state.sessionUpdatedSet = true
 		}
 	case "tool_call", "tool_call_update":
 		state.applyToolActivity(kind == "tool_call", update)
@@ -154,17 +162,26 @@ func (state kiroTurnState) metadata(stopReason string) map[string]any {
 	if state.usage != nil {
 		kiro["usage_update"] = state.usage
 	}
-	if len(state.plan) > 0 {
+	// In Rust these are Options: Some([]) and Some("") must still be
+	// serialized. Absence, not the value's length, suppresses a field.
+	if state.plan != nil {
 		kiro["plan"] = state.plan
 	}
-	if len(state.availableCommands) > 0 {
+	if state.availableCommands != nil {
 		kiro["available_commands"] = state.availableCommands
 	}
-	if state.currentModeID != "" {
+	if state.currentModeSet {
 		kiro["current_mode_id"] = state.currentModeID
 	}
-	if state.sessionTitle != "" || state.sessionUpdatedAt != "" {
-		kiro["session_info"] = map[string]any{kiroFieldTitle: nilOrText(state.sessionTitle), "updated_at": nilOrText(state.sessionUpdatedAt)}
+	if state.sessionTitleSet || state.sessionUpdatedSet {
+		var title, updated any
+		if state.sessionTitleSet {
+			title = state.sessionTitle
+		}
+		if state.sessionUpdatedSet {
+			updated = state.sessionUpdatedAt
+		}
+		kiro["session_info"] = map[string]any{kiroFieldTitle: title, "updated_at": updated}
 	}
 	if stopReason != "" {
 		kiro["stop_reason"] = stopReason
@@ -229,7 +246,7 @@ func sanitizeArray(value any) []any {
 	if !ok {
 		return nil
 	}
-	return append([]any(nil), items...)
+	return append([]any{}, items...)
 }
 
 func sanitizeMap(value map[string]any, keys ...string) map[string]any {
