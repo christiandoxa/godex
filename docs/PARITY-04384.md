@@ -2198,3 +2198,47 @@ passes its mutation test. `rtk go test ./...` passes 8,973 tests across
 shuffled race suite. Log:
 `/tmp/gdx-04384-deepseek-stream-identity-final-verify.log`. Clean-commit
 released-executable validation follows this commit.
+
+Clean commit `fd985be45f77222505f3f63453064c00a3f60672` passed all
+39 DeepSeek released cases and runtime mutation controls before its
+fast-forward push to `origin/main`. Report:
+`/tmp/gdx-04384-deepseek-stream-identity-oracle.json`.
+
+## DeepSeek releases the upstream reader after terminal output
+
+The tagged shared provider SSE reader stops filling pending data after its
+state reaches EOF. Godex's DeepSeek pump previously wrote completion/failure
+but continued calling the upstream reader, so a connection held open after
+DONE could prevent the client from receiving EOF indefinitely. Gemini's
+corresponding pump ownership was corrected in an earlier section.
+
+The DeepSeek pump now closes its pipe and returns immediately after writing
+a terminal state. Its existing defer closes upstream. There is no new
+goroutine, helper, public API, option, retry, persistence or layer change.
+The owner remains `gateway/deepseek/stream.go`.
+
+Fail-before `/tmp/gdx-04384-deepseek-terminal-close-before.log` proves
+extra reads after same-packet DONE, an embedded error, invalid tool failure,
+and a separate DONE packet. Premature EOF is a passing control because it
+requires the extra read. Channel synchronization observes upstream Close
+without sleeps; all terminal outputs occur once and trailing text stays
+suppressed. `rtk go test -race ./internal/gateway/deepseek ./tools/differential -count=1`
+passes 642 tests. Log: `/tmp/gdx-04384-deepseek-terminal-close-race.log`.
+
+The new `sse-terminal-close` released scenario flushes the existing complete
+text/usage fixture then keeps the HTTP response open until request cancellation.
+No timer supplies EOF. On clean baseline
+`fd985be45f77222505f3f63453064c00a3f60672`, the invocation fails on
+Godex's missing child response after the shim read deadline; the tool aborts
+without a JSON matrix report. This is failed baseline evidence, not a passing
+or completed differential. Log:
+`/tmp/gdx-04384-deepseek-terminal-close-before-oracle.stderr`.
+DeepSeek line/event size and cross-event JSON accumulation remain separate
+unclosed reader parity areas.
+
+`rtk go test ./...` passes 8,979 tests across 81 packages.
+`rtk proxy make verify` passes all local gates, including the complete
+shuffled race suite. Logs:
+`/tmp/gdx-04384-deepseek-terminal-close-final-test-all.log` and
+`/tmp/gdx-04384-deepseek-terminal-close-final-verify.log`. Clean-commit
+released-executable validation follows this commit.

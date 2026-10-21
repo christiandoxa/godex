@@ -51,6 +51,10 @@ func pumpDeepSeekChatSSE(body io.ReadCloser, writer *io.PipeWriter, state *deepS
 						return
 					}
 				}
+				if state.completed {
+					_ = writer.Close()
+					return
+				}
 			}
 		}
 		if err != nil {

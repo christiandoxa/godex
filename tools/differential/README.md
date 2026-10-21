@@ -386,6 +386,12 @@ oracle now exercises thirteen Gemini cases, including all earlier eight fixtures
 
 ### Bounded full DeepSeek oracle
 
+`sse-terminal-close` sends the canonical text/usage stream, flushes DONE,
+and leaves the upstream HTTP response open until the product closes it. Both
+clients must return the complete five-event response before the existing
+eight-second shim deadline; waiting for upstream EOF cannot pass. No delay or
+sleep releases the mock. Its request context owns handler cancellation.
+
 `deepseek-empty-identity` and `deepseek-sse-empty-identity` require present
 empty response ID/model strings to remain empty. The stream's later packets
 offer a different ID, which must not replace the already supplied empty ID.
