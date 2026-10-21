@@ -1913,7 +1913,65 @@ contains 42 cases.
 `rtk go test -race ./internal/gateway/gemini ./internal/gateway/chatcompat ./internal/gateway/deepseek ./tools/differential -count=1`
 passes 1,271 tests. `rtk go test ./...` passes 8,894 across 81 packages.
 Logs: `/tmp/gdx-04384-gemini-chat-error-final-race.log` and
-`/tmp/gdx-04384-gemini-chat-error-final-test-all.log`. The complete local
+`/tmp/gdx-04384-gemini-chat-error-final-test-all.log`.
 `rtk proxy make verify` passes all local gates, including the full race
 suite. Gate log: `/tmp/gdx-04384-gemini-chat-error-final-verify.log`.
 Exact clean-commit executable validation follows the commit.
+
+The released baseline on `dfb50c7fcdca02a63d1819be77902f19e992463a`
+matched 41/42 cases and failed only Godex's `stream-chat-error` case.
+Prodex emitted the required single failure frame, while Godex leaked
+creation/content and completion. Mutation controls passed. Log:
+`/tmp/gdx-04384-gemini-chat-error-before-oracle.json`.
+
+Clean commit `e4dca175ae040161e54cc311ad23822b2a8759a0` passed all 42
+Gemini cases, all 33 DeepSeek scenarios and their mutation controls before
+its fast-forward push to `origin/main`. Logs:
+`/tmp/gdx-04384-gemini-chat-error-oracle.json` and
+`/tmp/gdx-04384-gemini-chat-error-deepseek-oracle.json`.
+
+## Gemini SSE events may contain separate JSON data lines
+
+The tagged shared provider SSE reader first tries the joined data lines as
+one serde JSON value. When that fails, it tries every nonblank data line as
+a complete value, validates the full set, then observes them in order.
+Godex previously accepted only joined JSON and rejected two complete
+values in one event. Both native and API-key Gemini streams now implement
+the separate-value fallback with the same whole-serde admission boundary.
+
+The private `gateway/gemini/stream_data.go` parser has two real
+consumers and performs no I/O. Ordinary joined JSON keeps its existing path;
+fallback parsing cannot emit the first candidate when a later line is
+invalid. Every returned line is complete JSON, so recursive observation
+cannot re-enter the fallback. Empty lines are skipped. No new helper
+package, dependency, model, option, persistence, retry rule or goroutine is
+introduced. Accumulation across separate SSE events and broader framing
+size/error behavior remain separate audit areas.
+
+Fail-before log: `/tmp/gdx-04384-gemini-sse-lines-before.log`. HTTP/SSE-pump
+regressions cover both adapters with two text values in one event. Controls
+check valid pretty-printed joined JSON, blank lines, a malformed second
+value, unpaired surrogates and floating overflow, with no partial output
+from a rejected event. The `stream-chat-data-lines`
+executable fixture sends the same canonical text/usage conversation using
+two data lines for its first event. It must yield the existing exact
+six-event client trace. The Gemini matrix now contains 43 cases.
+
+Source-derived/local tests and released-executable evidence remain distinct.
+
+The reader's earlier DONE gate checks every data line before JSON parsing.
+A DONE marker in any position completes the already committed content and
+suppresses every other line in that event, even an embedded error or malformed
+JSON. Both adapters now apply this precedence. Fail-before evidence:
+`/tmp/gdx-04384-gemini-sse-done-before.log`; the focused final
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiSSE' -count=1`
+passes 16 tests. This remains separate from cross-event JSON accumulation.
+
+The final
+`rtk go test -race ./internal/gateway/gemini ./tools/differential -count=1`
+passes 864 tests. `rtk go test ./...` passes 8,903 across 81 packages.
+`rtk proxy make verify` passes all local gates, including the full race
+suite. Logs: `/tmp/gdx-04384-gemini-sse-lines-final2-race.log`,
+`/tmp/gdx-04384-gemini-sse-lines-final2-test-all.log` and
+`/tmp/gdx-04384-gemini-sse-lines-final2-verify.log`. Clean candidate
+executable validation follows the commit.

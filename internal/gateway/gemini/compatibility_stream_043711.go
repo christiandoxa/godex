@@ -157,12 +157,21 @@ func (state *geminiChatCompatibleStream043711) accept(writer io.Writer, data []b
 	if state.done {
 		return nil
 	}
-	if bytes.Equal(bytes.TrimSpace(data), []byte("[DONE]")) {
+	if geminiSSEDone04384(data) {
 		return state.complete(writer)
 	}
 	root, valid := geminiSerdeResponseObject04384(data)
 	if !valid {
-		return errors.New("failed to parse Gemini chat completions SSE JSON")
+		values, separate := geminiSeparateSSEValues04384(data)
+		if !separate {
+			return errors.New("failed to parse Gemini chat completions SSE JSON")
+		}
+		for _, value := range values {
+			if err := state.accept(writer, value); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 	if value, present := root["error"]; present {
 		code, message := chatcompat.ChatStreamError(value)

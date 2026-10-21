@@ -9,7 +9,7 @@ import (
 )
 
 func geminiChatStreamScenario04384(scenario string) bool {
-	return scenario == "stream-chat" || scenario == "stream-chat-eof" || scenario == "stream-chat-error"
+	return scenario == "stream-chat" || scenario == "stream-chat-eof" || scenario == "stream-chat-error" || scenario == "stream-chat-data-lines"
 }
 
 func geminiChatEOFFixture04384(responseID, itemID string, epoch int64) string {

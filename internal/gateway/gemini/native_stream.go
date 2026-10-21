@@ -2,7 +2,6 @@ package gemini
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
 	"io"
 	"net/http"
@@ -100,12 +99,21 @@ func (state *geminiStreamState) consume(writer io.Writer, data []byte, requestMe
 	if state.completed {
 		return nil
 	}
-	if bytes.Equal(bytes.TrimSpace(data), []byte("[DONE]")) {
+	if geminiSSEDone04384(data) {
 		return state.complete(writer, requestMetadata)
 	}
 	root, valid := geminiSerdeResponseObject04384(data)
 	if !valid {
-		return fmt.Errorf("failed to parse Gemini SSE JSON")
+		values, separate := geminiSeparateSSEValues04384(data)
+		if !separate {
+			return fmt.Errorf("failed to parse Gemini SSE JSON")
+		}
+		for _, value := range values {
+			if err := state.consume(writer, value, requestMetadata); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 	if code, message, failed := geminiNativeStreamError(root); failed {
 		return state.failed(writer, code, message)
