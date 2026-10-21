@@ -386,6 +386,11 @@ oracle now exercises thirteen Gemini cases, including all earlier eight fixtures
 
 ### Bounded full DeepSeek oracle
 
+`sse-tool-signature` requires a thought signature with surrounding tab, space
+and newline bytes to survive unchanged in both completed tool output and the
+final response. It compares the full five-event stream and rejects trimmed
+signatures, renamed fields, changed sequence numbers or tool identities.
+
 `sse-payload-bom` and `sse-payload-bom-repeat` exercise one or two BOMs at
 the start of a provider data field. The provider JSON reader preserves those
 bytes, so the exact output is one `provider_stream_error` with `incomplete

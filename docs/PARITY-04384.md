@@ -2783,3 +2783,52 @@ suite and cross-platform build/test compilation. Logs:
 `/tmp/gdx-04384-provider-bom-verify.log`. Clean-commit executable validation
 follows this commit. Broader provider whitespace/EOF and malformed buffered
 argument diagnostics remain unproven.
+
+## Released full-gate checkpoint and streamed tool signature bytes
+
+The complete default release gate finished successfully on clean commit
+`9a7e8e9283244e3535da02fa07fac54653bb7eb1` with actual exit status zero:
+
+```bash
+rtk proxy bash scripts/verify-release-parity.sh > /tmp/gdx-04384-9a7e8e9-full-release-parity.log 2>&1
+```
+
+That run used the pinned source/binary/manifest checksums, synthetic accounts
+and isolated loopback services. It completed all scripted phases, including
+the then-current 51 DeepSeek and 44 Gemini scenarios, CLI/context/profile/
+history, WebSocket transport/lifecycle/lineage, continuation, durable ownership,
+HTTP keepalive/recovery, prompt-cache, raw 429 and profile-status policy gates.
+The opt-in official Codex app-server executable checks were not enabled.
+This checkpoint applies to that exact commit and scripted coverage, not a
+claim of complete 1:1 parity or validation of native operating-system lanes.
+
+On clean `71bbd547b7f65705124499a6ec729ed6dd7bdc88`, the extended Gemini
+fail-before run finishes all 46 cases. Only the two new BOM cases fail Godex;
+Prodex independently meets both exact failure contracts. Report:
+`/tmp/gdx-04384-provider-bom-gemini-before-oracle.json`.
+
+The tagged DeepSeek stream tool projection preserves the original signature
+string. Its ThoughtSignature policy rejects only absent/blank values; accepted
+strings flow unchanged through item completion and conversation snapshots.
+Godex instead trimmed accepted signatures, changing opaque provider data.
+The existing private gateway extractor now uses trimming only for the
+blankness check and returns the original nonblank value. No model, shared
+helper, API, dependency, option, goroutine or storage format is introduced.
+
+Fail-before `/tmp/gdx-04384-tool-signature-before.log` passes the blank-update
+control and fails raw-byte extraction and completed-item/snapshot tests.
+The pinned executable separately preserves a tab/space/Unicode/newline
+signature across its entire five-event response while baseline Godex trims
+it. Report: `/tmp/gdx-04384-tool-signature-before-oracle.json`.
+The extended oracle checks every event byte and rejects matching trimmed
+signatures, renamed fields, incorrect sequences and changed tool identities.
+
+`rtk go test -race ./internal/gateway/deepseek ./tools/differential -count=1`
+passes 731 tests. `rtk go test ./...` passes 9,104 tests across 81 packages.
+`rtk proxy make verify` passes all local gates, including the shuffled race
+suite, cross-platform builds and test compilation. Logs:
+`/tmp/gdx-04384-tool-signature-race.log`,
+`/tmp/gdx-04384-tool-signature-test-all.log` and
+`/tmp/gdx-04384-tool-signature-verify.log`. Clean-commit executable validation
+follows this commit. Missing/present tool-call identity fields, padded names,
+and buffered malformed-argument diagnostics remain separate audit targets.

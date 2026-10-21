@@ -267,5 +267,8 @@ func deepSeekStreamThoughtSignature(call map[string]any) string {
 	extra, _ := call["extra_content"].(map[string]any)
 	google, _ := extra["google"].(map[string]any)
 	signature, _ := google["thought_signature"].(string)
-	return strings.TrimSpace(signature)
+	if strings.TrimSpace(signature) == "" {
+		return ""
+	}
+	return signature
 }
