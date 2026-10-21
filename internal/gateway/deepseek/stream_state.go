@@ -10,6 +10,7 @@ import (
 
 	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 	redacthelper "github.com/christiandoxa/godex/internal/helper/redact"
+	"github.com/christiandoxa/godex/internal/helper/sse"
 )
 
 type deepSeekChatStreamToolCall struct {
@@ -31,6 +32,7 @@ type deepSeekChatStreamState struct {
 	createdAt            uint64
 	created              bool
 	completed            bool
+	json                 sse.JSONFrames
 	outputText           strings.Builder
 	reasoning            strings.Builder
 	refusal              strings.Builder
@@ -62,22 +64,14 @@ func newDeepSeekChatStreamState(requestID uint64, messages []any, metadata map[s
 	}
 }
 
-func (state *deepSeekChatStreamState) observe(data []byte) ([]byte, bool, error) {
-	if state.completed {
-		return nil, false, nil
-	}
-	if string(data) == "[DONE]" {
-		return state.complete()
-	}
-	if !deepSeekValidStreamValue04384(data) {
-		return nil, false, fmt.Errorf("failed to parse DeepSeek SSE JSON")
-	}
-	var root map[string]any
+func (state *deepSeekChatStreamState) observeValue(data []byte) ([]byte, bool, error) {
+	var value any
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.UseNumber()
-	if err := decoder.Decode(&root); err != nil || root == nil {
+	if err := decoder.Decode(&value); err != nil {
 		return nil, false, fmt.Errorf("failed to parse DeepSeek SSE JSON")
 	}
+	root, _ := value.(map[string]any)
 	if value, present := root["error"]; present {
 		code, message := chatcompat.ChatStreamError(value)
 		return state.failed(code, message)

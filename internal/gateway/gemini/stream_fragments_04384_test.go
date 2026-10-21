@@ -60,18 +60,6 @@ func TestProdex04384GeminiSSEIncompleteJSONFailsAtDoneAndEOF(t *testing.T) {
 	}
 }
 
-func TestProdex04384GeminiSSEAccumulatedJSONHasExactBound(t *testing.T) {
-	state := &geminiStreamJSON04384{}
-	first := []byte(`"` + strings.Repeat("a", geminiStreamJSONMaxBytes04384-1))
-	values, err := state.observe(first)
-	if err != nil || len(values) != 0 || len(state.pending) != geminiStreamJSONMaxBytes04384 {
-		t.Fatalf("exact accumulation bound rejected: values=%d pending=%d err=%v", len(values), len(state.pending), err)
-	}
-	if _, err := state.observe([]byte(`x`)); err == nil || err.Error() != "provider SSE accumulated JSON exceeded safe size limit (4194304)" || len(state.pending) != geminiStreamJSONMaxBytes04384 {
-		t.Errorf("overflow changed bounded state or lost safe failure: pending=%d err=%v", len(state.pending), err)
-	}
-}
-
 func TestProdex04384GeminiSSECompleteValuesDoNotConsumePendingFragments(t *testing.T) {
 	state := &geminiChatCompatibleStream043711{id: "resp-fixture", created: 1}
 	var output bytes.Buffer

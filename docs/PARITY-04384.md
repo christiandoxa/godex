@@ -2258,3 +2258,50 @@ the unclosed reader/framing/numeric areas above are not certified by these
 mock-based executable matrices. The last Gemini executable regression remains
 44/44 PASS on `8d675af9c0d671d2fb3d3c43485f60ecc14899c4`; the later
 DeepSeek-only commits did not repeat that separate matrix.
+
+## Shared provider SSE JSON framing reaches DeepSeek
+
+The tagged DeepSeek and Gemini readers both delegate to the shared
+`RuntimeProviderSseJsonReader`. DeepSeek still treated each SSE data value as
+one complete object, failing on partial JSON, multiple complete data lines,
+valid non-object values and DONE sharing an event with other values. The
+reader's joined/separate/retained-fragment precedence was already implemented
+privately for the two Gemini adapters.
+
+That technical framing now belongs to the existing `helper/sse` package as
+`JSONFrames` with an explicitly owned 4 MiB pending buffer. Both gateway
+packages are real production consumers. The helper returns validated raw
+values, performs no I/O or application policy, and uses the existing
+`helper/jsonutil` serde boundary and number checks. DONE's UTF-8 gate precedes
+marker recognition. Domain response events, metadata, errors and terminal
+state remain in the gateways. The private Gemini implementation is removed;
+its exact-limit test moves beside the helper. Architecture ownership is
+documented in `docs/ARCHITECTURE.md`. No dependency, option, persistence,
+goroutine or public application model is introduced.
+
+DeepSeek now retains partial segments, processes only fully validated
+separate values, preserves complete-packet priority over pending fragments,
+and reports `incomplete JSON segment` at DONE/EOF. Valid arrays/scalars carry
+no response fields but remain valid events. Existing invalid-serde tests now
+assert no leaked text and exactly one failed terminal event by DONE, keeping
+Unicode and floating-point coverage under the shared reader contract.
+
+Fail-before `/tmp/gdx-04384-provider-sse-json-before.log` passes the joined
+JSON control and fails the targeted reassembly/separate/scalar/DONE/error
+contracts. Baseline `8e3b0cf9e06b7da1da1523e96ae5ae405f74fb84` also
+fails both new released scenarios only on Godex; Prodex meets the independent
+full stream contract. Logs:
+`/tmp/gdx-04384-provider-sse-json-fragments-before-oracle.json` and
+`/tmp/gdx-04384-provider-sse-json-lines-before-oracle.json`.
+
+`rtk go test -race ./internal/gateway/deepseek ./internal/gateway/gemini ./internal/helper/sse -count=1`
+passes 1,132 tests. `rtk go test ./...` passes 8,993 tests across 81 packages.
+Logs: `/tmp/gdx-04384-provider-sse-json-final-race.log` and
+`/tmp/gdx-04384-provider-sse-json-final-test-all.log`.
+Per-line/event size/error semantics remain a separate reader audit. The exact
+4 MiB accumulator admission/overflow currently has focused local coverage,
+not a separate large-payload released-executable scenario.
+
+`rtk proxy make verify` passes all local gates, including the complete
+shuffled race suite. Log: `/tmp/gdx-04384-provider-sse-json-final-verify.log`.
+Clean-commit DeepSeek and Gemini executable validation follows this commit.

@@ -28,7 +28,7 @@ type geminiStreamState struct {
 	finish     string
 	sequence   uint64
 	completed  bool
-	json       geminiStreamJSON04384
+	json       sse.JSONFrames
 }
 
 func translateGeminiNativeStream(response *http.Response, requestMetadata map[string]any) *proxymodel.Response {
@@ -76,7 +76,7 @@ func pumpGeminiNativeStream(body io.ReadCloser, writer *io.PipeWriter, requestMe
 				message := "Gemini stream failed"
 				if err == io.EOF {
 					message = "unexpected end of stream"
-					if len(state.json.pending) > 0 {
+					if state.json.Pending() {
 						message = "incomplete JSON segment"
 					}
 				}
@@ -107,15 +107,15 @@ func (state *geminiStreamState) consume(writer io.Writer, data []byte, requestMe
 	if state.completed {
 		return nil
 	}
-	if geminiSSEDone04384(data) {
-		if len(state.json.pending) > 0 {
+	if sse.JSONDone(data) {
+		if state.json.Pending() {
 			return state.failed(writer, "provider_stream_error", "incomplete JSON segment")
 		}
 		return state.complete(writer, requestMetadata)
 	}
 	root, valid := geminiSerdeResponseObject04384(data)
 	if !valid {
-		values, err := state.json.observe(data)
+		values, err := state.json.Observe(data)
 		if err != nil {
 			return state.failed(writer, "provider_stream_error", err.Error())
 		}

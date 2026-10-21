@@ -386,6 +386,12 @@ oracle now exercises thirteen Gemini cases, including all earlier eight fixtures
 
 ### Bounded full DeepSeek oracle
 
+`sse-json-fragments` splits a JSON string across SSE events, and
+`sse-data-lines` places separate JSON values on two data lines of one event.
+Both must produce the existing exact five-event text/usage trace, with no
+partial text or alternate terminal event. They join the complete DeepSeek
+matrix; shared framing changes also require the Gemini matrix regression.
+
 `sse-terminal-close` sends the canonical text/usage stream, flushes DONE,
 and leaves the upstream HTTP response open until the product closes it. Both
 clients must return the complete five-event response before the existing

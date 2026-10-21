@@ -69,8 +69,16 @@ func TestProdex04384DeepSeekSSEChunkRequiresCompleteSerdeJSON(t *testing.T) {
 			payload := []byte(`{"id":"chatcmpl-synthetic","choices":[{"delta":{"content":"stream-text"}}]` + tc.extra + `}`)
 			state := newDeepSeekChatStreamState(42, nil, nil, deepSeekConversationStore{})
 			wire, _, err := state.observe(payload)
-			if accepted := err == nil; accepted != tc.valid {
-				t.Fatalf("invalid serde DeepSeek SSE accepted=%t want=%t err=%v wire=%q", accepted, tc.valid, err, wire)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !tc.valid {
+				terminal, _, err := state.observe([]byte("[DONE]"))
+				wire = append(wire, terminal...)
+				if err != nil || strings.Contains(string(wire), "stream-text") || strings.Contains(string(wire), "event: response.completed") || strings.Count(string(wire), "event: response.failed") != 1 {
+					t.Fatalf("invalid serde DeepSeek SSE escaped terminal validation: err=%v wire=%s", err, wire)
+				}
+				return
 			}
 			if tc.valid && !strings.Contains(string(wire), "stream-text") {
 				t.Fatalf("valid DeepSeek SSE lost content: %q", wire)

@@ -5,9 +5,14 @@ import (
 	"testing"
 )
 
-func TestTranslateDeepSeekSSEDataRejectsMalformedJSON(t *testing.T) {
-	if _, _, err := translateDeepSeekSSEData([]byte("{bad")); err == nil {
-		t.Fatal("malformed SSE JSON was accepted")
+func TestTranslateDeepSeekSSEDataRejectsRetainedMalformedJSONAtDone(t *testing.T) {
+	state := newDeepSeekChatStreamState(1, nil, nil, deepSeekConversationStore{})
+	if output, supported, err := state.observe([]byte("{bad")); err != nil || supported || len(output) != 0 {
+		t.Fatalf("partial JSON was committed or rejected before DONE: output=%s error=%v", output, err)
+	}
+	output, _, err := state.observe([]byte("[DONE]"))
+	if err != nil || !strings.Contains(string(output), `"message":"incomplete JSON segment"`) || strings.Contains(string(output), "response.completed") {
+		t.Fatalf("malformed retained JSON was accepted at DONE: output=%s error=%v", output, err)
 	}
 }
 

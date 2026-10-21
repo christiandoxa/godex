@@ -85,6 +85,9 @@ func pumpDeepSeekChatSSE(body io.ReadCloser, writer *io.PipeWriter, state *deepS
 				message := "DeepSeek stream failed"
 				if errors.Is(err, io.EOF) {
 					message = "unexpected end of stream"
+					if state.json.Pending() {
+						message = "incomplete JSON segment"
+					}
 				}
 				failed, supported, failErr := state.failed("provider_stream_error", message)
 				if failErr != nil {

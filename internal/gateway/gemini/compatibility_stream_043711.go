@@ -47,7 +47,7 @@ type geminiChatCompatibleStream043711 struct {
 	model        string
 	finishReason string
 	usage        map[string]any
-	json         geminiStreamJSON04384
+	json         sse.JSONFrames
 }
 
 func (state *geminiChatCompatibleStream043711) send(writer io.Writer, event string, fields map[string]any) error {
@@ -158,15 +158,15 @@ func (state *geminiChatCompatibleStream043711) accept(writer io.Writer, data []b
 	if state.done {
 		return nil
 	}
-	if geminiSSEDone04384(data) {
-		if len(state.json.pending) > 0 {
+	if sse.JSONDone(data) {
+		if state.json.Pending() {
 			return state.failure(writer, "provider_stream_error", "incomplete JSON segment")
 		}
 		return state.complete(writer)
 	}
 	root, valid := geminiSerdeResponseObject04384(data)
 	if !valid {
-		values, err := state.json.observe(data)
+		values, err := state.json.Observe(data)
 		if err != nil {
 			return state.failure(writer, "provider_stream_error", err.Error())
 		}
@@ -272,7 +272,7 @@ func pumpGeminiChatCompatibleStream043711(source io.ReadCloser, writer *io.PipeW
 				}
 				if !state.done {
 					message := "unexpected end of stream"
-					if len(state.json.pending) > 0 {
+					if state.json.Pending() {
 						message = "incomplete JSON segment"
 					}
 					_ = state.failure(writer, "provider_stream_error", message)

@@ -236,6 +236,10 @@ Its shared Chat Completions stream-error classifier owns exact field-presence
 and numeric-kind rules for the DeepSeek and Gemini adapters. Each adapter
 acquires its own input, preserves JSON number types, and controls response
 commitment and redaction; the classifier performs no I/O or retry decisions.
+`helper/sse` owns technical JSON frame reassembly shared by the DeepSeek and
+Gemini gateways: joined/separate precedence, bounded partial JSON and DONE
+recognition. Provider state, response events and terminal handling remain in
+each gateway. The helper performs no I/O or application policy.
 entity/provider owns provider error classification and static fallback-chain
 policy, so bare 429, structured quota/rate errors, auth failures, model-not-found,
 and transient failures are interpreted consistently by Anthropic and Copilot.

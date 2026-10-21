@@ -103,9 +103,9 @@ func TestProdex04384GeminiSSESeparateValuesValidateBeforeEmission(t *testing.T) 
 }
 
 func TestProdex04384GeminiSSESeparateValuesSkipBlankLines(t *testing.T) {
-	values, valid := geminiSeparateSSEValues04384([]byte("  null\n\n {\"a\":1} \n"))
-	if !valid || len(values) != 2 || string(values[0]) != "null" || string(values[1]) != `{"a":1}` {
-		t.Errorf("separate-value whitespace changed: %q valid=%v", values, valid)
+	values, err := new(sse.JSONFrames).Observe([]byte("  null\n\n {\"a\":1} \n"))
+	if err != nil || len(values) != 2 || string(values[0]) != "null" || string(values[1]) != `{"a":1}` {
+		t.Errorf("separate-value whitespace changed: %q error=%v", values, err)
 	}
 }
 
