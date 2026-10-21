@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
+	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 )
 
 func geminiNativeBuiltinTools(value any) []any {
@@ -77,12 +78,23 @@ func geminiNativeToolCallItem(part, call map[string]any, fallbackID string) map[
 		}
 	}
 
-	encoded, err := json.Marshal(args)
+	// Tagged response_tool_calls.rs converts the serde_json::Value into
+	// canonical JSON before wrapping shell arguments with RTK. Go's
+	// json.Marshal otherwise escapes HTML/Unicode and retains raw decimal
+	// spellings, corrupting the function-call argument text.
+	encoded, err := jsonutil.MarshalSerdeValue04384(args)
 	if err != nil {
 		encoded = []byte("{}")
 	}
 	namespace, short := geminiNativeSplitToolName(name)
-	arguments := chatcompat.WrapRTKArguments(short, string(encoded))
+	arguments := string(encoded)
+	// Tagged Gemini response_tool_calls/rtk.rs examines the ORIGINAL flat
+	// tool name, not the namespace-shortened display name. Only exact
+	// `shell` and `exec_command` trigger RTK; `exec`, MCP namespaced tools
+	// and dotted shell aliases must remain untouched.
+	if name == "shell" || name == "exec_command" {
+		arguments = chatcompat.WrapRTKArguments(name, arguments)
+	}
 	item := map[string]any{
 		"type": "function_call", "call_id": callID,
 		"name": short, "arguments": arguments,

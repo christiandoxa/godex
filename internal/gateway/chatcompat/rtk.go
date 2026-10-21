@@ -3,6 +3,8 @@ package chatcompat
 import (
 	"encoding/json"
 	"strings"
+
+	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 )
 
 var rtkNoisyCommands = map[string]map[string]bool{
@@ -27,8 +29,17 @@ func WrapRTKArguments(name, arguments string) string {
 	if baseName != "shell" && baseName != "exec_command" && baseName != "exec" {
 		return arguments
 	}
+	// Tagged provider-core tool_args::wrap_json_string_arg_with parses
+	// serde_json::Value and serializes the modified map with serde_json,
+	// never encoding/json's optional HTML/JavaScript escaping. Invalid
+	// whole JSON is passed through unchanged, as on the Rust path.
+	if jsonutil.CheckSerdeBoundary(arguments) != nil || !jsonutil.CheckSerdeNumberTokens([]byte(arguments)) {
+		return arguments
+	}
+	decoder := json.NewDecoder(strings.NewReader(arguments))
+	decoder.UseNumber()
 	var value map[string]any
-	if err := json.Unmarshal([]byte(arguments), &value); err != nil {
+	if err := decoder.Decode(&value); err != nil || value == nil {
 		return arguments
 	}
 	for _, key := range []string{"cmd", "command"} {
@@ -41,7 +52,7 @@ func WrapRTKArguments(name, arguments string) string {
 			continue
 		}
 		value[key] = wrapped
-		content, err := json.Marshal(value)
+		content, err := jsonutil.MarshalSerdeValue04384(value)
 		if err == nil {
 			return string(content)
 		}

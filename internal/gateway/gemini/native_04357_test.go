@@ -232,7 +232,10 @@ func TestProdex04357GeminiBufferedSpecialToolItemsAndNamespaceMapping(t *testing
 	shell := output[2].(map[string]any)
 	if shell["type"] != "function_call" || shell["namespace"] != "ns" || shell["name"] != "shell" ||
 		shell["gemini_thought_signature"] != "sig" ||
-		!strings.Contains(shell["arguments"].(string), "rtk git status") {
+		// The original flat name is `ns--shell`, not the exact `shell`
+		// accepted by tagged Gemini RTK; shortening it for display must
+		// never rewrite its command arguments.
+		shell["arguments"] != `{"cmd":"git status"}` {
 		t.Fatalf("namespaced shell item = %#v", shell)
 	}
 }

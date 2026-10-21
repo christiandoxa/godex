@@ -905,3 +905,36 @@ response from gaining a fabricated model signature. The rule is verified
 against the tagged Rust and Mojo source and synthetic local tests; the
 broader Gemini 0.438.4 executable differential is a no-regression gate,
 not a dedicated live-provider signature-token experiment.
+
+## Canonical Gemini function-call arguments and exact RTK tool-name matching
+
+In the tagged `prodex-provider-core` Gemini `response_tool_calls.rs`, the
+`functionCall.args` serde JSON value is serialized with
+`serde_json::to_string` **before** being supplied as the text of a function
+call. Godex previously used `encoding/json.Marshal`, which escaped HTML,
+U+2028/U+2029, and preserved raw decimal number spellings. An otherwise
+identical tool call could therefore carry different `arguments` text in the
+continuation history (`1e-5` rather than the canonical `0.00001`, for
+example). Fail-before regressions cover direct and complete Responses tool
+items, Unicode, HTML, sorted nested arguments, and scientific floats. The
+Gemini tool-call projector now shares the serde-compatible value writer
+already validated for response video metadata.
+
+A second mismatch appeared in RTK shell wrapping. The published Gemini
+`response_tool_calls/rtk.rs` applies RTK **only** to the original flat tool
+name `shell` or `exec_command`, not to `exec` and not to a shortened suffix
+from a namespaced `mcp__...__shell` or `namespace.shell`. Godex previously
+passed the display-shortened tool name to a generic wrapper that accepted
+`exec`, causing unrelated tools to be silently rewritten. The adapter now
+checks the full original name first; qualified aliases remain unchanged.
+Rust's shared `tool_args::wrap_json_string_arg_with` also serializes a
+rewritten command with `serde_json::to_string`, so Godex's general RTK
+argument writer now validates complete serde JSON and uses the same
+canonical serializer when it actually changes `cmd` or `command`.
+
+Fail-before tests exercise canonical `shell`/`exec_command`, unrelated
+`exec` and namespaced names, HTML/Unicode/numeric metadata during wrapping,
+no-change source preservation, and serde-invalid JSON passthrough. This is
+source/dependency-aligned local parity plus the official Gemini and
+DeepSeek executable regression gates, not a claim that every synthetic
+RTK/media variant was run through a live API-key provider.
