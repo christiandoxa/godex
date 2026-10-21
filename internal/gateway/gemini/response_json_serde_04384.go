@@ -12,7 +12,7 @@ import (
 // authority for a complete buffered Gemini response or a complete SSE
 // `data:` value. Go encoding/json otherwise replaces malformed UTF-8 and
 // unpaired surrogate escapes, tolerates deeper values, and can admit near-
-// maximum floating-point numbers that serde_json 1.0.151 rejects.
+// maximum floating-point numbers that serde_json 1.0.154 rejects.
 // A syntactically valid candidate never authorizes silently ignoring an
 // invalid unrelated field in the same upstream response document.
 func geminiSerdeJSONValid04384(data []byte) bool {

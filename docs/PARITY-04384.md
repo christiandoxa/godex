@@ -24,7 +24,9 @@ describe historical probes, not the locked dependencies of this release.
 Those probes alone do not certify 0.438.4 numeric or typed-serde behavior;
 new source checks must use the actual lockfile versions. The native-stream
 error goldens below were regenerated with the correct versions and were
-byte-identical to the earlier probe's 32 fixtures.
+byte-identical to the earlier probe's 32 fixtures. The locked-dependency
+audit below separately revalidates 48 numeric goldens and a bounded
+21,317-input value corpus; typed Kiro behavior is not covered by that probe.
 
 Downloaded artifacts are checked against the official SHA256SUMS and manifest;
 Prodex reports `prodex 0.438.4`. The pin was migrated coherently in the
@@ -182,9 +184,9 @@ now verifies that precise boundary, not a blanket duplicate-key ban.
 Serde also rejects malformed UTF-8, lone Unicode surrogate escapes, excess
 container nesting, and its own floating-point overflow boundary. Go's
 standard decoder can replace invalid Unicode or accept numbers like
-`1.7976931348623158e308` that the pinned serde default rejects. Independent
-offline tests using the release's Rust `serde 1.0.228` and `serde_json
-1.0.151` dependencies confirmed the typed duplicate, Unicode, recursive
+`1.7976931348623158e308` that the pinned serde default rejects. Historical
+offline tests using Rust `serde 1.0.228` and `serde_json 1.0.151`
+confirmed the typed duplicate, Unicode, recursive
 and near-f64-maximum cases. Godex now checks those invariants before the
 normal ACP JSON-RPC decoder can turn an invalid notification into Kiro
 output, tool activity or usage. The source-matched serde-f64 parser was
@@ -863,7 +865,7 @@ separate from the broader executable DeepSeek oracle.
 Tagged `gemini_response_media.mojo::media_put_special_text` emits the
 `videoMetadata` value as `js_raw_view(tree, metadata)` inside a descriptive
 assistant text item. The parsed tree is built from the published
-`serde_json 1.0.151` canonical value representation. Godex previously used
+serde's canonical value representation. Godex previously used
 `encoding/json.Marshal(videoMetadata)` instead, which HTML-escapes `<`, `>`
 and `&`, escapes Unicode U+2028/U+2029, and preserves noncanonical numeric
 spellings (for example `1.00000000` instead of `1.0`, or `1e-5` instead of
@@ -1564,3 +1566,48 @@ Logs: `/tmp/gdx-04384-stream-error-final-race.log`,
 `/tmp/gdx-04384-stream-error-final-test-all.log` and
 `/tmp/gdx-04384-stream-error-final-verify.log`. Clean candidate executable
 differential validation follows the commit.
+
+## Locked serde dependency audit
+
+The tagged root lockfile pins `serde 1.0.229`, `serde_json 1.0.154`,
+`itoa 1.0.18`, `memchr 2.8.3` and `zmij 1.0.23`. The feature graph was
+checked without changing the reference source:
+
+```bash
+rtk proxy cargo tree --locked --offline -e features -i serde_json
+```
+
+Only `default` and `std` are enabled; `float_roundtrip`, `arbitrary_precision`
+and `preserve_order` are absent. Source formatting uses zmij. Earlier
+references to serde_json 1.0.151/Ryu were inherited probe descriptions,
+not an exact description of the 0.438.4 lockfile.
+
+A new offline Rust probe pinned to the actual lockfile versions was
+compared with Godex's existing Unicode/depth admission, whole-value decode,
+numeric admission and canonical writer. The deterministic seed-4384 corpus
+contains 21,317 inputs spanning signed/unsigned limits, negative zero,
+subnormals, decimal/exponent overflow and underflow, long mantissas,
+non-ASCII strings, duplicate fields, nesting and malformed trailing values.
+All validity decisions and accepted canonical bytes match. The temporary
+Go probe initially omitted the caller's trailing-value check; three fixture
+mismatches were corrected in that probe, with no production change.
+
+The checked-in 48 numeric goldens in
+`helper/jsonutil/testdata/serde_locked_04384.json` come from the locked Rust
+parser and serializer. They exercise the existing shared writer and numeric
+validator. Version comments now identify the actual dependency. No runtime
+behavior, dependency, exported API, ownership boundary or persisted format
+changes. Historical 0.438.3 comments keep their original version labels.
+
+Comparison log: `/tmp/gdx-04384-serde154-comparison.json`; corpus SHA-256:
+`85e4fc4909dc433265e060f22adfedb66cecc718fde422e117629f3d59d615d6`.
+This is bounded locked-source evidence, not a released-executable or
+whole-provider parity claim. Typed Kiro envelopes and every possible f64
+remain outside this probe's coverage.
+
+`rtk go test ./internal/helper/jsonutil ./internal/gateway/gemini -count=1`
+passes 694 tests. `rtk go test ./...` passes 8,813 across 81 packages.
+`rtk proxy make verify` passes all local gates, including the full race
+suite. Logs: `/tmp/gdx-04384-serde154-focused.log`,
+`/tmp/gdx-04384-serde154-final-test-all.log` and
+`/tmp/gdx-04384-serde154-final-verify.log`.

@@ -7,7 +7,7 @@ import (
 
 // Tagged gemini_response_media.mojo emits videoMetadata with
 // js_raw_view(ParsedJson), where the tree comes from canonical serde_json
-// 1.0.151. Go json.Marshal escapes HTML and U+2028/U+2029, and preserves
+// 1.0.154. Go json.Marshal escapes HTML and U+2028/U+2029, and preserves
 // raw json.Number spellings that canonical serde first converts to f64.
 func TestProdex04384GeminiVideoMetadataUsesSerdeCanonicalJSON(t *testing.T) {
 	for _, tc := range []struct {

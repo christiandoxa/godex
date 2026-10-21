@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// Canonical serde_json 1.0.151 outputs were verified with the pinned Rust
+// Canonical serde_json 1.0.154 outputs were verified with the pinned Rust
 // crate. Unlike encoding/json they retain HTML and Unicode line separators,
 // and normalize numerical spelling using serde's default f64 parser.
 func TestProdex04384SerdeValueWriterCanonicalOutput(t *testing.T) {

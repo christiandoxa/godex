@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// FormatSerdeDefaultFloat matches the default serde_json 1.0.151 Ryu f64
+// FormatSerdeDefaultFloat matches the default serde_json 1.0.154 f64
 // presentation used by Prodex 0.438.4: fixed decimal in [1e-5,1e16),
 // scientific outside that range, no padded exponent, and a `.0` suffix
 // for otherwise integer-looking floating-point values. The caller has

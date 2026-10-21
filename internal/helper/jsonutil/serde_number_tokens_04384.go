@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// CheckSerdeNumberTokens rejects numeric literals that serde_json 1.0.151
+// CheckSerdeNumberTokens rejects numeric literals that serde_json 1.0.154
 // rejects before any owning typed-struct validation. It observes nested
 // numbers through Decoder.Token rather than lossy Go float64 conversion.
 // The caller checks strict UTF-8/surrogates/container depth separately.

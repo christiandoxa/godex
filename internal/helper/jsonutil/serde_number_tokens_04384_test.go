@@ -2,7 +2,7 @@ package jsonutil
 
 import "testing"
 
-// These serde_json 1.0.151 whole-document outcomes were checked with the
+// These serde_json 1.0.154 whole-document outcomes were checked with the
 // exact pinned Rust crate. The Go default JSON decoder alone is insufficient
 // for the near-max-f64 boundary and nested values that are later ignored.
 func TestProdex04384SerdeNumberTokensPreserveRustValidity(t *testing.T) {
