@@ -3,7 +3,6 @@ package deepseek
 import (
 	"errors"
 	"io"
-	"sync"
 	"time"
 
 	"github.com/christiandoxa/godex/internal/helper/sse"
@@ -25,27 +24,14 @@ func deepSeekAnthropicSSEWithConversation(
 	conversationMessages []any,
 ) io.ReadCloser {
 	reader, writer := io.Pipe()
-	go pumpDeepSeekAnthropicSSE(
-		body, writer, requestMetadata, requestID, conversations, conversationMessages,
-	)
-	return &anthropicPipeBody{reader: reader, source: body}
-}
-
-type anthropicPipeBody struct {
-	reader *io.PipeReader
-	source io.Closer
-	once   sync.Once
-	err    error
-}
-
-func (body *anthropicPipeBody) Read(buffer []byte) (int, error) { return body.reader.Read(buffer) }
-
-func (body *anthropicPipeBody) Close() error {
-	body.once.Do(func() {
-		_ = body.reader.Close()
-		body.err = body.source.Close()
-	})
-	return body.err
+	stream := &streamBody{reader: reader, source: body}
+	go func() {
+		defer stream.closeSource()
+		pumpDeepSeekAnthropicSSE(
+			body, writer, requestMetadata, requestID, conversations, conversationMessages,
+		)
+	}()
+	return stream
 }
 
 func pumpDeepSeekAnthropicSSE(
@@ -56,7 +42,6 @@ func pumpDeepSeekAnthropicSSE(
 	conversations deepSeekConversationStore,
 	conversationMessages []any,
 ) {
-	defer body.Close()
 	decoder := sse.NewDecoder(nativeMessagesMaxBytes)
 	state := anthropicStreamState{
 		requestID: requestID, requestMetadata: requestMetadata,

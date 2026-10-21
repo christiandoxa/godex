@@ -20,12 +20,15 @@ func deepSeekChatSSEWithConversation(
 ) io.ReadCloser {
 	reader, writer := io.Pipe()
 	state := newDeepSeekChatStreamState(requestID, conversationMessages, responseMetadata, conversations)
-	go pumpDeepSeekChatSSE(body, writer, state)
-	return reader
+	stream := &streamBody{reader: reader, source: body}
+	go func() {
+		defer stream.closeSource()
+		pumpDeepSeekChatSSE(body, writer, state)
+	}()
+	return stream
 }
 
 func pumpDeepSeekChatSSE(body io.ReadCloser, writer *io.PipeWriter, state *deepSeekChatStreamState) {
-	defer body.Close()
 	decoder := sse.NewDecoder(streamEventMaxBytes)
 	buffer := make([]byte, 32<<10)
 	for {

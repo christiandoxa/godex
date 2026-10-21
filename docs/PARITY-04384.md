@@ -2305,3 +2305,36 @@ not a separate large-payload released-executable scenario.
 `rtk proxy make verify` passes all local gates, including the complete
 shuffled race suite. Log: `/tmp/gdx-04384-provider-sse-json-final-verify.log`.
 Clean-commit DeepSeek and Gemini executable validation follows this commit.
+
+## DeepSeek client stream closure owns upstream cancellation
+
+The tagged provider reader owns its upstream reader for the response lifetime.
+Godex's Chat bridge returned a bare pipe reader: closing it unblocked writes
+but did not interrupt an upstream Read already waiting for more data. The
+Messages bridge had a source-closing wrapper, but its pump defer separately
+closed that same source after completion, permitting duplicate Close calls.
+
+Both adapters now use that existing private pipe/source ownership pattern in
+`gateway/deepseek/stream_body.go`. The client Close and pump completion share
+one source-closing `sync.Once`; client Close also releases the pipe. The two
+existing pump goroutines retain their owners and now have an upstream
+cancellation path. No shared helper, exported API, option, dependency,
+persistence or layer-direction change is introduced. The wrapper stays local
+because both consumers belong to this gateway and own the same lifecycle.
+
+Fail-before `/tmp/gdx-04384-deepseek-stream-body-before.log` proves the
+Chat source remains blocked after client Close and the Messages source closes
+twice after completion/client Close. The channel-based fixture covers both
+protocols without sleeps, releases the fail-before blocked read, and checks
+one source close across completion and repeated client Close. These are local
+lifecycle regressions, not a new released executable cancellation case.
+The existing executable `cancel` scenario covers its earlier request phase
+and is not presented as proof of this post-response Close contract.
+
+`rtk go test -race ./internal/gateway/deepseek ./tools/differential -count=1`
+passes 655 tests. `rtk go test ./...` passes 8,995 tests across 81 packages.
+`rtk proxy make verify` passes all local gates, including the complete
+shuffled race suite. Logs: `/tmp/gdx-04384-deepseek-stream-body-race.log`,
+`/tmp/gdx-04384-deepseek-stream-body-final-test-all.log` and
+`/tmp/gdx-04384-deepseek-stream-body-final-verify.log`. Clean-commit
+released-executable regression follows this commit.
