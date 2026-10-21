@@ -336,3 +336,27 @@ These are published-Mojo source and local parser parity checks; the
 existing official Gemini executable differential is a broader regression
 gate, not a claim that every Unicode media fixture reached the native
 Gemini API-key provider path in that oracle.
+
+## DeepSeek provider error classification uses ASCII-only case folding
+
+Prodex 0.438.4 routes DeepSeek API errors through the compiled
+`provider_error.mojo` classifier. Its `provider_error_ascii_lower` folds
+**ASCII bytes only** when normalizing structured codes and matching
+case-insensitive provider status texts. Godex previously called
+`strings.ToLower` on raw codes and messages, allowing U+212A KELVIN SIGN
+(`K`) in `invalid_api_Key` to become the genuine authentication error
+`invalid_api_key`, or U+0130 dotted capital I (`İ`) in
+`rate_lİmit_error` / `MODEL İS NOT SUPPORTED` to become a rate-limit or
+model-not-found signal. Those false classifications could incorrectly
+invalidate a credential, quarantine it, or attempt an unrelated fallback.
+
+A fail-before regression demonstrates each incorrect decision, with exact
+ASCII, mixed-case, quota and rate-limit positive controls. The token
+projector also used Unicode lowercasing and mutated unrelated international
+codes such as `THÉ_雪`, whereas Mojo preserves all non-ASCII bytes. Both
+structured token normalization and downstream classification now apply a
+single bytewise ASCII-only fold. The error body and client response are
+unchanged. Local tests validate source-aligned classifications; the official
+DeepSeek executable differential remains the broader regression gate, not
+a claim that the synthetic Unicode confusables were tested against a live
+provider or authenticated third-party service.

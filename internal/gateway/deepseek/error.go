@@ -14,6 +14,19 @@ import (
 	providerentity "github.com/christiandoxa/godex/internal/entity/provider"
 )
 
+// Tagged Prodex 0.438.4 provider_error_ascii_lower operates on ASCII
+// bytes only. Go's Unicode ToLower can turn U+212A into ASCII k or U+0130
+// into ASCII i and falsely mint auth/quota/rate-limit errors.
+func deepSeekASCIILower04384(value string) string {
+	bytes := []byte(value)
+	for index := range bytes {
+		if bytes[index] >= 'A' && bytes[index] <= 'Z' {
+			bytes[index] += 'a' - 'A'
+		}
+	}
+	return string(bytes)
+}
+
 func classifyDeepSeekErrorBody(status int, body []byte) providerentity.ErrorClassification {
 	var text *string
 	if utf8.Valid(body) {
@@ -42,11 +55,11 @@ func classifyDeepSeekErrorBody(status int, body []byte) providerentity.ErrorClas
 func classifyDeepSeekErrorSignal(status *int, code, text *string) providerentity.ErrorClassification {
 	codeValue := ""
 	if code != nil {
-		codeValue = strings.ToLower(strings.TrimSpace(*code))
+		codeValue = deepSeekASCIILower04384(strings.TrimSpace(*code))
 	}
 	textValue := ""
 	if text != nil {
-		textValue = strings.ToLower(*text)
+		textValue = deepSeekASCIILower04384(*text)
 	}
 	if status != nil && (*status == http.StatusUnauthorized || *status == http.StatusForbidden) ||
 		codeValue == "unauthenticated" || codeValue == "invalid_api_key" || codeValue == "authentication_error" {
@@ -131,7 +144,7 @@ func collectDeepSeekErrorCodes(value any, codes *[]string) {
 }
 
 func appendDeepSeekErrorCode(codes *[]string, value string) {
-	if code := strings.ToLower(strings.TrimSpace(value)); code != "" {
+	if code := deepSeekASCIILower04384(strings.TrimSpace(value)); code != "" {
 		*codes = append(*codes, code)
 	}
 }
