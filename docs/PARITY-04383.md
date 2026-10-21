@@ -3380,3 +3380,37 @@ continued ownership of a separately verified second-account response.
 The local integration also verifies private sidecar deletion. Other
 unreferenced hard turn-state cleanup and native/external-provider modes
 remain separate parity boundaries, not globally certified by this slice.
+
+## Propagate a verified request turn-state into SSE response-ID lineage
+
+In the tagged 0.438.3 HTTP `response_forwarding.rs`, the committed stream's
+initial turn state is selected from the upstream response header, followed by
+the effective **outbound turn-state override**, followed by any lookahead
+turn-state. The same token seeds `RuntimeSseTapState`, so an output event
+with no `turn_state` still associates its new response ID with the verified
+request's current turn. Godex's precommit response observer and later HTTP
+SSE lineage tracker previously initialized their state only from the
+upstream **response** header or SSE body. If a request carried a valid
+`x-codex-turn-state` but the server returned only response IDs, Godex
+would persist those response owners without the opaque turn-state sidecars
+required to safely continue that conversation.
+
+A fail-before HTTP proxy integration test initializes a verified managed
+turn on main, sends a new full-context Responses request with that turn in
+the **request** header, and returns a two-event SSE stream whose upstream
+headers and events contain no turn state. Before the correction, its two
+response sidecars were missing. The scoped fix carries the effective
+request turn as **internal-only response metadata**, preserving response
+header precedence, request/body wire bytes, existing provider separation
+and the requested previous-response owner. Both the precommit `Observe`
+path and the same request-local committed SSE tracker now initialize the
+turn from that override only when the upstream has not supplied one.
+
+The pinned two-executable `--phase=http-session-conflict` oracle adds a
+`request-turn` SSE lineage variant. Two authenticated Ready managed accounts
+are present, with `turn-a` verified on main. The exact request and its
+`x-codex-turn-state` are forwarded once; two upstream SSE response IDs have
+no explicit turn. The oracle verifies identical streamed bytes, response
+owners on main, and the correct **request-turn** associations in the
+private Godex sidecars and Prodex durable lineage map. Additional native
+OS/provider combinations remain separately unverified.

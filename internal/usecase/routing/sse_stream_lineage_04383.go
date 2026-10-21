@@ -20,14 +20,17 @@ type SSELineageTracker04383 struct {
 	seen, withTurn                                               map[string]bool
 }
 
-func (router *Router) NewSSELineageTracker04383(accountID, providerKind string, headers http.Header, requestPrevious ...string) *SSELineageTracker04383 {
+func (router *Router) NewSSELineageTracker04383(accountID, providerKind string, headers http.Header, requestContinuation ...string) *SSELineageTracker04383 {
 	turn := strings.TrimSpace(headers.Get("x-codex-turn-state"))
 	if !validHardBindingComponent04383(turn) {
 		turn = ""
 	}
 	previous := ""
-	if len(requestPrevious) > 0 && validHardBindingComponent04383(requestPrevious[0]) {
-		previous = strings.TrimSpace(requestPrevious[0])
+	if len(requestContinuation) > 0 && validHardBindingComponent04383(requestContinuation[0]) {
+		previous = strings.TrimSpace(requestContinuation[0])
+	}
+	if turn == "" && len(requestContinuation) > 1 && validHardBindingComponent04383(requestContinuation[1]) {
+		turn = strings.TrimSpace(requestContinuation[1])
 	}
 	return &SSELineageTracker04383{router: router, accountID: accountID, originalPrevious: previous,
 		providerKind: providerKind, profileHome: router.accountHome(accountID),

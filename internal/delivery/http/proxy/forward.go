@@ -76,7 +76,8 @@ func clearMissingStandardHeaders(destination, source http.Header) {
 }
 
 func (proxy *Proxy) finishCommittedStream(ctx context.Context, writer http.ResponseWriter, response *proxymodel.Response, prefix []byte, accountID string, lifecycle *requestLifecycle, providerKind string) {
-	complete := proxy.forwardStream(ctx, writer, response.Body, prefix, accountID, response.Header, providerKind, response.RequestPreviousResponseID)
+	complete := proxy.forwardStream(ctx, writer, response.Body, prefix, accountID, response.Header,
+		providerKind, response.RequestPreviousResponseID, response.RequestTurnStateOverride)
 	copyTrailers(writer.Header(), response.Header, response.Trailer)
 	if complete {
 		lifecycle.complete()

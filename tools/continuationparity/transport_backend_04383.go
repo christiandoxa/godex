@@ -44,6 +44,13 @@ func newTransportBackend04383(scenario string) *transportBackend04383 {
 	return b
 }
 
+// Restrict strict lineage validation to the actual test inference, never
+// the earlier authenticated warmup used to establish previous-ID ownership.
+func httpSSETurnLineageTestRequest04383(scenario string, body []byte) bool {
+	return strings.HasPrefix(scenario, "http-sse-turn-lineage-") &&
+		strings.Contains(string(body), "separate turn states")
+}
+
 func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 	owner := r.Header.Get("ChatGPT-Account-Id")
 	expected := map[string]string{"account-a": "Bearer token-a", "account-b": "Bearer token-b"}[owner]
@@ -146,8 +153,18 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 			_, _ = io.WriteString(w, httpSSEDeadFailure04383)
 			return
 		}
-		if strings.HasPrefix(b.scenario, "http-sse-turn-lineage-") && string(body) == httpSSETurnLineageRequest04383 {
+		if httpSSETurnLineageTestRequest04383(b.scenario, body) {
+			// The authenticated previous-ID warmup request is a separate
+			// fixture stage, never the SSE test request. Do not intercept
+			// or reject it as an invalid lineage payload.
 			shape := strings.TrimPrefix(b.scenario, "http-sse-turn-lineage-")
+			if string(body) != httpSSETurnLineageRequestFor04383(shape) {
+				b.mu.Lock()
+				b.invalid = true
+				b.mu.Unlock()
+				http.Error(w, "unexpected lineage request bytes", http.StatusBadRequest)
+				return
+			}
 			b.mu.Lock()
 			b.attempts = append(b.attempts, transportAttempt04383{owner: owner, body: string(body),
 				turn: r.Header.Get("x-codex-turn-state"), trace: r.Header.Get("thread-id"),

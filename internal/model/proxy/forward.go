@@ -57,7 +57,11 @@ type Response struct {
 	// request identifier only within the committed HTTP stream observer.
 	// It is never forwarded or serialized to clients.
 	RequestPreviousResponseID string `json:"-"`
-	PrecommitFailure          *PrecommitFailure
+	// The effective request turn-state may initialize streamed response ID
+	// lineage even when the upstream sends no turn-state header or field.
+	// Internal-only metadata: never emitted to clients or forwarded upstream.
+	RequestTurnStateOverride string `json:"-"`
+	PrecommitFailure         *PrecommitFailure
 }
 
 // WebSocketEvent is borrowed parser output, valid until the next body Read.

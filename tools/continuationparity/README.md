@@ -949,3 +949,13 @@ durable response owners, while an independently verified second-owned
 response remains intact. Prodex and Godex must return identical SSE bytes
 with exactly one authenticated Ready main inference. Per-response Godex
 turn-state sidecar removal is also asserted by the local proxy regression.
+
+The HTTP session-conflict SSE lineage oracle includes a `request-turn`
+case: the original Responses request uses the verified main-owned
+`x-codex-turn-state: turn-a` header, but the upstream response header and
+both SSE response events contain **no** turn-state field. Both pinned
+executables must still remember each new response ID under main and
+associate it with the effective request turn. The client sees the exact
+same original SSE bytes; the model attempt and header are checked against
+two authenticated Ready profiles. The internal request override is never
+synthesized as a client-visible response header.

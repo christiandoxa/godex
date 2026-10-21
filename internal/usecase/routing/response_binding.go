@@ -110,6 +110,9 @@ func (router *Router) bindSuccessfulResponse(
 		// so a committed previous_response_not_found can clear that dead
 		// chain as well as any response IDs observed in the SSE prelude.
 		result.Response.RequestPreviousResponseID = keys.previous
+		if validHardBindingComponent04383(keys.turn) {
+			result.Response.RequestTurnStateOverride = keys.turn
+		}
 	}
 	if result.Prefix == nil && !stream {
 		prefix, _, err := inspectResponse(result.Response.Body, router.maxInspect)
@@ -143,7 +146,20 @@ func (router *Router) bindSuccessfulResponse(
 			return err
 		}
 	}
-	if err := router.Observe(ctx, result.AccountID, result.Response.Header, result.Prefix, stream, result.ProviderKind); err != nil {
+	var observeErr error
+	if stream && selection.RouteKind == quotamodel.RouteKindResponses &&
+		!externalProviderKind(result.ProviderKind) {
+		// Prodex seeds RuntimeSseTapState from response header, then the
+		// effective outbound turn-state override, then SSE lookahead. The
+		// already-inspected prefix IDs must inherit that request override.
+		observeErr = router.observeSSEBindingsWithTurn04383(
+			ctx, result.AccountID, result.Response.Header, result.Prefix,
+			result.Response.RequestTurnStateOverride)
+	} else {
+		observeErr = router.Observe(ctx, result.AccountID, result.Response.Header,
+			result.Prefix, stream, result.ProviderKind)
+	}
+	if err := observeErr; err != nil {
 		result.Response.Body.Close()
 		return err
 	}

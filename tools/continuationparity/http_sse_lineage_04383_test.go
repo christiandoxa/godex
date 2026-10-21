@@ -48,11 +48,12 @@ func TestProdex04383HTTPSSETurnLineageOracleRejectsMutations(t *testing.T) {
 // may inherit an earlier stream turn or be backfilled after the first output
 // chunk already committed. A 200 alone does not prove the lineage contract.
 func TestProdex04383HTTPSSETurnLineageCrossChunkOracleRejectsMutations(t *testing.T) {
-	for _, shape := range []string{"distinct", "inherit", "late", "large-committed"} {
+	for _, shape := range []string{"distinct", "inherit", "late", "large-committed", "request-turn"} {
 		t.Run(shape, func(t *testing.T) {
 			base := httpSoftConflictResult04383{
-				reply:    exchange{status: http.StatusOK, body: httpSSETurnLineageWireFor04383(shape)},
-				attempts: []transportAttempt04383{{owner: "account-a", ready: true, body: httpSSETurnLineageRequest04383}},
+				reply: exchange{status: http.StatusOK, body: httpSSETurnLineageWireFor04383(shape)},
+				attempts: []transportAttempt04383{{owner: "account-a", ready: true,
+					body: httpSSETurnLineageRequestFor04383(shape), turn: httpSSETurnLineageHeaderFor04383(shape)}},
 			}
 			if err := verifyHTTPSSETurnLineageFor04383(shape, base); err != nil {
 				t.Fatal(err)
@@ -69,7 +70,7 @@ func TestProdex04383HTTPSSETurnLineageCrossChunkOracleRejectsMutations(t *testin
 				{"first chunk missing", func(r *httpSoftConflictResult04383) {
 					r.reply.body = strings.Replace(r.reply.body, `"delta":"first"`, `"delta":"missing"`, 1)
 				}},
-				{"extra turn request", func(r *httpSoftConflictResult04383) { r.attempts[0].turn = "foreign" }},
+				{"altered request turn", func(r *httpSoftConflictResult04383) { r.attempts[0].turn = "foreign" }},
 				{"extra upstream request", func(r *httpSoftConflictResult04383) { r.attempts = append(r.attempts, r.attempts[0]) }},
 				{"missing inference", func(r *httpSoftConflictResult04383) { r.attempts = nil }},
 				{"unauthenticated", func(r *httpSoftConflictResult04383) { r.invalid = true }},
@@ -84,5 +85,19 @@ func TestProdex04383HTTPSSETurnLineageCrossChunkOracleRejectsMutations(t *testin
 				})
 			}
 		})
+	}
+}
+
+// The fixture warmup request must not be mistaken for the SSE model
+// inference. Authentication/readiness is independently checked in the
+// executable oracle, not simulated by a local unauthenticated test.
+func TestProdex04383HTTPSSETurnLineageWarmupIsAccepted(t *testing.T) {
+	const scenario = "http-sse-turn-lineage-request-turn"
+	warmup := []byte(`{"previous_response_id":"resp-ready-b","input":[]}`)
+	if httpSSETurnLineageTestRequest04383(scenario, warmup) {
+		t.Fatal("warmup incorrectly intercepted by SSE lineage guard")
+	}
+	if !httpSSETurnLineageTestRequest04383(scenario, []byte(httpSSETurnLineageRequestFor04383("request-turn"))) {
+		t.Fatal("expected SSE test request not recognized")
 	}
 }

@@ -13,12 +13,19 @@ import (
 // event in an entire buffered batch. Later states only backfill response IDs
 // which did not yet have a turn-state association.
 func (router *Router) observeSSEBindings04383(ctx context.Context, accountID string, headers http.Header, body []byte) error {
+	return router.observeSSEBindingsWithTurn04383(ctx, accountID, headers, body, "")
+}
+
+func (router *Router) observeSSEBindingsWithTurn04383(ctx context.Context, accountID string, headers http.Header, body []byte, requestTurn string) error {
 	decoder := sse.NewDecoder(len(body))
 	events := decoder.Feed(body)
 	events = append(events, decoder.Finish()...)
 	currentTurn := strings.TrimSpace(headers.Get("x-codex-turn-state"))
 	if !validHardBindingComponent04383(currentTurn) {
-		currentTurn = ""
+		currentTurn = strings.TrimSpace(requestTurn)
+		if !validHardBindingComponent04383(currentTurn) {
+			currentTurn = ""
+		}
 	}
 	seenIDs := make(map[string]bool)
 	withTurn := make(map[string]bool)

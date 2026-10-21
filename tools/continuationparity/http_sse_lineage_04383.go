@@ -18,6 +18,22 @@ const httpSSETurnLineageRequest04383 = `{"model":"gpt-6","previous_response_id":
 const httpSSETurnLineageWire04383 = "data: {\"type\":\"response.output_text.delta\",\"delta\":\"first\",\"response\":{\"id\":\"resp-sse-one\",\"turn_state\":\"state-one\"}}\n\n" +
 	"data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp-sse-two\",\"turn_state\":\"state-two\"}}\n\n"
 
+// A request-owned turn-state is independent of the returned response
+// header or SSE fields and must seed the tagged RuntimeSseTapState.
+func httpSSETurnLineageRequestFor04383(shape string) string {
+	if shape == "request-turn" {
+		return `{"model":"gpt-6","stream":true,"input":[{"role":"user","content":"separate turn states"}]}`
+	}
+	return httpSSETurnLineageRequest04383
+}
+
+func httpSSETurnLineageHeaderFor04383(shape string) string {
+	if shape == "request-turn" {
+		return "turn-a"
+	}
+	return ""
+}
+
 // The same strict per-response stream lineage is exercised when a later
 // response omits turn-state (inherit), and when the first turn only becomes
 // available after the precommit output was already committed (backfill).
@@ -29,6 +45,9 @@ func httpSSETurnLineageWireFor04383(shape string) string {
 		second = `{"type":"response.completed","response":{"id":"resp-sse-two"}}`
 	case "late":
 		first = `{"type":"response.output_text.delta","delta":"first","response":{"id":"resp-sse-one"}}`
+	case "request-turn":
+		first = `{"type":"response.output_text.delta","delta":"first","response":{"id":"resp-sse-one"}}`
+		second = `{"type":"response.completed","response":{"id":"resp-sse-two"}}`
 	case "large-committed":
 		second = `{"type":"response.completed","response":{"id":"resp-sse-two"},"padding":"` + strings.Repeat("x", 72<<10) + `"}`
 	}
@@ -36,6 +55,9 @@ func httpSSETurnLineageWireFor04383(shape string) string {
 }
 
 func httpSSETurnLineageExpected04383(shape, responseID string) string {
+	if shape == "request-turn" {
+		return "turn-a"
+	}
 	if shape == "inherit" || shape == "partial" || shape == "large-committed" {
 		return "state-one"
 	}
@@ -49,7 +71,7 @@ func httpSSETurnLineageExpected04383(shape, responseID string) string {
 }
 
 func runHTTPSSETurnLineageProduct04383(root string, p product) error {
-	for _, shape := range []string{"distinct", "inherit", "late", "large-committed"} {
+	for _, shape := range []string{"distinct", "inherit", "late", "large-committed", "request-turn"} {
 		if err := runHTTPSSETurnLineageCase04383(filepath.Join(root, shape), p, shape); err != nil {
 			return fmt.Errorf("SSE lineage %s: %w", shape, err)
 		}
@@ -86,7 +108,13 @@ func runHTTPSSETurnLineageCase04383(root string, p product, shape string) error 
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	reply, err := post(client, endpoint+"/responses", httpSSETurnLineageRequest04383)
+	var reply exchange
+	if header := httpSSETurnLineageHeaderFor04383(shape); header != "" {
+		reply, err = postContextHeader(client, endpoint+"/responses", httpSSETurnLineageRequestFor04383(shape),
+			"x-codex-turn-state", header)
+	} else {
+		reply, err = post(client, endpoint+"/responses", httpSSETurnLineageRequestFor04383(shape))
+	}
 	if err != nil {
 		return err
 	}
@@ -120,7 +148,8 @@ func verifyHTTPSSETurnLineage04383(result httpSoftConflictResult04383) error {
 func verifyHTTPSSETurnLineageFor04383(shape string, result httpSoftConflictResult04383) error {
 	if result.invalid || result.reply.status != http.StatusOK || result.reply.body != httpSSETurnLineageWireFor04383(shape) ||
 		len(result.attempts) != 1 || !result.attempts[0].ready || result.attempts[0].owner != "account-a" ||
-		result.attempts[0].body != httpSSETurnLineageRequest04383 || result.attempts[0].turn != "" ||
+		result.attempts[0].body != httpSSETurnLineageRequestFor04383(shape) ||
+		result.attempts[0].turn != httpSSETurnLineageHeaderFor04383(shape) ||
 		result.attempts[0].metadata != "" || result.attempts[0].trace != "" {
 		return fmt.Errorf("SSE turn lineage changed owner or stream/wire evidence: %+v", result)
 	}
@@ -149,8 +178,10 @@ func httpSSETurnLineageOwnersFor04383(p product, shape string) (bool, error) {
 		}{
 			{"resp-sse-one", "state-one", httpSSETurnLineageExpected04383(shape, "resp-sse-one") == "state-one"},
 			{"resp-sse-one", "state-two", httpSSETurnLineageExpected04383(shape, "resp-sse-one") == "state-two"},
+			{"resp-sse-one", "turn-a", httpSSETurnLineageExpected04383(shape, "resp-sse-one") == "turn-a"},
 			{"resp-sse-two", "state-one", httpSSETurnLineageExpected04383(shape, "resp-sse-two") == "state-one"},
 			{"resp-sse-two", "state-two", httpSSETurnLineageExpected04383(shape, "resp-sse-two") == "state-two"},
+			{"resp-sse-two", "turn-a", httpSSETurnLineageExpected04383(shape, "resp-sse-two") == "turn-a"},
 		} {
 			key := "__response_turn_state__:" + strconv.Itoa(len(tc.id)) + ":" + tc.id + ":" + tc.turn
 			profile := state.Value.Responses[key].Profile
