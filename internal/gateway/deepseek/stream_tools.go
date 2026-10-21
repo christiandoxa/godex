@@ -80,7 +80,7 @@ func deepSeekValidateStreamToolCall(index uint64, call *deepSeekChatStreamToolCa
 	// The tagged Prodex Mojo/serde_json boundary deliberately exposes one
 	// stable provider error, not Go-specific decoder/Unicode diagnostics.
 	invalid := func() error {
-		return fmt.Errorf("DeepSeek streamed malformed JSON arguments for tool call `%s` at index %d: invalid JSON", call.name, index)
+		return fmt.Errorf("DeepSeek streamed malformed JSON arguments for tool call `%s` at index %d: invalid JSON", strings.TrimSpace(call.name), index)
 	}
 	if jsonutil.CheckSerdeBoundary(arguments) != nil {
 		return invalid()
@@ -227,8 +227,8 @@ func (state *deepSeekChatStreamState) observeToolCallDelta(call map[string]any) 
 		current.id = id
 	}
 	if hasFunction {
-		if name, _ := function["name"].(string); strings.TrimSpace(name) != "" {
-			current.name = strings.TrimSpace(name)
+		if name, present := function["name"].(string); present {
+			current.name = name
 		}
 	}
 	if signature := deepSeekStreamThoughtSignature(call); signature != "" {

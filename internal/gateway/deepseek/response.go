@@ -184,13 +184,15 @@ func deepSeekSplitToolName(name string) (string, string) {
 }
 
 func deepSeekStreamSplitToolName(name string) (string, string) {
-	name = strings.TrimSpace(name)
-	if index := strings.LastIndex(name, "--"); index > 0 && index+2 < len(name) {
-		return name[:index], name[index+2:]
+	if index := strings.LastIndex(name, "--"); index >= 0 {
+		namespace, short := name[:index], name[index+2:]
+		if strings.TrimSpace(namespace) != "" && strings.TrimSpace(short) != "" {
+			return namespace, short
+		}
 	}
 	if strings.HasPrefix(name, "mcp__") {
 		rest := strings.TrimPrefix(name, "mcp__")
-		if index := strings.LastIndex(rest, "__"); index > 0 && index+2 < len(rest) {
+		if index := strings.LastIndex(rest, "__"); index >= 0 && strings.TrimSpace(rest[index+2:]) != "" {
 			return "mcp__" + rest[:index], rest[index+2:]
 		}
 	}

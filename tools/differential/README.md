@@ -386,6 +386,13 @@ oracle now exercises thirteen Gemini cases, including all earlier eight fixtures
 
 ### Bounded full DeepSeek oracle
 
+`sse-tool-name-padded` keeps a padded `tool_search` name as an ordinary function
+call. `sse-tool-name-blank-namespace` preserves a name whose apparent namespace
+separator has a blank side. `sse-tool-name-blank-late` requires a later present
+empty name to invalidate the earlier name and fail before tool completion.
+All compare full event bytes and independently reject altered names, sequence
+numbers and call identities.
+
 `sse-tool-id-empty` and `sse-tool-id-padded` require present string tool IDs
 to survive unchanged in every added/delta/done/final event. The positive
 `sse-tool-id-missing` control requires one stable generated UUIDv7 in the

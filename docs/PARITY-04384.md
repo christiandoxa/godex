@@ -2950,3 +2950,53 @@ Synthetic artifact roots are `/tmp/godex-differential-2497901154` and
 Prodex response binding with hashed credential/endpoint identity in state and
 continuation sidecars; Godex does not write those files in this raw-key flow.
 Restart behavior and the correct durable compatibility contract remain open.
+
+## Stream tool names retain presence, classification and namespace bytes
+
+The tagged stream projection stores every present string name without trimming.
+Special tool kinds require exact name bytes. Flat namespace splitting checks
+that both sides of the final double-hyphen are nonblank, then returns their
+original bytes. Exact `mcp__` names also accept a final double-underscore
+separator immediately after that prefix. Godex trimmed the whole name,
+ignored later blank names, and used incomplete namespace-side checks.
+
+The existing private DeepSeek accumulator and stream namespace converter now
+follow those contracts. The invalid-argument diagnostic alone trims the name,
+as the tagged formatter does. Buffered namespace conversion keeps its separate
+tagged contract. No shared helper, public API, package, dependency, option,
+goroutine or state format is added; protocol policy remains in the owning
+DeepSeek gateway.
+
+Fail-before `/tmp/gdx-04384-stream-tool-name-before.log` fails all four local
+regressions: byte-preserving namespace conversion, padded special-name
+classification, later blank-name replacement, and trimmed diagnostic names.
+Additional namespace evidence is retained in
+`/tmp/gdx-04384-stream-tool-name-namespace-before.log`. Ordinary names and
+absent/non-string replacement controls remain valid.
+
+On clean baseline `0ed4186b17f4ffca8ef4d2b68a6fe7c0664909ef`, all three
+new released cases independently meet the exact full-wire contract on Prodex
+and fail only Godex. Reports:
+`/tmp/gdx-04384-stream-tool-name-padded-before-oracle.json`,
+`/tmp/gdx-04384-stream-tool-name-blank-namespace-before-oracle.json` and
+`/tmp/gdx-04384-stream-tool-name-blank-late-before-oracle.json`.
+The first two keep the full five-event function-call trace; the last emits
+four events ending in one missing-name failure without completed tools or
+response success. Mutation controls reject matching altered names, event
+sequences and tool identities. Broader MCP namespace edge coverage is local
+and source-aligned, not an additional released-executable namespace matrix.
+
+Clean tool-ID commit `0ed4186b17f4ffca8ef4d2b68a6fe7c0664909ef`
+passed 60/60 released DeepSeek cases and mutation controls before its
+fast-forward push to `origin/main`. Report:
+`/tmp/gdx-04384-stream-tool-id-oracle.json`.
+
+`rtk go test -race ./internal/gateway/deepseek ./tools/differential -count=1`
+passes 747 tests. `rtk go test ./...` passes 9,123 tests across 81 packages.
+`rtk proxy make verify` passes all local gates, including the shuffled race
+suite and cross-platform build/test compilation. Logs:
+`/tmp/gdx-04384-stream-tool-name-race.log`,
+`/tmp/gdx-04384-stream-tool-name-test-all.log` and
+`/tmp/gdx-04384-stream-tool-name-verify.log`. Clean-commit released DeepSeek
+and Gemini validation follows this commit. Raw-key binding persistence and
+restart identity matching remain the next separate audit target.
