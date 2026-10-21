@@ -172,7 +172,7 @@ func chatContentPartText(part map[string]any) string {
 
 func stringOr(value any, fallback string) string {
 	text, ok := value.(string)
-	if !ok || text == "" {
+	if !ok {
 		return fallback
 	}
 	return text

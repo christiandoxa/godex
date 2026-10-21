@@ -386,6 +386,13 @@ oracle now exercises thirteen Gemini cases, including all earlier eight fixtures
 
 ### Bounded full DeepSeek oracle
 
+`deepseek-empty-identity` and `deepseek-sse-empty-identity` require present
+empty response ID/model strings to remain empty. The stream's later packets
+offer a different ID, which must not replace the already supplied empty ID.
+The oracle checks exact identity field presence and every event's ownership
+before applying the existing full response/SSE fixture contract. Missing,
+null, fallback and late replacement identities are negative controls.
+
 The `deepseek-usage-null` and `deepseek-sse-usage-null` scenarios require an
 explicit zero-counter object for present null usage. The streaming mock first
 sends nonzero counters, then null, proving the last present snapshot replaces

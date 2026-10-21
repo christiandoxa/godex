@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -28,6 +27,7 @@ type deepSeekChatStreamState struct {
 	sequenceNumber       uint64
 	responseID           string
 	model                string
+	modelPresent         bool
 	createdAt            uint64
 	created              bool
 	completed            bool
@@ -152,43 +152,6 @@ func (state *deepSeekChatStreamState) observe(data []byte) ([]byte, bool, error)
 	return bytes.Join(events, nil), len(events) > 0, nil
 }
 
-func (state *deepSeekChatStreamState) applyChunkMetadata(root map[string]any) {
-	if id, _ := root["id"].(string); strings.TrimSpace(id) != "" && strings.HasPrefix(state.responseID, "resp_deepseek_") {
-		state.responseID = strings.TrimSpace(id)
-	}
-	if model, _ := root["model"].(string); strings.TrimSpace(model) != "" {
-		state.model = strings.TrimSpace(model)
-	}
-	if created, ok := deepSeekStreamUint(root["created"]); ok {
-		state.createdAt = created
-	}
-	if fingerprint, _ := root["system_fingerprint"].(string); fingerprint != "" {
-		state.systemFingerprint = fingerprint
-	}
-	if usage, present := root["usage"]; present {
-		state.usage, state.usagePresent = usage, true
-	}
-}
-
-func deepSeekStreamUint(value any) (uint64, bool) {
-	switch current := value.(type) {
-	case float64:
-		if current >= 0 && current == float64(uint64(current)) {
-			return uint64(current), true
-		}
-	case json.Number:
-		parsed, err := strconv.ParseUint(current.String(), 10, 64)
-		return parsed, err == nil
-	case uint64:
-		return current, true
-	case int:
-		if current >= 0 {
-			return uint64(current), true
-		}
-	}
-	return 0, false
-}
-
 func (state *deepSeekChatStreamState) complete() ([]byte, bool, error) {
 	if state.completed {
 		return nil, false, nil
@@ -262,6 +225,9 @@ func (state *deepSeekChatStreamState) complete() ([]byte, bool, error) {
 	// the event envelope; object and created_at are absent from response.
 	delete(response, "object")
 	delete(response, "created_at")
+	if !state.modelPresent {
+		delete(response, "model")
+	}
 
 	var events [][]byte
 	for _, tool := range completedTools {

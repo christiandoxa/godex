@@ -2144,3 +2144,57 @@ complete shuffled race suite. Logs:
 `/tmp/gdx-04384-deepseek-usage-presence-final-test-all.log` and
 `/tmp/gdx-04384-deepseek-usage-presence-final-verify.log`. Clean-commit
 released-executable validation follows this commit.
+
+Clean commit `a05e4386b5eb1dd0730bd767bea613caa80aa97b` passed all
+37 DeepSeek released scenarios and runtime mutation controls, including both
+new null-usage cases, before its fast-forward push to `origin/main`.
+Report: `/tmp/gdx-04384-deepseek-usage-presence-oracle.json`.
+
+## DeepSeek keeps present response strings and stream model absence
+
+Tagged `bridge/chat_compat/response.rs` and `tool_calls.rs` apply fallbacks
+only when identity values are not strings. Empty strings are present values.
+The provider-core stream ID policy accepts the first supplied string while
+the current ID still has its generated fallback prefix; later IDs cannot
+replace an already supplied empty or whitespace ID. Runtime metadata stores
+model strings without trimming, including empty strings, and a stream with
+no string model omits that member from its sparse completion response.
+
+Godex's shared `gateway/chatcompat` scalar helper no longer replaces empty
+strings. `gateway/deepseek` retains supplied ID/model bytes and tracks model
+presence, so a missing/non-string model does not turn into a buffered default.
+A later present empty model clears an earlier model, whereas null/missing
+leaves the prior string. The existing chunk metadata acquisition and unsigned
+epoch parser move together into private `stream_metadata.go`; stream state
+remains below its source guard. This is a cohesive concern in the existing
+gateway package. No new helper package, exported API, dependency, option,
+persistence format, goroutine or layer-direction change is introduced.
+
+Fail-before `/tmp/gdx-04384-deepseek-stream-identity-before.log` proves
+empty shared response/model/tool-call ID replacement, trimmed stream strings,
+invented models for missing/null input and stale models after present empty
+input. Ordinary identity, whitespace shared values, non-string fallback and
+late null model controls pass. Actual SSE regressions check identity on every
+envelope and exactly one final completion, plus model presence separately.
+
+The released baseline on `a05e4386b5eb1dd0730bd767bea613caa80aa97b`
+fails both new empty-identity scenarios only on Godex. Prodex preserves empty
+IDs/models and refuses the later ID. Logs:
+`/tmp/gdx-04384-deepseek-stream-identity-buffered-before-oracle.json` and
+`/tmp/gdx-04384-deepseek-stream-identity-sse-before-oracle.json`.
+The executable fixture independently requires exact identity fields and all
+five SSE events; missing/null/default/late-replacement/text mutations fail.
+Whitespace and absent-model variations currently have source-aligned local
+coverage; they are not presented as separate executable oracle cases.
+
+`rtk go test -race ./internal/gateway/chatcompat ./internal/gateway/deepseek ./internal/gateway/claude -count=1`
+passes 508 tests. `rtk go test ./tools/differential -run '^TestProdex04384DeepSeekEmptyIdentityOracle' -count=1`
+passes its mutation test. `rtk go test ./...` passes 8,973 tests across
+81 packages. Logs: `/tmp/gdx-04384-deepseek-stream-identity-race.log`,
+`/tmp/gdx-04384-deepseek-stream-identity-oracle-selfcheck.log` and
+`/tmp/gdx-04384-deepseek-stream-identity-final-test-all.log`.
+
+`rtk proxy make verify` passes all local gates, including the complete
+shuffled race suite. Log:
+`/tmp/gdx-04384-deepseek-stream-identity-final-verify.log`. Clean-commit
+released-executable validation follows this commit.
