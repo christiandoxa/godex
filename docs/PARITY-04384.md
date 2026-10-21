@@ -1653,3 +1653,57 @@ Logs: `/tmp/gdx-04384-stream-metadata-race.log`,
 `/tmp/gdx-04384-stream-metadata-final-test-all.log` and
 `/tmp/gdx-04384-stream-metadata-final-verify.log`. Clean candidate executable
 differential validation follows the commit.
+
+Clean commit `6dae0ff25ce3cec7fead6f6c4e9e582663269291` passed all 40
+official Gemini executable cases and mutation controls before its
+fast-forward push to `origin/main`. Log:
+`/tmp/gdx-04384-stream-metadata-oracle.json`.
+
+## API-key Gemini SSE canonical event bytes
+
+The active API-key Gemini Chat Completions stream is emitted by the tagged
+shared Chat-compatible runtime with `serde_json::to_string` and exact CRLF
+frames. Godex's event builder used `json.Marshal`, escaping literal HTML
+characters and U+2028/U+2029 in text deltas, completed items and final
+output. Its intermediate decoders also converted provider integers to
+float64, which cannot preserve usage counters above `2^53`.
+
+The event builder now reuses the existing serde-compatible value writer.
+Both intermediate event and usage decoding retain `json.Number`, so an
+integer remains an integer and full-range u64 counters remain exact. No
+dependency, public model, shared helper, configuration, persisted format,
+new stream owner or account/retry policy is added. Protocol serialization
+stays in `gateway/gemini`.
+
+The existing `stream-chat` executable fixture now includes ASCII text,
+`<>&`, a slash, non-ASCII text, Unicode line separators and exact usage
+counts above `2^53`. Its oracle checks the entire six-event trace against
+an independent static fixture using the validated response ID, item ID and
+creation epoch. This retains every material payload byte, object key,
+spacing and CRLF delimiter; generated identities and clocks still have
+consistency checks. Negative controls prove that HTML/Unicode escapes,
+bare LF, JSON whitespace and a changed `data:` prefix are rejected even
+when the decoded events are otherwise equivalent. The static fixture does
+not call the production SSE builder or its serde writer.
+
+Local fail-before logs:
+`/tmp/gdx-04384-chat-sse-wire-before.log` and
+`/tmp/gdx-04384-chat-sse-wire-integer-before.log`. Plain ASCII and literal
+escaped-text lookalikes remain positive controls. The focused final
+`rtk go test -race ./internal/gateway/gemini ./tools/differential -count=1`
+passes 835 tests. Released-executable baseline and clean-candidate
+validation are recorded separately after their runs complete.
+
+The first released-executable fail-before run used the extended text with
+ordinary 2/1/3 usage. Prodex passed the strict oracle; only Godex commit
+`6dae0ff25ce3cec7fead6f6c4e9e582663269291` failed `stream-chat` (39/40
+matching cases), while mutation controls passed. Log:
+`/tmp/gdx-04384-chat-sse-wire-before-oracle.json`. The final fixture also
+checks exact larger integer usage; its baseline run is separate.
+
+`rtk go test ./...` passes 8,840 tests across 81 packages.
+`rtk proxy make verify` passes all local gates, including full race tests.
+Logs: `/tmp/gdx-04384-chat-sse-wire-final2-race.log`,
+`/tmp/gdx-04384-chat-sse-wire-final2-test-all.log` and
+`/tmp/gdx-04384-chat-sse-wire-final2-verify.log`. Clean candidate binary
+differential validation follows the commit.

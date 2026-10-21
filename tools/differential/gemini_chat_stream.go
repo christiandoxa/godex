@@ -79,7 +79,7 @@ func geminiChatSSEProjection043711(wire string) ([]map[string]any, error) {
 			value, _ := event["delta"].(string)
 			expected := "synthetic-"
 			if i == 3 {
-				expected = "ok"
+				expected = "ok<>&/🌍\u2028\u2029"
 			}
 			if value != expected || event["created_at"] != createdAt ||
 				event["response_id"] != responseID {
@@ -113,9 +113,9 @@ func geminiChatSSEProjection043711(wire string) ([]map[string]any, error) {
 			metadata, _ := completed["metadata"].(map[string]any)
 			gemini, _ := metadata["gemini"].(map[string]any)
 			if usage == nil || gemini == nil ||
-				usage["input_tokens"] != float64(2) ||
+				usage["input_tokens"] != float64(9007199254740993) ||
 				usage["output_tokens"] != float64(1) ||
-				usage["total_tokens"] != float64(3) ||
+				usage["total_tokens"] != float64(9007199254740994) ||
 				gemini["finish_reason"] != "stop" {
 				return nil, fmt.Errorf("Gemini Chat SSE lost finish reason or token usage: %+v", completed)
 			}
@@ -157,6 +157,9 @@ func geminiChatSSEProjection043711(wire string) ([]map[string]any, error) {
 		if strings.Count(wire, "event: "+kind) != want {
 			return nil, fmt.Errorf("Gemini Chat SSE event framing for %s: want %d", kind, want)
 		}
+	}
+	if wire != geminiChatSSEFixture043711(responseID, itemID, int64(createdAt)) {
+		return nil, errors.New("Gemini Chat SSE bytes differ from the canonical released trace")
 	}
 	return result, nil
 }

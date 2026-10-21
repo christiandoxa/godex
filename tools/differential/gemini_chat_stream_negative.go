@@ -12,11 +12,11 @@ import (
 func geminiChatSSEFixture043711(responseID, itemID string, epoch int64) string {
 	output := []any{map[string]any{
 		"type": "message", "role": "assistant",
-		"content": []any{map[string]any{"type": "output_text", "text": "synthetic-ok"}},
+		"content": []any{map[string]any{"type": "output_text", "text": "synthetic-ok<>&/🌍\u2028\u2029"}},
 	}}
 	item := map[string]any{
 		"id": itemID, "role": "assistant", "type": "message",
-		"content": []any{map[string]any{"type": "output_text", "text": "synthetic-ok"}},
+		"content": []any{map[string]any{"type": "output_text", "text": "synthetic-ok<>&/🌍\u2028\u2029"}},
 	}
 	events := []map[string]any{
 		{"type": "response.created", "created_at": epoch, "response": map[string]any{"id": responseID}},
@@ -24,12 +24,12 @@ func geminiChatSSEFixture043711(responseID, itemID string, epoch int64) string {
 			"id": itemID, "role": "assistant", "type": "message", "content": []any{},
 		}},
 		{"type": "response.output_text.delta", "created_at": epoch, "response_id": responseID, "delta": "synthetic-"},
-		{"type": "response.output_text.delta", "created_at": epoch, "response_id": responseID, "delta": "ok"},
+		{"type": "response.output_text.delta", "created_at": epoch, "response_id": responseID, "delta": "ok<>&/🌍\u2028\u2029"},
 		{"type": "response.output_item.done", "response_id": responseID, "item": item},
 		{"type": "response.completed", "created_at": epoch, "response": map[string]any{
 			"id": responseID, "model": "gemini-3.1-pro-preview", "output": output,
 			"usage": map[string]any{
-				"input_tokens": 2, "output_tokens": 1, "total_tokens": 3,
+				"input_tokens": uint64(9007199254740993), "output_tokens": 1, "total_tokens": uint64(9007199254740994),
 			},
 			"metadata": map[string]any{
 				"gemini": map[string]any{"finish_reason": "stop"},
@@ -40,7 +40,9 @@ func geminiChatSSEFixture043711(responseID, itemID string, epoch int64) string {
 	for index, event := range events {
 		event["sequence_number"] = index
 		body, _ := json.Marshal(event)
-		_, _ = fmt.Fprintf(&result, "event: %s\r\ndata: %s\r\n\r\n", event["type"], body)
+		// This static fixture contains literal characters, never escaped-text lookalikes.
+		canonical := strings.NewReplacer(`\u003c`, "<", `\u003e`, ">", `\u0026`, "&", `\u2028`, "\u2028", `\u2029`, "\u2029").Replace(string(body))
+		_, _ = fmt.Fprintf(&result, "event: %s\r\ndata: %s\r\n\r\n", event["type"], canonical)
 	}
 	return result.String()
 }
@@ -55,13 +57,13 @@ func geminiChatSSESentinel043711() bool {
 		strings.Replace(good, "\"sequence_number\":3", "\"sequence_number\":9", 1),
 		strings.Replace(good, "\"response_id\":\"resp_deepseek_fixture\"", "\"response_id\":\"resp_other\"", 1),
 		strings.Replace(good, "\"id\":\"msg_gemini_fixture\"", "\"id\":\"msg_other\"", 1),
-		strings.Replace(good, "\"input_tokens\":2", "\"input_tokens\":7", 1),
+		strings.Replace(good, "\"input_tokens\":9007199254740993", "\"input_tokens\":7", 1),
 		strings.Replace(good, "\"finish_reason\":\"stop\"", "\"finish_reason\":\"length\"", 1),
-		strings.Replace(good, "\"delta\":\"ok\"", "\"delta\":\"forged\"", 1),
+		strings.Replace(good, "\"delta\":\"ok", "\"delta\":\"forged", 1),
 		strings.Replace(good, "event: response.output_item.done", "event: response.failed", 1),
 		strings.Split(good, "event: response.completed")[0],
 	} {
-		if geminiChatSSEEqual043711(good, changed) {
+		if changed == good || geminiChatSSEEqual043711(good, changed) {
 			return false
 		}
 	}

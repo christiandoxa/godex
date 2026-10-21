@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
+	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 	"github.com/christiandoxa/godex/internal/helper/sse"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	"github.com/google/uuid"
@@ -50,7 +51,7 @@ func (state *geminiChatCompatibleStream043711) send(writer io.Writer, event stri
 	fields["type"] = event
 	fields["sequence_number"] = state.sequence
 	state.sequence++
-	body, err := json.Marshal(fields)
+	body, err := jsonutil.MarshalSerdeValue04384(fields)
 	if err != nil {
 		return err
 	}
@@ -131,7 +132,9 @@ func (state *geminiChatCompatibleStream043711) failure(writer io.Writer, message
 
 func (state *geminiChatCompatibleStream043711) observeChatChunk(data []byte) {
 	var chunk map[string]any
-	if err := json.Unmarshal(data, &chunk); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	if err := decoder.Decode(&chunk); err != nil {
 		return
 	}
 	if model, ok := chunk["model"].(string); ok && model != "" {
@@ -175,7 +178,9 @@ func (state *geminiChatCompatibleStream043711) accept(writer io.Writer, data []b
 	messages = append(messages, decoder.Finish()...)
 	for _, raw := range messages {
 		var event map[string]any
-		if err := json.Unmarshal(raw, &event); err != nil {
+		decoder := json.NewDecoder(bytes.NewReader(raw))
+		decoder.UseNumber()
+		if err := decoder.Decode(&event); err != nil {
 			return err
 		}
 		name, _ := event["type"].(string)
