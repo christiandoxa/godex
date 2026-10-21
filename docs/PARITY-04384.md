@@ -1189,3 +1189,48 @@ status, usage and attempt checks. Dedicated mutation tests reject changed
 identity, namespace or arguments. Native streaming assertions remain
 source-aligned local coverage; API-key executable cases do not certify
 every native SSE lifecycle behavior.
+
+The 37-case executable baseline run on clean `40826d2` failed exactly the
+five new buffered tool-identity cases; all earlier 32 cases passed. The
+independent WebSocket continuation executable oracle on that same commit
+also passed 56 upstream attempts, with hard-owner, precommit retry,
+no-replay, restart and quota-probe checks. That WebSocket result does not
+replace the separate transport/deadline/Compact-lineage release phases.
+
+## Gemini custom apply_patch converts unified diffs
+
+The tagged `response_tool_calls_apply_patch.rs` first extracts an explicit
+patch alias or assembles an edit, then normalizes an apply-patch block or
+calls the compiled `gemini_unified_diff_to_apply_patch` policy. Godex
+previously handled only the native block form and edit arguments; unified
+diff strings were returned unchanged. It also normalized CRLF in literal
+non-patch strings even though the tagged no-match path preserves the input.
+
+The new private `gateway/gemini/native_patch_diff.go` follows the published
+section/header and hunk rules: git or plain unified sections; quoted paths
+and `/dev/null`; Add/Delete/Update/Move records; hunk context without line
+counts; and explicit end-of-file markers. Incomplete or unchanged sections
+do not create fabricated edits. Native blocks still take precedence, now
+recognizing the same Unicode whitespace before a marker; unmatched literal
+input retains its original bytes. The parser only transforms provider tool
+input and never touches the filesystem or executes a patch.
+
+Fail-before regressions cover update/add/delete/rename/EOF output, malformed
+hunk labels, incomplete headers, unchanged sections, native-block controls,
+Unicode markers, LF/CRLF and the complete API-key custom-tool envelope.
+The implementation is a local protocol parser with no dependency, exported
+API, helper package, application policy or durable-state change. Focused
+Gemini/oracle coverage passes 719 tests, and `rtk go test ./...` passes
+8,675 tests across 81 packages. Three executable fixtures independently
+assert single-file conversion, a mixed update/move/add/delete diff, and
+literal CRLF preservation; negative controls reject changed patch bytes.
+
+These finite fixtures do not certify source panic behavior for oversized
+native custom-tool arguments or every malformed diff/header combination.
+The existing bounded upstream read remains in force. Full local and clean
+candidate executable validation are required before this change is pushed.
+
+`rtk proxy make verify` passes the complete local gate, including full race
+tests and cross-build/test compilation. The preceding clean commit
+`b512e8fdadb1b8bdf8784e750a89af6633a0d86d` passed all 37 Gemini executable
+cases and mutation controls before its fast-forward push to `origin/main`.

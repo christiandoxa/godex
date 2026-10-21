@@ -118,6 +118,10 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	if response, ok := geminiPatchResponse04384(mock.scenario); ok {
+		_, _ = io.WriteString(w, response)
+		return
+	}
 	if response, ok := geminiToolIdentityResponse04384(mock.scenario); ok {
 		_, _ = io.WriteString(w, response)
 		return
@@ -227,6 +231,9 @@ func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit string
 			"buffered-tool-empty",
 			"buffered-tool-mcp-empty-prefix",
 			"buffered-tool-trailing-separator",
+			"buffered-patch-unified-update",
+			"buffered-patch-unified-files",
+			"buffered-patch-literal-crlf",
 		})
 }
 
@@ -577,6 +584,9 @@ func geminiFixtureInvariant(scenario string, result geminiCandidateResult) error
 	}
 	if _, ok := geminiToolIdentityCase04384(scenario); ok {
 		return geminiToolIdentityInvariant04384(scenario, body)
+	}
+	if _, _, ok := geminiPatchFixture04384(scenario); ok {
+		return geminiPatchInvariant04384(scenario, body)
 	}
 	return nil
 }

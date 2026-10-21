@@ -2,6 +2,7 @@ package gemini
 
 import (
 	"strings"
+	"unicode"
 
 	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 	"github.com/christiandoxa/godex/internal/helper/jsonutil"
@@ -214,19 +215,21 @@ func geminiNativeEditPatch(value any) (string, bool) {
 }
 
 func geminiNativeNormalizePatch(input string) string {
-	input = geminiNativeNewlines(input)
-	lines := strings.Split(input, "\n")
+	lines := strings.Split(geminiNativeNewlines(input), "\n")
 	start, end := -1, -1
 	for index, line := range lines {
-		if start < 0 && strings.HasPrefix(strings.TrimLeft(line, " \t"), "*** Begin Patch") {
+		if start < 0 && strings.HasPrefix(strings.TrimLeftFunc(line, unicode.IsSpace), "*** Begin Patch") {
 			start = index
 		}
-		if start >= 0 && strings.HasPrefix(strings.TrimLeft(line, " \t"), "*** End Patch") {
+		if start >= 0 && strings.HasPrefix(strings.TrimLeftFunc(line, unicode.IsSpace), "*** End Patch") {
 			end = index
 			break
 		}
 	}
 	if start < 0 || end < start {
+		if patch, found := geminiNativeUnifiedDiff(lines); found {
+			return patch
+		}
 		return input
 	}
 	selected := append([]string(nil), lines[start:end+1]...)
