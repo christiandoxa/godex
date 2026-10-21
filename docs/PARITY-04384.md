@@ -230,3 +230,24 @@ ACP content projection; it does not fabricate tool calls, expose raw tool
 arguments, or alter the input wire. The comparisons use tagged source and
 local synthetic fixtures; an authenticated Kiro CLI 2.33.0 integration is
 still separately unverified.
+
+## Kiro ACP optional cost and canonical serde f64 serialization
+
+The 0.438.4 `RuntimeKiroAcpCost.amount` is a typed Rust `f64`. The source
+provider's `kiro_provider_core_acp_usage_update_json` serializes that typed
+value into the Mojo usage-update JSON; it does **not** retain the original
+ACP numeric literal. Previous Godex usage metadata did retain `json.Number`
+lexemes, so source `5` stayed `5`, `1e16` stayed `1e16`, and long decimals
+retained every digit instead of the canonical serde `5.0`, `1e+16`, and
+shortest round-trip f64. The source additionally always passes a JSON extra
+object containing `"cost"`: missing or null `Option<Cost>` becomes an
+**explicit `"cost":null`**, rather than omitting the member entirely.
+
+Fail-before regressions cover integer-typed and fractional amounts,
+negative zero, small/large exponent thresholds, long mantissas, u64 maximum,
+valid underflow and absent/null cost. The shared pinned serde_json 1.0.151
+f64 parser now has a matching canonical-format helper used by both quota
+JSON size accounting and the Kiro cost projector. The accepted numeric
+value is unchanged; only its exact serialized representation is corrected.
+The optional null key is also always retained. This is source/dependency-
+aligned local JSON parity, not a full Kiro CLI 2.33.0 runtime oracle.

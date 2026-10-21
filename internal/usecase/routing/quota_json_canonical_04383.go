@@ -2,6 +2,7 @@ package routing
 
 import (
 	"encoding/json"
+	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 	"strconv"
 	"strings"
 )
@@ -113,30 +114,5 @@ func quotaCanonicalNumberSize04383(number json.Number) (int, bool) {
 	if !valid {
 		return 0, false
 	}
-	// serde_json's ryu formatter uses fixed decimal notation for
-	// magnitudes in [1e-5, 1e16), scientific otherwise. Go's 'g'
-	// switches to scientific notation at much smaller magnitudes and
-	// zero-pads small exponents (1e-07 versus serde's 1e-7).
-	magnitude := floating
-	if magnitude < 0 {
-		magnitude = -magnitude
-	}
-	var formatted string
-	if magnitude == 0 || magnitude >= 1e-5 && magnitude < 1e16 {
-		formatted = strconv.FormatFloat(floating, 'f', -1, 64)
-		if !strings.Contains(formatted, ".") {
-			formatted += ".0"
-		}
-	} else {
-		formatted = strconv.FormatFloat(floating, 'e', -1, 64)
-		if index := strings.LastIndexByte(formatted, 'e'); index >= 0 && index+2 < len(formatted) {
-			prefix, exponent := formatted[:index+2], formatted[index+2:]
-			exponent = strings.TrimLeft(exponent, "0")
-			if exponent == "" {
-				exponent = "0"
-			}
-			formatted = prefix + exponent
-		}
-	}
-	return len(formatted), true
+	return len(jsonutil.FormatSerdeDefaultFloat(floating)), true
 }

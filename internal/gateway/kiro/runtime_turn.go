@@ -3,6 +3,7 @@ package kiro
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 	"strconv"
 	"strings"
 	"time"
@@ -254,9 +255,20 @@ func kiroUsageUpdate(update map[string]any) map[string]any {
 	if size > used {
 		remaining = size - used
 	}
-	result := map[string]any{"used": used, "size": size, "remaining": remaining}
+	// Tagged kiro_provider_core_acp_usage_update_json always serializes
+	// its optional cost field: None becomes `"cost":null`, not omission.
+	result := map[string]any{"used": used, "size": size, "remaining": remaining, "cost": nil}
 	if cost, ok := update["cost"].(map[string]any); ok {
-		result["cost"] = sanitizeMap(cost, "amount", "currency")
+		projected := sanitizeMap(cost, "amount", "currency")
+		if amount, ok := cost["amount"].(json.Number); ok {
+			// Prodex decodes the ACP cost as a typed f64 and emits its
+			// canonical serde_json spelling, NOT the original JSON number
+			// lexeme (5 must become 5.0, 1e16 must become 1e+16).
+			if parsed, valid := jsonutil.ParseSerdeDefaultFloat(string(amount)); valid {
+				projected["amount"] = json.Number(jsonutil.FormatSerdeDefaultFloat(parsed))
+			}
+		}
+		result["cost"] = projected
 	}
 	return result
 }

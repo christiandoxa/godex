@@ -3,6 +3,7 @@ package kiro
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 	"strconv"
 	"strings"
 )
@@ -112,6 +113,6 @@ func kiroACPCost04384(value any) bool {
 	if !ok {
 		return false
 	}
-	_, err := strconv.ParseFloat(string(number), 64)
-	return err == nil
+	_, valid := jsonutil.ParseSerdeDefaultFloat(string(number))
+	return valid
 }
