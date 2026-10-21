@@ -26,8 +26,7 @@ func translateResponseWithConversation(
 	conversationMessages []any,
 	requestID uint64,
 ) (*proxymodel.Response, error) {
-	contentType := strings.ToLower(response.Header.Get(contentTypeHeader))
-	if strings.Contains(contentType, "text/event-stream") {
+	if deepSeekContentTypeIsSSE04384(response.Header.Get(contentTypeHeader)) {
 		header := deepSeekSSEHeaders(response.Header)
 		return &proxymodel.Response{
 			StatusCode: response.StatusCode, Header: header,

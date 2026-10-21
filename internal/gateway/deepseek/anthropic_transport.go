@@ -4,7 +4,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
@@ -25,8 +24,7 @@ func translateAnthropicResponseWithConversation(
 	conversations deepSeekConversationStore,
 	conversationMessages []any,
 ) (*proxymodel.Response, error) {
-	contentType := strings.ToLower(response.Header.Get(contentTypeHeader))
-	if strings.Contains(contentType, "text/event-stream") {
+	if deepSeekContentTypeIsSSE04384(response.Header.Get(contentTypeHeader)) {
 		return &proxymodel.Response{
 			StatusCode: response.StatusCode,
 			Header:     translatedHeaders(response.Header, "text/event-stream; charset=utf-8"),

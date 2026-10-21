@@ -241,7 +241,7 @@ func (transport *RuntimeTransport) inspectNativePrecommit(
 	hasNextModel bool,
 ) (deepSeekPrecommitState, error) {
 	state := deepSeekPrecommitState{retryUsed: firstEventRetryUsed}
-	if !strings.Contains(strings.ToLower(response.Header.Get(contentTypeHeader)), "text/event-stream") {
+	if !deepSeekContentTypeIsSSE04384(response.Header.Get(contentTypeHeader)) {
 		return state, nil
 	}
 	state.committed = true
