@@ -136,7 +136,8 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		if b.scenario == "http-sse-dead-chain" && string(body) == httpSSEDeadRequest04383 {
+		if strings.HasPrefix(b.scenario, "http-sse-dead-chain-") && string(body) == httpSSEDeadRequest04383 {
+			shape := strings.TrimPrefix(b.scenario, "http-sse-dead-chain-")
 			b.mu.Lock()
 			b.attempts = append(b.attempts, transportAttempt04383{owner: owner, body: string(body),
 				turn: r.Header.Get("x-codex-turn-state"), trace: r.Header.Get("thread-id"),
@@ -150,7 +151,7 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 				flusher.Flush()
 			}
 			time.Sleep(150 * time.Millisecond)
-			_, _ = io.WriteString(w, httpSSEDeadFailure04383)
+			_, _ = io.WriteString(w, httpSSEDeadSuffixFor04383(shape))
 			return
 		}
 		if httpSSETurnLineageTestRequest04383(b.scenario, body) {

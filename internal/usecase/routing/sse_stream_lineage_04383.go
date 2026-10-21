@@ -55,7 +55,7 @@ func (state *SSELineageTracker04383) Observe(ctx context.Context, data []byte) e
 	if err := state.advance(data, ctx); err != nil {
 		return err
 	}
-	if !externalProviderKind(state.providerKind) && previousResponseNotFound(data) {
+	if !externalProviderKind(state.providerKind) && committedSSEPreviousResponseNotFound04383(data) {
 		// Tagged RuntimeSseTapState first observes this event's IDs,
 		// then clears the now-dead chain from its owning profile only.
 		// Its request previous ID may precede the SSE prelude entirely.
@@ -90,6 +90,14 @@ func (state *SSELineageTracker04383) Observe(ctx context.Context, data []byte) e
 		}
 	}
 	return nil
+}
+
+// The tagged SSE event parser is JSON-only. A standalone plain-text HTTP
+// 400 error is recognized by a separate classifier, but data: event text
+// must never remove a verified response owner without complete valid JSON.
+func committedSSEPreviousResponseNotFound04383(data []byte) bool {
+	value, valid := decodeNativeUsageJSON(data)
+	return valid && previousResponseMessageInJSON04383(value)
 }
 
 func (state *SSELineageTracker04383) advance(data []byte, ctx context.Context) error {

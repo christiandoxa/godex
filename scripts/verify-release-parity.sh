@@ -832,7 +832,7 @@ if [ "$phase" = 'all' ] || [ "$phase" = 'http-session-conflict' ]; then
   --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
   --http-session-conflict
 go test -race ./tools/continuationparity \
-  -run '^TestProdex04383(HTTP(SoftSessionConflict|PreviousSession|DirectShadow|NestedPrevious|DirectTurnShadow|UnsupportedThread|ResponseSession|SSETurnLineage|SSETurnLineageCrossChunk|SSEDeadChain)|HTTPTurnSession)OracleRejectsMutations$' -count=1 -timeout=30s
+  -run '^TestProdex04383(HTTP(SoftSessionConflict|PreviousSession|DirectShadow|NestedPrevious|DirectTurnShadow|UnsupportedThread|ResponseSession|SSETurnLineage|SSETurnLineageCrossChunk|SSEDeadChain|SSEPlainTextDeadMarker)|HTTPTurnSession)OracleRejectsMutations$' -count=1 -timeout=30s
 fi
 
 # Native cached-token affinity must prefer the highest verified cache-hit

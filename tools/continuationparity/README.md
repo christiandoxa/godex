@@ -983,3 +983,14 @@ source/manifest/executable-pinned postcommit dead-chain fixture. It shares
 exactly the same fixture logic and mutation controls used by the broader
 `--http-session-conflict` release gate, but avoids rerunning unrelated HTTP
 shape probes when validating an isolated dead-response/turn change.
+
+The focused `--http-sse-dead` fixture now runs two separate committed SSE
+errors after the initial output delta. Structured JSON
+`response.failed/error.code: previous_response_not_found` must clear
+previous-response and orphan-turn owners, while raw
+`data: previous_response_not_found` **must not**: the tagged SSE parser
+only derives structured error effects from serde-valid complete JSON,
+even though the separate HTTP 400 text classifier recognizes that message.
+Both controls compare full client-visible SSE bytes, authenticated Ready
+receipts, a single upstream inference and independent durable owner/turn
+projections on Prodex and Godex.

@@ -3483,3 +3483,30 @@ an orphaned `state-dead` direct turn owner is empty after the original
 previous-response ID and both streamed IDs are removed, while the
 unrelated second-account response remains valid and the exact HTTP 200 SSE
 bytes are preserved. Full provider and native-OS parity remain separate.
+
+## Plain-text SSE error markers must not invalidate a verified response chain
+
+The tagged 0.438.3 `parse_runtime_sse_event` calls
+`parse_runtime_sse_payload` and requires **successful whole-document
+`serde_json::Value` parsing** before populating
+`previous_response_not_found`. This differs from the ordinary HTTP 400
+classifier, which intentionally accepts certain standalone text errors.
+A committed event containing literal `data: previous_response_not_found`
+therefore remains opaque SSE output and cannot release a verified
+previous-response ID, a previously committed response ID, or its turn
+binding. Godex's postcommit lineage tracker previously reused the
+HTTP error classifier, which recognized plain-text markers and wrongly
+deleted all three after client output had already begun.
+
+A fail-before Router regression reproduced this using an existing verified
+previous response, a committed SSE output ID and a subsequent plain-text
+marker, in both memory and durable stores. The scoped fix extracts only
+the **structured** previous-response error class from a fully valid parsed
+JSON event; the unrelated HTTP plain-text fallback retains its original
+behavior. The source/manifest/executable-pinned focused
+`--http-sse-dead` oracle now runs complementary *structured* and
+*plain-text* cases, comparing the exact SSE bytes, one main-owner model
+request, two authenticated Ready profiles, and either the correct removal
+(structured) or retention (plain text) of original and streamed response
+owners and the associated turn-state binding. Full provider/OS parity
+remains separately open.
