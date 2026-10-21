@@ -61,8 +61,9 @@ func geminiNativeToolCallItem(part, call map[string]any, fallbackID string) map[
 	if strings.TrimSpace(callID) == "" {
 		callID = fallbackID
 	}
-	args := call["args"]
-	if args == nil {
+	args, present := call["args"]
+	if !present {
+		// Serde defaults absent args to {}, preserving explicit JSON null.
 		args = map[string]any{}
 	}
 	if name == "tool_search" {

@@ -118,6 +118,10 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	if response, ok := geminiBufferedArgsResponse04384(mock.scenario); ok {
+		_, _ = io.WriteString(w, response)
+		return
+	}
 	if mock.scenario == "buffered-null-tool-text" {
 		_, _ = io.WriteString(w, `{"candidates":[{"content":{"role":"model","parts":[{"text":"hidden before"},{"functionCall":null},{"text":"hidden after"}]},"finishReason":"STOP"}],"modelVersion":"gemini-3.1-pro-preview","usageMetadata":{"promptTokenCount":2,"candidatesTokenCount":1,"totalTokenCount":3}}`)
 		return
@@ -173,7 +177,7 @@ func (mock *geminiMock) recorded() []geminiCapturedRequest {
 
 func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit string) error {
 	return runGeminiDifferentialCases04384(prodexBin, godexBin, prodexCommit, godexCommit,
-		[]string{"chat-request", "orphan-tool", "chat-response", "wrapped-response-no-trace", "wrapped-response-trace", "stream-native", "stream-chat", "multi-turn-tool", "quota-plain-429", "quota-structured-429", "invalid-wrapped-tool-parameters", "invalid-flat-tool-parameters", "buffered-null-tool-text", "buffered-media-invalid-inline", "buffered-media-invalid-code", "buffered-media-suppressed-code", "buffered-grounding-null-status"})
+		[]string{"chat-request", "orphan-tool", "chat-response", "wrapped-response-no-trace", "wrapped-response-trace", "stream-native", "stream-chat", "multi-turn-tool", "quota-plain-429", "quota-structured-429", "invalid-wrapped-tool-parameters", "invalid-flat-tool-parameters", "buffered-null-tool-text", "buffered-media-invalid-inline", "buffered-media-invalid-code", "buffered-media-suppressed-code", "buffered-grounding-null-status", "buffered-args-null", "buffered-args-absent", "buffered-args-empty", "buffered-args-wrapped-null"})
 }
 
 func runGeminiDifferentialCases04384(prodexBin, godexBin, prodexCommit, godexCommit string, cases []string) error {
@@ -498,6 +502,9 @@ func geminiFixtureInvariant(scenario string, result geminiCandidateResult) error
 	}
 	if geminiMediaScenario04384(scenario) {
 		return geminiMediaFixtureInvariant04384(scenario, body)
+	}
+	if _, _, ok := geminiBufferedArgsFixture04384(scenario); ok {
+		return geminiBufferedArgsInvariant04384(scenario, body)
 	}
 	return nil
 }

@@ -997,3 +997,30 @@ This source/dependency-pinned slice covers synthetic streamed tool calls.
 The official 0.438.4 Gemini executable differential remains an independent
 regression gate, not a claim of live-provider coverage for every nested
 argument/value type.
+
+## Buffered Gemini arguments distinguish absent members from JSON null
+
+The tagged `gemini_response_tool_call_item_with_call_id` and Chat-compatible
+tool-call builder use `get("args").cloned().unwrap_or_else(|| json!({}))`.
+Only a missing member defaults to `{}`; a present null serializes as `null`.
+Godex's buffered projector instead treated both cases as absent, including
+the special `tool_search` and `apply_patch` output paths. The correction
+uses the map lookup's presence flag and preserves every present JSON value.
+
+An overlay of the original `cfa3d1235` implementation fails the explicit-null
+unit, HTTP envelope, and special-tool regressions. Missing arguments, empty
+objects, arrays, booleans, empty strings, and zero remain positive controls.
+HTTP translation tests cover wrapped/unwrapped responses and both direct
+and Chat-compatible call-ID modes. All 462 Gemini package tests pass, and
+`rtk go test ./internal/gateway/gemini ./tools/differential -count=1` passes
+664 tests. `rtk proxy make verify` passes formatting, source size, TUI
+framework, cross-build/test compilation, installer, vet, full race and build
+checks with the four new executable fixtures included.
+
+The `--gemini` executable oracle now includes `buffered-args-null`,
+`buffered-args-absent`, `buffered-args-empty`, and
+`buffered-args-wrapped-null`. It checks exact tool shape and argument text,
+HTTP status, identity, usage, provider request and attempt count. Its
+negative controls reject changed arguments or tool identity even if both
+products return the same invalid output. Candidate executable results must
+come from a clean committed build; local tests alone do not prove them.

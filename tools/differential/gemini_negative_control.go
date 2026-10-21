@@ -82,7 +82,8 @@ func geminiNegativeControl() bool {
 		return false
 	}
 	return geminiNativeSSESentinel043711() && geminiChatSSESentinel043711() &&
-		geminiMultiTurnSentinel043711() && geminiQuotaNegativeControl043711()
+		geminiMultiTurnSentinel043711() && geminiQuotaNegativeControl043711() &&
+		geminiBufferedArgsNegativeControl04384()
 }
 
 // Ensure the executable oracle detects fabricated native Gemini SSE output
