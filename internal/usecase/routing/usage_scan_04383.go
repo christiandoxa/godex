@@ -7,6 +7,7 @@ import (
 	"math"
 	"sort"
 	"strconv"
+	"strings"
 
 	runtimemodel "github.com/christiandoxa/godex/internal/model/runtime"
 )
@@ -41,8 +42,24 @@ func decodeNativeUsageJSON(payload []byte) (any, bool) {
 func validNativeJSONNumberRange04383(value any) bool {
 	switch typed := value.(type) {
 	case json.Number:
-		parsed, _ := strconv.ParseFloat(string(typed), 64)
-		return !math.IsInf(parsed, 0)
+		literal := string(typed)
+		if !strings.ContainsAny(literal, ".eE") && literal != "-0" {
+			if literal[0] == '-' {
+				if _, err := strconv.ParseInt(literal, 10, 64); err == nil {
+					return true
+				}
+			} else if _, err := strconv.ParseUint(literal, 10, 64); err == nil {
+				return true
+			}
+		}
+		// The pinned serde_json default f64 parser does NOT always share
+		// Go strconv.ParseFloat's overflow boundary. For example,
+		// 1.7976931348623158e308 is finite in Go but rejected by Rust's
+		// u64-significand multiplied by an exact literal 10^n constant.
+		// Reuse the already verified 0.438.3 serde float projection for
+		// entire-document validity, including unrelated JSON members.
+		_, valid := quotaSerdeFloat04383(literal)
+		return valid
 	case map[string]any:
 		for _, member := range typed {
 			if !validNativeJSONNumberRange04383(member) {

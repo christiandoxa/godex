@@ -1,7 +1,6 @@
 package routing
 
 import (
-	"encoding/json"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	"net/http"
 	"sort"
@@ -26,19 +25,19 @@ func requestAffinity(request proxymodel.Request, body []byte) affinityKeys {
 		session: firstHeader(request.Header, "session_id", "session-id", "x-session-id"),
 	}
 	if keys.session == "" {
-		var metadata map[string]any
-		raw := request.Header.Get("x-codex-turn-metadata")
-		if validNativeJSONUnicode04383([]byte(raw)) && json.Unmarshal([]byte(raw), &metadata) == nil && validNativeJSONContainerDepth04383(metadata) {
-			// The turn-metadata header uses the same direct-member presence
-			// rule as request JSON, including client_metadata fallback.
+		value, valid := decodeNativeUsageJSON([]byte(request.Header.Get("x-codex-turn-metadata")))
+		if metadata, ok := value.(map[string]any); valid && ok {
+			// Turn metadata, too, is semantically meaningful only when the
+			// entire serde JSON document is valid and complete.
 			keys.session = semanticNestedText(metadata, "session_id", "client_metadata", "session_id")
 		}
 	}
 	if len(body) == 0 {
 		return keys
 	}
-	var object map[string]any
-	if !validNativeJSONUnicode04383(body) || json.Unmarshal(body, &object) != nil || !validNativeJSONContainerDepth04383(object) {
+	value, valid := decodeNativeUsageJSON(body)
+	object, ok := value.(map[string]any)
+	if !valid || !ok {
 		return keys
 	}
 	if keys.turn == "" && request.WebSocketMessage {

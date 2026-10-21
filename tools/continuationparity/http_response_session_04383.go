@@ -27,6 +27,7 @@ var httpResponseSessionShapes04383 = []string{
 	"turn-absent-name-control", "turn-absent-value-control",
 	"root-object-space-leading", "root-object-space-trailing", "root-object-suffix-space",
 	"root-object-suffix-tab", "root-object-exact-response", "root-object-exact-suffix",
+	"serde-f64-overflow", "serde-f64-mantissa-valid",
 }
 
 func httpResponseSessionRequest04383(shape string) string {
@@ -52,6 +53,12 @@ func httpResponseSessionReply04383(shape string) string {
 		return `{"object":"response","id":"resp-response-session","output":[]}`
 	case "root-object-exact-suffix":
 		return `{"object":"provider.response","id":"resp-response-session","output":[]}`
+	case "serde-f64-overflow":
+		// Go ParseFloat produces finite here, but the tagged serde_json
+		// default u64-significand/f64-power parser rejects the whole JSON.
+		return `{"object":"response","id":"resp-response-session","unused":1.7976931348623158e308,"output":[]}`
+	case "serde-f64-mantissa-valid":
+		return `{"object":"response","id":"resp-response-session","unused":1.79769313486231580e308,"output":[]}`
 	case "nested-session":
 		return `{"id":"resp-response-session","object":"response","response":{"session_id":"payload-only-session"},"output":[]}`
 	case "data-session":
@@ -154,6 +161,22 @@ func httpResponseKindShapes04383() []string {
 		"root-object-suffix-tab", "root-object-exact-response", "root-object-exact-suffix"}
 }
 
+// The focused near-f64-maximum binary oracle checks exact Rust whole-JSON
+// validity and observable durable response owners without the long HTTP
+// session fixture, whose combined cases are still mandatory for release.
+func httpResponseSerdeFloatShapes04383() []string {
+	return []string{"serde-f64-overflow", "serde-f64-mantissa-valid"}
+}
+
+func runHTTPResponseSerdeFloatProduct04383(root string, p product) error {
+	for _, shape := range httpResponseSerdeFloatShapes04383() {
+		if err := runHTTPResponseSessionCase04383(filepath.Join(root, shape), p, shape); err != nil {
+			return fmt.Errorf("serde float response %s: %w", shape, err)
+		}
+	}
+	return nil
+}
+
 func runHTTPResponseKindProduct04383(root string, p product) error {
 	for _, shape := range httpResponseKindShapes04383() {
 		if err := runHTTPResponseSessionCase04383(filepath.Join(root, shape), p, shape); err != nil {
@@ -218,6 +241,7 @@ func runHTTPResponseSessionCase04383(root string, p product, shape string) error
 	}
 	wantResponse := "main"
 	if strings.HasPrefix(shape, "opaque-") || strings.HasPrefix(shape, "invalid-surrogate-") ||
+		shape == "serde-f64-overflow" ||
 		strings.HasPrefix(shape, "root-object-space-") || shape == "root-object-suffix-space" || shape == "root-object-suffix-tab" ||
 		shape == "response-id-1025" ||
 		shape == "response-id-control-c0" || shape == "response-id-control-c1" {

@@ -192,6 +192,7 @@ func main() {
 	httpSessionConflict := flag.Bool("http-session-conflict", false, "compare HTTP Responses soft session conflict fallback and durable binding")
 	httpSSEDeadOnly := flag.Bool("http-sse-dead", false, "compare only postcommit SSE dead-chain response/turn owner cleanup against the pinned binary")
 	httpResponseKind := flag.Bool("http-response-kind", false, "compare exact response object-kind identity and durable owner without other HTTP cases")
+	httpSerdeFloat := flag.Bool("http-serde-float", false, "compare near-max f64 serde whole-JSON validity and durable response binding")
 	httpPromptCache := flag.Bool("http-prompt-cache", false, "compare 0.438.3 compiled cached-token affinity on authenticated HTTP Responses")
 	http429Policy := flag.Bool("http-429-policy", false, "compare 0.438.3 Mojo raw HTTP 429 policy and authenticated profile selection")
 	httpProfileStatus := flag.Bool("http-profile-status", false, "compare 0.438.3 Mojo HTTP 402/403 profile/quota text policy")
@@ -199,7 +200,7 @@ func main() {
 	godexCommit := flag.String("godex-commit", "", "exact 40-character Godex commit (required with an isolated fixture)")
 	flag.Parse()
 	chosen := 0
-	for _, mode := range []bool{*websocket, *websocketCapacity, *websocketDeadline, *websocketCommittedIdle, *websocketLookaheadIdle, *websocketRealtime, *websocketTransport, *websocketTransportCore, *websocketTransportLifecycle, *websocketTransportCapacity, *websocketCompactLineage, *httpKeepAlive, *httpCompact, *httpTurnTransport, *httpSessionConflict, *httpSSEDeadOnly, *httpResponseKind, *httpPromptCache, *http429Policy, *httpProfileStatus} {
+	for _, mode := range []bool{*websocket, *websocketCapacity, *websocketDeadline, *websocketCommittedIdle, *websocketLookaheadIdle, *websocketRealtime, *websocketTransport, *websocketTransportCore, *websocketTransportLifecycle, *websocketTransportCapacity, *websocketCompactLineage, *httpKeepAlive, *httpCompact, *httpTurnTransport, *httpSessionConflict, *httpSSEDeadOnly, *httpResponseKind, *httpSerdeFloat, *httpPromptCache, *http429Policy, *httpProfileStatus} {
 		if mode {
 			chosen++
 		}
@@ -273,6 +274,8 @@ func main() {
 			err = runHTTPSSEDeadProduct04383(filepath.Join(root, "sse-dead-only"), p)
 		} else if *httpResponseKind {
 			err = runHTTPResponseKindProduct04383(filepath.Join(root, "response-object-kind"), p)
+		} else if *httpSerdeFloat {
+			err = runHTTPResponseSerdeFloatProduct04383(filepath.Join(root, "serde-float-response"), p)
 		} else if *httpTurnTransport {
 			err = runHTTPResponsesTurnProduct04383(root, p)
 		} else if *httpCompact {
@@ -339,6 +342,10 @@ func main() {
 	}
 	if *httpResponseKind {
 		fmt.Println("PASS Prodex 0.438.3 untrimmed HTTP response object identity and durable ownership across both binaries")
+		return
+	}
+	if *httpSerdeFloat {
+		fmt.Println("PASS Prodex 0.438.3 serde JSON near-maximum f64 response identity across both binaries")
 		return
 	}
 	if *httpTurnTransport {

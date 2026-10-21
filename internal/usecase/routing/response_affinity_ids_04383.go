@@ -1,7 +1,6 @@
 package routing
 
 import (
-	"encoding/json"
 	"net/http"
 	"slices"
 	"strings"
@@ -23,11 +22,12 @@ func responseAffinityWithIDs(headers http.Header, body []byte, stream bool) (aff
 	}
 	var ids []string
 	addEvent := func(data []byte) {
-		if !validNativeJSONUnicode04383(data) {
-			return
-		}
-		var object map[string]any
-		if json.Unmarshal(data, &object) != nil || !validNativeJSONContainerDepth04383(object) {
+		// Native response metadata is derived only after serde_json accepts
+		// the entire event. Go json.Unmarshal alone admits floats that the
+		// tagged 0.438.3 u64-significand parser rejects near f64::MAX.
+		value, valid := decodeNativeUsageJSON(data)
+		object, ok := value.(map[string]any)
+		if !valid || !ok {
 			return
 		}
 		keys = mergeAffinityKeys(keys, responseObjectAffinity(object))

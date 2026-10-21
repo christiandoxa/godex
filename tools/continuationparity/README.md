@@ -1072,3 +1072,19 @@ a 15,000-literal offline comparison against the exact Rust crate matched
 canonical lengths and spellings with zero mismatches. These cases are
 source/dependency-verified rather than incorrectly labeled a standalone
 HTTP executable quota-reset oracle.
+
+Whole-document JSON validity now uses the pinned serde 1.0.151 f64 parser.
+The distinction between `1.7976931348623158e308` (rejected) and
+`1.79769313486231580e308` (accepted) is covered by local routing,
+usage, prompt-cache, SSE and HTTP-recovery regressions. This source-pinned
+numeric control is separate from the official executable transport gates.
+
+
+A focused `--http-serde-float` mode compares two near-f64-maximum response
+JSON bodies on the published executable and a clean Godex commit. The
+shorter literal `1.7976931348623158e308` must not mint a durable response
+owner; the longer `1.79769313486231580e308` remains valid and binds main.
+Each fixture uses two authenticated Ready accounts, exact upstream bytes,
+one model attempt, unchanged client HTTP response and a checked durable
+response owner. Both cases also remain in the comprehensive HTTP
+session-conflict matrix.

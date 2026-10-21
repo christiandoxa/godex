@@ -41,6 +41,8 @@ func TestProdex04383InvalidJSONNumberCannotChangePromptCacheOwner(t *testing.T) 
 	}{
 		{"overflow", `{"usage":{"cached_input_tokens":91},"ignored":1e309}`, "main"},
 		{"negative-overflow", `{"usage":{"cached_input_tokens":92},"ignored":-1e400}`, "main"},
+		{"serde-max-float-overflow", `{"usage":{"cached_input_tokens":92},"ignored":1.7976931348623158e308}`, "main"},
+		{"serde-max-float-rounddown", `{"usage":{"cached_input_tokens":93},"ignored":1.79769313486231580e308}`, "second"},
 		{"finite-large", `{"usage":{"cached_input_tokens":93},"ignored":1e308}`, "second"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

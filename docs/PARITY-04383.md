@@ -3772,3 +3772,35 @@ quota-policy parity result; the standard executable HTTP429 regression
 is retained as a no-regression check, but the full-size synthetic JSON
 boundary cases are not yet certified against an independent timed
 Prodex/Godex HTTP executable interaction.
+
+## Whole-JSON numeric overflow must match serde_json f64 parsing
+
+Prodex 0.438.3 uses serde_json 1.0.151 to decide whether an entire JSON
+value is valid. Its default u64-significand/power-of-ten f64 algorithm
+rejects `1.7976931348623158e308`, although Go's strconv.ParseFloat sees
+a finite value. Conversely, the longer mantissa
+`1.79769313486231580e308` is valid in the tagged serde parser. An
+independent pinned Rust probe reproduced both outcomes.
+
+Fail-before tests showed Godex could accept invalid JSON at this boundary,
+then adopt cached usage metadata or authorize an HTTP history replay.
+Validation now uses the same source-matched parser as the canonical quota
+size estimator. Routing regressions cover usage and prompt-cache ownership,
+HTTP recovery, SSE rate-limit precommit and explicit retry-after advice;
+valid boundary controls remain accepted. The HTTP transport differential
+is retained separately, without asserting that these exact near-maximal
+float payloads were each checked through real providers.
+
+
+The first executable-pinned near-f64-maximum response-ID differential then
+exposed a separate decoder that still used Go `json.Unmarshal` to create a
+hard continuation owner. Prodex rejected the whole JSON and left the
+response unbound, but the initial Godex candidate incorrectly bound that
+ID. Godex now applies the same complete serde-compatible decoder in both
+response-ID extraction (including SSE events) and request/turn-metadata
+affinity extraction. The focused `--http-serde-float` binary oracle checks
+that the borderline invalid response cannot mint an owner, while the
+legitimate longer-mantissa control does. Local request-affinity regressions
+ensure neither a previous-response ID nor a session hint from malformed
+JSON may borrow a foreign account. The existing broader HTTP fixture also
+retains those controls.
