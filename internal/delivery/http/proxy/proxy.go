@@ -213,6 +213,9 @@ func (proxy *Proxy) Close(ctx context.Context) error {
 	}
 }
 func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	if rejectProdexRequestTarget04384(writer, request) {
+		return
+	}
 	if proxy.handleBrokerAdmin(writer, request) {
 		return
 	}

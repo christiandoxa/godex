@@ -172,13 +172,18 @@ func (mock *geminiMock) recorded() []geminiCapturedRequest {
 }
 
 func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit string) error {
+	return runGeminiDifferentialCases04384(prodexBin, godexBin, prodexCommit, godexCommit,
+		[]string{"chat-request", "orphan-tool", "chat-response", "wrapped-response-no-trace", "wrapped-response-trace", "stream-native", "stream-chat", "multi-turn-tool", "quota-plain-429", "quota-structured-429", "invalid-wrapped-tool-parameters", "invalid-flat-tool-parameters", "buffered-null-tool-text", "buffered-media-invalid-inline", "buffered-media-invalid-code", "buffered-media-suppressed-code", "buffered-grounding-null-status"})
+}
+
+func runGeminiDifferentialCases04384(prodexBin, godexBin, prodexCommit, godexCommit string, cases []string) error {
 	root, err := os.MkdirTemp("", "godex-gemini-parity-")
 	if err != nil {
 		return err
 	}
 	defer os.RemoveAll(root)
 	var results []geminiCaseResult
-	for _, scenario := range []string{"chat-request", "orphan-tool", "chat-response", "wrapped-response-no-trace", "wrapped-response-trace", "stream-native", "stream-chat", "multi-turn-tool", "quota-plain-429", "quota-structured-429", "invalid-wrapped-tool-parameters", "invalid-flat-tool-parameters", "buffered-null-tool-text", "buffered-media-invalid-inline", "buffered-media-invalid-code", "buffered-media-suppressed-code", "buffered-grounding-null-status"} {
+	for _, scenario := range cases {
 		prodex, err := runGeminiProduct(root, scenario, "prodex", prodexBin)
 		if err != nil {
 			return fmt.Errorf("Prodex Gemini %s: %w", scenario, err)
@@ -266,6 +271,9 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	if scenario == "multi-turn-tool" {
 		env = append(env, "DIFFERENTIAL_GEMINI_MULTITURN=1")
 	}
+	if fixture, yes := geminiModelCase04384For(scenario); yes {
+		env = append(env, "DIFFERENTIAL_GEMINI_MODEL_QUERY="+fixture.query)
+	}
 	if scenario == "stream-native" || scenario == "stream-chat" {
 		env = append(env, "DIFFERENTIAL_STREAM=1")
 	}
@@ -276,7 +284,7 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	exitCode := 0
 	if err := cmd.Run(); err != nil {
 		var childExit *exec.ExitError
-		if !geminiQuotaScenario043711(scenario) && !geminiInvalidToolScenario04380(scenario) ||
+		if !geminiQuotaScenario043711(scenario) && !geminiInvalidToolScenario04380(scenario) && !geminiModelScenario04384(scenario) ||
 			!errors.As(err, &childExit) || ctx.Err() != nil {
 			return geminiCandidateResult{}, fmt.Errorf("child failed: %w stderr=%q upstream=%v",
 				err, redact(stderr.String()), mock.recorded())
@@ -309,6 +317,9 @@ func geminiCompare(scenario string, prodex, godex geminiCandidateResult) []strin
 	}
 	if prodex.ExitCode != godex.ExitCode {
 		differences = append(differences, "product child process exit status differs")
+	}
+	if geminiModelScenario04384(scenario) {
+		return geminiModelCompare04384(scenario, prodex, godex, differences)
 	}
 	if geminiQuotaScenario043711(scenario) {
 		return geminiQuotaCompare043711(scenario, prodex, godex, differences)
@@ -380,6 +391,9 @@ func geminiSemanticEqual043711(left, right map[string]any) bool {
 }
 
 func geminiFixtureInvariant(scenario string, result geminiCandidateResult) error {
+	if geminiModelScenario04384(scenario) {
+		return geminiModelFixtureInvariant04384(scenario, result)
+	}
 	if scenario == "buffered-null-tool-text" {
 		if result.Client.Status != http.StatusOK || result.ExitCode != 0 || len(result.Upstream) != 1 {
 			return fmt.Errorf("buffered tool/visible text request status/exit/upstream incorrect: %d/%d/%d", result.Client.Status, result.ExitCode, len(result.Upstream))

@@ -601,3 +601,57 @@ require one authenticated synthetic upstream call, canonical text and usage,
 and a checked downstream semantic shape. Deliberate mutations of image/code
 output and source status must fail. No real Gemini keys or live provider data
 are used.
+
+## Model endpoint: source exact resolver plus static catalog alias fallback
+
+The tagged Rust provider bridge's `runtime_provider_model_json_for` first
+tries Mojo `resolve_catalog_model_exact` across its merged (static + dynamic)
+catalog, **then** calls `prodex_provider_core::provider_model_json` if that
+exact lookup finds nothing. The latter uses `provider_catalog_entry`, which
+applies `model.trim()` before its **static model ID and alias** lookup.
+Therefore the bare exact resolver's rejection of `" dynamic-x "` is not
+sufficient evidence that the full `/models/{id}` route rejects padded
+*static* model IDs or aliases. Earlier Gemini/DeepSeek tests assumed that
+all padded queries must return `model_not_found` based only on the first
+resolver, without checking the host fallback.
+
+A new isolated `--gemini-models` executable differential compares the full
+published 0.438.4 binary to Godex on canonical model IDs, uppercase ASCII,
+`default` alias, padded static ID and padded alias, a Unicode confusable and
+a missing model. Each query uses the pinned source/manifest/binary, a
+synthetic Codex shim, local provider-model routing, no real credentials or
+model usage, and independent positive/negative invariants on HTTP status,
+canonical model identity, and absence of upstream model completion calls.
+Only dynamic models without a static fallback should use the strict exact
+identity rule. Results from the executable gate must override an incomplete
+source-only inference; the local provider model tests and code are updated
+accordingly if the full runtime path differs.
+
+
+## Prodex 0.438.4 raw HTTP request-target gate precedes model lookup
+
+The initial `--gemini-models` binary differential exposed a critical
+host-layer distinction: source `provider_model_json` may trim static model
+IDs, but the published local-rewrite proxy invokes
+`runtime_request_target.mojo` **before** catalog lookup. Raw target spaces,
+UTF-8 non-ASCII and percent-encoded spaces/non-ASCII bytes are rejected with
+HTTP **400** `{"error":{"code":"invalid_request_target","message":"request target is invalid"}}`
+without any model, profile, provider or broker activity. Earlier Godex
+returned 404 from its local model adapter; this matched neither the binary
+nor the host's early request safety boundary. The source-only speculation
+that padded static models might return 200 is not public HTTP behavior.
+
+The scoped public proxy gate checks the untouched `RequestURI` (falling back
+to URL.RequestURI only when missing) using the tagged 8KiB ASCII request
+target parser. It rejects raw control/space, fragments, backslashes in paths,
+leading or repeated slashes, dot and parent traversal segments, malformed
+percent encoding and encoded path separators, dots, controls and non-ASCII.
+Safe query escaping and ordinary ASCII paths remain valid. Tests exercise
+byte-precise raw/encoded boundaries and the actual HTTP 400 response before
+a router or authenticated account is constructed. The pinned
+`--gemini-models` executable oracle now expects HTTP 400 for padded and
+Unicode-confusable URL paths, 200 for canonical and case-insensitive ASCII
+model/alias paths, and 404 for ordinary unknown ASCII model IDs. Every case
+must avoid upstream completion requests. This demonstrates observable full
+HTTP-path parity independently of the static catalog fallback's library
+semantics.

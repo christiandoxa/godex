@@ -156,6 +156,7 @@ func run() error {
 	godexSource := flags.String("godex-source", "", "Godex candidate source checkout")
 	expectedGodexCommit := flags.String("godex-commit", "", "expected Godex source HEAD commit SHA")
 	gemini := flags.Bool("gemini", false, "run isolated Gemini generateContent executable differential")
+	geminiModels := flags.Bool("gemini-models", false, "compare Gemini provider models catalog identity and aliases across two pinned binaries")
 	scenarioWorkers := flags.Int("scenario-workers", 1, "isolated DeepSeek scenario workers, 1-4 (parallel only for --scenario all)")
 	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, deepseek-unsupported-message-role, deepseek-null-message-content, deepseek-request-over-kernel-limit, deepseek-input-type-null, deepseek-input-type-number, deepseek-input-type-empty, deepseek-empty-top-level-tool-name, deepseek-invalid-nested-shell-command, sse-stream, sse-rate-limit, sse-tool-surrogate, sse-tool-depth, sse-tool-overflow, sse-tool-paired, retry, deepseek-sse-terminal, single-key-401, single-key-403, single-key-429, single-key-503, single-key-500, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
 	if err := flags.Parse(os.Args[1:]); err != nil {
@@ -192,9 +193,12 @@ func run() error {
 	if err := verifyGodexBinaryProvenance(*godexBin, godexSourceCommit); err != nil {
 		return fmt.Errorf("verify Godex executable provenance: %w", err)
 	}
-	if *gemini {
-		if *scenarioName != "all" || *scenarioWorkers != 1 {
-			return errors.New("--gemini runs its entire scenario set without DeepSeek scenario workers")
+	if *gemini || *geminiModels {
+		if *scenarioName != "all" || *scenarioWorkers != 1 || *gemini && *geminiModels {
+			return errors.New("Gemini differential modes are exclusive and run their full case sets without DeepSeek scenario workers")
+		}
+		if *geminiModels {
+			return runGeminiModelDifferential04384(*prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit)
 		}
 		return runGeminiDifferential(*prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit)
 	}
@@ -815,6 +819,11 @@ func runCodexShim(arguments []string) int {
 		return shimFailure("synthetic Codex shim received an invalid provider URL")
 	}
 	endpoint.Path = strings.TrimRight(endpoint.Path, "/") + "/responses"
+	method := http.MethodPost
+	if modelID := os.Getenv("DIFFERENTIAL_GEMINI_MODEL_QUERY"); modelID != "" {
+		endpoint.Path = strings.TrimSuffix(endpoint.Path, "/responses") + "/models/" + modelID
+		method = http.MethodGet
+	}
 	requestBody := []byte(`{"model":"deepseek-v4-pro","input":[{"role":"user","content":[{"type":"input_text","text":"same request"}]}],"stream":false}`)
 	if os.Getenv("DIFFERENTIAL_PROVIDER") == "gemini" {
 		requestBody = []byte(`{"model":"gemini-3.1-pro-preview","input":[{"role":"user","content":[{"type":"input_text","text":"same request"}]}],"stream":false}`)
@@ -860,7 +869,7 @@ func runCodexShim(arguments []string) int {
 	var clientResult exchange
 	var body []byte
 	for attempt := 0; attempt < maxAttempts; attempt++ {
-		request, err := http.NewRequest(http.MethodPost, endpoint.String(), bytes.NewReader(requestBody))
+		request, err := http.NewRequest(method, endpoint.String(), bytes.NewReader(requestBody))
 		if err != nil {
 			return shimFailure("synthetic Codex shim could not build request")
 		}
