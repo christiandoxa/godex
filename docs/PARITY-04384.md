@@ -360,3 +360,28 @@ unchanged. Local tests validate source-aligned classifications; the official
 DeepSeek executable differential remains the broader regression gate, not
 a claim that the synthetic Unicode confusables were tested against a live
 provider or authenticated third-party service.
+
+## DeepSeek structured error codes require complete serde-valid JSON
+
+The tagged `prodex-provider-core/src/errors/body.rs` obtains provider
+error-code candidates from `mojo_json::values_from_json_or_sse`, which
+first requires a **complete valid serde_json Value** for each body or SSE
+`data:` event. Godex previously used Go `json.Decoder` with `UseNumber`
+without the serde-specific Unicode, depth, and floating-point checks.
+Malformed JSON containing a correct `rate_limit_exceeded` code plus an
+unrelated lone `\uD800`, invalid UTF-8, an over-deep container or a number
+like `1.7976931348623158e308` was incorrectly allowed to mint a trusted
+rate-limit classification. For an HTTP 429 this could quarantine a key or
+rotate a request even though Prodex would ignore the entire event.
+
+Fail-before tests reproduce these cases in buffered HTTP JSON and SSE error
+frames, with positive paired-surrogate and near-maximum long-mantissa
+controls. The DeepSeek code extractor now uses the shared, tagged-compatible
+JSON boundary and serde numeric checks **before** decoding each candidate
+body/event. On rejection, the original provider body remains untouched but
+no synthetic structured error signal is trusted. Earlier ASCII-only error
+code/token classification and ordinary valid quota/rate/auth paths are
+preserved. These are local source/dependency-pinned semantic regressions;
+the official executable DeepSeek suite provides a separate broader transport
+no-regression check, not a claim of live provider coverage for all malformed
+Unicode/f64 fixtures.

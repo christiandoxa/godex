@@ -12,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	providerentity "github.com/christiandoxa/godex/internal/entity/provider"
+	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 )
 
 // Tagged Prodex 0.438.4 provider_error_ascii_lower operates on ASCII
@@ -103,6 +104,14 @@ func deepSeekErrorCodes(body []byte) []string {
 }
 
 func deepSeekErrorJSON(body []byte) (any, bool) {
+	// The 0.438.4 provider error extractor parses each *complete* JSON
+	// payload with serde_json::Value. Go's JSON decoder would accept
+	// unpaired surrogates, invalid UTF-8, and numeric values that the
+	// tagged serde u64-significand/f64 parser rejects. Reject the entire
+	// document before a structured code can authorize credential rotation.
+	if jsonutil.CheckSerdeBoundary(string(body)) != nil || !jsonutil.CheckSerdeNumberTokens(body) {
+		return nil, false
+	}
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.UseNumber()
 	var value any
