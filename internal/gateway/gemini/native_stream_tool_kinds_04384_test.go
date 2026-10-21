@@ -81,7 +81,7 @@ func TestProdex04384GeminiStreamCompletedToolKinds(t *testing.T) {
 				}
 				var item map[string]any
 				var delta, deltaID string
-				completed := 0
+				completed, deltas := 0, 0
 				for _, line := range strings.Split(string(wire), "\n") {
 					if !strings.HasPrefix(line, "data: ") {
 						continue
@@ -92,6 +92,7 @@ func TestProdex04384GeminiStreamCompletedToolKinds(t *testing.T) {
 					}
 					switch event["type"] {
 					case "response.function_call_arguments.delta":
+						deltas++
 						delta, _ = event["delta"].(string)
 						deltaID, _ = event["call_id"].(string)
 					case "response.completed":
@@ -103,8 +104,16 @@ func TestProdex04384GeminiStreamCompletedToolKinds(t *testing.T) {
 						completed++
 					}
 				}
-				if completed != 1 || delta != tc.args || item["type"] != tc.kind || item["call_id"] != deltaID || deltaID == "" {
+				callID, _ := item["call_id"].(string)
+				if completed != 1 || item["type"] != tc.kind || callID == "" || id != "" && callID != id {
 					t.Fatalf("tool stream kind/delta/identity changed: item=%#v delta=%q id=%q completed=%d", item, delta, deltaID, completed)
+				}
+				if tc.kind == "function_call" {
+					if deltas != 1 || delta != tc.args || callID != deltaID {
+						t.Errorf("ordinary function delta changed: %s", wire)
+					}
+				} else if deltas != 0 {
+					t.Errorf("special tool emitted forbidden function argument delta: %s", wire)
 				}
 				field := "arguments"
 				if tc.kind == "custom_tool_call" {

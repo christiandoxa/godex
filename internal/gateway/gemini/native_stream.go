@@ -160,6 +160,9 @@ func (state *geminiStreamState) consume(writer io.Writer, data []byte, requestMe
 					"name": name, "id": callID, "args": args, "thoughtSignature": signature,
 				}, callID)
 				state.toolCalls = append(state.toolCalls, tool)
+				if name == "tool_search" || name == "apply_patch" {
+					continue
+				}
 				delta := map[string]any{
 					"type":    "response.function_call_arguments.delta",
 					"call_id": callID, "delta": string(encoded),

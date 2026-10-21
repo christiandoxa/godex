@@ -1246,7 +1246,7 @@ and HTTP conflicted-session/durable-ownership checks across both products.
 The tagged `gemini_provider_core_stream_completed_tool_call_item` re-parses
 canonical arguments, applies RTK only to the supported original flat names,
 and emits parsed `tool_search_call` or normalized `custom_tool_call` items
-for special tools. Raw function-argument SSE deltas keep their upstream
+for special tools. Ordinary function-argument SSE deltas keep their upstream
 argument text. Godex instead stored every completed tool as a generic
 `function_call` without shell wrapping, even after buffered tool handling
 was corrected.
@@ -1254,7 +1254,7 @@ was corrected.
 The native stream now reuses the existing private Gemini tool projector
 for its completed output. It supplies the stream's already selected call
 ID, name, argument value and signature, preserving the distinct nonblank
-stream-ID fallback rule. Raw argument deltas and their IDs remain unchanged;
+stream-ID fallback rule. Ordinary argument deltas and their IDs remain unchanged;
 only the completed item gets RTK or special-tool shaping. This deletes a
 parallel projection implementation and adds no helper, interface, adapter,
 dependency, configuration, process, persistence or retry behavior.
@@ -1268,7 +1268,7 @@ Buffered provider-transform names keep their independent raw-name contract.
 
 Fail-before tests drive actual HTTP SSE translation through stream
 completion and the DONE sentinel. They assert exact raw deltas, one terminal
-completion, matching delta/completed IDs, parsed search arguments including
+completion, matching ordinary delta/completed IDs, parsed search arguments including
 null, normalized patch input, special-tool signature omission, and shell
 wrapping. Plain `exec`, dotted/MCP names, ordinary null arguments and explicit
 literal patches are negative controls; explicit/empty stream call IDs test
@@ -1288,3 +1288,39 @@ cases and mutation controls before its fast-forward push to `origin/main`.
 `rtk go test ./...` passes 8,687 tests across 81 packages. The final
 `rtk proxy make verify` passes formatting, source size, framework, cross
 build/test compilation, installers, vet, full race and build checks.
+
+## Native special tools suppress generic function-argument deltas
+
+The runtime `observe_function_call` invokes
+`gemini_provider_core_stream_should_emit_function_call_arguments_delta`
+after selecting a canonical output name. Its pinned Mojo
+`GEMINI_STREAM_SHOULD_EMIT_ARGUMENTS_DELTA` returns false for exact
+`tool_search` and `apply_patch`, while ordinary and namespaced function
+names retain their argument deltas. Godex's native stream previously emitted
+generic argument events for every tool, including these special kinds.
+
+A local gate now retains the completed special-tool item while omitting
+its generic function delta. Ordinary functions keep the exact canonical
+argument bytes and stable delta/completed identity. The earlier completion
+test assumed all tools emitted a function delta; tracing the complete
+runtime pipeline disproved that assumption. The corrected regression
+asserts zero such events for both special tools, one unchanged delta for
+ordinary functions, and the correct final item for explicit/fallback IDs.
+It fails against the preceding implementation only on special-tool cases.
+
+This private Gemini protocol fix adds no helper, dependency, state format,
+configuration or orchestration. Native SSE item-added/item-done lifecycle
+and repeated-call assembly remain separate audit areas; the finite local
+tests and public API-key oracle do not certify full native stream parity.
+
+`rtk go test ./internal/gateway/gemini ./tools/differential -count=1` passes
+731 tests and `rtk go test ./...` passes 8,687 across 81 packages. The final
+`rtk proxy make verify` passes its full formatting, source-size, framework,
+cross-build/test compilation, installer, vet, race and build gate.
+
+On clean stream-projection commit
+`f342b7e510a10bcd8ed85a29680e7e250747c177`, official executable checks pass:
+40 Gemini cases, all 30 DeepSeek scenarios, 56 WebSocket model attempts,
+strict WebSocket Compact lineage, and HTTP conflicted-session/durable
+ownership. These gates remain finite regression evidence; full native SSE
+and every release phase are not inferred from them.
