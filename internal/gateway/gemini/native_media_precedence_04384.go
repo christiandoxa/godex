@@ -1,8 +1,8 @@
 package gemini
 
 import (
-	"encoding/json"
 	"fmt"
+	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 	"strings"
 )
 
@@ -41,7 +41,12 @@ func geminiSpecialPartText(part map[string]any) string {
 		return fmt.Sprintf("Gemini code execution result (%s):\n```text\n%s\n```", outcome, nativeString(result["output"]))
 	}
 	if video, ok := part["videoMetadata"]; ok {
-		encoded, _ := json.Marshal(video)
+		// Mojo media_put_special_text embeds the canonical serde_json Value
+		// raw_view, which preserves HTML/Unicode and canonicalizes numbers.
+		encoded, err := jsonutil.MarshalSerdeValue04384(video)
+		if err != nil {
+			return ""
+		}
 		return "Gemini video metadata: " + string(encoded)
 	}
 	return ""

@@ -849,3 +849,33 @@ token checks already used by the DeepSeek Responses translator. It preserves
 normal tool, policy, model and payload conversion behavior, without sending
 real requests or accessing external credentials. This semantic test is
 separate from the broader executable DeepSeek oracle.
+
+## Gemini video metadata text must embed canonical serde JSON
+
+Tagged `gemini_response_media.mojo::media_put_special_text` emits the
+`videoMetadata` value as `js_raw_view(tree, metadata)` inside a descriptive
+assistant text item. The parsed tree is built from the published
+`serde_json 1.0.151` canonical value representation. Godex previously used
+`encoding/json.Marshal(videoMetadata)` instead, which HTML-escapes `<`, `>`
+and `&`, escapes Unicode U+2028/U+2029, and preserves noncanonical numeric
+spellings (for example `1.00000000` instead of `1.0`, or `1e-5` instead of
+`0.00001`). The resulting visible text differed despite equal original
+metadata. A pinned offline Rust serde_json probe confirmed the exact UTF-8
+and HTML behavior, and fail-before Go regressions reproduced the mismatch
+inside both a media text item and a complete Gemini Responses projection.
+
+A shared `jsonutil.MarshalSerdeValue04384` writer now emits canonical
+serde-like JSON for decoded values: sorted UTF-8 object keys, serde string
+escaping without optional Go HTML/JavaScript escapes, and the already
+verified default-serde f64 parsing/formatting (including negative zero and
+u64 bounds). It rejects invalid UTF-8, non-finite numbers and excessive
+nesting. The scoped Gemini video metadata projection uses this writer
+without changing the original provider payload, media precedence, or valid
+image/tool output. Unit tests compare canonical text for nested maps,
+controls, Unicode separators, numeric spellings and full assistant output.
+
+This change has **source- and dependency-pinned local coverage**. The
+existing Gemini 0.438.4 executable differential tests Chat-compatible Super
+fixtures; it is a broad no-regression gate, not a dedicated direct
+GenerateContent `videoMetadata` binary comparison. No live Gemini account
+or credentials were accessed.
