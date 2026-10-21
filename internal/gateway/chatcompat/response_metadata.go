@@ -43,15 +43,19 @@ func chatUsage(value any, providerKey string) map[string]any {
 	}
 	input := uintValueOr(usage["prompt_tokens"], 0)
 	output := uintValueOr(usage["completion_tokens"], 0)
-	total := uintValueOr(usage["total_tokens"], input+output)
+	total := input + output
+	if total < input {
+		total = ^uint64(0)
+	}
+	total = uintValueOr(usage["total_tokens"], total)
 	result := map[string]any{"input_tokens": input, "output_tokens": output, "total_tokens": total}
-	cacheHit, hitFound := uintOptional(usage["prompt_cache_hit_tokens"])
-	cacheMiss, missFound := uintOptional(usage["prompt_cache_miss_tokens"])
+	cacheHit, hitFound := uintValue(usage["prompt_cache_hit_tokens"])
+	cacheMiss, missFound := uintValue(usage["prompt_cache_miss_tokens"])
 	if hitFound {
 		result["input_tokens_details"] = map[string]any{"cached_tokens": cacheHit}
 	}
 	if details, ok := usage["completion_tokens_details"].(map[string]any); ok {
-		if reasoning, found := uintOptional(details["reasoning_tokens"]); found {
+		if reasoning, found := uintValue(details["reasoning_tokens"]); found {
 			result["output_tokens_details"] = map[string]any{"reasoning_tokens": reasoning}
 		}
 	}
@@ -62,15 +66,4 @@ func chatUsage(value any, providerKey string) map[string]any {
 		}}
 	}
 	return result
-}
-
-func uintOptional(value any) (uint64, bool) {
-	if value == nil {
-		return 0, false
-	}
-	converted := uintValueOr(value, ^uint64(0))
-	if converted == ^uint64(0) {
-		return 0, false
-	}
-	return converted, true
 }

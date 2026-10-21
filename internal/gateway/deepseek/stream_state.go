@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 	redacthelper "github.com/christiandoxa/godex/internal/helper/redact"
 )
 
@@ -27,7 +28,7 @@ type deepSeekChatStreamState struct {
 	sequenceNumber       uint64
 	responseID           string
 	model                string
-	createdAt            time.Time
+	createdAt            uint64
 	created              bool
 	completed            bool
 	outputText           strings.Builder
@@ -54,7 +55,7 @@ type deepSeekCompletedStreamTool struct {
 
 func newDeepSeekChatStreamState(requestID uint64, messages []any, metadata map[string]any, conversations deepSeekConversationStore) *deepSeekChatStreamState {
 	return &deepSeekChatStreamState{
-		requestID: requestID, responseID: deepSeekResponseFallbackID(), createdAt: time.Now(),
+		requestID: requestID, responseID: deepSeekResponseFallbackID(), createdAt: uint64(time.Now().Unix()),
 		toolCalls: make(map[uint64]*deepSeekChatStreamToolCall), conversationMessages: cloneDeepSeekMessages(messages),
 		conversations: conversations, responseMetadata: metadata,
 	}
@@ -71,10 +72,13 @@ func (state *deepSeekChatStreamState) observe(data []byte) ([]byte, bool, error)
 		return nil, false, fmt.Errorf("failed to parse DeepSeek SSE JSON")
 	}
 	var root map[string]any
-	if err := json.Unmarshal(data, &root); err != nil || root == nil {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	if err := decoder.Decode(&root); err != nil || root == nil {
 		return nil, false, fmt.Errorf("failed to parse DeepSeek SSE JSON")
 	}
-	if code, message, ok := deepSeekEmbeddedStreamError(root, data); ok {
+	if value, present := root["error"]; present {
+		code, message := chatcompat.ChatStreamError(value)
 		return state.failed(code, message)
 	}
 	state.applyChunkMetadata(root)
@@ -125,7 +129,7 @@ func (state *deepSeekChatStreamState) observe(data []byte) ([]byte, bool, error)
 		state.outputText.WriteString(text)
 		events = append(events, anthropicStreamEvent("response.output_text.delta", map[string]any{
 			"type": "response.output_text.delta", "sequence_number": state.nextSequenceNumber(),
-			"created_at": state.createdAt.Unix(), "response_id": state.responseID, "delta": text,
+			"created_at": state.createdAt, "response_id": state.responseID, "delta": text,
 		}))
 	}
 	if calls, ok := delta["tool_calls"].([]any); ok {
@@ -155,13 +159,13 @@ func (state *deepSeekChatStreamState) applyChunkMetadata(root map[string]any) {
 		state.model = strings.TrimSpace(model)
 	}
 	if created, ok := deepSeekStreamUint(root["created"]); ok {
-		state.createdAt = time.Unix(int64(created), 0)
+		state.createdAt = created
 	}
 	if fingerprint, _ := root["system_fingerprint"].(string); fingerprint != "" {
 		state.systemFingerprint = fingerprint
 	}
 	if usage, ok := root["usage"].(map[string]any); ok {
-		state.usage = cloneDeepSeekMap(usage)
+		state.usage = usage
 	}
 }
 
@@ -216,25 +220,28 @@ func (state *deepSeekChatStreamState) complete() ([]byte, bool, error) {
 		choice["logprobs"] = cloneMetadataValue(state.logprobs)
 	}
 	source := map[string]any{
-		"id": state.responseID, "model": state.model, "created": state.createdAt.Unix(),
+		"id": state.responseID, "model": state.model, "created": state.createdAt,
 		"choices": []any{choice},
 	}
 	if state.systemFingerprint != "" {
 		source["system_fingerprint"] = state.systemFingerprint
 	}
 	if state.usage != nil {
-		source["usage"] = cloneMetadataValue(state.usage)
+		source["usage"] = state.usage
 	}
 	encoded, err := json.Marshal(source)
 	if err != nil {
 		return nil, false, err
 	}
-	translated, err := deepSeekChatResponse(encoded, state.createdAt)
+	// The source carries its unsigned epoch; the fallback clock is never used.
+	translated, err := deepSeekChatResponse(encoded, time.Unix(0, 0))
 	if err != nil {
 		return nil, false, err
 	}
 	var response map[string]any
-	if err := json.Unmarshal(translated, &response); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(translated))
+	decoder.UseNumber()
+	if err := decoder.Decode(&response); err != nil {
 		return nil, false, err
 	}
 	output := make([]any, 0, len(completedTools)+1)
@@ -277,7 +284,7 @@ func (state *deepSeekChatStreamState) complete() ([]byte, bool, error) {
 	}
 	events = append(events, anthropicStreamEvent("response.completed", map[string]any{
 		"type": "response.completed", "sequence_number": state.nextSequenceNumber(),
-		"created_at": state.createdAt.Unix(), "response": response,
+		"created_at": state.createdAt, "response": response,
 	}))
 	state.storeConversationSnapshot()
 	state.completed = true
@@ -312,7 +319,7 @@ func (state *deepSeekChatStreamState) failed(code, message string) ([]byte, bool
 	state.completed = true
 	return anthropicStreamEvent("response.failed", map[string]any{
 		"type": "response.failed", "sequence_number": state.nextSequenceNumber(),
-		"created_at": state.createdAt.Unix(),
+		"created_at": state.createdAt,
 		"response": map[string]any{
 			"id":    state.responseID,
 			"error": map[string]any{"code": code, "message": redacthelper.Secrets(message)},
@@ -323,7 +330,7 @@ func (state *deepSeekChatStreamState) failed(code, message string) ([]byte, bool
 func (state *deepSeekChatStreamState) createdEvent() []byte {
 	return anthropicStreamEvent("response.created", map[string]any{
 		"type": "response.created", "sequence_number": state.nextSequenceNumber(),
-		"created_at": state.createdAt.Unix(), "response": map[string]any{"id": state.responseID},
+		"created_at": state.createdAt, "response": map[string]any{"id": state.responseID},
 	})
 }
 

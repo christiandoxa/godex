@@ -3,7 +3,6 @@ package deepseek
 import (
 	"errors"
 	"io"
-	"time"
 
 	"github.com/christiandoxa/godex/internal/helper/sse"
 )
@@ -103,6 +102,6 @@ func pumpDeepSeekChatSSE(body io.ReadCloser, writer *io.PipeWriter, state *deepS
 
 func translateDeepSeekSSEData(data []byte) ([]byte, bool, error) {
 	state := newDeepSeekChatStreamState(0, nil, nil, deepSeekConversationStore{})
-	state.createdAt = time.Unix(0, 0)
+	state.createdAt = 0
 	return state.observe(data)
 }

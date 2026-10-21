@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-	"time"
 )
 
 // The exact Prodex 0.436.1 binary emits these five events for one text chunk.
@@ -14,7 +13,7 @@ import (
 // created_at/object out of the nested completed response.
 func TestProdex04361DeepSeekStreamExactEventSequence(t *testing.T) {
 	state := newDeepSeekChatStreamState(123, nil, nil, deepSeekConversationStore{})
-	state.createdAt = time.Unix(1, 0)
+	state.createdAt = 1
 	var wire strings.Builder
 	for _, value := range []string{
 		`{"id":"chatcmpl-differential-stream","model":"deepseek-v4-pro","created":1,"choices":[{"delta":{"role":"assistant"},"finish_reason":null}]}`,

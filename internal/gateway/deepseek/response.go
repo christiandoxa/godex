@@ -1,6 +1,7 @@
 package deepseek
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -29,7 +30,9 @@ func deepSeekChatResponse(body []byte, now time.Time) ([]byte, error) {
 		return nil, err
 	}
 	var result map[string]any
-	if err := json.Unmarshal(translated, &result); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(translated))
+	decoder.UseNumber()
+	if err := decoder.Decode(&result); err != nil {
 		return nil, errors.New("failed to parse translated DeepSeek Responses JSON")
 	}
 	var source map[string]any

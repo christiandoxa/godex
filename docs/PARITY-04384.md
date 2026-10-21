@@ -2031,3 +2031,64 @@ passes 871 tests. Log: `/tmp/gdx-04384-gemini-sse-fragments-final-race.log`.
 `rtk proxy make verify` passes all local gates, including the full race
 suite. Gate log: `/tmp/gdx-04384-gemini-sse-fragments-final-verify.log`.
 Exact clean-commit executable validation follows the commit.
+
+The fragment baseline on `c6091b1b318222212161e82792c455ee9d88c40b`
+matched 43/44 Gemini cases and failed only Godex's fragment case; Prodex
+and mutation controls passed. Clean commit
+`6c450b3788dc712fc2f6245093c7ba5689f60a23` then passed all 44 cases
+and controls before its fast-forward push to `origin/main`. Logs:
+`/tmp/gdx-04384-gemini-sse-fragments-before-oracle.json` and
+`/tmp/gdx-04384-gemini-sse-fragments-oracle.json`.
+
+## DeepSeek buffered and SSE usage preserves unsigned integers
+
+The tagged `response.rs`, `stream/shaping.rs` and Mojo
+`deepseek_put_response_usage` retain serde unsigned integer counters, including
+u64::MAX. Missing/invalid totals use saturating prompt-plus-completion counts;
+present maximum cache/reasoning counts remain present. Streaming creation
+epochs are unsigned throughout the source pipeline.
+
+Godex previously narrowed the shared scalar parser to signed i64, treated
+u64::MAX as an absence sentinel, wrapped the missing total, and rounded counters
+through float64 in translated buffered responses and SSE decoding/cloning.
+Its stream clock also narrowed unsigned epochs through time.Time. The shared
+Chat-compatible scalar parser now preserves unsigned presence and range;
+DeepSeek keeps JSON numbers through response/stream serialization and privately
+retains the usage snapshot without a lossy clone. The stream clock is u64.
+The redundant error-only JSON parser is removed because the whole packet now
+preserves number kinds. Existing exact-key/error-presence coverage remains.
+
+Ownership remains in `gateway/chatcompat` for the protocol mapping and
+`gateway/deepseek` for provider input and stream state. Claude is the other
+real shared response consumer. No helper, public model, option, dependency,
+new goroutine, persistence or layer-direction change is introduced.
+
+Fail-before `/tmp/gdx-04384-deepseek-usage-u64-before.log` passes both
+ordinary buffered/SSE controls and fails all eight large-counter/saturation
+cases. Regressions also cover unsigned epochs and absent, negative, decimal,
+exponent, overflow and non-finite scalar rejection. Two new released-oracle
+scenarios independently check exact integer tokens with UseNumber before
+applying the existing response and complete SSE contracts; rounding cannot
+be hidden by semantic float equality. They also check normal request/auth,
+attempt, exit, header and durable-state invariants. Broader metadata/tool
+numeric canonicalization and other provider/transport parity remain open.
+
+The released baseline on `6c450b3788dc712fc2f6245093c7ba5689f60a23`
+fails both new scenarios only on Godex, while Prodex independently satisfies
+their exact unsigned contracts. Logs:
+`/tmp/gdx-04384-deepseek-usage-u64-buffered-before-oracle.json` and
+`/tmp/gdx-04384-deepseek-usage-u64-sse-before-oracle.json`.
+
+`rtk go test -race ./internal/gateway/deepseek ./internal/gateway/chatcompat ./tools/differential -count=1`
+passes 666 tests. Log:
+`/tmp/gdx-04384-deepseek-usage-u64-oracle-race.log`.
+After tightening the oracle's buffered epoch assertion,
+`rtk go test ./tools/differential -run '^TestProdex04384DeepSeekUnsignedUsageOracle' -count=1`
+passes all three tests, and `rtk go test ./...` passes 8,940 tests across
+81 packages. Logs: `/tmp/gdx-04384-deepseek-usage-u64-oracle-selfcheck.log`
+and `/tmp/gdx-04384-deepseek-usage-u64-verified-test-all.log`.
+
+`rtk proxy make verify` passes all local gates, including cross-builds,
+installer checks, vet and the complete shuffled race suite. Log:
+`/tmp/gdx-04384-deepseek-usage-u64-verified-final.log`. Clean-commit
+released-executable validation follows this commit.

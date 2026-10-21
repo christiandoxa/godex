@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -178,22 +179,27 @@ func stringOr(value any, fallback string) string {
 }
 
 func uintValueOr(value any, fallback uint64) uint64 {
-	switch current := value.(type) {
-	case json.Number:
-		parsed, err := current.Int64()
-		if err == nil && parsed >= 0 {
-			return uint64(parsed)
-		}
-	case float64:
-		if current >= 0 && current == float64(uint64(current)) {
-			return uint64(current)
-		}
-	case uint64:
-		return current
-	case int:
-		if current >= 0 {
-			return uint64(current)
-		}
+	if parsed, ok := uintValue(value); ok {
+		return parsed
 	}
 	return fallback
+}
+
+func uintValue(value any) (uint64, bool) {
+	switch current := value.(type) {
+	case json.Number:
+		parsed, err := strconv.ParseUint(current.String(), 10, 64)
+		return parsed, err == nil
+	case float64:
+		if current >= 0 && current < 0x1p64 && current == float64(uint64(current)) {
+			return uint64(current), true
+		}
+	case uint64:
+		return current, true
+	case int:
+		if current >= 0 {
+			return uint64(current), true
+		}
+	}
+	return 0, false
 }

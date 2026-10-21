@@ -386,6 +386,15 @@ oracle now exercises thirteen Gemini cases, including all earlier eight fixtures
 
 ### Bounded full DeepSeek oracle
 
+The 0.438.4 matrix includes `deepseek-usage-u64` and
+`deepseek-sse-usage-u64`. Their synthetic upstream usage covers integers above
+2^53 and i64, present u64::MAX cache/reasoning counters, and a missing total
+that must saturate at u64::MAX. The SSE fixture also uses a u64::MAX creation
+epoch. Independent `UseNumber` assertions require exact integer spellings
+before the existing ordinary-response/complete-stream contracts run. A float
+rounding match cannot satisfy these assertions. Mutation tests reject rounded
+input/output, missing cache details, changed reasoning, total and epochs.
+
 `--scenario all --scenario-workers 3` runs every scenario inside a separate
 loopback mock and private HOME, with up to three scenario pairs in flight.
 Product comparisons remain sequential within each scenario (Prodex then

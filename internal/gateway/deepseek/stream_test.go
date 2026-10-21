@@ -3,7 +3,6 @@ package deepseek
 import (
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestTranslateDeepSeekSSEDataRejectsMalformedJSON(t *testing.T) {
@@ -29,7 +28,7 @@ func TestTranslateDeepSeekSSEDataAddsToolItemBeforeArgumentDelta(t *testing.T) {
 
 func TestProdex04361DeepSeekStreamPreservesWhitespaceBytesAndTerminalOrder(t *testing.T) {
 	state := newDeepSeekChatStreamState(7, nil, nil, deepSeekConversationStore{})
-	state.createdAt = time.Unix(123, 0)
+	state.createdAt = 123
 	var stream strings.Builder
 	for _, chunk := range []string{
 		`{"id":"chatcmpl_empty_delta","choices":[{"delta":{"reasoning_content":"","refusal":"","content":""}}]}`,
