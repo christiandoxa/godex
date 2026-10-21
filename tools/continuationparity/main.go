@@ -318,6 +318,13 @@ func main() {
 		fmt.Println("PASS Prodex 0.438.3 Mojo raw HTTP 429 policy across both binaries")
 		return
 	}
+	if *httpProfileStatus {
+		// This isolated HTTP 402/403 oracle does not use the generic
+		// continuation loopback backend. Report its verified result as
+		// such, rather than emitting the unrelated zero-attempt headline.
+		fmt.Println("PASS Prodex 0.438.3 HTTP 402/403 profile and quota status policy across both binaries")
+		return
+	}
 	if *httpPromptCache {
 		fmt.Println("PASS Prodex 0.438.3 HTTP Responses native cached-token affinity across both binaries")
 		return
