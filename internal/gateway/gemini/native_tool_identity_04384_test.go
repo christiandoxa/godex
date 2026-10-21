@@ -40,6 +40,9 @@ func TestProdex04384GeminiToolNamesPreserveRawNamespacePolicy(t *testing.T) {
 			if err := state.consume(&events, wire, nil); err != nil {
 				t.Fatal(err)
 			}
+			if err := state.consume(&events, []byte("[DONE]"), nil); err != nil {
+				t.Fatal(err)
+			}
 			found := false
 			for _, line := range strings.Split(events.String(), "\n") {
 				if !strings.HasPrefix(line, "data: ") {

@@ -100,8 +100,11 @@ func TestProdex04384GeminiStreamNullArgsSurviveCompletedOutput(t *testing.T) {
 	if err := state.consume(&output, payload, nil); err != nil {
 		t.Fatal(err)
 	}
-	if !state.completed {
-		t.Fatal("finish reason did not complete")
+	if state.completed {
+		t.Fatal("finish reason completed before the stream DONE marker")
+	}
+	if err := state.consume(&output, []byte("[DONE]"), nil); err != nil {
+		t.Fatal(err)
 	}
 	for _, eventFrame := range strings.Split(output.String(), "\n\n") {
 		for _, line := range strings.Split(eventFrame, "\n") {

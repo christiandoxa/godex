@@ -119,15 +119,23 @@ func TestProdex04357GeminiStreamMetadataPreservesPresenceAndWhitespace(t *testin
 	state = &geminiStreamState{responseID: "resp_gemini_1", model: "existing-model"}
 	root = map[string]any{
 		"id": "", "model": "",
-		"candidates": []any{map[string]any{"finishReason": " STOP "}},
+		"candidates": []any{map[string]any{"finishReason": " STOP ", "content": map[string]any{
+			"parts": []any{map[string]any{"text": "metadata-control"}},
+		}}},
 	}
 	encoded, _ = json.Marshal(root)
 	output.Reset()
 	if err := state.consume(&output, encoded, nil); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output.String(), "event: response.completed") {
-		t.Fatalf("nonblank raw finish reason did not complete: %s", output.String())
+	if state.completed {
+		t.Fatalf("raw finish reason committed the response before DONE: %s", output.String())
+	}
+	if err := state.consume(&output, []byte("[DONE]"), nil); err != nil {
+		t.Fatal(err)
+	}
+	if !state.completed || !strings.Contains(output.String(), "event: response.completed") {
+		t.Fatalf("DONE did not finish a valid raw-reason response: %s", output.String())
 	}
 	if state.responseID != "" || state.model != "" || state.finish != " STOP " {
 		t.Fatalf("explicit-empty identity/model or raw finish lost = %q / %q / %q", state.responseID, state.model, state.finish)

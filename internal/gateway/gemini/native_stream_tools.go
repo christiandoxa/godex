@@ -13,6 +13,8 @@ import (
 type geminiStreamToolCall struct {
 	index     int
 	explicit  bool
+	announced bool
+	done      bool
 	name      string
 	id        string
 	signature string
@@ -77,6 +79,8 @@ func (state *geminiStreamState) updateTool(writer io.Writer, position int, curre
 	}
 	state.toolBytes += bytes - current.bytes
 	current.bytes = bytes
+	announce := !current.announced
+	current.announced = true
 	if position == len(state.toolCalls) || state.toolCalls[position].index != current.index {
 		state.toolCalls = append(state.toolCalls, geminiStreamToolCall{})
 		copy(state.toolCalls[position+1:], state.toolCalls[position:])
@@ -84,6 +88,19 @@ func (state *geminiStreamState) updateTool(writer io.Writer, position int, curre
 	state.toolCalls[position] = current
 	if current.name == "tool_search" || current.name == "apply_patch" {
 		return nil
+	}
+	if announce {
+		item := make(map[string]any, len(current.item)-1)
+		for key, value := range current.item {
+			if key != "arguments" {
+				item[key] = value
+			}
+		}
+		if err := writeGeminiSSEEvent(writer, "response.output_item.added", map[string]any{
+			"type": "response.output_item.added", "sequence_number": state.nextSequence(), "item": item,
+		}); err != nil {
+			return err
+		}
 	}
 	delta := map[string]any{
 		"type": "response.function_call_arguments.delta", "call_id": current.id,
@@ -101,13 +118,13 @@ func (state *geminiStreamState) toolPosition(partIndex int, id, name string) (in
 		if id != "" && current.explicit && current.id == id {
 			return position, current.index
 		}
-		if id == "" && !current.explicit && current.index == partIndex && current.name == name {
+		if id == "" && !current.done && !current.explicit && current.index == partIndex && current.name == name {
 			return position, current.index
 		}
 	}
 	if id == "" {
 		for position, current := range state.toolCalls {
-			if !current.explicit && current.name == name {
+			if !current.done && !current.explicit && current.name == name {
 				return position, current.index
 			}
 		}
@@ -122,4 +139,20 @@ func (state *geminiStreamState) toolPosition(partIndex int, id, name string) (in
 			return position, index
 		}
 	}
+}
+
+func (state *geminiStreamState) completeTools(writer io.Writer) error {
+	for index := range state.toolCalls {
+		call := &state.toolCalls[index]
+		if call.done {
+			continue
+		}
+		call.done = true
+		if err := writeGeminiSSEEvent(writer, "response.output_item.done", map[string]any{
+			"type": "response.output_item.done", "sequence_number": state.nextSequence(), "item": call.item,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
 }

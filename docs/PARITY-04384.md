@@ -1443,3 +1443,55 @@ The final `rtk proxy make verify` passes formatting, source size, framework,
 cross-build/test compilation, installers, vet, the full race suite and build.
 Log: `/tmp/gdx-04384-stream-merge-final-verify.log`. Clean candidate binary
 differential validation follows the commit.
+
+Clean commit `27d31f0cd92b03dd278f09b33cc257960bc1cf1c` passed all 40
+official Gemini executable cases and mutation controls before its
+fast-forward push to `origin/main`. Native repeated-call semantics remain
+covered by the tagged-source kernel and local HTTP SSE regressions.
+
+## Native Gemini tool lifecycle and finish barriers
+
+Tagged runtime `observe_function_call` emits an argument-free
+`response.output_item.added` once for an ordinary tool, followed by raw
+argument deltas. `complete_tool_call_events` emits one done event per
+unfinished slot, in slot order. Search and patch tools omit both the generic
+added event and argument deltas; their parsed/normalized item still gets a
+done event. A source-bound explicit ID may revisit a finished slot without
+another done event; anonymous calls cannot reuse a finished slot.
+
+Godex lacked item-added/item-done events and used a nonblank finish reason
+as the entire response's completion barrier. That dropped trailing usage
+chunks and treated EOF after STOP as successful even without DONE. The
+native stream now completes pending tool items at a normal finish reason,
+retains subsequent metadata, and emits response completion only on DONE.
+Premature EOF still fails. MAX_TOKENS emits `response.incomplete`, while
+the existing native finish-error classifier emits `response.failed` for
+malformed calls, safety failures and other recognized failures. The emitted
+SSE frame delimiter now matches the tagged runtime's exact CRLF bytes.
+Finish handling requires an actual candidate parts array, including an
+empty array; missing, null or incorrectly typed parts retain finish metadata
+without triggering a terminal event, matching the runtime's early return.
+
+Fail-before regressions verify full tool event order and sequence numbers,
+absence of arguments on added items, identical done/final items, special-tool
+suppression, slot completion deduplication, trailing usage and EOF failure,
+recognized finish statuses, and exact CRLF/serde event bytes. Existing
+tool-name/null-argument tests now supply the required DONE marker, retaining
+their complete field/value assertions. Raw finish metadata remains tested
+with visible content plus a separate assertion that STOP cannot commit the
+response early. No assertion or meaningful EOF coverage is removed.
+
+The protocol record and finish classifier stay private to `gateway/gemini`.
+The change adds no dependency, public model, helper, persisted field,
+configuration, account selection, retry decision or extra goroutine.
+`rtk go test -race ./internal/gateway/gemini ./tools/differential -count=1`
+passes 766 tests. `rtk go test ./...` passes 8,722 tests across 81 packages.
+`rtk proxy make verify` passes formatting, source size, framework,
+cross-build/test compilation, installers, vet, the full race suite and build.
+Logs: `/tmp/gdx-04384-stream-lifecycle-final2-test-all.log` and
+`/tmp/gdx-04384-stream-lifecycle-final2-verify.log`. Clean candidate binary
+differential validation follows the commit.
+
+Response-created/text/reasoning/media lifecycle, embedded provider errors
+and prompt-block precedence remain separate audit areas; this slice is not
+a claim of full native SSE parity.

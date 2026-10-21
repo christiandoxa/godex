@@ -105,8 +105,9 @@ func (state *geminiStreamState) consume(writer io.Writer, data []byte, requestMe
 	}
 	state.applyChunkMetadata(root)
 	candidate := firstNativeCandidate(root)
-	if candidate != nil {
-		for index, raw := range nativeCandidateParts(candidate) {
+	parts := nativeCandidateParts(candidate)
+	if parts != nil {
+		for index, raw := range parts {
 			part, _ := raw.(map[string]any)
 			if part == nil {
 				continue
@@ -137,8 +138,8 @@ func (state *geminiStreamState) consume(writer io.Writer, data []byte, requestMe
 			}
 		}
 	}
-	if state.finish != "" {
-		return state.complete(writer, requestMetadata)
+	if parts != nil && nativeNonblank(candidate["finishReason"]) != "" {
+		return state.finishChunk(writer, root, candidate)
 	}
 	return nil
 }
@@ -175,7 +176,6 @@ func (state *geminiStreamState) applyChunkMetadata(root map[string]any) {
 		}
 		mergeMetadataFields(state.metadata, provider)
 	}
-	state.finish = ""
 	if candidate != nil {
 		if finish, ok := candidate["finishReason"].(string); ok && strings.TrimSpace(finish) != "" {
 			state.finish = finish
@@ -192,6 +192,9 @@ func (state *geminiStreamState) nextSequence() uint64 {
 func (state *geminiStreamState) complete(writer io.Writer, requestMetadata map[string]any) error {
 	if state.completed {
 		return nil
+	}
+	if err := state.completeTools(writer); err != nil {
+		return err
 	}
 	state.completed = true
 	output := make([]any, 0)
@@ -239,7 +242,7 @@ func writeGeminiSSEEvent(writer io.Writer, event string, payload map[string]any)
 		return err
 	}
 	buffer := bufio.NewWriter(writer)
-	if _, err := fmt.Fprintf(buffer, "event: %s\ndata: %s\n\n", event, encoded); err != nil {
+	if _, err := fmt.Fprintf(buffer, "event: %s\r\ndata: %s\r\n\r\n", event, encoded); err != nil {
 		return err
 	}
 	return buffer.Flush()

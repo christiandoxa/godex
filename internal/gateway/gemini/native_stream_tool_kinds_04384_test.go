@@ -26,6 +26,9 @@ func TestProdex04384GeminiStreamCanonicalRunShellAliases(t *testing.T) {
 		if err := state.consume(&output, []byte(wire), nil); err != nil {
 			t.Fatal(err)
 		}
+		if err := state.consume(&output, []byte("[DONE]"), nil); err != nil {
+			t.Fatal(err)
+		}
 		found := false
 		for _, line := range strings.Split(output.String(), "\n") {
 			if !strings.HasPrefix(line, "data: ") {
