@@ -727,3 +727,24 @@ failure. No provider request, valid response body, or SSE output is rewritten.
 The differential Gemini executable matrix is retained as a separate broad
 no-regression gate rather than an unsupported claim that each malformed
 synthetic payload was exercised against an authenticated provider.
+
+## DeepSeek built-in model aliases follow exact-ID lookup fallback
+
+The tagged 0.438.4 `runtime_provider_model_json_for` first searches the
+live/dynamic list with the Mojo exact ASCII-folded ID resolver; on no match
+it calls `prodex_provider_core::provider_model_json`, which resolves static
+provider entries and their aliases. Godex previously returned a 404 as soon
+as the dynamic ID lookup failed, so built-in DeepSeek aliases such as
+`pro`, `auto`, and `flash` were not returned as valid model objects even
+though the published catalog maps them to `deepseek-v4-pro` and
+`deepseek-v4-flash`.
+
+The scoped correction retains dynamic exact-ID precedence, then resolves
+the provider's static model catalog and returns the existing matching
+model JSON. Regressions cover aliases, ASCII uppercase/mixed case,
+unknown IDs, a Unicode-Kelvin confusable and authenticated-provider
+noninterference. An isolated library lookup may trim static catalog
+aliases as the source fallback does; the separate raw public HTTP path
+gate still rejects padded/encoded invalid URLs **before** model lookup.
+This is a source-aligned catalog behavior, with the official executable
+DeepSeek matrix retained as a broader transport no-regression gate.

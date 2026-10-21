@@ -98,6 +98,22 @@ func modelsResponse(method string, current route) (*proxymodel.Response, error) 
 				return jsonResponse(http.StatusOK, model)
 			}
 		}
+		// Tagged runtime_provider_model_json_for falls back from exact
+		// catalog IDs to provider_model_json, which resolves built-in
+		// aliases through the static provider catalog. This also trims
+		// static queries when called as an isolated library function;
+		// raw invalid HTTP paths are rejected earlier by the proxy gate.
+		entries, err := proxymodel.DeepSeekProviderCatalog()
+		if err != nil {
+			return nil, err
+		}
+		if entry := proxymodel.ResolveProviderCatalogEntry(entries, current.modelID); entry != nil {
+			for _, model := range models {
+				if model["id"] == entry.ID {
+					return jsonResponse(http.StatusOK, model)
+				}
+			}
+		}
 		return jsonResponse(http.StatusNotFound, map[string]any{
 			"error": map[string]any{
 				"message": "model '" + current.modelID + "' is not available for deepseek",

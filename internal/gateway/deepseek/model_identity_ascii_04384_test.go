@@ -10,6 +10,8 @@ import (
 // Tagged 0.438.4 prodex_mojo_rich_catalog_resolve_exact_v1 uses
 // catalog_byte_equal_folded: only A-Z ASCII folds, never Unicode U+212A
 // KELVIN SIGN into k. Mixed/uppercase *ASCII* model queries remain valid.
+// The later static provider_catalog_entry fallback trims library queries;
+// the public HTTP ingress separately rejects literal/escaped path spaces.
 func TestProdex04384DeepSeekModelCatalogIdentityASCIIOnly(t *testing.T) {
 	for _, tc := range []struct {
 		name, model string
@@ -21,8 +23,8 @@ func TestProdex04384DeepSeekModelCatalogIdentityASCIIOnly(t *testing.T) {
 		{"mixedcase-ASCII", "DeepSeek-V4-Pro", http.StatusOK, "deepseek-v4-pro"},
 		{"kelvin-confusable", "deepseeK-v4-pro", http.StatusNotFound, ""},
 		{"kelvin-uppercase", "DEEPSEEK-V4-PRO", http.StatusNotFound, ""},
-		{"leading-space", " deepseek-v4-pro", http.StatusNotFound, ""},
-		{"trailing-space", "deepseek-v4-pro ", http.StatusNotFound, ""},
+		{"leading-space-static-fallback", " deepseek-v4-pro", http.StatusOK, "deepseek-v4-pro"},
+		{"trailing-space-static-fallback", "deepseek-v4-pro ", http.StatusOK, "deepseek-v4-pro"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			response, err := modelsResponse(http.MethodGet, route{kind: routeModelsSingle, modelID: tc.model})
