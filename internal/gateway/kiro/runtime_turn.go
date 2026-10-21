@@ -130,10 +130,19 @@ func (state *kiroTurnState) applyToolActivity(initial bool, update map[string]an
 	if state.truncatedTools {
 		return
 	}
-	id := runtimeString(update["toolCallId"], "")
-	previous := state.toolLabels[id]
-	title := runtimeString(update[kiroFieldTitle], previous.name)
-	kind := runtimeString(update["kind"], previous.kind)
+	id, _ := update["toolCallId"].(string)
+	previous, previousPresent := state.toolLabels[id]
+	// Tagged Mojo uses *Option field presence* to decide whether to reuse
+	// an earlier label. Present empty strings suppress inheritance even
+	// though the later presentation sanitizer may choose a fallback name.
+	title, titlePresent := update[kiroFieldTitle].(string)
+	if !titlePresent && previousPresent && len(id) <= 256 {
+		title = previous.name
+	}
+	kind, kindPresent := update["kind"].(string)
+	if !kindPresent && previousPresent && len(id) <= 256 {
+		kind = previous.kind
+	}
 	status := runtimeString(update[kiroFieldStatus], "")
 	// Tagged Rust treats raw_input/raw_output as Option<Value>: even a
 	// present JSON null is Some(Null) and requires detail omission.
@@ -155,7 +164,9 @@ func (state *kiroTurnState) applyToolActivity(initial bool, update map[string]an
 	item := kiroActivityItem(title, status, kind, initial, detailsOmitted)
 	state.toolActivities = append(state.toolActivities, item)
 	state.assistantText += kiroActivityText(item)
-	if id != "" && len(id) <= 256 && len(state.toolLabels) < maxToolActivityEvents {
+	// A zero-length string toolCallId remains a legitimate label key;
+	// the published Mojo ledger only caps its UTF-8 byte length at 256.
+	if len(id) <= 256 && (previousPresent || len(state.toolLabels) < maxToolActivityEvents) {
 		name, _ := item["name"].(string)
 		safeKind, _ := item["kind"].(string)
 		state.toolLabels[id] = toolLabel{name: name, kind: safeKind}

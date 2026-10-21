@@ -136,3 +136,25 @@ intent without including sensitive raw tool arguments in generated
 activity descriptions. This case is verified against the exact 0.438.4
 Rust source and local/race tests; no real provider/tool credentials were
 accessed, and it is not a new timed Kiro CLI 2.33.0 executable oracle.
+
+## Kiro ACP tool label inheritance uses field presence, including empty IDs
+
+The tagged `kiro_acp_tool_activity_policy.mojo` computes label inheritance
+from **Option<String> presence**, not from whether a value is nonblank.
+An explicitly present `title: ""` or `kind: ""` suppresses a previous label
+and allows the downstream sanitizer to choose the corresponding safe
+fallback. Only an absent optional field may reuse a previously verified
+label. The compiled ledger also accepts a zero-length string `toolCallId`
+as a key: the only ID-length limit is **at most 256 UTF-8 bytes**.
+
+Godex previously called `runtimeString(value, previous)` and therefore
+reused prior labels for explicitly empty or whitespace-only updates. It
+also refused to store labels for an empty `toolCallId`. Fail-before
+regressions cover absent/present title and kind separately, both empty,
+whitespace-only, and an empty ID used by two consecutive valid tool
+notifications. The correction uses field presence and the same tagged
+Mojo byte-length and previously-known-label conditions for recording the
+safe redacted label. The resulting synthetic tool-activity text contains
+only sanitized names, not raw tool arguments. This is supported by the
+published 0.438.4 Mojo/Rust source and local tests; no actual CLI provider
+sessions or secrets were read.
