@@ -423,3 +423,24 @@ bytewise ASCII fold, keeping the original catalog and exact model response
 body unchanged. This source-pinned synthetic parity slice does not claim
 every dynamic provider catalog/model alias combination has been verified
 in a live Prodex 0.438.4 deployment.
+
+## Gemini models endpoint cannot trim catalog query identity
+
+Prodex 0.438.4 obtains provider model JSON through
+`runtime_provider_model_json_for` and the compiled
+`rich_catalog_resolve_exact_v1` identity resolver. The reference kernel
+compares the original query ID with case-insensitive **ASCII** bytes, but
+never removes leading or trailing whitespace. This behavior is covered by
+the official source test rejecting `" gpt-main "` even though `"GPT-MAIN"`
+resolves normally. Godex's Gemini `/models/{id}` route previously called
+`strings.TrimSpace` first, incorrectly resolving
+`" gemini-3.1-pro-preview"`, `"gemini-3.1-pro-preview "` and `" auto "`
+to real catalog entries with HTTP 200 instead of returning `model_not_found`.
+
+A fail-before endpoint regression covers those padded model and alias
+queries plus canonical/uppercase ASCII positive controls. Godex now passes
+the raw route identity into the existing ASCII-only catalog comparator and
+preserves both the original error message and valid model response bodies.
+These are tagged-source and local-catalog parity assertions; dynamic model
+catalogs and live Gemini credentials are covered separately by broader
+executable differentials.

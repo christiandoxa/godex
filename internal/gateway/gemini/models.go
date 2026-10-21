@@ -3,7 +3,6 @@ package gemini
 import (
 	"errors"
 	"net/http"
-	"strings"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
@@ -19,7 +18,10 @@ func modelsResponse(current route) (*proxymodel.Response, error) {
 	if current.kind != routeModel {
 		return nil, errors.New("Gemini model catalog route is invalid")
 	}
-	modelID := strings.TrimSpace(current.modelID)
+	// The tagged rich_catalog_resolve_exact_v1 kernel folds ASCII case
+	// but never trims the incoming query. A padded model or alias is an
+	// independent identity and must not borrow a real provider model.
+	modelID := current.modelID
 	for _, model := range models {
 		id, _ := model["id"].(string)
 		if equalModelID(id, modelID) {

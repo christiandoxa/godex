@@ -147,7 +147,10 @@ func TestGeminiModelsAreServedLocallyWithCanonicalMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 	padded.Body.Close()
-	if padded.StatusCode != http.StatusOK || paddedModel["id"] != "gemini-3.5-flash" {
+	// Published 0.438.4 rich_catalog_resolve_exact_v1 does not trim
+	// model query IDs: spaces cannot borrow a canonical model identity.
+	paddedError, _ := paddedModel["error"].(map[string]any)
+	if padded.StatusCode != http.StatusNotFound || paddedError["code"] != "model_not_found" {
 		t.Fatalf("whitespace-padded Gemini model = status:%d model:%#v", padded.StatusCode, paddedModel)
 	}
 	unicodeFold, err := transport.Execute(context.Background(), proxymodel.Request{
