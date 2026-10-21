@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
@@ -51,7 +52,7 @@ func translateResponseWithCallFallback04380(
 		return nil, errors.New("failed to parse Gemini response JSON")
 	}
 	native = normalizedGeminiResponse(native)
-	translated, err := json.Marshal(geminiNativeResponsesValueWithFallback04380(native, requestMetadata, time.Now().Unix(), chatCompatible))
+	translated, err := jsonutil.MarshalSerdeValue04384(geminiNativeResponsesValueWithFallback04380(native, requestMetadata, time.Now().Unix(), chatCompatible))
 	if err != nil {
 		return nil, errors.New("failed to serialize Gemini Responses JSON")
 	}

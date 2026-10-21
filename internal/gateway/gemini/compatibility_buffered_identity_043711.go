@@ -2,11 +2,11 @@ package gemini
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 
+	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	"github.com/google/uuid"
 )
@@ -26,8 +26,8 @@ func normalizeGeminiAPIKeyBufferedIdentity043711(
 	if len(payload) > bodyMaxBytes {
 		return nil, errors.New("Gemini API-key translated response is too large")
 	}
-	var object map[string]json.RawMessage
-	if err := json.Unmarshal(payload, &object); err != nil || object == nil {
+	object, valid := geminiSerdeResponseObject04384(payload)
+	if !valid || object == nil {
 		// JSON null decodes successfully into a nil map, but cannot own a
 		// client-visible Responses ID. Fail closed instead of panicking.
 		return nil, errors.New("invalid Gemini API-key translated response")
@@ -39,8 +39,8 @@ func normalizeGeminiAPIKeyBufferedIdentity043711(
 	if err != nil {
 		return nil, errors.New("generate tagged Gemini Responses identity")
 	}
-	object["id"], _ = json.Marshal("resp_deepseek_" + generated.String())
-	normalized, err := json.Marshal(object)
+	object["id"] = "resp_deepseek_" + generated.String()
+	normalized, err := jsonutil.MarshalSerdeValue04384(object)
 	if err != nil {
 		return nil, errors.New("serialize Gemini API-key response")
 	}

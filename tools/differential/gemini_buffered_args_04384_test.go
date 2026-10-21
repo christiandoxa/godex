@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 )
 
@@ -9,7 +10,7 @@ func TestProdex04384GeminiBufferedArgsOracle(t *testing.T) {
 	if !geminiBufferedArgsNegativeControl04384() {
 		t.Fatal("buffered tool oracle rejected positive control or accepted a mutation")
 	}
-	for _, scenario := range []string{"buffered-args-null", "buffered-args-wrapped-null", "buffered-args-absent", "buffered-args-empty"} {
+	for _, scenario := range []string{"buffered-args-null", "buffered-args-wrapped-null", "buffered-args-absent", "buffered-args-empty", "buffered-args-canonical-wire", "buffered-args-patch-fallback"} {
 		t.Run(scenario, func(t *testing.T) {
 			wire, ok := geminiBufferedArgsResponse04384(scenario)
 			var root map[string]any
@@ -28,9 +29,9 @@ func TestProdex04384GeminiBufferedArgsOracle(t *testing.T) {
 			}
 			_, want, _ := geminiBufferedArgsFixture04384(scenario)
 			if present {
-				encoded, err := json.Marshal(args)
-				if err != nil || string(encoded) != want {
-					t.Fatalf("fixture arguments=%s want=%s err=%v", encoded, want, err)
+				var expected any
+				if json.Unmarshal([]byte(want), &expected) != nil || !reflect.DeepEqual(args, expected) {
+					t.Fatalf("fixture arguments=%#v want=%s", args, want)
 				}
 			}
 		})

@@ -1024,3 +1024,44 @@ HTTP status, identity, usage, provider request and attempt count. Its
 negative controls reject changed arguments or tool identity even if both
 products return the same invalid output. Candidate executable results must
 come from a clean committed build; local tests alone do not prove them.
+
+The official 21-case Gemini executable run on clean commit
+`880291b80d4988ebc9086937241e9f06f0ef2c42` passed every case and mutation
+sentinel. The same extended oracle on clean baseline `cfa3d1235` failed
+only `buffered-args-null` and `buffered-args-wrapped-null`; the other 19
+cases passed. This is executable evidence for that finite presence contract,
+not certification of all Gemini or overall provider parity.
+
+## Buffered Gemini emits canonical serde JSON through the final envelope
+
+The published buffered Gemini transformer serializes its Responses value
+with `serde_json::to_vec`. Its custom `apply_patch` fallback independently
+serializes unrecognized arguments with `Value::to_string`. Godex still used
+`encoding/json.Marshal` for that fallback, the native response envelope,
+and the final API-key identity rewrite. This escaped HTML and U+2028/U+2029
+and retained noncanonical decimal spellings even after function-call
+argument strings and SSE events had been corrected.
+
+Fail-before tests on `880291b` reproduce those differences in both direct
+and API-key buffered output, including canonical metadata floats, negative
+zero, and custom-tool fallback text. ASCII, null, empty-object and explicit
+patch aliases remain positive controls. The three emission sites now reuse
+the existing serde value writer. The identity rewrite retains decoded
+number tokens, generates the same UUIDv7 namespace, and preserves headers;
+no new dependency, helper package, retry policy, or persistence format is
+introduced. `rtk go test ./internal/gateway/gemini ./tools/differential -count=1`
+passes 679 tests, `rtk go test ./...` passes 8,635 tests across 81
+packages, and `rtk proxy make verify` passes its full local gate.
+
+Two added executable cases, `buffered-args-canonical-wire` and
+`buffered-args-patch-fallback`, compare every original client response byte
+except the independently validated generated response UUID. They also retain
+the ordinary response, request, attempt, identity and usage invariants.
+Mutation sentinels distinguish semantically equal HTML/Unicode escapes and
+decimal spellings, preventing a semantic JSON comparison from concealing
+wire differences. Clean candidate executable validation follows the commit.
+
+The 23-case pinned executable oracle fails against clean baseline `880291b`
+only in these two new cases: the canonical-wire case exposes byte differences
+without a semantic JSON mismatch, while the custom-tool fallback exposes
+both byte and argument-text differences. The earlier 21 cases still pass.

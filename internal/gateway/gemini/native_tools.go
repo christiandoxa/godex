@@ -1,7 +1,6 @@
 package gemini
 
 import (
-	"encoding/json"
 	"strings"
 
 	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
@@ -156,7 +155,7 @@ func geminiNativeApplyPatchInput(value any) string {
 			return geminiNativeNormalizePatch(content)
 		}
 	}
-	encoded, err := json.Marshal(value)
+	encoded, err := jsonutil.MarshalSerdeValue04384(value)
 	if err != nil {
 		return "{}"
 	}

@@ -177,7 +177,7 @@ func (mock *geminiMock) recorded() []geminiCapturedRequest {
 
 func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit string) error {
 	return runGeminiDifferentialCases04384(prodexBin, godexBin, prodexCommit, godexCommit,
-		[]string{"chat-request", "orphan-tool", "chat-response", "wrapped-response-no-trace", "wrapped-response-trace", "stream-native", "stream-chat", "multi-turn-tool", "quota-plain-429", "quota-structured-429", "invalid-wrapped-tool-parameters", "invalid-flat-tool-parameters", "buffered-null-tool-text", "buffered-media-invalid-inline", "buffered-media-invalid-code", "buffered-media-suppressed-code", "buffered-grounding-null-status", "buffered-args-null", "buffered-args-absent", "buffered-args-empty", "buffered-args-wrapped-null"})
+		[]string{"chat-request", "orphan-tool", "chat-response", "wrapped-response-no-trace", "wrapped-response-trace", "stream-native", "stream-chat", "multi-turn-tool", "quota-plain-429", "quota-structured-429", "invalid-wrapped-tool-parameters", "invalid-flat-tool-parameters", "buffered-null-tool-text", "buffered-media-invalid-inline", "buffered-media-invalid-code", "buffered-media-suppressed-code", "buffered-grounding-null-status", "buffered-args-null", "buffered-args-absent", "buffered-args-empty", "buffered-args-wrapped-null", "buffered-args-canonical-wire", "buffered-args-patch-fallback"})
 }
 
 func runGeminiDifferentialCases04384(prodexBin, godexBin, prodexCommit, godexCommit string, cases []string) error {
@@ -321,6 +321,13 @@ func geminiCompare(scenario string, prodex, godex geminiCandidateResult) []strin
 	}
 	if prodex.ExitCode != godex.ExitCode {
 		differences = append(differences, "product child process exit status differs")
+	}
+	if scenario == "buffered-args-canonical-wire" || scenario == "buffered-args-patch-fallback" {
+		left, leftErr := geminiBufferedWireProjection04384(prodex.Client.Body)
+		right, rightErr := geminiBufferedWireProjection04384(godex.Client.Body)
+		if leftErr != nil || rightErr != nil || left != right {
+			differences = append(differences, "buffered Gemini response bytes differ after UUID normalization")
+		}
 	}
 	if geminiModelScenario04384(scenario) {
 		return geminiModelCompare04384(scenario, prodex, godex, differences)
