@@ -115,3 +115,24 @@ client request bytes, and uses synthetic ACP notifications without loading
 real Kiro CLI credentials. Source/compiled-Mojo alignment and local
 race-enabled regression tests have passed; real Kiro 2.33.0 interaction
 remains outside this bounded proof.
+
+## Kiro ACP tool detail-redaction evidence distinguishes two Rust Option kinds
+
+The tagged `runtime_kiro_acp/turn_state.rs` calculates whether a synthetic
+tool activity must hide its details from four optional fields. `rawInput`
+and `rawOutput` are `Option<serde_json::Value>`: **a present JSON null is
+Some(Null)** and still sets `details_omitted: true`. By contrast `content`
+and `locations` are `Option<Vec<Value>>`: only **a nonempty array** triggers
+the flag. Empty arrays and non-array JSON values do not count as evidence.
+
+Godex previously used Go `map` value non-nil checks for all four, which
+lost explicit raw-input/raw-output nulls and falsely treated empty or
+wrongly-typed content/location fields as hidden details. Fail-before
+regressions cover each form for both initial `tool_call` and subsequent
+`tool_call_update`, including nonempty arrays and true missing-field
+controls. The scoped correction checks raw-field **presence** and typed
+nonempty arrays separately, preserving the source's safer redaction
+intent without including sensitive raw tool arguments in generated
+activity descriptions. This case is verified against the exact 0.438.4
+Rust source and local/race tests; no real provider/tool credentials were
+accessed, and it is not a new timed Kiro CLI 2.33.0 executable oracle.

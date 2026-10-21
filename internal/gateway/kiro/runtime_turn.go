@@ -135,8 +135,16 @@ func (state *kiroTurnState) applyToolActivity(initial bool, update map[string]an
 	title := runtimeString(update[kiroFieldTitle], previous.name)
 	kind := runtimeString(update["kind"], previous.kind)
 	status := runtimeString(update[kiroFieldStatus], "")
-	detailsOmitted := update["rawInput"] != nil || update["rawOutput"] != nil ||
-		update[kiroFieldContent] != nil || update["locations"] != nil
+	// Tagged Rust treats raw_input/raw_output as Option<Value>: even a
+	// present JSON null is Some(Null) and requires detail omission.
+	// content/locations are Option<Vec<Value>> and only NONEMPTY arrays
+	// trigger the same flag; empty arrays and unrelated JSON types do not.
+	_, rawInputPresent := update["rawInput"]
+	_, rawOutputPresent := update["rawOutput"]
+	content, _ := update[kiroFieldContent].([]any)
+	locations, _ := update["locations"].([]any)
+	detailsOmitted := rawInputPresent || rawOutputPresent ||
+		len(content) > 0 || len(locations) > 0
 	if len(state.toolActivities) >= maxToolActivityEvents-1 {
 		item := kiroTruncatedActivity()
 		state.toolActivities = append(state.toolActivities, item)
