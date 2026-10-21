@@ -184,7 +184,10 @@ func (state *geminiStreamState) applyChunkMetadata(root map[string]any) {
 		if state.metadata == nil {
 			state.metadata = make(map[string]any)
 		}
-		mergeMetadataFields(state.metadata, provider)
+		// Mojo merges the outer gemini object, replacing each provider field.
+		for key, value := range provider {
+			state.metadata[key] = value
+		}
 	}
 	if candidate != nil {
 		if finish, ok := candidate["finishReason"].(string); ok && strings.TrimSpace(finish) != "" {

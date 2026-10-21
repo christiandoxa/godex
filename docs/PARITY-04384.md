@@ -1611,3 +1611,45 @@ passes 694 tests. `rtk go test ./...` passes 8,813 across 81 packages.
 suite. Logs: `/tmp/gdx-04384-serde154-focused.log`,
 `/tmp/gdx-04384-serde154-final-test-all.log` and
 `/tmp/gdx-04384-serde154-final-verify.log`.
+
+Clean error-boundary commit `b86e982d0295b28cada3862fa5faf63d83ccdb0f`
+passed all 40 official Gemini executable cases and mutation controls before
+its fast-forward push to `origin/main`. Log:
+`/tmp/gdx-04384-stream-error-oracle.json`. Test/comment-only commit
+`52cde7f7e726c67084f2f10f8d65892b89510a98` then passed the locked-serde
+local gates and was pushed; the executable differential was not rerun for
+that test-only commit.
+
+## Native Gemini stream metadata replaces provider snapshots
+
+The tagged runtime merges response metadata with
+`gemini_provider_core_merge_stream_metadata`. Its Mojo
+`MergeValueObjects` operation merges the outer object and one immediate
+object level. Because runtime metadata is wrapped in `{"gemini": ...}`,
+each present provider field replaces the entire earlier field value.
+It does not recursively retain children inside usage or grounding
+snapshots. Missing or top-level null provider fields remain filtered by
+the existing acquisition policy, leaving earlier values intact.
+
+Godex used the request-metadata merge routine for stream updates. That
+routine intentionally preserves existing scalar fields, so later finish
+reasons, usage counters, empty ratings, false values and nested snapshots
+could retain stale values. The stream now assigns every newly acquired
+provider field directly. Request-metadata merging keeps its separate
+ownership policy; no helper, package, type, dependency or format is added.
+
+Fail-before regressions in
+`/tmp/gdx-04384-stream-metadata-before.log` demonstrate eight replacement
+cases and stale usage/prompt snapshots. Controls preserve absent/null
+fields and unrelated metadata. HTTP-response/SSE-pump coverage verifies
+that final provider usage metadata agrees with final usage and retains
+the request's ID/client metadata. These are tagged-source regressions,
+not released-executable native-OAuth evidence.
+
+`rtk go test -race ./internal/gateway/gemini ./tools/differential -count=1`
+passes 821 tests. `rtk go test ./...` passes 8,826 across 81 packages.
+`rtk proxy make verify` passes all local gates, including full race tests.
+Logs: `/tmp/gdx-04384-stream-metadata-race.log`,
+`/tmp/gdx-04384-stream-metadata-final-test-all.log` and
+`/tmp/gdx-04384-stream-metadata-final-verify.log`. Clean candidate executable
+differential validation follows the commit.
