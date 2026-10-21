@@ -15,7 +15,7 @@ func geminiDataURL(value string) (string, string, bool) {
 	segments := strings.Split(metadata, ";")
 	base64 := false
 	for _, segment := range segments {
-		if strings.EqualFold(segment, "base64") {
+		if geminiASCIIEqualFold04384(segment, "base64") {
 			base64 = true
 			break
 		}
@@ -28,6 +28,25 @@ func geminiDataURL(value string) (string, string, bool) {
 		mime = "application/octet-stream"
 	}
 	return mime, data, true
+}
+
+// The 0.438.4 Mojo response-media parser compares the decoded data-URL
+// metadata `base64` segment with ASCII-only byte folding. Unicode simple
+// case folding would let U+017F LONG S impersonate the ASCII `s`.
+func geminiASCIIEqualFold04384(input, literal string) bool {
+	if len(input) != len(literal) {
+		return false
+	}
+	for i := 0; i < len(input); i++ {
+		value := input[i]
+		if value >= 'A' && value <= 'Z' {
+			value += 'a' - 'A'
+		}
+		if value != literal[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // geminiResponseDataURL parses response text media. Prodex keeps this
@@ -44,11 +63,24 @@ func geminiResponseDataURL(value string) (string, string, bool) {
 	return strings.TrimSuffix(metadata, ";base64"), data, true
 }
 
+func geminiASCIILower04384(value string) string {
+	bytes := []byte(value)
+	for at := range bytes {
+		if bytes[at] >= 'A' && bytes[at] <= 'Z' {
+			bytes[at] += 'a' - 'A'
+		}
+	}
+	return string(bytes)
+}
+
 func geminiMIMEForURI(uri string) string {
 	if cutoff := strings.IndexAny(uri, "?#"); cutoff >= 0 {
 		uri = uri[:cutoff]
 	}
-	lower := strings.ToLower(uri)
+	// The tagged Mojo media_mime_kind folds A-Z bytes only. Unicode
+	// casing changes the meaning of URI extensions (for example U+0130
+	// dotted capital I would collapse `.GİF` into a false `.gif`).
+	lower := geminiASCIILower04384(uri)
 	switch {
 	case strings.HasSuffix(lower, ".png"):
 		return "image/png"

@@ -313,3 +313,26 @@ non-object cost, preserving the last valid usage and its canonical f64 cost.
 The scoped update now validates all **present** cost values, including null,
 before updating the turn. Synthetic source/dependency tests are not a live
 Kiro CLI 2.33.0 provider run.
+
+## Gemini media metadata and extension matching are ASCII-casefold only
+
+The released `gemini_response_media.mojo` classifies request image data URLs
+by searching semicolon-delimited metadata for exactly the ASCII `base64`
+marker, permitting **ASCII** uppercase but not Unicode simple-fold
+lookalikes. It also identifies filename extensions with ASCII-only
+case-folding. The older Go Gemini request parser called
+`strings.EqualFold(segment, "base64")`, so U+017F LONG S in
+`data:image/png;baſe64,AAAA` could falsely authorize inline image data.
+Its extension matcher used `strings.ToLower` on entire URLs, mapping U+0130
+DOTTED CAPITAL I in `.GİF` to ASCII `.gif` and falsely marking an opaque
+URI as `image/gif`. Both differences were reproduced as fail-before tests.
+
+The scoped fix uses bytewise ASCII-only comparisons for the base64 marker
+and URI extension normalization. It preserves legitimate lowercase,
+uppercase and mixed-case ASCII forms, query/fragment suffix handling, and
+valid explicit base64 segments alongside invalid confusable segments. Tests
+cover both the parser and actual Gemini image-part request conversion.
+These are published-Mojo source and local parser parity checks; the
+existing official Gemini executable differential is a broader regression
+gate, not a claim that every Unicode media fixture reached the native
+Gemini API-key provider path in that oracle.
