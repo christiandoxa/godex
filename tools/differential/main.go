@@ -164,7 +164,7 @@ func run() error {
 	gemini := flags.Bool("gemini", false, "run isolated Gemini generateContent executable differential")
 	geminiModels := flags.Bool("gemini-models", false, "compare Gemini provider models catalog identity and aliases across two pinned binaries")
 	scenarioWorkers := flags.Int("scenario-workers", 1, "isolated DeepSeek scenario workers, 1-4 (parallel only for --scenario all)")
-	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, deepseek-unsupported-message-role, deepseek-null-message-content, deepseek-request-over-kernel-limit, deepseek-input-type-null, deepseek-input-type-number, deepseek-input-type-empty, deepseek-empty-top-level-tool-name, deepseek-invalid-nested-shell-command, sse-stream, sse-rate-limit, sse-terminal-close, sse-json-fragments, sse-data-lines, sse-large-packet, sse-line-limit, sse-event-limit, sse-comment-utf8, sse-metadata-u64, deepseek-sse-error-presence, deepseek-sse-error-i64, deepseek-sse-error-float, deepseek-usage-u64, deepseek-sse-usage-u64, deepseek-usage-null, deepseek-sse-usage-null, deepseek-empty-identity, deepseek-sse-empty-identity, sse-tool-surrogate, sse-tool-depth, sse-tool-overflow, sse-tool-paired, retry, deepseek-sse-terminal, single-key-401, single-key-403, single-key-429, single-key-503, single-key-500, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
+	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, deepseek-unsupported-message-role, deepseek-null-message-content, deepseek-request-over-kernel-limit, deepseek-input-type-null, deepseek-input-type-number, deepseek-input-type-empty, deepseek-empty-top-level-tool-name, deepseek-invalid-nested-shell-command, sse-stream, sse-rate-limit, sse-terminal-close, sse-json-fragments, sse-data-lines, sse-large-packet, sse-line-limit, sse-event-limit, sse-comment-utf8, sse-metadata-u64, deepseek-sse-error-presence, deepseek-sse-error-i64, deepseek-sse-error-float, deepseek-usage-u64, deepseek-sse-usage-u64, deepseek-usage-null, deepseek-sse-usage-null, deepseek-empty-identity, deepseek-sse-empty-identity, sse-tool-surrogate, sse-tool-depth, sse-tool-overflow, sse-tool-paired, sse-tool-finish-error, sse-tool-empty-finish-error, retry, deepseek-sse-terminal, single-key-401, single-key-403, single-key-429, single-key-503, single-key-500, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		return err
 	}
@@ -266,6 +266,12 @@ func run() error {
 		}},
 		{"sse-tool-paired", func(mock *mockServer) (scenarioResult, error) {
 			return runPair(root, mock, "sse-tool-paired", mockPlan{Stream: true, StreamToolArgs: `{"cmd":"\uD83D\uDE00"}`}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{stream: true})
+		}},
+		{"sse-tool-finish-error", func(mock *mockServer) (scenarioResult, error) {
+			return runPair(root, mock, "sse-tool-finish-error", mockPlan{Stream: true, StreamToolArgs: `{"cmd":"\uD800"}`, SSEFraming: "tool-finish-error"}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{stream: true})
+		}},
+		{"sse-tool-empty-finish-error", func(mock *mockServer) (scenarioResult, error) {
+			return runPair(root, mock, "sse-tool-empty-finish-error", mockPlan{Stream: true, StreamToolArgs: `{"cmd":"\uD800"}`, SSEFraming: "tool-empty-finish-error"}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{stream: true})
 		}},
 		{"retry", func(mock *mockServer) (scenarioResult, error) {
 			return runPair(root, mock, "retry", mockPlan{FirstStatus: http.StatusTooManyRequests}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{retry: true})
@@ -810,16 +816,23 @@ func (mock *mockServer) serveHTTP(writer http.ResponseWriter, request *http.Requ
 		writer.Header().Set("X-Ratelimit-Reset-Tokens", "1893456000000")
 	}
 	if plan.StreamToolArgs != "" && status == http.StatusOK {
+		finish := "tool_calls"
+		if plan.SSEFraming == "tool-empty-finish-error" {
+			finish = ""
+		}
 		delta, _ := json.Marshal(map[string]any{
 			"id": "chatcmpl-toolargs", "object": "chat.completion.chunk", "model": "deepseek-v4-pro", "created": 1,
 			"choices": []any{map[string]any{
 				"index": 0, "delta": map[string]any{"tool_calls": []any{map[string]any{
 					"index": 0, "id": "call-toolargs", "type": "function",
 					"function": map[string]any{"name": "shell", "arguments": plan.StreamToolArgs},
-				}}}, "finish_reason": "tool_calls",
+				}}}, "finish_reason": finish,
 			}},
 		})
 		responseBody = "data: " + string(delta) + "\n\n" + "data: [DONE]\n\n"
+		if plan.SSEFraming == "tool-finish-error" || plan.SSEFraming == "tool-empty-finish-error" {
+			responseBody = "data: " + string(delta) + "\n\ndata: {\"error\":{\"code\":\"must-not-borrow\",\"message\":\"must-not-borrow\"}}\n\ndata: [DONE]\n\n"
+		}
 		writer.Header().Set("Content-Type", "text/event-stream")
 	} else if plan.Stream && status == http.StatusOK {
 
@@ -1127,6 +1140,11 @@ func scenarioInvariants(scenario scenarioResult) []string {
 			if run.Client.Status != http.StatusOK || !validFixtureToolArgumentsSSE043713(run.Client.Body, phase) ||
 				run.Client.Headers.Get("Content-Type") != "text/event-stream; charset=utf-8" {
 				failures = append(failures, prefix+".stream_tool_argument_contract")
+			}
+		case "sse-tool-finish-error", "sse-tool-empty-finish-error":
+			if run.Client.Status != http.StatusOK || !validFixtureToolArgumentsSSE043713(run.Client.Body, "sse-tool-surrogate") ||
+				run.Client.Headers.Get("Content-Type") != "text/event-stream; charset=utf-8" {
+				failures = append(failures, prefix+".stream_tool_finish_error_contract")
 			}
 		case "sse-stream", "sse-rate-limit", "sse-terminal-close", "sse-json-fragments", "sse-data-lines", "sse-large-packet":
 			if run.Client.Status != http.StatusOK || !validFixtureSSE(run.Client.Body) {

@@ -15,7 +15,9 @@ func appendChoiceMetadata(metadata, choice map[string]any) {
 	if value, ok := choice["logprobs"]; ok && value != nil {
 		metadata["logprobs"] = value
 	}
-	appendStringMetadata(metadata, choice, "finish_reason")
+	if finish, present := choice["finish_reason"].(string); present {
+		metadata["finish_reason"] = finish
+	}
 }
 
 func appendMessageMetadata(metadata, message map[string]any) {

@@ -35,11 +35,14 @@ func TestProdex043713DeepSeekInvalidJSONFailureMatchesOfficialWireMessage(t *tes
 		}}},
 		"finish_reason": "tool_calls",
 	}}})
-	if _, _, err := state.observe(chunk); err != nil {
+	terminal, emitted, err := state.observe(chunk)
+	if err != nil {
 		t.Fatal(err)
 	}
-	terminal, emitted, err := state.observe([]byte("[DONE]"))
 	if err != nil || !emitted || !strings.Contains(string(terminal), `"message":"DeepSeek streamed malformed JSON arguments for tool call `+"`"+`shell`+"`"+` at index 0: invalid JSON"`) {
 		t.Fatalf("invalid JSON stream did not emit canonical native failure: %q, %t, %v", terminal, emitted, err)
+	}
+	if late, supported, err := state.observe([]byte("[DONE]")); err != nil || supported || len(late) != 0 {
+		t.Fatalf("DONE repeated a finished invalid-tool failure: %s supported=%v error=%v", late, supported, err)
 	}
 }

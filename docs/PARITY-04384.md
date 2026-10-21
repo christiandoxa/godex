@@ -2093,6 +2093,8 @@ installer checks, vet and the complete shuffled race suite. Log:
 `/tmp/gdx-04384-deepseek-usage-u64-verified-final.log`. Clean-commit
 released-executable validation follows this commit.
 
+
+
 Clean commit `8d675af9c0d671d2fb3d3c43485f60ecc14899c4` passed all
 35 DeepSeek released-executable scenarios, including both new unsigned cases,
 and runtime mutation controls. Report:
@@ -2454,4 +2456,59 @@ complete shuffled race suite. Logs:
 `/tmp/gdx-04384-deepseek-stream-metadata-oracle-selfcheck.log`,
 `/tmp/gdx-04384-deepseek-stream-metadata-final-test-all.log` and
 `/tmp/gdx-04384-deepseek-stream-metadata-final-verify.log`. Clean-commit
+released-executable validation follows this commit.
+
+Clean wire-limit commit `cfe27296b13e865558bc6810c77e8fddb49dd32e`
+passed all 46 DeepSeek and 44 Gemini released cases and controls before its
+fast-forward push. Reports:
+`/tmp/gdx-04384-provider-sse-limits-oracle.json` and
+`/tmp/gdx-04384-provider-sse-limits-gemini-oracle.json`.
+Clean metadata commit `3fc9f37c0dc827f3a31409f8e1251c280b075ea0` then
+passed all 47 DeepSeek released scenarios and controls before its fast-forward
+push. Report: `/tmp/gdx-04384-deepseek-stream-metadata-oracle.json`.
+
+## DeepSeek tool validation and item completion happen at finish
+
+Tagged `deepseek_sse.rs::observe_finish` runs for every string finish reason,
+including empty strings. It validates all accumulated tools immediately,
+emits each pending tool's done item once, and keeps accepting later usage.
+Final DONE retains every tool in the final response without repeating its
+done event. A malformed tool fails at finish; a later upstream error cannot
+replace that failure. Godex previously only stored nonblank finish strings
+and waited for DONE to validate and emit tool completion.
+
+`gateway/deepseek` now separates output-item snapshots from pending done
+events, validates on each present finish string, and retains finish presence
+for response metadata. The shared `gateway/chatcompat` metadata mapping also
+preserves present empty finish strings, matching the tagged Mojo projection.
+The new private `stream_tool_completion.go` owns validation and done-event
+emission for finish/DONE; snapshots still belong to stream state. No shared
+helper, exported model, option, dependency, goroutine, persistence format or
+layer-direction change is introduced.
+
+Fail-before `/tmp/gdx-04384-deepseek-finish-tools-before.log` passes the
+missing/non-string finish control and fails immediate valid completion and
+invalid-tool failure for ordinary, empty and whitespace finish strings.
+Regressions assert per-packet behavior, one done item, trailing usage, all
+tools retained in final output and suppression after terminal failure. The
+older invalid-Unicode test now asserts the same exact failure at finish and
+no duplicate at DONE; its validation/error assertions remain intact.
+
+On clean baseline `3fc9f37c0dc827f3a31409f8e1251c280b075ea0`, both
+new released scenarios fail only Godex. Prodex independently emits the original
+four-event invalid-tool trace before the later error, including when the
+finish string is empty. Reports:
+`/tmp/gdx-04384-sse-tool-finish-error-before-oracle.json` and
+`/tmp/gdx-04384-sse-tool-empty-finish-error-before-oracle.json`.
+The fixture reuses the exact tool-error contract and its mutation controls.
+Valid-tool packet timing and empty buffered finish metadata currently have
+source-aligned local coverage rather than separate executable scenarios.
+Broader tool payload/numeric and native lifecycle parity remain open.
+
+`rtk go test -race ./internal/gateway/deepseek ./internal/gateway/chatcompat ./internal/gateway/claude ./tools/differential -count=1`
+passes 771 tests. `rtk go test ./...` passes 9,040 tests across 81 packages.
+`rtk proxy make verify` passes all local gates, including the complete
+shuffled race suite. Logs: `/tmp/gdx-04384-deepseek-finish-tools-race.log`,
+`/tmp/gdx-04384-deepseek-finish-tools-final-test-all.log` and
+`/tmp/gdx-04384-deepseek-finish-tools-final-verify.log`. Clean-commit
 released-executable validation follows this commit.

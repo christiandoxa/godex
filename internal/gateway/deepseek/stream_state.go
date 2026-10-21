@@ -37,6 +37,7 @@ type deepSeekChatStreamState struct {
 	reasoning            strings.Builder
 	refusal              strings.Builder
 	finishReason         string
+	finishPresent        bool
 	systemFingerprint    string
 	usage                any
 	usagePresent         bool
@@ -90,9 +91,6 @@ func (state *deepSeekChatStreamState) observeValue(data []byte) ([]byte, bool, e
 	if logprobs, ok := choice["logprobs"]; ok && logprobs != nil {
 		state.logprobs = logprobs
 	}
-	if finish, _ := choice["finish_reason"].(string); strings.TrimSpace(finish) != "" {
-		state.finishReason = finish
-	}
 
 	delta, _ := choice["delta"].(map[string]any)
 	if reasoning, ok := delta["reasoning_content"].(string); ok && reasoning != "" {
@@ -140,8 +138,17 @@ func (state *deepSeekChatStreamState) observeValue(data []byte) ([]byte, bool, e
 			}
 		}
 	}
-	if state.finishReason != "" && len(state.toolCalls) > 0 && !state.completed {
-		state.storeConversationSnapshot()
+	if finish, present := choice["finish_reason"].(string); present {
+		state.finishReason, state.finishPresent = finish, true
+		if err := state.validateToolCalls(); err != nil {
+			failed, _, _ := state.failed("invalid_tool_call_arguments", err.Error())
+			events = append(events, failed)
+			return bytes.Join(events, nil), true, nil
+		}
+		events = append(events, state.completeToolEvents(state.completedToolItems())...)
+		if len(state.toolCalls) > 0 {
+			state.storeConversationSnapshot()
+		}
 	}
 	return bytes.Join(events, nil), len(events) > 0, nil
 }
@@ -150,10 +157,8 @@ func (state *deepSeekChatStreamState) complete() ([]byte, bool, error) {
 	if state.completed {
 		return nil, false, nil
 	}
-	for index, call := range state.toolCalls {
-		if err := deepSeekValidateStreamToolCall(index, call); err != nil {
-			return state.failed("invalid_tool_call_arguments", err.Error())
-		}
+	if err := state.validateToolCalls(); err != nil {
+		return state.failed("invalid_tool_call_arguments", err.Error())
 	}
 
 	completedTools := state.completedToolItems()
@@ -171,7 +176,7 @@ func (state *deepSeekChatStreamState) complete() ([]byte, bool, error) {
 		baseAssistant["annotations"] = state.annotations
 	}
 	choice := map[string]any{"message": baseAssistant}
-	if state.finishReason != "" {
+	if state.finishPresent {
 		choice["finish_reason"] = state.finishReason
 	}
 	if state.logprobs != nil {
@@ -223,13 +228,7 @@ func (state *deepSeekChatStreamState) complete() ([]byte, bool, error) {
 		delete(response, "model")
 	}
 
-	var events [][]byte
-	for _, tool := range completedTools {
-		events = append(events, anthropicStreamEvent("response.output_item.done", map[string]any{
-			"type": "response.output_item.done", "sequence_number": state.nextSequenceNumber(),
-			"output_index": tool.index, "item": tool.item,
-		}))
-	}
+	events := state.completeToolEvents(completedTools)
 	if state.reasoning.Len() > 0 {
 		events = append(events, anthropicStreamEvent("response.reasoning_summary_text.done", map[string]any{
 			"type": "response.reasoning_summary_text.done", "sequence_number": state.nextSequenceNumber(),
@@ -261,10 +260,9 @@ func (state *deepSeekChatStreamState) completedToolItems() []deepSeekCompletedSt
 	items := make([]deepSeekCompletedStreamTool, 0, len(indices))
 	for _, index := range indices {
 		call := state.toolCalls[index]
-		if call == nil || call.done {
+		if call == nil {
 			continue
 		}
-		call.done = true
 		item := deepSeekStreamCompletedToolItem(call)
 		if item != nil {
 			items = append(items, deepSeekCompletedStreamTool{index: index, item: item})

@@ -386,6 +386,14 @@ oracle now exercises thirteen Gemini cases, including all earlier eight fixtures
 
 ### Bounded full DeepSeek oracle
 
+`sse-tool-finish-error` and `sse-tool-empty-finish-error` send invalid tool
+arguments with a present finish string, then a different upstream error before
+DONE. Both require the original exact invalid-tool failure trace; the later
+error cannot take ownership. Empty finish strings trigger the same validation.
+The existing malformed-tool and valid-tool stream contracts remain in the
+matrix. Local event-boundary tests separately prove valid tools emit their
+done item at finish and retain that tool in the final response after usage.
+
 `sse-metadata-u64` requires exact integers above 2^53 in logprobs and
 u64::MAX in annotations. The provider metadata object must match the tagged
 bytes before the existing full SSE contract runs; rounded/dropped counters,
