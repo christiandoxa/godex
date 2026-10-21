@@ -109,3 +109,42 @@ func TestProdex04383QuotaChronoClockChangesActualQuarantine(t *testing.T) {
 		})
 	}
 }
+
+// chrono 0.4.45 additionally accepts signed proleptic years when %Y is
+// explicitly signed; unsigned years remain at most four digits. The
+// published quota text planner passes the year token through unchanged.
+func TestProdex04383QuotaAbsoluteSignedYearsMatchChrono(t *testing.T) {
+	now := time.Date(2026, time.October, 21, 10, 0, 0, 0, time.UTC)
+	for _, tc := range []struct {
+		name, yearToken string
+		expected        int
+		valid           bool
+	}{
+		{"positive-short", "+1", 1, true},
+		{"negative-short", "-1", -1, true},
+		{"positive-extended", "+10000", 10000, true},
+		{"negative-extended", "-0001", -1, true},
+		{"positive-extended-leading-zero", "+010000", 10000, true},
+		{"proleptic-zero", "+00000", 0, true},
+		{"signed-upper-bound", "+262142", 262142, true},
+		{"signed-lower-bound", "-262143", -262143, true},
+		{"signed-out-of-bounds-upper", "+262143", 0, false},
+		{"signed-out-of-bounds-lower", "-262144", 0, false},
+		{"unsigned-five-digits", "10000", 0, false},
+		{"unsigned-padded-year", "02026", 0, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			reset, valid := quotaResetAtFromText("You can try again at Mar 24th, "+tc.yearToken+" 2:04 AM.", now)
+			if valid != tc.valid {
+				t.Fatalf("signed chrono year %q valid=%t want=%t", tc.yearToken, valid, tc.valid)
+			}
+			if !valid {
+				return
+			}
+			want := time.Date(tc.expected, time.March, 24, 2, 4, 0, 0, time.UTC).Unix()
+			if reset != want {
+				t.Fatalf("signed chrono year %q parsed=%d want=%d", tc.yearToken, reset, want)
+			}
+		})
+	}
+}

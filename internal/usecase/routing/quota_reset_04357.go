@@ -186,11 +186,14 @@ func quotaResetAtFromText(message string, now time.Time) (int64, bool) {
 	for end < len(day) && day[end] >= '0' && day[end] <= '9' {
 		end++
 	}
-	if end == 0 || end > 2 || len(parts[2]) == 0 || len(parts[2]) > 4 || !quotaASCIIDigits04383(parts[2]) {
+	if end == 0 || end > 2 {
+		return 0, false
+	}
+	year, validYear := quotaChronoYear04383(parts[2])
+	if !validYear {
 		return 0, false
 	}
 	d, _ := strconv.Atoi(day[:end])
-	year, _ := strconv.Atoi(parts[2])
 	month, err := time.Parse("Jan", parts[0])
 	if err != nil {
 		return 0, false
@@ -232,6 +235,31 @@ func quotaChronoClock04383(clock, period string) (int, int, bool) {
 		hour += 12
 	}
 	return hour, minute, true
+}
+
+// chrono 0.4.45 parses unsigned `%Y` as 1–4 digits. An explicit +/-
+// sign permits an extended proleptic year, bounded by chrono's supported
+// NaiveDate range (-262143 through +262142). This must not be silently
+// coerced through Go's stricter `time.Parse(..., "2006")` grammar.
+func quotaChronoYear04383(value string) (int, bool) {
+	if value == "" {
+		return 0, false
+	}
+	digits := value
+	signed := value[0] == '+' || value[0] == '-'
+	if signed {
+		digits = value[1:]
+	} else if len(digits) > 4 {
+		return 0, false
+	}
+	if !quotaASCIIDigits04383(digits) {
+		return 0, false
+	}
+	parsed, err := strconv.ParseInt(value, 10, 32)
+	if err != nil || parsed < -262143 || parsed > 262142 {
+		return 0, false
+	}
+	return int(parsed), true
 }
 
 func quotaASCIIDigits04383(value string) bool {

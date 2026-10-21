@@ -1046,3 +1046,9 @@ is not valid with `%I`. These cases were reproduced with a standalone pinned
 Rust chrono probe and checked against actual Go quota quarantine duration.
 The full native timezone/DST permutation space is not inferred from this
 local semantic test or from an unrelated broad transport differential.
+
+The local pinned-chrono quota reset parser also covers signed proleptic
+`%Y` years (including `+10000` and `-0001`) and rejects unsigned five-digit
+or out-of-range values. The source `chrono::Local` conversion was validated
+separately with `TZ=UTC`; these extreme dates are not live-provider timing
+or cross-OS certificates.

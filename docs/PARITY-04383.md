@@ -3664,3 +3664,26 @@ pinned HTTP transport regression is retained as a broad no-regression check;
 these exact clock strings have **not** been asserted as independently timed
 binary-to-binary comparisons across timezone/DST boundaries. Live provider
 and native OS clock semantics remain unverified beyond this finite slice.
+
+## Explicit signed `%Y` quota date years retain chrono's proleptic range
+
+The same pinned `chrono 0.4.45` absolute quota retry parser accepts
+**signed** extended `%Y` years that are not accepted without a leading
+sign. For example, `Mar 24th, +10000 2:04 AM` and
+`Mar 24th, -0001 2:04 AM` are valid, while `Mar 24th, 10000 2:04 AM`
+and a padded unsigned five-digit year are not. Chrono's supported
+proleptic calendar spans -262143 through +262142; malformed or out-of-
+range signed years must not return a valid reset timestamp. These cases
+were checked with the pinned `chrono::NaiveDateTime` parser followed by
+`chrono::Local.from_local_datetime` using a deterministic UTC timezone.
+
+A fail-before regression added explicit positive/negative signed-year
+controls, checked against Go's proleptic `time.Date` Unix timestamp under
+UTC. Godex now distinguishes the 1–4 digit unsigned form from explicitly
+signed values, validates ASCII digits and chrono year bounds, and does not
+silently normalize an unsigned five-digit input into a valid timestamp.
+The same selected local timezone is used for ordinary runtime parsing.
+
+These extreme-date tests establish the source parser behavior; they do not
+certify future local time-zone or DST rules in every OS, nor real quota
+provider messages containing such years.
