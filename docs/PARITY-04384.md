@@ -208,3 +208,25 @@ longer steal those identities. The normalization is limited to internal
 synthetic activity metadata, not credentials or the original ACP wire.
 This is source-pinned Kiro 0.438.4 parity, not an authenticated 2.33.0
 Kiro CLI binary experiment.
+
+## Kiro ACP text extraction recurses into nested `content` values
+
+Published `kiro.mojo` `kiro_json_write_content_value` processes a text
+string directly, walks arrays in order, and recursively processes an
+object's `content` member when the object has no direct string `text`.
+The Rust provider-core wrapper uses that compiled kernel for buffered ACP
+turn state and streaming text. Godex's earlier `acpContentText` supported
+strings, arrays, and the direct `text` member only. Nested envelopes such
+as `{"content":[{"text":"hello"},{"text":" 世界"}]}` silently yielded an
+empty answer even when the upstream provided real assistant content.
+
+Fail-before regressions cover nested maps and arrays, text-vs-content
+precedence, a numeric non-text field with content fallback, ignored unrelated
+members, and valid direct controls. A buffered Kiro turn and a live Chat SSE
+chunk both now retain the entire original Unicode text. The source-aligned
+recursive walker is capped at 128 levels, mirroring the compiled Mojo depth
+guard and avoiding unbounded recursion. This change is bounded to internal
+ACP content projection; it does not fabricate tool calls, expose raw tool
+arguments, or alter the input wire. The comparisons use tagged source and
+local synthetic fixtures; an authenticated Kiro CLI 2.33.0 integration is
+still separately unverified.

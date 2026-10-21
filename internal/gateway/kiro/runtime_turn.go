@@ -215,6 +215,18 @@ func (state kiroTurnState) metadata(stopReason string) map[string]any {
 }
 
 func acpContentText(value any) string {
+	return acpContentTextDepth04384(value, 0)
+}
+
+// Published 0.438.4 kiro_json_write_content_value accepts direct strings,
+// arrays of values, or nested `content` objects. A direct string `text`
+// wins over the nested member when both are present. Its Mojo walker caps
+// recursion at 128 steps, so a malformed deeply nested structure cannot
+// grow Go's call stack without bound.
+func acpContentTextDepth04384(value any, depth int) string {
+	if depth > 128 {
+		return ""
+	}
 	switch typed := value.(type) {
 	case string:
 		return typed
@@ -222,10 +234,13 @@ func acpContentText(value any) string {
 		if text, ok := typed["text"].(string); ok {
 			return text
 		}
+		if nested, present := typed["content"]; present {
+			return acpContentTextDepth04384(nested, depth+1)
+		}
 	case []any:
 		var builder strings.Builder
 		for _, item := range typed {
-			builder.WriteString(acpContentText(item))
+			builder.WriteString(acpContentTextDepth04384(item, depth+1))
 		}
 		return builder.String()
 	}
