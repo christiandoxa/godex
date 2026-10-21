@@ -1011,3 +1011,12 @@ same `--prodex`, `--prodex-source`, `--godex`, `--godex-source` and
 `--godex-commit` arguments. This focused mode is also included unchanged
 in the comprehensive `--http-session-conflict` release matrix; it avoids
 rerunning unrelated long-lived SSE tests when iterating on root-ID parsing.
+
+Local 0.438.3 retry-after parity tests also separate Rust `http::HeaderValue`
+**insertion** validity from `to_str` readability. A later case-insensitive
+JSON duplicate containing non-ASCII obs-text is inserted (shadowing an
+older valid Retry-After) but cannot become a numeric/date delay; the error
+message fallback wins. A late ASCII control fails insertion, leaving the
+earlier valid value. This is checked against pinned Rust `http 1.5.0`
+behavior and direct Go precommit cooldown tests, not falsely counted as
+a separate timed two-executable oracle.

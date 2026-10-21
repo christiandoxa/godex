@@ -115,9 +115,13 @@ func streamRetryAfterHeaders(raw json.RawMessage, now time.Time) (time.Duration,
 }
 
 func validStreamRetryHeaderValue(value string) bool {
+	// Tagged runtime_retry_header_value_valid models HeaderValue::from_str:
+	// horizontal tab and obs-text (bytes >= 128) may be inserted, while
+	// ASCII control bytes and DEL may not. A later valid *inserted* value
+	// shadows earlier duplicates even if to_str subsequently rejects it.
 	for i := 0; i < len(value); i++ {
 		c := value[i]
-		if c != 9 && (c < 32 || c >= 127) {
+		if c != 9 && (c < 32 || c == 127) {
 			return false
 		}
 	}
@@ -125,6 +129,14 @@ func validStreamRetryHeaderValue(value string) bool {
 }
 
 func parseStreamRetryHeader(raw string, now time.Time) (time.Duration, bool) {
+	// HeaderValue::to_str is stricter than insertion. A selected header
+	// containing obs-text is NOT silently normalized into ASCII advice,
+	// even when Unicode trimming would otherwise produce valid seconds.
+	for i := 0; i < len(raw); i++ {
+		if raw[i] >= 128 {
+			return 0, false
+		}
+	}
 	value := strings.TrimSpace(raw)
 	if value == "" {
 		return 0, false

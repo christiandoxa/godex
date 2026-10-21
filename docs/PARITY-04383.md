@@ -3536,3 +3536,37 @@ main with authenticated Ready evidence on two profiles, return exactly the
 upstream response, and either leave the root ID unbound or persist main
 for the exact valid kind. The finite test does not claim complete provider
 or native-platform 1:1 parity.
+
+## JSON `Retry-After` duplicate precedence must survive obs-text insertion
+
+Tagged Prodex 0.438.3 `error_policy/retry_after_json.rs` inserts each
+matching JSON header into `http::HeaderMap` **before** asking
+`HeaderValue::to_str` for a delay. The compiled Mojo
+`runtime_retry_header_value_valid` permits HTTP obs-text bytes (128–255)
+for insertion, while rejecting ASCII control characters and DEL. The
+selected final header can therefore be a legal HTTP value but **not**
+valid UTF-8/ASCII advice, and must shadow an older, otherwise valid
+`Retry-After` instead of resurrecting it.
+
+Godex previously rejected all non-ASCII bytes while *selecting* a JSON
+header. A later `"retry-after":"é"` or `"retry-after":"5\\u00a0"`
+was silently skipped, leaving an earlier `"Retry-After":"5"` in effect.
+The published Rust `http 1.5.0` crate and pinned `serde_json 1.0.151` were
+used in an independent offline probe: the Unicode cases both insert
+successfully and return a `HeaderValue::to_str` error; a late control
+`"5\\n"` fails insertion and leaves the earlier value, and `"4"`
+correctly replaces it.
+
+Fail-before routing tests demonstrate incorrect 5-second advice instead of
+the tagged 12-second error-message fallback, with additional ASCII,
+Unicode-space and header-control cases. A direct PrecommitFailure policy
+test verifies the **actual retry cooldown**, not just the header helper.
+The scoped correction separates HTTP HeaderValue insertion validity from
+its later ASCII-only `to_str` conversion, preserving sorted duplicate-key
+precedence and the complete original SSE/error JSON.
+
+This is a source/locked-dependency and local-policy parity result; the
+existing official HTTP turn-transport executable differential remains a
+regression gate, but no new two-executable timed cooldown experiment has
+been asserted for these Unicode duplicate values. Native OS and real
+provider timing permutations are still open.
