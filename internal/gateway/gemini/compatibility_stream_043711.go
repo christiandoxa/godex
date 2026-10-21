@@ -186,7 +186,9 @@ func (state *geminiChatCompatibleStream043711) accept(writer io.Writer, data []b
 		name, _ := event["type"].(string)
 		switch name {
 		case "response.completed":
-			return state.complete(writer)
+			if bytes.Equal(bytes.TrimSpace(data), []byte("[DONE]")) {
+				return state.complete(writer)
+			}
 		case "response.output_text.delta":
 			if err := state.openTextItem(writer); err != nil {
 				return err

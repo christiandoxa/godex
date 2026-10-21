@@ -1707,3 +1707,50 @@ Logs: `/tmp/gdx-04384-chat-sse-wire-final2-race.log`,
 `/tmp/gdx-04384-chat-sse-wire-final2-test-all.log` and
 `/tmp/gdx-04384-chat-sse-wire-final2-verify.log`. Clean candidate binary
 differential validation follows the commit.
+
+The final large-usage baseline also failed only Godex's `stream-chat`
+case, with the other 39 cases and mutation controls passing. Its client
+trace shows Prodex sending integer `9007199254740993` and Godex sending
+`9007199254740992`; Prodex retains literal HTML characters while Godex
+escapes them. Log: `/tmp/gdx-04384-chat-sse-wire-final-before-oracle.json`.
+
+Clean commit `ace591890358886b92ed9af119f858b5952c7c24` passed all 40
+final Gemini executable cases, including literal event bytes and exact
+large usage counters, plus all mutation controls. It was fast-forward
+pushed to `origin/main`. Log: `/tmp/gdx-04384-chat-sse-wire-oracle.json`.
+
+## API-key Gemini finish barriers retain trailing usage
+
+Tagged `RuntimeDeepSeekSseState::observe_chat_chunk`, used by API-key
+Gemini, records a nonblank finish reason without completing the response.
+`RuntimeProviderSseReader` invokes completion on `[DONE]`; EOF before that
+marker produces a stream failure. This preserves usage-only chunks that
+follow a finish-only chunk.
+
+Godex delegated chunk translation to the existing Chat-compatible codec,
+then treated its finish-reason completion signal as the entire stream's
+completion barrier. That discarded later usage and treated EOF after a
+finish-only chunk as success. The Gemini adapter now commits assistant-text
+item-done and response-completed only for the DONE marker. The codec's
+other consumers keep their separate contracts; no shared helper, API, model, package,
+dependency, persistence or retry policy changes.
+
+Fail-before log: `/tmp/gdx-04384-chat-sse-finish-before.log`. Regressions
+cover finish-only and finish-with-text chunks, repeated finish reasons,
+trailing usage-only chunks, one DONE completion, ignored post-DONE chunks,
+and premature EOF with committed text both with and without a finish
+reason. The existing strict six-event `stream-chat` executable fixture now
+places its exact large usage counters in a separate trailing chunk. Its
+expected client trace remains unchanged, including raw payload bytes,
+identities, sequence, metadata and final usage.
+
+`rtk go test -race ./internal/gateway/gemini ./tools/differential -count=1`
+passes 839 tests. The released baseline and clean-candidate differential
+results remain separate from these local regressions.
+
+`rtk go test ./...` passes 8,844 tests across 81 packages.
+`rtk proxy make verify` passes all local gates, including full race tests.
+Logs: `/tmp/gdx-04384-chat-sse-finish-race.log`,
+`/tmp/gdx-04384-chat-sse-finish-final-test-all.log` and
+`/tmp/gdx-04384-chat-sse-finish-final-verify.log`. Clean candidate executable
+differential validation follows the commit.
