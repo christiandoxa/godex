@@ -825,3 +825,27 @@ separate from the 486-line stream-state file, with the source-size baseline
 reduced to match the shorter implementation. Broader real-provider parity
 and exact Rust error diagnostic strings are not inferred from the local
 semantic tests or the official 30-case transport differential.
+
+## DeepSeek native Anthropic Messages request translation enforces serde JSON
+
+The published 0.438.4 DeepSeek native Messages route calls the shared
+`translate_openai_chat_request_to_anthropic_messages` provider-core bridge.
+`translators/anthropic/messages.rs` first deserializes its entire
+ChatCompletion-shaped input with `serde_json::from_slice::<Value>`, then
+passes the typed Value to Mojo request translation. Godex previously decoded
+this path directly with `encoding/json`, which accepts unpaired surrogate
+escapes and invalid UTF-8 and can also accept serde-invalid near-maximum
+floating-point numbers or excessive nested JSON. An ignored malformed
+member of an otherwise ordinary `messages[0]` could disappear and leave a
+provider request containing apparently valid user text.
+
+Fail-before regressions exercise both `parseAnthropicChatRequest` and the
+actual native Messages request translator. They confirm invalid Unicode,
+UTF-8, depth, `1e309` and the pinned serde f64 boundary are rejected before
+upstream request construction. Legitimate user messages, paired Unicode,
+and the valid longer-mantissa float remain accepted. The scoped correction
+reuses the source-matched whole-document serde Unicode/depth and numeric
+token checks already used by the DeepSeek Responses translator. It preserves
+normal tool, policy, model and payload conversion behavior, without sending
+real requests or accessing external credentials. This semantic test is
+separate from the broader executable DeepSeek oracle.

@@ -8,6 +8,8 @@ import (
 	"io"
 	"sort"
 	"strings"
+
+	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 )
 
 var anthropicChatFields = map[string]bool{
@@ -33,6 +35,13 @@ func deepSeekAnthropicRequest(body []byte) ([]byte, error) {
 }
 
 func parseAnthropicChatRequest(body []byte) (map[string]any, error) {
+	// Prodex 0.438.4 translates this ChatCompletion-shaped payload into
+	// Anthropic Messages only after serde_json accepts the whole Value.
+	// An ignored nested field with an invalid Unicode escape, excessive
+	// recursion, or serde-only f64 overflow must reject the full request.
+	if jsonutil.CheckSerdeBoundary(string(body)) != nil || !jsonutil.CheckSerdeNumberTokens(body) {
+		return nil, errors.New("DeepSeek native Messages request must be a JSON object")
+	}
 	var chat map[string]any
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.UseNumber()
