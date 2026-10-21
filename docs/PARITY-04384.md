@@ -2512,3 +2512,45 @@ shuffled race suite. Logs: `/tmp/gdx-04384-deepseek-finish-tools-race.log`,
 `/tmp/gdx-04384-deepseek-finish-tools-final-test-all.log` and
 `/tmp/gdx-04384-deepseek-finish-tools-final-verify.log`. Clean-commit
 released-executable validation follows this commit.
+
+Clean finish commit `8918d065a8504f398042905bdf47f60a0266fd63` passed
+all 49 DeepSeek released scenarios and runtime mutation controls before its
+fast-forward push to `origin/main`. Report:
+`/tmp/gdx-04384-deepseek-finish-tools-oracle.json`. Production code is fully
+committed; this subsequent checkpoint update changes documentation only.
+
+## Execution checkpoint: provider SSE and metadata work
+
+The last tested production commit is
+`8918d065a8504f398042905bdf47f60a0266fd63`: 9,040 local tests across
+81 packages, the full `make verify` gate, and 49/49 DeepSeek executable cases.
+The separate latest Gemini executable matrix is 44/44 PASS on
+`cfe27296b13e865558bc6810c77e8fddb49dd32e`; later commits change only
+DeepSeek behavior and its shared response mapper, whose Claude consumer has
+focused local race coverage. A successful provider subset does not establish
+global parity or replace native OS/live-provider validation.
+
+Exact final provider matrix commands (already executed successfully):
+
+```bash
+rtk proxy /tmp/gdx-04384-deepseek-finish-tools-candidate-differential --prodex /tmp/godex-release-parity-04384-20261021/prodex-x86_64-unknown-linux-gnu --godex /tmp/gdx-04384-deepseek-finish-tools-candidate-godex --prodex-source /tmp/godex-release-parity-04384-20261021/prodex-source --godex-source /tmp/gdx-04384-deepseek-finish-tools-work --godex-commit 8918d065a8504f398042905bdf47f60a0266fd63 --scenario all --scenario-workers 3
+rtk proxy /tmp/gdx-04384-provider-sse-limits-candidate-differential --prodex /tmp/godex-release-parity-04384-20261021/prodex-x86_64-unknown-linux-gnu --godex /tmp/gdx-04384-provider-sse-limits-candidate-godex --prodex-source /tmp/godex-release-parity-04384-20261021/prodex-source --godex-source /tmp/gdx-04384-provider-sse-limits-work --godex-commit cfe27296b13e865558bc6810c77e8fddb49dd32e --gemini
+```
+
+The pinned reference source remains unmodified. Candidate worktrees are clean,
+with no pending implementation patch. The independent editor checkout's
+unrelated files were not changed. No tag, release, dependency or persisted
+format change was made; commits were pushed directly without waiting for CI.
+The complete multi-phase release parity script was not rerun in this provider
+slice. Its broader transport/ownership coverage remains a separate gate.
+
+Continue with targeted fail-before evidence for these still-unproven areas:
+
+- DeepSeek structured tool arguments, floating-point output canonicalization,
+  multi-tool error ordering and request/conversation metadata number handling.
+- Native Gemini created/text/reasoning/media lifecycle and cancellation ownership.
+- Remaining provider SSE BOM, Unicode whitespace and malformed framing semantics.
+- Broader Kiro, account ownership, continuation, transport and native OS parity.
+
+These are audit targets, not newly confirmed executable mismatches. Keep the
+same official 0.438.4 source, binary, manifest and locked serde dependencies.
