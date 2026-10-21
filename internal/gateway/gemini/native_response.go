@@ -316,8 +316,13 @@ func geminiAppendSource(result *[]map[string]any, seen map[string]bool, source m
 		item["title"] = title
 	}
 	for _, key := range []string{"urlRetrievalStatus", "url_retrieval_status", "status"} {
-		if status, ok := source[key]; ok && status != nil {
-			item["status"] = status
+		// Tagged gemini_grounding_source_status uses first PRESENT field,
+		// even when it is null. A null primary explicitly suppresses
+		// all lower-priority status aliases.
+		if status, present := source[key]; present {
+			if status != nil {
+				item["status"] = status
+			}
 			break
 		}
 	}

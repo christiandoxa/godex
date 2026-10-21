@@ -557,3 +557,21 @@ uses string-type presence rather than non-empty value to select defaults;
 no unrelated media or executable payload changes. This is a tagged-source
 synthetic parity test, with the official Gemini 0.438.4 executable suite
 retained as the broader transport no-regression gate.
+
+## Gemini grounding status aliases stop at the first present member
+
+Prodex 0.438.4 `gemini_grounding_source_status` selects the first **present**
+field in this order: `urlRetrievalStatus`, `url_retrieval_status`, `status`.
+If that field is JSON null, the kernel intentionally emits **no** status
+instead of borrowing a lower-priority alias. The previous Godex source
+projector skipped null statuses and incorrectly exposed a later
+`"status":"FAILED"` even when the provider explicitly supplied
+`"urlRetrievalStatus":null`.
+
+A fail-before regression covers null primary/secondary overrides, valid
+primary/secondary/tertiary fields, explicit empty strings, non-string
+Booleans, and a complete `web_search_call` projection with source arrays.
+The scoped fix stops at the first present status field, preserving null
+suppression and all genuine non-null values. This source-backed synthetic
+metadata check complements the broader official Gemini 0.438.4 binary
+transport gate; it is not a claim of live grounding-provider verification.
