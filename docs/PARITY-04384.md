@@ -2885,3 +2885,68 @@ suite and cross-platform build/test compilation:
 `/tmp/gdx-04384-half-close-production-verify.log`. Clean-commit provider and
 HTTP keepalive regression gates follow this commit. The prototype's additional
 Prodex persistence files remain an open audit item.
+
+## Preserve present empty and whitespace-bearing stream tool IDs
+
+Clean BOM commit `12e94e87c9769ff4e736af292f9e3014fe4f4242` passed
+56/56 DeepSeek and 46/46 Gemini released scenarios and mutation controls before
+its fast-forward push to `origin/main`. Reports:
+`/tmp/gdx-04384-provider-bom-oracle.json` and
+`/tmp/gdx-04384-provider-bom-gemini-oracle.json`.
+Clean signature commit `f859439626cfcd9c4e3dc45373fbae73b44dfc61` passed
+57/57 DeepSeek scenarios and mutation controls before its fast-forward push.
+Report: `/tmp/gdx-04384-tool-signature-oracle.json`.
+
+The tagged stream tool projection preserves every present string ID, including
+empty/whitespace values, and replaces an earlier ID when a later string arrives.
+Godex ignored blank IDs and trimmed others. Its private DeepSeek gateway
+accumulator now accepts the original string on type presence. Absent and
+non-string IDs retain the existing UUIDv7 fallback or prior ID. No model,
+helper, API, dependency, option, goroutine or storage format changes.
+
+An initial fallback probe expected the lower-level provider-core helper's
+deterministic request/index ID. The released executable rejected that expected
+fixture: `RuntimeDeepSeekToolCall::default` already assigns a UUIDv7 before
+the helper could be used. The initial missing-ID probe is not mismatch evidence.
+The corrected missing-ID positive control validates the stable UUIDv7 namespace,
+version and bytes across all five events and passes both unmodified binaries:
+`/tmp/gdx-04384-stream-tool-id-missing-control-oracle.json`.
+The existing generated-ID production path is unchanged.
+
+Confirmed fail-before `/tmp/gdx-04384-stream-tool-id-confirmed-before.log`
+passes five controls and fails five tests, including present empty/space/padded
+IDs in actual pumps and later empty-ID replacement. Missing/null/numeric IDs
+and maximum unsigned request/tool indices retain valid generated UUIDv7s.
+The source-pinned empty and padded executable cases independently satisfy
+the complete five-event contract on Prodex and fail only Godex. Reports:
+`/tmp/gdx-04384-stream-tool-id-empty-before-oracle.json` and
+`/tmp/gdx-04384-stream-tool-id-padded-before-oracle.json`. Independent mutation
+controls reject altered identity, tool type, sequence and event presence.
+
+This change is based on the separate half-close fix
+`43cd08b931829db2086186aaa37ec1d58d0a8ffe`, whose clean candidate passed
+57/57 DeepSeek executable cases and the HTTP keepalive phase before its push.
+Reports: `/tmp/gdx-04384-half-close-production-oracle.json` and
+`/tmp/gdx-04384-half-close-http-keepalive.log`. The initial tool-ID gate failure
+is retained; it is not described as passing. After the transport fix,
+`rtk go test -race ./internal/gateway/deepseek ./tools/differential -count=1`
+passes 742 tests, `rtk go test ./...` passes 9,118 tests across 81 packages,
+and `rtk proxy make verify` passes all local gates, including the full shuffled
+race suite. Logs: `/tmp/gdx-04384-stream-tool-id-final-race.log`,
+`/tmp/gdx-04384-stream-tool-id-final-test-all.log` and
+`/tmp/gdx-04384-stream-tool-id-final-verify.log`. Clean-commit executable
+tool-ID validation follows this commit.
+
+The retained delayed half-close diagnostic now supplies executable fail-before
+evidence as well: the baseline Godex stops after 82 client turns with an empty
+HTTP 200 while Prodex completes all 150. On clean `43cd08b`, both binaries
+complete 150 turns with matching status, headers, payload and attempt count.
+Reports: `/tmp/gdx-04384-half-close-state-diagnostic.json` and
+`/tmp/gdx-04384-half-close-state-diagnostic-fixed.json`. Both diagnostic reports
+remain FAIL because of the unresolved persistence comparison. No diagnostic
+assertion is bypassed and neither report is a full parity pass.
+Synthetic artifact roots are `/tmp/godex-differential-2497901154` and
+`/tmp/godex-differential-2065269940`. Shape-only inspection finds a nonempty
+Prodex response binding with hashed credential/endpoint identity in state and
+continuation sidecars; Godex does not write those files in this raw-key flow.
+Restart behavior and the correct durable compatibility contract remain open.

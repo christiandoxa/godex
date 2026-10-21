@@ -164,7 +164,7 @@ func run() error {
 	gemini := flags.Bool("gemini", false, "run isolated Gemini generateContent executable differential")
 	geminiModels := flags.Bool("gemini-models", false, "compare Gemini provider models catalog identity and aliases across two pinned binaries")
 	scenarioWorkers := flags.Int("scenario-workers", 1, "isolated DeepSeek scenario workers, 1-4 (parallel only for --scenario all)")
-	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, tool-search-canonical, sse-tool-search-canonical, sse-apply-patch-canonical, deepseek-unsupported-message-role, deepseek-null-message-content, deepseek-request-over-kernel-limit, deepseek-input-type-null, deepseek-input-type-number, deepseek-input-type-empty, deepseek-empty-top-level-tool-name, deepseek-invalid-nested-shell-command, sse-stream, sse-rate-limit, sse-terminal-close, sse-json-fragments, sse-data-lines, sse-large-packet, sse-line-limit, sse-event-limit, sse-comment-utf8, sse-metadata-u64, deepseek-sse-error-presence, deepseek-sse-error-i64, deepseek-sse-error-float, deepseek-usage-u64, deepseek-sse-usage-u64, deepseek-usage-null, deepseek-sse-usage-null, deepseek-empty-identity, deepseek-sse-empty-identity, sse-tool-surrogate, sse-tool-depth, sse-tool-overflow, sse-tool-paired, sse-tool-finish-error, sse-tool-empty-finish-error, sse-tool-order-finish, sse-tool-order-done, sse-tool-signature, sse-payload-bom, sse-payload-bom-repeat, retry, deepseek-sse-terminal, single-key-401, single-key-403, single-key-429, single-key-503, single-key-500, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
+	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, tool-search-canonical, sse-tool-search-canonical, sse-apply-patch-canonical, deepseek-unsupported-message-role, deepseek-null-message-content, deepseek-request-over-kernel-limit, deepseek-input-type-null, deepseek-input-type-number, deepseek-input-type-empty, deepseek-empty-top-level-tool-name, deepseek-invalid-nested-shell-command, sse-stream, sse-rate-limit, sse-terminal-close, sse-json-fragments, sse-data-lines, sse-large-packet, sse-line-limit, sse-event-limit, sse-comment-utf8, sse-metadata-u64, deepseek-sse-error-presence, deepseek-sse-error-i64, deepseek-sse-error-float, deepseek-usage-u64, deepseek-sse-usage-u64, deepseek-usage-null, deepseek-sse-usage-null, deepseek-empty-identity, deepseek-sse-empty-identity, sse-tool-surrogate, sse-tool-depth, sse-tool-overflow, sse-tool-paired, sse-tool-finish-error, sse-tool-empty-finish-error, sse-tool-order-finish, sse-tool-order-done, sse-tool-signature, sse-tool-id-missing, sse-tool-id-empty, sse-tool-id-padded, sse-payload-bom, sse-payload-bom-repeat, retry, deepseek-sse-terminal, single-key-401, single-key-403, single-key-429, single-key-503, single-key-500, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		return err
 	}
@@ -387,6 +387,12 @@ func run() error {
 	for _, name := range []string{"sse-payload-bom", "sse-payload-bom-repeat"} {
 		specs = append(specs, differentialScenario043713{name, func(mock *mockServer) (scenarioResult, error) {
 			return runPair(root, mock, name, mockPlan{Stream: true, SSEFraming: name}, *prodexBin, *godexBin,
+				prodexSourceCommit, godexSourceCommit, runOptions{stream: true})
+		}})
+	}
+	for _, name := range []string{"sse-tool-id-missing", "sse-tool-id-empty", "sse-tool-id-padded"} {
+		specs = append(specs, differentialScenario043713{name, func(mock *mockServer) (scenarioResult, error) {
+			return runPair(root, mock, name, mockPlan{Stream: true, StreamToolArgs: `{}`, SSEFraming: name}, *prodexBin, *godexBin,
 				prodexSourceCommit, godexSourceCommit, runOptions{stream: true})
 		}})
 	}
@@ -868,6 +874,14 @@ func (mock *mockServer) serveHTTP(writer http.ResponseWriter, request *http.Requ
 			signature, _ := json.Marshal(streamedToolSignature04384)
 			delta = []byte(strings.Replace(string(delta), `"function":`, `"extra_content":{"google":{"thought_signature":`+string(signature)+`}},"function":`, 1))
 		}
+		if id, known := streamToolIDFixture04384(plan.SSEFraming); known {
+			member := ""
+			if plan.SSEFraming != "sse-tool-id-missing" {
+				quoted, _ := json.Marshal(id)
+				member = `"id":` + string(quoted) + `,`
+			}
+			delta = []byte(strings.Replace(string(delta), `"id":"call-toolargs",`, member, 1))
+		}
 		responseBody = "data: " + string(delta) + "\n\n" + "data: [DONE]\n\n"
 		if plan.SSEFraming == "tool-finish-error" || plan.SSEFraming == "tool-empty-finish-error" {
 			responseBody = "data: " + string(delta) + "\n\ndata: {\"error\":{\"code\":\"must-not-borrow\",\"message\":\"must-not-borrow\"}}\n\ndata: [DONE]\n\n"
@@ -1192,6 +1206,10 @@ func scenarioInvariants(scenario scenarioResult) []string {
 			if run.Client.Status != http.StatusOK || run.Client.Body != canonicalToolSignatureWire04384() {
 				failures = append(failures, prefix+".tool_signature_wire")
 			}
+		case "sse-tool-id-missing", "sse-tool-id-empty", "sse-tool-id-padded":
+			if run.Client.Status != http.StatusOK || !validStreamToolIDWire04384(phase, run.Client.Body) {
+				failures = append(failures, prefix+".stream_tool_id_wire")
+			}
 		case "sse-tool-surrogate", "sse-tool-depth", "sse-tool-overflow", "sse-tool-paired":
 			if run.Client.Status != http.StatusOK || !validFixtureToolArgumentsSSE043713(run.Client.Body, phase) ||
 				run.Client.Headers.Get("Content-Type") != "text/event-stream; charset=utf-8" {
@@ -1336,7 +1354,8 @@ func compare(left, right productRun) []string {
 			!equivalentDeepSeekEmptyIdentitySSE04384(a, b) && !equivalentWireLimitSSE04384(a, b) &&
 			!equivalentStreamMetadata04384(a, b) && !equivalentCanonicalToolSearchSSE04384(a, b) &&
 			!equivalentToolValidationOrderSSE04384(a, b) && !equivalentCanonicalApplyPatchSSE04384(a, b) &&
-			!equivalentProviderBOMSSE04384(a, b) && !equivalentToolSignatureSSE04384(a, b) {
+			!equivalentProviderBOMSSE04384(a, b) && !equivalentToolSignatureSSE04384(a, b) &&
+			!equivalentStreamToolIDSSE04384(a, b) {
 			differences = append(differences, "stdout")
 		}
 	} else if left.Stdout != right.Stdout {
@@ -1365,6 +1384,7 @@ func compare(left, right productRun) []string {
 			!equivalentCanonicalApplyPatchSSE04384(left.Client.Body, right.Client.Body) &&
 			!equivalentProviderBOMSSE04384(left.Client.Body, right.Client.Body) &&
 			!equivalentToolSignatureSSE04384(left.Client.Body, right.Client.Body) &&
+			!equivalentStreamToolIDSSE04384(left.Client.Body, right.Client.Body) &&
 			!equivalentFixtureToolArgumentsSSE043713(left.Client.Body, right.Client.Body) {
 			differences = append(differences, "client.body")
 		}

@@ -223,8 +223,8 @@ func (state *deepSeekChatStreamState) observeToolCallDelta(call map[string]any) 
 		current = &deepSeekChatStreamToolCall{id: deepSeekCallFallbackID()}
 		state.toolCalls[index] = current
 	}
-	if id, _ := call["id"].(string); strings.TrimSpace(id) != "" {
-		current.id = strings.TrimSpace(id)
+	if id, present := call["id"].(string); present {
+		current.id = id
 	}
 	if hasFunction {
 		if name, _ := function["name"].(string); strings.TrimSpace(name) != "" {

@@ -386,6 +386,14 @@ oracle now exercises thirteen Gemini cases, including all earlier eight fixtures
 
 ### Bounded full DeepSeek oracle
 
+`sse-tool-id-empty` and `sse-tool-id-padded` require present string tool IDs
+to survive unchanged in every added/delta/done/final event. The positive
+`sse-tool-id-missing` control requires one stable generated UUIDv7 in the
+`call_deepseek_` namespace across the same full stream. Only that validated
+generated value is normalized. Renamed/missing IDs, mismatched event identity,
+changed sequence numbers and tool types are rejected even if both products
+return the same wrong trace.
+
 `sse-tool-signature` requires a thought signature with surrounding tab, space
 and newline bytes to survive unchanged in both completed tool output and the
 final response. It compares the full five-event stream and rejects trimmed
