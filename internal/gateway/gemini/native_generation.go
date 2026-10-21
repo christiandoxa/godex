@@ -56,7 +56,12 @@ func geminiThinkingConfig(original map[string]any, model, effort string) map[str
 	if effort == "none" || effort == "minimal" {
 		return map[string]any{"includeThoughts": false, "thinkingBudget": 0}
 	}
-	if strings.Contains(model, "gemini-3") || strings.Contains(model, "gemma-3") || strings.Contains(model, "gemma-4") {
+	// The tagged gemini_bridge_request_string_contains kernel uses
+	// ASCII-only folding for family names as well as effort controls.
+	// Ordinary mixed-case model IDs must keep thinkingLevel; Unicode
+	// confusables must not borrow the identity of another model family.
+	asciiModel := geminiASCIILower04384(model)
+	if strings.Contains(asciiModel, "gemini-3") || strings.Contains(asciiModel, "gemma-3") || strings.Contains(asciiModel, "gemma-4") {
 		level := "HIGH"
 		if effort == "low" {
 			level = "LOW"

@@ -465,3 +465,26 @@ projection. All normal ASCII efforts and provider request bytes remain
 unchanged. This is a local source-derived semantic slice; the full official
 Gemini 0.438.4 executable differential is a separate no-regression gate,
 not a claim that every Unicode effort string was sent to a live provider.
+
+## Gemini/Gemma thinking model family uses ASCII-folded substring matching
+
+The published `provider_constraints.mojo`
+`gemini_bridge_request_string_contains` searches model IDs for `gemini-3`,
+`gemma-3`, or `gemma-4` using **ASCII-only case folding**. Matched model
+families receive the modern `thinkingLevel` shape; unrelated older models
+use numeric `thinkingBudget`. Godex had used case-sensitive `strings.Contains`
+for this family decision. For example, `GEMINI-3.1-PRO-PREVIEW` with effort
+`low` was incorrectly assigned `thinkingBudget: 1024` instead of
+`thinkingLevel: LOW`. Mixed-case Gemma 3/4 model names had the same issue.
+
+A fail-before matrix covers lowercase/uppercase/mixed-case Gemini 3 and
+Gemma 3/4, a matching substring in a custom model ID, and an unrelated
+Gemini 2.5 legacy control. A non-ASCII dotted-I confusable intentionally
+remains distinct from a genuine ASCII Gemini model family. Godex now
+applies its shared Mojo-compatible ASCII byte fold to the model string
+before the family check, retaining the already verified independent
+reasoning-effort validation and all existing provider wire shapes for
+canonical model IDs. This is a finite tagged source and local policy slice;
+the official Gemini executable differential is a broader no-regression
+check rather than an assertion that each synthetic mixed-case model was
+sent through the provider gateway.
