@@ -58,6 +58,28 @@ func runtimeRoute(path string) (route, error) {
 	return route{}, errors.New("DeepSeek runtime received an unsupported proxy path")
 }
 
+// Prodex rich_catalog exact resolution performs only ASCII A-Z byte
+// folding. Unicode simple-fold lookalikes such as U+212A KELVIN SIGN may
+// never resolve to a different verified provider model ID.
+func deepSeekASCIIEqualFold04384(left, right string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for i := 0; i < len(left); i++ {
+		a, b := left[i], right[i]
+		if a >= 'A' && a <= 'Z' {
+			a += 'a' - 'A'
+		}
+		if b >= 'A' && b <= 'Z' {
+			b += 'a' - 'A'
+		}
+		if a != b {
+			return false
+		}
+	}
+	return true
+}
+
 func modelsResponse(method string, current route) (*proxymodel.Response, error) {
 	if !strings.EqualFold(method, http.MethodGet) {
 		return nil, errors.New("DeepSeek model catalog endpoint requires GET")
@@ -72,7 +94,7 @@ func modelsResponse(method string, current route) (*proxymodel.Response, error) 
 	case routeModelsSingle:
 		for _, model := range models {
 			id, _ := model["id"].(string)
-			if strings.EqualFold(id, current.modelID) {
+			if deepSeekASCIIEqualFold04384(id, current.modelID) {
 				return jsonResponse(http.StatusOK, model)
 			}
 		}

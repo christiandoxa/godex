@@ -404,3 +404,22 @@ uppercase/mixed-case positive controls. Unsupported Unicode confusables now
 produce the ordinary invalid-effort error before reaching the provider.
 This is a tagged source and local request-semantic parity result, separate
 from the broad official DeepSeek executable suite and live-provider paths.
+
+## DeepSeek model catalog lookup uses exact ASCII-folded identities
+
+The tagged 0.438.4 provider models endpoint delegates catalog resolution
+to `prodex_mojo_rich_catalog_resolve_exact_v1`, whose
+`catalog_byte_equal_folded` lowercases **ASCII A–Z only** and preserves
+all non-ASCII UTF-8 bytes. Go's DeepSeek `/models/{id}` endpoint previously
+used Unicode `strings.EqualFold`. The query `deepseeK-v4-pro` (U+212A
+KELVIN SIGN) was therefore incorrectly matched to the real
+`deepseek-v4-pro` model and returned HTTP 200 instead of a
+`model_not_found` 404.
+
+A fail-before local endpoint regression covers canonical, uppercase and
+mixed-case ASCII identifiers as positive controls, plus Kelvin-confusable
+and padded model IDs as negative controls. Model lookup now uses an explicit
+bytewise ASCII fold, keeping the original catalog and exact model response
+body unchanged. This source-pinned synthetic parity slice does not claim
+every dynamic provider catalog/model alias combination has been verified
+in a live Prodex 0.438.4 deployment.
