@@ -1,6 +1,6 @@
 package gemini
 
-func geminiNativeTools(chat map[string]any) []any {
+func geminiNativeTools(chat map[string]any, model string) []any {
 	items, _ := chat["tools"].([]any)
 	declarations := make([]any, 0, len(items))
 	for _, raw := range items {
@@ -22,6 +22,7 @@ func geminiNativeTools(chat map[string]any) []any {
 	if len(declarations) == 0 {
 		return nil
 	}
+	gemini3ApplyDescriptions04384(declarations, model)
 	return []any{map[string]any{"functionDeclarations": declarations}}
 }
 

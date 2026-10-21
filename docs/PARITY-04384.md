@@ -938,3 +938,35 @@ no-change source preservation, and serde-invalid JSON passthrough. This is
 source/dependency-aligned local parity plus the official Gemini and
 DeepSeek executable regression gates, not a claim that every synthetic
 RTK/media variant was run through a live API-key provider.
+
+## Gemini 3 tool-description and parameter enrichment
+
+Prodex 0.438.4 includes a new compiled `gemini_tool_descriptions.mojo` policy.
+The production `gemini_provider_core_function_tools_from_chat` builds normal
+`functionDeclarations`, then invokes
+`gemini_provider_core_apply_gemini3_tool_declaration_overrides(model, ... )`
+before sending the GenerateContent request. On model IDs containing
+`gemini-3` (case-insensitive ASCII) or the `auto` selector, declarations
+such as `read_file`, `read_many_files`, `grep`, `exec_command`, `write_file`
+and `apply_patch` are enriched with fixed source-defined instructions. The
+published name policy trims Unicode whitespace, strips a dotted namespace,
+converts ASCII uppercase and hyphens, then separately recognizes a narrow
+set of MCP `__` suffix aliases. Qualified `mcp__repo__read_file` may match,
+while `mcp__repo__read` intentionally does **not** inherit the short alias.
+
+Godex's native Gemini adapter previously forwarded converted function tools
+without any of these overrides. Fail-before tests reproduced missing tool
+instructions and absent `start_line`, `end_line`, `grep.pattern` and
+`apply_patch.properties.input.description` guidance. A scoped source-aligned
+Gemini 3 declaration enrichment phase now injects those descriptions,
+preserves pre-existing targeted property descriptions (even explicit null),
+replaces only the patch input description as the Mojo policy requires, and
+leaves unrelated parameters, original request schema and older Gemini 2.5
+models unchanged. Tests cover canonical and namespaced aliases, ASCII case,
+non-ASCII near-matches, `AUTO`, patch schema preservation, and complete
+Responses-to-GenerateContent translation.
+
+This is a finite source-derived Gemini 3 request-shape parity result. The
+released two-executable Gemini differential is retained as a no-regression
+gate; it does not certify every schema corner (notably compiled Mojo panic
+behavior on invalid nested patch schema nodes) or a live Gemini API call.

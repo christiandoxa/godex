@@ -142,7 +142,11 @@ func geminiGenerateContentRequest(chat, original map[string]any) (map[string]any
 	}
 
 	tools := geminiNativeBuiltinTools(original["tools"])
-	tools = append(tools, geminiNativeTools(chat)...)
+	toolModel, _ := chat["model"].(string)
+	if requested, _ := original["model"].(string); strings.TrimSpace(requested) != "" {
+		toolModel = requested
+	}
+	tools = append(tools, geminiNativeTools(chat, toolModel)...)
 	if len(tools) > 0 {
 		result["tools"] = tools
 	}
