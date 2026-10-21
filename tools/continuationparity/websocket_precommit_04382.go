@@ -36,7 +36,7 @@ func verifyWebSocketDeadline04382(result websocketDeadlineResult04382) error {
 		return fmt.Errorf("precommit deadline status/code/message=%d/%q/%q", result.status, result.code, result.message)
 	}
 	if result.heartbeats < 1 || result.heartbeats > 40 {
-		return fmt.Errorf("precommit hidden metadata was not kept alive by 0.438.3 Ping frames: %d", result.heartbeats)
+		return fmt.Errorf("precommit hidden metadata was not kept alive by 0.438.4 Ping frames: %d", result.heartbeats)
 	}
 	if result.elapsed < deadlineBudget04382-2500*time.Millisecond || result.elapsed > 31*time.Second {
 		return fmt.Errorf("precommit watchdog shifted from original 30s: %s", result.elapsed)

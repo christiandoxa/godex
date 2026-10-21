@@ -28,7 +28,7 @@ func verifyWebSocketCommittedIdle04382(result websocketCommittedIdleResult04382)
 		return fmt.Errorf("committed WebSocket delta was mutated/lost: %q/%q", result.eventType, result.delta)
 	}
 	if result.heartbeats < 1 || result.heartbeats > 3 {
-		return fmt.Errorf("0.438.3 missing/excess client Ping heartbeat: %d", result.heartbeats)
+		return fmt.Errorf("0.438.4 missing/excess client Ping heartbeat: %d", result.heartbeats)
 	}
 	if result.closeOpcode != 8 || len(result.closePayload) != 0 {
 		return fmt.Errorf("committed WebSocket stream was not closed gracefully: opcode=%d body=%q", result.closeOpcode, result.closePayload)

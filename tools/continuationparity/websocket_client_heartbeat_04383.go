@@ -8,7 +8,7 @@ import (
 	"github.com/christiandoxa/godex/internal/helper/websocketframe"
 )
 
-// The 0.438.3 liveness plan sends transport-only empty Ping control frames
+// The 0.438.4 liveness plan sends transport-only empty Ping control frames
 // every 1000ms while waiting upstream. Clients answer them with masked Pong,
 // but neither Ping nor Pong counts as committed output or upstream progress.
 // Never skip unexpected application data, invalid control frames or CLOSE.

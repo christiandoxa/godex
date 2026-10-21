@@ -3887,3 +3887,22 @@ later values, zero, and native SSE quota cooldown. The official HTTP 429
 transport oracle is retained for an executable-pinned no-regression check;
 these exact native cooldown timestamps are tested locally against the
 source policy, not advertised as timed provider/executable observations.
+
+## SSE precommit hold uses normalized response event type before exact Mojo match
+
+The published Rust response metadata decoder selects the SSE `event_type`
+string from a serde-compatible document **and trims its Unicode whitespace**
+before passing it to `rich_route.mojo`. Mojo then uses exact literal matches
+for `response.created`, `keepalive` and other precommit hold events. Reading
+the Mojo function alone led to an incorrect initial Go change that treated
+`" response.created "` as already committed. The official 0.438.4 binary
+exposed the error: padded metadata remains a hold, so a following quota
+failure can rotate to an authenticated Ready backup before any client output.
+
+The corrected Go behavior retains `strings.TrimSpace` in the event inspector.
+Memory and HTTP proxy regressions, positive canonical controls, and a focused
+pinned `--http-sse-event-kind` executable oracle check three padded variants
+plus canonical `response.created`, exact upstream requests, two attempts
+and the unchanged recovered client SSE. The exercise is limited to this
+synthetic precommit event-kind boundary and does not certify every provider
+or transport.

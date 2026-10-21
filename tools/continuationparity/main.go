@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	prodexCommit = "42042d765100fc06895a27e0904ffb64842092e6"
-	prodexSHA    = "5efa06fef57b0026eae7ec3cad23ac76b40c3e5d8a3afaee6c20feaeb5737923"
+	prodexCommit = "4cf03ccff2b6132058e2359fd253ad6e2d107011"
+	prodexSHA    = "b736e1b2430b80ff2af35cff18e884b42ca83e8028c4fd47df5285f5d0d584e9"
 )
 
 type attempt struct{ account, mode, body string }
@@ -172,11 +172,11 @@ func main() {
 		}
 		return
 	}
-	prodex := flag.String("prodex", "", "official Prodex 0.438.3 binary")
+	prodex := flag.String("prodex", "", "official Prodex 0.438.4 binary")
 	godex := flag.String("godex", "", "Godex binary")
-	prodexSource := flag.String("prodex-source", "", "tagged Prodex 0.438.3 source")
+	prodexSource := flag.String("prodex-source", "", "tagged Prodex 0.438.4 source")
 	websocket := flag.Bool("websocket", false, "run the isolated WebSocket request/recovery differential")
-	websocketCapacity := flag.Bool("websocket-capacity", false, "check 0.438.3 completed WebSocket profile capacity and cached reuse")
+	websocketCapacity := flag.Bool("websocket-capacity", false, "check 0.438.4 completed WebSocket profile capacity and cached reuse")
 	websocketDeadline := flag.Bool("websocket-deadline", false, "compare original precommit deadline after hidden frames across both official binaries")
 	websocketCommittedIdle := flag.Bool("websocket-committed-idle", false, "compare committed output stream idle expiry/close frame across both pinned binaries")
 	websocketLookaheadIdle := flag.Bool("websocket-lookahead-idle", false, "compare 8KiB precommit hold promotion into committed stream idle against both binaries")
@@ -185,7 +185,7 @@ func main() {
 	websocketTransportCore := flag.Bool("websocket-transport-core", false, "compare the original transport retry/error cases without the long-lived lifecycle cases")
 	websocketTransportLifecycle := flag.Bool("websocket-transport-lifecycle", false, "compare authenticated cancellation and original 30-second deadline")
 	websocketTransportCapacity := flag.Bool("websocket-transport-capacity", false, "compare no-replay while the alternate Ready profile is busy")
-	websocketCompactLineage := flag.Bool("websocket-compact-lineage", false, "compare WebSocket strict Compact turn lineage and unbound selection against 0.438.3")
+	websocketCompactLineage := flag.Bool("websocket-compact-lineage", false, "compare WebSocket strict Compact turn lineage and unbound selection against 0.438.4")
 	websocketSerdeFloat := flag.Bool("websocket-serde-float", false, "compare serde JSON whole-document validity for WebSocket tool-output affinity")
 	httpKeepAlive := flag.Bool("http-keepalive", false, "compare request-local deadlines across a reused HTTP connection")
 	httpCompact := flag.Bool("http-compact", false, "compare Compact precommit transport recovery and durable ownership")
@@ -194,14 +194,15 @@ func main() {
 	httpSSEDeadOnly := flag.Bool("http-sse-dead", false, "compare only postcommit SSE dead-chain response/turn owner cleanup against the pinned binary")
 	httpResponseKind := flag.Bool("http-response-kind", false, "compare exact response object-kind identity and durable owner without other HTTP cases")
 	httpSerdeFloat := flag.Bool("http-serde-float", false, "compare near-max f64 serde whole-JSON validity and durable response binding")
-	httpPromptCache := flag.Bool("http-prompt-cache", false, "compare 0.438.3 compiled cached-token affinity on authenticated HTTP Responses")
-	http429Policy := flag.Bool("http-429-policy", false, "compare 0.438.3 Mojo raw HTTP 429 policy and authenticated profile selection")
-	httpProfileStatus := flag.Bool("http-profile-status", false, "compare 0.438.3 Mojo HTTP 402/403 profile/quota text policy")
+	httpSSEEventKind := flag.Bool("http-sse-event-kind", false, "compare exact unpadded SSE event-kind precommit hold/commit semantics")
+	httpPromptCache := flag.Bool("http-prompt-cache", false, "compare 0.438.4 compiled cached-token affinity on authenticated HTTP Responses")
+	http429Policy := flag.Bool("http-429-policy", false, "compare 0.438.4 Mojo raw HTTP 429 policy and authenticated profile selection")
+	httpProfileStatus := flag.Bool("http-profile-status", false, "compare 0.438.4 Mojo HTTP 402/403 profile/quota text policy")
 	godexSource := flag.String("godex-source", "", "clean Godex commit source (required with an isolated fixture)")
 	godexCommit := flag.String("godex-commit", "", "exact 40-character Godex commit (required with an isolated fixture)")
 	flag.Parse()
 	chosen := 0
-	for _, mode := range []bool{*websocket, *websocketCapacity, *websocketDeadline, *websocketCommittedIdle, *websocketLookaheadIdle, *websocketRealtime, *websocketTransport, *websocketTransportCore, *websocketTransportLifecycle, *websocketTransportCapacity, *websocketCompactLineage, *websocketSerdeFloat, *httpKeepAlive, *httpCompact, *httpTurnTransport, *httpSessionConflict, *httpSSEDeadOnly, *httpResponseKind, *httpSerdeFloat, *httpPromptCache, *http429Policy, *httpProfileStatus} {
+	for _, mode := range []bool{*websocket, *websocketCapacity, *websocketDeadline, *websocketCommittedIdle, *websocketLookaheadIdle, *websocketRealtime, *websocketTransport, *websocketTransportCore, *websocketTransportLifecycle, *websocketTransportCapacity, *websocketCompactLineage, *websocketSerdeFloat, *httpKeepAlive, *httpCompact, *httpTurnTransport, *httpSessionConflict, *httpSSEDeadOnly, *httpResponseKind, *httpSerdeFloat, *httpSSEEventKind, *httpPromptCache, *http429Policy, *httpProfileStatus} {
 		if mode {
 			chosen++
 		}
@@ -277,6 +278,8 @@ func main() {
 			err = runHTTPResponseKindProduct04383(filepath.Join(root, "response-object-kind"), p)
 		} else if *httpSerdeFloat {
 			err = runHTTPResponseSerdeFloatProduct04383(filepath.Join(root, "serde-float-response"), p)
+		} else if *httpSSEEventKind {
+			err = runHTTPSSEEventKindProduct04383(filepath.Join(root, "sse-exact-kind"), p)
 		} else if *httpTurnTransport {
 			err = runHTTPResponsesTurnProduct04383(root, p)
 		} else if *httpCompact {
@@ -321,58 +324,62 @@ func main() {
 		}
 	}
 	if *http429Policy {
-		fmt.Println("PASS Prodex 0.438.3 Mojo raw HTTP 429 policy across both binaries")
+		fmt.Println("PASS Prodex 0.438.4 Mojo raw HTTP 429 policy across both binaries")
 		return
 	}
 	if *httpProfileStatus {
 		// This isolated HTTP 402/403 oracle does not use the generic
 		// continuation loopback backend. Report its verified result as
 		// such, rather than emitting the unrelated zero-attempt headline.
-		fmt.Println("PASS Prodex 0.438.3 HTTP 402/403 profile and quota status policy across both binaries")
+		fmt.Println("PASS Prodex 0.438.4 HTTP 402/403 profile and quota status policy across both binaries")
 		return
 	}
 	if *httpPromptCache {
-		fmt.Println("PASS Prodex 0.438.3 HTTP Responses native cached-token affinity across both binaries")
+		fmt.Println("PASS Prodex 0.438.4 HTTP Responses native cached-token affinity across both binaries")
 		return
 	}
 	if *httpSessionConflict {
-		fmt.Println("PASS Prodex 0.438.3 HTTP Responses conflicted soft-session fallback and durable ownership across both binaries")
+		fmt.Println("PASS Prodex 0.438.4 HTTP Responses conflicted soft-session fallback and durable ownership across both binaries")
 		return
 	}
 	if *httpSSEDeadOnly {
-		fmt.Println("PASS Prodex 0.438.3 postcommit SSE dead response and orphan turn cleanup across both binaries")
+		fmt.Println("PASS Prodex 0.438.4 postcommit SSE dead response and orphan turn cleanup across both binaries")
 		return
 	}
 	if *httpResponseKind {
-		fmt.Println("PASS Prodex 0.438.3 untrimmed HTTP response object identity and durable ownership across both binaries")
+		fmt.Println("PASS Prodex 0.438.4 untrimmed HTTP response object identity and durable ownership across both binaries")
 		return
 	}
 	if *httpSerdeFloat {
-		fmt.Println("PASS Prodex 0.438.3 serde JSON near-maximum f64 response identity across both binaries")
+		fmt.Println("PASS Prodex 0.438.4 serde JSON near-maximum f64 response identity across both binaries")
+		return
+	}
+	if *httpSSEEventKind {
+		fmt.Println("PASS Prodex 0.438.4 exact SSE event kind precommit policy across both binaries")
 		return
 	}
 	if *httpTurnTransport {
-		fmt.Println("PASS Prodex 0.438.3 owned HTTP Responses turn transport failure and durable ownership across both binaries")
+		fmt.Println("PASS Prodex 0.438.4 owned HTTP Responses turn transport failure and durable ownership across both binaries")
 		return
 	}
 	if *httpCompact {
-		fmt.Println("PASS Prodex 0.438.3 HTTP Compact transport recovery and durable ownership across both binaries")
+		fmt.Println("PASS Prodex 0.438.4 HTTP Compact transport recovery and durable ownership across both binaries")
 		return
 	}
 	if *httpKeepAlive {
-		fmt.Println("PASS Prodex 0.438.3 HTTP keepalive request-budget renewal across both binaries")
+		fmt.Println("PASS Prodex 0.438.4 HTTP keepalive request-budget renewal across both binaries")
 		return
 	}
 	if *websocketCompactLineage {
-		fmt.Println("PASS Prodex 0.438.3 strict WebSocket Compact turn lineage across both binaries")
+		fmt.Println("PASS Prodex 0.438.4 strict WebSocket Compact turn lineage across both binaries")
 		return
 	}
 	if *websocketSerdeFloat {
-		fmt.Println("PASS Prodex 0.438.3 WebSocket serde numeric whole-document affinity across both binaries")
+		fmt.Println("PASS Prodex 0.438.4 WebSocket serde numeric whole-document affinity across both binaries")
 		return
 	}
 	if *websocketTransport {
-		fmt.Println("PASS Prodex 0.438.3 authenticated full-history WebSocket transport recovery across both binaries")
+		fmt.Println("PASS Prodex 0.438.4 authenticated full-history WebSocket transport recovery across both binaries")
 		return
 	}
 	if *websocketTransportCore || *websocketTransportLifecycle || *websocketTransportCapacity {
@@ -382,7 +389,7 @@ func main() {
 		} else if *websocketTransportCapacity {
 			scope = "capacity"
 		}
-		fmt.Printf("PASS Prodex 0.438.3 authenticated full-history WebSocket transport %s oracle across both binaries\n", scope)
+		fmt.Printf("PASS Prodex 0.438.4 authenticated full-history WebSocket transport %s oracle across both binaries\n", scope)
 		return
 	}
 	if chosen > 0 && !*websocketRealtime {
@@ -391,23 +398,23 @@ func main() {
 		b.mu.Unlock()
 	}
 	if *websocketRealtime {
-		fmt.Println("PASS Prodex 0.438.3 realtime duplex permit and close lifecycle across both binaries")
+		fmt.Println("PASS Prodex 0.438.4 realtime duplex permit and close lifecycle across both binaries")
 		return
 	}
 	if *websocketLookaheadIdle {
-		fmt.Printf("PASS Prodex 0.438.3 precommit 8KiB lookahead committed idle: %d upstream attempts across both binaries\n", len(mustAttempts(b)))
+		fmt.Printf("PASS Prodex 0.438.4 precommit 8KiB lookahead committed idle: %d upstream attempts across both binaries\n", len(mustAttempts(b)))
 		return
 	}
 	if *websocketCommittedIdle {
-		fmt.Printf("PASS Prodex 0.438.3 committed output WebSocket idle graceful closure: %d authenticated upstream attempts across both binaries\n", len(mustAttempts(b)))
+		fmt.Printf("PASS Prodex 0.438.4 committed output WebSocket idle graceful closure: %d authenticated upstream attempts across both binaries\n", len(mustAttempts(b)))
 		return
 	}
 	if *websocketDeadline {
-		fmt.Printf("PASS Prodex 0.438.3 absolute precommit WebSocket deadline: %d total upstream attempts across both binaries\n", len(mustAttempts(b)))
+		fmt.Printf("PASS Prodex 0.438.4 absolute precommit WebSocket deadline: %d total upstream attempts across both binaries\n", len(mustAttempts(b)))
 		return
 	}
 	if *websocketCapacity {
-		fmt.Printf("PASS Prodex 0.438.3 completed-idle WebSocket capacity/reuse: %d total upstream attempts across both binaries\n", len(mustAttempts(b)))
+		fmt.Printf("PASS Prodex 0.438.4 completed-idle WebSocket capacity/reuse: %d total upstream attempts across both binaries\n", len(mustAttempts(b)))
 		return
 	}
 	if *websocket {
@@ -429,7 +436,7 @@ func verifyProdex(binary, source string) error {
 		return err
 	}
 	output, err := exec.Command(binary, "--version").CombinedOutput()
-	if err != nil || strings.TrimSpace(string(output)) != "prodex 0.438.3" {
+	if err != nil || strings.TrimSpace(string(output)) != "prodex 0.438.4" {
 		return fmt.Errorf("unexpected Prodex version %q: %v", output, err)
 	}
 	if err := verifyProdexSource(source); err != nil {
@@ -441,7 +448,7 @@ func verifyProdex(binary, source string) error {
 func verifyProdexSource(source string) error {
 	output, err := exec.Command("git", "-C", source, "rev-parse", "HEAD").Output()
 	if err != nil || strings.TrimSpace(string(output)) != prodexCommit {
-		return fmt.Errorf("Prodex source is not tag 0.438.3")
+		return fmt.Errorf("Prodex source is not tag 0.438.4")
 	}
 	return verifyProdexSourceClean(source)
 }

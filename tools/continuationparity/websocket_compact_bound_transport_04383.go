@@ -11,7 +11,7 @@ import (
 	"github.com/christiandoxa/godex/internal/helper/websocketframe"
 )
 
-// Prodex 0.438.3 treats a Compact-origin turn alias as a turn-state profile
+// Prodex 0.438.4 treats a Compact-origin turn alias as a turn-state profile
 // when full request history is independently reconstructable. On a precommit
 // EOF, the original second-owned attempt can replay once on authenticated
 // Ready main with its stale turn token scrubbed. The Compact alias remains on

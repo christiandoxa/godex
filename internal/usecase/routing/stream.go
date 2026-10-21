@@ -94,6 +94,10 @@ func streamOutcome(data []byte, headers http.Header, now time.Time, providerKind
 	if json.Unmarshal(data, &event) != nil {
 		return responseOutcome{kind: responsePass}, false
 	}
+	// The tagged Rust response_metadata decoder trims the event_type
+	// before passing it to Mojo rich_route.websocket_event_kind, which
+	// then checks the normalized type using an exact literal comparison.
+	// Padded response.created therefore remains a precommit hold.
 	event.Type = strings.TrimSpace(event.Type)
 	if !externalProviderKind(providerKind) {
 		// Tagged 0.438.3 runtime_sse_inspection_step checks terminal

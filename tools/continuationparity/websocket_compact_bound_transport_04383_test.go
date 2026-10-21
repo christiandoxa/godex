@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// The actual pinned 0.438.3 executable replays a reconstructable full history
+// The actual pinned 0.438.4 executable replays a reconstructable full history
 // from its old Compact turn owner to an authenticated Ready alternate. It
 // scrubs both stale turn-state carriers without losing opaque user history.
 func TestProdex04383CompactBoundTransportRejectsReplayMutations(t *testing.T) {

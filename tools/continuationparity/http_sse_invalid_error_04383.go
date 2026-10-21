@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -21,11 +22,25 @@ func httpSSEInvalidErrorShapes04383() []string {
 		"canonical-quota", "canonical-rate", "created-quota", "inprogress-rate", "keepalive-quota",
 		"quota-and-invalid-id", "rate-and-invalid-id", "reason-quota-and-invalid-id",
 		"payload-bom-quota", "payload-double-bom-quota", "wire-field-bom-ignored",
-		"bare-cr-embedded-quota", "crlf-quota", "cr-padding-quota"}
+		"bare-cr-embedded-quota", "crlf-quota", "cr-padding-quota",
+		"padded-created-leading", "padded-created-trailing", "padded-keepalive", "canonical-created-hold"}
 }
 
 func httpSSEInvalidErrorBody04383(shape string) string {
 	switch shape {
+	case "padded-created-leading", "padded-created-trailing", "padded-keepalive", "canonical-created-hold":
+		kind := "response.created"
+		switch shape {
+		case "padded-created-leading":
+			kind = " response.created"
+		case "padded-created-trailing":
+			kind = "response.created "
+		case "padded-keepalive":
+			kind = "keepalive "
+		}
+		first := "data: " + `{"type":` + quotedSSEKindForOracle04383(kind) + `,"response":{"id":"resp-first-output"}}` + "\n\n"
+		second := "data: " + `{"type":"response.failed","response":{"error":{"code":"insufficient_quota"}}}` + "\n\n"
+		return first + second
 	case "opaque-scalar-quota":
 		return "data: " + `{"type":"response.failed","response":{"error":"insufficient_quota"}}` + "\n\n"
 	case "opaque-error-code-quota":
@@ -84,8 +99,27 @@ func httpSSEInvalidErrorBody04383(shape string) string {
 	return "data: " + `{"type":"response.failed","response":{"error":{"code":"insufficient_quota"}},"unused":` + note + `}` + "\n\n"
 }
 
+func quotedSSEKindForOracle04383(value string) string {
+	bytes, _ := json.Marshal(value)
+	return string(bytes)
+}
+
+func httpSSEEventKindShapes04383() []string {
+	return []string{"padded-created-leading", "padded-created-trailing", "padded-keepalive", "canonical-created-hold"}
+}
+
+func runHTTPSSEEventKindProduct04383(root string, p product) error {
+	for _, shape := range httpSSEEventKindShapes04383() {
+		if err := runHTTPSSEInvalidErrorCase04383(filepath.Join(root, shape), p, shape); err != nil {
+			return fmt.Errorf("SSE exact event kind %s: %w", shape, err)
+		}
+	}
+	return nil
+}
+
 func httpSSEInvalidErrorRotates04383(shape string) bool {
-	return shape == "canonical-quota" || shape == "canonical-rate" ||
+	return shape == "canonical-created-hold" || shape == "padded-created-leading" ||
+		shape == "padded-created-trailing" || shape == "padded-keepalive" || shape == "canonical-quota" || shape == "canonical-rate" ||
 		shape == "created-quota" || shape == "inprogress-rate" || shape == "keepalive-quota" ||
 		shape == "quota-and-invalid-id" || shape == "rate-and-invalid-id" || shape == "reason-quota-and-invalid-id" ||
 		shape == "payload-bom-quota" || shape == "payload-double-bom-quota" ||

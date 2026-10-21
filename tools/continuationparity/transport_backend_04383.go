@@ -199,6 +199,18 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			if owner == "account-b" && httpSSEInvalidErrorRotates04383(shape) {
 				_, _ = io.WriteString(w, httpSSERecovered04383)
+			} else if strings.HasPrefix(shape, "padded-") || shape == "canonical-created-hold" {
+				// Commit the first independent event before the later quota
+				// failure arrives. A padded kind must already be visible to
+				// the client and cannot be retroactively retried elsewhere.
+				wire := httpSSEInvalidErrorBody04383(shape)
+				boundary := strings.Index(wire, "\n\n") + 2
+				_, _ = io.WriteString(w, wire[:boundary])
+				if flusher, ok := w.(http.Flusher); ok {
+					flusher.Flush()
+				}
+				time.Sleep(120 * time.Millisecond)
+				_, _ = io.WriteString(w, wire[boundary:])
 			} else {
 				_, _ = io.WriteString(w, httpSSEInvalidErrorBody04383(shape))
 			}

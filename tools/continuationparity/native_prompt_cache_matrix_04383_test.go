@@ -16,6 +16,6 @@ func TestProdex04383NativeMatrixRunsPromptCacheOracle(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.Contains(string(data), "'--http-prompt-cache'") {
-		t.Fatal("native 0.438.3 mode matrix omits the prompt-cache differential")
+		t.Fatal("native 0.438.4 mode matrix omits the prompt-cache differential")
 	}
 }

@@ -37,7 +37,7 @@ func websocketToolTypeAttempts04383(shape string) int {
 	case "trailing-space", "trailing-tab":
 		return 1
 	case "serde-max-invalid":
-		return 12 // Tagged 0.438.3 unbound precommit attempt budget.
+		return 12 // Tagged 0.438.4 unbound precommit attempt budget.
 	default:
 		return 4
 	}

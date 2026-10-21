@@ -1,6 +1,6 @@
-# Prodex 0.438.3 continuation and WebSocket executable differential
+# Prodex 0.438.4 continuation and WebSocket executable differential
 
-This harness compares an official SHA-256-pinned Prodex `0.438.3` binary
+This harness compares an official SHA-256-pinned Prodex `0.438.4` binary
 and Godex using isolated two-profile homes, synthetic credentials, and a
 loopback-only upstream. It does **not** send real model requests or use
 the caller's account credentials.
@@ -11,12 +11,15 @@ streaming output, cancellation, and process restart. Historical status
 and retry differences may remain within this bounded HTTP observation;
 the fixture is not a full feature-parity certificate.
 
-The current runner and published native manifest are pinned to source commit
-`42042d765100fc06895a27e0904ffb64842092e6` and release-manifest
-SHA-256 `300a8f046041a95f9757e4cbdb72917d37927683b6e1af442492254e2f1a37da`.
-The 0.438.2 names below identify where particular compatibility fixtures
-originated; their active executable reference is **0.438.3**. All release
-phases must use the same clean Godex commit.
+The current runner and published native manifest are pinned to **0.438.4**
+source commit `4cf03ccff2b6132058e2359fd253ad6e2d107011`, Linux
+x86-64 executable SHA-256
+`b736e1b2430b80ff2af35cff18e884b42ca83e8028c4fd47df5285f5d0d584e9`,
+and release-manifest SHA-256
+`28b7a894cd10fb69c528245e25dc01b9f204cfcc78b5ee575e22b4967c72c650`.
+The earlier 0.438.2/0.438.3 names below identify where particular
+compatibility fixtures originated; their **active executable reference is
+0.438.4**. All release phases must use the same clean Godex commit.
 
 ## HTTP keep-alive request budgets
 
@@ -1115,3 +1118,12 @@ provider's 24-hour cap. Local HTTP 429 and precommit SSE regressions check
 actual cooldown classification and multiple header candidates; the broad
 official HTTP 429 oracle remains a separate no-regression gate rather than
 a claimed timed comparison of these particular large delays.
+
+The `--http-sse-event-kind` focused fixture checks Rust-trimmed
+SSE event-type semantics: canonical `response.created`, padded
+`response.created `, ` response.created` and `keepalive ` all hold
+precommit. The fixture flushes the first upstream event, then sends a
+quota failure; the request may rotate to an authenticated Ready second
+profile before releasing any client output. Both binaries must return the
+same recovered SSE, two exact model attempts, and unchanged previously
+verified response ownership. This mode remains in `--http-turn-transport`.

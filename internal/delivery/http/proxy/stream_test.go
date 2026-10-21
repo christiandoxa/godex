@@ -154,11 +154,14 @@ func TestProxySSETrimsEventTypeBeforeRetryClassification(t *testing.T) {
 	response := doProxyJSON(t, proxy.URL+"/responses", `{}`, nil)
 	body, err := io.ReadAll(response.Body)
 	_ = response.Body.Close()
+	// Rust's response_metadata decoder trims event_type before Mojo's
+	// exact-literal hold classification. Therefore padded response.created
+	// does not commit and a later quota failure may retry on B.
 	if err != nil || response.StatusCode != http.StatusOK || string(body) != "data: {\"type\":\"response.output_text.delta\",\"delta\":\"recovered\"}\n\n" {
-		t.Fatalf("whitespace SSE retry = status:%d body:%q err:%v", response.StatusCode, body, err)
+		t.Fatalf("normalized SSE hold/retry = status:%d body:%q err:%v", response.StatusCode, body, err)
 	}
 	if !reflect.DeepEqual(seen, []string{"workspace-A", "workspace-B"}) {
-		t.Fatalf("whitespace SSE accounts = %#v", seen)
+		t.Fatalf("normalized SSE hold owner trace = %#v", seen)
 	}
 }
 

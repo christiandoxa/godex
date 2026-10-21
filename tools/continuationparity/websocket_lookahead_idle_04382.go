@@ -29,7 +29,7 @@ func verifyWebSocketLookaheadIdle04382(result websocketLookaheadIdleResult04382)
 		return fmt.Errorf("lookahead hold content or event kind was changed/lost: kind=%q padding_bytes=%d", result.eventType, len(result.padding))
 	}
 	if result.heartbeats < 1 || result.heartbeats > 3 {
-		return fmt.Errorf("0.438.3 missing/excess client Ping heartbeat: %d", result.heartbeats)
+		return fmt.Errorf("0.438.4 missing/excess client Ping heartbeat: %d", result.heartbeats)
 	}
 	if result.closeOpcode != 8 || len(result.closePayload) != 0 {
 		return fmt.Errorf("lookahead committed idle must close WebSocket gracefully: opcode=%d payload=%q", result.closeOpcode, result.closePayload)
