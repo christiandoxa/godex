@@ -35,8 +35,7 @@ func translateResponse(response *http.Response, requestMetadata map[string]any) 
 func translateResponseWithCallFallback04380(
 	response *http.Response, requestMetadata map[string]any, chatCompatible bool,
 ) (*proxymodel.Response, error) {
-	contentType := strings.ToLower(response.Header.Get("Content-Type"))
-	if strings.Contains(contentType, "text/event-stream") {
+	if geminiContentTypeIsSSE04384(response.Header.Get("Content-Type")) {
 		return translateGeminiNativeStream(response, requestMetadata), nil
 	}
 	defer response.Body.Close()

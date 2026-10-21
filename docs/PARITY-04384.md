@@ -655,3 +655,48 @@ model/alias paths, and 404 for ordinary unknown ASCII model IDs. Every case
 must avoid upstream completion requests. This demonstrates observable full
 HTTP-path parity independently of the static catalog fallback's library
 semantics.
+
+## Provider Content-Type SSE detection uses ASCII-only casing
+
+The published 0.438.4 local-rewrite response dispatcher computes
+`content_type.to_ascii_lowercase()` from the original upstream header
+before checking for `"text/event-stream"`. Rust's ASCII-only conversion
+**does not** turn Unicode U+017F LONG S (`ſ`) into ASCII `s`.
+Several Godex Gemini and DeepSeek response paths previously used Unicode
+`strings.ToLower`: the header `text/event-ſtream` would therefore be
+misclassified as an SSE response, potentially sending a valid buffered
+JSON response to the SSE translator, committing the stream too early, or
+losing assistant output.
+
+A source-aligned regression matrix verifies canonical lowercase, uppercase
+and mixed-case ASCII MIME labels as genuine SSE, but rejects long-s
+lookalikes. Complete synthetic buffered Responses are decoded through the
+native Gemini and Chat-compatible Gemini adapters and the DeepSeek
+Chat-compatible adapter: each retains a normal JSON response and visible
+assistant output. The scoped fix shares bytewise ASCII-only media-type
+helpers across the affected provider branches, including DeepSeek SSE
+precommit inspection and Anthropic Messages translation. Provider headers
+and upstream request payloads are unchanged. The broader pinned executable
+Gemini/DeepSeek differential is a separate no-regression check, not a
+claim of live HTTP header injection into real providers.
+
+## Gemini response Content-Type detection uses ASCII-only case folding
+
+The tagged 0.438.4 `local_rewrite_response_dispatch.rs` and Chat-compatible
+response dispatcher classify streamed upstream Gemini content only after
+calling Rust `str::to_ascii_lowercase()` and checking for the literal
+`text/event-stream`. Godex previously used `strings.ToLower` (Unicode
+casefolding) in its native Responses and Chat-compatible bridges, allowing
+U+017F LATIN LONG S in `text/event-ſtream` to impersonate the ASCII SSE
+MIME type. That could send an otherwise valid buffered Gemini JSON response
+through the SSE decoder, losing the response object and client output.
+
+Fail-before tests cover canonical, uppercase, mixed-case ASCII types,
+Unicode long-s variants, and end-to-end native and Chat-compatible response
+translation. The correction shares one ASCII-only content-type detector,
+preserving the genuine stream path while keeping the lookalike response in
+buffered JSON mode with its visible assistant text intact. The original
+upstream bytes are not rewritten. The source-pinned local regression is
+separate from the comprehensive Gemini executable transport oracle, which
+serves as a broader no-regression check rather than a claim that this
+specific Unicode header traversed a real provider.

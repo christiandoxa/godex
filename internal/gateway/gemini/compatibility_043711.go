@@ -7,7 +7,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"strings"
 
 	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
@@ -45,7 +44,7 @@ func (transport *RuntimeTransport) executeChatCompatibleResponses(
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		return proxyResponse(response), nil
 	}
-	if strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream") {
+	if geminiContentTypeIsSSE04384(response.Header.Get("Content-Type")) {
 		return translateGeminiChatCompatibleStream043711(response), nil
 	}
 	return translateGeminiChatOrNativeResponse043711(response)
@@ -102,7 +101,7 @@ func normalizeGeminiChatInput043711(body []byte) ([]byte, error) {
 func translateGeminiChatOrNativeResponse043711(
 	response *http.Response,
 ) (*proxymodel.Response, error) {
-	if strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream") {
+	if geminiContentTypeIsSSE04384(response.Header.Get("Content-Type")) {
 		return translateResponse(response, nil)
 	}
 	defer response.Body.Close()
