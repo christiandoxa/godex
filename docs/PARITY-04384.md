@@ -54,3 +54,38 @@ cases is evidence for those behaviors only. Expanded 0.438.4-specific
 source/behavior comparisons remain required for any claim of overall 1:1
 parity, especially provider-specific proxy paths, Kiro CLI 2.33.0, and
 native macOS/Windows execution.
+
+## Kiro ACP update policy and unsigned usage
+
+The 0.438.4 Rust `runtime_kiro_acp/protocol.rs` delegates the precise
+`session/update` discriminator and required field checks to the compiled
+`kiro_acp_update_policy.mojo`. Its turn-state collector calls
+`parse_session_notification().ok()`: malformed updates are **ignored**, not
+converted into tool activity, usage or streamed model output. The notification
+must include a string `sessionId`, an update object and a string
+`sessionUpdate`. Recognized variants require their appropriate fields:
+`tool_call` needs string `toolCallId` and `title`, `tool_call_update` needs
+string `toolCallId`, `usage_update` needs full-range unsigned `used` and
+`size`, `plan` needs valid typed entries, and the command/mode updates need
+their appropriate list/string. The exact discriminator is case- and
+whitespace-sensitive. Unknown variants remain valid but have no state effect.
+
+Godex previously projected raw `session/update` maps directly, even if the
+Rust parser would reject them. Fail-before regressions demonstrated phantom
+tool activities with no ID/title, overwriting a good usage snapshot with a
+malformed update, and client-visible live text from a notification missing
+`sessionId`. The scoped Go validator now gates both buffered collection and
+streaming observation before mutating turn state, preserves earlier valid
+updates, and retains the original network request bytes. A second fail-before
+regression found `runtimeUint` parsing `json.Number` with `Int64` rather than
+`Uint64`: accepted u64 usage values above `2^63-1` became **zero**. The
+projection now preserves all accepted 64-bit unsigned usage and computes
+remaining capacity without signed overflow.
+
+The matrix checks the exact recognized/unknown variants, missing and
+wrong-type fields, valid plan and usage controls, cost parsing, and streamed
+activity suppression. It is matched to the published 0.438.4 Mojo/Rust source
+and is exercised by local and race-enabled Kiro package tests. A local
+`kiro-cli` reports version 2.13.0; the release's Kiro CLI 2.33.0 smoke
+qualification has **not** been reproduced with that live binary, and no
+personal Kiro credential, conversation, or provider session was accessed.

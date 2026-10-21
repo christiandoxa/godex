@@ -63,12 +63,8 @@ func (state *kiroLiveState) observe(route runtimeRoute, envelope acpEnvelope) []
 	if envelope.Method != "session/update" || len(envelope.Params) == 0 {
 		return nil
 	}
-	var params map[string]any
-	if json.Unmarshal(envelope.Params, &params) != nil {
-		return nil
-	}
-	update, _ := params["update"].(map[string]any)
-	if update == nil {
+	update, valid := kiroACPValidatedUpdate04384(envelope)
+	if !valid {
 		return nil
 	}
 	assistantBefore := len(state.turn.assistantText)

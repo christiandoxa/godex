@@ -3,6 +3,7 @@ package kiro
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -79,19 +80,19 @@ func collectKiroTurnState(notifications []acpEnvelope) kiroTurnState {
 		if envelope.Method != "session/update" || len(envelope.Params) == 0 {
 			continue
 		}
-		var params struct {
-			Update map[string]any `json:"update"`
-		}
-		if json.Unmarshal(envelope.Params, &params) != nil || params.Update == nil {
+		update, valid := kiroACPValidatedUpdate04384(envelope)
+		if !valid {
 			continue
 		}
-		state.applyUpdate(params.Update)
+		state.applyUpdate(update)
 	}
 	return state
 }
 
 func (state *kiroTurnState) applyUpdate(update map[string]any) {
-	kind := runtimeString(update["sessionUpdate"], "")
+	// Mojo classifies the exact update discriminator before content
+	// processing; padding cannot turn an unknown variant into tool_call.
+	kind, _ := update["sessionUpdate"].(string)
 	switch kind {
 	case "agent_message_chunk":
 		state.assistantText += acpContentText(update[kiroFieldContent])
@@ -276,8 +277,11 @@ func runtimeUint(value any) uint64 {
 			return uint64(typed)
 		}
 	case json.Number:
-		if parsed, err := typed.Int64(); err == nil && parsed >= 0 {
-			return uint64(parsed)
+		// Tagged serde Value::as_u64 supports the entire unsigned range.
+		// json.Number.Int64 rejects valid [2^63, 2^64-1] usage and
+		// would silently turn a real Kiro usage update into zero.
+		if parsed, err := strconv.ParseUint(string(typed), 10, 64); err == nil {
+			return parsed
 		}
 	case int:
 		if typed >= 0 {
