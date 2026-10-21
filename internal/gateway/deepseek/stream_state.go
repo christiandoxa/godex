@@ -74,7 +74,7 @@ func (state *deepSeekChatStreamState) observe(data []byte) ([]byte, bool, error)
 	if err := json.Unmarshal(data, &root); err != nil || root == nil {
 		return nil, false, fmt.Errorf("failed to parse DeepSeek SSE JSON")
 	}
-	if code, message, ok := deepSeekEmbeddedStreamError(root); ok {
+	if code, message, ok := deepSeekEmbeddedStreamError(root, data); ok {
 		return state.failed(code, message)
 	}
 	state.applyChunkMetadata(root)
@@ -182,103 +182,6 @@ func deepSeekStreamUint(value any) (uint64, bool) {
 		}
 	}
 	return 0, false
-}
-
-func deepSeekEmbeddedStreamError(root map[string]any) (string, string, bool) {
-	raw, ok := root["error"]
-	if !ok {
-		return "", "", false
-	}
-	if message, ok := raw.(string); ok {
-		return "provider_stream_error", message, true
-	}
-	errorObject, _ := raw.(map[string]any)
-	code := "provider_stream_error"
-	for _, key := range []string{"type", "code"} {
-		switch value := errorObject[key].(type) {
-		case string:
-			if value != "" {
-				code = value
-				goto codeDone
-			}
-		case float64:
-			if value == float64(int64(value)) {
-				code = strconv.FormatInt(int64(value), 10)
-				goto codeDone
-			}
-		case json.Number:
-			code = value.String()
-			goto codeDone
-		}
-	}
-codeDone:
-	message := "Provider stream returned an embedded error"
-	for _, key := range []string{"message", "detail"} {
-		if value, _ := errorObject[key].(string); value != "" {
-			message = value
-			break
-		}
-	}
-	return code, message, true
-}
-
-func (state *deepSeekChatStreamState) observeToolCallDelta(call map[string]any) ([][]byte, bool) {
-	index := integerValue(call["index"])
-	current := state.toolCalls[index]
-	function, hasFunction := call["function"].(map[string]any)
-	if current == nil && !hasFunction {
-		failed, _, _ := state.failed("invalid_tool_call_arguments", "DeepSeek streamed a tool call without a function object")
-		return [][]byte{failed}, true
-	}
-	if current == nil {
-		current = &deepSeekChatStreamToolCall{id: deepSeekCallFallbackID()}
-		state.toolCalls[index] = current
-	}
-	if id, _ := call["id"].(string); strings.TrimSpace(id) != "" {
-		current.id = strings.TrimSpace(id)
-	}
-	if hasFunction {
-		if name, _ := function["name"].(string); strings.TrimSpace(name) != "" {
-			current.name = strings.TrimSpace(name)
-		}
-	}
-	if signature := deepSeekStreamThoughtSignature(call); signature != "" {
-		current.thoughtSignature = signature
-	}
-
-	name := current.name
-	if name == "" {
-		name = "tool_call"
-	}
-	var events [][]byte
-	if !current.added {
-		current.added = true
-		if item := deepSeekStreamAddedToolItem(current.id, name); item != nil {
-			events = append(events, anthropicStreamEvent("response.output_item.added", map[string]any{
-				"type": "response.output_item.added", "sequence_number": state.nextSequenceNumber(),
-				"output_index": index, "item": item,
-			}))
-		}
-	}
-	if hasFunction {
-		if arguments, ok := function["arguments"].(string); ok && arguments != "" {
-			current.arguments.WriteString(arguments)
-			if name != "tool_search" && name != "apply_patch" {
-				events = append(events, anthropicStreamEvent("response.function_call_arguments.delta", map[string]any{
-					"type": "response.function_call_arguments.delta", "sequence_number": state.nextSequenceNumber(),
-					"output_index": index, "call_id": current.id, "delta": arguments,
-				}))
-			}
-		}
-	}
-	return events, false
-}
-
-func deepSeekStreamThoughtSignature(call map[string]any) string {
-	extra, _ := call["extra_content"].(map[string]any)
-	google, _ := extra["google"].(map[string]any)
-	signature, _ := google["thought_signature"].(string)
-	return strings.TrimSpace(signature)
 }
 
 func (state *deepSeekChatStreamState) complete() ([]byte, bool, error) {

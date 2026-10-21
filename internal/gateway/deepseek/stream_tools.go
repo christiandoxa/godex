@@ -211,3 +211,62 @@ func firstDeepSeekStringFound(object map[string]any, keys ...string) (string, bo
 	}
 	return "", false
 }
+
+func (state *deepSeekChatStreamState) observeToolCallDelta(call map[string]any) ([][]byte, bool) {
+	index := integerValue(call["index"])
+	current := state.toolCalls[index]
+	function, hasFunction := call["function"].(map[string]any)
+	if current == nil && !hasFunction {
+		failed, _, _ := state.failed("invalid_tool_call_arguments", "DeepSeek streamed a tool call without a function object")
+		return [][]byte{failed}, true
+	}
+	if current == nil {
+		current = &deepSeekChatStreamToolCall{id: deepSeekCallFallbackID()}
+		state.toolCalls[index] = current
+	}
+	if id, _ := call["id"].(string); strings.TrimSpace(id) != "" {
+		current.id = strings.TrimSpace(id)
+	}
+	if hasFunction {
+		if name, _ := function["name"].(string); strings.TrimSpace(name) != "" {
+			current.name = strings.TrimSpace(name)
+		}
+	}
+	if signature := deepSeekStreamThoughtSignature(call); signature != "" {
+		current.thoughtSignature = signature
+	}
+
+	name := current.name
+	if name == "" {
+		name = "tool_call"
+	}
+	var events [][]byte
+	if !current.added {
+		current.added = true
+		if item := deepSeekStreamAddedToolItem(current.id, name); item != nil {
+			events = append(events, anthropicStreamEvent("response.output_item.added", map[string]any{
+				"type": "response.output_item.added", "sequence_number": state.nextSequenceNumber(),
+				"output_index": index, "item": item,
+			}))
+		}
+	}
+	if hasFunction {
+		if arguments, ok := function["arguments"].(string); ok && arguments != "" {
+			current.arguments.WriteString(arguments)
+			if name != "tool_search" && name != "apply_patch" {
+				events = append(events, anthropicStreamEvent("response.function_call_arguments.delta", map[string]any{
+					"type": "response.function_call_arguments.delta", "sequence_number": state.nextSequenceNumber(),
+					"output_index": index, "call_id": current.id, "delta": arguments,
+				}))
+			}
+		}
+	}
+	return events, false
+}
+
+func deepSeekStreamThoughtSignature(call map[string]any) string {
+	extra, _ := call["extra_content"].(map[string]any)
+	google, _ := extra["google"].(map[string]any)
+	signature, _ := google["thought_signature"].(string)
+	return strings.TrimSpace(signature)
+}

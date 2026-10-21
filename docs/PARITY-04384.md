@@ -1801,3 +1801,70 @@ Logs: `/tmp/gdx-04384-chat-sse-eof-race.log`,
 `/tmp/gdx-04384-chat-sse-eof-final-test-all.log` and
 `/tmp/gdx-04384-chat-sse-eof-final-verify.log`. Clean candidate executable
 differential validation follows the commit.
+
+The released EOF baseline on `8527a718d6d17833c10116cc921e2ad6f4ca04ea`
+matched 40/41 cases and failed only Godex's missing failure timestamp.
+Prodex and mutation controls passed. Clean commit
+`eb15bee887f080663c6439ce21ea33718e7997c7` then passed all 41 cases and
+controls before its fast-forward push to `origin/main`. Logs:
+`/tmp/gdx-04384-chat-sse-eof-before-oracle.json` and
+`/tmp/gdx-04384-chat-sse-eof-oracle.json`.
+
+## DeepSeek embedded SSE errors preserve field presence and numeric kinds
+
+Tagged `deepseek_provider_core_chat_stream_error` acquires the exact
+`error` member and delegates to the compiled `StreamErrorClassification`
+operation. A present `type` overrides `code`, even when empty, null or
+incorrectly typed. A present `message` similarly overrides `detail`.
+Strings retain empty values and whitespace. Numeric codes require signed
+i64 values; integral floats, exponent tokens, negative zero and unsigned
+overflow use the generic code. A root error string is a message, while
+other present non-objects use the generic code/message.
+
+Godex's parser borrowed secondary values after an ineligible primary and
+converted error numbers through float64. Fail-before coverage in
+`/tmp/gdx-04384-deepseek-sse-error-before.log` demonstrates incorrect
+fallbacks, loss of the signed maximum and acceptance of floating codes.
+The private error codec now preserves presence, exact case and numeric
+type. Its additional bounded decode runs only when `error` is present;
+normal chunk acquisition and other numeric fields keep their current
+contracts. A mixed-case `Error` decoy cannot shadow the lowercase member.
+
+Twenty-one packet cases assert the actual failed event, original response
+ownership, no response-created or text event from a rejected chunk, and no
+later DONE completion. A separate offline probe using the actual locked
+`serde 1.0.229`/`serde_json 1.0.154` verifies all nine signed-number boundary
+outcomes. Log: `/tmp/gdx-04384-deepseek-sse-error-i64-oracle.log`.
+This is locked-dependency/source evidence, not a compiled-Mojo or released
+executable claim for these new edge cases.
+
+The classifier stays in a focused private `gateway/deepseek/stream_error.go`.
+Tool-call accumulation and signature acquisition move unchanged beside the
+existing tool formatter/validator in `stream_tools.go`. The state file
+shrinks from 486 to 389 lines, allowing removal of its oversized-file
+baseline exception while retaining the 400-line guard. No shared helper,
+package, exported API, dependency, clock, goroutine or persisted format is
+introduced; all ownership remains in the same outbound integration.
+
+The released baseline additionally fails all three new executable cases
+on `eb15bee887f080663c6439ce21ea33718e7997c7`: primary-field presence,
+the signed maximum and an integral-float code. Only Godex fails their
+strict code/message contracts; Prodex passes. Each report verifies the
+original upstream request, client HTTP 200, one primary-key attempt,
+zero retries with an alternate key configured, child exit and durable-state
+integrity, with mutation controls. Logs:
+`/tmp/gdx-04384-deepseek-sse-error-presence-before-oracle.json`,
+`/tmp/gdx-04384-deepseek-sse-error-i64-before-oracle.json` and
+`/tmp/gdx-04384-deepseek-sse-error-float-before-oracle.json`.
+These executable results supersede the source-only limit for those three
+specific packet shapes; the other local edge cases retain that limit.
+
+`rtk go test -race ./internal/gateway/deepseek ./tools/differential -count=1`
+passes 592 tests after adding independent error-presence mutation controls.
+
+`rtk go test ./...` passes 8,872 tests across 81 packages.
+`rtk proxy make verify` passes all local gates, including the full race
+suite, formatting, source size, vet and build. The final local
+verification log is `/tmp/gdx-04384-deepseek-sse-error-final2-verify.log`;
+the full-test log is `/tmp/gdx-04384-deepseek-sse-error-final2-test-all.log`.
+The exact clean-commit executable differential follows the commit.

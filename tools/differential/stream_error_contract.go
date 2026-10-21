@@ -18,6 +18,10 @@ var deepSeekResponseIDPattern = regexp.MustCompile(
 // silently retried on another key. Only source-generated timestamp and
 // UUIDv7 are normalized after strict validation of every other field.
 func canonicalFixtureFailedSSE(body string) (string, error) {
+	return canonicalFixtureStreamFailure04384(body, "rate_limit_exceeded", "Please try again in 1s.")
+}
+
+func canonicalFixtureStreamFailure04384(body, code, message string) (string, error) {
 	if !strings.HasSuffix(body, "\r\n\r\n") {
 		return "", errors.New("failed SSE event missing terminator")
 	}
@@ -56,8 +60,8 @@ func canonicalFixtureFailedSSE(body string) (string, error) {
 		"response": map[string]any{
 			"id": "<opaque-response-id>",
 			"error": map[string]any{
-				"code":    "rate_limit_exceeded",
-				"message": "Please try again in 1s.",
+				"code":    code,
+				"message": message,
 			},
 		},
 	}

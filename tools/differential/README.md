@@ -107,6 +107,13 @@ not equivalent to a global provider, live-TUI or transport parity certificate.
 Use `--scenario success|tool-call|deepseek-user-id|sse-stream|sse-rate-limit|retry|deepseek-sse-terminal|single-key-401|single-key-403|single-key-429|single-key-500|single-key-503|key-rotation-429|key-rotation-restart|cancel|restart|recover-after-429|recover-after-503` to rerun one case while
 investigating a mismatch; the default is `--scenario all`.
 
+The 0.438.4 `deepseek-sse-error-presence`, `deepseek-sse-error-i64` and
+`deepseek-sse-error-float` scenarios verify embedded-error primary-field
+presence and signed numeric kinds. Each must produce one failure frame
+with the expected code/message, HTTP 200, one primary-key attempt and no
+rotation despite a configured second key. They run in `--scenario all`
+and can also be selected individually.
+
 The `deepseek-user-id` fixture sends the Responses `user` alias through the
 real Codex shim and requires the upstream DeepSeek request to contain the
 canonical `user_id` field from the 0.438.2 provider conformance fixture.

@@ -108,6 +108,7 @@ type mockPlan struct {
 	Stream                bool
 	StreamQuota           bool
 	DeepSeekEmbeddedError bool
+	StreamErrorJSON       string
 	StreamToolArgs        string
 }
 
@@ -158,7 +159,7 @@ func run() error {
 	gemini := flags.Bool("gemini", false, "run isolated Gemini generateContent executable differential")
 	geminiModels := flags.Bool("gemini-models", false, "compare Gemini provider models catalog identity and aliases across two pinned binaries")
 	scenarioWorkers := flags.Int("scenario-workers", 1, "isolated DeepSeek scenario workers, 1-4 (parallel only for --scenario all)")
-	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, deepseek-unsupported-message-role, deepseek-null-message-content, deepseek-request-over-kernel-limit, deepseek-input-type-null, deepseek-input-type-number, deepseek-input-type-empty, deepseek-empty-top-level-tool-name, deepseek-invalid-nested-shell-command, sse-stream, sse-rate-limit, sse-tool-surrogate, sse-tool-depth, sse-tool-overflow, sse-tool-paired, retry, deepseek-sse-terminal, single-key-401, single-key-403, single-key-429, single-key-503, single-key-500, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
+	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, deepseek-unsupported-message-role, deepseek-null-message-content, deepseek-request-over-kernel-limit, deepseek-input-type-null, deepseek-input-type-number, deepseek-input-type-empty, deepseek-empty-top-level-tool-name, deepseek-invalid-nested-shell-command, sse-stream, sse-rate-limit, deepseek-sse-error-presence, deepseek-sse-error-i64, deepseek-sse-error-float, sse-tool-surrogate, sse-tool-depth, sse-tool-overflow, sse-tool-paired, retry, deepseek-sse-terminal, single-key-401, single-key-403, single-key-429, single-key-503, single-key-500, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		return err
 	}
@@ -303,6 +304,13 @@ func run() error {
 		scenario := name
 		specs = append(specs, differentialScenario043713{scenario, func(mock *mockServer) (scenarioResult, error) {
 			return runPair(root, mock, scenario, mockPlan{}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{invalidInput: scenario})
+		}})
+	}
+	for _, name := range []string{"deepseek-sse-error-presence", "deepseek-sse-error-i64", "deepseek-sse-error-float"} {
+		specs = append(specs, differentialScenario043713{name, func(mock *mockServer) (scenarioResult, error) {
+			raw, _, _, _ := deepSeekStreamErrorFixture04384(name)
+			return runPair(root, mock, name, mockPlan{StreamErrorJSON: raw}, *prodexBin, *godexBin,
+				prodexSourceCommit, godexSourceCommit, runOptions{rotate: true})
 		}})
 	}
 	scenarios, err := executeDifferentialScenarios043713(specs, *scenarioName, *scenarioWorkers)
@@ -732,8 +740,11 @@ func (mock *mockServer) serveHTTP(writer http.ResponseWriter, request *http.Requ
 			responseBody = `{"error":{"code":"rate_limit_exceeded"}}`
 		}
 	}
-	if plan.DeepSeekEmbeddedError && keySlot == "primary" {
+	if (plan.DeepSeekEmbeddedError || plan.StreamErrorJSON != "") && keySlot == "primary" {
 		responseBody = "data: {\"error\":{\"code\":\"rate_limit_exceeded\",\"message\":\"Please try again in 1s.\",\"headers\":{\"Retry-After\":\"5\"}}}\r\n\r\n"
+		if plan.StreamErrorJSON != "" {
+			responseBody = "data: {\"error\":" + plan.StreamErrorJSON + "}\r\n\r\n"
+		}
 		writer.Header().Set("Content-Type", "text/event-stream")
 		writer.Header().Set("X-Synthetic-Upstream", "differential-v1")
 		writer.WriteHeader(status)
@@ -1019,6 +1030,10 @@ func scenarioInvariants(scenario scenarioResult) []string {
 			if run.Client.Status != http.StatusOK || !validFixtureFailedSSE(run.Client.Body) {
 				failures = append(failures, prefix+".embedded_stream_error")
 			}
+		case "deepseek-sse-error-presence", "deepseek-sse-error-i64", "deepseek-sse-error-float":
+			if run.Client.Status != http.StatusOK || !validFixtureStreamErrorPresence04384(phase, run.Client.Body) {
+				failures = append(failures, prefix+".embedded_stream_error_presence")
+			}
 		case "tool-call":
 			if run.Client.Status != http.StatusOK || !validFixtureToolCallResponse(run.Client.Body) {
 				failures = append(failures, prefix+".tool_call_semantics")
@@ -1094,7 +1109,7 @@ func scenarioInvariants(scenario scenarioResult) []string {
 			if !upstream.AuthOK || upstream.Method != http.MethodPost || upstream.Path != "/v1/chat/completions" {
 				failures = append(failures, prefix+".upstream_auth_or_route")
 			}
-			if phase == "deepseek-sse-terminal" {
+			if phase == "deepseek-sse-terminal" || strings.HasPrefix(phase, "deepseek-sse-error-") {
 				if upstream.KeySlot != "primary" {
 					failures = append(failures, prefix+".unexpected_credential_rotation")
 				}
@@ -1125,7 +1140,8 @@ func compare(left, right productRun) []string {
 		strings.Contains(strings.ToLower(right.Client.Headers.Get("Content-Type")), "text/event-stream")
 	if stream {
 		a, b := strings.TrimSuffix(left.Stdout, "\n"), strings.TrimSuffix(right.Stdout, "\n")
-		if !equivalentFixtureSSE(a, b) && !equivalentFixtureFailedSSE(a, b) && !equivalentFixtureToolArgumentsSSE043713(a, b) {
+		if !equivalentFixtureSSE(a, b) && !equivalentFixtureFailedSSE(a, b) &&
+			!equivalentFixtureToolArgumentsSSE043713(a, b) && !equivalentFixtureStreamErrorPresence04384(a, b) {
 			differences = append(differences, "stdout")
 		}
 	} else if left.Stdout != right.Stdout {
@@ -1143,6 +1159,7 @@ func compare(left, right productRun) []string {
 	if stream {
 		if !equivalentFixtureSSE(left.Client.Body, right.Client.Body) &&
 			!equivalentFixtureFailedSSE(left.Client.Body, right.Client.Body) &&
+			!equivalentFixtureStreamErrorPresence04384(left.Client.Body, right.Client.Body) &&
 			!equivalentFixtureToolArgumentsSSE043713(left.Client.Body, right.Client.Body) {
 			differences = append(differences, "client.body")
 		}
