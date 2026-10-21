@@ -575,3 +575,29 @@ The scoped fix stops at the first present status field, preserving null
 suppression and all genuine non-null values. This source-backed synthetic
 metadata check complements the broader official Gemini 0.438.4 binary
 transport gate; it is not a claim of live grounding-provider verification.
+
+## Binary-verified Gemini media and grounding precedence
+
+The isolated, release-SHA-pinned Gemini differential now includes four
+additional synthetic upstream **native JSON** fixtures passed through the
+API-key Chat-compatible transform in both official Prodex 0.438.4 and Godex:
+null `inlineData` shadowing `fileData`; null `executableCode` shadowing an
+execution result; suppression of executable-code media even with an explicit
+empty language; and null grounding status shadowing a lower-priority source
+status. Importantly, source-native `gemini_text_from_special_part` can expose
+an empty code-language label, but the **Chat-compatible provider transform**
+can suppress that code output: the initial independent oracle incorrectly
+expected the direct-native result from the API-key executable. The pinned
+binary comparison demonstrated suppression on *both* products and the
+fixture was corrected instead of modifying a valid transformation.
+
+The first binary comparison also exposed a real Gemini identity mismatch:
+Prodex uses `gemini_resp_prodex` as the provider-transform fallback
+`responseId` and builds a grounding item `ws_gemini_resp_prodex`, whereas
+Godex initially used a random native `resp_gemini_*` identity. The
+provider-transform and direct-native identity selectors now have separate
+source-matched fallbacks and first-present field/alias behavior. All cases
+require one authenticated synthetic upstream call, canonical text and usage,
+and a checked downstream semantic shape. Deliberate mutations of image/code
+output and source status must fail. No real Gemini keys or live provider data
+are used.

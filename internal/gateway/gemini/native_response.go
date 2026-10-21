@@ -21,21 +21,7 @@ func geminiNativeResponsesValue(root map[string]any, requestMetadata map[string]
 func geminiNativeResponsesValueWithFallback04380(
 	root map[string]any, requestMetadata map[string]any, createdAt int64, chatCompatible bool,
 ) map[string]any {
-	responseID := nativeString(root["responseId"])
-	if responseID == "" {
-		responseID = nativeString(root["id"])
-	}
-	if responseID == "" {
-		responseID = "resp_gemini_" + uuid.NewString()
-	}
-	model := nativeString(root["modelVersion"])
-	if model == "" {
-		model = nativeString(root["model"])
-	}
-	if model == "" {
-		model = "auto"
-	}
-
+	responseID, model := geminiResponseIdentity04384(root, chatCompatible)
 	candidate := firstNativeCandidate(root)
 	parts := nativeCandidateParts(candidate)
 	output := make([]any, 0)

@@ -122,6 +122,10 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, `{"candidates":[{"content":{"role":"model","parts":[{"text":"hidden before"},{"functionCall":null},{"text":"hidden after"}]},"finishReason":"STOP"}],"modelVersion":"gemini-3.1-pro-preview","usageMetadata":{"promptTokenCount":2,"candidatesTokenCount":1,"totalTokenCount":3}}`)
 		return
 	}
+	if geminiMediaScenario04384(mock.scenario) {
+		_, _ = io.WriteString(w, geminiMediaResponse04384(mock.scenario))
+		return
+	}
 	if mock.scenario == "chat-response" {
 		response := map[string]any{
 			"id": "chatcmpl-gemini-fixture", "object": "chat.completion",
@@ -174,7 +178,7 @@ func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit string
 	}
 	defer os.RemoveAll(root)
 	var results []geminiCaseResult
-	for _, scenario := range []string{"chat-request", "orphan-tool", "chat-response", "wrapped-response-no-trace", "wrapped-response-trace", "stream-native", "stream-chat", "multi-turn-tool", "quota-plain-429", "quota-structured-429", "invalid-wrapped-tool-parameters", "invalid-flat-tool-parameters", "buffered-null-tool-text"} {
+	for _, scenario := range []string{"chat-request", "orphan-tool", "chat-response", "wrapped-response-no-trace", "wrapped-response-trace", "stream-native", "stream-chat", "multi-turn-tool", "quota-plain-429", "quota-structured-429", "invalid-wrapped-tool-parameters", "invalid-flat-tool-parameters", "buffered-null-tool-text", "buffered-media-invalid-inline", "buffered-media-invalid-code", "buffered-media-suppressed-code", "buffered-grounding-null-status"} {
 		prodex, err := runGeminiProduct(root, scenario, "prodex", prodexBin)
 		if err != nil {
 			return fmt.Errorf("Prodex Gemini %s: %w", scenario, err)
@@ -477,6 +481,9 @@ func geminiFixtureInvariant(scenario string, result geminiCandidateResult) error
 	if usage["input_tokens"] != float64(2) || usage["output_tokens"] != float64(1) ||
 		usage["total_tokens"] != float64(3) {
 		return fmt.Errorf("client lost synthetic usage accounting: %+v", usage)
+	}
+	if geminiMediaScenario04384(scenario) {
+		return geminiMediaFixtureInvariant04384(scenario, body)
 	}
 	return nil
 }
