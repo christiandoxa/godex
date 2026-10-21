@@ -127,8 +127,8 @@ func (state *geminiStreamState) consume(writer io.Writer, data []byte, requestMe
 				}
 			}
 			if call, ok := part["functionCall"].(map[string]any); ok {
-				name := nativeString(call["name"])
-				if name == "" {
+				name, hasName := call["name"].(string)
+				if !hasName {
 					name = "tool_call"
 				}
 				callID := nativeString(call["id"])
@@ -149,8 +149,12 @@ func (state *geminiStreamState) consume(writer io.Writer, data []byte, requestMe
 					return encodeErr
 				}
 				signature := geminiNativeThoughtSignature(part, call)
+				namespace, short := geminiNativeSplitToolName(name)
 				tool := map[string]any{
-					"type": "function_call", "call_id": callID, "name": name, "arguments": string(encoded),
+					"type": "function_call", "call_id": callID, "name": short, "arguments": string(encoded),
+				}
+				if namespace != "" {
+					tool["namespace"] = namespace
 				}
 				if signature != "" {
 					tool["gemini_thought_signature"] = signature

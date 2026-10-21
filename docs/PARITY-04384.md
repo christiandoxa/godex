@@ -1151,3 +1151,41 @@ commit; source-derived unit coverage alone is not binary evidence.
 `rtk go test ./internal/gateway/gemini ./tools/differential -count=1` passes
 685 tests; `rtk go test ./...` passes 8,641 across 81 packages.
 `rtk proxy make verify` passes its full local gate, including race tests.
+
+The source-ID oracle failed against clean `b81f3e7` only for the three
+string-ID cases; the other 29 cases passed. Clean commit
+`40826d2a6e297f89403e7f0f8e580e4fed9d3010` then passed all 32 Gemini
+executable cases before its fast-forward push to `origin/main`.
+
+## Gemini tool names and call identities retain raw string semantics
+
+Tagged `response_tool_calls.rs` uses `Value::as_str` for buffered function
+names and IDs, preserving explicit empty or whitespace strings. Its Mojo
+`gemini_tool_name_split` recognizes a nonblank double-hyphen split, scanning
+backward for a valid separator, then the last valid double underscore in an
+exact `mcp__` name. It preserves raw prefix/suffix whitespace and does not
+recognize dots. Godex instead trimmed names, treated empty strings as
+missing, split dotted names, rejected an empty MCP provider segment, and
+did not recover an earlier valid separator after a trailing one.
+
+The corrected local splitter and buffered type-presence checks follow the
+tagged rules. Completed native SSE tools now use the same splitter, keeping
+namespace and explicit empty-name semantics in the final stream history.
+Stream call IDs keep their separate source-defined nonblank selection.
+No tool is executed by these transformations; account selection, retries,
+request bytes, and the independent generic Chat-compatible splitter remain
+unchanged. The implementation stays private to `gateway/gemini` and creates
+no shared helper, interface, dependency, configuration or background work.
+
+Fail-before regressions cover ordinary names, valid namespace controls,
+dots, Unicode/padded strings, empty names and IDs, empty MCP provider
+segments, trailing separators and full completed SSE output. The 702 focused
+Gemini/oracle tests and 8,658 tests across 81 packages pass; the final
+`rtk proxy make verify` passes formatting, source size, framework, cross
+build/test compilation, installers, vet, full race and build checks.
+Five new executable cases independently assert the exact buffered name,
+call ID, namespace and arguments, alongside existing request/response,
+status, usage and attempt checks. Dedicated mutation tests reject changed
+identity, namespace or arguments. Native streaming assertions remain
+source-aligned local coverage; API-key executable cases do not certify
+every native SSE lifecycle behavior.

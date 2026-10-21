@@ -52,12 +52,12 @@ func geminiNativeBuiltinTools(value any) []any {
 }
 
 func geminiNativeToolCallItem(part, call map[string]any, fallbackID string) map[string]any {
-	name := nativeString(call["name"])
-	if strings.TrimSpace(name) == "" {
+	name, hasName := call["name"].(string)
+	if !hasName {
 		name = "tool_call"
 	}
-	callID := nativeString(call["id"])
-	if strings.TrimSpace(callID) == "" {
+	callID, hasID := call["id"].(string)
+	if !hasID {
 		callID = fallbackID
 	}
 	args, present := call["args"]
@@ -127,18 +127,17 @@ func geminiNativeThoughtSignature(part, call map[string]any) string {
 }
 
 func geminiNativeSplitToolName(name string) (string, string) {
-	name = strings.TrimSpace(name)
-	if index := strings.LastIndex(name, "--"); index > 0 && index+2 < len(name) {
-		return name[:index], name[index+2:]
-	}
-	if strings.HasPrefix(name, "mcp__") {
-		rest := strings.TrimPrefix(name, "mcp__")
-		if index := strings.LastIndex(rest, "__"); index > 0 && index+2 < len(rest) {
-			return "mcp__" + rest[:index], rest[index+2:]
+	for index := len(name) - 2; index >= 0; index-- {
+		if name[index:index+2] == "--" && strings.TrimSpace(name[:index]) != "" && strings.TrimSpace(name[index+2:]) != "" {
+			return name[:index], name[index+2:]
 		}
 	}
-	if index := strings.LastIndex(name, "."); index > 0 && index+1 < len(name) {
-		return name[:index], name[index+1:]
+	if strings.HasPrefix(name, "mcp__") {
+		for index := len(name) - 2; index >= 5; index-- {
+			if name[index:index+2] == "__" && strings.TrimSpace(name[index+2:]) != "" {
+				return name[:index], name[index+2:]
+			}
+		}
 	}
 	return "", name
 }
