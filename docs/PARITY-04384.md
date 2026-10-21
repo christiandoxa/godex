@@ -2338,3 +2338,78 @@ shuffled race suite. Logs: `/tmp/gdx-04384-deepseek-stream-body-race.log`,
 `/tmp/gdx-04384-deepseek-stream-body-final-test-all.log` and
 `/tmp/gdx-04384-deepseek-stream-body-final-verify.log`. Clean-commit
 released-executable regression follows this commit.
+
+Clean JSON-framing commit `527b2ae0e04fdd77236958a7e6d0bc814c322952`
+passed all 42 DeepSeek and 44 Gemini released cases and mutation controls
+before its fast-forward push. Reports:
+`/tmp/gdx-04384-provider-sse-json-oracle.json` and
+`/tmp/gdx-04384-provider-sse-json-gemini-oracle.json`.
+Clean body-lifecycle commit `361d385976c82cfeb092d002693a41bef4cf1269`
+then passed the same 42 DeepSeek released scenarios and controls before its
+fast-forward push. Report: `/tmp/gdx-04384-deepseek-stream-body-oracle.json`.
+That regression does not replace the local post-response Close tests above.
+
+## Provider SSE wire limits fail explicitly at the tagged bounds
+
+Tagged `provider_sse_reader.rs` counts physical line bytes including CR/LF,
+and counts data bytes plus one byte per data line for each event. Both bounds
+are 4 MiB. Every physical line must be valid UTF-8, including ignored fields
+and comments. An over-limit line/event or invalid UTF-8 is terminal; it cannot
+be skipped to admit later text. Godex's generic skip/recover decoder instead
+silently discarded packets above its 1 MiB provider limit and ignored unsafe
+comment lines.
+
+The existing `helper/sse.Decoder` gains a strict constructor and terminal error
+accessor. It retains its prior default contract for other real consumers.
+DeepSeek Chat and both Gemini pumps select strict 4 MiB bounds and convert
+framing failures to one provider failure. Wire/event counts include original
+data bytes before BOM normalization. EOF validates the last unterminated line.
+Provider-specific output and lifecycle remain in the gateways. Architecture
+ownership is documented; no new package, dependency, configuration, goroutine
+or persistence format is introduced.
+
+Once Gemini accepts larger upstream values, its internally generated single
+Responses frame must also fit the intermediate decoder. That decoder now
+uses the actual generated frame length rather than another unrelated 1 MiB
+limit. Its input is already bounded by the admitted upstream event. The
+regression checks that all 2 MiB of visible text reach the client exactly once.
+Fail-before: `/tmp/gdx-04384-provider-sse-limits-large-text-before.log`.
+
+`/tmp/gdx-04384-provider-sse-limits-before.log` passes three ordinary
+gateway controls and fails twelve targeted large-packet, oversized line/event
+and invalid-comment cases across DeepSeek, Gemini Chat and native Gemini.
+Focused decoder tests check exact LF/CRLF/EOF line admission, exact event
+admission, counted BOM bytes, invalid ignored fields, terminal no-recovery
+and preservation of an earlier complete event before a later error. An
+initial BOM fixture exceeded the physical line bound first; its length was
+corrected to isolate the intended event-bound assertion. The corrected
+`rtk go test ./internal/helper/sse -run '^TestStrictDecoder' -count=1`
+passes 14 tests. Log: `/tmp/gdx-04384-provider-sse-limits-strict-unit.log`.
+
+On clean baseline `361d385976c82cfeb092d002693a41bef4cf1269`, all four
+new released wire scenarios fail only Godex; Prodex independently meets the
+normal trace or exact failure contract. Logs:
+`/tmp/gdx-04384-provider-sse-large-packet-before-oracle.json`,
+`/tmp/gdx-04384-provider-sse-line-limit-before-oracle.json`,
+`/tmp/gdx-04384-provider-sse-event-limit-before-oracle.json` and
+`/tmp/gdx-04384-provider-sse-comment-utf8-before-oracle.json`.
+Mutation checks reject wrong failure codes/text, shifted sequence and extra
+partial output. Boundary byte-level variations and large visible Gemini text
+have focused local coverage; the released large packet carries ordinary text
+plus ignored padding. Native OS/live-provider and broader numeric/output
+canonicalization remain open.
+
+An intermediate `rtk proxy make verify` ran while the differential files
+were being added and failed with undefined wire-oracle functions. That run
+is failed, not completion evidence:
+`/tmp/gdx-04384-provider-sse-limits-final-verify.log`. All final checks below
+were rerun after the complete code and test files were present.
+
+`rtk go test -race ./internal/helper/sse ./internal/gateway/deepseek ./internal/gateway/gemini ./tools/differential -count=1`
+passes 1,392 tests. `rtk go test ./...` passes 9,028 tests across 81 packages.
+`rtk proxy make verify` passes every local gate, including the complete
+shuffled race suite. Logs:
+`/tmp/gdx-04384-provider-sse-limits-complete-race.log`,
+`/tmp/gdx-04384-provider-sse-limits-complete-test-all.log` and
+`/tmp/gdx-04384-provider-sse-limits-complete-verify.log`. Clean-commit
+DeepSeek and Gemini executable validation follows this commit.

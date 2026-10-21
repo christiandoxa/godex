@@ -200,7 +200,7 @@ func (state *geminiChatCompatibleStream043711) accept(writer io.Writer, data []b
 	// TranslateChatSSEData returns a single Responses SSE frame. Decode its
 	// bounded payload, attach the canonical sequence, and retain visible text
 	// for the final response. Gemini-native chunks are ignored above.
-	decoder := sse.NewDecoder(1 << 20)
+	decoder := sse.NewDecoder(len(translated))
 	messages := decoder.Feed(translated)
 	messages = append(messages, decoder.Finish()...)
 	for _, raw := range messages {
@@ -247,7 +247,7 @@ func pumpGeminiChatCompatibleStream043711(source io.ReadCloser, writer *io.PipeW
 	state := &geminiChatCompatibleStream043711{
 		id: responseID, created: time.Now().Unix(),
 	}
-	decoder := sse.NewDecoder(1 << 20)
+	decoder := sse.NewStrictDecoder(4 << 20)
 	buffer := make([]byte, 32<<10)
 	for {
 		n, err := source.Read(buffer)
@@ -262,6 +262,10 @@ func pumpGeminiChatCompatibleStream043711(source io.ReadCloser, writer *io.PipeW
 				return
 			}
 		}
+		if decoder.Err() != nil {
+			_ = state.failure(writer, "provider_stream_error", decoder.Err().Error())
+			return
+		}
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				for _, payload := range decoder.Finish() {
@@ -272,7 +276,9 @@ func pumpGeminiChatCompatibleStream043711(source io.ReadCloser, writer *io.PipeW
 				}
 				if !state.done {
 					message := "unexpected end of stream"
-					if state.json.Pending() {
+					if decoder.Err() != nil {
+						message = decoder.Err().Error()
+					} else if state.json.Pending() {
 						message = "incomplete JSON segment"
 					}
 					_ = state.failure(writer, "provider_stream_error", message)

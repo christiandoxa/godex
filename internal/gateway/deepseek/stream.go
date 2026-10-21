@@ -29,7 +29,7 @@ func deepSeekChatSSEWithConversation(
 }
 
 func pumpDeepSeekChatSSE(body io.ReadCloser, writer *io.PipeWriter, state *deepSeekChatStreamState) {
-	decoder := sse.NewDecoder(streamEventMaxBytes)
+	decoder := sse.NewStrictDecoder(4 << 20)
 	buffer := make([]byte, 32<<10)
 	for {
 		read, err := body.Read(buffer)
@@ -60,6 +60,12 @@ func pumpDeepSeekChatSSE(body io.ReadCloser, writer *io.PipeWriter, state *deepS
 				}
 			}
 		}
+		if decoder.Err() != nil {
+			failed, _, _ := state.failed("provider_stream_error", decoder.Err().Error())
+			_, writeErr := writer.Write(failed)
+			_ = writer.CloseWithError(writeErr)
+			return
+		}
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				for _, data := range decoder.Finish() {
@@ -86,7 +92,9 @@ func pumpDeepSeekChatSSE(body io.ReadCloser, writer *io.PipeWriter, state *deepS
 			}
 			if !state.completed {
 				message := "DeepSeek stream failed"
-				if errors.Is(err, io.EOF) {
+				if decoder.Err() != nil {
+					message = decoder.Err().Error()
+				} else if errors.Is(err, io.EOF) {
 					message = "unexpected end of stream"
 					if state.json.Pending() {
 						message = "incomplete JSON segment"

@@ -164,7 +164,7 @@ func run() error {
 	gemini := flags.Bool("gemini", false, "run isolated Gemini generateContent executable differential")
 	geminiModels := flags.Bool("gemini-models", false, "compare Gemini provider models catalog identity and aliases across two pinned binaries")
 	scenarioWorkers := flags.Int("scenario-workers", 1, "isolated DeepSeek scenario workers, 1-4 (parallel only for --scenario all)")
-	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, deepseek-unsupported-message-role, deepseek-null-message-content, deepseek-request-over-kernel-limit, deepseek-input-type-null, deepseek-input-type-number, deepseek-input-type-empty, deepseek-empty-top-level-tool-name, deepseek-invalid-nested-shell-command, sse-stream, sse-rate-limit, sse-terminal-close, sse-json-fragments, sse-data-lines, deepseek-sse-error-presence, deepseek-sse-error-i64, deepseek-sse-error-float, deepseek-usage-u64, deepseek-sse-usage-u64, deepseek-usage-null, deepseek-sse-usage-null, deepseek-empty-identity, deepseek-sse-empty-identity, sse-tool-surrogate, sse-tool-depth, sse-tool-overflow, sse-tool-paired, retry, deepseek-sse-terminal, single-key-401, single-key-403, single-key-429, single-key-503, single-key-500, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
+	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, deepseek-unsupported-message-role, deepseek-null-message-content, deepseek-request-over-kernel-limit, deepseek-input-type-null, deepseek-input-type-number, deepseek-input-type-empty, deepseek-empty-top-level-tool-name, deepseek-invalid-nested-shell-command, sse-stream, sse-rate-limit, sse-terminal-close, sse-json-fragments, sse-data-lines, sse-large-packet, sse-line-limit, sse-event-limit, sse-comment-utf8, deepseek-sse-error-presence, deepseek-sse-error-i64, deepseek-sse-error-float, deepseek-usage-u64, deepseek-sse-usage-u64, deepseek-usage-null, deepseek-sse-usage-null, deepseek-empty-identity, deepseek-sse-empty-identity, sse-tool-surrogate, sse-tool-depth, sse-tool-overflow, sse-tool-paired, retry, deepseek-sse-terminal, single-key-401, single-key-403, single-key-429, single-key-503, single-key-500, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		return err
 	}
@@ -248,6 +248,9 @@ func run() error {
 		}},
 		{"sse-data-lines", func(mock *mockServer) (scenarioResult, error) {
 			return runPair(root, mock, "sse-data-lines", mockPlan{Stream: true, SSEFraming: "data-lines"}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{stream: true})
+		}},
+		{"sse-large-packet", func(mock *mockServer) (scenarioResult, error) {
+			return runPair(root, mock, "sse-large-packet", mockPlan{Stream: true, SSEFraming: "large-packet"}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{stream: true})
 		}},
 		{"sse-tool-surrogate", func(mock *mockServer) (scenarioResult, error) {
 			return runPair(root, mock, "sse-tool-surrogate", mockPlan{Stream: true, StreamToolArgs: `{"cmd":"\uD800"}`}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{stream: true})
@@ -346,6 +349,12 @@ func run() error {
 			stream := name == "deepseek-sse-empty-identity"
 			return runPair(root, mock, name, mockPlan{Stream: stream, EmptyIdentity: true}, *prodexBin, *godexBin,
 				prodexSourceCommit, godexSourceCommit, runOptions{stream: stream})
+		}})
+	}
+	for _, name := range []string{"sse-line-limit", "sse-event-limit", "sse-comment-utf8"} {
+		specs = append(specs, differentialScenario043713{name, func(mock *mockServer) (scenarioResult, error) {
+			return runPair(root, mock, name, mockPlan{Stream: true, SSEFraming: name}, *prodexBin, *godexBin,
+				prodexSourceCommit, godexSourceCommit, runOptions{stream: true})
 		}})
 	}
 	scenarios, err := executeDifferentialScenarios043713(specs, *scenarioName, *scenarioWorkers)
@@ -823,6 +832,14 @@ func (mock *mockServer) serveHTTP(writer http.ResponseWriter, request *http.Requ
 		responseBody = strings.Replace(responseBody, `"content":"synthetic-ok"`, "\"content\":\"synthe\n\ndata: tic-ok\"", 1)
 	} else if plan.SSEFraming == "data-lines" {
 		responseBody = strings.Replace(responseBody, "\n\ndata: ", "\ndata: ", 1)
+	} else if plan.SSEFraming == "large-packet" {
+		responseBody = strings.Replace(responseBody, `"content":"synthetic-ok"`, `"content":"synthetic-ok","unused":"`+strings.Repeat("a", 2<<20)+`"`, 1)
+	} else if plan.SSEFraming == "sse-line-limit" {
+		responseBody = ":" + strings.Repeat("a", 4<<20) + "\n\n" + responseBody
+	} else if plan.SSEFraming == "sse-event-limit" {
+		responseBody = "data: \"" + strings.Repeat("a", 2<<20) + "\"\ndata: \"" + strings.Repeat("b", 2<<20) + "\"\n\n" + responseBody
+	} else if plan.SSEFraming == "sse-comment-utf8" {
+		responseBody = ":" + string([]byte{0xff}) + "\n\n" + responseBody
 	}
 	if plan.UnsignedUsage && status == http.StatusOK {
 		responseBody = strings.ReplaceAll(responseBody, `"created":1`, `"created":18446744073709551615`)
@@ -1105,12 +1122,16 @@ func scenarioInvariants(scenario scenarioResult) []string {
 				run.Client.Headers.Get("Content-Type") != "text/event-stream; charset=utf-8" {
 				failures = append(failures, prefix+".stream_tool_argument_contract")
 			}
-		case "sse-stream", "sse-rate-limit", "sse-terminal-close", "sse-json-fragments", "sse-data-lines":
+		case "sse-stream", "sse-rate-limit", "sse-terminal-close", "sse-json-fragments", "sse-data-lines", "sse-large-packet":
 			if run.Client.Status != http.StatusOK || !validFixtureSSE(run.Client.Body) {
 				failures = append(failures, prefix+".stream_semantics")
 			}
 			if phase == "sse-rate-limit" && !validFixtureStreamingQuotaHeaders(run.Client.Headers) {
 				failures = append(failures, prefix+".stream_quota_headers")
+			}
+		case "sse-line-limit", "sse-event-limit", "sse-comment-utf8":
+			if run.Client.Status != http.StatusOK || !validWireLimitSSE04384(phase, run.Client.Body) {
+				failures = append(failures, prefix+".stream_wire_limit_contract")
 			}
 		case "deepseek-usage-u64", "deepseek-sse-usage-u64":
 			if run.Client.Status != http.StatusOK || !validDeepSeekUnsignedUsage04384(run.Client.Body, phase == "deepseek-sse-usage-u64") {
@@ -1191,7 +1212,7 @@ func scenarioInvariants(scenario scenarioResult) []string {
 				failures = append(failures, prefix+".wrong_credential_slot")
 			}
 			validRequest := validFixtureRequest(upstream.Body)
-			if phase == "sse-stream" || phase == "sse-rate-limit" || phase == "sse-terminal-close" || phase == "sse-json-fragments" || phase == "sse-data-lines" || phase == "deepseek-sse-usage-u64" || phase == "deepseek-sse-usage-null" || phase == "deepseek-sse-empty-identity" || strings.HasPrefix(phase, "sse-tool-") {
+			if phase == "sse-stream" || phase == "sse-rate-limit" || phase == "sse-terminal-close" || phase == "sse-json-fragments" || phase == "sse-data-lines" || phase == "sse-large-packet" || wireLimitMessage04384(phase) != "" || phase == "deepseek-sse-usage-u64" || phase == "deepseek-sse-usage-null" || phase == "deepseek-sse-empty-identity" || strings.HasPrefix(phase, "sse-tool-") {
 				validRequest = validFixtureStreamingRequest(upstream.Body)
 			}
 			if phase == "deepseek-user-id" {
@@ -1217,7 +1238,7 @@ func compare(left, right productRun) []string {
 		if !equivalentFixtureSSE(a, b) && !equivalentFixtureFailedSSE(a, b) &&
 			!equivalentFixtureToolArgumentsSSE043713(a, b) && !equivalentFixtureStreamErrorPresence04384(a, b) &&
 			!equivalentDeepSeekUnsignedSSE04384(a, b) && !equivalentDeepSeekNullUsageSSE04384(a, b) &&
-			!equivalentDeepSeekEmptyIdentitySSE04384(a, b) {
+			!equivalentDeepSeekEmptyIdentitySSE04384(a, b) && !equivalentWireLimitSSE04384(a, b) {
 			differences = append(differences, "stdout")
 		}
 	} else if left.Stdout != right.Stdout {
@@ -1239,6 +1260,7 @@ func compare(left, right productRun) []string {
 			!equivalentDeepSeekUnsignedSSE04384(left.Client.Body, right.Client.Body) &&
 			!equivalentDeepSeekNullUsageSSE04384(left.Client.Body, right.Client.Body) &&
 			!equivalentDeepSeekEmptyIdentitySSE04384(left.Client.Body, right.Client.Body) &&
+			!equivalentWireLimitSSE04384(left.Client.Body, right.Client.Body) &&
 			!equivalentFixtureToolArgumentsSSE043713(left.Client.Body, right.Client.Body) {
 			differences = append(differences, "client.body")
 		}

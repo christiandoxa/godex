@@ -240,6 +240,10 @@ commitment and redaction; the classifier performs no I/O or retry decisions.
 Gemini gateways: joined/separate precedence, bounded partial JSON and DONE
 recognition. Provider state, response events and terminal handling remain in
 each gateway. The helper performs no I/O or application policy.
+Those gateways select the strict SSE decoder with the tagged 4 MiB wire
+bounds and handle its terminal error. Other transports retain their existing
+decoder contract. DeepSeek's private stream body owns upstream closure once
+across pump completion and client cancellation.
 entity/provider owns provider error classification and static fallback-chain
 policy, so bare 429, structured quota/rate errors, auth failures, model-not-found,
 and transient failures are interpreted consistently by Anthropic and Copilot.

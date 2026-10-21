@@ -45,7 +45,7 @@ func translateGeminiNativeStream(response *http.Response, requestMetadata map[st
 func pumpGeminiNativeStream(body io.ReadCloser, writer *io.PipeWriter, requestMetadata map[string]any) {
 	defer body.Close()
 	state := &geminiStreamState{responseID: "resp_gemini_" + uuid.NewString(), createdAt: time.Now().Unix()}
-	decoder := sse.NewDecoder(1 << 20)
+	decoder := sse.NewStrictDecoder(4 << 20)
 	buffer := make([]byte, 32<<10)
 	for {
 		n, err := body.Read(buffer)
@@ -62,6 +62,11 @@ func pumpGeminiNativeStream(body io.ReadCloser, writer *io.PipeWriter, requestMe
 				return
 			}
 		}
+		if decoder.Err() != nil {
+			_ = state.failed(writer, "provider_stream_error", decoder.Err().Error())
+			_ = writer.Close()
+			return
+		}
 		if err != nil {
 			if err == io.EOF {
 				for _, data := range decoder.Finish() {
@@ -74,7 +79,9 @@ func pumpGeminiNativeStream(body io.ReadCloser, writer *io.PipeWriter, requestMe
 			}
 			if !state.completed {
 				message := "Gemini stream failed"
-				if err == io.EOF {
+				if decoder.Err() != nil {
+					message = decoder.Err().Error()
+				} else if err == io.EOF {
 					message = "unexpected end of stream"
 					if state.json.Pending() {
 						message = "incomplete JSON segment"

@@ -386,6 +386,16 @@ oracle now exercises thirteen Gemini cases, including all earlier eight fixtures
 
 ### Bounded full DeepSeek oracle
 
+The wire-bound cases are `sse-large-packet` (an admissible 2 MiB packet),
+`sse-line-limit`, `sse-event-limit` and `sse-comment-utf8`. The first requires
+the normal exact five-event trace. Each failure case independently requires
+one failed event with the exact tagged error and no text/completion; UUIDv7
+and current epoch are validated before normalization. All use one synthetic
+authenticated request with normal child exit and unchanged durable-state
+checks. Wrong error text/code, extra output and shifted sequence are negative
+controls. These join `--scenario all`; the shared decoder also requires the
+Gemini matrix as a separate regression.
+
 `sse-json-fragments` splits a JSON string across SSE events, and
 `sse-data-lines` places separate JSON values on two data lines of one event.
 Both must produce the existing exact five-event text/usage trace, with no
