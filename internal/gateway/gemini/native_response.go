@@ -80,6 +80,9 @@ func geminiNativeResponsesValueWithFallback04380(
 	result := map[string]any{
 		"id": responseID, "object": "response", "model": model, "output": output,
 	}
+	if chatCompatible {
+		result["usage"], result["metadata"] = map[string]any{}, map[string]any{}
+	}
 	if createdAt > 0 {
 		result["created_at"] = createdAt
 	}

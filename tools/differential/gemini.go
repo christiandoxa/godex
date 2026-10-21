@@ -118,6 +118,10 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	if response, ok := geminiEnvelopeFixture04384(mock.scenario); ok {
+		_, _ = io.WriteString(w, response)
+		return
+	}
 	if response, ok := geminiBufferedArgsResponse04384(mock.scenario); ok {
 		_, _ = io.WriteString(w, response)
 		return
@@ -177,7 +181,7 @@ func (mock *geminiMock) recorded() []geminiCapturedRequest {
 
 func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit string) error {
 	return runGeminiDifferentialCases04384(prodexBin, godexBin, prodexCommit, godexCommit,
-		[]string{"chat-request", "orphan-tool", "chat-response", "wrapped-response-no-trace", "wrapped-response-trace", "stream-native", "stream-chat", "multi-turn-tool", "quota-plain-429", "quota-structured-429", "invalid-wrapped-tool-parameters", "invalid-flat-tool-parameters", "buffered-null-tool-text", "buffered-media-invalid-inline", "buffered-media-invalid-code", "buffered-media-suppressed-code", "buffered-grounding-null-status", "buffered-args-null", "buffered-args-absent", "buffered-args-empty", "buffered-args-wrapped-null", "buffered-args-canonical-wire", "buffered-args-patch-fallback"})
+		[]string{"chat-request", "orphan-tool", "chat-response", "wrapped-response-no-trace", "wrapped-response-trace", "stream-native", "stream-chat", "multi-turn-tool", "quota-plain-429", "quota-structured-429", "invalid-wrapped-tool-parameters", "invalid-flat-tool-parameters", "buffered-null-tool-text", "buffered-media-invalid-inline", "buffered-media-invalid-code", "buffered-media-suppressed-code", "buffered-grounding-null-status", "buffered-args-null", "buffered-args-absent", "buffered-args-empty", "buffered-args-wrapped-null", "buffered-args-canonical-wire", "buffered-args-patch-fallback", "buffered-envelope-null", "buffered-envelope-array", "buffered-envelope-scalar", "buffered-value-array", "buffered-value-number"})
 }
 
 func runGeminiDifferentialCases04384(prodexBin, godexBin, prodexCommit, godexCommit string, cases []string) error {
@@ -288,7 +292,8 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	exitCode := 0
 	if err := cmd.Run(); err != nil {
 		var childExit *exec.ExitError
-		if !geminiQuotaScenario043711(scenario) && !geminiInvalidToolScenario04380(scenario) && !geminiModelScenario04384(scenario) ||
+		_, envelopeScenario := geminiEnvelopeFixture04384(scenario)
+		if !geminiQuotaScenario043711(scenario) && !geminiInvalidToolScenario04380(scenario) && !geminiModelScenario04384(scenario) && !envelopeScenario ||
 			!errors.As(err, &childExit) || ctx.Err() != nil {
 			return geminiCandidateResult{}, fmt.Errorf("child failed: %w stderr=%q upstream=%v",
 				err, redact(stderr.String()), mock.recorded())
@@ -471,6 +476,12 @@ func geminiFixtureInvariant(scenario string, result geminiCandidateResult) error
 	}
 	if body["object"] != "response" {
 		return fmt.Errorf("client Responses object mismatched: %+v", body)
+	}
+	if _, ok := geminiEnvelopeFixture04384(scenario); ok {
+		if result.ExitCode != 0 {
+			return errors.New("Gemini valid non-object response produced a child error exit")
+		}
+		return geminiEnvelopeInvariant04384(body)
 	}
 	output, _ := body["output"].([]any)
 	if scenario == "chat-response" {

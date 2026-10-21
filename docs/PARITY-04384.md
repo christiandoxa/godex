@@ -1065,3 +1065,50 @@ The 23-case pinned executable oracle fails against clean baseline `880291b`
 only in these two new cases: the canonical-wire case exposes byte differences
 without a semantic JSON mismatch, while the custom-tool fallback exposes
 both byte and argument-text differences. The earlier 21 cases still pass.
+
+Clean commit `7899defb40bcedc39390bea0c0b25b8bdb9a153d` passed all 23
+Gemini executable cases, including both exact-byte cases and every mutation
+sentinel, before its fast-forward push to `origin/main`.
+
+## Gemini envelope presence and complete serde acquisition
+
+Tagged `gemini_put_normalized_response_envelope` selects any present
+`response` value, including null, arrays and scalars. Only object values
+accept the optional string trace-ID override. Godex previously unwrapped
+only objects, allowing candidates, model, usage and identity on the outer
+envelope to surface when the selected inner value contained no response
+fields. A present non-object envelope now exposes no native fields. Missing
+envelopes and valid inner objects retain their visible content; outer
+`choices` cannot override an explicitly present response envelope.
+
+The tagged Rust acquisition is `serde_json::from_slice::<Value>`, not an
+object-only decoder. The shared Gemini response reader now validates the
+entire serde document before accepting any JSON value; valid non-objects
+have no candidate/metadata fields. The Chat-compatible fallback uses this
+same validation before examining `choices`, closing a path that previously
+ignored invalid Unicode/UTF-8 or overflowing numbers in unrelated members.
+API-key empty responses retain the provider transform's empty `usage` and
+`metadata` objects. The downstream identity rewriter still requires an
+object, so these accepted upstream scalars do not relax that internal
+output boundary.
+
+Fail-before tests exercise outer-field leakage, valid null/array/scalar
+documents, non-object SSE values, outer-choices precedence, missing/default
+metadata, and invalid ignored Chat fallback members. Paired Unicode and the
+pinned valid longer-mantissa number remain controls. All changes stay in
+`gateway/gemini`; no application policy, persistence, retry contract, helper
+package or dependency is added. Focused Gemini/oracle coverage passes 683
+tests. The extended executable oracle adds five envelope/value cases with
+independent exact empty-response, identity, usage and mutation assertions.
+
+The executable baseline run against clean `7899def` failed at
+`buffered-value-array`: Godex rejected the valid array and made four
+upstream attempts before the synthetic client deadline expired. This is a
+recorded FAIL, not a completed 28-case comparison or a timeout counted as
+PASS. Local regressions independently prove the parser/envelope mismatch;
+clean candidate executable validation follows the commit. No live provider
+account or credential is involved.
+
+`rtk go test ./...` passes 8,639 tests across 81 packages. The final
+`rtk proxy make verify` passes formatting, source size, framework,
+cross-build/test compilation, installers, vet, full race and build checks.

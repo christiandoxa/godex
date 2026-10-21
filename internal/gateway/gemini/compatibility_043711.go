@@ -118,15 +118,12 @@ func translateGeminiChatOrNativeResponse043711(
 	if len(payload) > bodyMaxBytes {
 		return nil, errors.New("Gemini chat-compatible response exceeded its read limit")
 	}
-	decoder := json.NewDecoder(bytes.NewReader(payload))
-	var root map[string]json.RawMessage
-	if err := decoder.Decode(&root); err != nil {
+	root, valid := geminiSerdeResponseObject04384(payload)
+	if !valid {
 		return nil, errors.New("failed to parse Gemini chat-compatible response JSON")
 	}
-	if err := decoder.Decode(new(any)); !errors.Is(err, io.EOF) {
-		return nil, errors.New("failed to parse Gemini chat-compatible response JSON")
-	}
-	if _, hasCandidates := root["candidates"]; !hasCandidates {
+	_, hasEnvelope := root["response"]
+	if _, hasCandidates := root["candidates"]; !hasCandidates && !hasEnvelope {
 		if _, hasChoices := root["choices"]; hasChoices {
 			// This is the exact tagged provider translator's fallback for
 			// an upstream Chat Completion that cannot be decoded as native

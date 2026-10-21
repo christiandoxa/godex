@@ -25,13 +25,15 @@ func geminiSerdeResponseObject04384(data []byte) (map[string]any, bool) {
 	}
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.UseNumber()
-	var object map[string]any
-	if err := decoder.Decode(&object); err != nil {
+	var value any
+	if err := decoder.Decode(&value); err != nil {
 		return nil, false
 	}
 	var trailing any
 	if err := decoder.Decode(&trailing); err != io.EOF {
 		return nil, false
 	}
+	// Valid scalars and arrays have no native response fields.
+	object, _ := value.(map[string]any)
 	return object, true
 }
