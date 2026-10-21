@@ -47,6 +47,13 @@ they do not execute tools, select accounts or authorize retries. Missing
 results carry an explicit unavailable-result error. The independent
 Chat-compatible transport and disabled OAuth runtime retain their contracts.
 
+Native SSE call snapshots also remain private to `gateway/gemini`: explicit
+IDs own their slots, anonymous updates reuse the tagged position/name policy,
+and completed output follows slot order. Updating a call replaces its retained
+arguments rather than accumulating another tool execution. The existing
+buffered-response budget bounds retained tool snapshots; this adapter never
+executes tools, persists state, or selects a retry/account.
+
 ## Runtime components for v0.1
 
 ### Account store

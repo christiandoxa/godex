@@ -19,7 +19,8 @@ type geminiStreamState struct {
 	model      string
 	text       strings.Builder
 	reasoning  strings.Builder
-	toolCalls  []map[string]any
+	toolCalls  []geminiStreamToolCall
+	toolBytes  int
 	usage      map[string]any
 	metadata   map[string]any
 	finish     string
@@ -92,6 +93,9 @@ func (state *geminiStreamState) failed(writer io.Writer, code, message string) e
 }
 
 func (state *geminiStreamState) consume(writer io.Writer, data []byte, requestMetadata map[string]any) error {
+	if state.completed {
+		return nil
+	}
 	if bytes.Equal(bytes.TrimSpace(data), []byte("[DONE]")) {
 		return state.complete(writer, requestMetadata)
 	}
@@ -102,7 +106,7 @@ func (state *geminiStreamState) consume(writer io.Writer, data []byte, requestMe
 	state.applyChunkMetadata(root)
 	candidate := firstNativeCandidate(root)
 	if candidate != nil {
-		for _, raw := range nativeCandidateParts(candidate) {
+		for index, raw := range nativeCandidateParts(candidate) {
 			part, _ := raw.(map[string]any)
 			if part == nil {
 				continue
@@ -127,51 +131,7 @@ func (state *geminiStreamState) consume(writer io.Writer, data []byte, requestMe
 				}
 			}
 			if call, ok := part["functionCall"].(map[string]any); ok {
-				name, hasName := call["name"].(string)
-				if !hasName {
-					name = "tool_call"
-				}
-				canonical := strings.TrimSpace(name)
-				if dot := strings.LastIndexByte(canonical, '.'); dot >= 0 {
-					canonical = canonical[dot+1:]
-				}
-				if strings.ReplaceAll(geminiASCIILower04384(canonical), "-", "_") == "run_shell_command" {
-					name = "exec_command"
-				}
-				callID := nativeString(call["id"])
-				if strings.TrimSpace(callID) == "" {
-					callID = "call_gemini_" + uuid.NewString()
-				}
-				args, exists := call["args"]
-				if !exists {
-					args = map[string]any{}
-				}
-				// Published stream/shaping.rs serializes the serde JSON args
-				// before Mojo projects function-call delta source. A present
-				// null is distinct from absent args ("null" versus "{}").
-				// Go json.Marshal would also re-escape HTML/U+2028 and retain
-				// raw decimal spellings, changing delta and completed history.
-				encoded, encodeErr := jsonutil.MarshalSerdeValue04384(args)
-				if encodeErr != nil {
-					return encodeErr
-				}
-				signature := geminiNativeThoughtSignature(part, call)
-				tool := geminiNativeToolCallItem(nil, map[string]any{
-					"name": name, "id": callID, "args": args, "thoughtSignature": signature,
-				}, callID)
-				state.toolCalls = append(state.toolCalls, tool)
-				if name == "tool_search" || name == "apply_patch" {
-					continue
-				}
-				delta := map[string]any{
-					"type":    "response.function_call_arguments.delta",
-					"call_id": callID, "delta": string(encoded),
-					"sequence_number": state.nextSequence(),
-				}
-				if signature != "" {
-					delta["thought_signature"] = signature
-				}
-				if err := writeGeminiSSEEvent(writer, "response.function_call_arguments.delta", delta); err != nil {
+				if err := state.observeTool(writer, index, part, call); err != nil {
 					return err
 				}
 			}
@@ -242,7 +202,7 @@ func (state *geminiStreamState) complete(writer io.Writer, requestMetadata map[s
 		})
 	}
 	for _, tool := range state.toolCalls {
-		output = append(output, tool)
+		output = append(output, tool.item)
 	}
 	response := map[string]any{
 		"id": state.responseID, "object": "response", "output": output,

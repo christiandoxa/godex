@@ -27,7 +27,7 @@ func TestProdex04384GeminiStreamCanonicalToolArguments(t *testing.T) {
 			if err := state.consume(&output, upstream, nil); err != nil {
 				t.Fatal(err)
 			}
-			if len(state.toolCalls) != 1 || state.toolCalls[0]["arguments"] != tc.want {
+			if len(state.toolCalls) != 1 || state.toolCalls[0].item["arguments"] != tc.want {
 				t.Fatalf("Gemini stream args=%s gave toolCalls=%#v want=%q", tc.argument, state.toolCalls, tc.want)
 			}
 			var parsedDelta string
@@ -70,7 +70,7 @@ func TestProdex04384GeminiStreamAbsentToolArgsDefaultOnlyWhenMissing(t *testing.
 			if err := state.consume(new(bytes.Buffer), payload, nil); err != nil {
 				t.Fatal(err)
 			}
-			if len(state.toolCalls) != 1 || state.toolCalls[0]["arguments"] != tc.want {
+			if len(state.toolCalls) != 1 || state.toolCalls[0].item["arguments"] != tc.want {
 				t.Fatalf("explicit args=%q yielded %#v want=%q", tc.tail, state.toolCalls, tc.want)
 			}
 		})

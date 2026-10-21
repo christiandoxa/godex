@@ -1388,3 +1388,58 @@ boundaries, every release phase, live provider paths, and native macOS or
 Windows execution also remain unverified. No live credentials or private
 conversation data were used; no tag or release was created. CI status was
 neither awaited nor claimed. The parity goal remains active.
+
+## Native Gemini repeated tool snapshots retain their slot and identity
+
+Tagged runtime `gemini_sse_tool_calls.rs::observe_function_call` asks the
+compiled `gemini_tool_call_index` policy for a slot, then replaces that
+slot's arguments with the current snapshot. A known explicit ID wins even
+if the part position changes. Anonymous calls reuse a compatible position,
+then the earliest anonymous slot with the same canonical name. New explicit
+IDs never take over an anonymous or differently owned call. Otherwise an
+unused part position wins, falling back to the first free slot starting at
+the number of existing slots. Final output follows the Rust BTreeMap order.
+
+Godex previously appended a completed item per observed chunk and generated
+a fresh UUIDv4 for every missing ID, so repeated partial arguments could
+become several tool executions. Fail-before HTTP SSE tests reproduce these
+errors and verify positive/negative controls for distinct explicit IDs,
+anonymous ownership, shifted/sparse part positions, canonical shell aliases,
+null/absent arguments and retained thought signatures. The private stream
+record now keeps the selected slot and UUIDv7; later snapshots replace the
+item without concatenating argument JSON or borrowing another tool's ID.
+All ordinary raw argument deltas remain visible, and special-tool delta
+suppression is unchanged. Completed streams ignore later chunks.
+
+An unmodified copy of the pinned `provider_constraints.mojo` was compiled
+with local Mojo 1.1.0 using:
+
+```bash
+rtk proxy mojo build --emit shared-lib -O0 -I mojo/prodex_core -o /tmp/gdx-04384-tool-index-policy.so mojo/prodex_core/provider_constraints.mojo
+```
+
+Calling its exported slot-selection ABI produced 48 deterministic goldens
+in `native_stream_index_04384.json`, including sparse occupied-index
+collisions. Godex matches every golden. This is compiled tagged-source
+evidence, separate from the released CLI executable differential.
+
+The stream's retained tool snapshots are bounded by the existing 8 MiB
+buffered-response budget, and replacement releases the old snapshot's
+budget. Reaching that bound returns an explicit stream error without adding
+the rejected item. The tagged source does not establish the same aggregate
+tool-state bound, so requests exceeding it remain a documented safety
+boundary rather than a claim of byte-for-byte parity. No new option,
+dependency, exported type, shared helper, persistence or account/retry policy
+is introduced. Protocol state stays in `gateway/gemini`; the source-size
+split gives tool acquisition/indexing its own cohesive private file.
+
+`rtk go test -race ./internal/gateway/gemini ./tools/differential -count=1`
+passes 747 tests; `rtk go test ./...` passes 8,703 across 81 packages. Native tool
+item-added/item-done lifecycle and behavior after a nonterminal finish
+reason remain separate audit work; this slice does not certify complete
+native streaming or live OAuth transport parity.
+
+The final `rtk proxy make verify` passes formatting, source size, framework,
+cross-build/test compilation, installers, vet, the full race suite and build.
+Log: `/tmp/gdx-04384-stream-merge-final-verify.log`. Clean candidate binary
+differential validation follows the commit.
