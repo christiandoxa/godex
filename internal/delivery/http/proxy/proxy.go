@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"strings"
@@ -255,6 +254,10 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 			return
 		}
 	} else {
+		// A complete Connection: close request may receive TCP EOF during capture.
+		if request.RequestURI != "" && request.Close {
+			requestContext, detachCancel = detachRequestDeadline(requestContext)
+		}
 		if request.ContentLength > proxy.maxRequest {
 			const message = "proxied request body is too large"
 			activity.fail(http.StatusRequestEntityTooLarge, message)
@@ -290,7 +293,7 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 			writeProxyError(writer, request.URL.Path, http.StatusGatewayTimeout, requestRecoveryTimeoutMessage)
 			return
 		}
-		if requestContext.Err() != nil || request.RequestURI != "" && request.Close {
+		if requestContext.Err() != nil {
 			requestContext, detachCancel = detachRequestDeadline(requestContext)
 		}
 		if proxy.redactor != nil && len(body) > 0 {
@@ -364,35 +367,4 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 		result.Response.Header.Del("Set-Cookie")
 	}
 	proxy.forwardResponse(requestContext, writer, result.Response, result.Prefix, result.AccountID, lifecycle, result.ProviderKind)
-}
-
-var errRequestBodyTooLarge = errors.New("request body limit exceeded")
-
-func readLimited(ctx context.Context, reader io.ReadCloser, limit int64) ([]byte, error) {
-	if reader == nil {
-		return nil, nil
-	}
-	type result struct {
-		data []byte
-		err  error
-	}
-	read := make(chan result, 1)
-	go func() {
-		data, err := io.ReadAll(io.LimitReader(reader, limit+1))
-		read <- result{data: data, err: err}
-	}()
-	select {
-	case result := <-read:
-		_ = reader.Close()
-		if result.err != nil {
-			return nil, result.err
-		}
-		if int64(len(result.data)) > limit {
-			return nil, errRequestBodyTooLarge
-		}
-		return result.data, nil
-	case <-ctx.Done():
-		_ = reader.Close()
-		return nil, ctx.Err()
-	}
 }

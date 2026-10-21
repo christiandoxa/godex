@@ -3,6 +3,7 @@ package proxy
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -200,6 +201,14 @@ func (body *blockingBody04381) Close() error {
 }
 
 func TestProdex04381BodyCaptureUsesRequestDeadline(t *testing.T) {
+	for _, closing := range []bool{false, true} {
+		t.Run(fmt.Sprintf("connection-close=%v", closing), func(t *testing.T) {
+			testBodyCaptureRequestDeadline04381(t, closing)
+		})
+	}
+}
+
+func testBodyCaptureRequestDeadline04381(t *testing.T, closing bool) {
 	gateway := &requestDeadlineGateway04381{
 		canceled: make(chan struct{}),
 		started:  make(chan bool, 1),
@@ -219,6 +228,7 @@ func TestProdex04381BodyCaptureUsesRequestDeadline(t *testing.T) {
 		t.Fatal(err)
 	}
 	request := httptest.NewRequest(http.MethodPost, "/backend-api/status", nil)
+	request.Close = closing
 	request.Body = &blockingBody04381{closed: make(chan struct{})}
 	response := httptest.NewRecorder()
 	proxy.ServeHTTP(response, request)

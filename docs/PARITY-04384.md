@@ -2832,3 +2832,56 @@ suite, cross-platform builds and test compilation. Logs:
 `/tmp/gdx-04384-tool-signature-verify.log`. Clean-commit executable validation
 follows this commit. Missing/present tool-call identity fields, padded names,
 and buffered malformed-argument diagnostics remain separate audit targets.
+
+## Closing HTTP connections retain complete captured bodies
+
+While validating the tool-ID candidate, `rtk proxy make verify` failed the
+existing `TestProxyForwardsCapturedBodyAfterClientHalfClose` regression with an
+empty HTTP 200 instead of the upstream status/body. Failed gate log:
+`/tmp/gdx-04384-stream-tool-id-verify.log`. The same race reproduces on clean
+baseline `f859439626cfcd9c4e3dc45373fbae73b44dfc61`: 147/150 passes and
+three failures under `rtk go test -race ./internal/delivery/http/proxy -run '^TestProxyForwardsCapturedBodyAfterClientHalfClose$' -count=150`.
+Log: `/tmp/gdx-04384-half-close-repro-baseline.log`.
+
+Go can cancel a closing server request's context on TCP read EOF while the
+body-capture goroutine has completed but not delivered its result. Delivery
+previously detached this cancellation only after capture, so the select could
+discard an otherwise complete body. Closing server connections now detach
+before capture while keeping the local request budget and any earlier parent
+deadline. Ordinary cancellation and incomplete-body rejection retain their
+existing controls. The existing private bounded-read implementation moves to
+`delivery/http/proxy/request_body.go`; it has one transport-specific consumer,
+so no shared helper is introduced. Gateway, use-case, routing and persistence
+ownership are unchanged. No new production API, option, dependency or worker
+is introduced. Architecture documentation records this transport boundary.
+
+The unchanged half-close regression passes all 150 repetitions after the fix:
+`/tmp/gdx-04384-half-close-repro-fixed.log`. Thirty repetitions of complete/
+incomplete-body and closing/normal deadline controls pass 180 tests, and thirty
+ordinary upstream/body-cancellation controls pass 60 tests. Logs:
+`/tmp/gdx-04384-half-close-fixed-controls.log` and
+`/tmp/gdx-04384-half-close-cancel-controls.log`.
+The parent-deadline regression uses explicit cancellation and retained deadline
+values without sleeps; closing and normal stalled capture still expire under
+the owning watchdog.
+
+An isolated released-executable prototype issued 150 independent client turns,
+each with TCP CloseWrite before reading its response. Both binaries delivered
+all expected responses with 150 upstream attempts and zero retries in the
+updated probe, but Prodex also created durable state files not classified by
+that prototype's ephemeral fixture validator. Report:
+`/tmp/gdx-04384-half-close-baseline-oracle.json`. That FAIL is not an
+executable half-close mismatch or a qualified completion gate; it requires a
+separate persistence audit. The full prototype is retained in
+`/tmp/gdx-04384-half-close-oracle-probe-work`, outside the production change.
+No assertion is disabled and the state error is not treated as passing.
+The initial full-test prototype also had an invalid one-product test fixture;
+its failed log is retained at `/tmp/gdx-04384-half-close-test-all.log`.
+
+The final production-only change passes `rtk go test ./...`: 9,107 tests across
+81 packages, logged at `/tmp/gdx-04384-half-close-production-test-all.log`.
+`rtk proxy make verify` passes all local gates, including the full shuffled race
+suite and cross-platform build/test compilation:
+`/tmp/gdx-04384-half-close-production-verify.log`. Clean-commit provider and
+HTTP keepalive regression gates follow this commit. The prototype's additional
+Prodex persistence files remain an open audit item.

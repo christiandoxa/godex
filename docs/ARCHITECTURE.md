@@ -465,6 +465,11 @@ and stops its timer; no shared helper or background worker is introduced.
 The budget lives in delivery's request scope, outside `Context.Deadline`, whose
 parent deadline remains stable before and after commitment. The timer's own
 cancellation cause distinguishes local expiry from caller cancellation.
+For closing server connections, delivery detaches TCP EOF cancellation before
+body capture while retaining the request budget and any earlier parent
+deadline. Complete bodies can finish forwarding; malformed/incomplete bodies
+remain rejected. Private `delivery/http/proxy/request_body.go` owns bounded
+body capture; it is transport-specific and has one consumer.
 The connection's acceptance timestamp is claimed only by its first request.
 Later HTTP keep-alive requests start their own admission budget; connection
 age cannot expire unrelated follow-up requests. The claim is connection-owned

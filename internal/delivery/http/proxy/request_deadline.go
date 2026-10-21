@@ -140,16 +140,16 @@ func withoutRequestDeadline(ctx context.Context) context.Context {
 	return ctx
 }
 
-// detachRequestDeadline keeps the local watchdog while dropping a client
-// disconnect cancellation so captured requests can finish their bounded work.
+// detachRequestDeadline preserves the budget and any earlier parent deadline
+// while dropping disconnect cancellation for closing connections.
 func detachRequestDeadline(ctx context.Context) (context.Context, context.CancelFunc) {
 	scope, ok := requestDeadlineScopeFor(ctx)
 	if !ok {
 		return context.WithoutCancel(ctx), func() {}
 	}
 	base := context.WithoutCancel(scope.parent)
-	if !scope.local {
-		return base, func() {}
+	if deadline, present := scope.parent.Deadline(); present && deadline.Before(scope.deadline) {
+		scope.deadline = deadline
 	}
 	return newRequestDeadlineContext(base, scope)
 }
