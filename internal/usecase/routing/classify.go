@@ -96,7 +96,11 @@ func (proxy *Router) classifyResponse(response *proxymodel.Response, providerKin
 			classification.Class != providerentity.ErrorTransient {
 			return responseOutcome{kind: responsePass}, pending, nil
 		}
-		cooldown := maxDuration(retryAfter(response.Header, proxy.now()), classification.Cooldown)
+		advice := retryAfter(response.Header, proxy.now())
+		if !externalProviderKind(providerKind) {
+			advice = nativeRetryAfterHeaders04383(response.Header)
+		}
+		cooldown := maxDuration(advice, classification.Cooldown)
 		if classification.Class == providerentity.ErrorRateLimit {
 			cooldown = rateLimitCooldown(response.Header, classificationBody)
 		}

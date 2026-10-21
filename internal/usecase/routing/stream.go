@@ -151,8 +151,12 @@ func classifyStreamError(data []byte, headers http.Header, now time.Time, provid
 	}
 	switch classification.Class {
 	case providerentity.ErrorQuota:
+		advice := retryAfter(headers, now)
+		if !externalProviderKind(providerKind) {
+			advice = nativeRetryAfterHeaders04383(headers)
+		}
 		return responseOutcome{
-			kind: responseRetry, quarantine: maxDuration(retryAfter(headers, now), classification.Cooldown),
+			kind: responseRetry, quarantine: maxDuration(advice, classification.Cooldown),
 			failed: true, quota: true, quotaResetAt: quotaResetAtFromMessage(data, now), firstEventRetry: true,
 		}, false
 	case providerentity.ErrorRateLimit:

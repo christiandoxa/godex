@@ -1108,3 +1108,10 @@ serde-valid long-mantissa control retains four bounded retries exclusively
 on its verified previous-response owner. The oracle checks every attempt's
 owner and byte-exact message and the previous owner's durable binding; it
 never skips verification in diagnostic mode.
+
+Source-pinned native quota Retry-After parsing uses only Mojo-valid numeric
+seconds capped at 300, never an RFC HTTP-date or the generic external
+provider's 24-hour cap. Local HTTP 429 and precommit SSE regressions check
+actual cooldown classification and multiple header candidates; the broad
+official HTTP 429 oracle remains a separate no-regression gate rather than
+a claimed timed comparison of these particular large delays.

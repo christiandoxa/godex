@@ -29,6 +29,21 @@ func rateLimitCooldown(headers http.Header, body []byte) time.Duration {
 	return min(delay, maxRetryAfter)
 }
 
+// The native 0.438.3 HTTP/SSE error policy folds Retry-After header
+// names as ASCII and accepts *only* unsigned integer seconds, capped at
+// 300 seconds. Rust runtime_retry_after_from_headers gathers all matching
+// values and selects the maximum valid delay; it never parses HTTP dates.
+// Keep the older generic retryAfter helper for external provider paths.
+func nativeRetryAfterHeaders04383(headers http.Header) time.Duration {
+	var greatest time.Duration
+	for _, raw := range headers.Values("Retry-After") {
+		if delay, ok := retryAfterHeader(raw); ok && delay > greatest {
+			greatest = delay
+		}
+	}
+	return greatest
+}
+
 func retryAfterHeader(value string) (time.Duration, bool) {
 	value = strings.TrimSpace(value)
 	// Mojo accepts a positive unsigned UInt64 literal, not +1 or -1.

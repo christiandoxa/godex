@@ -3863,3 +3863,27 @@ original response owner. A legitimate long-mantissa serde-positive control
 retains four bounded same-owner tool-output retries. These are finite
 synthetic conditions; native provider and platform permutations are not
 fully certified.
+
+## Native HTTP/SSE quota Retry-After is numeric-only and capped at 300 seconds
+
+The tagged 0.438.3 `runtime_retry_after_from_headers` in
+`prodex-runtime-proxy/src/error_policy/retry_after.rs` uses the compiled
+Mojo `RUNTIME_RETRY_AFTER_TEXT_HEADER` parser on matching raw header values.
+It accepts unsigned integer **seconds** only (zero and invalid text provide
+no candidate), caps every accepted value at **300 seconds**, and chooses
+the maximum valid delay from all matching headers. It does not interpret
+HTTP-date values. The earlier generic Go `retryAfter` helper accepted
+HTTP-date strings and could return up to **24 hours**; native HTTP 429
+quota or SSE quota response classification used that generic helper and
+could therefore impose a much longer retry quarantine than tagged Prodex.
+
+A fail-before HTTP 429 regression reproduces the mismatch for `3600`,
+`9999999999`, and future HTTP-date values, with numeric-300 and invalid
+controls. A scoped native helper now applies the existing source-matched
+numeric header parser to native 429 and SSE quota classification, preserving
+the separate external-provider helper's HTTP-date behavior and request
+wire. Further regressions verify duplicate numeric candidates, invalid
+later values, zero, and native SSE quota cooldown. The official HTTP 429
+transport oracle is retained for an executable-pinned no-regression check;
+these exact native cooldown timestamps are tested locally against the
+source policy, not advertised as timed provider/executable observations.
