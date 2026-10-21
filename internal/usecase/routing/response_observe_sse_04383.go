@@ -27,6 +27,12 @@ func (router *Router) observeSSEBindingsWithTurn04383(ctx context.Context, accou
 			currentTurn = ""
 		}
 	}
+	// Tagged response_forwarding records all precommit lookahead IDs with
+	// the selected response header/request override before constructing the
+	// streaming SSE tap. The tap may change its active turn when it reads an
+	// event, but it cannot rewrite those pre-recorded IDs. Only when no
+	// selected turn exists may prelude event fields determine each ID's turn.
+	precommitSelectedTurn := currentTurn
 	seenIDs := make(map[string]bool)
 	withTurn := make(map[string]bool)
 	profileHome := router.accountHome(accountID)
@@ -53,15 +59,19 @@ func (router *Router) observeSSEBindingsWithTurn04383(ctx context.Context, accou
 				continue
 			}
 			seenIDs[id] = true
+			selectedTurn := currentTurn
+			if precommitSelectedTurn != "" {
+				selectedTurn = precommitSelectedTurn
+			}
 			binding := affinityKeys{previous: id}
-			if currentTurn != "" {
-				binding.turn = currentTurn
+			if selectedTurn != "" {
+				binding.turn = selectedTurn
 			}
 			if err := router.rememberVerifiedAccountBinding(ctx, accountID, binding, router.now()); err != nil {
 				return err
 			}
-			if currentTurn != "" {
-				router.rememberAccountTurnState(ctx, id, accountID, profileHome, currentTurn, router.now())
+			if selectedTurn != "" {
+				router.rememberAccountTurnState(ctx, id, accountID, profileHome, selectedTurn, router.now())
 				withTurn[id] = true
 			}
 		}

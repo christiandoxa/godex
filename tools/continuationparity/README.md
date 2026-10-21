@@ -959,3 +959,12 @@ associate it with the effective request turn. The client sees the exact
 same original SSE bytes; the model attempt and header are checked against
 two authenticated Ready profiles. The internal request override is never
 synthesized as a client-visible response header.
+
+The `request-turn-conflict` SSE lineage control tests precedence within
+the precommit boundary: the source request has the verified main-owned
+`x-codex-turn-state: turn-a`, but its first output event carries
+`turn_state: state-one`. The first response ID must retain `turn-a` from
+the precommit binding step; a second response ID produced **after** commit
+without its own turn must inherit `state-one` from the stream tap. Both
+products must retain identical SSE bytes, exact request-header provenance,
+Ready evidence and the two distinct durable ID/turn pairs.

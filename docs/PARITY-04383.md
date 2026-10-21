@@ -3414,3 +3414,38 @@ no explicit turn. The oracle verifies identical streamed bytes, response
 owners on main, and the correct **request-turn** associations in the
 private Godex sidecars and Prodex durable lineage map. Additional native
 OS/provider combinations remain separately unverified.
+
+## Precommit response IDs retain the request turn override before SSE event changes
+
+Tagged Prodex 0.438.3 `response_forwarding.rs` chooses the initial
+`response_turn_state` from the upstream response header, then the effective
+request-side turn-state override, then the SSE lookahead turn. It remembers
+**all precommit response IDs** with that selected turn **before** seeding
+`RuntimeSseTapState`. The stream tap can subsequently advance its current
+turn from a different `turn_state` inside the first SSE event, but an ID
+already remembered with the request override cannot have its original
+turn pairing rewritten. A later response ID without a turn value inherits
+the event's newer turn.
+
+Godex's precommit SSE observer previously set its current turn from every
+parsed event **before** remembering that event's ID, ignoring the request
+override's higher priority for response IDs already present in the
+lookahead. This could attach the first response ID to the event token rather
+than the verified request token, while the later continuation inherited the
+event token correctly. A fail-before HTTP proxy regression reproduces that
+mismatch using a committed first SSE event whose explicit turn conflicts
+with the request header, followed by another response ID delivered after
+the precommit boundary. The scoped fix retains the selected header/override
+for all precommit IDs, leaving the event's current token available for
+**later** committed IDs; without a selected header/override the previous
+per-event and late-backfill rules remain unchanged.
+
+The pinned `--phase=http-session-conflict` oracle adds a
+`request-turn-conflict` stream, with verified `turn-a` on main, first SSE
+response `resp-sse-one/state-one` and a later no-turn response
+`resp-sse-two`. It checks **resp-sse-one/turn-a** and
+**resp-sse-two/state-one** independently in the official Prodex 0.438.3
+durable lineage map and Godex private sidecars, alongside byte-identical
+stream output, one authenticated Ready owner inference, and preservation of
+both accounts' earlier bindings. This finite test does not certify all
+provider/OS combinations.

@@ -21,14 +21,14 @@ const httpSSETurnLineageWire04383 = "data: {\"type\":\"response.output_text.delt
 // A request-owned turn-state is independent of the returned response
 // header or SSE fields and must seed the tagged RuntimeSseTapState.
 func httpSSETurnLineageRequestFor04383(shape string) string {
-	if shape == "request-turn" {
+	if shape == "request-turn" || shape == "request-turn-conflict" {
 		return `{"model":"gpt-6","stream":true,"input":[{"role":"user","content":"separate turn states"}]}`
 	}
 	return httpSSETurnLineageRequest04383
 }
 
 func httpSSETurnLineageHeaderFor04383(shape string) string {
-	if shape == "request-turn" {
+	if shape == "request-turn" || shape == "request-turn-conflict" {
 		return "turn-a"
 	}
 	return ""
@@ -48,6 +48,9 @@ func httpSSETurnLineageWireFor04383(shape string) string {
 	case "request-turn":
 		first = `{"type":"response.output_text.delta","delta":"first","response":{"id":"resp-sse-one"}}`
 		second = `{"type":"response.completed","response":{"id":"resp-sse-two"}}`
+	case "request-turn-conflict":
+		first = `{"type":"response.output_text.delta","delta":"first","response":{"id":"resp-sse-one","turn_state":"state-one"}}`
+		second = `{"type":"response.completed","response":{"id":"resp-sse-two"}}`
 	case "large-committed":
 		second = `{"type":"response.completed","response":{"id":"resp-sse-two"},"padding":"` + strings.Repeat("x", 72<<10) + `"}`
 	}
@@ -57,6 +60,12 @@ func httpSSETurnLineageWireFor04383(shape string) string {
 func httpSSETurnLineageExpected04383(shape, responseID string) string {
 	if shape == "request-turn" {
 		return "turn-a"
+	}
+	if shape == "request-turn-conflict" {
+		if responseID == "resp-sse-one" {
+			return "turn-a"
+		}
+		return "state-one"
 	}
 	if shape == "inherit" || shape == "partial" || shape == "large-committed" {
 		return "state-one"
@@ -71,7 +80,7 @@ func httpSSETurnLineageExpected04383(shape, responseID string) string {
 }
 
 func runHTTPSSETurnLineageProduct04383(root string, p product) error {
-	for _, shape := range []string{"distinct", "inherit", "late", "large-committed", "request-turn"} {
+	for _, shape := range []string{"distinct", "inherit", "late", "large-committed", "request-turn", "request-turn-conflict"} {
 		if err := runHTTPSSETurnLineageCase04383(filepath.Join(root, shape), p, shape); err != nil {
 			return fmt.Errorf("SSE lineage %s: %w", shape, err)
 		}
