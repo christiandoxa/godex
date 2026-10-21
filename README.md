@@ -217,6 +217,12 @@ are removed from the Codex child process and raw keys are never persisted in
 profile metadata, routing bindings, or bundles. Without API keys, the same
 `--provider anthropic` shortcut resolves managed Claude OAuth profiles.
 
+The 0.438.4 local bridge rejects a known raw-key response, turn, or session
+continuation with HTTP 503 (`bound_continuation_unavailable`) before another
+upstream attempt, including after restart. Fresh self-contained requests and
+unknown response discovery remain available. Routing state stores hashed
+rejection markers without provider credentials.
+
 DeepSeek now has the bounded 0.435.1 raw-key runtime plus the advanced
 request-side Responses adapter. `godex run --provider deepseek` resolves
 `--api-key`, then `DEEPSEEK_API_KEYS`, then `DEEPSEEK_API_KEY`; plural keys

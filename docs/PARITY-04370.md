@@ -79,6 +79,10 @@ a substitute for independent observable behavioral verification.
   verify the initial cache, restart, and non-destructive managed-profile
   behavior. This does not change the separate managed-profile
   continuation recovery guarantees.
+  The [0.438.4 persistence re-audit](PARITY-04384.md#raw-key-continuation-persistence-audit)
+  supersedes the affinity-volatility assumption above: delayed reference saves
+  and same-process dispatch require a durable fail-closed continuation marker.
+  The private raw-key turn-state cache and legacy-binding safety rules remain.
 - A second, independent **managed-profile lifecycle differential** was
   added to the release gate. It uses the exact SHA-256-pinned Prodex
   0.437.0 executable and a clean-commit Godex binary. Nineteen separate

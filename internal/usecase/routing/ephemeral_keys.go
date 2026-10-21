@@ -2,6 +2,7 @@ package routing
 
 import (
 	"context"
+	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	"time"
 )
@@ -85,18 +86,17 @@ func (router *Router) persistAccountState(accountID string) bool {
 	return !ephemeral
 }
 
-// rememberVerifiedAccountBinding keeps ephemeral provider responses local
-// while preserving durable ownership for actual managed provider profiles.
+// Raw-key bindings cannot pass the local-rewrite dispatch identity check.
+// Persist the existing conflict sentinel so a restart cannot rediscover another owner.
 func (router *Router) rememberVerifiedAccountBinding(ctx context.Context, accountID string, keys affinityKeys, now time.Time) error {
 	router.mu.Lock()
 	_, ephemeral := router.ephemeralCredentialIDs[accountID]
 	router.mu.Unlock()
-	var err error
 	if ephemeral {
-		err = router.affinity.rememberVerifiedVolatile(accountID, keys, now)
-	} else {
-		err = router.affinity.rememberVerified(ctx, accountID, keys, now)
+		accountID = routingentity.ConflictAccountID
+		keys.thread = ""
 	}
+	err := router.affinity.rememberVerified(ctx, accountID, keys, now)
 	if err == nil {
 		router.notifySelectionChange()
 	}

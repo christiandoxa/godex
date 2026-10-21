@@ -45,6 +45,13 @@ deadline may attempt the account upstream; a continuing quota failure is handled
 by the normal precommit retry/quarantine policy. There are no background probes
 or per-chunk checks, and hard continuation affinity always wins.
 
+Raw API-key pools follow the 0.438.4 local-rewrite dispatch contract: a known
+response, turn, or session binding returns HTTP 503 with
+`bound_continuation_unavailable` before another upstream attempt. The rejection
+survives restart through a hashed conflict marker; no credential owner is
+restored from that marker. Fresh self-contained requests and unknown response
+discovery remain eligible. Managed-profile owner recovery keeps the flow above.
+
 ## Failure policy
 
 | Upstream result | Before commitment | After commitment |

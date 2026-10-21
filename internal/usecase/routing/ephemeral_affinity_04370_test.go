@@ -2,6 +2,7 @@ package routing
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -14,14 +15,13 @@ import (
 	routingrepo "github.com/christiandoxa/godex/internal/repository/routing"
 )
 
-func TestProdex04370EphemeralProviderResponseAffinityIsNotDurable(t *testing.T) {
+func TestProdex04384RawKeyResponsePersistsRejectionWithoutCredentialOwner(t *testing.T) {
 	for _, fixture := range []struct {
-		name          string
-		ephemeral     bool
-		wantPersisted bool
+		name      string
+		ephemeral bool
 	}{
-		{"transient_provider_key", true, false},
-		{"managed_provider_profile", false, true},
+		{"transient_provider_key", true},
+		{"managed_provider_profile", false},
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
 			repository := routingrepo.NewStore(t.TempDir())
@@ -55,15 +55,23 @@ func TestProdex04370EphemeralProviderResponseAffinityIsNotDurable(t *testing.T) 
 				t.Fatal(err)
 			}
 			memoryOwner, err := router.affinity.owner(t.Context(), affinityKeys{previous: responseID}, router.now())
-			if err != nil || memoryOwner != owner {
+			if fixture.ephemeral {
+				if memoryOwner != "" || !errors.Is(err, errConflictingAccountAffinity) {
+					t.Fatalf("raw-key continuation is not fenced: owner=%q err=%v", memoryOwner, err)
+				}
+			} else if err != nil || memoryOwner != owner {
 				t.Fatalf("within-process previous response owner=%q, err=%v", memoryOwner, err)
 			}
 			bindings, err := repository.Load(t.Context())
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got := len(bindings) > 0; got != fixture.wantPersisted {
-				t.Fatalf("durable previous response bindings=%#v, wantPersisted=%t", bindings, fixture.wantPersisted)
+			wantOwner := owner
+			if fixture.ephemeral {
+				wantOwner = routingentity.ConflictAccountID
+			}
+			if len(bindings) != 1 || bindings[0].AccountID != wantOwner {
+				t.Fatalf("durable previous response bindings=%#v, want owner=%q", bindings, wantOwner)
 			}
 		})
 	}
@@ -169,8 +177,8 @@ func TestProdex04370LegacyEphemeralAffinityCannotHijackNewLaunch(t *testing.T) {
 		t.Fatal(err)
 	}
 	owner, err := first.affinity.owner(t.Context(), affinityKeys{previous: "resp-new-transient"}, now)
-	if err != nil || owner != transientID {
-		t.Fatalf("current transient owner=%q err=%v", owner, err)
+	if !errors.Is(err, errConflictingAccountAffinity) || owner != "" {
+		t.Fatalf("new transient continuation must fail closed: owner=%q err=%v", owner, err)
 	}
 	second := newRouter()
 	if _, err := second.loadAccounts(t.Context()); err != nil {
@@ -178,7 +186,6 @@ func TestProdex04370LegacyEphemeralAffinityCannotHijackNewLaunch(t *testing.T) {
 	}
 	for _, fixture := range []struct{ key, want string }{
 		{"resp-old-transient", ""},
-		{"resp-new-transient", ""},
 		{"resp-managed", managedID},
 	} {
 		owner, err := second.affinity.owner(t.Context(), affinityKeys{previous: fixture.key}, now)
@@ -186,8 +193,11 @@ func TestProdex04370LegacyEphemeralAffinityCannotHijackNewLaunch(t *testing.T) {
 			t.Fatalf("restart %q owner=%q want=%q err=%v", fixture.key, owner, fixture.want, err)
 		}
 	}
+	if owner, err := second.affinity.owner(t.Context(), affinityKeys{previous: "resp-new-transient"}, now); owner != "" || !errors.Is(err, errConflictingAccountAffinity) {
+		t.Fatalf("restart lost raw-key rejection: owner=%q err=%v", owner, err)
+	}
 	persisted, err := repo.Load(t.Context())
-	if err != nil || len(persisted) != 2 {
+	if err != nil || len(persisted) != 3 {
 		t.Fatalf("upgrade must be non-destructive: persisted=%v err=%v", persisted, err)
 	}
 }

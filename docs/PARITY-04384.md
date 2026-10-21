@@ -3047,3 +3047,46 @@ instead returns 200 and attempts a credential after every restart resume, and
 makes a third upstream attempt within the original process where Prodex stops
 after the two seed attempts. These are confirmed routing mismatches, beyond
 file-layout differences. Production repair and clean-commit gates follow.
+
+
+## Raw-key continuations fail before credential dispatch
+
+`usecase/routing` now resolves raw-key response/turn/session bindings before
+ordinary managed-owner recovery. Known bindings return the reference HTTP 503
+message without retry or another credential attempt. Fresh and unknown-response
+requests retain bounded discovery. Verified raw-key observations use the
+existing conflict sentinel with hashed continuation keys in the existing
+version-1 routing snapshot/backup; no raw credential, credential ID, endpoint,
+new field or migration is introduced. Legacy synthetic-account owners are
+still ignored without modifying their records, and managed-profile bindings
+and private turn-state sidecars retain their existing boundaries.
+
+The obsolete volatile-only observation function is removed. The new private
+owner-resolution policy belongs to `usecase/routing`; HTTP JSON code/presentation
+belongs to `delivery/http/proxy`, and the existing repository remains responsible
+for locking, atomic snapshots and recovery. No shared helper, dependency,
+exported API, option or background worker is introduced. Architecture, rotation
+and user documentation record the compatibility behavior, and the historical
+0.437.0 volatility assumption points to this re-audit.
+
+Exact fail-before `rtk go test ./internal/usecase/routing ./internal/delivery/http/proxy -run '^TestProdex04384RawKeyContinuation' -count=1`
+on isolated `c18c799` fails response/session/turn controls with an extra upstream
+attempt and the HTTP integration with 200 instead of 503. Log:
+`/tmp/gdx-04384-raw-key-continuation-confirmed-before.log`.
+The updated tests also cover same-process/restarted routers, changed credential
+IDs/endpoints, fresh and unknown-response requests, the exact HTTP error
+code/body, durable markers, managed ownership and legacy-binding safety.
+
+`rtk go test ./tools/differential -count=1` passes 243 tests, including strict
+snapshot identity checks and independent oracle mutations. Log:
+`/tmp/gdx-04384-raw-key-oracle-tests.log`. `rtk go test ./...` passes 9,137 tests
+across 81 packages, logged at
+`/tmp/gdx-04384-raw-key-continuation-final-test-all.log`.
+The focused routing/repository/HTTP/oracle race suite passed 2,410 tests before
+one additional oracle self-test was added. Log:
+`/tmp/gdx-04384-raw-key-continuation-final-race.log`.
+`rtk proxy make verify` passes formatting, source-size/TUI guards, vet, the
+full shuffled race suite, cross-platform build/test compilation, installers
+and build. Log: `/tmp/gdx-04384-raw-key-continuation-final-verify.log`.
+Clean-commit released-executable validation follows this candidate.
+No whole-project 1:1 parity claim is made.

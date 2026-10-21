@@ -279,6 +279,18 @@ binds one transport to each credential ID. `gateway/codex` removes all provider
 API-key environment variables from external-provider child processes. This keeps
 conversation affinity stable without persisting or logging raw provider secrets.
 
+For launch-local raw-key pools, `usecase/routing` applies the 0.438.4 local
+rewrite dispatch contract before ordinary owner recovery: a known response,
+turn or session binding returns `bound_continuation_unavailable` (HTTP 503)
+without another credential attempt. Unknown lineage and fresh requests remain
+eligible for bounded dispatch. Verified raw-key observations persist only hashed
+continuation keys with the existing conflict sentinel, never a credential ID,
+endpoint, secret or profile. `repository/routing` retains its atomic version-1
+snapshot/backup format; no migration or new persisted field is needed. Older
+readers recognize the sentinel and still fail closed. Legacy synthetic account
+bindings remain ignored without deletion or adoption by a new key pool. Retry
+quarantine and profile turn-state sidecars keep their separate existing rules.
+
 gateway/compact owns the bounded deterministic local compaction fallback used by
 translated providers: at most 24 recent snippets, 768 bytes per snippet, and
 24 KiB total summary, with the reference x-prodex-compact-* degradation metadata.

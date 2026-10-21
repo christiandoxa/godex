@@ -24,6 +24,9 @@ func writeProxyError(writer http.ResponseWriter, path string, status int, messag
 			code = "invalid_request_error"
 		}
 	}
+	if status == http.StatusServiceUnavailable && message == "bound continuation provider is unavailable" {
+		code = "bound_continuation_unavailable"
+	}
 	if code != "" {
 		writer.Header().Set("Content-Type", "application/json")
 		writer.Header().Set("Cache-Control", "no-store")

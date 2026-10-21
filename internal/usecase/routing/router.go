@@ -291,10 +291,7 @@ func (router *Router) forwardWithoutWatchdog(ctx context.Context, request proxym
 	if err != nil {
 		return nil, err
 	}
-	if err := router.repairConflictedFullHistorySession043711(ctx, request, keys); err != nil {
-		return nil, err
-	}
-	owner, durableRelease, err := router.resolveOwner(ctx, keys, request.QuotaSelection)
+	owner, durableRelease, err := router.resolveRequestOwner(ctx, request, accounts, keys)
 	if err != nil {
 		return nil, err
 	}
