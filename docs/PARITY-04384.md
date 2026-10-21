@@ -2554,3 +2554,51 @@ Continue with targeted fail-before evidence for these still-unproven areas:
 
 These are audit targets, not newly confirmed executable mismatches. Keep the
 same official 0.438.4 source, binary, manifest and locked serde dependencies.
+
+## Structured DeepSeek tool-search arguments retain serde number values
+
+The pinned buffered tool-call kernel retains structured `tool_search`
+arguments and returns a serde Value; streaming `stream_tool_call_item` also
+parses/serializes that Value before embedding it. Godex used float64 decoding
+in both adapters, rounding integers above 2^53 and serializing decimal and
+negative-zero values with different numeric kinds.
+
+`gateway/deepseek/tool_search.go` now owns the existing two adapters' private
+structured argument conversion. It validates the complete serde boundary and
+number range, decodes with UseNumber, and uses the existing locked-serde writer
+to retain canonical JSON number tokens inside RawMessage. Buffered validation
+errors remain provider failures; streaming retains the reference's empty
+argument fallback after its owning validator. The stream argument validator
+now checks serde number validity directly instead of parsing every scalar
+through Go float64, allowing the pinned long-mantissa finite control.
+Other function-tool argument strings and apply_patch behavior are unchanged.
+No new helper package, exported interface, model, dependency, option,
+goroutine or persistence format is introduced. Conversion stays private to
+the owning integration; generic serde rules stay in `helper/jsonutil`.
+
+Fail-before `/tmp/gdx-04384-deepseek-tool-search-u64-before.log` passes
+six ordinary/null controls and fails eight buffered/SSE large or nested
+integer cases. The completed regression additionally checks decimal/exponent,
+negative zero, u64 overflow converted to serde f64, and the locked finite
+long-mantissa value in both item-done and final response output. Invalid UTF-8,
+surrogates, out-of-range float, trailing JSON and depth remain rejected.
+
+On clean baseline `8918d065a8504f398042905bdf47f60a0266fd63`, both
+new released cases fail only Godex. Prodex independently meets the entire
+canonical byte contract, including nested u64::MAX, 100.0 and -0.0. Reports:
+`/tmp/gdx-04384-tool-search-canonical-before-oracle.json` and
+`/tmp/gdx-04384-sse-tool-search-canonical-before-oracle.json`.
+The oracle compares all buffered/SSE bytes without opaque IDs or float
+normalization. Independent invariants reject matching wrong outputs.
+Malformed buffered argument diagnostic text and broader envelope string/
+floating-point canonicalization remain separate audit targets; local rejection
+tests are not presented as released-executable diagnostic equivalence.
+
+`rtk go test -race ./internal/gateway/deepseek ./tools/differential -count=1`
+passes 700 tests. `rtk go test ./...` passes 9,067 tests across 81 packages.
+`rtk proxy make verify` passes every local gate, including the complete
+shuffled race suite. Logs:
+`/tmp/gdx-04384-deepseek-tool-search-final-race.log`,
+`/tmp/gdx-04384-deepseek-tool-search-final-test-all.log` and
+`/tmp/gdx-04384-deepseek-tool-search-final-verify.log`. Clean-commit
+released-executable validation follows this commit.

@@ -386,6 +386,14 @@ oracle now exercises thirteen Gemini cases, including all earlier eight fixtures
 
 ### Bounded full DeepSeek oracle
 
+`tool-search-canonical` and `sse-tool-search-canonical` compare complete
+buffered and three-event SSE bytes for structured tool-search arguments.
+The fixture includes nested u64::MAX, integers above 2^53, exponent input,
+negative zero and null. Both original canonical number spellings and tool
+identity must match; the oracle performs no float decoding or normalization.
+Mutation controls reject rounding, changed integer kinds, execution, tool
+type and final output even when both products agree on the same wrong value.
+
 `sse-tool-finish-error` and `sse-tool-empty-finish-error` send invalid tool
 arguments with a present finish string, then a different upstream error before
 DONE. Both require the original exact invalid-tool failure trace; the later

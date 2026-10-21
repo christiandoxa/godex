@@ -39,9 +39,9 @@ func deepSeekStreamCompletedToolItem(call *deepSeekChatStreamToolCall) map[strin
 	arguments := call.arguments.String()
 	switch call.name {
 	case "tool_search":
-		var value any
-		if json.Unmarshal([]byte(arguments), &value) != nil {
-			value = map[string]any{}
+		value, err := deepSeekToolSearchArguments(arguments)
+		if err != nil {
+			value = json.RawMessage(`{}`)
 		}
 		return map[string]any{
 			"type": "tool_search_call", "call_id": call.id,
@@ -85,8 +85,7 @@ func deepSeekValidateStreamToolCall(index uint64, call *deepSeekChatStreamToolCa
 	if jsonutil.CheckSerdeBoundary(arguments) != nil {
 		return invalid()
 	}
-	var value any
-	if json.Unmarshal([]byte(arguments), &value) != nil {
+	if !json.Valid([]byte(arguments)) || !jsonutil.CheckSerdeNumberTokens([]byte(arguments)) {
 		return invalid()
 	}
 	return nil

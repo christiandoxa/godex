@@ -135,16 +135,20 @@ func deepSeekResponseToolCall(raw any) (map[string]any, string, string, error) {
 }
 
 func deepSeekResponseSpecialTool(call map[string]any, name, arguments string) (map[string]any, bool, error) {
-	if strings.TrimSpace(arguments) != "" || name == "tool_search" {
+	if name == "tool_search" {
+		decoded, err := deepSeekToolSearchArguments(arguments)
+		if err != nil {
+			return nil, true, fmt.Errorf("DeepSeek returned malformed JSON arguments for tool call `%s`: %w", name, err)
+		}
+		return map[string]any{
+			"type": "tool_search_call", "call_id": deepSeekResponseCallID(call),
+			"execution": "client", "arguments": decoded,
+		}, true, nil
+	}
+	if strings.TrimSpace(arguments) != "" {
 		var decoded any
 		if err := json.Unmarshal([]byte(arguments), &decoded); err != nil {
 			return nil, true, fmt.Errorf("DeepSeek returned malformed JSON arguments for tool call `%s`: %w", name, err)
-		}
-		if name == "tool_search" {
-			return map[string]any{
-				"type": "tool_search_call", "call_id": deepSeekResponseCallID(call),
-				"execution": "client", "arguments": decoded,
-			}, true, nil
 		}
 	}
 	if name == "apply_patch" {

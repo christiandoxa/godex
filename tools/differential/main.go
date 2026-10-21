@@ -164,7 +164,7 @@ func run() error {
 	gemini := flags.Bool("gemini", false, "run isolated Gemini generateContent executable differential")
 	geminiModels := flags.Bool("gemini-models", false, "compare Gemini provider models catalog identity and aliases across two pinned binaries")
 	scenarioWorkers := flags.Int("scenario-workers", 1, "isolated DeepSeek scenario workers, 1-4 (parallel only for --scenario all)")
-	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, deepseek-unsupported-message-role, deepseek-null-message-content, deepseek-request-over-kernel-limit, deepseek-input-type-null, deepseek-input-type-number, deepseek-input-type-empty, deepseek-empty-top-level-tool-name, deepseek-invalid-nested-shell-command, sse-stream, sse-rate-limit, sse-terminal-close, sse-json-fragments, sse-data-lines, sse-large-packet, sse-line-limit, sse-event-limit, sse-comment-utf8, sse-metadata-u64, deepseek-sse-error-presence, deepseek-sse-error-i64, deepseek-sse-error-float, deepseek-usage-u64, deepseek-sse-usage-u64, deepseek-usage-null, deepseek-sse-usage-null, deepseek-empty-identity, deepseek-sse-empty-identity, sse-tool-surrogate, sse-tool-depth, sse-tool-overflow, sse-tool-paired, sse-tool-finish-error, sse-tool-empty-finish-error, retry, deepseek-sse-terminal, single-key-401, single-key-403, single-key-429, single-key-503, single-key-500, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
+	scenarioName := flags.String("scenario", "all", "scenario to run: all, success, tool-call, tool-search-canonical, sse-tool-search-canonical, deepseek-unsupported-message-role, deepseek-null-message-content, deepseek-request-over-kernel-limit, deepseek-input-type-null, deepseek-input-type-number, deepseek-input-type-empty, deepseek-empty-top-level-tool-name, deepseek-invalid-nested-shell-command, sse-stream, sse-rate-limit, sse-terminal-close, sse-json-fragments, sse-data-lines, sse-large-packet, sse-line-limit, sse-event-limit, sse-comment-utf8, sse-metadata-u64, deepseek-sse-error-presence, deepseek-sse-error-i64, deepseek-sse-error-float, deepseek-usage-u64, deepseek-sse-usage-u64, deepseek-usage-null, deepseek-sse-usage-null, deepseek-empty-identity, deepseek-sse-empty-identity, sse-tool-surrogate, sse-tool-depth, sse-tool-overflow, sse-tool-paired, sse-tool-finish-error, sse-tool-empty-finish-error, retry, deepseek-sse-terminal, single-key-401, single-key-403, single-key-429, single-key-503, single-key-500, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		return err
 	}
@@ -221,6 +221,12 @@ func run() error {
 			// A real function call must preserve its ID, name and JSON
 			// arguments when bridging Chat Completions to Responses.
 			return runPair(root, mock, "tool-call", mockPlan{ToolCall: true}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{})
+		}},
+		{"tool-search-canonical", func(mock *mockServer) (scenarioResult, error) {
+			return runPair(root, mock, "tool-search-canonical", mockPlan{ToolCall: true, SSEFraming: "tool-search-canonical"}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{})
+		}},
+		{"sse-tool-search-canonical", func(mock *mockServer) (scenarioResult, error) {
+			return runPair(root, mock, "sse-tool-search-canonical", mockPlan{Stream: true, StreamToolArgs: toolSearchRawArguments04384, SSEFraming: "tool-search-canonical"}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{stream: true})
 		}},
 		{"deepseek-user-id", func(mock *mockServer) (scenarioResult, error) {
 			// The canonical DeepSeek adapter accepts Responses' user alias but
@@ -781,6 +787,11 @@ func (mock *mockServer) serveHTTP(writer http.ResponseWriter, request *http.Requ
 	if plan.ToolCall && status == http.StatusOK {
 		responseBody = `{"id":"chatcmpl-differential-tool","object":"chat.completion","created":1,"model":"deepseek-v4-pro","choices":[{"index":0,"message":{"role":"assistant","content":null,"tool_calls":[{"id":"call-differential","type":"function","function":{"name":"lookup","arguments":"{\"key\":\"alpha\"}"}}]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":2,"completion_tokens":1,"total_tokens":3}}`
 	}
+	if plan.ToolCall && plan.SSEFraming == "tool-search-canonical" && status == http.StatusOK {
+		quoted, _ := json.Marshal(toolSearchRawArguments04384)
+		responseBody = strings.Replace(responseBody, `"name":"lookup"`, `"name":"tool_search"`, 1)
+		responseBody = strings.Replace(responseBody, `"arguments":"{\"key\":\"alpha\"}"`, `"arguments":`+string(quoted), 1)
+	}
 	if status != http.StatusOK {
 		switch status {
 		case http.StatusUnauthorized:
@@ -817,6 +828,10 @@ func (mock *mockServer) serveHTTP(writer http.ResponseWriter, request *http.Requ
 	}
 	if plan.StreamToolArgs != "" && status == http.StatusOK {
 		finish := "tool_calls"
+		name := "shell"
+		if plan.SSEFraming == "tool-search-canonical" {
+			name = "tool_search"
+		}
 		if plan.SSEFraming == "tool-empty-finish-error" {
 			finish = ""
 		}
@@ -825,7 +840,7 @@ func (mock *mockServer) serveHTTP(writer http.ResponseWriter, request *http.Requ
 			"choices": []any{map[string]any{
 				"index": 0, "delta": map[string]any{"tool_calls": []any{map[string]any{
 					"index": 0, "id": "call-toolargs", "type": "function",
-					"function": map[string]any{"name": "shell", "arguments": plan.StreamToolArgs},
+					"function": map[string]any{"name": name, "arguments": plan.StreamToolArgs},
 				}}}, "finish_reason": finish,
 			}},
 		})
@@ -1136,6 +1151,10 @@ func scenarioInvariants(scenario scenarioResult) []string {
 			if run.Client.Status != http.StatusOK || !validFixtureToolCallResponse(run.Client.Body) {
 				failures = append(failures, prefix+".tool_call_semantics")
 			}
+		case "tool-search-canonical", "sse-tool-search-canonical":
+			if run.Client.Status != http.StatusOK || run.Client.Body != canonicalToolSearchWire04384(phase == "sse-tool-search-canonical") {
+				failures = append(failures, prefix+".tool_search_canonical_wire")
+			}
 		case "sse-tool-surrogate", "sse-tool-depth", "sse-tool-overflow", "sse-tool-paired":
 			if run.Client.Status != http.StatusOK || !validFixtureToolArgumentsSSE043713(run.Client.Body, phase) ||
 				run.Client.Headers.Get("Content-Type") != "text/event-stream; charset=utf-8" {
@@ -1268,7 +1287,7 @@ func compare(left, right productRun) []string {
 			!equivalentFixtureToolArgumentsSSE043713(a, b) && !equivalentFixtureStreamErrorPresence04384(a, b) &&
 			!equivalentDeepSeekUnsignedSSE04384(a, b) && !equivalentDeepSeekNullUsageSSE04384(a, b) &&
 			!equivalentDeepSeekEmptyIdentitySSE04384(a, b) && !equivalentWireLimitSSE04384(a, b) &&
-			!equivalentStreamMetadata04384(a, b) {
+			!equivalentStreamMetadata04384(a, b) && !equivalentCanonicalToolSearchSSE04384(a, b) {
 			differences = append(differences, "stdout")
 		}
 	} else if left.Stdout != right.Stdout {
@@ -1292,6 +1311,7 @@ func compare(left, right productRun) []string {
 			!equivalentDeepSeekEmptyIdentitySSE04384(left.Client.Body, right.Client.Body) &&
 			!equivalentWireLimitSSE04384(left.Client.Body, right.Client.Body) &&
 			!equivalentStreamMetadata04384(left.Client.Body, right.Client.Body) &&
+			!equivalentCanonicalToolSearchSSE04384(left.Client.Body, right.Client.Body) &&
 			!equivalentFixtureToolArgumentsSSE043713(left.Client.Body, right.Client.Body) {
 			differences = append(differences, "client.body")
 		}
