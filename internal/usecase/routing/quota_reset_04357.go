@@ -147,9 +147,13 @@ func quotaResetJSONInt64(raw json.RawMessage) (int64, bool) {
 }
 
 func quotaResetAtFromText(message string, now time.Time) (int64, bool) {
-	lower := strings.ToLower(message)
 	const marker = "try again at "
-	index := strings.Index(lower, marker)
+	// Tagged 0.438.3 finds this phrase by ASCII-casefolding the original
+	// UTF-8 bytes and returns an offset INTO THOSE ORIGINAL BYTES. Go's
+	// Unicode-aware strings.ToLower maps U+0130 to ASCII 'i' and changes
+	// byte lengths: it both accepts forged markers and truncates legitimate
+	// clock text when non-ASCII characters precede the marker.
+	index := quotaASCIICasefoldIndex04383(message, marker)
 	if index < 0 {
 		return 0, false
 	}
@@ -186,6 +190,15 @@ func quotaResetAtFromText(message string, now time.Time) (int64, bool) {
 		return 0, false
 	}
 	return parsed.Unix(), true
+}
+
+func quotaASCIICasefoldIndex04383(source, literal string) int {
+	for at := 0; at+len(literal) <= len(source); at++ {
+		if previousASCIIEqualFold04383(source[at:at+len(literal)], literal) {
+			return at
+		}
+	}
+	return -1
 }
 
 func quotaRetryASCIIWhitespace(value rune) bool {

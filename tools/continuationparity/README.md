@@ -1029,3 +1029,12 @@ local regressions test these distinctions against observable precommit
 cooldowns, including numeric and error-message fallback precedence. This
 codec slice is source-aligned but is not claimed as an independent timed
 two-executable measurement.
+
+Quota-reset message search also has an exact tagged Mojo byte-offset
+boundary. The marker `try again at ` is matched with ASCII case folding
+in the original UTF-8, not after converting the whole message with Go's
+Unicode-aware lowercase mapping. This prevents U+0130 `İ` from forging a
+marker and avoids truncated time suffixes when multi-byte Unicode precedes
+a real marker. Local tests exercise both recognized reset times and the
+five-minute quota-quarantine fallback; these examples are source-aligned,
+not separately counted as a timed two-executable differential result.

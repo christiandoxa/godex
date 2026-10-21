@@ -3602,3 +3602,33 @@ The general official two-executable HTTP turn-transport regression is
 retained, but these particular synthetic HTTP dates have not yet been
 individually checked in a timed binary differential. Native/provider
 wall-clock differences remain an open parity boundary.
+
+## Quota-reset text marker uses ASCII case-folding at original byte offsets
+
+The tagged Prodex 0.438.3 `prodex-quota/src/render/windows.rs` searches for
+`try again at ` through the Mojo `ascii_casefold_find` kernel, which returns
+an **original UTF-8 byte offset**. Godex previously called Unicode-aware
+`strings.ToLower` on the entire message and searched the transformed copy,
+then used that transformed offset to slice the *untransformed* original.
+Unicode `İ` (U+0130, Latin capital I with dot) exposes both mismatches:
+`Try agaİn at 5:08 PM.` improperly became a recognized marker, potentially
+extending quarantine for hours, while `İİİTry again at 5:08 PM.` wrongly
+truncated the legitimate time after losing three bytes to lowercasing.
+
+Fail-before regressions cover a canonical marker, uppercase ASCII,
+Unicode-confusable text inside the marker, several multi-byte characters
+*before* a valid marker, and a forged marker followed by a later valid
+one. The scoped fix searches the original input by ASCII-only byte folding
+and returns the same original byte index used to extract the suffix. The
+native Mojo quota retry-time planner and local timezone parsing are left
+unchanged. A separate observable quota-quarantine test verifies that a
+confusable marker selects the tagged five-minute fallback, a genuine marker
+returns the source-provided local reset time and a later genuine marker
+still succeeds even when an earlier Unicode imitation is present.
+
+This change is source/ABI-aligned with the published 0.438.3 marker search and
+validated locally at the quarantine-policy boundary. The official pinned
+binary's broader HTTP retry/429 oracles remain regression gates, but these
+particular Unicode timing variants have not yet been measured with a new
+paired real-time Prodex-vs-Godex oracle. Cross-platform local-clock and live
+provider permutations are not claimed certified.
