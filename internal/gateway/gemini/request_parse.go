@@ -12,6 +12,13 @@ func parseResponsesRequest(body []byte) (map[string]any, error) {
 	if len(body) > requestMaxBytes {
 		return nil, fmt.Errorf("Gemini Responses request exceeds %d bytes", requestMaxBytes)
 	}
+	// Tagged 0.438.4 gemini_parse_request deserializes the COMPLETE
+	// input body through serde_json::Value before looking at model,
+	// messages, tools, or generated content. Reject ignored fields whose
+	// malformed Unicode/numerics Go's permissive JSON decoder would accept.
+	if !geminiSerdeJSONValid04384(body) {
+		return nil, errors.New("failed to parse Gemini Responses request JSON")
+	}
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.UseNumber()
 	var root any

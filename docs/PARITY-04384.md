@@ -748,3 +748,29 @@ aliases as the source fallback does; the separate raw public HTTP path
 gate still rejects padded/encoded invalid URLs **before** model lookup.
 This is a source-aligned catalog behavior, with the official executable
 DeepSeek matrix retained as a broader transport no-regression gate.
+
+## Gemini request bodies must be serde-valid before any provider translation
+
+The published 0.438.4 Gemini `request_transform.rs` parses the **complete**
+Responses request with `serde_json::from_slice::<Value>` before inspecting
+any model, content, tool or thinking fields. The corresponding
+Chat-compatible request normalizer must not silently turn an invalid raw
+JSON input into a valid re-serialized one. Godex previously relied on Go's
+more permissive `encoding/json` for both paths. An unrelated malformed
+Unicode surrogate, invalid UTF-8, deeply nested value or finite-to-Go but
+serde-invalid f64 literal could be ignored by the native translator or
+converted to replacement text/f64 by the Chat-compatible normalizer, then
+forwarded as an apparently valid request with the original user message.
+
+Fail-before tests exercise both translator variants with authentic model and
+user input plus unrelated invalid values. Paired Unicode escapes and the
+published long-mantissa near-f64-maximum positive control remain accepted;
+lone surrogates, bad UTF-8, serde-only numeric overflow, `1e309` and
+excess nesting are rejected **before** constructing a provider request.
+The scoped fix centralizes the same tagged Unicode, container-depth and
+number-token checks already used by the corrected Gemini response decoder,
+while retaining the original request model/type validations and error
+behavior for normal JSON. This semantic slice is established by source and
+local tests; the pinned executable Gemini oracle provides an additional
+transport no-regression check, not real-provider testing of these malformed
+fixtures.

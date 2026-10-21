@@ -72,6 +72,12 @@ func geminiChatStreamOptions043711(body []byte) ([]byte, error) {
 // Responses input entries may specify only a role and content, with no
 // explicit "type":"message". The tagged provider treats them as messages.
 func normalizeGeminiChatInput043711(body []byte) ([]byte, error) {
+	// A malformed complete JSON value cannot become valid merely because
+	// Go normalized/re-serialized an unrelated ignored field into U+FFFD
+	// or a differently rounded f64 before calling the provider.
+	if !geminiSerdeJSONValid04384(body) {
+		return nil, errors.New("invalid Gemini Responses request")
+	}
 	var root map[string]any
 	if err := json.Unmarshal(body, &root); err != nil {
 		return nil, errors.New("invalid Gemini Responses request")

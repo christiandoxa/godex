@@ -15,8 +15,12 @@ import (
 // maximum floating-point numbers that serde_json 1.0.151 rejects.
 // A syntactically valid candidate never authorizes silently ignoring an
 // invalid unrelated field in the same upstream response document.
+func geminiSerdeJSONValid04384(data []byte) bool {
+	return jsonutil.CheckSerdeBoundary(string(data)) == nil && jsonutil.CheckSerdeNumberTokens(data)
+}
+
 func geminiSerdeResponseObject04384(data []byte) (map[string]any, bool) {
-	if jsonutil.CheckSerdeBoundary(string(data)) != nil || !jsonutil.CheckSerdeNumberTokens(data) {
+	if !geminiSerdeJSONValid04384(data) {
 		return nil, false
 	}
 	decoder := json.NewDecoder(bytes.NewReader(data))
