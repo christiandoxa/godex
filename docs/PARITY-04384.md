@@ -700,3 +700,30 @@ upstream bytes are not rewritten. The source-pinned local regression is
 separate from the comprehensive Gemini executable transport oracle, which
 serves as a broader no-regression check rather than a claim that this
 specific Unicode header traversed a real provider.
+
+## Gemini buffered and streamed responses require complete serde-valid JSON
+
+The official `prodex-provider-core` Gemini buffered response transform uses
+`serde_json::from_slice::<Value>` **before** projecting any output. The tagged
+Gemini SSE reader similarly relies on the shared `RuntimeProviderSseJsonReader`
+whose complete-value decisions use serde_json. Godex previously used a Go
+`json.Decoder` for both paths without the stricter serde validity boundaries.
+A legitimate `candidates[0]` assistant text could consequently be returned
+even when an unrelated field contained an unpaired `\\uD800` surrogate,
+invalid UTF-8, an over-depth JSON container, `1e309`, or
+`1.7976931348623158e308` (finite to Go, rejected by the pinned default
+serde f64 parser). This meant accepting a response that Prodex would reject
+or treating its SSE segment as incomplete.
+
+Fail-before tests cover complete buffered native and Chat-compatible output,
+as well as direct SSE chunk processing, including genuine paired-surrogate
+and valid long-mantissa near-f64-maximum controls. The scoped correction
+uses a shared Gemini response decoder with the existing source-matched
+Unicode/depth and serde number-token validations before Go map decoding.
+It also requires exactly one complete JSON document per event. Invalid
+frames no longer create synthesized assistant text; the streaming bridge's
+existing provider-stream error handling remains responsible for terminal
+failure. No provider request, valid response body, or SSE output is rewritten.
+The differential Gemini executable matrix is retained as a separate broad
+no-regression gate rather than an unsupported claim that each malformed
+synthetic payload was exercised against an authenticated provider.

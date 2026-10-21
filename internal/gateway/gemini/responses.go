@@ -46,13 +46,8 @@ func translateResponseWithCallFallback04380(
 	if len(body) > bodyMaxBytes {
 		return nil, errors.New("Gemini translated response exceeded the safe read limit")
 	}
-	decoder := json.NewDecoder(bytes.NewReader(body))
-	decoder.UseNumber()
-	var native map[string]any
-	if err := decoder.Decode(&native); err != nil {
-		return nil, errors.New("failed to parse Gemini response JSON")
-	}
-	if err := decoder.Decode(new(any)); !errors.Is(err, io.EOF) {
+	native, valid := geminiSerdeResponseObject04384(body)
+	if !valid {
 		return nil, errors.New("failed to parse Gemini response JSON")
 	}
 	native = normalizedGeminiResponse(native)

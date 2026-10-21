@@ -95,10 +95,8 @@ func (state *geminiStreamState) consume(writer io.Writer, data []byte, requestMe
 	if bytes.Equal(bytes.TrimSpace(data), []byte("[DONE]")) {
 		return state.complete(writer, requestMetadata)
 	}
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.UseNumber()
-	var root map[string]any
-	if err := decoder.Decode(&root); err != nil {
+	root, valid := geminiSerdeResponseObject04384(data)
+	if !valid {
 		return fmt.Errorf("failed to parse Gemini SSE JSON")
 	}
 	state.applyChunkMetadata(root)
