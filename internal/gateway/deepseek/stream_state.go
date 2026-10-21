@@ -37,6 +37,7 @@ type deepSeekChatStreamState struct {
 	finishReason         string
 	systemFingerprint    string
 	usage                any
+	usagePresent         bool
 	logprobs             any
 	annotations          []any
 	outputTextItemAdded  bool
@@ -164,8 +165,8 @@ func (state *deepSeekChatStreamState) applyChunkMetadata(root map[string]any) {
 	if fingerprint, _ := root["system_fingerprint"].(string); fingerprint != "" {
 		state.systemFingerprint = fingerprint
 	}
-	if usage, ok := root["usage"].(map[string]any); ok {
-		state.usage = usage
+	if usage, present := root["usage"]; present {
+		state.usage, state.usagePresent = usage, true
 	}
 }
 
@@ -226,7 +227,7 @@ func (state *deepSeekChatStreamState) complete() ([]byte, bool, error) {
 	if state.systemFingerprint != "" {
 		source["system_fingerprint"] = state.systemFingerprint
 	}
-	if state.usage != nil {
+	if state.usagePresent {
 		source["usage"] = state.usage
 	}
 	encoded, err := json.Marshal(source)

@@ -2092,3 +2092,55 @@ and `/tmp/gdx-04384-deepseek-usage-u64-verified-test-all.log`.
 installer checks, vet and the complete shuffled race suite. Log:
 `/tmp/gdx-04384-deepseek-usage-u64-verified-final.log`. Clean-commit
 released-executable validation follows this commit.
+
+Clean commit `8d675af9c0d671d2fb3d3c43485f60ecc14899c4` passed all
+35 DeepSeek released-executable scenarios, including both new unsigned cases,
+and runtime mutation controls. Report:
+`/tmp/gdx-04384-deepseek-usage-u64-oracle.json`.
+
+The same clean commit also passed all 44 Gemini released cases and controls:
+`/tmp/gdx-04384-deepseek-usage-u64-gemini-oracle.json`. It was then
+fast-forwarded and pushed to `origin/main`.
+
+## Present DeepSeek usage replaces prior counters even when null
+
+Tagged `deepseek/response.rs` converts every present usage Value with the
+compiled mapper; non-object Values produce explicit zero counters. The Mojo
+stream metadata projector retains field presence, and Rust maps a present
+null to that zero object. Missing fields leave the prior stream snapshot
+alone. Godex previously required an object and therefore dropped present
+scalar/array/null usage or retained stale counters from an earlier packet.
+
+The shared `gateway/chatcompat` response mapper now checks presence at its
+root caller and maps non-objects to zeros. `gateway/deepseek` retains a
+private presence bit alongside the raw stream snapshot, so a present null
+replaces prior usage while a missing field preserves it. Ownership, public
+models, dependency direction, persistence and helpers remain unchanged;
+Claude's real shared response consumer is included in focused race coverage.
+
+Fail-before `/tmp/gdx-04384-deepseek-usage-presence-before.log` passes
+six missing/ordinary/empty-object controls and fails ten null/scalar/array
+buffered/SSE cases, plus the stale-snapshot parent regression. Local tests
+also verify a missing later snapshot preserves prior usage and a present
+null/false clears it. The executable matrix adds two scenarios: buffered
+null and a stream with nonzero usage followed by null. Independent assertions
+require exactly three zero integer counters before checking the existing
+response or complete five-event SSE contract. Negative controls reject
+missing, null, decimal and stale output usage, changed text and trailing JSON.
+
+Both new scenarios fail only Godex on clean baseline
+`8d675af9c0d671d2fb3d3c43485f60ecc14899c4`; Prodex meets their independent
+contracts. Logs:
+`/tmp/gdx-04384-deepseek-usage-presence-buffered-before-oracle.json` and
+`/tmp/gdx-04384-deepseek-usage-presence-sse-before-oracle.json`.
+
+`rtk go test -race ./internal/gateway/deepseek ./internal/gateway/chatcompat ./internal/gateway/claude -count=1`
+passes 495 tests. `rtk go test ./tools/differential -run '^TestProdex04384DeepSeekNullUsageOracle' -count=1`
+passes its mutation test. `rtk go test ./...` passes 8,959 tests across
+81 packages. `rtk proxy make verify` passes all local gates, including the
+complete shuffled race suite. Logs:
+`/tmp/gdx-04384-deepseek-usage-presence-race.log`,
+`/tmp/gdx-04384-deepseek-usage-presence-oracle-selfcheck.log`,
+`/tmp/gdx-04384-deepseek-usage-presence-final-test-all.log` and
+`/tmp/gdx-04384-deepseek-usage-presence-final-verify.log`. Clean-commit
+released-executable validation follows this commit.

@@ -386,6 +386,13 @@ oracle now exercises thirteen Gemini cases, including all earlier eight fixtures
 
 ### Bounded full DeepSeek oracle
 
+The `deepseek-usage-null` and `deepseek-sse-usage-null` scenarios require an
+explicit zero-counter object for present null usage. The streaming mock first
+sends nonzero counters, then null, proving the last present snapshot replaces
+the previous one. Exact zero integer fields are independently checked before
+the existing full response/SSE oracle runs. Missing, null, stale and decimal
+zero counters are negative controls.
+
 The 0.438.4 matrix includes `deepseek-usage-u64` and
 `deepseek-sse-usage-u64`. Their synthetic upstream usage covers integers above
 2^53 and i64, present u64::MAX cache/reasoning counters, and a missing total
