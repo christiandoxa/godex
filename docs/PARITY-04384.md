@@ -879,3 +879,29 @@ existing Gemini 0.438.4 executable differential tests Chat-compatible Super
 fixtures; it is a broad no-regression gate, not a dedicated direct
 GenerateContent `videoMetadata` binary comparison. No live Gemini account
 or credentials were accessed.
+
+## Gemini response thought-signature selection respects first PRESENT source
+
+Tagged `prodex-provider-core` Gemini `response_tool_calls.rs` supplies the
+response part's **camelCase** `thoughtSignature` and then the nested
+`functionCall.thoughtSignature` to the compiled
+`prodex_gemini_signature_choice_v1` policy. The Mojo selector stops on the
+**first present** candidate, even if it is null, wrong-type or only
+whitespace; those invalid values suppress the signature instead of allowing
+a later field to override them. The source does **not** offer snake_case
+`thought_signature` as an alternative response field. Godex previously
+iterated both camelCase and snake_case fields and skipped empty or malformed
+values, so an explicit null/blank response-part signature incorrectly
+borrowed a nested signature; snake_case-only content also created an
+unrecognized continuation token.
+
+Fail-before regressions cover positive part/nested signatures; null, empty,
+blank and non-string primary values; unsupported snake_case variants;
+Unicode whitespace; and precedence within the complete Gemini Responses
+tool-call history. The scoped correction stops at the first present
+camelCase field, emitting only a nonblank string. It preserves canonical
+signatures and the original upstream JSON, preventing an upstream tool
+response from gaining a fabricated model signature. The rule is verified
+against the tagged Rust and Mojo source and synthetic local tests; the
+broader Gemini 0.438.4 executable differential is a no-regression gate,
+not a dedicated live-provider signature-token experiment.

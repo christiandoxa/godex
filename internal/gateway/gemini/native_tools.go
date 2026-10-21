@@ -97,11 +97,18 @@ func geminiNativeToolCallItem(part, call map[string]any, fallbackID string) map[
 }
 
 func geminiNativeThoughtSignature(part, call map[string]any) string {
+	// Tagged 0.438.4 response_tool_calls.rs offers only camelCase
+	// `thoughtSignature` on the part then the nested function call. Its
+	// compiled gemini_signature_choice_v1 returns on the first PRESENT
+	// candidate, even if null, non-string or blank, so it cannot borrow
+	// a later nested signature or an unsupported snake_case alias.
 	for _, object := range []map[string]any{part, call} {
-		for _, key := range []string{"thoughtSignature", "thought_signature"} {
-			if signature := nativeString(object[key]); strings.TrimSpace(signature) != "" {
-				return signature
+		if value, exists := object["thoughtSignature"]; exists {
+			signature, valid := value.(string)
+			if !valid || strings.TrimSpace(signature) == "" {
+				return ""
 			}
+			return signature
 		}
 	}
 	return ""
