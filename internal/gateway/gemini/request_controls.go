@@ -22,11 +22,11 @@ func geminiReasoningEffort(request map[string]any) (string, error) {
 	if !ok {
 		return "", errors.New("Gemini OpenAI-compatible reasoning effort must be a string")
 	}
-	switch strings.ToLower(strings.TrimSpace(effort)) {
+	switch geminiASCIILower04384(strings.TrimSpace(effort)) {
 	case "xhigh", "max", "high":
-		return strings.ToLower(strings.TrimSpace(effort)), nil
+		return geminiASCIILower04384(strings.TrimSpace(effort)), nil
 	case "medium", "low", "minimal", "none":
-		return strings.ToLower(strings.TrimSpace(effort)), nil
+		return geminiASCIILower04384(strings.TrimSpace(effort)), nil
 	default:
 		return "", errors.New("Gemini OpenAI-compatible reasoning effort is not supported")
 	}

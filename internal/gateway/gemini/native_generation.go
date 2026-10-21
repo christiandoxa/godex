@@ -50,7 +50,9 @@ func geminiNativeGenerationConfig(original, chat map[string]any) (map[string]any
 }
 
 func geminiThinkingConfig(original map[string]any, model, effort string) map[string]any {
-	effort = strings.ToLower(strings.TrimSpace(effort))
+	// The tagged Gemini request policy folds ASCII capitals only.
+	// Unicode casefolding could promote an unsupported thinking label.
+	effort = geminiASCIILower04384(strings.TrimSpace(effort))
 	if effort == "none" || effort == "minimal" {
 		return map[string]any{"includeThoughts": false, "thinkingBudget": 0}
 	}

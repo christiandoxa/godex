@@ -444,3 +444,24 @@ preserves both the original error message and valid model response bodies.
 These are tagged-source and local-catalog parity assertions; dynamic model
 catalogs and live Gemini credentials are covered separately by broader
 executable differentials.
+
+## Gemini reasoning-effort identifiers use ASCII-only case folding
+
+The tagged 0.438.4 Gemini bridge request policy uses the compiled
+`gemini_request_content_string_equals(..., fold_ascii=True)` matcher and
+the shared DeepSeek/Gemini reasoning policy's ASCII-only effort classifier.
+Only ASCII capital letters are folded; Unicode U+0130 DOTTED CAPITAL I in
+`HİGH`, `MİNİMAL`, `MEDİUM`, or `XHİGH` must not be normalized into a
+legitimate control. Godex had used Unicode `strings.ToLower` for both the
+Responses `reasoning_effort` and nested `reasoning.effort` fields. These
+lookalikes were consequently accepted and could change upstream model
+thinking, including disabling thoughts or raising the reasoning tier.
+
+Fail-before regressions cover both request shapes, valid ASCII case changes,
+unsupported Unicode forms and the actual derived Gemini thinking config.
+The scoped fix reuses the already source-aligned Gemini ASCII-only byte
+normalizer at both request control validation and generation config
+projection. All normal ASCII efforts and provider request bytes remain
+unchanged. This is a local source-derived semantic slice; the full official
+Gemini 0.438.4 executable differential is a separate no-regression gate,
+not a claim that every Unicode effort string was sent to a live provider.
