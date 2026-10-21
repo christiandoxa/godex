@@ -1324,3 +1324,67 @@ On clean stream-projection commit
 strict WebSocket Compact lineage, and HTTP conflicted-session/durable
 ownership. These gates remain finite regression evidence; full native SSE
 and every release phase are not inferred from them.
+
+## 2026-10-21 verified checkpoint
+
+Eight focused production commits have been pushed by fast-forward to
+`origin/main`, ending at `08523c87d2a4418499e49b7a8f9bac5aad83fbd0`:
+
+| Commit | Closed behavior gap | Gemini executable cases |
+| --- | --- | --- |
+| `880291b80` | Missing versus null buffered arguments | 21 PASS |
+| `7899defb4` | Canonical buffered JSON and fallback argument text | 23 PASS |
+| `b81f3e782` | Envelope presence and complete serde acquisition | 28 PASS |
+| `40826d2a6` | Original string-ID typed fallback | 32 PASS |
+| `b512e8fda` | Raw tool identity and namespace splitting | 37 PASS |
+| `e02a676b9` | Unified patch conversion and literal CRLF | 40 PASS |
+| `f342b7e51` | Completed native tool kinds, RTK and shell aliases | 40 PASS |
+| `08523c87d` | Suppress special-tool function deltas | 40 PASS |
+
+Each executable report validates the pinned 0.438.4 source, published binary
+and manifest digests, and its exact clean candidate VCS revision. Newly
+added buffered fixtures fail against the preceding clean baseline; their
+positive controls retain the earlier passing cases. Native stream-only
+changes additionally have failing-before HTTP/SSE regressions; the public
+API-key executable matrix remains an independent no-regression gate.
+
+Final exact-commit validation at `08523c87d`:
+
+- `rtk go test ./internal/gateway/gemini ./tools/differential -count=1`:
+  PASS, 731 tests.
+- `rtk go test ./...`: PASS, 8,687 tests across 81 packages.
+- `rtk proxy make verify`: PASS, including formatting, source size, TUI
+  framework, cross-build/test compilation, installers, vet, full race and
+  build. Log: `/tmp/gdx-04384-stream-delta-verify.log`.
+- `rtk go build -trimpath -o /tmp/gdx-04384-stream-delta-candidate-godex ./cmd/godex`
+  and the matching `./tools/differential` build: PASS. Embedded VCS metadata
+  identifies `08523c87d2a4418499e49b7a8f9bac5aad83fbd0`, modified=false.
+- The exact-commit `--gemini` invocation: PASS, 40 cases and mutation
+  controls. Report: `/tmp/gdx-04384-stream-delta-candidate-oracle.json`.
+
+The last invocation was:
+
+```bash
+rtk proxy /tmp/gdx-04384-stream-delta-candidate-differential --prodex /tmp/godex-release-parity-04384-20261021/prodex-x86_64-unknown-linux-gnu --godex /tmp/gdx-04384-stream-delta-candidate-godex --prodex-source /tmp/godex-release-parity-04384-20261021/prodex-source --godex-source /tmp/gdx-04384-stream-delta-work --godex-commit 08523c87d2a4418499e49b7a8f9bac5aad83fbd0 --gemini
+```
+
+Broader exact-source executable gates at preceding stream commit `f342b7e51`
+also passed all 30 DeepSeek scenarios, 56 WebSocket upstream attempts,
+strict WebSocket Compact lineage, and HTTP conflicted-session/durable
+ownership. Their reports are respectively
+`/tmp/gdx-04384-stream-tools-deepseek-oracle.json`,
+`/tmp/gdx-04384-stream-tools-websocket.log`,
+`/tmp/gdx-04384-stream-tools-ws-compact.log`, and
+`/tmp/gdx-04384-stream-tools-http-ownership.log`. They were not rerun at
+`08523c87d` and must not be represented as results for that later commit.
+
+Full 1:1 parity remains unproven. Next source-confirmed audit areas include
+native streamed call indexing/replacement across chunks, native
+item-added/item-done lifecycle and fallback-ID formats. The published
+`gemini_sse_tool_calls.rs` tracks explicit call IDs and part positions,
+replaces current arguments, and completes calls once; Godex still appends
+one stored call per observed chunk. Oversized custom-tool panic/error
+boundaries, every release phase, live provider paths, and native macOS or
+Windows execution also remain unverified. No live credentials or private
+conversation data were used; no tag or release was created. CI status was
+neither awaited nor claimed. The parity goal remains active.
