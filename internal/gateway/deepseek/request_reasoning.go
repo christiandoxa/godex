@@ -57,7 +57,10 @@ func reasoningObjectEffort(value any) (string, error) {
 	if !valid {
 		return "", errors.New("DeepSeek reasoning.effort must be a string")
 	}
-	return strings.ToLower(strings.TrimSpace(text)), nil
+	// The published DeepSeek Mojo reasoning mode kernel compares trimmed
+	// effort labels with ASCII-only casefold. Unicode lowercase could turn
+	// U+0130 into ASCII i and accept a misspelled thinking control.
+	return deepSeekASCIILower04384(strings.TrimSpace(text)), nil
 }
 
 func validateReasoningKeys(mapping map[string]any) error {
@@ -77,5 +80,8 @@ func reasoningEffortField(value any) (string, error) {
 	if !valid {
 		return "", errors.New("DeepSeek reasoning_effort must be a string")
 	}
-	return strings.ToLower(strings.TrimSpace(text)), nil
+	// The published DeepSeek Mojo reasoning mode kernel compares trimmed
+	// effort labels with ASCII-only casefold. Unicode lowercase could turn
+	// U+0130 into ASCII i and accept a misspelled thinking control.
+	return deepSeekASCIILower04384(strings.TrimSpace(text)), nil
 }

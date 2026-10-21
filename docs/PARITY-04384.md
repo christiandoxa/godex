@@ -385,3 +385,22 @@ preserved. These are local source/dependency-pinned semantic regressions;
 the official executable DeepSeek suite provides a separate broader transport
 no-regression check, not a claim of live provider coverage for all malformed
 Unicode/f64 fixtures.
+
+## DeepSeek reasoning-effort labels require ASCII-only case folding
+
+Prodex 0.438.4's `deepseek_trimmed_effort_equals` Mojo kernel trims
+surrounding Unicode space but folds only ASCII uppercase bytes before
+classifying `none`, `minimal`, `low`, `medium`, `high`, `xhigh` and `max`.
+Godex's reasoning object and top-level `reasoning_effort` decoder previously
+used Unicode `strings.ToLower`; U+0130 dotted capital I in `HİGH`,
+`MEDİUM`, `MİNİMAL` or `XHİGH` was converted into ASCII `i` and an
+otherwise invalid effort could silently enable, disable, or increase model
+thinking. A fail-before regression reproduced the wrong outbound thinking
+fields for both accepted request shapes.
+
+The scoped correction uses the already validated DeepSeek ASCII-only byte
+folding helper after whitespace trimming, retaining the canonical ASCII
+uppercase/mixed-case positive controls. Unsupported Unicode confusables now
+produce the ordinary invalid-effort error before reaching the provider.
+This is a tagged source and local request-semantic parity result, separate
+from the broad official DeepSeek executable suite and live-provider paths.
