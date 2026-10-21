@@ -131,6 +131,13 @@ func (state *geminiStreamState) consume(writer io.Writer, data []byte, requestMe
 				if !hasName {
 					name = "tool_call"
 				}
+				canonical := strings.TrimSpace(name)
+				if dot := strings.LastIndexByte(canonical, '.'); dot >= 0 {
+					canonical = canonical[dot+1:]
+				}
+				if strings.ReplaceAll(geminiASCIILower04384(canonical), "-", "_") == "run_shell_command" {
+					name = "exec_command"
+				}
 				callID := nativeString(call["id"])
 				if strings.TrimSpace(callID) == "" {
 					callID = "call_gemini_" + uuid.NewString()
@@ -149,16 +156,9 @@ func (state *geminiStreamState) consume(writer io.Writer, data []byte, requestMe
 					return encodeErr
 				}
 				signature := geminiNativeThoughtSignature(part, call)
-				namespace, short := geminiNativeSplitToolName(name)
-				tool := map[string]any{
-					"type": "function_call", "call_id": callID, "name": short, "arguments": string(encoded),
-				}
-				if namespace != "" {
-					tool["namespace"] = namespace
-				}
-				if signature != "" {
-					tool["gemini_thought_signature"] = signature
-				}
+				tool := geminiNativeToolCallItem(nil, map[string]any{
+					"name": name, "id": callID, "args": args, "thoughtSignature": signature,
+				}, callID)
 				state.toolCalls = append(state.toolCalls, tool)
 				delta := map[string]any{
 					"type":    "response.function_call_arguments.delta",

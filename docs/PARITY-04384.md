@@ -1234,3 +1234,57 @@ candidate executable validation are required before this change is pushed.
 tests and cross-build/test compilation. The preceding clean commit
 `b512e8fdadb1b8bdf8784e750a89af6633a0d86d` passed all 37 Gemini executable
 cases and mutation controls before its fast-forward push to `origin/main`.
+
+The extended 40-case executable baseline on clean `b512e8f` failed only the
+three new patch cases (single-file unified diff, mixed file operations,
+and literal CRLF); its earlier 37 cases passed. Additional source/binary
+oracles on clean `40826d2` passed both strict WebSocket Compact turn lineage
+and HTTP conflicted-session/durable-ownership checks across both products.
+
+## Native Gemini stream completion retains tool kinds and RTK policy
+
+The tagged `gemini_provider_core_stream_completed_tool_call_item` re-parses
+canonical arguments, applies RTK only to the supported original flat names,
+and emits parsed `tool_search_call` or normalized `custom_tool_call` items
+for special tools. Raw function-argument SSE deltas keep their upstream
+argument text. Godex instead stored every completed tool as a generic
+`function_call` without shell wrapping, even after buffered tool handling
+was corrected.
+
+The native stream now reuses the existing private Gemini tool projector
+for its completed output. It supplies the stream's already selected call
+ID, name, argument value and signature, preserving the distinct nonblank
+stream-ID fallback rule. Raw argument deltas and their IDs remain unchanged;
+only the completed item gets RTK or special-tool shaping. This deletes a
+parallel projection implementation and adds no helper, interface, adapter,
+dependency, configuration, process, persistence or retry behavior.
+
+The runtime's preceding `gemini_provider_core_canonical_output_tool_name`
+step also maps the normalized `run_shell_command` alias to `exec_command`.
+The stream now applies the same Unicode outer trim, final dotted suffix,
+ASCII fold and hyphen normalization solely for that alias. MCP suffixes,
+leading suffix whitespace, and non-ASCII near-matches do not gain an alias.
+Buffered provider-transform names keep their independent raw-name contract.
+
+Fail-before tests drive actual HTTP SSE translation through stream
+completion and the DONE sentinel. They assert exact raw deltas, one terminal
+completion, matching delta/completed IDs, parsed search arguments including
+null, normalized patch input, special-tool signature omission, and shell
+wrapping. Plain `exec`, dotted/MCP names, ordinary null arguments and explicit
+literal patches are negative controls; explicit/empty stream call IDs test
+the separate fallback rule. Separate fail-before tests cover plain,
+uppercase and dotted shell aliases plus MCP/Unicode near-matches. Focused
+Gemini/oracle coverage passes 731 tests.
+
+This is source-aligned native SSE coverage. The official API-key Gemini
+differential remains a separate no-regression gate and does not establish
+native OAuth transport, multi-chunk tool assembly, or full native SSE
+item-added/item-done lifecycle parity. Those are independent audit areas.
+
+The preceding clean patch commit
+`e02a676b9dbe4aa9d360e0e1c2ce7d69a9e2d808` passed all 40 Gemini executable
+cases and mutation controls before its fast-forward push to `origin/main`.
+
+`rtk go test ./...` passes 8,687 tests across 81 packages. The final
+`rtk proxy make verify` passes formatting, source size, framework, cross
+build/test compilation, installers, vet, full race and build checks.
