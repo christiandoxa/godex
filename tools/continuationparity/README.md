@@ -968,3 +968,18 @@ the precommit binding step; a second response ID produced **after** commit
 without its own turn must inherit `state-one` from the stream tap. Both
 products must retain identical SSE bytes, exact request-header provenance,
 Ready evidence and the two distinct durable ID/turn pairs.
+
+The committed SSE dead-chain fixture also verifies that the direct
+`turn:state-dead` owner is **released** when its last response/turn pairing
+is removed. Prodex's release planner checks surviving same-profile
+response-turn references before dropping a dead turn. Godex now performs
+the same safe check using its bounded volatile cache or the private durable
+per-response sidecars; a separate local cold-restart regression verifies
+that a still-live sibling response keeps a shared turn. Foreign accounts'
+owners must not be removed by either operation.
+
+For focused investigation, `--http-sse-dead` runs only the authenticated,
+source/manifest/executable-pinned postcommit dead-chain fixture. It shares
+exactly the same fixture logic and mutation controls used by the broader
+`--http-session-conflict` release gate, but avoids rerunning unrelated HTTP
+shape probes when validating an isolated dead-response/turn change.

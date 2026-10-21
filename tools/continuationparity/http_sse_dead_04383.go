@@ -58,11 +58,13 @@ func runHTTPSSEDeadProduct04383(root string, p product) error {
 		prefix, err2 := readHTTPResponseOwner04383(p, "resp-dead-output")
 		failed, err3 := readHTTPResponseOwner04383(p, "resp-dead-terminal")
 		other, err4 := readHTTPResponseOwner04383(p, "resp-ready-b")
-		if err1 == nil && err2 == nil && err3 == nil && err4 == nil && old == "" && prefix == "" && failed == "" && other == "second" {
+		turn, err5 := readCompactBindingOwner04383(p, "turn", "state-dead")
+		if err1 == nil && err2 == nil && err3 == nil && err4 == nil && err5 == nil &&
+			old == "" && prefix == "" && failed == "" && other == "second" && turn == "" {
 			break
 		}
 		if time.Now().After(deadline) {
-			return fmt.Errorf("SSE dead chain durable mismatch: original=%q prefix=%q failed=%q unaffected=%q errors=%v/%v/%v/%v", old, prefix, failed, other, err1, err2, err3, err4)
+			return fmt.Errorf("SSE dead chain durable mismatch: original=%q prefix=%q failed=%q unaffected=%q orphan-turn=%q errors=%v/%v/%v/%v/%v", old, prefix, failed, other, turn, err1, err2, err3, err4, err5)
 		}
 		time.Sleep(20 * time.Millisecond)
 	}

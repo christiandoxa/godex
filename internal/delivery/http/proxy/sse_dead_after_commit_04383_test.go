@@ -82,6 +82,14 @@ func TestProdex04383CommittedSSEDeadResponseClearsOwnChain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The tagged release planner also drops the now-unreferenced direct
+	// turn owner after its last response/turn pairing has disappeared.
+	turnDigest := sha256.Sum256([]byte("turn:stream-turn"))
+	for _, entry := range stored {
+		if entry.Kind == "turn" && entry.Key == hex.EncodeToString(turnDigest[:]) {
+			t.Fatalf("dead SSE stream left orphaned turn-state binding with owner %q", entry.AccountID)
+		}
+	}
 	for _, tc := range []struct{ id, owner string }{{"resp-main", ""}, {"resp-stream-prefix", ""}, {"resp-stream-failed", ""}, {"resp-independent-other", otherID}} {
 		found := ""
 		for _, entry := range stored {

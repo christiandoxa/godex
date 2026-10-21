@@ -3449,3 +3449,37 @@ durable lineage map and Godex private sidecars, alongside byte-identical
 stream output, one authenticated Ready owner inference, and preservation of
 both accounts' earlier bindings. This finite test does not certify all
 provider/OS combinations.
+
+## Committed SSE dead-chain cleanup also releases orphaned turn-state owners
+
+The tagged 0.438.3 `clear_runtime_dead_response_bindings` planner collects
+turn states drained from the dead response IDs, computes turn-state
+associations of **surviving** response IDs on that same profile, then
+removes only turn bindings whose last response association was released.
+Godex's earlier postcommit SSE cleanup removed the dead previous-response
+owners and their private turn-state sidecars but left the direct `turn`
+owner cached/persisted. That orphan could still hard-pin a new request to
+a continuation whose entire response chain had already failed.
+
+A fail-before proxy regression demonstrates that a streamed
+`previous_response_not_found` leaves the `stream-turn` owner verified even
+though the associated response IDs and sidecars were deleted. The scoped
+correction collects each affected response's turn **before** deleting its
+sidecar, then releases a turn only after checking whether any surviving
+response on the same account still references it. Durable mode walks
+persisted current previous-response bindings and reads their private
+response-turn sidecars; volatile mode checks active cached response/turn
+pairs. A storage error, missing capability or inaccessible private profile
+home conservatively **retains** the turn rather than risking removal of
+an actively used continuation. The released owner is checked against the
+original account and statuses are marked dead, never stealing another
+profile's turn-state binding.
+
+Memory/durable tests cover last-reference removal, a live sibling response
+that must keep the shared turn, and a cold-start store whose in-memory
+turn-state cache is empty. The source/manifest/executable-pinned
+`--phase=http-session-conflict` dead-chain oracle additionally checks that
+an orphaned `state-dead` direct turn owner is empty after the original
+previous-response ID and both streamed IDs are removed, while the
+unrelated second-account response remains valid and the exact HTTP 200 SSE
+bytes are preserved. Full provider and native-OS parity remain separate.

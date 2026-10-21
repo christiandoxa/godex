@@ -67,8 +67,24 @@ func (state *SSELineageTracker04383) Observe(ctx context.Context, data []byte) e
 			dead = append(dead, state.originalPrevious)
 		}
 		sort.Strings(dead)
+		deadTurns := make(map[string]struct{})
 		for _, id := range dead {
+			turn := state.router.affinity.responseTurnStateForHome(ctx, id, state.accountID, state.profileHome, state.router.now())
+			if validHardBindingComponent04383(turn) {
+				deadTurns[turn] = struct{}{}
+			}
 			if err := state.router.affinity.forgetDeadResponse(ctx, id, state.accountID, state.profileHome); err != nil {
+				return err
+			}
+		}
+		orderedTurns := make([]string, 0, len(deadTurns))
+		for turn := range deadTurns {
+			orderedTurns = append(orderedTurns, turn)
+		}
+		sort.Strings(orderedTurns)
+		for _, turn := range orderedTurns {
+			if err := state.router.affinity.releaseDeadStreamOrphanTurn04383(
+				ctx, state.accountID, state.profileHome, turn, state.router.now()); err != nil {
 				return err
 			}
 		}
