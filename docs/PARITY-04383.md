@@ -3570,3 +3570,35 @@ existing official HTTP turn-transport executable differential remains a
 regression gate, but no new two-executable timed cooldown experiment has
 been asserted for these Unicode duplicate values. Native OS and real
 provider timing permutations are still open.
+
+## Structured `Retry-After` HTTP-date parsing must validate actual weekdays
+
+Prodex 0.438.3 pins Rust `httpdate 1.0.3` in `Cargo.lock`, and its
+`error_policy/retry_after_json.rs` calls `httpdate::parse_http_date` to
+interpret selected JSON `Retry-After` values that are not numeric seconds.
+Unlike Go `net/http.ParseTime`, the tagged Rust decoder validates the
+**actual weekday**, exact IMF-fixdate/RFC850/asctime field widths and a
+calendar year not earlier than 1970. Its RFC850 two-digit-year mapping is
+1970–2069: specifically, `69` means **2069**, whereas Go parses it as
+1969. A mismatched or noncanonical string must be rejected before it can
+override the error-message fallback delay.
+
+A source/dependency-pinned offline comparison against `httpdate 1.0.3`
+confirmed that Go's parser accepted incorrect weekdays, single-digit
+hours, pre-epoch dates and the wrong interpretation of an RFC850 `-69`.
+A fail-before regression records canonical date formats and these negative
+cases, along with a valid source-date control for 2069. Godex now parses
+using the standard Go HTTP parser only as a first pass, then demands an
+exact round-trip of one of the three tagged wire layouts against the actual
+calendar weekday. The one ambiguous RFC850 year 69 is normalized to 2069
+before that check; pre-1970 values are rejected. Original upstream
+header bytes and retry-after numeric-second policy remain unchanged.
+
+A separate precommit-classification regression verifies the observable
+retry cooldown: a valid one-minute date is honored, malformed weekday,
+width or pre-epoch hints fall back to the native 12-second error message,
+and the valid RFC850 year-69 case saturates at the tagged five-minute cap.
+The general official two-executable HTTP turn-transport regression is
+retained, but these particular synthetic HTTP dates have not yet been
+individually checked in a timed binary differential. Native/provider
+wall-clock differences remain an open parity boundary.

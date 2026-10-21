@@ -1020,3 +1020,12 @@ message fallback wins. A late ASCII control fails insertion, leaving the
 earlier valid value. This is checked against pinned Rust `http 1.5.0`
 behavior and direct Go precommit cooldown tests, not falsely counted as
 a separate timed two-executable oracle.
+
+The pinned retry-after codec also requires strict Rust `httpdate 1.0.3`
+HTTP-date syntax and an actually correct weekday. Go `http.ParseTime`
+accepts incorrect weekdays and a noncanonical one-digit hour; RFC850 `69`
+means 2069 in the tagged Rust library, not 1969. Source/dependency-pinned
+local regressions test these distinctions against observable precommit
+cooldowns, including numeric and error-message fallback precedence. This
+codec slice is source-aligned but is not claimed as an independent timed
+two-executable measurement.

@@ -128,6 +128,35 @@ func validStreamRetryHeaderValue(value string) bool {
 	return true
 }
 
+// The pinned Prodex 0.438.3 httpdate 1.0.3 decoder accepts only exact
+// IMF-fixdate, RFC850 or asctime layouts with a truthful weekday and
+// calendar year >=1970. net/http.ParseTime tolerates mismatched weekdays,
+// variable-width hours, and interprets two-digit RFC850 year 69 as 1969.
+// Compare the fully formatted parsed date to the original source string,
+// adjusting that single RFC850 year ambiguity to the tagged 2069 rule.
+func parseTaggedHTTPDate04383(value string) (time.Time, bool) {
+	parsed, err := http.ParseTime(value)
+	if err != nil {
+		return time.Time{}, false
+	}
+	if parsed.Year() == 1969 && strings.HasSuffix(value, " GMT") &&
+		strings.Contains(value, "-69 ") {
+		adjusted := parsed.AddDate(100, 0, 0)
+		if adjusted.Format(time.RFC850) == value {
+			return adjusted, true
+		}
+	}
+	if parsed.Year() < 1970 || parsed.Year() > 9999 {
+		return time.Time{}, false
+	}
+	for _, layout := range [...]string{http.TimeFormat, time.RFC850, time.ANSIC} {
+		if parsed.Format(layout) == value {
+			return parsed, true
+		}
+	}
+	return time.Time{}, false
+}
+
 func parseStreamRetryHeader(raw string, now time.Time) (time.Duration, bool) {
 	// HeaderValue::to_str is stricter than insertion. A selected header
 	// containing obs-text is NOT silently normalized into ASCII advice,
@@ -158,8 +187,8 @@ func parseStreamRetryHeader(raw string, now time.Time) (time.Duration, bool) {
 		}
 		return time.Duration(seconds) * time.Second, true
 	}
-	date, err := http.ParseTime(value)
-	if err != nil {
+	date, valid := parseTaggedHTTPDate04383(value)
+	if !valid {
 		return 0, false
 	}
 	if !date.After(now) {
