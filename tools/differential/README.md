@@ -386,6 +386,12 @@ oracle now exercises thirteen Gemini cases, including all earlier eight fixtures
 
 ### Bounded full DeepSeek oracle
 
+`sse-metadata-u64` requires exact integers above 2^53 in logprobs and
+u64::MAX in annotations. The provider metadata object must match the tagged
+bytes before the existing full SSE contract runs; rounded/dropped counters,
+altered text and extra events are negative controls. The scenario is part of
+the complete DeepSeek matrix.
+
 The wire-bound cases are `sse-large-packet` (an admissible 2 MiB packet),
 `sse-line-limit`, `sse-event-limit` and `sse-comment-utf8`. The first requires
 the normal exact five-event trace. Each failure case independently requires

@@ -88,7 +88,7 @@ func (state *deepSeekChatStreamState) observeValue(data []byte) ([]byte, bool, e
 		return bytes.Join(events, nil), len(events) > 0, nil
 	}
 	if logprobs, ok := choice["logprobs"]; ok && logprobs != nil {
-		state.logprobs = cloneMetadataValue(logprobs)
+		state.logprobs = logprobs
 	}
 	if finish, _ := choice["finish_reason"].(string); strings.TrimSpace(finish) != "" {
 		state.finishReason = finish
@@ -114,7 +114,7 @@ func (state *deepSeekChatStreamState) observeValue(data []byte) ([]byte, bool, e
 		state.refusal.WriteString(refusal)
 	}
 	if annotations, ok := delta["annotations"].([]any); ok && len(annotations) > 0 {
-		state.annotations = append(state.annotations, cloneDeepSeekMessages(annotations)...)
+		state.annotations = append(state.annotations, annotations...)
 	}
 	if text, ok := delta["content"].(string); ok && text != "" {
 		if !state.outputTextItemAdded {
@@ -168,14 +168,14 @@ func (state *deepSeekChatStreamState) complete() ([]byte, bool, error) {
 		baseAssistant["refusal"] = state.refusal.String()
 	}
 	if len(state.annotations) > 0 {
-		baseAssistant["annotations"] = cloneDeepSeekMessages(state.annotations)
+		baseAssistant["annotations"] = state.annotations
 	}
 	choice := map[string]any{"message": baseAssistant}
 	if state.finishReason != "" {
 		choice["finish_reason"] = state.finishReason
 	}
 	if state.logprobs != nil {
-		choice["logprobs"] = cloneMetadataValue(state.logprobs)
+		choice["logprobs"] = state.logprobs
 	}
 	source := map[string]any{
 		"id": state.responseID, "model": state.model, "created": state.createdAt,

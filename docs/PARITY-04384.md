@@ -2413,3 +2413,45 @@ shuffled race suite. Logs:
 `/tmp/gdx-04384-provider-sse-limits-complete-test-all.log` and
 `/tmp/gdx-04384-provider-sse-limits-complete-verify.log`. Clean-commit
 DeepSeek and Gemini executable validation follows this commit.
+
+## DeepSeek stream metadata retains exact integer snapshots
+
+Tagged stream metadata clones serde Values and serializes them without
+rounding integer variants. Godex still cloned logprobs and annotations through
+JSON float64 decoding, both when acquiring the packet and constructing the
+final source. Buffered responses already retained numbers after the unsigned
+usage correction, but the stream snapshots were separately lossy.
+
+The stream now keeps its privately decoded logprobs value and appends owned
+annotation values directly. Completion reads those same snapshots. No caller
+can mutate the per-packet decoded objects, and there is no concurrent access
+outside the owning pump. The four lossy clone calls are removed; unrelated
+request/conversation clone contracts remain unchanged. The owner stays in
+`gateway/deepseek/stream_state.go` with no shared helper, exported identifier,
+configuration, dependency, goroutine or persistence change.
+
+Fail-before `/tmp/gdx-04384-deepseek-stream-metadata-before.log` passes
+the ordinary integer control and fails both >2^53/u64::MAX metadata cases.
+The regression observes final client SSE with UseNumber and verifies that a
+later null logprobs packet preserves the prior snapshot. Baseline clean commit
+`cfe27296b13e865558bc6810c77e8fddb49dd32e` also fails the new released
+`sse-metadata-u64` scenario only on Godex. Prodex independently retains exact
+logprobs and annotation integers. Report:
+`/tmp/gdx-04384-deepseek-stream-metadata-before-oracle.json`.
+The independent oracle checks exact metadata bytes before the full five-event
+trace and rejects rounded/dropped values, text changes and extra events.
+Broader metadata floating-point canonicalization, tool numeric payloads and
+other provider/native OS/live-provider behavior remain open.
+
+`rtk go test -race ./internal/gateway/deepseek ./tools/differential -count=1`
+passes 666 tests before the new oracle mutation test was added; its final
+coverage is included in the complete race gate below. The standalone
+`rtk go test ./tools/differential -run '^TestProdex04384StreamMetadataOracle' -count=1`
+passes its mutation test. `rtk go test ./...` passes 9,033 tests across
+81 packages. `rtk proxy make verify` passes every local gate, including the
+complete shuffled race suite. Logs:
+`/tmp/gdx-04384-deepseek-stream-metadata-race.log`,
+`/tmp/gdx-04384-deepseek-stream-metadata-oracle-selfcheck.log`,
+`/tmp/gdx-04384-deepseek-stream-metadata-final-test-all.log` and
+`/tmp/gdx-04384-deepseek-stream-metadata-final-verify.log`. Clean-commit
+released-executable validation follows this commit.
