@@ -10,7 +10,7 @@ import (
 )
 
 func geminiToolSnapshotCases04384() []string {
-	return append([]string{"compact-owner-tool-simple", "compact-owner-tool-shell", "compact-owner-tool-finish-eof", "compact-owner-tool-done-only", "compact-owner-tool-unfinished", "compact-owner-tool-invalid"}, geminiRepairedSnapshotCases04384()...)
+	return append(append([]string{"compact-owner-tool-simple", "compact-owner-tool-shell", "compact-owner-tool-finish-eof", "compact-owner-tool-done-only", "compact-owner-tool-unfinished", "compact-owner-tool-invalid", "compact-owner-tool-mixed-text", "compact-owner-tool-multiple"}, geminiRepairedSnapshotCases04384()...), geminiFailedTextSnapshotCases04384()...)
 }
 
 func geminiToolSnapshotCase04384(scenario string) bool {
@@ -18,7 +18,7 @@ func geminiToolSnapshotCase04384(scenario string) bool {
 }
 
 func geminiToolSnapshotCached04384(scenario string) bool {
-	return scenario != "compact-owner-tool-unfinished" && scenario != "compact-owner-tool-invalid" && scenario != "compact-owner-tool-error-valid-done"
+	return scenario != "compact-owner-tool-unfinished" && scenario != "compact-owner-tool-invalid" && scenario != "compact-owner-tool-error-valid-done" && scenario != "compact-owner-tool-error-text-done"
 }
 
 func geminiToolSnapshotLifecycle04384(scenario string) string {
@@ -27,12 +27,20 @@ func geminiToolSnapshotLifecycle04384(scenario string) string {
 		return "stream-chat-tool-shell"
 	case "compact-owner-tool-invalid":
 		return "stream-chat-tool-invalid-arguments"
+	case "compact-owner-tool-mixed-text":
+		return "stream-chat-tool-mixed-text"
+	case "compact-owner-tool-multiple":
+		return "stream-chat-tool-multiple"
 	default:
 		return "stream-chat-tool-simple"
 	}
 }
 
 func writeGeminiToolSnapshot04384(writer io.Writer, scenario string) {
+	if geminiFailedTextSnapshotCase04384(scenario) {
+		writeGeminiFailedTextSnapshot04384(writer, scenario)
+		return
+	}
 	if geminiRepairedSnapshotCase04384(scenario) {
 		writeGeminiRepairedSnapshot04384(writer, scenario)
 		return
@@ -51,11 +59,14 @@ func writeGeminiToolSnapshot04384(writer io.Writer, scenario string) {
 	}
 }
 
-func geminiToolSnapshotSeedWire04384(scenario, responseID string) string {
+func geminiToolSnapshotSeedWire04384(scenario, responseID, itemID string) string {
+	if geminiFailedTextSnapshotCase04384(scenario) {
+		return geminiFailedTextSnapshotWire04384(scenario, responseID, itemID)
+	}
 	if geminiRepairedSnapshotCase04384(scenario) {
 		return geminiRepairedSnapshotSeedWire04384(scenario, responseID)
 	}
-	wire := geminiLifecycleWire04384(geminiToolSnapshotLifecycle04384(scenario), responseID, "")
+	wire := geminiLifecycleWire04384(geminiToolSnapshotLifecycle04384(scenario), responseID, itemID)
 	if scenario == "compact-owner-tool-done-only" {
 		return strings.Replace(wire, `"metadata":{"gemini":{"finish_reason":"tool_calls"}},`, "", 1)
 	}
@@ -84,14 +95,29 @@ func geminiToolSnapshotExpected04384(scenario string) geminiCandidateResult {
 			map[string]any{"role": "assistant", "content": "", "tool_calls": []any{map[string]any{"id": "call_synthetic", "type": "function", "function": map[string]any{"name": name, "arguments": arguments}}}},
 			map[string]any{"role": "tool", "tool_call_id": "call_synthetic", "content": "done"},
 		}
+		if geminiFailedTextSnapshotCase04384(scenario) {
+			text := geminiFailedSnapshotAfter04384
+			if scenario == "compact-owner-tool-repaired-text-finish" {
+				text = geminiFailedSnapshotBefore04384 + text
+			}
+			history[1].(map[string]any)["content"] = text
+		}
+		if scenario == "compact-owner-tool-mixed-text" {
+			history[1].(map[string]any)["content"] = "synthetic-ok<>&/🌍\u2028\u2029"
+		}
+		if scenario == "compact-owner-tool-multiple" {
+			assistant := history[1].(map[string]any)
+			assistant["tool_calls"] = append(assistant["tool_calls"].([]any), map[string]any{"id": "call_synthetic_8", "type": "function", "function": map[string]any{"name": "lookup", "arguments": `{}`}})
+			history = append(history, map[string]any{"role": "tool", "tool_call_id": "call_synthetic_8", "content": "second"})
+		}
 		messages := request.Body["messages"].([]any)
 		request.Body["messages"] = append(append([]any{messages[0]}, history...), messages[1])
 		encoded, _ := json.Marshal(request.Body)
-		request.RawBody = string(encoded)
+		request.RawBody = strings.NewReplacer(`\u003c`, "<", `\u003e`, ">", `\u0026`, "&", `\u2028`, "\u2028", `\u2029`, "\u2029").Replace(string(encoded))
 		_ = json.Unmarshal(encoded, &request.Body)
 	}
 	seed := geminiReasoningStreamExpected04384("stream-chat-reasoning-empty")
-	seed.Client.Body = geminiToolSnapshotSeedWire04384(scenario, "resp_deepseek_fixture")
+	seed.Client.Body = geminiToolSnapshotSeedWire04384(scenario, "resp_deepseek_fixture", "msg_gemini_fixture")
 	run.Client.Seed = &seed.Client
 	run.Upstream = append(seed.Upstream, run.Upstream...)
 	return run

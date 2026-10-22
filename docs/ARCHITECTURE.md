@@ -248,8 +248,9 @@ and reuses matching history for API-key Compact before adjacency repair. Current
 cached context; input duplicates and repeated instructions are removed. Native
 Gemini response text is not fabricated into a cached Chat assistant message.
 The existing Gemini SSE owner records completed text before the terminal event;
-EOF and provider failures do not create snapshots. Valid tool finish boundaries
-already stored before a later failure remain available. Completed reasoning streams
+EOF and provider failures alone do not create snapshots. A later valid tool
+finish can still snapshot retained text after an earlier semantic failure;
+previously stored valid boundaries also survive later failures. Completed reasoning streams
 use the same owner to emit summary lifecycle events, retain completion metadata,
 and cache assistant reasoning for Compact, including reasoning-only responses.
 The stream owner also retains the latest nonempty fingerprint and nonnull
@@ -273,7 +274,8 @@ priority over the Gemini stream policy.
 The same Gemini stream owner distinguishes a terminal response outcome from
 reader EOF. Semantic failures emit one failed event, preserve later chunk text,
 and suppress another response completion; the terminal sentinel still stops upstream reads.
-Post-failure visible text is forwarded without retaining unused completion text.
+Post-failure visible text stays in the bounded text buffer for later valid tool
+finish snapshots, without fabricating another terminal response.
 New tool indices require a function object, while known indices may omit it.
 Index projection retains Serde's unsigned integer/default rules. A private
 per-tool map retains raw argument fragments, identity, name and signature.
@@ -296,6 +298,8 @@ with one failure and no completion or cache update. Tool streams store validated
 snapshots at finish boundaries and final DONE through the existing scoped Chat
 conversation owner. Snapshots retain original flat tool names, raw call identity,
 ordered arguments after completion transforms and optional thought signatures.
+The Gemini adjacency projector keeps selected calls and existing content in one
+assistant message, followed by the first matching outputs in call order.
 Unknown/unfinished or invalid tool paths create no snapshot; a later invalid
 packet does not replace a previously validated finish snapshot. The existing
 store supplies cloning, per-credential scope, capacity and byte bounds. No new

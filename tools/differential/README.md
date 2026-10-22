@@ -1114,3 +1114,12 @@ identifier is normalized, with consistency checked across the full lifecycle.
 Matching ID/name/index/signature and request/state mutations are rejected. The
 default Gemini matrix reaches 968 cases; production code needs no correction
 for these newly qualified field probes.
+
+The Gemini tool-snapshot family also covers post-failure text at later valid
+finish boundaries, finish followed by EOF, a repaired missing name, and a
+DONE-only cache-negative control. Successful mixed text/tool and two-call
+snapshots check that Compact keeps content and selected calls in one assistant
+message, with first outputs in call order. Independent checks retain exact seed
+wire, Compact history and request bytes, attempts, credential scope and state;
+matching-corruption tests reject moved text and split call groups. These six
+cases extend the default Gemini matrix to 974.

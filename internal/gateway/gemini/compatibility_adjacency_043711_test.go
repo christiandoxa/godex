@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestProdex043711GeminiMultiTurnToolAdjacencyMatchesMojo(t *testing.T) {
+func TestProdex04384GeminiMultiTurnToolAdjacencyMatchesMojo(t *testing.T) {
 	call := func(id string) map[string]any {
 		return map[string]any{
 			"id": id, "type": "function",
@@ -28,9 +28,8 @@ func TestProdex043711GeminiMultiTurnToolAdjacencyMatchesMojo(t *testing.T) {
 			},
 			want: []any{
 				map[string]any{"role": "user", "content": "first"},
-				map[string]any{"role": "assistant", "content": "", "tool_calls": []any{call("call-1")}},
+				map[string]any{"role": "assistant", "content": "keep prose", "tool_calls": []any{call("call-1")}},
 				map[string]any{"role": "tool", "tool_call_id": "call-1", "content": "ok"},
-				map[string]any{"role": "assistant", "content": "keep prose"},
 				map[string]any{"role": "user", "content": "later"},
 			},
 		},
@@ -43,9 +42,8 @@ func TestProdex043711GeminiMultiTurnToolAdjacencyMatchesMojo(t *testing.T) {
 				map[string]any{"role": "tool", "tool_call_id": "call-a", "content": "first"},
 			},
 			want: []any{
-				map[string]any{"role": "assistant", "content": "", "tool_calls": []any{call("call-a")}},
+				map[string]any{"role": "assistant", "content": "", "tool_calls": []any{call("call-a"), call("call-b")}},
 				map[string]any{"role": "tool", "tool_call_id": "call-a", "content": "first"},
-				map[string]any{"role": "assistant", "content": "", "tool_calls": []any{call("call-b")}},
 				map[string]any{"role": "tool", "tool_call_id": "call-b", "content": "second"},
 				map[string]any{"role": "user", "content": "after"},
 			},
@@ -66,7 +64,7 @@ func TestProdex043711GeminiMultiTurnToolAdjacencyMatchesMojo(t *testing.T) {
 				t.Fatal(err)
 			}
 			if !reflect.DeepEqual(parsed["messages"], fixture.want) {
-				t.Fatalf("tagged 0.437.11 multi-turn Gemini adjacency got=%+v want=%+v", parsed["messages"], fixture.want)
+				t.Fatalf("tagged 0.438.4 multi-turn Gemini adjacency got=%+v want=%+v", parsed["messages"], fixture.want)
 			}
 		})
 	}

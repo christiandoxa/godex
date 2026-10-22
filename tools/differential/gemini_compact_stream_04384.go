@@ -55,7 +55,7 @@ func geminiCompactStreamInput04384(scenario string, seed exchange) ([]byte, erro
 func geminiCompactStreamSeedExchange04384(scenario string) exchange {
 	body := geminiChatSSEFixture043711("resp_deepseek_fixture", "msg_gemini_fixture", 111)
 	if geminiToolSnapshotCase04384(scenario) {
-		body = geminiToolSnapshotSeedWire04384(scenario, "resp_deepseek_fixture")
+		body = geminiToolSnapshotSeedWire04384(scenario, "resp_deepseek_fixture", "msg_gemini_fixture")
 	}
 	if reasoning := geminiCompactReasoningStream04384(scenario); reasoning != "" {
 		body = geminiReasoningStreamFixture04384(reasoning, "resp_deepseek_fixture", "msg_gemini_fixture", 111)
@@ -79,7 +79,22 @@ func geminiCompactStreamSeedValid04384(scenario string, seed *exchange) bool {
 		var created struct {
 			Response struct{ ID string } `json:"response"`
 		}
-		return json.Unmarshal(frames[0], &created) == nil && strings.HasPrefix(created.Response.ID, "resp_deepseek_") && seed.Body == geminiToolSnapshotSeedWire04384(scenario, created.Response.ID)
+		itemID := ""
+		if geminiFailedTextSnapshotCase04384(scenario) || scenario == "compact-owner-tool-mixed-text" {
+			for _, frame := range frames {
+				var event struct {
+					Type string              `json:"type"`
+					Item struct{ ID string } `json:"item"`
+				}
+				if json.Unmarshal(frame, &event) == nil && event.Type == "response.output_item.added" && event.Item.ID != "" {
+					itemID = event.Item.ID
+				}
+			}
+			if !strings.HasPrefix(itemID, "msg_gemini_") {
+				return false
+			}
+		}
+		return json.Unmarshal(frames[0], &created) == nil && strings.HasPrefix(created.Response.ID, "resp_deepseek_") && seed.Body == geminiToolSnapshotSeedWire04384(scenario, created.Response.ID, itemID)
 	}
 	if scenario == "compact-owner-stream-eof" {
 		return geminiChatEOFWireValid04384(seed.Body)

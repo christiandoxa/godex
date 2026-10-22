@@ -40,6 +40,9 @@ func geminiCompactOwnershipSeedInput04384(scenario string) string {
 func geminiCompactOwnershipInput04384(scenario string) string {
 	body := `{"model":"gemini-3.1-pro-preview","input":[]`
 	if geminiToolSnapshotCase04384(scenario) {
+		if scenario == "compact-owner-tool-multiple" {
+			return `{"model":"gemini-3.1-pro-preview","input":[{"type":"function_call_output","call_id":"call_synthetic_8","output":"second"},{"type":"function_call_output","call_id":"call_synthetic","output":"done"}],"previous_response_id":"chatcmpl-differential"}`
+		}
 		return `{"model":"gemini-3.1-pro-preview","input":[{"type":"function_call_output","call_id":"call_synthetic","output":"done"}],"previous_response_id":"chatcmpl-differential"}`
 	}
 	switch scenario {

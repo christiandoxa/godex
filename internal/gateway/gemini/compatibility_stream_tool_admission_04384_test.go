@@ -42,7 +42,7 @@ func TestProdex04384GeminiChatSSERejectsNewToolWithoutFunction(t *testing.T) {
 				t.Fatal("tool admission lost preceding or subsequent text")
 			}
 			if fixture.rejected {
-				if failures != 1 || completed != 0 || state.text.String() != "before" || !strings.Contains(wire.String(), `"code":"invalid_tool_call_arguments","message":"Gemini OpenAI-compatible streamed a tool call without a function object"`) {
+				if failures != 1 || completed != 0 || state.text.String() != "beforeafter" || !strings.Contains(wire.String(), `"code":"invalid_tool_call_arguments","message":"Gemini OpenAI-compatible streamed a tool call without a function object"`) {
 					t.Fatal("new malformed tool did not fail exactly once without completion")
 				}
 			} else if failures != 0 || completed != 1 {

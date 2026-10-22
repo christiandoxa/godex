@@ -7,11 +7,8 @@ import (
 	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 )
 
-// The tagged 0.437.11 Gemini API-key chat-compatible bridge invokes the
-// Prodex/DeepSeek message-adjacency kernel. Calls with an available output
-// are emitted immediately before that output, even if the output was
-// received out of order. Unanswered calls are removed; assistant prose
-// is preserved separately after the tool sequence.
+// The tagged 0.438.4 adjacency kernel keeps selected calls and prose in one
+// assistant message, followed by first outputs in call order.
 func filterGeminiOrphanToolMessages043711(body []byte) ([]byte, error) {
 	request, err := decodeGeminiChatRequest04384(body)
 	if err != nil {
@@ -50,7 +47,7 @@ func filterGeminiOrphanToolMessages043711(body []byte) ([]byte, error) {
 			result = append(result, raw)
 			continue
 		}
-		paired := 0
+		selected := make([]any, 0, len(calls))
 		for _, candidate := range calls {
 			call, _ := candidate.(map[string]any)
 			id, _ := call["id"].(string)
@@ -61,22 +58,26 @@ func filterGeminiOrphanToolMessages043711(body []byte) ([]byte, error) {
 			}
 			matchedID[id] = true
 			claimedOutput[index] = true
-			paired++
+			selected = append(selected, candidate)
+		}
+		if len(selected) > 0 {
 			caller := copyGeminiMessage043711(message)
-			caller["tool_calls"] = []any{candidate}
-			if caller["role"] == "assistant" {
+			caller["tool_calls"] = selected
+			if caller["role"] == "assistant" && caller["content"] == nil {
 				caller["content"] = ""
 			}
-			result = append(result, caller, messages[index])
+			result = append(result, caller)
+			for _, candidate := range selected {
+				call := candidate.(map[string]any)
+				id := call["id"].(string)
+				result = append(result, messages[firstOutput[id]])
+			}
+			continue
 		}
 		prose := copyGeminiMessage043711(message)
 		delete(prose, "tool_calls")
 		if geminiMessageHasIndependentContent043711(prose) {
 			result = append(result, prose)
-		} else if paired == 0 {
-			// A message with only unanswered tool calls and no visible
-			// prose is not a usable continuation. Other messages are
-			// retained by geminiMessageHasIndependentContent043711.
 		}
 	}
 	if len(result) == 0 {

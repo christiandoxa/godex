@@ -9701,3 +9701,48 @@ PASS. The latest completed full-Gemini qualification remains 912 at exact
 pending. Candidate c42bd28c was pushed directly to origin/main after fetch,
 cleanliness and ancestry checks, without waiting for CI. No production
 correction, dependency, state format or ownership change was needed.
+
+### Retain post-failure text and grouped assistant calls in Gemini Compact
+
+Ten exact clean c42bd28c0422cfe698eb006691b0392c21c2f2d6 executable baselines
+qualify five Godex-only FAILs and five PASS controls (original session 96905,
+exit 0). Audit: /tmp/gdx-04384-gemini-stream-failed-text-snapshot-before-grouped-audit.json.
+The five failures are post-error text with a valid finish, valid finish followed
+by EOF, repaired-name text spanning failure, successful mixed text/tool replay,
+and a two-call snapshot with reverse-order outputs. Reference seeds, following
+Compact requests, status/stdout, exact raw bytes, attempts/auth/slot and durable
+state all satisfy their independent invariants. DONE after failure without a
+valid finish remains uncached in both products. Four prior controls also PASS.
+Original session 50232 has three both-product FAILs from incorrect fixture
+expectations for canonical HTML/line-separator escaping; its reports are retained
+and are not qualification. Corrected original session 13636 qualifies three
+Godex-only FAILs plus five controls before the final ten-case expansion.
+
+Pinned Rust observe_content_delta retains text after a terminal semantic failure;
+observe_finish may still store a validated tool snapshot. Godex now retains that
+text within its existing 64 MiB limit. A unit regression first failed on both
+post-failure cached-content cases and the exact budget boundary. The pinned Mojo
+ds_repair_adjacency/ds_message path retains selected calls and content in one
+assistant message, then emits first outputs in call order. Godex previously
+split prose and every call into separate messages; the gateway now keeps the
+selected group. Existing adjacency tests were updated to assert the pinned
+0.438.4 behavior, including orphan removal and reverse output ordering; both
+assertions failed before the fix. The original unit FAIL log is
+/tmp/gdx-04384-gemini-stream-failed-text-snapshot-unit-before.log.
+
+Both corrections remain private to gateway/gemini. They reuse its existing
+scoped conversation store, message copier and request pipeline, with no shared
+helper extraction, dependency, export, interface, worker, option or state-format
+change. One failed response remains terminal even when a later valid finish
+stores a snapshot; no second failed/completed response is fabricated. Text
+retention remains bounded after failure; streams above 64 MiB remain an explicit
+unqualified safety limit. Six new executable cases extend the default Gemini
+matrix to 974. Full local and exact clean executable validation follow.
+
+Full local validation PASSes 10,958 tests with 18 optional SKIP. The final
+matching-split sentinel is included. make verify exits 0, including shuffled
+race tests, Linux/macOS/Windows cross-builds, vet and source/format guards.
+Exact commands:
+`rtk proxy go test -json ./... > /tmp/gdx-04384-gemini-stream-failed-text-snapshot-full.jsonl 2>&1`
+and `rtk proxy make verify > /tmp/gdx-04384-gemini-stream-failed-text-snapshot-verify.log 2>&1`.
+Exact clean candidate executable qualification follows before publication.

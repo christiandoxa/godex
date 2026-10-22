@@ -34,16 +34,14 @@ func (state *geminiChatCompatibleStream043711) observeChoiceOutput(writer io.Wri
 
 func (state *geminiChatCompatibleStream043711) emitText(writer io.Writer, text string) error {
 	// shortcut: completion text is capped at 64 MiB; qualify larger streams before raising this budget.
-	if !state.done && len(text) > geminiStreamMetadataMaxBytes04384-state.text.Len() {
+	if len(text) > geminiStreamMetadataMaxBytes04384-state.text.Len() {
 		state.eof = true
 		return state.failure(writer, "provider_stream_error", "provider text exceeded safe size limit (67108864)")
 	}
 	if err := state.openTextItem(writer); err != nil {
 		return err
 	}
-	if !state.done {
-		state.text.WriteString(text)
-	}
+	state.text.WriteString(text)
 	return state.send(writer, "response.output_text.delta", map[string]any{
 		"created_at": state.created, "response_id": state.id, "delta": text,
 	})
