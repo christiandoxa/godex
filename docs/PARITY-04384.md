@@ -4192,3 +4192,33 @@ passes 2,734 tests: `/tmp/gdx-04384-gemini-body-race.log`.
 race tests, cross-platform build/test compilation, installers and build:
 `/tmp/gdx-04384-gemini-body-verify.log`.
 Clean-commit executable verification follows. Global 1:1 parity remains unproven.
+
+
+## Validated Gemini buffered admission checkpoint: 8730116
+
+Clean `8730116c9ecafb6e6d9db06f5a76055ed868913f` passes all 55 Gemini cases
+and all 125 DeepSeek scenarios. Both independent negative-control sets PASS.
+Reports: `/tmp/gdx-04384-gemini-body-oracle.json` and
+`/tmp/gdx-04384-gemini-body-deepseek-oracle.json`.
+All four Gemini body boundaries satisfy exact output/type/exit/stdout,
+authenticated original request, selected key, single attempt and durable-state
+invariants. Both over-limit runs return the exact local 502, including one
+primary attempt with two configured synthetic keys and no model/key replay.
+
+Both binaries were built from that clean commit with
+`rtk go build -trimpath -o /tmp/gdx-04384-gemini-body-godex ./cmd/godex` and
+`rtk go build -trimpath -o /tmp/gdx-04384-gemini-body-final-differential ./tools/differential`.
+The Gemini command uses `--gemini`; DeepSeek uses
+`--scenario all --scenario-workers 3`. Entry gates verify the same pinned
+0.438.4 source/binary digest and clean Godex VCS provenance. Latest local checks
+are 2,734 focused race tests, 9,375 full-suite tests and
+`rtk proxy make verify`, all PASS.
+
+This stage is ready for direct fast-forward push after checking the clean
+primary worktree and remote. A complete default `rtk proxy scripts/verify-release-parity.sh`
+run is separately in progress on an isolated clean 8730116 worktree:
+`/tmp/gdx-04384-release-8730116.log`. It is not yet a PASS; the historical
+complete-default PASS remains on `e9ccedc` until that entire invocation exits,
+including stages after its phase-all marker. Other lexical classes, valid
+Gemini continuation/Compact ownership, native macOS/Windows and live
+authentication remain open. Global 1:1 parity is not claimed.
