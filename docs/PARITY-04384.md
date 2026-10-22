@@ -9011,4 +9011,12 @@ SKIP. `rtk proxy make verify` PASSes with exit 0, including shuffled race tests,
 cross-builds, format/source guards, vet and the build. Logs:
 /tmp/gdx-04384-gemini-stream-usage-full.jsonl and
 /tmp/gdx-04384-gemini-stream-usage-verify.log. Exact clean executable
-qualification follows; overall 1:1 parity remains unproven.
+qualification subsequently PASSes nineteen targeted scenarios on exact clean
+b717a6acdf0fed80d12aa6bab9dcb18a1edf9903. Fifteen new usage cases and three
+previous detailed SSE cases retain exact original request/stdout/state/wire
+assertions; the native SSE control retains its prior native usage/wire scope.
+Audit: /tmp/gdx-04384-gemini-stream-usage-targeted-audit.json. The full 894-case
+matrix remains running on its original immutable source worktree. The latest
+full Gemini PASS remains 851 cases at exact 05a61ff, and the latest complete
+default-gate PASS remains exact 78d256d. Neither qualifies a later revision;
+overall 1:1 parity remains unproven.
