@@ -342,6 +342,10 @@ for arguments, and 16 MiB for their combined input bytes after RTK wrapping.
 Private `tool_kernel.go` owns that provider-specific admission check. Missing
 call IDs contribute no input bytes; blank signatures still count before omission
 from output. These limits are not shared routing or generic JSON-helper policy.
+Local response-processing failures carry the existing non-retryable precommit
+failure code `provider_response_translation_failed`. Routing returns that
+failure without penalizing or rotating provider keys; actual upstream 502 errors
+keep their existing retry classification. No downstream commitment is invented.
 `gateway/deepseek` also owns Responses/SSE output shaping, web-search modes,
 beta-base routing, and the partial native Anthropic Messages bridge. Exact
 0.435.1 parity for that bridge remains open; delivery and generic routing do not

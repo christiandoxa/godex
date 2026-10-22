@@ -3827,3 +3827,56 @@ Final `rtk proxy make verify` passes formatting, source/TUI guards, vet, full
 shuffled race tests, cross-platform build/test compilation, installers and
 build: `/tmp/gdx-04384-tool-kernel-reviewed-verify.log`.
 Clean-commit executable verification follows; no new global parity claim is made.
+
+
+## Local buffered processing failures must not rotate provider credentials
+
+The first 106-case run on clean `11203a0cd621da119c97af06e1fcdb694b816caa`
+does not PASS. It aborts in `deepseek-buffered-body-over-rotation` because
+Godex's Codex shim times out before receiving HTTP headers and writes no child
+exchange. The report is empty, not a completed parity result:
+`/tmp/gdx-04384-admission-oracle.json` and
+`/tmp/gdx-04384-admission-oracle.stderr`.
+An isolated repeat fails the same way:
+`/tmp/gdx-04384-admission-rotation-isolated.stderr`.
+A diagnostic harness retains the redacted child stderr and confirms the HTTP
+client timeout: `/tmp/gdx-04384-admission-rotation-diagnostic.stderr`.
+No timeout was counted as PASS or dismissed as a fixture problem.
+
+The gateway correctly constructed the local processing HTTP 502 but omitted
+its terminal routing evidence. With two keys, generic external-provider
+classification treated it like an upstream 502, rotated, then waited after
+repeated failures. The release's `local_rewrite_response.rs` constructs this
+terminal translation response after upstream selection; it cannot retry it.
+
+The private DeepSeek failure constructor now supplies the existing
+`PrecommitFailure` model with code `provider_response_translation_failed`.
+The existing use-case classification treats that non-retryable code as a
+failed terminal response. It does not pretend bytes were committed, change
+upstream-error retry policy or introduce a new model field/interface. Gateway
+owns the translation-failure evidence; routing still owns the retry decision.
+Helpers stay private in the owning gateway. State formats and credentials
+remain unchanged.
+
+A real HTTP gateway/pool/router regression uses two synthetic credentials.
+It cancels on an unexpected extra attempt, without sleeps. Before repair,
+malformed and oversized successful bodies fail by attempting another key;
+the actual-upstream-502 rotation control passes. After repair all four tests
+pass, preserving exact 502 text/type and failed outcome while the upstream
+control still uses two attempts. Exact command:
+`rtk go test ./internal/gateway/deepseek -run '^TestProdex04384BufferedTranslationFailureDoesNotRotateCredentials$' -count=1`.
+Qualified before/after logs: `/tmp/gdx-04384-body-terminal-qualified-before.log`
+and `/tmp/gdx-04384-body-terminal-focused.log`.
+The initial fixture omitted required account homes and failed all controls;
+`/tmp/gdx-04384-body-terminal-before.log` is retained as an unqualified fixture
+failure, not bug evidence.
+
+`rtk go test -race ./internal/gateway/deepseek ./internal/usecase/routing ./tools/differential -count=1`
+passes 2,673 tests: `/tmp/gdx-04384-body-terminal-race.log`.
+`rtk go test ./...` passes 9,298 tests across 81 packages:
+`/tmp/gdx-04384-body-terminal-test-all.log`.
+`rtk proxy make verify` passes formatting, source/TUI guards, vet, full shuffled
+race tests, cross-platform build/test compilation, installers and build:
+`/tmp/gdx-04384-body-terminal-verify.log`.
+Clean-commit executable verification follows before pushing either admission
+commit; the failed 11203a0 matrix remains incomplete.

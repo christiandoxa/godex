@@ -73,6 +73,8 @@ func providerResponseProcessingFailure() *proxymodel.Response {
 		StatusCode: http.StatusBadGateway,
 		Header:     http.Header{"Content-Type": {"text/plain; charset=utf-8"}},
 		Body:       io.NopCloser(strings.NewReader("provider response could not be processed")),
+		// A local translation failure cannot be repaired by another credential.
+		PrecommitFailure: &proxymodel.PrecommitFailure{Code: "provider_response_translation_failed"},
 	}
 }
 
