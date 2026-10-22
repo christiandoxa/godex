@@ -9515,3 +9515,17 @@ Exact clean executable qualification follows. A distinct source audit remains
 open: a later valid finish after an earlier semantic failure may store a new
 snapshot because the reference finish path does not guard its completed flag.
 That repaired-stream case is not qualified by these six probes.
+
+Exact clean 56fb3ba2293e92a41ff2fd6eb214535d176255ac then PASSes all 16
+targeted executable scenarios: six tool-snapshot cases and ten prior
+text/tool/semantic-failure/pending controls. Independent exact seed wire,
+following Compact history/request bytes, stdout, HTTP headers/status,
+attempts/auth/slot, durable state and matching-corruption guards pass. Both
+binaries embed the exact revision with vcs.modified=false. Commands and audit:
+/tmp/gdx-04384-gemini-stream-tool-snapshot-targeted-commands.json and
+/tmp/gdx-04384-gemini-stream-tool-snapshot-targeted-audit.json. The change is
+pushed directly to origin/main after fetch, cleanliness and ancestry checks
+without waiting for CI. Full Gemini 940 now runs on the unchanged source
+(original session 97523); it is not yet a PASS. Restart, cross-account and
+repaired-semantic-error snapshots remain outside this qualification. All earlier
+failed reports and independent larger matrices retain their exact source scope.
