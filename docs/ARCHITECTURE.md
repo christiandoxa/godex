@@ -257,6 +257,8 @@ callback. Ordinary text/tool/message inputs may select the source's stateless
 body; stored previous IDs and non-simple shapes retain reconstruction. Pending
 messages are captured before the body override and used when recording the next
 response. The public pure request translator keeps its independent contract.
+The pending snapshot decoder preserves JSON number kinds and integer precision,
+so repeated replay does not round cached tool-call fields through float64.
 Runtime gateway startup marks the proxy model's internal GatewayMode field;
 ordinary local launches keep invocation-local history. The composition root
 selects Gemini's local pool constructor or its request-scoped shared gateway

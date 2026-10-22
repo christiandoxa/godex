@@ -3,6 +3,8 @@ package deepseek
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 )
 
 func TestProdex04384DeepSeekBufferedChatHistoryProjection(t *testing.T) {
@@ -23,5 +25,23 @@ func TestProdex04384DeepSeekBufferedChatHistoryProjection(t *testing.T) {
 				t.Fatalf("history=%s error=%v, want %s", body, err, fixture.want)
 			}
 		})
+	}
+}
+
+func TestProdex04384DeepSeekPendingHistoryPreservesSerdeNumbers(t *testing.T) {
+	for _, number := range []string{"9007199254740993", "18446744073709551615", "-9223372036854775808", "-0.0", "1000.0", "0.1"} {
+		t.Run(number, func(t *testing.T) {
+			want := `[{"role":"assistant","tool_calls":[{"id":"call-synthetic","priority":` + number + `}]}]`
+			messages := deepSeekTranslatedConversationMessages([]byte(`{"messages":` + want + `}`))
+			body, err := jsonutil.MarshalSerdeValue04384(messages)
+			if err != nil || string(body) != want {
+				t.Fatalf("pending history=%s error=%v, want %s", body, err, want)
+			}
+		})
+	}
+	for _, body := range []string{`{"messages":[]}`, `{"messages":[]} {}`, `{"messages":[`, `[]`, `null`} {
+		if messages := deepSeekTranslatedConversationMessages([]byte(body)); len(messages) != 0 {
+			t.Fatalf("invalid or empty snapshot produced messages: %s", body)
+		}
 	}
 }

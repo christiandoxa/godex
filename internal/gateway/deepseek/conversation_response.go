@@ -11,7 +11,9 @@ import (
 
 func deepSeekTranslatedConversationMessages(body []byte) []any {
 	var value map[string]any
-	if json.Unmarshal(body, &value) != nil {
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.UseNumber()
+	if decoder.Decode(&value) != nil || decoder.Decode(new(any)) != io.EOF {
 		return nil
 	}
 	messages, _ := value["messages"].([]any)

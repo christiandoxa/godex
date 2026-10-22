@@ -15,6 +15,7 @@ func deepSeekHistoryNegativeControl04384() bool {
 			func(r *productRun) { r.Client.Seed.Status++ },
 			func(r *productRun) { r.Client.Seed.Headers.Set("Content-Type", "text/plain") },
 			func(r *productRun) { r.Upstream[1].Body = `{}` },
+			func(r *productRun) { r.Upstream[len(r.Upstream)-1].Body = `{}` },
 			func(r *productRun) { r.Upstream[0].AuthOK = false },
 			func(r *productRun) { r.Upstream[1].KeySlot = "secondary" },
 			func(r *productRun) { r.Events[2].Attempt = 1 },

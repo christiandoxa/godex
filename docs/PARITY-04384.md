@@ -8698,3 +8698,36 @@ FAIL: reference temporary state files violate independent state invariants.
 An unchanged serial 213-case run on 0ea01e9 separately passes; it does not replace
 those reports or qualify a different source revision. The complete default gate
 on 78d256d remains running; the latest complete default-gate PASS is 15d1c55.
+
+### Preserve numeric values across DeepSeek pending-history snapshots
+
+Two exact clean executable baselines on 3ca16168faa0029e839a9c4b2312bf7e3d88e8c3
+establish Godex-only request mismatches on the third call. A cached tool-call
+priority of 9007199254740993 becomes 9007199254740992; uint64 maximum becomes
+1.8446744073709552e+19. Prodex retains both integers. The second request matches,
+isolating the loss to the pending snapshot. The three-call nonnumeric control
+and existing two-call numeric control PASS. Reference/client/attempt/state and
+matching mutation assertions qualify all four baselines. Reports and commands:
+/tmp/gdx-04384-deepseek-pending-numbers-before-audit.json and
+/tmp/gdx-04384-deepseek-pending-numbers-before-commands.json.
+
+Pinned chat_compatible_request.rs clones the serde message vector into the
+emitted request and retains that original vector in RuntimeDeepSeekTranslatedRequest.
+Godex's internal snapshot round trip decoded numbers as float64. The existing
+gateway/deepseek decoder now uses json.Decoder.UseNumber and retains strict
+single-document validation. Number precision stays local to its owning adapter;
+no helper, exported API, dependency, background work or state format is added.
+
+The focused regression fails four numeric boundaries before the fix, including
+int64 minimum and the floating kind 1000.0. It also covers negative zero, a small
+fraction, empty snapshots, invalid roots, truncated JSON and trailing values.
+After the fix, `rtk proxy go test -json ./internal/gateway/deepseek ./tools/differential`
+PASSes 1,159 tests. The executable harness adds two three-call numeric cases,
+checks the exact intermediate response and final request, and rejects matching
+corruption of the third request. The full DeepSeek matrix now contains 224 cases.
+`rtk proxy go test -json ./...` PASSes 10,739 tests with 18 optional SKIP.
+`rtk proxy make verify` PASSes with exit 0, including shuffled race tests,
+cross-builds, format/source guards, vet and the build. Logs:
+/tmp/gdx-04384-deepseek-pending-numbers-full.jsonl and
+/tmp/gdx-04384-deepseek-pending-numbers-verify.log. Exact clean executable
+qualification follows. Global continuation and 1:1 parity remain unproven.

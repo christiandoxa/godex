@@ -1229,7 +1229,7 @@ func runCodexShim(arguments []string) int {
 	if os.Getenv("DIFFERENTIAL_CONTINUATION_PHASE") == "same-process" {
 		maxAttempts = 2
 	}
-	if os.Getenv("DIFFERENTIAL_HISTORY_PROJECTION") == "deepseek-history-simple-pending" {
+	if deepSeekHistoryPending04384(os.Getenv("DIFFERENTIAL_HISTORY_PROJECTION")) {
 		maxAttempts = 3
 	}
 	var clientResult exchange
@@ -1276,12 +1276,12 @@ func runCodexShim(arguments []string) int {
 			}
 			continue
 		}
-		if os.Getenv("DIFFERENTIAL_HISTORY_PROJECTION") == "deepseek-history-simple-pending" && attempt == 1 {
+		if scenario := os.Getenv("DIFFERENTIAL_HISTORY_PROJECTION"); deepSeekHistoryPending04384(scenario) && attempt == 1 {
 			want := deepSeekPrimitiveExpected04384("deepseek-request-primitive-output").Client
 			if clientResult.Status != want.Status || clientResult.Body != want.Body || clientResult.Headers.Get("Content-Type") != want.Headers.Get("Content-Type") {
 				return shimFailure("synthetic pending history lacks its exact second response")
 			}
-			requestBody = deepSeekHistoryInput04384("deepseek-history-simple-pending", 2)
+			requestBody = deepSeekHistoryInput04384(scenario, 2)
 			continue
 		}
 		if response.StatusCode != http.StatusTooManyRequests || attempt+1 == maxAttempts {

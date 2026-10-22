@@ -8,7 +8,11 @@ import (
 )
 
 func deepSeekHistoryCases04384() []string {
-	return []string{"deepseek-history-extra", "deepseek-history-rtk", "deepseek-history-null", "deepseek-history-empty", "deepseek-history-numeric", "deepseek-history-simple", "deepseek-history-simple-inline", "deepseek-history-simple-unbound", "deepseek-history-simple-pending"}
+	return []string{"deepseek-history-extra", "deepseek-history-rtk", "deepseek-history-null", "deepseek-history-empty", "deepseek-history-numeric", "deepseek-history-simple", "deepseek-history-simple-inline", "deepseek-history-simple-unbound", "deepseek-history-simple-pending", "deepseek-history-numeric-pending", "deepseek-history-u64-pending"}
+}
+
+func deepSeekHistoryPending04384(scenario string) bool {
+	return strings.HasSuffix(scenario, "-pending")
 }
 
 func deepSeekHistoryCase04384(scenario string) bool {
@@ -46,8 +50,11 @@ func deepSeekHistoryCall04384(scenario string, wrapped bool) map[string]any {
 		}
 	}
 	call := map[string]any{"id": "call-history", "type": "function", "function": map[string]any{"name": name, "arguments": arguments}}
-	if scenario == "deepseek-history-numeric" {
+	if scenario == "deepseek-history-numeric" || scenario == "deepseek-history-numeric-pending" {
 		call["priority"] = json.Number("9007199254740993")
+	}
+	if scenario == "deepseek-history-u64-pending" {
+		call["priority"] = json.Number("18446744073709551615")
 	}
 	return call
 }
@@ -90,7 +97,7 @@ func deepSeekHistoryExpected04384(scenario string) productRun {
 	if strings.HasPrefix(scenario, "deepseek-history-simple") && scenario != "deepseek-history-simple-inline" {
 		requests[1] = []any{tool}
 	}
-	if scenario == "deepseek-history-simple-pending" {
+	if deepSeekHistoryPending04384(scenario) {
 		requests = append(requests, []any{user, assistant, tool, map[string]any{"role": "assistant", "content": "synthetic-ok"}})
 	}
 	run.Upstream = nil
@@ -104,7 +111,7 @@ func deepSeekHistoryExpected04384(scenario string) productRun {
 	}
 	run.Retries = 1
 	run.Events = []upstreamEvent{{Kind: "upstream.request", Attempt: 1}, {Kind: "upstream.response", Attempt: 1, Status: 200}, {Kind: "upstream.request", Attempt: 2}, {Kind: "upstream.response", Attempt: 2, Status: 200}}
-	if scenario == "deepseek-history-simple-pending" {
+	if deepSeekHistoryPending04384(scenario) {
 		run.Retries = 2
 		run.Events = append(run.Events, upstreamEvent{Kind: "upstream.request", Attempt: 3}, upstreamEvent{Kind: "upstream.response", Attempt: 3, Status: 200})
 	}

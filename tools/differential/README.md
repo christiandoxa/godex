@@ -979,6 +979,10 @@ release SHA-256 plus manifest, and builds/validates the Godex candidate.
 A successful subset is not a complete gate. Never skip an unverified phase
 or treat partial-phase PASS as general production readiness.
 
+The 0.438.4 DeepSeek history matrix also checks three-call numeric pending
+snapshots at 2^53+1 and uint64 maximum. Its independent expected bytes detect
+rounding on the third request even when the preceding request matches.
+
 ### Tagged 0.438.2 Gemini function-tool rejection parity
 
 Two additional **source/binary-pinned** cases, `invalid-wrapped-tool-parameters`
