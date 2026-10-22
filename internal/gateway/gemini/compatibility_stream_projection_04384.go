@@ -22,6 +22,9 @@ func (source *geminiChatStreamSource04384) Close() error {
 }
 
 func pendingGeminiChatProjection04384(chunk map[string]any) bool {
+	if chunk == nil {
+		return true
+	}
 	choices, _ := chunk["choices"].([]any)
 	if len(choices) == 0 {
 		return false

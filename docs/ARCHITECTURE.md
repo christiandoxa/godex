@@ -260,7 +260,7 @@ Model presence is retained separately from its string value, so an explicit
 empty upstream model survives completion while absent values remain absent.
 The finish-reason state likewise retains explicit empty strings and only ends
 the stream at the terminal sentinel, preserving trailing usage and metadata.
-Non-object first choices and Chat tool entries retain the tagged pending
+Non-object whole frames, first choices and Chat tool entries retain the tagged pending
 response: their current frame emits no events, and the existing producer waits for request or body
 cancellation. A private child context follows `helper/sse.PipeBody`'s single
 upstream close owner. HTTP delivery flushes SSE headers at commitment before

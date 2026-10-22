@@ -9,7 +9,7 @@ import (
 const geminiProjectionReadError04384 = "context deadline exceeded (Client.Timeout or context cancellation while reading body)"
 
 func geminiStreamProjectionCases04384() []string {
-	return []string{"stream-chat-tool-entry-null", "stream-chat-tool-entry-bool", "stream-chat-tool-entry-number", "stream-chat-tool-entry-string", "stream-chat-tool-entry-array", "stream-chat-tool-calls-empty-control", "stream-chat-tool-calls-null-control", "stream-chat-tool-calls-object-control", "stream-chat-tool-calls-bool-control", "stream-chat-tool-calls-absent-control", "stream-chat-choice-null", "stream-chat-choice-bool", "stream-chat-choice-number", "stream-chat-choice-string", "stream-chat-choice-array", "stream-chat-choice-tail-control"}
+	return []string{"stream-chat-tool-entry-null", "stream-chat-tool-entry-bool", "stream-chat-tool-entry-number", "stream-chat-tool-entry-string", "stream-chat-tool-entry-array", "stream-chat-tool-calls-empty-control", "stream-chat-tool-calls-null-control", "stream-chat-tool-calls-object-control", "stream-chat-tool-calls-bool-control", "stream-chat-tool-calls-absent-control", "stream-chat-choice-null", "stream-chat-choice-bool", "stream-chat-choice-number", "stream-chat-choice-string", "stream-chat-choice-array", "stream-chat-choice-tail-control", "stream-chat-root-null", "stream-chat-root-bool", "stream-chat-root-number", "stream-chat-root-string", "stream-chat-root-array"}
 }
 
 func geminiStreamProjectionCase04384(scenario string) bool {
@@ -18,6 +18,8 @@ func geminiStreamProjectionCase04384(scenario string) bool {
 
 func geminiStreamProjectionFixture04384(scenario string) (calls string, pending bool) {
 	switch scenario {
+	case "stream-chat-root-null", "stream-chat-root-bool", "stream-chat-root-number", "stream-chat-root-string", "stream-chat-root-array":
+		return "", true
 	case "stream-chat-choice-null", "stream-chat-choice-bool", "stream-chat-choice-number", "stream-chat-choice-string", "stream-chat-choice-array":
 		return "", true
 	case "stream-chat-tool-entry-null":
@@ -42,9 +44,19 @@ func geminiStreamProjectionFixture04384(scenario string) (calls string, pending 
 	return "", false
 }
 
-func geminiStreamChoicePacket04384(scenario, packet string) string {
+func geminiStreamProjectionPacket04384(scenario, packet string) string {
 	first := ""
 	switch scenario {
+	case "stream-chat-root-null":
+		return "null"
+	case "stream-chat-root-bool":
+		return "false"
+	case "stream-chat-root-number":
+		return "0"
+	case "stream-chat-root-string":
+		return `""`
+	case "stream-chat-root-array":
+		return "[]"
 	case "stream-chat-choice-null":
 		first = "null"
 	case "stream-chat-choice-bool":

@@ -9586,3 +9586,35 @@ original log. Audit: /tmp/gdx-04384-release-e9d88ce-deepseek-phase-audit.json.
 This qualifies only DeepSeek at exact e9d88ce; the entire default gate remains
 RUNNING on original session 29510, and this phase is not attributed to later
 Gemini revisions.
+
+### Preserve pending non-object Gemini whole-frame projections
+
+Nine exact clean d82cb0972ae6201c6ee34273c460e60dd9b2e07f executable baselines
+qualify five Godex-only failures and four PASS controls. A valid JSON null,
+boolean, number, string or array as the entire upstream SSE payload leaves the
+reference pending after SSE 200 with empty bytes, an exact read deadline,
+stdout newline and child exit 1. Godex instead fabricates a created response
+and completes. Earlier choice/tool-pending, ignored-tool and native controls
+PASS. Audit: /tmp/gdx-04384-gemini-stream-root-projection-before-audit.json.
+Original independent failure tuple, scoped raw requests, status/stdout,
+attempts/auth/slot, state and matching-corruption guards qualify; the legacy
+native control keeps its existing decoded-request scope.
+
+Pinned StreamChunkMetadata rejects a non-object before the current chunk's
+event batch returns. The existing Gemini stream projection preflight now
+recognizes the decoded non-object root and reuses its quiescent pending reader.
+An empty object still projects normally. Narrow regressions fail five shapes
+before the fix and retain that object control. No worker, helper, export,
+interface, option, dependency or persisted format is added; the existing body/
+request cancellation and single upstream close owner remain responsible.
+
+Five executable cases extend the default Gemini matrix to 948. Full local and
+exact clean executable qualification follow; earlier failed reports remain
+retained and global parity is unproven.
+
+Focused Gemini and differential tests PASS 2,208 cases. Full local validation
+PASSes 10,929 tests with 18 optional SKIP; make verify exits 0 including race
+tests, cross-builds, vet and source/format guards. Exact commands:
+`rtk proxy go test -json ./... > /tmp/gdx-04384-gemini-stream-root-projection-full.jsonl 2>&1`
+and `rtk proxy make verify > /tmp/gdx-04384-gemini-stream-root-projection-verify.log 2>&1`.
+Exact clean executable qualification follows before promotion.
