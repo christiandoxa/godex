@@ -6914,3 +6914,65 @@ remain pending. Custom/MCP/shell projection and other controls need separate
 proof. Gemini Compact, executable session/turn continuation, native macOS/
 Windows and live authentication remain unproven. No force push, tag, release
 or editor edit occurred. Global 1:1 parity is not claimed.
+
+
+## Absent or empty input retains the tagged empty-user fallback
+
+Pinned `runtime_provider_chat_compatible_messages` inserts one empty user
+message when input reconstruction produces no messages. Without nonblank
+instructions, absent input or an empty array therefore remains valid work.
+Explicit null/object input still fails; nonempty instructions retain a
+system-only path. Complete serde and candidate/tool gates run earlier.
+
+Godex's shared converter rejected the valid empty cases. The concrete Gemini
+normalizer now supplies an empty string input only for absent/empty-array input
+without instructions, after existing validation and whitespace normalization.
+This five-line protocol decision remains beside complete-request admission;
+shared Claude and native Gemini policies remain independent. No new helper,
+package, API, interface, dependency, configuration, worker or durable format
+is added. Wrong-type input cannot become a valid fallback.
+
+Before repair four controls pass and five tests fail, including the parent:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiEmptyInputUsesTaggedUserFallback$' -count=1`;
+`/tmp/gdx-04384-gemini-empty-input-before.log`.
+The same command PASSes all nine tests after repair:
+`/tmp/gdx-04384-gemini-empty-input-focused.log`.
+The real gateway table checks exact outgoing empty/system message bytes, one
+attempt for valid input and terminal 502/zero attempts for null/object input.
+
+Ten executable baselines pin clean
+`cf7e03de0297fc020a3c0a5b56a5141086042986`, unchanged reference and
+`/tmp/gdx-04384-gemini-empty-input-before-differential`:
+`/tmp/gdx-04384-gemini-empty-input-<suffix>-before-oracle.json`.
+Four empty-input cases FAIL only Godex, which rejects work the reference sends
+once with an empty user message. Six controls PASS: empty string, system-only,
+null/object rejection, earlier candidate and malformed Unicode. Every reference
+and independent mutation invariant passes. Commands use
+`--gemini --scenario request-primitive-empty-input-<suffix>` with exact clean
+source/commit pins. Independent full expected wire requests, response/status/
+headers/stdout/exit, authenticated attempt counts and safe durable state retain
+all prior matching-corruption checks.
+
+`rtk go test ./tools/differential -count=1` PASSes 281 tests:
+`/tmp/gdx-04384-gemini-empty-input-oracle-tests.log`.
+`rtk proxy go test -json ./...` PASSes 9,990 tests in 71 packages; ten packages
+have no tests and 18 optional installed-Codex/executable tests are skipped:
+`/tmp/gdx-04384-gemini-empty-input-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+PASSes 3,182 tests: `/tmp/gdx-04384-gemini-empty-input-race.log`.
+
+Protected clean `175091ff89e61059c796639225dc5880530a1efe` now PASSes all
+306 Gemini cases and independent mutations:
+`/tmp/gdx-04384-gemini-message-projection-oracle.json`.
+Its original/isolated/full-rerun DeepSeek reference-state failures remain FAIL.
+The later ID/name/payload clean candidates each separately PASS all 213 DeepSeek
+cases; their larger Gemini matrices remain pending. Main remains `c651bff59`.
+No state, owner, status/header or mutation assertion was relaxed.
+`rtk proxy make verify` PASSes: `/tmp/gdx-04384-gemini-empty-input-verify.log`.
+Clean-commit 378-case Gemini qualification follows. DeepSeek is unchanged and
+its exact reports retain their original revision scope. Protected Gemini/
+default matrices remain pending. Custom/MCP/shell projection and remaining
+controls require separate audit and executable proof. Gemini Compact,
+executable session/turn continuation, native macOS/Windows and live login
+remain unproven. No force push, tag, release or editor edit occurred. Global
+1:1 parity is not claimed.

@@ -151,6 +151,11 @@ func normalizeGeminiChatInput043711(body []byte) ([]byte, map[string]any, error)
 	if !normalizeGeminiChatInputItems04384(root["input"]) {
 		return nil, nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
+	_, hasInput := root["input"]
+	entries, isArray := root["input"].([]any)
+	if _, hasInstructions := root["instructions"]; !hasInstructions && (!hasInput || isArray && len(entries) == 0) {
+		root["input"] = ""
+	}
 	normalized, err := json.Marshal(root)
 	return normalized, controls, err
 }

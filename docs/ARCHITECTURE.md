@@ -496,6 +496,9 @@ aliases using first-present serialization semantics. Absent arguments become
 use the existing content projector. Wire ID fallback remains distinct from
 first-string admission. Function namespaces are ignored, and a selected
 non-string/missing name preserves the tagged empty assistant message.
+With no nonblank instructions, an absent input or empty input array becomes
+one empty user message before shared conversion. Explicit null/object input
+still fails admission, and nonempty instructions retain their system-only path.
 DeepSeek independently checks present `stream` as a boolean and present
 `instructions`/`previous_response_id` as strings before constructing its
 translated request. Invalid types use its common terminal preparation boundary,

@@ -429,6 +429,11 @@ canonical nested JSON, ignored namespace and selected-name shadowing. Matched
 call/output fixtures expose field loss before adjacency; accepted name-validation
 edge cases retain the tagged empty assistant message and discard orphan output.
 
+Gemini `request-primitive-empty-input-*` verifies absent/empty-array/blank-
+instruction requests use exactly one empty user message. Empty-string and
+system-only controls remain accepted; null/object input, earlier candidate
+errors and malformed Unicode retain exact rejection and zero-attempt behavior.
+
 DeepSeek scenario workers evaluate their complete independent invariants as
 each scenario finishes, preserving failures in the ordered report. The strict
 five-minute generated SSE timestamp window is unchanged; later cases cannot
