@@ -238,10 +238,14 @@ serde-size estimate. Request namespace selection, exact-number snapshot cloning
 and deduplication of replayed Chat input remain protocol concerns; each credential
 transport owns its cache lifetime. DeepSeek still owns request admission,
 assistant projection and response eligibility. Gemini records successful buffered
-Chat requests under their final public Responses ID and reuses matching history
+Chat requests and completed text streams under their final public Responses ID
+and reuses matching history
 for API-key Compact before adjacency repair. Current Compact instructions precede
 cached context; input duplicates and repeated instructions are removed. Native
 Gemini response text is not fabricated into a cached Chat assistant message.
+The existing Gemini SSE owner records completed text before the terminal event;
+EOF and provider failures do not record snapshots. Tool/reasoning streams retain their
+existing uncached behavior until complete argument snapshots are qualified.
 Its shared Chat Completions stream-error classifier owns exact field-presence
 and numeric-kind rules for the DeepSeek and Gemini adapters. Each adapter
 acquires its own input, preserves JSON number types, and controls response

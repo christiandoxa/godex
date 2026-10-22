@@ -142,7 +142,11 @@ func geminiCompactInvariant04384(scenario string, result geminiCandidateResult) 
 	if geminiCompactOwnershipSeed04384(scenario) {
 		seed := result.Client.Seed
 		want := geminiUserIDExpected04384("request-user-id-absent").Client
-		if seed == nil || seed.Seed != nil || seed.Status != want.Status || seed.Body != want.Body || seed.Headers.Get("Content-Type") != want.Headers.Get("Content-Type") {
+		valid := seed != nil && seed.Seed == nil && seed.Status == want.Status && seed.Body == want.Body && seed.Headers.Get("Content-Type") == want.Headers.Get("Content-Type")
+		if geminiCompactStreamSeed04384(scenario) {
+			valid = geminiCompactStreamSeedValid04384(scenario, seed)
+		}
+		if !valid {
 			return errors.New("Gemini Compact lacks an exact successful owner seed")
 		}
 	}

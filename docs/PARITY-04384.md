@@ -8510,3 +8510,49 @@ Exact b9f1600 subsequently PASSes 791 unique Gemini cases including every prior
 764, with state and mutation assertions, and is pushed directly to origin/main:
 /tmp/gdx-04384-gemini-search-declarations-oracle.json. The latest entire default
 gate PASS still belongs to 15d1c55; no newer full-gate result is implied.
+
+
+### Retain completed Gemini Chat text streams for Compact
+
+The pinned streamed-seed oracle identifies one Godex-only missing-history
+request mismatch and two PASS controls (EOF and unknown previous ID). The shim
+extracts the actual public response ID from the independently validated seed
+SSE trace before constructing Compact. Successful completion replays the cached
+user plus assistant text; EOF must not fabricate completed history. Seed framing,
+usage, sequence, identity consistency, exact Compact bytes, attempts, state and
+matching-corruption assertions pass on the reference. Before evidence:
+/tmp/gdx-04384-gemini-compact-stream-before-audit.json. The original success-case
+expectation escaped HTML and U+2028/U+2029 incorrectly; its unqualified FAIL is
+retained. The corrected unchanged-product report is independently scoped.
+
+The existing gateway/gemini SSE owner receives its explicit private conversation
+context and records text at successful completion before the terminal event.
+It reuses the bounded Chat cache and buffered assistant projector. Failed,
+incomplete, unknown-ID and different-credential controls cannot supply context.
+Tool/reasoning streams retain their prior uncached path; their complete argument
+and reasoning snapshots remain required work, marked by a shortcut comment.
+This stage adds no second stream pump, reader, goroutine, shared helper, option,
+dependency or durable state. Account selection remains in usecase/routing.
+
+The final gateway regression copied alone to the old production base e01a8e8
+fails completed text replay and passes the other five controls:
+`rtk proxy go test -json ./internal/gateway/gemini -run '^TestProdex04384GeminiCompactReplaysCompletedTextStream$' -count=1`.
+Log: /tmp/gdx-04384-gemini-compact-stream-final-unit-before-complete.jsonl.
+After repair, `rtk go test ./internal/gateway/gemini -count=1` PASSes 1,728 before
+additional failure/complex controls. `rtk go test ./tools/differential -count=1`
+PASSes 296. `rtk proxy go test -json ./...` on final code PASSes 10,683 tests in
+71 packages, with 18 optional SKIP. Logs use
+/tmp/gdx-04384-gemini-compact-stream-. `rtk proxy make verify` on final code
+PASSes exit 0, including race tests and cross-builds. Exact clean executable
+qualification follows. Streamed tools, local/gateway namespace
+selection and global 1:1 parity are not certified.
+
+Exact 03750e3176cef7b2cccc4ea71a7c064d0a66a2f6 now PASSes 821 unique Gemini
+cases including every prior 791, with strict independent state and mutations,
+and is pushed directly as origin/main. The c32018d buffered history stage has
+seven exact clean targeted executable PASSes, including the number above 2^53.
+Its full DeepSeek report remains FAIL: single-key-503 reference left a zero-byte
+runtime-scores.json.last-good temporary file. Godex invariants pass. An unchanged
+isolated single-key-503 rerun PASSes; the original full FAIL is not relabeled.
+Full unchanged strict rerun is separately pending. No newer full default-gate
+PASS is attributed beyond 15d1c55.

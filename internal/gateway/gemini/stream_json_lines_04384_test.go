@@ -27,7 +27,7 @@ func TestProdex04384GeminiSSESeparateJSONDataLines(t *testing.T) {
 			if native {
 				response = translateGeminiNativeStream(upstream, nil)
 			} else {
-				response = translateGeminiChatCompatibleStream043711(upstream, nil)
+				response = translateGeminiChatCompatibleStream043711(upstream, nil, nil)
 			}
 			defer response.Body.Close()
 			body, err := io.ReadAll(response.Body)

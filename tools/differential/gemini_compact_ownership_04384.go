@@ -6,7 +6,7 @@ import (
 )
 
 func geminiCompactOwnershipCases04384() []string {
-	return []string{"compact-owner-previous", "compact-owner-session", "compact-owner-unbound", "compact-owner-assistant", "compact-owner-history-instructions", "compact-owner-duplicate", "compact-owner-numeric"}
+	return []string{"compact-owner-previous", "compact-owner-session", "compact-owner-unbound", "compact-owner-assistant", "compact-owner-history-instructions", "compact-owner-duplicate", "compact-owner-numeric", "compact-owner-stream", "compact-owner-stream-eof", "compact-owner-stream-unbound"}
 }
 
 func geminiCompactOwnershipSeed04384(scenario string) bool {
@@ -22,6 +22,9 @@ func geminiCompactOwnershipSession04384(scenario string) string {
 
 func geminiCompactOwnershipSeedInput04384(scenario string) string {
 	body := `{"model":"gemini-3.1-pro-preview","input":"same request","stream":false`
+	if geminiCompactStreamSeed04384(scenario) {
+		body = strings.Replace(body, `"stream":false`, `"stream":true`, 1)
+	}
 	if scenario == "compact-owner-history-instructions" {
 		body += `,"instructions":"synthetic seed instruction"`
 	}
@@ -34,11 +37,11 @@ func geminiCompactOwnershipSeedInput04384(scenario string) string {
 func geminiCompactOwnershipInput04384(scenario string) string {
 	body := `{"model":"gemini-3.1-pro-preview","input":[]`
 	switch scenario {
-	case "compact-owner-previous", "compact-owner-assistant", "compact-owner-history-instructions", "compact-owner-duplicate", "compact-owner-numeric":
+	case "compact-owner-previous", "compact-owner-assistant", "compact-owner-history-instructions", "compact-owner-duplicate", "compact-owner-numeric", "compact-owner-stream", "compact-owner-stream-eof":
 		body += `,"previous_response_id":"chatcmpl-differential"`
 	case "compact-owner-session":
 		body += `,"session_id":"synthetic-compact-session"`
-	case "compact-owner-unbound":
+	case "compact-owner-unbound", "compact-owner-stream-unbound":
 		body += `,"previous_response_id":"chatcmpl-unknown"`
 	}
 	if scenario == "compact-owner-numeric" {
@@ -59,10 +62,13 @@ func geminiCompactOwnershipExpected04384(scenario string) geminiCandidateResult 
 		result.Client.Body = strings.Replace(result.Client.Body, `Semantic continuation summary:\n`, `Active user request that must still be completed:\nsame request\n\nSemantic continuation summary:\n`, 1)
 		result.Stdout = result.Client.Body + "\n"
 	}
-	if scenario != "compact-owner-session" {
+	if scenario != "compact-owner-session" && scenario != "compact-owner-stream-eof" && scenario != "compact-owner-stream-unbound" {
 		request := &result.Upstream[0]
 		messages := request.Body["messages"].([]any)
 		history := []any{map[string]any{"role": "user", "content": "same request"}}
+		if scenario == "compact-owner-stream" {
+			history = append(history, map[string]any{"role": "assistant", "content": "synthetic-ok<>&/🌍\u2028\u2029"})
+		}
 		if scenario == "compact-owner-history-instructions" {
 			history = append([]any{map[string]any{"role": "system", "content": "synthetic seed instruction"}}, history...)
 		}
@@ -80,9 +86,19 @@ func geminiCompactOwnershipExpected04384(scenario string) geminiCandidateResult 
 		request.Body["messages"] = append(append([]any{messages[0]}, history...), messages[1])
 		wire, _ := json.Marshal(request.Body)
 		request.RawBody = string(wire)
+		if geminiCompactStreamSeed04384(scenario) {
+			request.RawBody = strings.NewReplacer(`\u003c`, "<", `\u003e`, ">", `\u0026`, "&", `\u2028`, "\u2028", `\u2029`, "\u2029").Replace(request.RawBody)
+		}
 		_ = json.Unmarshal(wire, &request.Body)
 	}
 	seed := geminiUserIDExpected04384("request-user-id-absent")
+	if geminiCompactStreamSeed04384(scenario) {
+		seed.Client = geminiCompactStreamSeedExchange04384(scenario)
+		seed.Upstream[0].Body["stream"] = true
+		seed.Upstream[0].Body["stream_options"] = map[string]any{"include_usage": true}
+		wire, _ := json.Marshal(seed.Upstream[0].Body)
+		seed.Upstream[0].RawBody = string(wire)
+	}
 	if scenario == "compact-owner-history-instructions" {
 		seed.Upstream[0].Body["messages"] = []any{map[string]any{"role": "system", "content": "synthetic seed instruction"}, map[string]any{"role": "user", "content": "same request"}}
 		wire, _ := json.Marshal(seed.Upstream[0].Body)

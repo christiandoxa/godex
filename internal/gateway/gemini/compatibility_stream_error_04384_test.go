@@ -25,7 +25,7 @@ func TestProdex04384GeminiAPIKeyEmbeddedErrorPrecedesCreatedAndContent(t *testin
 			chunk := `{"error":` + tc.raw + `,"choices":[{"delta":{"content":"must-not-emit"}}]}`
 			wire := "data: " + chunk + "\n\ndata: " + `{"choices":[{"delta":{"content":"must-not-emit-later"}}]}` + "\n\ndata: [DONE]\n\n"
 			response := translateGeminiChatCompatibleStream043711(&http.Response{StatusCode: http.StatusOK,
-				Header: http.Header{"Content-Type": {"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(wire))}, nil)
+				Header: http.Header{"Content-Type": {"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(wire))}, nil, nil)
 			defer response.Body.Close()
 			data, err := io.ReadAll(response.Body)
 			if err != nil {

@@ -41,7 +41,7 @@ func TestProdex04384GeminiStreamBodyCloseCancelsBlockedUpstream(t *testing.T) {
 		if native {
 			body = translateGeminiNativeStream(upstream, nil).Body
 		} else {
-			body = translateGeminiChatCompatibleStream043711(upstream, nil).Body
+			body = translateGeminiChatCompatibleStream043711(upstream, nil, nil).Body
 		}
 		<-source.started
 		if err := body.Close(); err != nil {
@@ -68,7 +68,7 @@ func TestProdex04384GeminiSourceClosesOnceAfterCompletionAndRepeatedClientClose(
 		if native {
 			body = translateGeminiNativeStream(upstream, nil).Body
 		} else {
-			body = translateGeminiChatCompatibleStream043711(upstream, nil).Body
+			body = translateGeminiChatCompatibleStream043711(upstream, nil, nil).Body
 		}
 		output, err := io.ReadAll(body)
 		if err != nil || !strings.Contains(string(output), "event: response.completed") {

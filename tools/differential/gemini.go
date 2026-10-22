@@ -106,7 +106,8 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 	mock.requests = append(mock.requests, record)
 	compactSeed := len(mock.requests) == 1 && geminiCompactOwnershipSeed04384(mock.scenario)
 	mock.mu.Unlock()
-	if mock.scenario == "compact-control-responses" || compactSeed {
+	streamSeed := compactSeed && geminiCompactStreamSeed04384(mock.scenario)
+	if mock.scenario == "compact-control-responses" || compactSeed && !streamSeed {
 		w.Header().Set("Content-Type", "application/json")
 		body := geminiContinuationResponse04384()
 		if mock.scenario == "compact-owner-assistant" || mock.scenario == "compact-owner-numeric" {
@@ -123,7 +124,7 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, body)
 		return
 	}
-	if geminiCompactCase04384(mock.scenario) && mock.scenario != "compact-control-responses" {
+	if geminiCompactCase04384(mock.scenario) && mock.scenario != "compact-control-responses" && !streamSeed {
 		status, payload := geminiCompactUpstream04384(mock.scenario)
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Upstream-Decoy", "must-not-leak")
@@ -144,7 +145,7 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	if geminiChatStreamScenario04384(mock.scenario) || primitiveFixture.geminiChatStream {
+	if geminiChatStreamScenario04384(mock.scenario) || primitiveFixture.geminiChatStream || streamSeed {
 		w.Header().Set("Content-Type", "text/event-stream")
 		if geminiProviderBOMScenario04384(mock.scenario) {
 			_, _ = io.WriteString(w, providerBOMUpstream04384(mock.scenario == "stream-chat-bom-repeat"))
@@ -166,7 +167,7 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, "data: "+`{"id":"chat-synthetic","model":"gemini-3.1-pro-preview","choices":[{"delta":{"content":"ok<>&/🌍\u2028\u2029"},"finish_reason":null}]}`+"\n\n")
 		_, _ = io.WriteString(w, "data: "+`{"id":"chat-synthetic","model":"gemini-3.1-pro-preview","choices":[{"delta":{},"finish_reason":"stop"}]}`+"\n\n")
 		_, _ = io.WriteString(w, "data: "+`{"choices":[],"usage":{"prompt_tokens":9007199254740993,"completion_tokens":1,"total_tokens":9007199254740994}}`+"\n\n")
-		if mock.scenario != "stream-chat-eof" {
+		if mock.scenario != "stream-chat-eof" && mock.scenario != "compact-owner-stream-eof" {
 			_, _ = io.WriteString(w, "data: [DONE]\n\n")
 		}
 		return

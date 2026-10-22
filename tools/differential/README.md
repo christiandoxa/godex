@@ -104,6 +104,11 @@ current/old instructions, duplicate input, session-only and unknown-ID controls,
 and a paired tool call with a numeric field above 2^53. Seed response, original
 upstream bytes, attempt order and durable ownership remain independent checks;
 matching numeric rounding and missing history are rejected even in both products.
+Three `compact-owner-stream*` cases seed the exact independently validated Chat
+SSE trace, use its actual generated public response ID for Compact, and compare
+cached user/assistant text. EOF and unknown-ID controls require fresh Compact
+requests. Seed event/framing/usage, raw Compact bytes, state and matching
+corruption checks remain independent of production code.
 
 Build and run from a clean, committed Godex worktree:
 

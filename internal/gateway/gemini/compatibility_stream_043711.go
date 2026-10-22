@@ -24,12 +24,12 @@ import (
 // Chat Completions SSE rather than interpreting the stream as native Gemini
 // GenerateContent. Native Gemini chunks contain no choices and therefore
 // cannot materialize output_text delta events.
-func translateGeminiChatCompatibleStream043711(response *http.Response, requestMetadata map[string]any) *proxymodel.Response {
+func translateGeminiChatCompatibleStream043711(response *http.Response, requestMetadata map[string]any, conversation *geminiChatConversation04384) *proxymodel.Response {
 	reader, writer := io.Pipe()
 	body := sse.NewPipeBody(reader, response.Body)
 	go func() {
 		defer body.CloseSource()
-		pumpGeminiChatCompatibleStream043711(response.Body, writer, requestMetadata)
+		pumpGeminiChatCompatibleStream043711(response.Body, writer, requestMetadata, conversation)
 	}()
 	return &proxymodel.Response{
 		StatusCode: response.StatusCode,
@@ -53,6 +53,8 @@ type geminiChatCompatibleStream043711 struct {
 	usage        map[string]any
 	metadata     map[string]any
 	json         sse.JSONFrames
+	conversation *geminiChatConversation04384
+	complexDelta bool
 }
 
 func (state *geminiChatCompatibleStream043711) send(writer io.Writer, event string, fields map[string]any) error {
@@ -125,6 +127,11 @@ func (state *geminiChatCompatibleStream043711) complete(writer io.Writer) error 
 	if state.usage != nil {
 		completed["usage"] = state.usage
 	}
+	// shortcut: tool/reasoning snapshots need complete capture; qualify those paths before caching them.
+	if !state.complexDelta {
+		source := map[string]any{"choices": []any{map[string]any{"message": map[string]any{"content": state.text.String()}}}}
+		state.conversation.remember(completed, source)
+	}
 	return state.send(writer, "response.completed", map[string]any{
 		"created_at": state.created,
 		"response":   completed,
@@ -153,6 +160,12 @@ func (state *geminiChatCompatibleStream043711) observeChatChunk(chunk map[string
 	}
 	if choices, ok := chunk["choices"].([]any); ok && len(choices) > 0 {
 		if first, ok := choices[0].(map[string]any); ok {
+			delta, _ := first["delta"].(map[string]any)
+			calls, _ := delta["tool_calls"].([]any)
+			reasoning, _ := delta["reasoning_content"].(string)
+			if len(calls) > 0 || reasoning != "" {
+				state.complexDelta = true
+			}
 			if finish, ok := first["finish_reason"].(string); ok && finish != "" {
 				state.finishReason = finish
 			}
@@ -250,14 +263,14 @@ func (state *geminiChatCompatibleStream043711) accept(writer io.Writer, data []b
 	return nil
 }
 
-func pumpGeminiChatCompatibleStream043711(source io.ReadCloser, writer *io.PipeWriter, requestMetadata map[string]any) {
+func pumpGeminiChatCompatibleStream043711(source io.ReadCloser, writer *io.PipeWriter, requestMetadata map[string]any, conversation *geminiChatConversation04384) {
 	defer writer.Close()
 	responseID := "resp_deepseek_" + uuid.NewString()
 	if value, err := uuid.NewV7(); err == nil {
 		responseID = "resp_deepseek_" + value.String()
 	}
 	state := &geminiChatCompatibleStream043711{
-		id: responseID, created: time.Now().Unix(), metadata: requestMetadata,
+		id: responseID, created: time.Now().Unix(), metadata: requestMetadata, conversation: conversation,
 	}
 	decoder := sse.NewStrictDecoder(4 << 20)
 	buffer := make([]byte, 32<<10)

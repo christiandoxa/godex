@@ -43,10 +43,10 @@ func (transport *RuntimeTransport) executeChatCompatibleResponses(
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		return proxyResponse(response), nil
 	}
-	if geminiContentTypeIsSSE04384(response.Header.Get("Content-Type")) {
-		return translateGeminiChatCompatibleStream043711(response, metadata), nil
-	}
 	conversation := &geminiChatConversation04384{store: transport.conversations.ForRequest(input), messages: geminiChatConversationMessages04384(body)}
+	if geminiContentTypeIsSSE04384(response.Header.Get("Content-Type")) {
+		return translateGeminiChatCompatibleStream043711(response, metadata, conversation), nil
+	}
 	translated, err := translateGeminiChatOrNativeResponse043711(response, metadata, conversation)
 	if err != nil {
 		return &proxymodel.Response{

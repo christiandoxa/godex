@@ -1240,7 +1240,10 @@ func runCodexShim(arguments []string) int {
 			successfulSeed = &seed
 			if scenario := os.Getenv("DIFFERENTIAL_GEMINI_COMPACT"); geminiCompactOwnershipSeed04384(scenario) {
 				endpoint.Path += "/compact"
-				requestBody = []byte(geminiCompactInput04384(scenario))
+				requestBody, err = geminiCompactStreamInput04384(scenario, seed)
+				if err != nil {
+					return shimFailure("synthetic Compact seed could not supply its public ID")
+				}
 			} else {
 				requestBody = []byte(strings.TrimSuffix(string(requestBody), "}") + `,"previous_response_id":"chatcmpl-differential"}`)
 			}
