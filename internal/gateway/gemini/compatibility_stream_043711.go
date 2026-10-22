@@ -64,7 +64,6 @@ type geminiChatCompatibleStream043711 struct {
 	metadata     map[string]any
 	json         sse.JSONFrames
 	conversation *geminiChatConversation04384
-	complexDelta bool
 
 	refusal              strings.Builder
 	annotations          []any
@@ -169,18 +168,7 @@ func (state *geminiChatCompatibleStream043711) complete(writer io.Writer) error 
 	if state.usage != nil {
 		completed["usage"] = state.usage
 	}
-	// shortcut: tool snapshots are not cached, qualify executable continuations before enabling them.
-	if !state.complexDelta {
-		message := map[string]any{"content": state.text.String()}
-		if state.reasoning.Len() > 0 {
-			message["reasoning_content"] = state.reasoning.String()
-			if state.text.Len() == 0 {
-				message["content"] = nil
-			}
-		}
-		source := map[string]any{"choices": []any{map[string]any{"message": message}}}
-		state.conversation.remember(completed, source)
-	}
+	state.rememberConversation()
 	return state.send(writer, "response.completed", map[string]any{
 		"created_at": state.created,
 		"response":   completed,
@@ -217,11 +205,6 @@ func (state *geminiChatCompatibleStream043711) observeChatChunk(chunk map[string
 		if first, ok := choices[0].(map[string]any); ok {
 			if logprobs := first["logprobs"]; logprobs != nil {
 				state.logprobs = logprobs
-			}
-			delta, _ := first["delta"].(map[string]any)
-			calls, _ := delta["tool_calls"].([]any)
-			if len(calls) > 0 {
-				state.complexDelta = true
 			}
 			if finish, ok := first["finish_reason"].(string); ok {
 				state.finishReason, state.finishSet = finish, true

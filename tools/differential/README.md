@@ -1096,4 +1096,9 @@ Ten streamed-tool lifecycle cases cover raw argument fragments, item/index
 ordering, validation, shell completion, search/patch items and empty arguments.
 Their independent before reports retain the original Godex FAILs. The producer
 correction adds these cases to the default matrix, reaching 934 Gemini cases.
-Continuation snapshots remain a separate qualification.
+Six tool-snapshot probes exercise same-process Compact with cached tool results:
+simple/shell completion, valid finish followed by EOF, DONE without finish, and
+unfinished/invalid negative controls. Each verifies the exact seed wire plus
+the following original Compact request/history, headers, attempts and state.
+The default Gemini matrix reaches 940 cases. Restart and cross-account snapshot
+behavior remain outside this new qualification.

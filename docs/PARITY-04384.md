@@ -9473,3 +9473,45 @@ adapter and its admission map; the independent fixture stage was published
 separately. Earlier 912/918/924 matrices and the e9d88ce entire default gate
 remain on their original handles and immutable sources. Overall parity remains
 unproven.
+
+### Retain validated Gemini streamed-tool snapshots at finish and DONE
+
+Eight exact clean c0d02b7099df3ed1c47a290030129c30c933485a executable baselines
+qualify four Godex-only failures and four PASS controls. Reference Compact
+requests retain simple and shell tool calls, a valid tool finish followed by
+EOF, and a valid DONE without finish. Unfinished and invalid tool seeds create
+no tool history; earlier successful/EOF text controls remain unchanged. All
+eight independently verify exact seed wire, following Compact request/history,
+selected model, summary/headers, stdout, attempts/auth/slot and durable state.
+Matching corruption must fail. Audit:
+/tmp/gdx-04384-gemini-stream-tool-snapshot-before-audit.json. This proves
+same-process credential-owned context; restart/cross-account behavior is not
+newly qualified.
+
+Pinned observe_finish validates and emits tool completion before storing its
+conversation snapshot; complete_event records the final snapshot at DONE. Godex
+now uses its existing Gemini conversation owner at those same boundaries.
+The local projector supplies sorted calls, original names/identities, completed
+arguments and optional signatures to the existing cloning Chat projector/store.
+It replaces the tool-snapshot exclusion rather than adding a second cache.
+Failed validation creates no snapshot, and a later failure preserves a prior
+valid finish snapshot. The existing store retains its credential scope, byte
+and count bounds; no helper, export, port, worker, dependency or durable format
+is added. Text/reasoning-only snapshots continue through the same owner.
+
+Four narrow snapshot regressions fail before the fix, then test finish/DONE,
+EOF retention, validation, scope and clone isolation. Focused Gemini and
+differential tests PASS 2,195 cases before adding the final validated-boundary
+regression. Six executable cases extend the default Gemini matrix to 940. Full
+local and exact clean executable qualification follow; global parity remains
+unproven.
+
+Full local validation PASSes 10,917 tests with 18 optional SKIP; make verify
+exits 0 including race tests, cross-builds, vet and source/format guards. Exact
+commands:
+`rtk proxy go test -json ./... > /tmp/gdx-04384-gemini-stream-tool-snapshot-full.jsonl 2>&1`
+and `rtk proxy make verify > /tmp/gdx-04384-gemini-stream-tool-snapshot-verify.log 2>&1`.
+Exact clean executable qualification follows. A distinct source audit remains
+open: a later valid finish after an earlier semantic failure may store a new
+snapshot because the reference finish path does not guard its completed flag.
+That repaired-stream case is not qualified by these six probes.

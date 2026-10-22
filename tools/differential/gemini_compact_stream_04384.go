@@ -10,7 +10,7 @@ import (
 )
 
 func geminiCompactStreamSeed04384(scenario string) bool {
-	return scenario == "compact-owner-stream" || scenario == "compact-owner-stream-eof" || scenario == "compact-owner-stream-unbound" || geminiCompactReasoningStream04384(scenario) != ""
+	return scenario == "compact-owner-stream" || scenario == "compact-owner-stream-eof" || scenario == "compact-owner-stream-unbound" || geminiCompactReasoningStream04384(scenario) != "" || geminiToolSnapshotCase04384(scenario)
 }
 
 func geminiCompactReasoningStream04384(scenario string) string {
@@ -54,6 +54,9 @@ func geminiCompactStreamInput04384(scenario string, seed exchange) ([]byte, erro
 
 func geminiCompactStreamSeedExchange04384(scenario string) exchange {
 	body := geminiChatSSEFixture043711("resp_deepseek_fixture", "msg_gemini_fixture", 111)
+	if geminiToolSnapshotCase04384(scenario) {
+		body = geminiToolSnapshotSeedWire04384(scenario, "resp_deepseek_fixture")
+	}
 	if reasoning := geminiCompactReasoningStream04384(scenario); reasoning != "" {
 		body = geminiReasoningStreamFixture04384(reasoning, "resp_deepseek_fixture", "msg_gemini_fixture", 111)
 	}
@@ -66,6 +69,17 @@ func geminiCompactStreamSeedExchange04384(scenario string) exchange {
 func geminiCompactStreamSeedValid04384(scenario string, seed *exchange) bool {
 	if seed == nil || seed.Seed != nil || seed.Status != 200 || seed.Headers.Get("Content-Type") != "text/event-stream; charset=utf-8" {
 		return false
+	}
+	if geminiToolSnapshotCase04384(scenario) {
+		decoder := sse.NewStrictDecoder(1 << 20)
+		frames := append(decoder.Feed([]byte(seed.Body)), decoder.Finish()...)
+		if decoder.Err() != nil || len(frames) == 0 || seed.ReadError != "" {
+			return false
+		}
+		var created struct {
+			Response struct{ ID string } `json:"response"`
+		}
+		return json.Unmarshal(frames[0], &created) == nil && strings.HasPrefix(created.Response.ID, "resp_deepseek_") && seed.Body == geminiToolSnapshotSeedWire04384(scenario, created.Response.ID)
 	}
 	if scenario == "compact-owner-stream-eof" {
 		return geminiChatEOFWireValid04384(seed.Body)

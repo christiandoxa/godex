@@ -22,7 +22,12 @@ func (state *geminiChatCompatibleStream043711) observeChoiceOutput(writer io.Wri
 		}
 	}
 	if _, present := choice["finish_reason"].(string); present {
-		return state.completeToolEvents(writer)
+		if err := state.completeToolEvents(writer); err != nil || state.done {
+			return err
+		}
+		if len(state.toolCalls) > 0 {
+			state.rememberConversation()
+		}
 	}
 	return nil
 }

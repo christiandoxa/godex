@@ -147,6 +147,10 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	if geminiChatStreamScenario04384(mock.scenario) || primitiveFixture.geminiChatStream || streamSeed {
 		w.Header().Set("Content-Type", "text/event-stream")
+		if geminiToolSnapshotCase04384(mock.scenario) {
+			writeGeminiToolSnapshot04384(w, mock.scenario)
+			return
+		}
 		if geminiStreamToolLifecycleCase04384(mock.scenario) {
 			writeGeminiToolLifecycle04384(w, mock.scenario)
 			return

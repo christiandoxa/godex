@@ -6,7 +6,7 @@ import (
 )
 
 func geminiCompactOwnershipCases04384() []string {
-	return []string{"compact-owner-previous", "compact-owner-session", "compact-owner-unbound", "compact-owner-assistant", "compact-owner-history-instructions", "compact-owner-duplicate", "compact-owner-numeric", "compact-owner-stream", "compact-owner-stream-eof", "compact-owner-stream-unbound", "compact-owner-local-session-same", "compact-owner-local-session-changed", "compact-owner-local-session-omitted", "compact-owner-local-session-added", "compact-owner-stream-reasoning", "compact-owner-stream-reasoning-only"}
+	return append([]string{"compact-owner-previous", "compact-owner-session", "compact-owner-unbound", "compact-owner-assistant", "compact-owner-history-instructions", "compact-owner-duplicate", "compact-owner-numeric", "compact-owner-stream", "compact-owner-stream-eof", "compact-owner-stream-unbound", "compact-owner-local-session-same", "compact-owner-local-session-changed", "compact-owner-local-session-omitted", "compact-owner-local-session-added", "compact-owner-stream-reasoning", "compact-owner-stream-reasoning-only"}, geminiToolSnapshotCases04384()...)
 }
 
 func geminiCompactOwnershipSeed04384(scenario string) bool {
@@ -39,6 +39,9 @@ func geminiCompactOwnershipSeedInput04384(scenario string) string {
 
 func geminiCompactOwnershipInput04384(scenario string) string {
 	body := `{"model":"gemini-3.1-pro-preview","input":[]`
+	if geminiToolSnapshotCase04384(scenario) {
+		return `{"model":"gemini-3.1-pro-preview","input":[{"type":"function_call_output","call_id":"call_synthetic","output":"done"}],"previous_response_id":"chatcmpl-differential"}`
+	}
 	switch scenario {
 	case "compact-owner-previous", "compact-owner-assistant", "compact-owner-history-instructions", "compact-owner-duplicate", "compact-owner-numeric", "compact-owner-stream", "compact-owner-stream-eof", "compact-owner-local-session-same", "compact-owner-local-session-changed", "compact-owner-local-session-omitted", "compact-owner-local-session-added", "compact-owner-stream-reasoning", "compact-owner-stream-reasoning-only":
 		body += `,"previous_response_id":"chatcmpl-differential"`
@@ -63,6 +66,9 @@ func geminiCompactOwnershipInput04384(scenario string) string {
 }
 
 func geminiCompactOwnershipExpected04384(scenario string) geminiCandidateResult {
+	if geminiToolSnapshotCase04384(scenario) {
+		return geminiToolSnapshotExpected04384(scenario)
+	}
 	if scenario == "compact-owner-unbound" {
 		return geminiCompactExpected04384("compact-empty")
 	}
