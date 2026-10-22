@@ -9618,3 +9618,20 @@ tests, cross-builds, vet and source/format guards. Exact commands:
 `rtk proxy go test -json ./... > /tmp/gdx-04384-gemini-stream-root-projection-full.jsonl 2>&1`
 and `rtk proxy make verify > /tmp/gdx-04384-gemini-stream-root-projection-verify.log 2>&1`.
 Exact clean executable qualification follows before promotion.
+
+Exact clean d67033945f1076f87ec52532897d824d148a3692 subsequently PASSes all
+15 targeted executable scenarios: five new whole-frame projections and ten
+prior controls, with seven expected pending/read-failure tuples in total.
+Independent scoped original requests, wire/stdout/status, attempts/auth/slot,
+Compact seed/following history, state and matching-corruption guards pass.
+Both binaries embed the exact revision with vcs.modified=false. Commands and
+audit: /tmp/gdx-04384-gemini-stream-root-projection-targeted-commands.json and
+/tmp/gdx-04384-gemini-stream-root-projection-targeted-audit.json. The change
+is pushed directly to origin/main after fetch, cleanliness and ancestry checks
+without waiting for CI. Full Gemini 948 now runs on the unchanged source
+(original session 72630); it is not yet a PASS. The latest complete full-Gemini
+PASS remains exact 78078cb with 902 cases; later full matrices retain their
+own running handles. The entire e9d88ce default gate also remains running,
+with its completed DeepSeek 224 phase separately qualified. Earlier failed
+reports remain retained. Overall 1:1 parity, live authentication, native
+macOS/Windows and larger retained streams remain unproven.
