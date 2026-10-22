@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
@@ -20,21 +21,14 @@ const (
 )
 
 func Semantic(summary, provider string) (*proxymodel.Response, error) {
-	content, err := json.Marshal(map[string]any{
-		"output": []any{map[string]any{
-			"type": "message", "role": "user",
-			"content": []any{map[string]any{
-				"type": "input_text", "text": SummaryPrefix + "\n\n" + strings.TrimSpace(summary),
-			}},
-		}},
-	})
+	content, err := compactResponseBody(summary)
 	if err != nil {
 		return nil, errors.New("serialize semantic compact response")
 	}
 	header := make(http.Header)
 	header.Set("Content-Type", "application/json; charset=utf-8")
-	header.Set("X-Godex-Compact-Mode", "semantic")
-	header.Set("X-Godex-Compact-Provider", provider)
+	header.Set("X-Prodex-Compact-Mode", "semantic")
+	header.Set("X-Prodex-Compact-Provider", provider)
 	return &proxymodel.Response{
 		StatusCode: http.StatusOK, Header: header,
 		Body: io.NopCloser(bytes.NewReader(content)), Trailer: make(http.Header),
@@ -49,13 +43,13 @@ func LocalFallback(body []byte, provider, reason string) (*proxymodel.Response, 
 	}
 	header := make(http.Header)
 	header.Set("Content-Type", "application/json; charset=utf-8")
-	header.Set("X-Godex-Compact-Mode", "local-fallback")
-	header.Set("X-Godex-Compact-Provider", provider)
-	header.Set("X-Godex-Compact-Degraded", "true")
+	header.Set("X-Prodex-Compact-Mode", "local-fallback")
+	header.Set("X-Prodex-Compact-Provider", provider)
+	header.Set("X-Prodex-Compact-Degraded", "true")
 	if strings.TrimSpace(reason) == "" {
 		reason = "local-policy"
 	}
-	header.Set("X-Godex-Compact-Reason", reason)
+	header.Set("X-Prodex-Compact-Reason", reason)
 	return &proxymodel.Response{
 		StatusCode: http.StatusOK,
 		Header:     header,
@@ -65,14 +59,11 @@ func LocalFallback(body []byte, provider, reason string) (*proxymodel.Response, 
 }
 
 func compactResponseBody(summary string) ([]byte, error) {
-	return json.Marshal(map[string]any{
-		"output": []any{map[string]any{
-			"type": "message", "role": "user",
-			"content": []any{map[string]any{
-				"type": "input_text", "text": SummaryPrefix + "\n\n" + strings.TrimSpace(summary),
-			}},
-		}},
-	})
+	text, err := jsonutil.MarshalSerdeValue04384(SummaryPrefix + "\n\n" + strings.TrimSpace(summary))
+	if err != nil {
+		return nil, err
+	}
+	return []byte(`{"output":[{"type":"message","role":"user","content":[{"type":"input_text","text":` + string(text) + `}]}]}`), nil
 }
 
 func LocalSummary(body []byte) string {
@@ -80,13 +71,13 @@ func LocalSummary(body []byte) string {
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.UseNumber()
 	if decoder.Decode(&value) != nil {
-		return "Local Godex compact fallback could not parse the compact request body."
+		return "Local Prodex compact fallback could not parse the compact request body."
 	}
 	model := stringField(value, "model", "unknown")
 	input, _ := value["input"].([]any)
 	snippets := compactSnippets(input)
 	var summary strings.Builder
-	summary.WriteString("Local Godex compact fallback summary.\n\n")
+	summary.WriteString("Local Prodex compact fallback summary.\n\n")
 	fmt.Fprintf(&summary, "Model: %s\n", model)
 	fmt.Fprintf(&summary, "Original input items: %d\n", len(input))
 	fmt.Fprintf(&summary, "Retained recent items: %d\n\n", len(snippets))

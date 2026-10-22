@@ -223,6 +223,8 @@ upstream attempt, including after restart. Fresh self-contained requests and
 unknown response discovery remain available. Routing state stores hashed
 rejection markers without provider credentials.
 Local Compact and Models endpoints remain available with bound context.
+Compact compatibility responses use the reference `x-prodex-compact-*` headers
+and summary text.
 
 DeepSeek now has the bounded 0.435.1 raw-key runtime plus the advanced
 request-side Responses adapter. `godex run --provider deepseek` resolves

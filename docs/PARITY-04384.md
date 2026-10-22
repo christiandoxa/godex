@@ -3188,3 +3188,42 @@ HTTP 200/failed Responses on both. Exploratory report:
 `/tmp/gdx-04384-buffered-tool-invalid-confirmed-probe.json`. Its generic success
 invariant is intentionally still FAIL; this is diagnostic mismatch evidence,
 not a qualified parity gate or a production fix.
+
+
+## Shared Compact wire compatibility
+
+The default release gate on clean `bd08991a22594e8fcde7bd4bef383b93812014a3`
+completed preflight tests/oracles but failed the extended DeepSeek matrix's
+local Compact phase. It returns 200 with no upstream attempt on both products,
+but Godex uses `X-Godex-Compact-*`, `Local Godex ...` summary text and Go map
+field order, while the reference uses `X-Prodex-Compact-*`, `Local Prodex ...`
+and the Mojo envelope order. Command:
+`rtk proxy bash scripts/verify-release-parity.sh > /tmp/gdx-04384-raw-key-local-routes-full-release-parity.log 2>&1`.
+Exit status is 1; this run is not a full release pass. Extracted matrix report:
+`/tmp/gdx-04384-raw-key-local-routes-full-deepseek-report.json`.
+
+The shared protocol owner `gateway/compact` now emits the reference header
+namespace, fallback summary/malformed-input text and ordered envelope. Both
+semantic and local responses use its existing private envelope builder, removing
+the duplicated semantic map construction. String escaping reuses the existing
+`helper/jsonutil` writer: raw valid UTF-8/HTML/U+2028/U+2029 and JSON control
+escapes match `json_sink.mojo`; no new shared helper or dependency is introduced.
+Provider gateways still own invocation and routing policy is unchanged.
+
+Every current caller was traced: Anthropic, DeepSeek, Gemini and Kiro fallback,
+plus Gemini/Kiro semantic Compact. Their integration expectations now require
+the compatibility headers. A focused exact-wire regression covers all four
+provider labels, all degradation headers and semantic Unicode/control/field
+ordering. It fails all six tests before repair:
+`/tmp/gdx-04384-compact-wire-before.log`. Focused
+`rtk go test ./internal/gateway/compact ./internal/gateway/deepseek ./internal/gateway/claude ./internal/gateway/gemini ./internal/gateway/kiro -count=1`
+passes 1,462 tests: `/tmp/gdx-04384-compact-wire-focused.log`.
+The existing byte-exact local-route executable oracle remains unchanged.
+`rtk go test -race ./internal/gateway/compact ./internal/gateway/deepseek ./internal/gateway/claude ./internal/gateway/gemini ./internal/gateway/kiro -count=1`
+passes 1,462 tests; `rtk go test ./...` passes 9,147 tests across 81 packages.
+Logs: `/tmp/gdx-04384-compact-wire-race.log` and
+`/tmp/gdx-04384-compact-wire-test-all.log`.
+`rtk proxy make verify` passes every local gate, including the full shuffled
+race suite, cross-platform builds/test compilation, installers and build.
+Log: `/tmp/gdx-04384-compact-wire-verify.log`.
+Clean-commit executable gates follow.

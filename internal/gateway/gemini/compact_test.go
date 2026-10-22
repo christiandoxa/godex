@@ -41,8 +41,8 @@ func TestGeminiSemanticCompactUsesSelectedModelAndSummary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if response.StatusCode != http.StatusOK || response.Header.Get("X-Godex-Compact-Mode") != "semantic" ||
-		response.Header.Get("X-Godex-Compact-Provider") != "gemini" || !strings.Contains(string(body), "Keep the current worktree") {
+	if response.StatusCode != http.StatusOK || response.Header.Get("X-Prodex-Compact-Mode") != "semantic" ||
+		response.Header.Get("X-Prodex-Compact-Provider") != "gemini" || !strings.Contains(string(body), "Keep the current worktree") {
 		t.Fatalf("compact response = status:%d headers:%v body:%s", response.StatusCode, response.Header, body)
 	}
 	if len(paths) != 1 || paths[0] != "/models/chat-compression-default:generateContent" {
@@ -72,8 +72,8 @@ func TestGeminiCompactUsesLocalFallbackOnRequestFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer response.Body.Close()
-	if response.Header.Get("X-Godex-Compact-Mode") != "local-fallback" || response.Header.Get("X-Godex-Compact-Degraded") != "true" ||
-		response.Header.Get("X-Godex-Compact-Reason") != "invalid-request" {
+	if response.Header.Get("X-Prodex-Compact-Mode") != "local-fallback" || response.Header.Get("X-Prodex-Compact-Degraded") != "true" ||
+		response.Header.Get("X-Prodex-Compact-Reason") != "invalid-request" {
 		t.Fatalf("compact fallback headers = %v", response.Header)
 	}
 }

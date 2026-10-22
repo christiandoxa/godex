@@ -298,6 +298,9 @@ recognizes these existing local routes; their gateway still owns their payloads.
 gateway/compact owns the bounded deterministic local compaction fallback used by
 translated providers: at most 24 recent snippets, 768 bytes per snippet, and
 24 KiB total summary, with the reference x-prodex-compact-* degradation metadata.
+Both local and semantic Compact envelopes retain the tagged field order and
+JSON string escaping through the existing `helper/jsonutil` writer. The
+compatibility payload and header namespace use the reference Prodex identity.
 It performs no model call. Anthropic Models responses are local and derive from
 the embedded 0.435.1 model IDs/aliases/context/endpoint metadata, while
 usecase/runtime owns the Codex launch catalog and user-override precedence.
