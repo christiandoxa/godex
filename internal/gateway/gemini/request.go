@@ -286,16 +286,3 @@ func geminiSignatureField(object map[string]any, path ...string) (any, bool) {
 	}
 	return value, true
 }
-
-func ensureJSONInstruction(chat map[string]any) {
-	messages, _ := chat["messages"].([]any)
-	for _, raw := range messages {
-		message, _ := raw.(map[string]any)
-		role, _ := message["role"].(string)
-		if role == "system" {
-			message["content"] = strings.TrimSpace(fmt.Sprint(message["content"]) + "\nReturn valid JSON without markdown fences.")
-			return
-		}
-	}
-	chat["messages"] = append([]any{map[string]any{"role": "system", "content": "Return valid JSON without markdown fences."}}, messages...)
-}

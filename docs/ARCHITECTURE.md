@@ -534,6 +534,14 @@ whole rather than recursively filling them from provider output. Native
 GenerateContent retains its own metadata contract. Buffered Chat fallback also
 uses the existing serde writer so metadata numbers and Unicode keep their tagged
 bytes; completed SSE applies the same merge without adding metadata to failures.
+The private Chat format adapter reuses the Gemini format classifier before
+removing response_format/text from shared conversion. JSON modes send only
+json_object and prepend the tagged JSON instruction unless a user/system
+message already mentions JSON. Assistant/tool text cannot suppress guidance.
+Schema/structured-output formats record the tagged degradation note, replacing
+the same request-provider key while retaining thinking omission metadata. The
+existing response-metadata path carries both notes through native output,
+Chat fallback and completed SSE; direct native schema enforcement is separate.
 All supported call/tool-output items require a nonblank identity selected from
 the first string `call_id`, `tool_call_id`, then `id`. This local admission runs
 before conversion or orphan filtering can silently drop the malformed item.

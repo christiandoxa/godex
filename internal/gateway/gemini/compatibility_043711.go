@@ -87,6 +87,9 @@ func geminiChatRequestOptions04384(body, input []byte, controls map[string]any) 
 	if geminiChatThinking04384(controls) {
 		normalizeGeminiChatThinkingMessages04384(request)
 	}
+	if controls["response_format"] != nil {
+		ensureGeminiChatJSONInstruction04384(request)
+	}
 	user, hasUser := request["user"]
 	if hasUser {
 		request["user_id"] = user
@@ -145,6 +148,10 @@ func normalizeGeminiChatInput043711(body []byte) ([]byte, map[string]any, error)
 		return nil, nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
 	controls, valid = normalizeGeminiChatReasoning04384(root, controls)
+	if !valid {
+		return nil, nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
+	}
+	controls, valid = normalizeGeminiChatFormat04384(root, controls)
 	if !valid {
 		return nil, nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}

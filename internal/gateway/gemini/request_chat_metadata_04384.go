@@ -39,6 +39,8 @@ func geminiChatResponseMetadata04384(body []byte, controls map[string]any) (map[
 			}
 		}
 	}
+	geminiChatFormatMetadata04384(root, metadata)
+	provider, _ = metadata["gemini"].(map[string]any)
 	if choice, present := root["tool_choice"]; present && geminiChatThinking04384(controls) {
 		if provider == nil {
 			provider = make(map[string]any)

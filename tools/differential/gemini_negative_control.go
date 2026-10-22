@@ -88,7 +88,7 @@ func geminiNegativeControl() bool {
 		geminiChatEOFSentinel04384() &&
 		geminiChatErrorSentinel04384() &&
 		geminiMultiTurnSentinel043711() && geminiQuotaNegativeControl043711() &&
-		geminiBufferedArgsNegativeControl04384() && geminiBufferedBodyNegativeControl04384() && geminiContinuationNegativeControl04384() && geminiRequestNumberNegativeControl04384() && geminiUserIDNegativeControl04384() && geminiIgnoredNegativeControl04384() && geminiControlTypeNegativeControl04384() && geminiJSONAdmissionNegativeControl04384() && requestPrimitiveNegativeControl04384() && geminiReasoningChoiceNegativeControl04384() && geminiRequestMetadataNegativeControl04384()
+		geminiBufferedArgsNegativeControl04384() && geminiBufferedBodyNegativeControl04384() && geminiContinuationNegativeControl04384() && geminiRequestNumberNegativeControl04384() && geminiUserIDNegativeControl04384() && geminiIgnoredNegativeControl04384() && geminiControlTypeNegativeControl04384() && geminiJSONAdmissionNegativeControl04384() && requestPrimitiveNegativeControl04384() && geminiReasoningChoiceNegativeControl04384() && geminiRequestMetadataNegativeControl04384() && geminiFormatNegativeControl04384()
 }
 
 // Ensure the executable oracle detects fabricated native Gemini SSE output

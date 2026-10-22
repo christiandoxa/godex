@@ -7687,3 +7687,80 @@ Other protected matrices retain their own exact revision scope.
 Remaining format/metadata controls, Gemini Compact, executable session/turn
 continuation, native macOS/Windows and live login remain unproven. No force
 push, tag, release or editor edit occurred. Global 1:1 parity is not claimed.
+
+## Gemini Chat response format, JSON guidance and degradation notes
+
+Pinned `chat_compatible_request.rs` selects response_format before text.format,
+maps json/json_object/json_schema/structured_output to wire json_object, and
+omits text mode. Wrong types, missing/unknown types and present-null shadowing
+fail terminal admission. Other text fields remain ignored. Before sending JSON
+mode it adds exactly `Respond with valid JSON only.` unless a normalized user
+or system string contains ASCII-case-insensitive JSON. Assistant/tool messages
+and unrelated metadata cannot suppress the instruction; developer content has
+already become system content. The Mojo guidance policy runs after adjacency,
+signature preservation and thinking normalization. Schema/structured formats
+add the exact degradation note before any thinking omission note, overriding
+the same request-provider key. Complete buffered/fallback/SSE response handling
+retains those notes through the existing private metadata path.
+
+Thirty executable baselines pin clean old production
+`15d1c558a740a04b4da0638650b221606d0f96d4` with the unchanged official
+0.438.4 source/binary/manifest. Nineteen FAIL only Godex; eleven controls PASS.
+All reference, state and independent mutation invariants pass. Reports use
+`/tmp/gdx-04384-gemini-response-format-<suffix>-before-oracle.json`; exact
+argument arrays are `/tmp/gdx-04384-gemini-response-format-before-commands.json`,
+and summary is `/tmp/gdx-04384-gemini-response-format-before-summary.log`.
+The final gateway regression was copied alone to that old production source in
+`/tmp/gdx-04384-gemini-response-format-before-work`.
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiChatResponseFormatPreservesCompletePipeline$' -count=1`
+FAILs 40 tests including the parent, with seven controls PASS:
+`/tmp/gdx-04384-gemini-response-format-gateway-final-before.log`.
+The same command PASSes all 47 after repair:
+`/tmp/gdx-04384-gemini-response-format-gateway-focused.log`.
+It verifies exact wire controls/guidance, aliases, no-attempt rejection and
+degradation/omission notes across native, fallback and completed SSE responses.
+
+Private `gateway/gemini/request_chat_format_04384.go` owns normalization,
+guidance and the generated format note. It reuses the existing format classifier,
+ASCII case helper, outbound control map and explicit response-metadata flow.
+The unused legacy JSON-guidance helper is removed. Native GenerateContent
+retains its separate schema support. No new shared helper, package, exported
+API, dependency, option, goroutine, routing policy or durable format is added.
+
+The 30 new executable cases keep complete independent expected requests,
+response/metadata bytes, authenticated attempts, status/header/stdout/exit and
+safe durable state. Matching-corruption controls change wire and decoded
+request together and reject altered guidance, format controls and note
+fields/values even when both products match the corruption. These checks also
+run in the standalone executable gate. `rtk go test ./tools/differential -count=1`
+PASSes 285 self-tests before the production repair:
+`/tmp/gdx-04384-gemini-response-format-oracle-tests.log`.
+The focused matching-corruption test also PASSes after making raw and decoded
+mutations consistent:
+`rtk go test ./tools/differential -run '^TestGeminiFormatOracleRejectsMatchingCorruption04384$' -count=1`;
+`/tmp/gdx-04384-gemini-response-format-oracle-negative.log`.
+`rtk proxy go test -json ./...` PASSes 10,244 tests in 71 packages, ten packages
+without tests and 18 optional installed-Codex/executable skips:
+`/tmp/gdx-04384-gemini-response-format-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+PASSes 3,423 tests: `/tmp/gdx-04384-gemini-response-format-race.log`.
+`rtk proxy make verify` PASSes with exit 0:
+`/tmp/gdx-04384-gemini-response-format-verify.log`. Exact clean-commit executable
+qualification follows local verification.
+
+Clean `f1f5bbaef7b4a8fa3b09e614b8d6e04d6b0fa8ae` PASSes all 486 Gemini
+cases, every prior 468 and independent mutations/state checks:
+`/tmp/gdx-04384-gemini-shell-projection-oracle.json`. It is pushed directly
+to origin/main. Clean `3784eba7ceeee5da9694cf91047bf0db666dc6c0` subsequently
+PASSes all 495 Gemini cases, including every earlier 486 and independent
+mutations/state: `/tmp/gdx-04384-gemini-ignored-messages-oracle.json`. It is also
+pushed to origin/main. No new full DeepSeek run is attributed to these
+Gemini-only revisions. Clean metadata candidate `15d1c55` PASSes all 31 targeted Gemini
+metadata cases, with exact pins, independent mutations/state and before/after
+reports. Its complete 559-case matrix and default gate remain pending:
+`/tmp/gdx-04384-gemini-request-metadata-oracle.json` and
+`/tmp/gdx-04384-release-15d1c55.log`. The full reasoning/other protected matrices
+retain their exact revision scope. Remaining controls, Gemini Compact,
+executable session/turn continuation, native macOS/Windows and live login
+remain unproven. No force push, tag, release or editor edit occurred. Global
+1:1 parity is not claimed.

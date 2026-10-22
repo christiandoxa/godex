@@ -43,6 +43,13 @@ retain independent full wire/response/status/header/stdout/exit/credential/state
 checks. Matching-corruption controls reject lost/renamed metadata, JSON number
 or escaping changes, recursive provider-field filling and metadata moved onto
 another stream event. These cases add no DeepSeek scenarios.
+The 30 `request-primitive-format-*` cases cover text/JSON/schema forms and
+aliases, first-present precedence, invalid shapes, ignored text controls, JSON
+guidance restricted to user/system messages, normalized developer content,
+split text, degradation-note collisions, thinking and buffered/fallback/real
+SSE responses. Expected complete wire bytes and metadata remain independent
+of production code. Matching-corruption controls reject changed JSON guidance,
+format controls and degradation notes in both products.
 
 Build and run from a clean, committed Godex worktree:
 
