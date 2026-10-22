@@ -1061,3 +1061,12 @@ verifying the required ID namespace. Mutation negative controls reject
 missing call, leaked/modified text, wrong fallback ID, wrong arguments,
 extra messages and missing/incorrect upstream dispatch. A separate Go test
 keeps direct native/OAuth GenerateContent semantics unchanged.
+
+The synthetic shim normally rejects incomplete response reads without recording
+an exchange. Expected transport-failure probes can explicitly set the private
+`DIFFERENTIAL_CAPTURE_READ_ERROR=1` fixture environment. Such a capture retains
+status, headers, bounded partial bytes and a nonempty `read_error`, still exits
+1, and never retries or uses the failed read as a continuation seed. The 1 MiB
+limit remains mandatory even in this mode. A read-error record alone is never
+parity evidence: a focused invariant must verify the expected error, wire,
+status, upstream attempts and state for each product independently.

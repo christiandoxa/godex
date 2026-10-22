@@ -52,10 +52,11 @@ type upstreamEvent struct {
 }
 
 type exchange struct {
-	Status  int         `json:"status"`
-	Headers http.Header `json:"headers"`
-	Body    string      `json:"body"`
-	Seed    *exchange   `json:"successful_seed,omitempty"`
+	Status    int         `json:"status"`
+	Headers   http.Header `json:"headers"`
+	Body      string      `json:"body"`
+	Seed      *exchange   `json:"successful_seed,omitempty"`
+	ReadError string      `json:"read_error,omitempty"`
 }
 
 type fileState struct {
@@ -1256,10 +1257,14 @@ func runCodexShim(arguments []string) int {
 		if len(body) > bodyLimit {
 			return shimFailure("synthetic Codex shim response exceeded its bound")
 		}
-		if err != nil {
+		if err != nil && os.Getenv("DIFFERENTIAL_CAPTURE_READ_ERROR") != "1" {
 			return shimFailure("synthetic Codex shim response read failed: " + err.Error())
 		}
 		clientResult = exchange{Status: response.StatusCode, Headers: response.Header.Clone(), Body: string(body)}
+		if err != nil {
+			clientResult.ReadError = err.Error()
+			break
+		}
 		if os.Getenv("DIFFERENTIAL_CONTINUATION_PHASE") == "same-process" && attempt == 0 {
 			if response.StatusCode != http.StatusOK {
 				return shimFailure("synthetic continuation seed did not succeed")
@@ -1309,6 +1314,9 @@ func runCodexShim(arguments []string) int {
 	}
 	_, _ = os.Stdout.Write(body)
 	_, _ = io.WriteString(os.Stdout, "\n")
+	if clientResult.ReadError != "" {
+		return shimFailure("synthetic Codex shim response read failed: " + clientResult.ReadError)
+	}
 	if clientResult.Status < 200 || clientResult.Status >= 300 {
 		return 2
 	}

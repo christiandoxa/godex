@@ -9098,3 +9098,39 @@ embedded VCS revision, reference binary SHA-256 and manifest pin qualify in
 Gemini PASS to exact ac597d4, without qualifying later source revisions. The
 original 844/847 FAIL reports remain retained; the latest complete default-gate
 PASS remains exact 78d256d. Overall 1:1 parity remains unproven.
+
+### Retain explicit failed-read oracle evidence
+
+A narrow HTTP regression first proves that an incomplete read cannot be
+inspected after the default shim rejects it. The private expected-failure
+capture mode now retains status, headers, bounded partial bytes and read_error
+in an explicitly failed exchange. Exit 1 and its diagnostic remain mandatory;
+the failed read cannot seed, retry or advance another request. Default capture
+and the 1 MiB overflow guard retain their behavior. Complete, truncated,
+oversized and failed-seed controls cover both modes. Full local validation
+PASSes 10,822 tests with 18 optional SKIP; make verify exits 0 with race tests,
+cross-builds, vet and guards. Exact commands:
+`rtk proxy go test -json ./... > /tmp/gdx-04384-shim-read-error-capture-full.jsonl 2>&1`
+and `rtk proxy make verify > /tmp/gdx-04384-shim-read-error-capture-verify.log 2>&1`.
+Fail-before: /tmp/gdx-04384-shim-read-error-capture-before.log. This is
+test-harness evidence plumbing, not a product parity fix.
+
+A diagnostic-only re-observation of the two non-object Gemini tool-entry probes
+now reports context deadline exceeded while reading the reference response.
+The earlier overflow wording did not establish a body overflow. Those probes
+remain unqualified until bounded partial captures and independent transport
+invariants explain the outcome. All original v1/v2 FAIL/error reports remain
+retained. Audit: /tmp/gdx-04384-gemini-stream-tool-admission-before-v3-audit.json.
+The pinned StreamToolCallDelta kernel rejects non-object roots before function
+validation, and the Rust wrapper panics on kernel errors; the public connection
+lifecycle still needs executable qualification. Three object-entry admission
+mismatches remain separately qualified on exact 78078cb, including the tagged
+OpenAI-compatible error label and continued text after response.failed.
+
+The original full Gemini 862-case matrix subsequently completes PASS at exact
+clean 6818d40296238180ef0393048bf00d1249c07afa with terminal exit 0. Every
+previous 857 case remains included; unique names, source/binary/manifest pins
+and original state/wire/matching-corruption assertions qualify in
+/tmp/gdx-04384-gemini-stream-metadata-audit.json. This is the latest full Gemini
+PASS and does not qualify later revisions or erase earlier FAIL reports. The
+latest complete default-gate PASS remains exact 78d256d.
