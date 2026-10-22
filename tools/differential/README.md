@@ -1100,5 +1100,8 @@ Six tool-snapshot probes exercise same-process Compact with cached tool results:
 simple/shell completion, valid finish followed by EOF, DONE without finish, and
 unfinished/invalid negative controls. Each verifies the exact seed wire plus
 the following original Compact request/history, headers, attempts and state.
-The default Gemini matrix reaches 940 cases. Restart and cross-account snapshot
+Three further probes distinguish a repaired name or valid tool finish after an
+earlier semantic failure from a DONE-only control. A single response.failed
+remains the terminal outcome even when a later valid finish stores new history.
+The default Gemini matrix reaches 943 cases. Restart and cross-account snapshot
 behavior remain outside this new qualification.

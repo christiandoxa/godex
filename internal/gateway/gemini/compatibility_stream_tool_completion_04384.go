@@ -20,11 +20,11 @@ func (state *geminiChatCompatibleStream043711) orderedToolIndices() []uint64 {
 	return indices
 }
 
-func (state *geminiChatCompatibleStream043711) completeToolEvents(writer io.Writer) error {
+func (state *geminiChatCompatibleStream043711) completeToolEvents(writer io.Writer) (bool, error) {
 	indices := state.orderedToolIndices()
 	for _, index := range indices {
 		if err := validateGeminiChatStreamTool04384(index, state.toolCalls[index]); err != nil {
-			return state.failure(writer, "invalid_tool_call_arguments", err.Error())
+			return false, state.failure(writer, "invalid_tool_call_arguments", err.Error())
 		}
 	}
 	for _, index := range indices {
@@ -35,7 +35,7 @@ func (state *geminiChatCompatibleStream043711) completeToolEvents(writer io.Writ
 		arguments := chatcompat.WrapRTKArguments(tool.name, tool.arguments.String())
 		if len(arguments)-tool.arguments.Len() > geminiStreamMetadataMaxBytes04384-state.toolBytes {
 			state.eof = true
-			return state.failure(writer, "provider_stream_error", "provider tool state exceeded safe size limit (67108864)")
+			return false, state.failure(writer, "provider_stream_error", "provider tool state exceeded safe size limit (67108864)")
 		}
 		if arguments != tool.arguments.String() {
 			state.toolBytes += len(arguments) - tool.arguments.Len()
@@ -45,10 +45,10 @@ func (state *geminiChatCompatibleStream043711) completeToolEvents(writer io.Writ
 		}
 		tool.done = true
 		if err := state.send(writer, "response.output_item.done", map[string]any{"output_index": index, "item": geminiChatCompletedToolItem04384(tool)}); err != nil {
-			return err
+			return false, err
 		}
 	}
-	return nil
+	return true, nil
 }
 
 func validateGeminiChatStreamTool04384(index uint64, tool *geminiChatStreamTool04384) error {

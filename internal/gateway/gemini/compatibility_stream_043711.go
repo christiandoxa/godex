@@ -103,7 +103,7 @@ func (state *geminiChatCompatibleStream043711) complete(writer io.Writer) error 
 	if state.done {
 		return nil
 	}
-	if err := state.completeToolEvents(writer); err != nil || state.done {
+	if valid, err := state.completeToolEvents(writer); err != nil || !valid {
 		return err
 	}
 	if err := state.completeReasoning(writer); err != nil {

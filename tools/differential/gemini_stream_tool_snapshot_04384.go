@@ -10,7 +10,7 @@ import (
 )
 
 func geminiToolSnapshotCases04384() []string {
-	return []string{"compact-owner-tool-simple", "compact-owner-tool-shell", "compact-owner-tool-finish-eof", "compact-owner-tool-done-only", "compact-owner-tool-unfinished", "compact-owner-tool-invalid"}
+	return append([]string{"compact-owner-tool-simple", "compact-owner-tool-shell", "compact-owner-tool-finish-eof", "compact-owner-tool-done-only", "compact-owner-tool-unfinished", "compact-owner-tool-invalid"}, geminiRepairedSnapshotCases04384()...)
 }
 
 func geminiToolSnapshotCase04384(scenario string) bool {
@@ -18,7 +18,7 @@ func geminiToolSnapshotCase04384(scenario string) bool {
 }
 
 func geminiToolSnapshotCached04384(scenario string) bool {
-	return scenario != "compact-owner-tool-unfinished" && scenario != "compact-owner-tool-invalid"
+	return scenario != "compact-owner-tool-unfinished" && scenario != "compact-owner-tool-invalid" && scenario != "compact-owner-tool-error-valid-done"
 }
 
 func geminiToolSnapshotLifecycle04384(scenario string) string {
@@ -33,6 +33,10 @@ func geminiToolSnapshotLifecycle04384(scenario string) string {
 }
 
 func writeGeminiToolSnapshot04384(writer io.Writer, scenario string) {
+	if geminiRepairedSnapshotCase04384(scenario) {
+		writeGeminiRepairedSnapshot04384(writer, scenario)
+		return
+	}
 	var wire bytes.Buffer
 	writeGeminiToolLifecycle04384(&wire, geminiToolSnapshotLifecycle04384(scenario))
 	blocks := strings.Split(strings.TrimSuffix(wire.String(), "\n\n"), "\n\n")
@@ -48,6 +52,9 @@ func writeGeminiToolSnapshot04384(writer io.Writer, scenario string) {
 }
 
 func geminiToolSnapshotSeedWire04384(scenario, responseID string) string {
+	if geminiRepairedSnapshotCase04384(scenario) {
+		return geminiRepairedSnapshotSeedWire04384(scenario, responseID)
+	}
 	wire := geminiLifecycleWire04384(geminiToolSnapshotLifecycle04384(scenario), responseID, "")
 	if scenario == "compact-owner-tool-done-only" {
 		return strings.Replace(wire, `"metadata":{"gemini":{"finish_reason":"tool_calls"}},`, "", 1)

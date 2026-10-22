@@ -272,7 +272,7 @@ their existing precommit body inspection; explicit precommit failures retain
 priority over the Gemini stream policy.
 The same Gemini stream owner distinguishes a terminal response outcome from
 reader EOF. Semantic failures emit one failed event, preserve later chunk text,
-and suppress another completion/snapshot; the terminal sentinel still stops upstream reads.
+and suppress another response completion; the terminal sentinel still stops upstream reads.
 Post-failure visible text is forwarded without retaining unused completion text.
 New tool indices require a function object, while known indices may omit it.
 Index projection retains Serde's unsigned integer/default rules. A private
@@ -300,6 +300,9 @@ Unknown/unfinished or invalid tool paths create no snapshot; a later invalid
 packet does not replace a previously validated finish snapshot. The existing
 store supplies cloning, per-credential scope, capacity and byte bounds. No new
 cache owner, persistence, helper, port or worker is introduced.
+Finish validation returns its own private outcome: a valid later finish may
+store a repaired snapshot after a prior semantic response failure. DONE alone
+still cannot create another snapshot once the response outcome is terminal.
 DeepSeek's runtime preparation retains the tagged distinction between emitted
 stateless messages and pending reconstructed history. The request-shape policy
 stays private to gateway/deepseek and consumes only a bounded store-membership

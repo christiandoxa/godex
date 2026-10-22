@@ -9529,3 +9529,39 @@ without waiting for CI. Full Gemini 940 now runs on the unchanged source
 (original session 97523); it is not yet a PASS. Restart, cross-account and
 repaired-semantic-error snapshots remain outside this qualification. All earlier
 failed reports and independent larger matrices retain their exact source scope.
+
+### Store valid Gemini finish snapshots after a prior semantic failure
+
+Five exact clean 56fb3ba2293e92a41ff2fd6eb214535d176255ac executable baselines
+qualify two Godex-only failures and three PASS controls. A missing tool name
+that is corrected after its failed finish, and an embedded error followed by a
+valid tool finish, both supply cached tool context to the next reference Compact
+request. An error followed by a valid tool and DONE alone supplies no history;
+prior finish/EOF and invalid-tool controls remain correct. Exact seed failure/
+tool events, following original Compact request/history, stdout/status/headers,
+attempts/auth/slot, state and matching-corruption guards qualify independently.
+Audit: /tmp/gdx-04384-gemini-stream-repaired-snapshot-before-audit.json.
+
+Pinned observe_finish validates the current tool map and stores valid history
+without checking whether a response outcome was already emitted. DONE's
+complete_event retains that terminal guard. The existing private tool
+completion function now returns its validation result separately from errors;
+finish snapshot eligibility consumes that result rather than the terminal
+response flag. Invalid or oversized tools still fail closed, and the response
+still emits at most one terminal outcome. No state flag, helper, export, port,
+worker, dependency, option or persisted format is added. Original ownership,
+cloning and retention bounds are unchanged.
+
+Two narrow regressions fail before the fix; paired DONE-only and still-invalid
+controls remain covered. Three executable cases extend the default matrix to
+943. Full local and exact clean executable qualification follow; this stage
+does not newly qualify restart or cross-account snapshots.
+
+Full local validation PASSes 10,922 tests with 18 optional SKIP. make verify
+exits 0 including race tests, cross-builds, vet and source/format guards. Exact
+commands:
+`rtk proxy go test -json ./... > /tmp/gdx-04384-gemini-stream-repaired-snapshot-full.jsonl 2>&1`
+and `rtk proxy make verify > /tmp/gdx-04384-gemini-stream-repaired-snapshot-verify.log 2>&1`.
+Exact clean executable qualification follows. Empty text was also inspected:
+the pinned JSON view recognizes quoted empty strings and Mojo omits them, so
+Godex's current empty-text guard needs no speculative change.
