@@ -9204,3 +9204,44 @@ and `rtk proxy make verify > /tmp/gdx-04384-gemini-stream-projection-route-verif
 The earlier full/verify logs are retained as well. Exact executable
 qualification follows. The original b80df3d capture FAILs remain FAIL; later
 results cannot retroactively qualify that revision.
+
+Exact clean 9e4b80807f4a3a79201f4208852c241351a2f4d5 subsequently PASSes all
+15 targeted executable scenarios: five pending projections, five ignored or
+empty tool-call controls, message metadata, usage details, native SSE, embedded
+error and EOF. The original independent request, stdout, HTTP, attempt/auth/slot,
+state and matching-corruption guards pass. Both binaries embed that revision and
+vcs.modified=false; pinned reference source, binary and manifest are unchanged.
+The command arrays and strict audit are retained at
+/tmp/gdx-04384-gemini-stream-projection-route-targeted-commands.json and
+/tmp/gdx-04384-gemini-stream-projection-route-targeted-audit.json. Both necessary
+commits are pushed together to origin/main after fetch, cleanliness and ancestry
+checks. Full Gemini 912 is now running on that unchanged clean source (original
+session 70523); it is not yet a PASS. Later work must use another checkout.
+
+### Additional completed oracle records
+
+The entire original default release gate at exact
+ae685d1fbbde970c9d70dc1eae05634975b156ca completes with exit 0: all seven
+embedded reports PASS, including DeepSeek 224, Gemini 869 and final HTTP
+profile-status/raw-429 phases. Audit:
+/tmp/gdx-04384-release-ae685d1-audit.json. Original temporary binaries were
+removed by the script's EXIT trap; the audit retains the original successful
+pin/provenance checks and unchanged source. This qualifies that revision only.
+
+Full Gemini 879 at exact 0243472efa2b8f19f49b0f7172e7bfacf02b1d82 completes
+PASS with exit 0 and includes every earlier 874 case. Full Gemini 894 at exact
+b717a6acdf0fed80d12aa6bab9dcb18a1edf9903 has a complete strict PASS report,
+includes all 879 cases and retains clean source/binary provenance. Its original
+handle became terminal/missing after a resumed poll without an exposed exit
+code; that exit code is not asserted and the oracle was not restarted. Audits:
+/tmp/gdx-04384-gemini-stream-finish-presence-full-audit.json and
+/tmp/gdx-04384-gemini-stream-usage-full-audit.json. Full Gemini 902 remains on
+its original running handle; these reports do not qualify that later revision.
+
+The original full 874 at exact 4f9699ee3f1d809d173c160b32fce0003214d59d
+remains FAIL, exit 1: request-primitive-declaration-generic-first leaves two
+reference continuation/journal temporary files. Request, stdout and client
+wire match; the reference state-integrity guard fails. Audit:
+/tmp/gdx-04384-gemini-stream-model-full-failure-audit.json. Its root cause is
+unproven and no isolated rerun has been started. Earlier 844/847 failures are
+also retained. Later complete PASS reports do not erase those observations.
