@@ -457,6 +457,10 @@ Before adding implicit message types, this adapter rejects nonobject `input`
 array entries and any item with a present `prefix`. These bytes cannot disappear
 inside the shared Chat converter and turn into a different accepted request.
 Item-level `suffix`/`prompt` and nested metadata retain their separate contract.
+Explicit item types must match the tagged message, function/custom/MCP/shell
+call or corresponding tool-output kinds. Wrong-type and unknown type values
+fail terminal admission; they cannot fall through to the shared converter's
+loose-text behavior. Typeless message normalization remains in this adapter.
 DeepSeek independently checks present `stream` as a boolean and present
 `instructions`/`previous_response_id` as strings before constructing its
 translated request. Invalid types use its common terminal preparation boundary,

@@ -374,6 +374,12 @@ item metadata, earlier candidate/tool 400s and complete serde failure behavior.
 Plain 502/exit 2/zero-attempt expectations and matching-corruption mutations
 prevent silently dropping an invalid item before sending the remaining input.
 
+Gemini `request-primitive-input-kind-*` rejects null, scalar/container and
+unknown explicit types, including loose input/output text and reasoning items.
+Explicit and implicit message controls remain accepted; rejected image controls,
+earlier candidate/tool 400s and malformed serde retain their exact outcomes.
+The existing exact wire, zero-attempt and independent mutation checks apply.
+
 DeepSeek scenario workers evaluate their complete independent invariants as
 each scenario finishes, preserving failures in the ordered report. The strict
 five-minute generated SSE timestamp window is unchanged; later cases cannot

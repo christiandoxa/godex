@@ -150,8 +150,14 @@ func normalizeGeminiChatInput043711(body []byte) ([]byte, map[string]any, error)
 			if _, hasPrefix := item["prefix"]; !ok || hasPrefix {
 				return nil, nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 			}
-			if _, hasKind := item["type"]; hasKind {
-				continue
+			if kind, hasKind := item["type"]; hasKind {
+				switch kind {
+				case "message", "function_call", "custom_tool_call", "mcp_call", "local_shell_call",
+					"function_call_output", "custom_tool_call_output", "mcp_tool_result", "mcp_call_output":
+					continue
+				default:
+					return nil, nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
+				}
 			}
 			if role, _ := item["role"].(string); role != "" {
 				item["type"] = "message"

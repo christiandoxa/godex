@@ -6238,3 +6238,64 @@ restart mismatch remains a retained FAIL. Main remains published at `a7fabe9`.
 Unsupported item kinds and per-item fields/content, other controls, Gemini
 Compact, executable session/turn continuation, native macOS/Windows and live
 authentication remain open. Global 1:1 parity is not claimed.
+
+
+## Gemini explicit input-item types cannot fall through to loose text
+
+Pinned `deepseek_input_item_validation` permits explicit `message`, function/
+custom/MCP/shell calls and the corresponding output kinds. Every other present
+type, including null, wrong-type values, input/output text, image and reasoning,
+returns an input-item error. The API-key runtime translates it to terminal plain
+502 before upstream work. Absent types retain their separate implicit-message
+path; earlier candidate/tool validation still returns structured 400.
+
+Godex skipped validation whenever `type` was present. Its shared converter could
+then turn an unsupported item's content into an ordinary user message. The
+concrete Gemini adapter now checks explicit kinds in its existing item loop,
+keeping the shared Claude converter and native Gemini translator independent.
+The small local switch uses the pinned supported set; no helper, interface,
+package, dependency, worker, configuration, exported API or durable-state format
+is introduced. Existing multi-turn and supported tool conversion stay covered
+by the complete matrix rather than a new speculative abstraction.
+
+The focused command below first FAILs with 11 controls passing and 15 failures,
+including parents, then PASSes all 26 tests:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384Gemini(RejectsUnsupportedExplicitInputTypes|RequestAdmissionDoesNotRetryModelOrCredential)$' -count=1`.
+Logs: `/tmp/gdx-04384-gemini-input-kinds-before.log` and
+`/tmp/gdx-04384-gemini-input-kinds-focused.log`.
+The real two-key gateway/router table now proves unsupported/null kinds have
+zero upstream attempts and no retry wait.
+
+Sixteen executable baselines pin clean
+`f4a277da9fd00ac5d45dfd570875e793cd7114d7`, the unchanged reference and
+`/tmp/gdx-04384-gemini-input-kinds-before-differential`:
+`/tmp/gdx-04384-gemini-input-kind-<suffix>-before-oracle.json`.
+Ten cases FAIL only Godex, which executes ordinary work instead of rejecting it.
+Six controls PASS: explicit/implicit messages, existing rejected images,
+earlier tools/candidates and malformed Unicode. Every reference and independent
+mutation invariant passes. Commands use
+`--gemini --scenario request-primitive-input-kind-<suffix>` and exact clean
+source/commit pins. Fixtures retain original JSON, canonical upstream bytes,
+exact response/status/headers/stdout/exit, attempts and safe durable state.
+No matching-corruption or zero-attempt assertion is removed or relaxed.
+
+`rtk go test ./tools/differential -count=1` passes 281 tests:
+`/tmp/gdx-04384-gemini-input-kinds-oracle-tests.log`.
+`rtk proxy go test -json ./...` passes 9,835 tests in 71 packages; ten packages
+have no tests and 18 optional installed-Codex/executable tests are skipped:
+`/tmp/gdx-04384-gemini-input-kinds-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+passes 3,048 tests: `/tmp/gdx-04384-gemini-input-kinds-race.log`.
+`rtk proxy make verify` PASSes the complete local gate:
+`/tmp/gdx-04384-gemini-input-kinds-verify.log`.
+Clean-commit 263-case Gemini and 213-case DeepSeek qualification follows.
+Protected `a82be84bb77f124ac2f02fa3fc01a43c1be13918` now passes all 213
+DeepSeek cases and independent mutations:
+`/tmp/gdx-04384-gemini-beta-admission-deepseek-oracle.json`.
+Its Gemini matrix, the protected input-item matrices, `5f49a5f` Gemini/default
+gates and unchanged `4c270db` Gemini rerun remain pending. The original
+reference changed-key restart report remains FAIL. Main remains at `a7fabe9`.
+Message roles/content, call identities and other per-item fields, remaining
+request/response controls, Gemini Compact, executable session/turn continuation,
+native macOS/Windows and live authentication remain open. Global 1:1 parity
+is not claimed.
