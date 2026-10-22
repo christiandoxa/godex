@@ -7,7 +7,7 @@ import (
 )
 
 func TestProdex04384RequestPrimitiveOracleFixtures(t *testing.T) {
-	for _, suffix := range append(requestPrimitiveSuffixes04384(), deepSeekAdmissionSuffixes04384()...) {
+	for _, suffix := range append(append(requestPrimitiveSuffixes04384(), deepSeekAdmissionSuffixes04384()...), geminiPreparationSuffixes04384()...) {
 		scenario := "request-primitive-" + suffix
 		fixture, _ := requestPrimitiveCase04384(scenario)
 		if (fixture.body == "" || !fixture.reject) && !json.Valid(requestPrimitiveInput04384(scenario, "gemini-3.1-pro-preview")) {

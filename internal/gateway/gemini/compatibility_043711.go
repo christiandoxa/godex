@@ -33,22 +33,22 @@ func (transport *RuntimeTransport) executeChatCompatibleResponses(
 			}
 			return nil, failure
 		}
-		return nil, &proxymodel.Error{StatusCode: http.StatusBadRequest, Message: err.Error()}
+		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
 	body, err := chatcompat.ResponsesRequest(normalized, requestModel(input.Body), "")
 	if err != nil {
-		return nil, &proxymodel.Error{StatusCode: http.StatusBadRequest, Message: err.Error()}
+		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
 	if err := validateGeminiChatCompatibleTools04380(body); err != nil {
 		return nil, &proxymodel.Error{StatusCode: http.StatusBadRequest, Message: err.Error()}
 	}
 	body, err = filterGeminiOrphanToolMessages043711(body)
 	if err != nil {
-		return nil, &proxymodel.Error{StatusCode: http.StatusBadRequest, Message: err.Error()}
+		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
 	body, err = geminiChatRequestOptions04384(body, controls)
 	if err != nil {
-		return nil, &proxymodel.Error{StatusCode: http.StatusBadRequest, Message: err.Error()}
+		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
 	response, err := transport.send(ctx, input, current, body)
 	if err != nil {

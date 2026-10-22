@@ -304,7 +304,7 @@ func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit, selec
 		"buffered-patch-unified-files",
 		"buffered-patch-literal-crlf",
 	}
-	for _, suffix := range requestPrimitiveSuffixes04384() {
+	for _, suffix := range append(requestPrimitiveSuffixes04384(), geminiPreparationSuffixes04384()...) {
 		cases = append(cases, "request-primitive-"+suffix)
 	}
 	cases = append(cases, geminiIgnoredControlCases04384()...)

@@ -336,6 +336,15 @@ invalid web-search context size. Each requires the same exact terminal plain
 translation-failure boundary alongside all earlier successful control cases;
 matching errors, missing exchanges or unsafe durable state still fail.
 
+Gemini adds `request-primitive-preparation-tools`, `preparation-reasoning`,
+`preparation-tool-params`, `preparation-tool-missing-params`,
+`preparation-tool-missing-name`, `preparation-tool-description` and
+`preparation-input` under that prefix. Malformed tool declarations require
+their exact indexed structured 400, `invalid_request_error`, JSON content type,
+no-store/nosniff headers, exit 2 and zero attempts. Invalid input/reasoning
+requires plain terminal 502. Independent mutations cover both error forms;
+Content-Type mutations use a value different from every valid fixture type.
+
 DeepSeek scenario workers evaluate their complete independent invariants as
 each scenario finishes, preserving failures in the ordered report. The strict
 five-minute generated SSE timestamp window is unchanged; later cases cannot

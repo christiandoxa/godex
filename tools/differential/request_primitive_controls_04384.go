@@ -11,6 +11,7 @@ type requestPrimitiveFixture04384 struct {
 	fields, limit, wireFields, wirePrefix, wireStop, text, body string
 	reject                                                      bool
 	failureStatus                                               int
+	geminiToolError                                             string
 }
 
 func requestPrimitiveSuffixes04384() []string {
@@ -32,6 +33,11 @@ func deepSeekAdmissionSuffixes04384() []string {
 		"user-id-null", "user-id-number", "user-id-over-limit", "user-id-invalid-character",
 		"preparation-frequency", "preparation-presence", "preparation-seed", "preparation-n", "preparation-include", "preparation-store",
 		"preparation-background", "preparation-truncation", "preparation-text", "preparation-tools", "preparation-tool-choice", "preparation-reasoning", "preparation-web-search"}
+}
+
+func geminiPreparationSuffixes04384() []string {
+	return []string{"preparation-tools", "preparation-reasoning", "preparation-tool-params", "preparation-tool-missing-params",
+		"preparation-tool-missing-name", "preparation-tool-description", "preparation-input"}
 }
 
 func requestPrimitiveCase04384(scenario string) (requestPrimitiveFixture04384, bool) {
@@ -182,13 +188,28 @@ func requestPrimitiveCase04384(scenario string) (requestPrimitiveFixture04384, b
 	case "preparation-text":
 		return requestPrimitiveFixture04384{fields: `"text":null`, reject: true}, true
 	case "preparation-tools":
-		return requestPrimitiveFixture04384{fields: `"tools":"opaque"`, reject: true}, true
+		return requestPrimitiveFixture04384{fields: `"tools":"opaque"`, reject: true,
+			geminiToolError: "invalid_tool_declaration: Gemini request field `tools` must be an array"}, true
 	case "preparation-tool-choice":
 		return requestPrimitiveFixture04384{fields: `"tool_choice":{"type":"function","name":"missing_tool"}`, reject: true}, true
 	case "preparation-reasoning":
 		return requestPrimitiveFixture04384{fields: `"reasoning":"opaque"`, reject: true}, true
 	case "preparation-web-search":
 		return requestPrimitiveFixture04384{fields: `"web_search_options":{"search_context_size":"huge"}`, reject: true}, true
+	case "preparation-tool-params":
+		return requestPrimitiveFixture04384{fields: `"tools":[{"type":"function","function":{"name":"synthetic_lookup","parameters":false}}]`, reject: true,
+			geminiToolError: "invalid_tool_declaration: Gemini request field `tools[0].function.parameters` must be an object"}, true
+	case "preparation-tool-missing-params":
+		return requestPrimitiveFixture04384{fields: `"tools":[{"type":"function","name":"synthetic_lookup"}]`, reject: true,
+			geminiToolError: "invalid_tool_declaration: Gemini request field `tools[0].function.parameters` is required"}, true
+	case "preparation-tool-missing-name":
+		return requestPrimitiveFixture04384{fields: `"tools":[{"type":"function","function":{"parameters":{}}}]`, reject: true,
+			geminiToolError: "invalid_tool_declaration: Gemini request field `tools[0].function.name` must be a non-empty string"}, true
+	case "preparation-tool-description":
+		return requestPrimitiveFixture04384{fields: `"tools":[{"type":"function","name":"synthetic_lookup","parameters":{},"description":7}]`, reject: true,
+			geminiToolError: "invalid_tool_declaration: Gemini request field `tools[0].function.description` must be a string"}, true
+	case "preparation-input":
+		return requestPrimitiveFixture04384{body: `{"input":7,"model":"gemini-3.1-pro-preview"}`, reject: true}, true
 	}
 	return requestPrimitiveFixture04384{}, false
 }
@@ -236,6 +257,12 @@ func geminiPrimitiveExpected04384(scenario string) geminiCandidateResult {
 	fixture, _ := requestPrimitiveCase04384(scenario)
 	if fixture.reject {
 		result := geminiUserIDExpected04384("request-user-id-number")
+		if fixture.geminiToolError != "" {
+			result.Client = exchange{Status: 400, Headers: http.Header{"Content-Type": {"application/json"},
+				"Cache-Control": {"no-store"}, "X-Content-Type-Options": {"nosniff"}},
+				Body: `{"error":{"code":"invalid_request_error","message":"` + fixture.geminiToolError + `"}}`}
+			result.Stdout = result.Client.Body + "\n"
+		}
 		if fixture.failureStatus == http.StatusInternalServerError {
 			result.Client = exchange{Status: 500, Headers: make(http.Header)}
 			result.Stdout = "\n"
@@ -291,6 +318,9 @@ func deepSeekPrimitiveInvariants04384(scenario scenarioResult) []string {
 
 func geminiPrimitiveInvariant04384(scenario string, result geminiCandidateResult) error {
 	fixture, _ := requestPrimitiveCase04384(scenario)
+	if fixture.geminiToolError != "" && (result.Client.Headers.Get("Cache-Control") != "no-store" || result.Client.Headers.Get("X-Content-Type-Options") != "nosniff") {
+		return errors.New("invalid tool declaration lost terminal response headers")
+	}
 	if fixture.failureStatus == 500 && len(result.Client.Headers["Content-Type"]) != 0 {
 		return errors.New("nonobject root invented a content type")
 	}
@@ -301,7 +331,7 @@ func geminiPrimitiveInvariant04384(scenario string, result geminiCandidateResult
 }
 
 func requestPrimitiveNegativeControl04384() bool {
-	for _, suffix := range append(requestPrimitiveSuffixes04384(), deepSeekAdmissionSuffixes04384()...) {
+	for _, suffix := range append(append(requestPrimitiveSuffixes04384(), deepSeekAdmissionSuffixes04384()...), geminiPreparationSuffixes04384()...) {
 		scenario := "request-primitive-" + suffix
 		gemini := geminiPrimitiveExpected04384(scenario)
 		deepseek := deepSeekPrimitiveExpected04384(scenario)
@@ -311,7 +341,7 @@ func requestPrimitiveNegativeControl04384() bool {
 		for _, mutate := range []func(*geminiCandidateResult){
 			func(r *geminiCandidateResult) { r.Client.Status++ },
 			func(r *geminiCandidateResult) { r.Client.Body = `{}` },
-			func(r *geminiCandidateResult) { r.Client.Headers.Set("Content-Type", "application/json") },
+			func(r *geminiCandidateResult) { r.Client.Headers.Set("Content-Type", "application/x-corrupt-fixture") },
 			func(r *geminiCandidateResult) { r.Client.Headers.Set("Content-Type", "") },
 			func(r *geminiCandidateResult) { r.ExitCode++ },
 			func(r *geminiCandidateResult) { r.Stdout = "changed" },
@@ -329,7 +359,7 @@ func requestPrimitiveNegativeControl04384() bool {
 		for _, mutate := range []func(*productRun){
 			func(r *productRun) { r.Client.Status++ },
 			func(r *productRun) { r.Client.Body = `{}` },
-			func(r *productRun) { r.Client.Headers.Set("Content-Type", "application/json") },
+			func(r *productRun) { r.Client.Headers.Set("Content-Type", "application/x-corrupt-fixture") },
 			func(r *productRun) { r.Client.Headers.Set("Content-Type", "") },
 			func(r *productRun) { r.ExitStatus++ },
 			func(r *productRun) { r.Stdout = "changed" },
@@ -359,6 +389,16 @@ func requestPrimitiveNegativeControl04384() bool {
 				}
 				if len(geminiCompare(scenario, changedGemini, changedGemini)) == 0 ||
 					len(deepSeekPrimitiveInvariants04384(scenarioResult{Name: "deepseek-" + scenario, Runs: []productRun{changedDeepSeek, changedDeepSeek}})) == 0 {
+					return false
+				}
+			}
+		}
+		if gemini.Client.Status == 400 {
+			for _, header := range []string{"Cache-Control", "X-Content-Type-Options"} {
+				changed := gemini
+				changed.Client.Headers = gemini.Client.Headers.Clone()
+				changed.Client.Headers.Del(header)
+				if len(geminiCompare(scenario, changed, changed)) == 0 {
 					return false
 				}
 			}

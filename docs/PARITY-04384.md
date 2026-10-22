@@ -4143,6 +4143,119 @@ The completed default gate remains `293b1b6` while the full protected
 `8d618e0` invocation runs. Global 1:1 parity is not claimed.
 
 
+## Complete default release gate checkpoint: 8d618e0
+
+The unchanged default command completes every stage and exits 0 from protected
+clean `8d618e097c8549015785bce1e23c89999198d42f`:
+`rtk proxy scripts/verify-release-parity.sh > /tmp/gdx-04384-release-8d618e0.log 2>&1`.
+The final HTTP profile-status and raw-429 checks after the phase marker also
+PASS. The protected worktree remains clean at the same exact revision.
+This advances the completed default-gate checkpoint from `293b1b6` to
+`8d618e0`, not to subsequent DeepSeek or Gemini changes. Global parity is unproven.
+
+
+## Validated DeepSeek JSON and identity checkpoints
+
+Clean `09790dca9375f389578f5f921998c77a515dc6e5` passes all 190 DeepSeek
+scenarios with independent mutation controls:
+`/tmp/gdx-04384-deepseek-json-admission-oracle.json`.
+The exact null-root, malformed-syntax and valid-Unicode targeted cases PASS:
+`/tmp/gdx-04384-deepseek-json-<root-null|syntax|valid-unicode>-targeted-oracle.json`.
+The clean binaries were built with
+`rtk go build -trimpath -o /tmp/gdx-04384-deepseek-json-admission-godex ./cmd/godex` and
+`rtk go build -trimpath -o /tmp/gdx-04384-deepseek-json-admission-final-differential ./tools/differential`.
+
+Clean `587f04a08cd252fd44c8d231a344b4b06498d265` passes all 200 DeepSeek
+scenarios with independent mutations:
+`/tmp/gdx-04384-deepseek-user-id-oracle.json`.
+Canonical and null-identity targeted reports PASS:
+`/tmp/gdx-04384-deepseek-user-id-<canonical|null>-targeted-oracle.json`.
+The binaries were built with
+`rtk go build -trimpath -o /tmp/gdx-04384-deepseek-user-id-godex ./cmd/godex` and
+`rtk go build -trimpath -o /tmp/gdx-04384-deepseek-user-id-final-differential ./tools/differential`.
+Both full matrices use `--scenario all --scenario-workers 3`, the unchanged
+pinned reference and matching clean candidate source/commit pins.
+Each completed candidate was checked, fast-forwarded through the clean primary
+worktree and pushed directly to `origin/main` without waiting for CI.
+No force push, tag, release or editor-checkout change occurred.
+The newer `18f7ad3` 213-case matrix remains pending:
+`/tmp/gdx-04384-deepseek-preparation-errors-oracle.json`.
+Its targeted frequency-penalty and malformed-web-search reports PASS:
+`/tmp/gdx-04384-deepseek-preparation-<frequency|web-search>-targeted-oracle.json`.
+
+
+## Gemini preparation errors preserve the tool-declaration exception
+
+The pinned `local_rewrite_gemini_send.rs:147–158` first runs
+`runtime_gemini_request_validation_error`, returning structured 400
+`invalid_request_error` for malformed tool declarations. Later request
+translation errors propagate to the plain terminal 502 pipeline boundary.
+These are distinct public outcomes. Godex's tool errors already matched;
+invalid reasoning or input instead entered recovery through an ordinary 400.
+
+The API-key gateway now uses the existing generic terminal 502 for its request
+translation/normalization failures, preserving the indexed tool validator's
+400 presentation and the valid nonobject empty-500 path. The native adapter,
+credential routing and provider response paths are unchanged. Four existing
+error returns change; no production helper, package, exported API, interface,
+dependency, config, worker or persisted format is added. This stage does not
+claim correct precedence for every combination of invalid fields.
+
+The first regression/oracle draft incorrectly expected plain 502 for all seven
+cases. Its eight failing unit tests and seven FAIL executable reports remain
+unqualified evidence:
+`/tmp/gdx-04384-gemini-preparation-errors-before.log` and
+`/tmp/gdx-04384-gemini-preparation-<suffix>-before-oracle.json`.
+Five reference tool-error invariants correctly reject that expectation. The
+raw executable reports show that both products already return the same exact
+structured 400, indexed text, JSON type, no-store/nosniff, exit and no attempt.
+The overbroad draft change and its altered legacy test were undone before any
+commit. The original detailed tool regression remains unchanged.
+
+The corrected regression is run against isolated `18f7ad3` source with only
+the new test added: five controls PASS and three tests FAIL, including parent:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiRequestPreparationFailuresAreTerminal$' -count=1`;
+`/tmp/gdx-04384-gemini-preparation-errors-qualified-before.log`.
+The corrected new regression and existing valid/invalid tool tests pass 16 tests:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex(04384GeminiRequestPreparationFailuresAreTerminal|04380GeminiAPIKeyChat(RejectsInvalidFunctionToolsBeforeUpstream|KeepsValidFunctionTools))$' -count=1`;
+`/tmp/gdx-04384-gemini-preparation-errors-qualified-focused.log`.
+
+The first corrected oracle self-check caught a preexisting fixed mutation that
+set Content-Type to `application/json`, which is the valid value for the newly
+added 400 fixtures. Three oracle tests FAILed:
+`/tmp/gdx-04384-gemini-preparation-errors-qualified-oracle-tests.log`.
+The corresponding qualified executable attempts stop on the negative-control
+guard and produce no valid reports:
+`/tmp/gdx-04384-gemini-preparation-<suffix>-qualified-before-oracle.json`.
+They are not parity evidence. The mutation now uses a distinct corrupt media
+type, preserving every assertion and strengthening the separate no-store/
+nosniff mutations. `rtk go test ./tools/differential -count=1` then passes all
+281 tests: `/tmp/gdx-04384-gemini-preparation-errors-final-oracle-tests.log`.
+
+Seven final qualified baselines pin clean
+`18f7ad39733e8a5a033a5766d6d14ecd934401bd`, the unchanged reference and
+`/tmp/gdx-04384-gemini-preparation-errors-final-qualified-differential`:
+`/tmp/gdx-04384-gemini-preparation-<suffix>-final-qualified-before-oracle.json`.
+All five tool-declaration controls PASS; the two input/reasoning cases FAIL
+only Godex. Every reference and independent mutation invariant passes.
+The existing strict primitive fixture family retains exact error bodies/types,
+exit/stdout, attempts, authenticated valid controls and safe durable state.
+
+Earlier draft/invalid-control checks are not final qualification.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+passes 2,968 tests: `/tmp/gdx-04384-gemini-preparation-errors-final-race.log`.
+`rtk proxy go test -json ./...` passes 9,755 tests across 81 packages
+(71 passing and ten with no tests):
+`/tmp/gdx-04384-gemini-preparation-errors-final-test-all.jsonl`.
+`rtk proxy make verify` PASSes the complete local gate:
+`/tmp/gdx-04384-gemini-preparation-errors-final-verify.log`.
+Clean-commit 192-case Gemini qualification follows, with 213 DeepSeek scenarios
+separately qualified on unchanged DeepSeek production in clean `18f7ad3`.
+Other controls, combined-error ordering, Gemini Compact, executable session/
+turn continuation, native macOS/Windows and live authentication remain open.
+Global 1:1 parity is not claimed.
+
+
 ## Validated model-input and DeepSeek control-type checkpoints
 
 Clean `8d618e097c8549015785bce1e23c89999198d42f` passes all 185 Gemini cases
