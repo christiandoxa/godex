@@ -10163,3 +10163,58 @@ The prior full273 and the separate a05e1cbc entire default gate remain pending.
 Latest completed qualifications remain exact full236 and full943; the entire
 default gate last qualified remains e9d88ce. Normal embedded-call projection
 still needs executable qualification. Overall 1:1 parity remains unproven.
+
+### Full Gemini948 qualifies exact d670339
+
+Original session 72630 exits 0. All 948 unique cases PASS at exact clean
+d67033945f1076f87ec52532897d824d148a3692, including every prior943 case.
+Audit: /tmp/gdx-04384-gemini-stream-root-projection-full-audit.json.
+Original strict invariants and matching-corruption guards, immutable source,
+both artifact hashes and clean embedded VCS metadata were checked. There are
+no per-case or durable-state errors. This qualifies only that revision; later
+matrices and the a05e1cbc entire default gate remain pending. Earlier failures
+remain retained. Overall 1:1 parity remains unproven.
+
+### DeepSeek normal bridge history ignores embedded message calls
+
+The pinned Rust normal input/history pipeline uses RawBridgeInputItem, whose
+message projection emits role/content without embedded tool_calls. The later
+simple-request override replaces only the upstream body, leaving normal
+pending messages intact. Exact clean 5165058 executable baseline proves four
+Godex-only FAILs and ten PASS controls across fourteen cases (original session
+36197, exit 0). Audit: /tmp/gdx-04384-deepseek-bridge-messages-before-audit.json.
+Three normal paired-call shapes retain unwanted calls/outputs in Godex. The
+three-turn pending case retains call-inline on requests two and three, while
+the reference retains only the valid upstream call-history. Both first wire
+requests match. Pinned reference originals, seed/client responses/stdout/status,
+exact attempts/retries/events, auth/slots, durable state and corruption guards
+all satisfy their independent assertions.
+
+The private gateway/deepseek item projector now receives an explicit embedded
+call-preservation flag. Runtime normal messages omit these calls before history
+merging and adjacency repair; a simple wire request reuses the same item
+projector with preservation enabled. This replaces a redundant message clone
+and keeps the two protocol views independent. Top-level function/custom/MCP
+items and cached upstream calls retain their existing handling. Standalone
+conversion retains its established contract; no exported API, option, helper,
+interface, layer, dependency, worker or persisted format is added. This is
+protocol projection inside the existing gateway, not account-routing policy.
+Shared technical helper ownership is unchanged.
+
+Two unit cases first FAIL on normal wire or simple pending history; top-level
+and standalone controls PASS. Original log:
+/tmp/gdx-04384-deepseek-bridge-messages-unit-before.jsonl. Focused gateway and
+differential tests then PASS 1,358 tests. Seven primitive cases and one
+three-turn history case extend default DeepSeek282 to 290; Gemini remains 974.
+Full local and exact clean executable validation follow before publication.
+Other message fields, malformed embedded-call shapes, broader continuation/
+account/restart combinations and live authentication remain outside this
+qualification. Overall 1:1 parity remains unproven.
+
+Full local validation PASSes 11,099 tests with 18 optional SKIP (original
+session 2169, exit 0). make verify also exits 0 (original session 5587),
+including shuffled race tests, cross-builds, vet, source/format guards and the
+build. Exact commands:
+`rtk proxy go test -json ./... > /tmp/gdx-04384-deepseek-bridge-messages-full.jsonl 2>&1`
+and `rtk proxy make verify > /tmp/gdx-04384-deepseek-bridge-messages-verify.log 2>&1`.
+Exact clean executable qualification follows before publication.

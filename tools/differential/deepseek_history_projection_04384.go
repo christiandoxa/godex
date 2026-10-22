@@ -8,7 +8,7 @@ import (
 )
 
 func deepSeekHistoryCases04384() []string {
-	return []string{"deepseek-history-extra", "deepseek-history-rtk", "deepseek-history-null", "deepseek-history-empty", "deepseek-history-numeric", "deepseek-history-simple", "deepseek-history-simple-inline", "deepseek-history-simple-unbound", "deepseek-history-simple-pending", "deepseek-history-numeric-pending", "deepseek-history-u64-pending", "deepseek-history-id-padded", "deepseek-history-id-output-padded", "deepseek-history-id-call-padded", "deepseek-history-simple-padded-pending"}
+	return []string{"deepseek-history-extra", "deepseek-history-rtk", "deepseek-history-null", "deepseek-history-empty", "deepseek-history-numeric", "deepseek-history-simple", "deepseek-history-simple-inline", "deepseek-history-simple-unbound", "deepseek-history-simple-pending", "deepseek-history-numeric-pending", "deepseek-history-u64-pending", "deepseek-history-id-padded", "deepseek-history-id-output-padded", "deepseek-history-id-call-padded", "deepseek-history-simple-padded-pending", "deepseek-history-message-pending"}
 }
 
 func deepSeekHistoryCallIDs04384(scenario string) (string, string) {
@@ -55,6 +55,9 @@ func deepSeekHistoryInput04384(scenario string, phase int) []byte {
 		_, outputID := deepSeekHistoryCallIDs04384(scenario)
 		body = strings.ReplaceAll(body, "call-history", outputID)
 		return []byte(body)
+	}
+	if scenario == "deepseek-history-message-pending" {
+		return []byte(`{"model":"deepseek-v4-pro","input":[{"type":"message","role":"assistant","content":"preface","tool_calls":[{"id":"call-inline","type":"function","function":{"name":"lookup","arguments":"{}"}}]},{"type":"function_call_output","call_id":"call-inline","output":"done"},{"type":"message","role":"user","content":"history request"}],"stream":false}`)
 	}
 	return []byte(`{"model":"deepseek-v4-pro","input":"history request","stream":false}`)
 }
@@ -125,6 +128,17 @@ func deepSeekHistoryExpected04384(scenario string) productRun {
 	}
 	if deepSeekHistoryPending04384(scenario) {
 		requests = append(requests, []any{user, assistant, tool, map[string]any{"role": "assistant", "content": "synthetic-ok"}})
+	}
+	if scenario == "deepseek-history-message-pending" {
+		preface := map[string]any{"role": "assistant", "content": "preface"}
+		inline := map[string]any{"role": "assistant", "content": "preface", "tool_calls": []any{map[string]any{
+			"id": "call-inline", "type": "function", "function": map[string]any{"name": "lookup", "arguments": "{}"},
+		}}}
+		requests = [][]any{
+			{inline, map[string]any{"role": "tool", "tool_call_id": "call-inline", "content": "done"}, user},
+			{preface, user, assistant, tool},
+			{preface, user, assistant, tool, map[string]any{"role": "assistant", "content": "synthetic-ok"}},
+		}
 	}
 	run.Upstream = nil
 	for index, messages := range requests {

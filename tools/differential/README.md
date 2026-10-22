@@ -1166,3 +1166,13 @@ structured Unicode/numeric JSON, arrays and u64 values retain their exact wire
 bytes. Complete independent invariants and matching argument-corruption
 controls apply. These cases do not qualify normal embedded-call projection.
 The default DeepSeek matrix reaches 282; Gemini remains 974.
+
+Seven DeepSeek `deepseek-request-primitive-bridge-message-*` cases distinguish
+normal message projection from simple-request wire replacement. Normal paired
+embedded calls are ignored; unpaired/unmatched and plain-text controls retain
+their text. Simple wire retains its embedded call/output pair. The three-turn
+`deepseek-history-message-pending` case requires that pair only on the first
+wire request, then checks normal pending history alongside the valid upstream
+seed call. Independent exact requests, seed/client output, attempts/events,
+auth/state and matching leaked-history corruption controls apply.
+The default DeepSeek matrix reaches 290; Gemini remains 974.

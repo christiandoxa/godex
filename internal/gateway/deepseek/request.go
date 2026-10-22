@@ -56,12 +56,12 @@ func parseResponsesObject(body []byte) (map[string]any, error) {
 	return object, nil
 }
 
-func translateRequestParts(object map[string]any, options RequestOptions) (translatedRequestParts, error) {
+func translateRequestParts(object map[string]any, options RequestOptions, preserveMessageCalls bool) (translatedRequestParts, error) {
 	thinking, reasoningFields, err := deepSeekReasoning(object)
 	if err != nil {
 		return translatedRequestParts{}, err
 	}
-	messages, err := deepSeekMessages(object)
+	messages, err := deepSeekMessages(object, preserveMessageCalls)
 	if err != nil {
 		return translatedRequestParts{}, err
 	}

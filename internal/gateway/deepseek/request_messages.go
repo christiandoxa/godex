@@ -8,7 +8,7 @@ import (
 	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 )
 
-func deepSeekMessages(object map[string]any) ([]any, error) {
+func deepSeekMessages(object map[string]any, preserveMessageCalls bool) ([]any, error) {
 	messages := make([]any, 0)
 	if instructions, ok := object["instructions"].(string); ok && strings.TrimSpace(instructions) != "" {
 		messages = append(messages, map[string]any{"role": "system", deepSeekContentKey: instructions})
@@ -26,7 +26,7 @@ func deepSeekMessages(object map[string]any) ([]any, error) {
 			if !ok {
 				return nil, errors.New("DeepSeek input items must be objects")
 			}
-			converted, err := deepSeekInputItem(item)
+			converted, err := deepSeekInputItem(item, preserveMessageCalls)
 			if err != nil {
 				return nil, err
 			}
@@ -38,7 +38,7 @@ func deepSeekMessages(object map[string]any) ([]any, error) {
 	return messages, nil
 }
 
-func deepSeekInputItem(item map[string]any) ([]any, error) {
+func deepSeekInputItem(item map[string]any, preserveMessageCalls bool) ([]any, error) {
 	if _, found := item["prefix"]; found {
 		return nil, errors.New("DeepSeek chat prefix completion requires the beta chat endpoint, which is outside this Responses adapter")
 	}
@@ -48,7 +48,7 @@ func deepSeekInputItem(item map[string]any) ([]any, error) {
 	}
 	switch kind {
 	case "", "message":
-		message, err := deepSeekMessageItem(item)
+		message, err := deepSeekMessageItem(item, preserveMessageCalls)
 		if err != nil || message == nil {
 			return nil, err
 		}
@@ -76,7 +76,7 @@ func deepSeekInputItem(item map[string]any) ([]any, error) {
 	}
 }
 
-func deepSeekMessageItem(item map[string]any) (map[string]any, error) {
+func deepSeekMessageItem(item map[string]any, preserveMessageCalls bool) (map[string]any, error) {
 	role := "user"
 	if value, ok := item["role"]; ok {
 		text, valid := value.(string)
@@ -108,6 +108,9 @@ func deepSeekMessageItem(item map[string]any) (map[string]any, error) {
 			return nil, errors.New(deepSeekToolCallIDRequired)
 		}
 		message[deepSeekToolCallIDKey] = callID
+	}
+	if !preserveMessageCalls {
+		return message, nil
 	}
 	toolCalls, err := deepSeekMessageToolCalls(item["tool_calls"])
 	if err != nil {

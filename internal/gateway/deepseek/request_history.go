@@ -157,14 +157,18 @@ func translateResponsesRequestWithHistory(body []byte, options RequestOptions, h
 	if err != nil {
 		return TranslatedRequest{}, err
 	}
-	parts, err := translateRequestParts(object, options)
+	// Standalone conversion preserves chat calls; runtime pending history uses the normal bridge.
+	parts, err := translateRequestParts(object, options, contains == nil)
 	if err != nil {
 		return TranslatedRequest{}, err
 	}
 	stateless := parts
 	override := contains != nil && deepSeekSimpleRequest04384(object, contains)
 	if override {
-		stateless.messages = chatcompat.CloneMessages(parts.messages)
+		stateless.messages, err = deepSeekMessages(object, true)
+		if err != nil {
+			return TranslatedRequest{}, err
+		}
 	}
 	parts.messages = repairDeepSeekToolCallAdjacency(chatcompat.MergeHistory(history, parts.messages))
 	if parts.thinking {
