@@ -10731,3 +10731,18 @@ Exact commands:
 `rtk proxy go test -json ./... > /tmp/gdx-04384-deepseek-tool-strict-full.jsonl 2>&1`
 and `rtk proxy make verify > /tmp/gdx-04384-deepseek-tool-strict-verify.log 2>&1`.
 Exact clean executable qualification follows before publication.
+
+Exact clean b3ecbff2f61dfb063e1fd9d86c2a7027ed53cc88 subsequently PASSes all
+103 executable cases (original session 58677, exit 0), including the complete
+previous96 scope and every strict-flag baseline case. All five original
+Godex-only failures now satisfy the unchanged reference invariants. False flag
+bytes survive, absent/false conflicts reject before dispatch, and prior schema
+number/equality, response metadata, routing, history and stream controls PASS.
+Pinned source/reference binary/manifest, candidate/driver hashes and clean VCS
+metadata were checked alongside original wire/client/seed/status/exit/attempt/
+auth/state assertions and active matching-corruption guards. Audit:
+/tmp/gdx-04384-deepseek-tool-strict-targeted-audit.json. Exact command:
+`rtk proxy python3 /tmp/gdx-04384-deepseek-tool-strict-targeted.py > /tmp/gdx-04384-deepseek-tool-strict-targeted.log 2>&1`.
+The candidate includes a documentation-only merge preserving the already
+published numeric qualification record; cmd/internal/tools bytes were unchanged
+by that merge. Neither a full369 nor a complete default-gate PASS is claimed.
