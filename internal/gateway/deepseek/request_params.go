@@ -85,7 +85,7 @@ func copyLogprobFields(target, source map[string]any) error {
 func copyStopField(target, source map[string]any) error {
 	stop, ok, err := deepSeekStop(source)
 	if err != nil {
-		return err
+		return &invalidResponsesInputError{err}
 	}
 	if ok {
 		target["stop"] = stop

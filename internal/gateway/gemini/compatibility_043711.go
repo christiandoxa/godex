@@ -21,7 +21,7 @@ const bufferedChatResponseMaxBytes = 4 << 20
 func (transport *RuntimeTransport) executeChatCompatibleResponses(
 	ctx context.Context, input proxymodel.Request, current route,
 ) (*proxymodel.Response, error) {
-	normalized, logprobs, err := normalizeGeminiChatInput043711(input.Body)
+	normalized, controls, err := normalizeGeminiChatInput043711(input.Body)
 	if err != nil {
 		var failure *proxymodel.Error
 		if errors.As(err, &failure) {
@@ -46,7 +46,7 @@ func (transport *RuntimeTransport) executeChatCompatibleResponses(
 	if err != nil {
 		return nil, &proxymodel.Error{StatusCode: http.StatusBadRequest, Message: err.Error()}
 	}
-	body, err = geminiChatRequestOptions04384(body, logprobs)
+	body, err = geminiChatRequestOptions04384(body, controls)
 	if err != nil {
 		return nil, &proxymodel.Error{StatusCode: http.StatusBadRequest, Message: err.Error()}
 	}
@@ -74,7 +74,7 @@ func (transport *RuntimeTransport) executeChatCompatibleResponses(
 
 // Tagged Gemini uses user_id on the Chat wire and requests final token
 // usage for streaming requests.
-func geminiChatRequestOptions04384(body []byte, logprobs map[string]any) ([]byte, error) {
+func geminiChatRequestOptions04384(body []byte, controls map[string]any) ([]byte, error) {
 	request, err := decodeGeminiChatRequest04384(body)
 	if err != nil {
 		return nil, errors.New("invalid Gemini chat-compatible stream request")
@@ -84,11 +84,11 @@ func geminiChatRequestOptions04384(body []byte, logprobs map[string]any) ([]byte
 		request["user_id"] = user
 		delete(request, "user")
 	}
-	for key, value := range logprobs {
+	for key, value := range controls {
 		request[key] = value
 	}
 	stream, _ := request["stream"].(bool)
-	if !stream && !hasUser && len(logprobs) == 0 {
+	if !stream && !hasUser && len(controls) == 0 {
 		return body, nil
 	}
 	if stream {
@@ -125,7 +125,11 @@ func normalizeGeminiChatInput043711(body []byte) ([]byte, map[string]any, error)
 	if !normalizeGeminiTokenLimit04384(root) {
 		return nil, nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
-	logprobs, valid := extractGeminiChatLogprobs04384(root)
+	controls, valid := extractGeminiChatLogprobs04384(root)
+	if !valid {
+		return nil, nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
+	}
+	controls, valid = extractGeminiChatStop04384(root, controls)
 	if !valid {
 		return nil, nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
@@ -150,7 +154,7 @@ func normalizeGeminiChatInput043711(body []byte) ([]byte, map[string]any, error)
 		}
 	}
 	normalized, err := json.Marshal(root)
-	return normalized, logprobs, err
+	return normalized, controls, err
 }
 
 func decodeGeminiChatRequest04384(body []byte) (map[string]any, error) {

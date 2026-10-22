@@ -8,8 +8,8 @@ import (
 )
 
 type requestPrimitiveFixture04384 struct {
-	fields, limit, wireFields, wirePrefix, text string
-	reject                                      bool
+	fields, limit, wireFields, wirePrefix, wireStop, text string
+	reject                                                bool
 }
 
 func requestPrimitiveSuffixes04384() []string {
@@ -17,13 +17,16 @@ func requestPrimitiveSuffixes04384() []string {
 		"numeric-control", "numeric-exponent", "numeric-negative-zero", "numeric-fraction", "numeric-u64", "numeric-unicode",
 		"numeric-temperature-null", "numeric-temperature-string", "numeric-top-p-bool", "numeric-top-p-array",
 		"logprobs-false", "logprobs-zero", "logprobs-max", "logprobs-null", "logprobs-string", "logprobs-top-null",
-		"logprobs-top-negative", "logprobs-top-float", "logprobs-top-over", "logprobs-top-u64", "logprobs-top-missing-flag", "logprobs-top-false-flag"}
+		"logprobs-top-negative", "logprobs-top-float", "logprobs-top-over", "logprobs-top-u64", "logprobs-top-missing-flag", "logprobs-top-false-flag",
+		"stop-string", "stop-empty-string", "stop-empty-array", "stop-snake", "stop-camel", "stop-precedence", "stop-alias-precedence",
+		"stop-shadow-null", "stop-null", "stop-bool", "stop-array-number", "stop-limit", "stop-over"}
 }
 
 func requestPrimitiveCase04384(scenario string) (requestPrimitiveFixture04384, bool) {
 	if !strings.HasPrefix(scenario, "request-primitive-") && !strings.HasPrefix(scenario, "deepseek-request-primitive-") {
 		return requestPrimitiveFixture04384{}, false
 	}
+	const stops16 = `["s01","s02","s03","s04","s05","s06","s07","s08","s09","s10","s11","s12","s13","s14","s15","s16"]`
 	suffix := strings.TrimPrefix(strings.TrimPrefix(scenario, "deepseek-"), "request-primitive-")
 	switch suffix {
 	case "output":
@@ -88,6 +91,32 @@ func requestPrimitiveCase04384(scenario string) (requestPrimitiveFixture04384, b
 		return requestPrimitiveFixture04384{fields: `"top_logprobs":2`, reject: true}, true
 	case "logprobs-top-false-flag":
 		return requestPrimitiveFixture04384{fields: `"logprobs":false,"top_logprobs":0`, reject: true}, true
+	case "stop-string":
+		return requestPrimitiveFixture04384{fields: `"stop":"STOP"`, wireStop: `"STOP"`}, true
+	case "stop-empty-string":
+		return requestPrimitiveFixture04384{fields: `"stop":""`, wireStop: `""`}, true
+	case "stop-empty-array":
+		return requestPrimitiveFixture04384{fields: `"stop":[]`, wireStop: `[]`}, true
+	case "stop-snake":
+		return requestPrimitiveFixture04384{fields: `"stop_sequences":[" STOP ",""]`, wireStop: `[" STOP ",""]`}, true
+	case "stop-camel":
+		return requestPrimitiveFixture04384{fields: `"stopSequences":"CAMEL"`, wireStop: `"CAMEL"`}, true
+	case "stop-precedence":
+		return requestPrimitiveFixture04384{fields: `"stop":"PRIMARY","stop_sequences":null,"stopSequences":false`, wireStop: `"PRIMARY"`}, true
+	case "stop-alias-precedence":
+		return requestPrimitiveFixture04384{fields: `"stop_sequences":"SECOND","stopSequences":"THIRD"`, wireStop: `"SECOND"`}, true
+	case "stop-shadow-null":
+		return requestPrimitiveFixture04384{fields: `"stop":null,"stop_sequences":"SECOND"`, reject: true}, true
+	case "stop-null":
+		return requestPrimitiveFixture04384{fields: `"stop":null`, reject: true}, true
+	case "stop-bool":
+		return requestPrimitiveFixture04384{fields: `"stop":false`, reject: true}, true
+	case "stop-array-number":
+		return requestPrimitiveFixture04384{fields: `"stop":["STOP",1]`, reject: true}, true
+	case "stop-limit":
+		return requestPrimitiveFixture04384{fields: `"stop":` + stops16, wireStop: stops16}, true
+	case "stop-over":
+		return requestPrimitiveFixture04384{fields: `"stop":` + strings.TrimSuffix(stops16, "]") + `,"s17"]`, reject: true}, true
 	}
 	return requestPrimitiveFixture04384{}, false
 }
@@ -113,7 +142,11 @@ func requestPrimitiveWire04384(scenario, model string) string {
 		text = fixture.text
 	}
 	// Fixture text has no quotes, backslashes or control bytes; expected wire escaping stays independent.
-	body += `"messages":[{"content":"` + text + `","role":"user"}],"model":"` + model + `","stream":false`
+	body += `"messages":[{"content":"` + text + `","role":"user"}],"model":"` + model + `"`
+	if fixture.wireStop != "" {
+		body += `,"stop":` + fixture.wireStop
+	}
+	body += `,"stream":false`
 	if fixture.wireFields != "" {
 		body += "," + fixture.wireFields
 	}

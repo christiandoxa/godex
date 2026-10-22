@@ -18,7 +18,7 @@ func TestProdex04384GeminiLogprobsAdmissionAndWire(t *testing.T) {
 		{"zero", `"logprobs":true,"top_logprobs":0`, `"logprobs":true,`, `,"stream":false,"top_logprobs":0`},
 		{"maximum", `"logprobs":true,"top_logprobs":20`, `"logprobs":true,`, `,"stream":false,"top_logprobs":20`},
 		{"flag_only", `"logprobs":true`, `"logprobs":true,`, `,"stream":false`},
-		{"stream_and_identity", `"logprobs":true,"top_logprobs":2,"stream":true,"user_id":"synthetic_user"`, `"logprobs":true,`, `,"stream":true,"stream_options":{"include_usage":true},"top_logprobs":2,"user_id":"synthetic_user"`},
+		{"stream_identity_and_stop", `"logprobs":true,"top_logprobs":2,"stop_sequences":"END","stream":true,"user_id":"synthetic_user"`, `"logprobs":true,`, `,"stop":"END","stream":true,"stream_options":{"include_usage":true},"top_logprobs":2,"user_id":"synthetic_user"`},
 		{"null_flag", `"logprobs":null`, "", ""},
 		{"string_flag", `"logprobs":"true"`, "", ""},
 		{"null_top", `"logprobs":true,"top_logprobs":null`, "", ""},

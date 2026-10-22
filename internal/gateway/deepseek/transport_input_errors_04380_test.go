@@ -48,6 +48,10 @@ func TestProdex04380DeepSeekInvalidInputIsTerminalBeforeUpstream(t *testing.T) {
 		{"unsigned-top-logprobs", `{"input":"same request","logprobs":true,"top_logprobs":18446744073709551615}`},
 		{"missing-logprobs-flag", `{"input":"same request","top_logprobs":2}`},
 		{"false-logprobs-flag", `{"input":"same request","logprobs":false,"top_logprobs":0}`},
+		{"null-stop", `{"input":"same request","stop":null}`},
+		{"boolean-stop", `{"input":"same request","stop":false}`},
+		{"mixed-stop", `{"input":"same request","stop":["STOP",1]}`},
+		{"shadow-null-stop", `{"input":"same request","stop":null,"stop_sequences":"SECOND"}`},
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
 			calls.Store(0)

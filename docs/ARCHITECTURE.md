@@ -439,6 +439,12 @@ DeepSeek owns its validation and terminal preparation errors. Gemini privately
 extracts validated controls before the shared Chat converter, then restores
 them during final serde encoding. The controls travel as explicit local data;
 the shared Claude converter retains its independent supported-field contract.
+Stop controls use field presence in the order `stop`, `stop_sequences`, then
+`stopSequences`. The selected value must be a string or at most 16 strings;
+empty strings/arrays and whitespace remain intact. Gemini carries canonical
+`stop` through the same explicit private control map after alias validation,
+reusing its existing package-local presence lookup. DeepSeek preserves its
+existing projection and makes invalid selected values terminal before dispatch.
 `gateway/gemini` reuses `gateway/chatcompat` for shared message/history
 and Chat response conversion, while Gemini-specific reasoning, metadata, tool
 shapes, and thought signatures stay in the Gemini gateway. Native Messages and

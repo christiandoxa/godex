@@ -278,6 +278,16 @@ Both provider runners reuse the same fixed fixture data and independent
 matching-corruption contracts; a shared incorrect rejection or dropped valid
 control cannot satisfy the oracle.
 
+The `stop-string`, `stop-empty-string`, `stop-empty-array`, `stop-snake`,
+`stop-camel`, `stop-precedence`, `stop-alias-precedence` and `stop-limit`
+suffixes require the exact canonical `stop` bytes, including empty values,
+unchanged whitespace, selected-alias precedence and the 16-string boundary.
+`stop-shadow-null`, `stop-null`, `stop-bool`, `stop-array-number` and `stop-over`
+require terminal plain 502 with no attempt. Lower-priority invalid aliases
+must not override a valid selected value, while a selected null cannot fall
+through to a valid alias. Both products must satisfy independent fixed request,
+response, authentication, exit/stdout, attempt and durable-state contracts.
+
 The 0.438.4 `deepseek-sse-error-presence`, `deepseek-sse-error-i64` and
 `deepseek-sse-error-float` scenarios verify embedded-error primary-field
 presence and signed numeric kinds. Each must produce one failure frame

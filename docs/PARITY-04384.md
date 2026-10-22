@@ -5193,3 +5193,85 @@ Clean-commit 133-case Gemini and 156-case DeepSeek matrices follow.
 Other controls, combined-error ordering, Gemini Compact, executable session/
 turn continuation, native macOS/Windows and live authentication remain open.
 Global 1:1 parity is not claimed.
+
+
+## Validated numeric-control checkpoint: bb98216
+
+Clean `bb98216f698b6a018d19c8b9c45534b57936a973` passes all 121 Gemini cases
+and all 144 DeepSeek scenarios, including their independent mutation checks:
+`/tmp/gdx-04384-request-numeric-fields-gemini-oracle.json` and
+`/tmp/gdx-04384-request-numeric-fields-deepseek-oracle.json`.
+The exact clean binaries were built with
+`rtk go build -trimpath -o /tmp/gdx-04384-request-numeric-fields-godex ./cmd/godex` and
+`rtk go build -trimpath -o /tmp/gdx-04384-request-numeric-fields-final-differential ./tools/differential`.
+The matrices use the unchanged pinned reference and
+`--gemini`, or `--scenario all --scenario-workers 3`, with the clean numeric
+source and `--godex-commit bb98216f698b6a018d19c8b9c45534b57936a973`.
+Targeted exponent DeepSeek and null-temperature Gemini reports also PASS:
+`/tmp/gdx-04384-request-deepseek-numeric-exponent-targeted-oracle.json` and
+`/tmp/gdx-04384-request-gemini-numeric-temperature-null-targeted-oracle.json`.
+The clean primary worktree and unchanged remote were checked, fast-forwarded
+and pushed directly to `origin/main` at `bb98216` without waiting for CI.
+No force push, tag, release or editor-checkout changes occurred.
+The separate full default-script rerun remains pending on protected `293b1b6`;
+this numeric checkpoint does not advance that gate or establish global parity.
+
+
+## Stop-control presence, aliases and terminal admission
+
+Pinned `deepseek_provider_core_stop_from_responses_request` selects the first
+present `stop`, `stop_sequences` or `stopSequences`, including a present null.
+The shared chat-compatible Rust path applies it for both providers.
+`deepseek.mojo:2216–2260` accepts a string or an array of at most 16 strings.
+Empty strings/arrays and whitespace are retained; malformed lower-priority
+aliases do not replace a valid selected value.
+
+Godex's Gemini Chat converter discarded canonical/camel-case controls and
+rejected the snake-case alias, while invalid canonical types could reach
+upstream unchanged as fresh work without a stop control. DeepSeek already
+projected the aliases correctly, but its ordinary validation errors could
+enter routing recovery rather than the tagged terminal preparation failure.
+
+The Gemini adapter now validates its selected stop value, deletes all three
+aliases before shared conversion and carries only the canonical field through
+its existing explicit private controls map. It reuses the package-local
+`firstPresent` lookup and existing final serde writer. The concrete DeepSeek
+adapter wraps its existing stop error class at the preparation boundary.
+Protocol policy remains local to each gateway; the shared Claude converter,
+routing ownership and state formats are unchanged. No production shared
+helper, package, exported API, interface, dependency, configuration or worker
+is introduced. The combined stream/identity/logprobs regression now also
+requires its stop value, proving the private controls survive together.
+
+Before repair, 34 regression controls pass and 25 tests fail, including parents:
+`rtk go test ./internal/gateway/deepseek ./internal/gateway/gemini -run '^TestProdex(04384(DeepSeekStopAdmissionAndAliases|GeminiStopAdmissionAndAliases)|04380DeepSeekInvalidInputIsTerminalBeforeUpstream)$' -count=1`;
+`/tmp/gdx-04384-request-stop-before.log`.
+The same command passes 59 tests after repair:
+`/tmp/gdx-04384-request-stop-focused.log`.
+
+Twenty-six executable baseline reports pin clean
+`f4bf577507cacd03abcd6d7fbbf8f49fc51f5271`, the unchanged reference and
+`/tmp/gdx-04384-request-stop-differential`:
+`/tmp/gdx-04384-request-<gemini|deepseek>-<stop-suffix>-before-oracle.json`.
+All thirteen Gemini cases FAIL only Godex. Eight valid DeepSeek controls PASS;
+five invalid-field cases FAIL only Godex. All reference and independent
+matching-corruption invariants pass. The strict primitive fixture family
+retains exact original authenticated requests for accepted controls, terminal
+502/exit 2/no attempt for invalid controls, exact response/status/type/stdout
+and safe durable state. Empty values and selected null are distinct cases.
+
+`rtk go test ./tools/differential -count=1` passes 276 tests:
+`/tmp/gdx-04384-request-stop-oracle-tests.log`.
+`rtk go test ./internal/gateway/deepseek ./internal/gateway/gemini ./internal/gateway/chatcompat -count=1`
+passes 1,638 tests: `/tmp/gdx-04384-request-stop-gateway-tests.log`.
+`rtk proxy go test -json ./...` passes 9,625 tests across 81 packages
+(71 passing packages and ten with no tests):
+`/tmp/gdx-04384-request-stop-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/deepseek ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+passes 3,665 tests: `/tmp/gdx-04384-request-stop-race.log`.
+`rtk proxy make verify` passes the complete local gate:
+`/tmp/gdx-04384-request-stop-verify.log`.
+Clean-commit 146-case Gemini and 169-case DeepSeek matrices follow.
+Other controls, combined-error ordering, Gemini Compact, executable session/
+turn continuation, native macOS/Windows and live authentication remain open.
+Global 1:1 parity is not claimed.
