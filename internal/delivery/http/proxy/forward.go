@@ -7,6 +7,7 @@ import (
 	routingusecase "github.com/christiandoxa/godex/internal/usecase/routing"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 )
@@ -30,6 +31,12 @@ func (proxy *Proxy) forwardResponse(ctx context.Context, writer http.ResponseWri
 	}
 	copyResponseHeaders(writer.Header(), response.Header)
 	clearMissingStandardHeaders(writer.Header(), response.Header)
+	// Only delivery's own bounded read proves EOF; upstream framing is untrusted.
+	if !stream && prefix == nil && int64(len(prepared)) <= proxy.maxInspect &&
+		response.StatusCode >= 200 && response.StatusCode != http.StatusNoContent && response.StatusCode != http.StatusNotModified &&
+		len(response.Trailer) == 0 && !hasHeader(response.Header, "Trailer") {
+		writer.Header().Set("Content-Length", strconv.Itoa(len(prepared)))
+	}
 	if stream && !hasHeader(response.Header, "Date") {
 		// The canonical streaming bridge does not synthesize a Date. Keep
 		// the stream envelope stable while leaving ordinary HTTP responses
@@ -64,10 +71,8 @@ func (proxy *Proxy) prepareResponsePrefix(writer http.ResponseWriter, response *
 }
 
 func clearMissingStandardHeaders(destination, source http.Header) {
-	// Let net/http derive Date and Content-Length from the actual wire response.
-	// A nil header suppresses its automatic synthesis even when buffering
-	// proves the exact body length; a stale upstream framing value is still
-	// filtered by copyResponseHeaders, never forwarded unchanged.
+	// net/http supplies Date and uncaptured-body framing. A nil header would
+	// suppress automatic synthesis; upstream framing is filtered separately.
 	for _, header := range []string{"Content-Type"} {
 		if !hasHeader(source, header) {
 			destination[header] = nil

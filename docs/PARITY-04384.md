@@ -3280,3 +3280,38 @@ probe and passes all 26 focused syntax cases:
 Final `rtk go test ./...` passes 9,169 tests across 81 packages after that
 additional control: `/tmp/gdx-04384-buffered-tool-object-final-test-all.log`.
 Clean-commit executable gates follow this candidate.
+
+
+## Complete bounded response captures retain exact framing
+
+Combined `869ca483c6ce83816fd264dc81311a5d2d5bf54c` passes 9,175 tests and
+`rtk proxy make verify`. Logs:
+`/tmp/gdx-04384-compact-buffered-combined-test-all.log` and
+`/tmp/gdx-04384-compact-buffered-combined-verify.log`.
+The extended restart probe now matches every Compact/model payload, but its
+strict header comparison still fails Models list: Prodex emits Content-Length
+2864, while Go switches to chunked framing beyond its automatic buffer size.
+Report: `/tmp/gdx-04384-compact-buffered-raw-key-oracle.json` (FAIL).
+The six buffered object-error cases on clean `a3466b9` all meet their exact
+contracts; that candidate's complete 71-case report remains FAIL on its
+unfixed Compact parent: `/tmp/gdx-04384-buffered-tool-object-oracle.json`.
+
+HTTP delivery now derives Content-Length when its own existing bounded capture
+proves EOF. The upstream framing value is still discarded. Prior prefixes,
+partial captures, streams, bodyless statuses and trailer-bearing responses do
+not gain an inferred length. No extra body read, buffer, gateway/model field,
+shared helper, option or worker is introduced. Framing remains in
+`delivery/http/proxy`; routing, credential selection and persistence are unchanged.
+
+The existing framing regression now exercises the exact inspection boundary
+with short and larger JSON bodies, plus an intentionally false upstream length.
+Before repair, the short control passes and all three larger bodies report
+length -1: `/tmp/gdx-04384-buffered-framing-before.log`.
+`rtk go test -race ./internal/delivery/http/proxy -count=1` passes 343 tests,
+including partial-body, trailer, stream and half-close controls. Log:
+`/tmp/gdx-04384-buffered-framing-race.log`. `rtk go test ./...` passes 9,179
+tests across 81 packages: `/tmp/gdx-04384-buffered-framing-test-all.log`.
+`rtk proxy make verify` passes formatting, source/TUI guards, vet, full
+shuffled race tests, cross-platform build/test compilation, installers and build.
+Log: `/tmp/gdx-04384-buffered-framing-verify.log`.
+Clean-commit executable gates follow.

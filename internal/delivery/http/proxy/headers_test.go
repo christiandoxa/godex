@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -56,26 +57,31 @@ func TestProxyAddsValidDateWhenUpstreamHasNoDate(t *testing.T) {
 }
 
 func TestProxyRecomputesBufferedJSONContentLength(t *testing.T) {
-	proxy := &Proxy{maxInspect: 1024}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		proxy.forwardResponse(context.Background(), w, &proxymodel.Response{
-			StatusCode: http.StatusOK,
-			Header:     http.Header{"Content-Type": []string{"application/json"}},
-			Body:       io.NopCloser(strings.NewReader(`{"ok":true}`)),
-		}, nil, "", &requestLifecycle{})
-	}))
-	defer server.Close()
-	response, err := http.Get(server.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer response.Body.Close()
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(body) != `{"ok":true}` || response.ContentLength != int64(len(body)) {
-		t.Fatalf("incorrect buffered response framing: length=%d body=%q", response.ContentLength, body)
+	for _, size := range []int{0, 2048, 4096, 64 << 10} {
+		t.Run(strconv.Itoa(size), func(t *testing.T) {
+			payload := `{"text":"` + strings.Repeat("x", size) + `"}`
+			proxy := &Proxy{maxInspect: int64(len(payload))}
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				proxy.forwardResponse(context.Background(), w, &proxymodel.Response{
+					StatusCode: http.StatusOK,
+					Header:     http.Header{"Content-Type": {"application/json"}, "Content-Length": {"999"}},
+					Body:       io.NopCloser(strings.NewReader(payload)),
+				}, nil, "", &requestLifecycle{})
+			}))
+			defer server.Close()
+			response, err := http.Get(server.URL)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer response.Body.Close()
+			body, err := io.ReadAll(response.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(body) != payload || response.ContentLength != int64(len(body)) {
+				t.Fatalf("incorrect buffered response framing: length=%d body bytes=%d", response.ContentLength, len(body))
+			}
+		})
 	}
 }
 

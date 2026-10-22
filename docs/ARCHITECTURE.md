@@ -495,6 +495,12 @@ The connection's acceptance timestamp is claimed only by its first request.
 Later HTTP keep-alive requests start their own admission budget; connection
 age cannot expire unrelated follow-up requests. The claim is connection-owned
 and atomic, with no global connection registry or shared helper.
+For a non-streaming body captured entirely by delivery's existing bounded
+lookahead, EOF proves the downstream Content-Length. Delivery derives that
+length from the captured bytes, excludes bodyless statuses and trailer-bearing
+responses, and still discards untrusted upstream framing. Partial lookahead
+and streams retain their existing framing path.
+
 
 A forwarded request starts as **uncommitted**. Rotation is legal only in this state.
 
