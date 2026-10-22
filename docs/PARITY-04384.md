@@ -10527,3 +10527,18 @@ and `rtk proxy make verify > /tmp/gdx-04384-previous-id-routing-controls-verify.
 Exact clean tools-candidate qualification follows before publication. The older
 full333 and three entire default gates retain their original running handles
 and immutable sources. Overall 1:1 parity remains unproven.
+
+Exact clean cd5303b440c5e0133b6d39107a5cb47141c01b5d subsequently PASSes all
+72 executable cases (original session 76143, exit 0). It includes all eleven
+routing baseline cases and every case from the previous65 qualification. All
+original independent request/client/seed/attempt/auth/state and mutation guards
+remain active. Prior reference request and client bytes also match, including
+zero-attempt image/cache rejection. Pinned source, reference binary/manifest,
+candidate/driver artifacts and clean VCS metadata were verified. Audit:
+/tmp/gdx-04384-previous-id-routing-controls-targeted-audit.json. Exact command:
+`rtk proxy python3 /tmp/gdx-04384-previous-id-routing-controls-targeted.py > /tmp/gdx-04384-previous-id-routing-controls-targeted.log 2>&1`.
+The standalone audit initially failed to read a valid null request list for a
+zero-attempt rejection; handling that empty representation corrected the audit
+without changing any oracle assertion or restarting the original run. The
+production diff remains empty and the rejected candidate is not an ancestor.
+This tools-only qualification is not a full339 or complete-default-gate PASS.
