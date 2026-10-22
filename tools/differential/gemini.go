@@ -161,6 +161,10 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, response)
 		return
 	}
+	if response, ok := geminiBufferedBodyResponse04384(mock.scenario); ok {
+		_, _ = io.WriteString(w, response)
+		return
+	}
 	if mock.scenario == "buffered-null-tool-text" {
 		_, _ = io.WriteString(w, `{"candidates":[{"content":{"role":"model","parts":[{"text":"hidden before"},{"functionCall":null},{"text":"hidden after"}]},"finishReason":"STOP"}],"modelVersion":"gemini-3.1-pro-preview","usageMetadata":{"promptTokenCount":2,"candidatesTokenCount":1,"totalTokenCount":3}}`)
 		return
@@ -216,6 +220,10 @@ func (mock *geminiMock) recorded() []geminiCapturedRequest {
 
 func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit, selected string) error {
 	cases := []string{
+		"buffered-body-under",
+		"buffered-body-limit",
+		"buffered-body-over",
+		"buffered-body-over-rotation",
 		"raw-key-session-limit",
 		"raw-key-session-over-limit",
 		"raw-key-session-unicode-limit",
@@ -345,11 +353,12 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	}
 	childResult := filepath.Join(home, "gemini-child-exchange.json")
 	_, _, rawIdentity := geminiRawKeyIdentity04384(scenario)
-	if rawIdentity {
+	_, bodyBoundary := geminiBufferedBodyCase04384(scenario)
+	if rawIdentity || bodyBoundary {
 		childResult = filepath.Join(home, "child-exchange.json")
 	}
 	args := []string{"super", "--provider", "gemini"}
-	if !geminiQuotaScenario043711(scenario) {
+	if !geminiQuotaScenario043711(scenario) && scenario != "buffered-body-over-rotation" {
 		args = append(args, "--api-key", apiKey)
 	}
 	args = append(args,
@@ -364,7 +373,7 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	if rawIdentity {
 		env = append(env, "DIFFERENTIAL_GEMINI_RAW_KEY_IDENTITY="+scenario)
 	}
-	if geminiQuotaScenario043711(scenario) {
+	if geminiQuotaScenario043711(scenario) || scenario == "buffered-body-over-rotation" {
 		env = append(env, "GEMINI_API_KEYS="+rotationPrimaryKey+","+rotationSecondaryKey)
 	}
 	if scenario == "invalid-wrapped-tool-parameters" {
@@ -393,7 +402,7 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	if err := cmd.Run(); err != nil {
 		var childExit *exec.ExitError
 		_, envelopeScenario := geminiEnvelopeFixture04384(scenario)
-		if !rawIdentity && !geminiQuotaScenario043711(scenario) && !geminiInvalidToolScenario04380(scenario) && !geminiModelScenario04384(scenario) && !envelopeScenario ||
+		if !rawIdentity && !bodyBoundary && !geminiQuotaScenario043711(scenario) && !geminiInvalidToolScenario04380(scenario) && !geminiModelScenario04384(scenario) && !envelopeScenario ||
 			!errors.As(err, &childExit) || ctx.Err() != nil {
 			return geminiCandidateResult{}, fmt.Errorf("child failed: %w stderr=%q upstream=%v",
 				err, redact(stderr.String()), mock.recorded())
@@ -412,7 +421,7 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	candidate := geminiCandidateResult{
 		Name: name, Version: version, ExitCode: exitCode, Upstream: mock.recorded(), Client: result,
 	}
-	if rawIdentity {
+	if rawIdentity || bodyBoundary {
 		candidate.Stdout = stdout.String()
 		candidate.StateIntegrity = auditFixtureDurableState(home)
 	}
@@ -431,6 +440,9 @@ func geminiCompare(scenario string, prodex, godex geminiCandidateResult) []strin
 	}
 	if prodex.ExitCode != godex.ExitCode {
 		differences = append(differences, "product child process exit status differs")
+	}
+	if _, known := geminiBufferedBodyCase04384(scenario); known {
+		return differences
 	}
 	if _, reject, known := geminiRawKeyIdentity04384(scenario); known && reject {
 		if prodex.Client.Body != godex.Client.Body {
@@ -530,6 +542,9 @@ func geminiSemanticEqual043711(left, right map[string]any) bool {
 }
 
 func geminiFixtureInvariant(scenario string, result geminiCandidateResult) error {
+	if _, known := geminiBufferedBodyCase04384(scenario); known {
+		return geminiBufferedBodyInvariant04384(scenario, result)
+	}
 	if _, _, known := geminiRawKeyIdentity04384(scenario); known {
 		return geminiRawKeyIdentityInvariant04384(scenario, result)
 	}

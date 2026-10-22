@@ -26,6 +26,10 @@ func bufferedBodyUpstream04384(phase, body string) string {
 	if !known {
 		return body
 	}
+	return paddedBufferedUpstream04384(body, size)
+}
+
+func paddedBufferedUpstream04384(body string, size int) string {
 	var root map[string]any
 	if json.Unmarshal([]byte(body), &root) != nil {
 		return ""

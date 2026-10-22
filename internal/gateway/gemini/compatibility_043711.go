@@ -12,6 +12,8 @@ import (
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
+const bufferedChatResponseMaxBytes = 4 << 20
+
 // The tagged Prodex 0.437.11 API-key Super path is the Gemini
 // OpenAI-compatible Chat Completions bridge. OAuth/native Gemini routes use
 // the separate generateContent adapter and are left untouched here.
@@ -47,7 +49,16 @@ func (transport *RuntimeTransport) executeChatCompatibleResponses(
 	if geminiContentTypeIsSSE04384(response.Header.Get("Content-Type")) {
 		return translateGeminiChatCompatibleStream043711(response), nil
 	}
-	return translateGeminiChatOrNativeResponse043711(response)
+	translated, err := translateGeminiChatOrNativeResponse043711(response)
+	if err != nil {
+		return &proxymodel.Response{
+			StatusCode:       http.StatusBadGateway,
+			Header:           http.Header{"Content-Type": {"text/plain; charset=utf-8"}},
+			Body:             io.NopCloser(bytes.NewBufferString("provider response could not be processed")),
+			PrecommitFailure: &proxymodel.PrecommitFailure{Code: "provider_response_translation_failed"},
+		}, nil
+	}
+	return translated, nil
 }
 
 // The tagged 0.437.11 Super Gemini chat-compatible provider asks the
@@ -111,11 +122,11 @@ func translateGeminiChatOrNativeResponse043711(
 		return translateResponse(response, nil)
 	}
 	defer response.Body.Close()
-	payload, err := io.ReadAll(io.LimitReader(response.Body, bodyMaxBytes+1))
+	payload, err := io.ReadAll(io.LimitReader(response.Body, bufferedChatResponseMaxBytes+1))
 	if err != nil {
 		return nil, errors.New("failed to read Gemini chat-compatible response")
 	}
-	if len(payload) > bodyMaxBytes {
+	if len(payload) > bufferedChatResponseMaxBytes {
 		return nil, errors.New("Gemini chat-compatible response exceeded its read limit")
 	}
 	root, valid := geminiSerdeResponseObject04384(payload)

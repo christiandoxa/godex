@@ -4120,3 +4120,75 @@ race tests, cross-platform build/test compilation, installers and build:
 Clean-commit executable verification follows. Other lexical classes, valid
 Gemini continuation/Compact ownership, native macOS/Windows and live
 authentication remain open. Global 1:1 parity is not claimed.
+
+
+## Gemini API-key buffered body admission and terminal retry evidence
+
+The string EOF checkpoint was fast-forwarded and pushed directly to
+`origin/main` at `f4aca3f4b69ca70c1fa8f573a11fbc46fa410b7a` after checking
+the clean primary worktree and unchanged remote. No CI wait, force push, tag,
+release or editor-worktree modification occurred.
+
+The pinned API-key Gemini chat-compatible response path calls
+`runtime_deepseek_chat_buffered_response_parts` through
+`local_rewrite_response_chat_compatible.rs`. It therefore shares the same
+4 MiB complete-body gate before provider normalization. Godex's Gemini bridge
+instead read 8 MiB and accepted oversized success. Its translation errors also
+escaped as ordinary gateway errors, allowing inappropriate credential retry.
+
+`gateway/gemini/compatibility_043711.go` now has a separate 4 MiB successful
+buffered chat-body cap and returns the exact local plain HTTP 502 processing
+failure with the existing non-retryable precommit code. `usecase/routing` now
+respects that code's classification before retrying a Gemini model. Without
+that use-case change, even a correctly marked local 502 was retried on the
+next model before credential routing could recognize its terminal evidence.
+The gateway owns input admission/failure evidence; the use case owns retry
+policy and consumes existing models/entities. No dependency direction changes,
+new interface, shared production helper, configuration, state format, worker
+or external dependency were introduced. Native direct-provider transports and
+Compact remain separate audit surfaces.
+
+A two-credential HTTP pool/router regression cancels unexpected extra attempts
+without sleeps. Malformed and oversized successes must terminate after one
+attempt; an actual upstream 502 remains retryable. Before repair, the focused
+command passes three controls and fails five tests including parents:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiBuffered(BodyBoundary|FailureDoesNotRetry)' -count=1`;
+log: `/tmp/gdx-04384-gemini-body-before.log`.
+With only the gateway repair, five tests pass and three still fail due to model
+fallback: `/tmp/gdx-04384-gemini-body-gateway-only.log`.
+After the routing repair all eight pass:
+`/tmp/gdx-04384-gemini-body-focused.log`.
+
+Four new Gemini executable fixtures pad complete native bodies to 4 MiB minus
+one, exactly 4 MiB and 4 MiB plus one. The same technical padding function now
+has two real fixture consumers within `tools/differential`; it has not moved
+into production or a cross-domain helper. Accepted responses match every byte
+except an independently validated UUIDv7 value. Oversized responses require
+exact 502 text/type, stdout and exit 2. All cases require the original exact
+authenticated request, correct key slot, one attempt, no model/key replay and
+safe durable state. The rotation case configures two synthetic keys.
+Independent matching corruptions of status, type, body, exit, stdout, state,
+attempts, auth, slot and request must fail.
+
+Initial executable fixtures used `gemini-child-exchange.json`, which the common
+state auditor correctly rejected as unknown on both products. These reports
+remain unqualified FAIL results:
+`/tmp/gdx-04384-gemini-body-<under|limit|over|over-rotation>-before-oracle.json`.
+The fixture now uses the existing standard private `child-exchange.json` path;
+no allowlist or state assertion was weakened. Corrected strict baseline runs on
+clean `c1f0e5a45b7705d21d95e6181663da3a9ffa5895` PASS under/limit and FAIL
+only Godex for over/over-rotation. Every reference run meets the entire contract,
+including one primary-key attempt in the two-key case. Reports:
+`/tmp/gdx-04384-gemini-body-qualified-<suffix>-before-oracle.json`.
+Exact invocations are retained in `/tmp/gdx-04384-gemini-body-baseline.py`.
+
+`rtk go test ./tools/differential -count=1` passes 257 tests before the production
+repair: `/tmp/gdx-04384-gemini-body-oracle-tests.log`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+passes 2,734 tests: `/tmp/gdx-04384-gemini-body-race.log`.
+`rtk go test ./...` passes 9,375 tests across 81 packages:
+`/tmp/gdx-04384-gemini-body-test-all.log`.
+`rtk proxy make verify` passes formatting, source/TUI guards, vet, full shuffled
+race tests, cross-platform build/test compilation, installers and build:
+`/tmp/gdx-04384-gemini-body-verify.log`.
+Clean-commit executable verification follows. Global 1:1 parity remains unproven.

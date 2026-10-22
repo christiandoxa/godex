@@ -142,6 +142,18 @@ one original authenticated attempt, no retry and safe durable state. The rotatio
 case configures two synthetic keys and requires only the primary attempt. These
 runtime tests do not claim executable coverage of larger provider-core limits.
 
+The Gemini `buffered-body-under`, `buffered-body-limit`, `buffered-body-over`
+and `buffered-body-over-rotation` cases run with `--gemini --scenario <name>`.
+They use complete native upstream envelopes at 4 MiB minus one, exactly 4 MiB,
+and 4 MiB plus one, projected through the API-key chat-compatible runtime.
+Accepted output must match every byte after validating and normalizing UUIDv7.
+Oversized output requires exact plain HTTP 502 and exit 2. All four cases audit
+stdout, original request, credential slot, one upstream attempt and safe durable
+state; the two-key case forbids model fallback and credential rotation. The
+recorded child exchange uses the standard private fixture-artifact path, so the
+durable-state auditor needs no extra exception. Independent matching mutations
+cover output/type/status/exit/stdout, attempts, auth, key, request and state.
+
 The `deepseek-buffered-view-search-output-*` cases cover overflow, overflow-line,
 surrogate, depth-limit, depth-over and early-surrogate. They require the exact
 outer Mojo-item serde message and byte position, or a successful structured

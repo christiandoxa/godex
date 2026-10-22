@@ -130,6 +130,10 @@ func withModel(fields map[string]json.RawMessage, model string) ([]byte, error) 
 }
 
 func retryGeminiModelResponse(response *proxymodel.Response) (bool, error) {
+	if failure := response.PrecommitFailure; failure != nil && !failure.Transport &&
+		!providerentity.RetryableAcrossModels(providerentity.ClassifyProviderCode(failure.Code).Class) {
+		return false, nil
+	}
 	if response.Body == nil {
 		classification := providerentity.ClassifyError(response.StatusCode, nil)
 		return providerentity.RetryableAcrossModels(classification.Class), nil

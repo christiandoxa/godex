@@ -372,6 +372,13 @@ bodies retained for that decision are capped at 8 MiB, and a final non-retryable
 response keeps its status, headers, trailers, and body. Compact HTTP errors use
 the same retry boundary before `gateway/compact` produces its bounded local
 fallback; transport errors and invalid summaries go directly to that fallback.
+The API-key chat-compatible gateway caps the complete successful buffered body
+at 4 MiB before native-response normalization. Read/parse/translation failures
+produce the exact local plain HTTP 502 and the existing terminal precommit code.
+Model fallback consumes non-retryable precommit classification before examining
+HTTP error bodies; credential routing uses the same evidence. An upstream 502
+retains its existing retry policy. The gateway owns the read gate and failure
+evidence, while `usecase/routing` owns both model and credential retry decisions.
 `gateway/gemini` reuses `gateway/chatcompat` for shared message/history
 and Chat response conversion, while Gemini-specific reasoning, metadata, tool
 shapes, and thought signatures stay in the Gemini gateway. Native Messages and
