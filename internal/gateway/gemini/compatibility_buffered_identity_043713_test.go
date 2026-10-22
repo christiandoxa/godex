@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	"github.com/google/uuid"
 )
 
@@ -19,14 +18,14 @@ func TestProdex043713GeminiAPIKeyBufferedAlwaysReplacesProviderID(t *testing.T) 
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			body, _ := json.Marshal(map[string]any{
-				"id": tc.sourceID, "object": "response", "model": "gemini-3.1-pro-preview", "created_at": float64(1),
-				"output": []any{map[string]any{"type": "message", "role": "assistant", "content": []any{map[string]any{"type": "output_text", "text": "synthetic-ok"}}}},
+				"responseId": tc.sourceID, "modelVersion": "gemini-3.1-pro-preview", "created_at": float64(1),
+				"candidates": []any{map[string]any{"content": map[string]any{"parts": []any{map[string]any{"text": "synthetic-ok"}}}}},
 			})
-			translated, err := normalizeGeminiAPIKeyBufferedIdentity043711(&proxymodel.Response{
+			translated, err := translateGeminiChatOrNativeResponse043711(&http.Response{
 				StatusCode: http.StatusOK,
 				Header:     http.Header{"Content-Type": []string{"application/json"}},
 				Body:       io.NopCloser(strings.NewReader(string(body))),
-			}, nil)
+			}, nil, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

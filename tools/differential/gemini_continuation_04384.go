@@ -52,6 +52,13 @@ func geminiContinuationOwners04384(scenario string, result geminiCandidateResult
 			break
 		}
 	}
+	if session := geminiCompactOwnershipSession04384(scenario); session != "" {
+		for _, owner := range owners {
+			owner.kind = "session"
+			owners[session] = owner
+			break
+		}
+	}
 	return owners
 }
 

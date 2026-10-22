@@ -234,9 +234,14 @@ gateway/chatcompat owns the reusable Responses-to-Chat request transform and Cha
 JSON/SSE-to-Responses transform. It contains no credential or routing policy.
 It also owns the bounded Chat conversation snapshots previously private to
 DeepSeek: 256 entries per request namespace, 2048 entries overall and a 64 MiB
-serde-size estimate. Request namespace selection and snapshot cloning remain
-protocol concerns; each credential transport owns its cache lifetime. DeepSeek
-still owns history reconstruction, assistant projection and response eligibility.
+serde-size estimate. Request namespace selection, exact-number snapshot cloning
+and deduplication of replayed Chat input remain protocol concerns; each credential
+transport owns its cache lifetime. DeepSeek still owns request admission,
+assistant projection and response eligibility. Gemini records successful buffered
+Chat requests under their final public Responses ID and reuses matching history
+for API-key Compact before adjacency repair. Current Compact instructions precede
+cached context; input duplicates and repeated instructions are removed. Native
+Gemini response text is not fabricated into a cached Chat assistant message.
 Its shared Chat Completions stream-error classifier owns exact field-presence
 and numeric-kind rules for the DeepSeek and Gemini adapters. Each adapter
 acquires its own input, preserves JSON number types, and controls response
@@ -306,13 +311,15 @@ cannot satisfy the profile-projected dispatch identity. `usecase/routing`
 returns the existing bound-continuation HTTP 503 before another gateway call.
 An unbound previous-response identifier uses the fresh-input fallback:
 `gateway/gemini` validates the complete JSON before removing that identifier
-from its stateless chat request. Verified Gemini raw-key observations persist
+from its upstream chat request. Verified Gemini raw-key observations persist
 the same hashed conflict sentinel as DeepSeek, so restart, key and endpoint
 changes cannot turn known work into a fresh request. No credential owner or
 token is written; the persistence format and managed-profile policy are unchanged.
 
 Local DeepSeek and Gemini raw-key Compact and Models routes run before continuation validation and
-do not observe or persist continuation identities. The owning routing policy
+do not observe or persist continuation identities. Gemini API-key Compact may
+replay successful buffered Chat context already held in the owning credential's
+request namespace; this in-memory cache adds no durable owner. The owning routing policy
 recognizes these existing local routes; their gateway still owns their payloads.
 
 gateway/compact owns the bounded deterministic local compaction fallback used by

@@ -243,7 +243,9 @@ func CloneMessages(messages []any) []any {
 		return nil
 	}
 	var cloned []any
-	if json.Unmarshal(encoded, &cloned) != nil {
+	decoder := json.NewDecoder(strings.NewReader(string(encoded)))
+	decoder.UseNumber()
+	if decoder.Decode(&cloned) != nil {
 		return nil
 	}
 	return cloned

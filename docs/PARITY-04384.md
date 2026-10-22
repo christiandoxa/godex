@@ -8445,3 +8445,68 @@ size guard and then an omitted import after moving the completion method; both
 are corrected without changing the guard. Logs use
 /tmp/gdx-04384-chat-history-store-. Exact clean executable qualification follows.
 No global 1:1 claim is made.
+
+### Replay successful buffered Chat history in Gemini Compact
+
+Seven pinned executable baselines establish four Godex-only request mismatches
+and three PASS controls. A previous Responses ID must replay the stored user,
+projected Chat assistant, old system instruction and paired tool-call context;
+session-only, unknown-ID and duplicate-input controls retain their contracts.
+The retained tool-call number 9007199254740993 must survive snapshots unchanged.
+All reference, independent state and mutation assertions pass. Aggregate and
+individual report paths are recorded in
+/tmp/gdx-04384-gemini-compact-history-before-audit.json. Original wrong same-key
+rejection, duplicate-summary and annotation-retention expectations remain
+unqualified FAIL. Corrected unchanged-product reports do not relabel them.
+
+gateway/gemini records successful buffered request messages under the final
+public Responses ID while the translated object is already available; it does
+not reread or rebuffer the response to discover that ID. Native response text
+does not become a fictitious Chat assistant message. The tagged Chat projection
+retains string content, nonempty reasoning and present tool_calls, applies the
+existing RTK argument transform, and discards unrelated assistant metadata.
+Current Compact instructions precede cached context, and input deduplication
+runs before the existing adjacency repair. Previous IDs remain absent upstream.
+Failed seeds and another credential's cache cannot supply replay context.
+
+The existing input merger moves unchanged from DeepSeek into gateway/chatcompat;
+DeepSeek keeps admission and request construction. JSON snapshot decoding now
+uses UseNumber: a source-aligned regression fails before the fix on the exact
+integer above 2^53. Bounds, eviction, account isolation and oversized replacement
+ordering remain intact. No helper package, dependency, option, durable format or
+goroutine is added. Streamed seeds, cross-session/local-file-access scoping and
+changed-key/restart Compact behavior remain separate required audits.
+
+The initial narrow before run fails three history cases plus numeric snapshots,
+with duplicate-input and other-credential controls PASS:
+`rtk proxy go test -json ./internal/gateway/gemini ./internal/gateway/chatcompat -run 'Test(Prodex04384GeminiCompactReplaysBufferedChatHistory|ConversationSnapshotPreservesJSONNumbers)$' -count=1`.
+Log: /tmp/gdx-04384-gemini-compact-history-unit-before.jsonl. After the fix,
+`rtk go test ./internal/gateway/gemini ./internal/gateway/chatcompat ./internal/gateway/deepseek ./tools/differential -count=1`
+PASSes 2,945 tests. `rtk proxy go test -json ./...` on the final code PASSes
+10,674 tests across 71 packages; 18 optional tests are skipped. Logs use
+/tmp/gdx-04384-gemini-compact-history-. `rtk proxy make verify` on the final code
+PASSes exit 0, including race tests and cross-builds. An initial focused build
+needed one remaining test caller updated for the new private conversation
+argument; the corrected focused and full runs pass. Exact clean executable
+qualification follows. This is no claim of global 1:1 parity.
+
+The final two regression files are also copied alone to clean production base
+e01a8e8 in /tmp/gdx-04384-gemini-compact-history-before-work. The same narrow
+command records all final cases independently in
+/tmp/gdx-04384-gemini-compact-history-final-unit-before.jsonl. The superseded
+buffered response reader is deleted; its identity and invalid-envelope tests
+exercise the direct translation/object-normalization path instead.
+
+Mechanical cache extraction e01a8e86dfde8e869c806f9661f08806f881f9ef independently
+PASSes all 213 DeepSeek executable cases with exact clean source/binary metadata,
+state and mutation checks: /tmp/gdx-04384-chat-history-store-deepseek-oracle.json.
+Audit: /tmp/gdx-04384-chat-history-store-deepseek-audit.json. Exact 617ae56 now
+PASSes 764 unique Gemini cases including every prior 718, and was fast-forwarded
+and pushed directly as origin/main after fetched-remote and cleanliness checks.
+The worktree's branch is named gdx-parity-04383-p3-20261020, so publication uses
+HEAD:main; an earlier attempt to push its unrelated local main ref was rejected
+without changing the remote. No tag or release was made.
+Exact b9f1600 subsequently PASSes 791 unique Gemini cases including every prior
+764, with state and mutation assertions, and is pushed directly to origin/main:
+/tmp/gdx-04384-gemini-search-declarations-oracle.json. The latest entire default
+gate PASS still belongs to 15d1c55; no newer full-gate result is implied.

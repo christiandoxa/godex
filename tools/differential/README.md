@@ -98,6 +98,12 @@ original-request summaries, 4 MiB boundaries and bounded model-attempt order.
 One ordinary Responses control verifies that its independent mapping survives.
 Matching-corruption tests cover request/client bytes, status, headers, stdout,
 exit, authenticated attempts and durable-state integrity.
+The seven `compact-owner-*` cases seed an ordinary Responses request and issue
+Compact in the same process. They cover cached users, projected Chat assistants,
+current/old instructions, duplicate input, session-only and unknown-ID controls,
+and a paired tool call with a numeric field above 2^53. Seed response, original
+upstream bytes, attempt order and durable ownership remain independent checks;
+matching numeric rounding and missing history are rejected even in both products.
 
 Build and run from a clean, committed Godex worktree:
 

@@ -22,7 +22,7 @@ const bufferedChatResponseMaxBytes = 4 << 20
 func (transport *RuntimeTransport) executeChatCompatibleResponses(
 	ctx context.Context, input proxymodel.Request, current route,
 ) (*proxymodel.Response, error) {
-	body, metadata, err := prepareGeminiChatCompatibleRequest04384(input.Body)
+	body, metadata, err := prepareGeminiChatCompatibleRequest04384(input.Body, nil)
 	if err != nil {
 		var failure *proxymodel.Error
 		if errors.As(err, &failure) {
@@ -46,7 +46,8 @@ func (transport *RuntimeTransport) executeChatCompatibleResponses(
 	if geminiContentTypeIsSSE04384(response.Header.Get("Content-Type")) {
 		return translateGeminiChatCompatibleStream043711(response, metadata), nil
 	}
-	translated, err := translateGeminiChatOrNativeResponse043711(response, metadata)
+	conversation := &geminiChatConversation04384{store: transport.conversations.ForRequest(input), messages: geminiChatConversationMessages04384(body)}
+	translated, err := translateGeminiChatOrNativeResponse043711(response, metadata, conversation)
 	if err != nil {
 		return &proxymodel.Response{
 			StatusCode:       http.StatusBadGateway,
@@ -58,7 +59,7 @@ func (transport *RuntimeTransport) executeChatCompatibleResponses(
 	return translated, nil
 }
 
-func prepareGeminiChatCompatibleRequest04384(input []byte) ([]byte, map[string]any, error) {
+func prepareGeminiChatCompatibleRequest04384(input []byte, history []any) ([]byte, map[string]any, error) {
 	normalized, controls, err := normalizeGeminiChatInput043711(input)
 	if err != nil {
 		return nil, nil, err
@@ -68,6 +69,10 @@ func prepareGeminiChatCompatibleRequest04384(input []byte) ([]byte, map[string]a
 		return nil, nil, err
 	}
 	body, err := chatcompat.ResponsesRequestPreservingMessages(normalized, requestModel(input), "")
+	if err != nil {
+		return nil, nil, err
+	}
+	body, err = mergeGeminiChatHistory04384(body, normalized, history)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -238,7 +243,7 @@ func validGeminiChatControlTypes04384(request map[string]any) bool {
 // official provider-transform fallback does NOT reuse the chat completion's
 // ID, model, or usage: it emits an empty Gemini error envelope.
 func translateGeminiChatOrNativeResponse043711(
-	response *http.Response, requestMetadata map[string]any,
+	response *http.Response, requestMetadata map[string]any, conversation *geminiChatConversation04384,
 ) (*proxymodel.Response, error) {
 	if geminiContentTypeIsSSE04384(response.Header.Get("Content-Type")) {
 		return translateResponse(response, requestMetadata)
@@ -264,11 +269,16 @@ func translateGeminiChatOrNativeResponse043711(
 			return geminiChatFallbackResponse04384(response.StatusCode, requestMetadata)
 		}
 	}
-	native := *response
-	native.Body = io.NopCloser(bytes.NewReader(payload))
-	translated, err := translateResponseWithCallFallback04380(&native, requestMetadata, true)
+	object := geminiNativeResponsesValueWithFallback04380(normalizedGeminiResponse(root), requestMetadata, 0, true)
+	if err := normalizeGeminiAPIKeyBufferedValue04384(object, root); err != nil {
+		return nil, err
+	}
+	translated, err := jsonutil.MarshalSerdeValue04384(object)
 	if err != nil {
 		return nil, err
 	}
-	return normalizeGeminiAPIKeyBufferedIdentity043711(translated, root)
+	conversation.remember(object, root)
+	return &proxymodel.Response{StatusCode: response.StatusCode,
+		Header: translatedHeaders(response.Header, "application/json; charset=utf-8"),
+		Body:   io.NopCloser(bytes.NewReader(translated)), Trailer: response.Trailer.Clone()}, nil
 }

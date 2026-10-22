@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
@@ -24,6 +25,7 @@ type RuntimeTransport struct {
 	upstream       *url.URL
 	apiKey         string
 	chatCompatible bool
+	conversations  chatcompat.ConversationStore
 }
 
 func NewRuntimeTransport(apiURL, apiKey string, client *http.Client) (*RuntimeTransport, error) {
@@ -37,7 +39,7 @@ func NewRuntimeTransport(apiURL, apiKey string, client *http.Client) (*RuntimeTr
 	if strings.TrimSpace(apiKey) == "" {
 		return nil, errors.New("Gemini runtime API key is unavailable")
 	}
-	return &RuntimeTransport{client: cloneClient(client), upstream: parsed, apiKey: apiKey}, nil
+	return &RuntimeTransport{client: cloneClient(client), upstream: parsed, apiKey: apiKey, conversations: chatcompat.NewConversationStore()}, nil
 }
 
 func (transport *RuntimeTransport) Execute(ctx context.Context, input proxymodel.Request, _ proxymodel.Account) (*proxymodel.Response, error) {

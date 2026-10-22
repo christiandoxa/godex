@@ -1,6 +1,9 @@
 package main
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+)
 
 func geminiCompactNegativeControl04384() bool {
 	for _, scenario := range geminiCompactCases04384() {
@@ -31,6 +34,26 @@ func geminiCompactNegativeControl04384() bool {
 			run.Upstream[0].Body["model"] = "wrong-model"
 			wire, _ := json.Marshal(run.Upstream[0].Body)
 			run.Upstream[0].RawBody = string(wire)
+			if len(geminiCompare(scenario, run, run)) == 0 {
+				return false
+			}
+		}
+		if geminiCompactOwnershipSeed04384(scenario) {
+			run := geminiCompactExpected04384(scenario)
+			run.Client.Seed = nil
+			if len(geminiCompare(scenario, run, run)) == 0 {
+				return false
+			}
+			run = geminiCompactExpected04384(scenario)
+			run.Upstream[len(run.Upstream)-1].RawBody = `{}`
+			if len(geminiCompare(scenario, run, run)) == 0 {
+				return false
+			}
+		}
+		if scenario == "compact-owner-numeric" {
+			run := geminiCompactExpected04384(scenario)
+			last := &run.Upstream[len(run.Upstream)-1]
+			last.RawBody = strings.Replace(last.RawBody, "9007199254740993", "9007199254740992", 1)
 			if len(geminiCompare(scenario, run, run)) == 0 {
 				return false
 			}

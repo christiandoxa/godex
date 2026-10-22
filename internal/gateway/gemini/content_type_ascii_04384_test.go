@@ -46,7 +46,7 @@ func TestProdex04384GeminiUnicodeSSELookalikeStaysBufferedJSON(t *testing.T) {
 			var responseErr error
 			var body []byte
 			if chatCompatible {
-				translated, err := translateGeminiChatOrNativeResponse043711(upstream, nil)
+				translated, err := translateGeminiChatOrNativeResponse043711(upstream, nil, nil)
 				responseErr = err
 				if translated != nil {
 					defer translated.Body.Close()

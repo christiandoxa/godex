@@ -1179,7 +1179,9 @@ func runCodexShim(arguments []string) int {
 			return shimFailure("unknown Gemini Compact fixture")
 		}
 		requestBody = []byte(geminiCompactInput04384(scenario))
-		if scenario != "compact-control-responses" {
+		if geminiCompactOwnershipSeed04384(scenario) {
+			requestBody = []byte(geminiCompactOwnershipSeedInput04384(scenario))
+		} else if scenario != "compact-control-responses" {
 			endpoint.Path += "/compact"
 		}
 	}
@@ -1236,7 +1238,12 @@ func runCodexShim(arguments []string) int {
 			}
 			seed := clientResult
 			successfulSeed = &seed
-			requestBody = []byte(strings.TrimSuffix(string(requestBody), "}") + `,"previous_response_id":"chatcmpl-differential"}`)
+			if scenario := os.Getenv("DIFFERENTIAL_GEMINI_COMPACT"); geminiCompactOwnershipSeed04384(scenario) {
+				endpoint.Path += "/compact"
+				requestBody = []byte(geminiCompactInput04384(scenario))
+			} else {
+				requestBody = []byte(strings.TrimSuffix(string(requestBody), "}") + `,"previous_response_id":"chatcmpl-differential"}`)
+			}
 			continue
 		}
 		if response.StatusCode != http.StatusTooManyRequests || attempt+1 == maxAttempts {

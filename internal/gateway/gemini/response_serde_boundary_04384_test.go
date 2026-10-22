@@ -38,7 +38,7 @@ func TestProdex04384GeminiBufferedResponseRequiresCompleteSerdeJSON(t *testing.T
 				var resultErr error
 				var body []byte
 				if chat {
-					out, err := translateGeminiChatOrNativeResponse043711(response, nil)
+					out, err := translateGeminiChatOrNativeResponse043711(response, nil, nil)
 					resultErr = err
 					if out != nil {
 						body, _ = io.ReadAll(out.Body)

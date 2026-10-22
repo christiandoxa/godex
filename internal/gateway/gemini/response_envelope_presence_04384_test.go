@@ -91,7 +91,7 @@ func geminiEnvelopeResponse04384(wire string, chat bool) ([]byte, error) {
 	var response *proxymodel.Response
 	var err error
 	if chat {
-		response, err = translateGeminiChatOrNativeResponse043711(upstream, nil)
+		response, err = translateGeminiChatOrNativeResponse043711(upstream, nil, nil)
 	} else {
 		response, err = translateResponse(upstream, nil)
 	}

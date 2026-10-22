@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 )
 
@@ -50,7 +51,7 @@ func translateResponsesRequestWithHistory(body []byte, options RequestOptions, h
 	if err != nil {
 		return TranslatedRequest{}, err
 	}
-	parts.messages = repairDeepSeekToolCallAdjacency(mergeDeepSeekHistory(history, parts.messages))
+	parts.messages = repairDeepSeekToolCallAdjacency(chatcompat.MergeHistory(history, parts.messages))
 	if parts.thinking {
 		parts.messages = normalizeDeepSeekThinkingToolCallMessages(parts.messages)
 	}

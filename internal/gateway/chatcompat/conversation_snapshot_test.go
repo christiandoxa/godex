@@ -1,9 +1,19 @@
 package chatcompat
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 )
+
+func TestConversationSnapshotPreservesJSONNumbers(t *testing.T) {
+	store := NewConversationStore()
+	store.Insert("resp-numeric", []any{map[string]any{"value": json.Number("9007199254740993")}})
+	body, err := json.Marshal(store.History("resp-numeric"))
+	if err != nil || string(body) != `[{"value":9007199254740993}]` {
+		t.Fatalf("numeric snapshot rounded: %s, %v", body, err)
+	}
+}
 
 func TestConversationSnapshotsAreIndependent(t *testing.T) {
 	store := NewConversationStore().Scoped("synthetic-session")

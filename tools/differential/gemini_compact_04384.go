@@ -12,7 +12,7 @@ const geminiCompactInstructions04384 = "Compact the supplied coding-agent transc
 const geminiCompactPrefix04384 = "Another language model started to solve this problem and produced a summary of its thinking process. You also have access to the state of the tools that were used by that language model. Use this to build on the work that has already been done and avoid duplicating work. Here is the summary produced by the other language model, use the information in this summary to assist with your own analysis:"
 
 func geminiCompactCases04384() []string {
-	return []string{"compact-empty", "compact-active", "compact-controls", "compact-chat", "compact-content", "compact-responses", "compact-wrapped", "compact-wrapped-no-trace", "compact-fallback-empty", "compact-fallback-http", "compact-invalid-input", "compact-thought", "compact-limit-under", "compact-limit-at", "compact-limit-over", "compact-control-responses"}
+	return append([]string{"compact-empty", "compact-active", "compact-controls", "compact-chat", "compact-content", "compact-responses", "compact-wrapped", "compact-wrapped-no-trace", "compact-fallback-empty", "compact-fallback-http", "compact-invalid-input", "compact-thought", "compact-limit-under", "compact-limit-at", "compact-limit-over", "compact-control-responses"}, geminiCompactOwnershipCases04384()...)
 }
 
 func geminiCompactCase04384(scenario string) bool {
@@ -20,6 +20,9 @@ func geminiCompactCase04384(scenario string) bool {
 }
 
 func geminiCompactInput04384(scenario string) string {
+	if geminiCompactOwnershipName04384(scenario) {
+		return geminiCompactOwnershipInput04384(scenario)
+	}
 	if scenario == "compact-control-responses" {
 		return `{"model":"gemini-3.1-pro-preview","input":"same request","stream":false}`
 	}
@@ -70,6 +73,9 @@ func geminiCompactUpstream04384(scenario string) (int, string) {
 }
 
 func geminiCompactExpected04384(scenario string) geminiCandidateResult {
+	if geminiCompactOwnershipName04384(scenario) {
+		return geminiCompactOwnershipExpected04384(scenario)
+	}
 	if scenario == "compact-control-responses" {
 		return geminiUserIDExpected04384("request-user-id-absent")
 	}
@@ -133,6 +139,13 @@ func geminiCompactExpected04384(scenario string) geminiCandidateResult {
 }
 
 func geminiCompactInvariant04384(scenario string, result geminiCandidateResult) error {
+	if geminiCompactOwnershipSeed04384(scenario) {
+		seed := result.Client.Seed
+		want := geminiUserIDExpected04384("request-user-id-absent").Client
+		if seed == nil || seed.Seed != nil || seed.Status != want.Status || seed.Body != want.Body || seed.Headers.Get("Content-Type") != want.Headers.Get("Content-Type") {
+			return errors.New("Gemini Compact lacks an exact successful owner seed")
+		}
+	}
 	want := geminiCompactExpected04384(scenario)
 	if !geminiExactRequestResult04384(result, want) {
 		return errors.New("Gemini Compact lost original wire, selected model, raw summary, response, attempt or durable state")

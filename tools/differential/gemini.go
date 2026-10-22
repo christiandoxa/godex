@@ -104,10 +104,23 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	mock.mu.Lock()
 	mock.requests = append(mock.requests, record)
+	compactSeed := len(mock.requests) == 1 && geminiCompactOwnershipSeed04384(mock.scenario)
 	mock.mu.Unlock()
-	if mock.scenario == "compact-control-responses" {
+	if mock.scenario == "compact-control-responses" || compactSeed {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(w, geminiContinuationResponse04384())
+		body := geminiContinuationResponse04384()
+		if mock.scenario == "compact-owner-assistant" || mock.scenario == "compact-owner-numeric" {
+			extra := ""
+			if mock.scenario == "compact-owner-numeric" {
+				extra = `,"tool_calls":[{"id":"call-synthetic","type":"function","priority":9007199254740993,"function":{"name":"lookup","arguments":"{}"}}]`
+			}
+			content := `"synthetic cached assistant"`
+			if mock.scenario == "compact-owner-numeric" {
+				content = `null`
+			}
+			body = strings.TrimSuffix(body, "}") + `,"choices":[{"message":{"role":"user","content":` + content + extra + `}}]}`
+		}
+		_, _ = io.WriteString(w, body)
 		return
 	}
 	if geminiCompactCase04384(mock.scenario) && mock.scenario != "compact-control-responses" {
@@ -432,6 +445,9 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	env = append(env, "DIFFERENTIAL_PROVIDER=gemini")
 	if geminiCompactCase04384(scenario) {
 		env = append(env, "DIFFERENTIAL_GEMINI_COMPACT="+scenario)
+	}
+	if geminiCompactOwnershipSeed04384(scenario) {
+		env = append(env, "DIFFERENTIAL_CONTINUATION_PHASE=same-process")
 	}
 	if primitive {
 		env = append(env, "DIFFERENTIAL_REQUEST_PRIMITIVE="+scenario)
