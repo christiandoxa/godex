@@ -315,18 +315,6 @@ func deepSeekShellCallItem(item map[string]any) (map[string]any, error) {
 	return assistantToolCall(callID, "shell_command", arguments), nil
 }
 
-func deepSeekToolOutputItem(item map[string]any) (map[string]any, error) {
-	callID := firstStringValue(item, deepSeekCallIDKey, deepSeekToolCallIDKey, "id")
-	if strings.TrimSpace(callID) == "" {
-		return nil, errors.New(deepSeekToolCallIDRequired)
-	}
-	value, ok := firstExistingValue(item, "output", deepSeekContentKey, "result", "error")
-	if !ok {
-		return nil, errors.New("DeepSeek input tool output items require output content")
-	}
-	return map[string]any{"role": "tool", deepSeekToolCallIDKey: callID, deepSeekContentKey: compactValue(value)}, nil
-}
-
 func assistantToolCall(callID, name string, arguments any) map[string]any {
 	return map[string]any{
 		"role": "assistant", deepSeekContentKey: "",
@@ -355,15 +343,6 @@ func firstStringValue(object map[string]any, keys ...string) string {
 		}
 	}
 	return ""
-}
-
-func firstValue(object map[string]any, keys ...string) any {
-	for _, key := range keys {
-		if value, ok := object[key]; ok {
-			return value
-		}
-	}
-	return nil
 }
 
 func firstExistingValue(object map[string]any, keys ...string) (any, bool) {

@@ -41,6 +41,7 @@ func deepSeekAdmissionSuffixes04384() []string {
 	suffixes = append(suffixes, deepSeekMessageArgumentSuffixes04384()...)
 	suffixes = append(suffixes, deepSeekBridgeMessageSuffixes04384()...)
 	suffixes = append(suffixes, deepSeekMessageTextSuffixes04384()...)
+	suffixes = append(suffixes, deepSeekOutputTextSuffixes04384()...)
 	return append(suffixes, deepSeekFunctionArgumentSuffixes04384()...)
 }
 
@@ -89,6 +90,9 @@ func requestPrimitiveCase04384(scenario string) (requestPrimitiveFixture04384, b
 	suffix := strings.TrimPrefix(strings.TrimPrefix(scenario, "deepseek-"), "request-primitive-")
 	if strings.HasPrefix(suffix, "message-text-") {
 		return deepSeekMessageTextFixture04384(suffix)
+	}
+	if strings.HasPrefix(suffix, "output-text-") {
+		return deepSeekOutputTextFixture04384(suffix)
 	}
 	if strings.HasPrefix(suffix, "bridge-message-") {
 		return deepSeekBridgeMessageFixture04384(suffix)
