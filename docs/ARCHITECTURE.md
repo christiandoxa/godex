@@ -449,6 +449,10 @@ presence and type: `stream` must be a boolean, and `instructions` and
 `previous_response_id` must be strings. Invalid values return the existing
 terminal preparation 502 before a previous ID is removed or an ignored field
 is normalized. A non-string previous ID cannot become a fresh request.
+The same private admission rejects every present top-level `prefix`, `suffix`
+or `prompt`, including null, false and empty values: beta completion requests
+cannot become ordinary Responses work. Earlier candidate/tool errors retain
+their structured 400 precedence; unrelated nested metadata remains unchanged.
 DeepSeek independently checks present `stream` as a boolean and present
 `instructions`/`previous_response_id` as strings before constructing its
 translated request. Invalid types use its common terminal preparation boundary,

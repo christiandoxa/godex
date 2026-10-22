@@ -6097,3 +6097,86 @@ Clean-commit 221-case Gemini and 213-case DeepSeek qualification follows.
 Native OAuth execution, other controls and combined errors, Gemini Compact,
 executable session/turn continuation, native macOS/Windows and live login
 remain unproven. Global 1:1 parity is not claimed.
+
+
+## Retained reference restart mismatch on 4c270db
+
+The first unchanged clean `4c270dbd273182ecb2803eb2126ee9a705a52f49`
+199-case Gemini report FAILs exactly `raw-key-bound-response-restart-key`:
+`/tmp/gdx-04384-gemini-tool-priority-oracle.json`.
+The reference seed returns 200 with one original attempt and verified durable
+ownership, but its changed-key restart unexpectedly returns 200 with a second
+upstream attempt. Godex returns the expected terminal 503, exit 2 and no new
+attempt. This is not an orphan-temp-file failure. The cause remains unexplained.
+All other 198 cases pass, as does the separately pinned 213-case DeepSeek matrix.
+
+The isolated unchanged restart rerun PASSes with both products returning
+503, exit 2 and only the seed upstream attempt:
+`/tmp/gdx-04384-gemini-tool-priority-restart-key-rerun-oracle.json`.
+A full unchanged 199-case rerun is pending:
+`/tmp/gdx-04384-gemini-tool-priority-rerun-oracle.json`.
+No assertion, expected status, owner policy or state allowlist was changed.
+The original full report remains FAIL and this candidate is withheld from
+`origin/main` pending complete executable qualification.
+
+
+## Gemini top-level beta completions cannot become Responses work
+
+Pinned `runtime_provider_chat_compatible_request_body` rejects beta completion
+fields before shared shape/history conversion. Mojo `deepseek_beta_fields_plan`
+rejects the presence of root `prefix`, `suffix` or `prompt`, regardless of the
+value. The tagged local pipeline presents this preparation failure as plain
+terminal 502 with no provider attempt. Earlier Gemini candidate/tool validation
+still has its structured 400 precedence, after complete serde admission.
+
+Godex silently discarded these root fields and executed an ordinary Responses
+request. The Gemini gateway's existing private control-admission function now
+rejects all three present fields before conversion. The entire production
+change is five lines; no shared helper, package, interface, dependency,
+configuration, worker, exported API or durable-state format is added. The
+existing generic terminal preparation error keeps model/credential routing
+from replaying or waiting. Unrelated nested metadata remains ignored normally.
+DeepSeek and native Gemini code retain their existing separate policies.
+Input-item beta fields and other input-shape decisions remain a separate audit.
+
+Before repair six controls pass and 17 tests fail, including parents:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384Gemini(RejectsPresentBetaCompletionFields|RequestAdmissionDoesNotRetryModelOrCredential)$' -count=1`;
+`/tmp/gdx-04384-gemini-beta-admission-cross-before.log`.
+The same command passes all 23 tests after repair:
+`/tmp/gdx-04384-gemini-beta-admission-focused.log`.
+The two-key real gateway/router regression verifies zero upstream attempts and
+no retry wait for all three fields; malformed JSON and candidate-count controls
+remain in the same table.
+
+Eleven executable baselines pin clean
+`5f49a5ff86b6399fadb65ddb18ba649097ffe6b0`, the unchanged published reference
+and `/tmp/gdx-04384-gemini-beta-admission-before-differential`:
+`/tmp/gdx-04384-gemini-beta-<suffix>-before-oracle.json`.
+Seven present-field cases FAIL only Godex, which returns 200 after one upstream
+attempt instead of plain 502/exit 2/zero attempts. Four controls PASS: nested
+metadata, earlier malformed tools, earlier invalid candidate and invalid
+Unicode. All reference and independent mutation invariants pass. Commands use
+`--gemini --scenario request-primitive-beta-<suffix>` and exact clean source/
+commit pins. Existing exact request/response/status/header/stdout/exit/attempt/
+state assertions and independent matching-corruption mutations cover the cases.
+
+`rtk go test ./tools/differential -count=1` passes 281 tests:
+`/tmp/gdx-04384-gemini-beta-admission-oracle-tests.log`.
+`rtk proxy go test -json ./...` passes 9,808 tests across 71 packages; ten
+packages have no tests and 18 optional installed-Codex/executable tests skip:
+`/tmp/gdx-04384-gemini-beta-admission-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+passes 3,021 tests: `/tmp/gdx-04384-gemini-beta-admission-race.log`.
+`rtk proxy make verify` PASSes the full local gate:
+`/tmp/gdx-04384-gemini-beta-admission-verify.log`.
+Clean-commit 232-case Gemini and 213-case DeepSeek matrices follow. Protected
+`5f49a5f` separately runs its 221-case Gemini/213-case DeepSeek qualification
+and the entire default gate from `/tmp/gdx-04384-release-5f49a5f-work`:
+`rtk proxy scripts/verify-release-parity.sh > /tmp/gdx-04384-release-5f49a5f.log 2>&1`.
+Its four exact clean targeted candidate null/equal-floats/tools/controls reports
+PASS: `/tmp/gdx-04384-gemini-candidate-<suffix>-targeted-oracle.json`.
+The complete default-gate PASS remains scoped to `8d618e0` until every newer
+stage exits successfully, including the final HTTP stages after the phase
+marker. Other input/response controls, Gemini Compact, executable session/turn
+continuation, native macOS/Windows and live authentication remain unproven.
+Global 1:1 parity is not claimed.

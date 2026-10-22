@@ -22,6 +22,9 @@ func TestProdex04384GeminiRequestAdmissionDoesNotRetryModelOrCredential(t *testi
 	}{
 		{"null", "", 500},
 		{"{bad", "upstream request failed", 502},
+		{`{"input":"synthetic","prefix":null}`, "upstream request failed", 502},
+		{`{"input":"synthetic","suffix":""}`, "upstream request failed", 502},
+		{`{"input":"synthetic","prompt":false}`, "upstream request failed", 502},
 		{`{"input":"synthetic","candidate_count":2}`, "invalid_candidate_count: Gemini request field `candidate_count` must be omitted, null, or 1", 400},
 		{`{"input":"synthetic","candidateCount":2}`, "invalid_candidate_count: Gemini request field `candidateCount` must be omitted, null, or 1", 400},
 		{`{"input":"synthetic","candidate_count":1,"candidateCount":2}`, "invalid_candidate_count: Gemini request fields `candidate_count` and `candidateCount` conflict", 400},

@@ -361,6 +361,12 @@ still wins first. Rejections require exact structured 400 messages, terminal
 headers, exit 2 and zero attempts. Accepted counts are omitted on the Chat wire.
 The same independent body/header/exit/attempt/state mutations cover these cases.
 
+Gemini `request-primitive-beta-*` rejects present top-level completion
+`prefix`, `suffix` and `prompt`, including null, false and empty strings, with
+plain terminal 502 and zero attempts. Controls retain unrelated nested metadata,
+earlier candidate/tool structured 400s and complete serde failure precedence.
+Original request bytes and all existing independent mutations remain checked.
+
 DeepSeek scenario workers evaluate their complete independent invariants as
 each scenario finishes, preserving failures in the ordered report. The strict
 five-minute generated SSE timestamp window is unchanged; later cases cannot
