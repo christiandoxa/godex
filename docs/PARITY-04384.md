@@ -9746,3 +9746,21 @@ Exact commands:
 `rtk proxy go test -json ./... > /tmp/gdx-04384-gemini-stream-failed-text-snapshot-full.jsonl 2>&1`
 and `rtk proxy make verify > /tmp/gdx-04384-gemini-stream-failed-text-snapshot-verify.log 2>&1`.
 Exact clean candidate executable qualification follows before publication.
+
+Exact clean 3399a8c360aa5c52fbb06c0dceee80dd854569f7 executable qualification
+PASSes all 24 cases (original session 50897, exit 0). This includes all ten
+baseline scenarios and fourteen prior snapshot, cache-negative, pending,
+numeric, reasoning, shell, multi-turn and orphan-tool controls. All five
+Godex-only baseline failures now satisfy the original independent seed and
+following Compact invariants. Audit:
+/tmp/gdx-04384-gemini-stream-failed-text-snapshot-targeted-audit.json.
+Pinned reference source/binary/manifest, clean source and embedded artifact
+VCS metadata, exact request/wire/status/stdout/headers, attempts/auth/slot,
+durable state and matching-corruption guards were checked. Full Gemini 974
+is running in original session 59683 against that immutable source; report:
+/tmp/gdx-04384-gemini-stream-failed-text-snapshot-oracle.json. It is not a
+full974 PASS. Candidate 3399a8c was pushed directly to origin/main after
+fetch, clean-primary and ancestry checks, without waiting for CI. Later
+matrix results remain source-scoped; the latest completed full-Gemini
+qualification remains 912 at 9e4b808. Original fixture errors, prior full
+reference state-integrity failures and other unqualified limits stay retained.
