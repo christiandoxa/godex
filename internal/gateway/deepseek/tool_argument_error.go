@@ -23,6 +23,14 @@ func deepSeekToolArgumentError(name, arguments string, cause error) error {
 			diagnostic = "expected `,` or `}`"
 		case strings.Contains(syntax.Error(), "after object key"):
 			diagnostic = "expected `:`"
+		case strings.Contains(syntax.Error(), "after array element"):
+			diagnostic = "expected `,` or `]`"
+		case strings.Contains(syntax.Error(), "after top-level value"):
+			diagnostic = "trailing characters"
+		case strings.Contains(syntax.Error(), "looking for beginning of value") &&
+			arguments[syntax.Offset-1] == ']' &&
+			strings.HasSuffix(strings.TrimSpace(arguments[:syntax.Offset-1]), ","):
+			diagnostic = "trailing comma"
 		}
 		if diagnostic != "" {
 			// Serde columns count UTF-8 bytes, including the unexpected byte.

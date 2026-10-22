@@ -326,8 +326,8 @@ history). Shared RTK argument shaping stays in `gateway/chatcompat`.
 Private `gateway/deepseek/tool_arguments.go` owns structured tool-search and
 streamed apply-patch argument decoding; generic serde number serialization
 stays in `helper/jsonutil`.
-Private `gateway/deepseek/tool_object_error.go` formats buffered object-syntax
-diagnostics at the provider boundary; it runs only after argument validation fails.
+Private `gateway/deepseek/tool_argument_error.go` formats buffered object/array
+and trailing-input syntax diagnostics after argument validation fails.
 Private `buffered_fragment.go` reproduces the tagged 256-depth structural view
 for ordinary buffered arguments without interpreting primitive or escape contents.
 `buffered_fragment_error.go` preserves earlier serde range/surrogate failures

@@ -114,6 +114,9 @@ original argument strings, the pinned serde diagnostic where applicable,
 HTTP status/type, stdout, child exit, one exact authenticated upstream request,
 zero retries and safe durable state. The surrogate and two depth-boundary
 cases are positive controls. Equal corrupted outputs fail independent invariants.
+The array-comma, array-separator and trailing suffixes, plus their search-
+prefixed equivalents, require the exact serde array/trailing-input diagnostics
+for ordinary tools and structured tool-search calls.
 
 The 0.438.4 `deepseek-sse-error-presence`, `deepseek-sse-error-i64` and
 `deepseek-sse-error-float` scenarios verify embedded-error primary-field

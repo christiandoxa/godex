@@ -3452,3 +3452,57 @@ passes 792 tests: `/tmp/gdx-04384-buffered-fragment-race.log`.
 shuffled race suite, cross-platform build/test compilation, installers and build.
 Log: `/tmp/gdx-04384-buffered-fragment-verify.log`.
 Clean-commit executable gates follow.
+
+
+## Validated pushed checkpoint: e9ccedc
+
+Clean `e9ccedcdfe82afd01707a37260d79a1db6ebc1e1` passes all 89 released
+DeepSeek scenarios and their independent mutation controls, including the ten
+new bounded-view cases. Report:
+`/tmp/gdx-04384-buffered-fragment-oracle.json`.
+The primary worktree was clean and `origin/main` unchanged before fast-forward
+integration and direct push. No force push, tag, release or unrelated editor
+change occurred. The default full release gate is being rerun separately; this
+89-case result is not a complete release or global parity claim.
+
+
+## Buffered array and trailing-input syntax diagnostics
+
+The next pinned serde probe and released-executable comparison identify three
+more diagnostic contexts: array trailing comma, missing array separator and
+trailing input after a complete value. Both ordinary and structured-search
+tool arguments fail with the reference's exact syntax messages; Godex retained
+Go decoder text or a generic structured-search error.
+
+The existing private formatter gains three mappings. Its file is renamed from
+`gateway/deepseek/tool_object_error.go` to `tool_argument_error.go` to describe
+its broader syntax ownership. Accepted inputs, raw-view depth, streaming,
+routing and state are unchanged. No new parser, helper, exported API,
+dependency, option or worker is introduced.
+
+`rtk go test ./internal/gateway/deepseek -run '^TestProdex04384BufferedArrayAndTrailingSyntaxDiagnostics$' -count=1`
+fails all eighteen tool/argument cases and their parent before repair:
+`/tmp/gdx-04384-buffered-array-before.log`.
+The cases cover ordinary lookup, apply-patch and structured search, mismatched
+closers, Unicode byte columns, newline positions and string-valued elements.
+`rtk go test ./internal/gateway/deepseek ./tools/differential -run '^TestProdex04384Buffered' -count=1`
+then passes 52 tests, retaining accepted opaque/depth/search controls:
+`/tmp/gdx-04384-buffered-array-focused.log`.
+
+Six strict executable cases use array-comma, array-separator, trailing,
+search-array-comma, search-array-separator and search-trailing suffixes. On
+clean `e9ccedc`, every reference trace meets the exact expected failed envelope,
+status/type, stdout, exit, authenticated original request, single attempt,
+zero retries and safe durable-state contract; every Godex trace fails only its
+response bytes and corresponding framing. Reports:
+`/tmp/gdx-04384-buffered-<suffix>-before-oracle.json`.
+The existing independent corruption tests automatically cover these fixtures.
+
+`rtk go test -race ./internal/gateway/deepseek ./tools/differential -count=1`
+passes 811 tests: `/tmp/gdx-04384-buffered-array-race.log`.
+`rtk go test ./...` passes 9,223 tests across 81 packages:
+`/tmp/gdx-04384-buffered-array-test-all.log`.
+`rtk proxy make verify` passes formatting, source/TUI guards, vet, the full
+shuffled race suite, cross-platform build/test compilation, installers and build.
+Log: `/tmp/gdx-04384-buffered-array-verify.log`.
+Clean-commit executable gates follow.

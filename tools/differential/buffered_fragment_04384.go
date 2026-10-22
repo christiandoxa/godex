@@ -6,7 +6,7 @@ import (
 )
 
 func bufferedFragmentCases04384() []string {
-	return []string{"deepseek-buffered-view-literal", "deepseek-buffered-view-overflow", "deepseek-buffered-view-escape", "deepseek-buffered-view-surrogate", "deepseek-buffered-view-depth-limit", "deepseek-buffered-view-depth-empty", "deepseek-buffered-view-depth-over", "deepseek-buffered-view-early-surrogate", "deepseek-buffered-view-early-range", "deepseek-buffered-view-patch"}
+	return []string{"deepseek-buffered-view-literal", "deepseek-buffered-view-overflow", "deepseek-buffered-view-escape", "deepseek-buffered-view-surrogate", "deepseek-buffered-view-depth-limit", "deepseek-buffered-view-depth-empty", "deepseek-buffered-view-depth-over", "deepseek-buffered-view-early-surrogate", "deepseek-buffered-view-early-range", "deepseek-buffered-view-patch", "deepseek-buffered-view-array-comma", "deepseek-buffered-view-array-separator", "deepseek-buffered-view-trailing", "deepseek-buffered-view-search-array-comma", "deepseek-buffered-view-search-array-separator", "deepseek-buffered-view-search-trailing"}
 }
 
 func bufferedFragmentFixture04384(phase string) (name, arguments, diagnostic string) {
@@ -32,6 +32,18 @@ func bufferedFragmentFixture04384(phase string) (name, arguments, diagnostic str
 		return "lookup", `{"v":1e309,"deep":` + deep + `}`, "number out of range at line 1 column 10"
 	case "deepseek-buffered-view-patch":
 		return "apply_patch", "truex", ""
+	case "deepseek-buffered-view-array-comma":
+		return "lookup", "[1,]", "trailing comma at line 1 column 4"
+	case "deepseek-buffered-view-array-separator":
+		return "lookup", "[1 2]", "expected `,` or `]` at line 1 column 4"
+	case "deepseek-buffered-view-trailing":
+		return "lookup", "{} true", "trailing characters at line 1 column 4"
+	case "deepseek-buffered-view-search-array-comma":
+		return "tool_search", "[1,]", "trailing comma at line 1 column 4"
+	case "deepseek-buffered-view-search-array-separator":
+		return "tool_search", "[1 2]", "expected `,` or `]` at line 1 column 4"
+	case "deepseek-buffered-view-search-trailing":
+		return "tool_search", "{} true", "trailing characters at line 1 column 4"
 	}
 	return "", "", ""
 }

@@ -69,3 +69,26 @@ func TestProdex04384BufferedStructuredSearchRetainsSerdeAdmission(t *testing.T) 
 		}
 	}
 }
+
+func TestProdex04384BufferedArrayAndTrailingSyntaxDiagnostics(t *testing.T) {
+	for _, fixture := range []struct{ arguments, diagnostic string }{
+		{`[1,]`, "trailing comma at line 1 column 4"},
+		{`[1 2]`, "expected `,` or `]` at line 1 column 4"},
+		{"[1}\n", "expected `,` or `]` at line 1 column 3"},
+		{`{} true`, "trailing characters at line 1 column 4"},
+		{"\n[\"雪\" 2]", "expected `,` or `]` at line 2 column 8"},
+		{`["a",]`, "trailing comma at line 1 column 6"},
+	} {
+		for _, name := range []string{"lookup", "tool_search", "apply_patch"} {
+			t.Run(name+"/"+fixture.arguments, func(t *testing.T) {
+				_, err := deepSeekResponseToolItem(map[string]any{"function": map[string]any{
+					"name": name, "arguments": fixture.arguments,
+				}})
+				want := "DeepSeek returned malformed JSON arguments for tool call `" + name + "`: " + fixture.diagnostic
+				if err == nil || err.Error() != want {
+					t.Fatalf("syntax diagnostic = %v, want %q", err, want)
+				}
+			})
+		}
+	}
+}
