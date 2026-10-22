@@ -40,6 +40,7 @@ func geminiPreparationSuffixes04384() []string {
 	suffixes = append(suffixes, geminiInputItemSuffixes04384()...)
 	suffixes = append(suffixes, geminiInputKindSuffixes04384()...)
 	suffixes = append(suffixes, geminiMessageRoleSuffixes04384()...)
+	suffixes = append(suffixes, geminiContentTypeSuffixes04384()...)
 	return append(suffixes, []string{"preparation-tools", "preparation-reasoning", "preparation-tool-params", "preparation-tool-missing-params",
 		"preparation-tool-missing-name", "preparation-tool-description", "preparation-input",
 		"tool-priority-stream", "tool-priority-temperature", "tool-priority-tokens", "tool-priority-user", "tool-priority-input", "tool-priority-reasoning", "tool-priority-serde"}...)
@@ -51,6 +52,9 @@ func requestPrimitiveCase04384(scenario string) (requestPrimitiveFixture04384, b
 	}
 	const stops16 = `["s01","s02","s03","s04","s05","s06","s07","s08","s09","s10","s11","s12","s13","s14","s15","s16"]`
 	suffix := strings.TrimPrefix(strings.TrimPrefix(scenario, "deepseek-"), "request-primitive-")
+	if strings.HasPrefix(suffix, "message-content-") {
+		return geminiContentTypeFixture04384(suffix)
+	}
 	if strings.HasPrefix(suffix, "message-role-") {
 		return geminiMessageRoleFixture04384(suffix)
 	}

@@ -466,6 +466,9 @@ message normalization. Explicit message roles must be absent or exactly user,
 assistant, system or developer before shared conversion; malformed roles cannot
 default to user. This package-local step has one caller and owns a concrete
 protocol invariant, so it does not belong in a shared helper package.
+Present content on an explicit message must be a string, object or array.
+Null, boolean and numeric roots fail before shared conversion can discard
+the invalid message and execute only the remaining valid input.
 DeepSeek independently checks present `stream` as a boolean and present
 `instructions`/`previous_response_id` as strings before constructing its
 translated request. Invalid types use its common terminal preparation boundary,

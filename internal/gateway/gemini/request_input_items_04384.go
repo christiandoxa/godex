@@ -17,6 +17,13 @@ func normalizeGeminiChatInputItems04384(value any) bool {
 						return false
 					}
 				}
+				if content, present := item["content"]; present {
+					switch content.(type) {
+					case string, map[string]any, []any:
+					default:
+						return false
+					}
+				}
 			case "function_call", "custom_tool_call", "mcp_call", "local_shell_call",
 				"function_call_output", "custom_tool_call_output", "mcp_tool_result", "mcp_call_output":
 			default:

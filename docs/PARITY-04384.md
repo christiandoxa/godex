@@ -6392,3 +6392,76 @@ call IDs/names/output validation, instructions-only behavior and remaining
 request/response controls still require source audit and executable proof.
 Gemini Compact, executable session/turn continuation, native macOS/Windows and
 live authentication remain unproven. Global 1:1 parity is not claimed.
+
+
+## Validated top-level beta admission checkpoint: a82be84
+
+Clean `a82be84bb77f124ac2f02fa3fc01a43c1be13918` passes all 232 Gemini
+cases and 213 DeepSeek scenarios with independent mutation controls:
+`/tmp/gdx-04384-gemini-beta-admission-oracle.json` and
+`/tmp/gdx-04384-gemini-beta-admission-deepseek-oracle.json`.
+Clean builds use
+`rtk go build -trimpath -o /tmp/gdx-04384-gemini-beta-admission-godex ./cmd/godex` and
+`rtk go build -trimpath -o /tmp/gdx-04384-gemini-beta-admission-final-differential ./tools/differential`.
+The commands use `--gemini`, or `--scenario all --scenario-workers 3`, exact
+clean source/commit pins and the unchanged published reference. After fetching
+and checking the clean primary and remote, `a82be84` was fast-forwarded and
+pushed directly to `origin/main` without waiting for CI. Main is `a82be84`.
+No force push, tag, release or editor-checkout edit occurred.
+The protected `5f49a5f` full default gate has passed its Gemini and WebSocket
+continuation stages but is still running; its complete PASS is not claimed.
+
+
+## Gemini invalid message-content roots cannot disappear during conversion
+
+Pinned `deepseek_input_item_content_tag` accepts a present explicit-message
+content root only as string, object or array. Null, boolean and numeric values
+return an input-shape error, presented by the API-key pipeline as terminal
+plain 502 before upstream dispatch. This is separate from content-part rules.
+
+Godex's shared converter silently discarded such a message and could execute
+using the valid message that followed it. The existing private Gemini input-item
+admission now checks the content root before shared conversion. The change is
+one local type switch; no helper, package, interface, dependency, worker,
+configuration, exported API or persisted format is added. The native Gemini
+translator and shared Claude policy stay independent. Earlier candidate/tool
+structured 400 errors and complete serde admission keep their precedence.
+String and text-part-array controls retain exact canonical upstream bytes.
+
+Before repair 15 controls pass and nine tests fail, including parents:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384Gemini(ExplicitMessageContentRequiresSupportedShape|RequestAdmissionDoesNotRetryModelOrCredential)$' -count=1`;
+`/tmp/gdx-04384-gemini-content-types-before.log`.
+The same command passes all 24 tests after repair:
+`/tmp/gdx-04384-gemini-content-types-focused.log`.
+The real two-key gateway/router table proves mixed invalid/valid content never
+creates an upstream attempt or retry wait.
+
+Eight executable baselines pin clean
+`0830ef5b92c001e36bae6e3a223cbfdd8ddba76a`, the unchanged reference and
+`/tmp/gdx-04384-gemini-content-types-before-differential`:
+`/tmp/gdx-04384-gemini-content-<suffix>-before-oracle.json`.
+The null, boolean and number cases FAIL only Godex, which executes the remaining
+message. Five controls PASS: string/array content, earlier tools/candidates and
+invalid Unicode. Every reference and independent mutation invariant passes.
+Commands use `--gemini --scenario request-primitive-message-content-<suffix>`
+with exact clean source/commit pins. Original JSON, canonical upstream bytes,
+exact response/status/headers/stdout/exit, attempt counts and safe durable state
+retain the existing independent matching-corruption checks.
+
+`rtk go test ./tools/differential -count=1` passes 281 tests:
+`/tmp/gdx-04384-gemini-content-types-oracle-tests.log`.
+`rtk proxy go test -json ./...` passes 9,855 tests in 71 packages; ten packages
+have no tests and 18 optional installed-Codex/executable tests are skipped:
+`/tmp/gdx-04384-gemini-content-types-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+passes 3,068 tests: `/tmp/gdx-04384-gemini-content-types-race.log`.
+`rtk proxy make verify` PASSes the complete local gate:
+`/tmp/gdx-04384-gemini-content-types-verify.log`.
+Clean-commit 286-case Gemini and 213-case DeepSeek qualification follows.
+Earlier input-item/kind/role Gemini matrices and the entire default `5f49a5f`
+gate remain pending. Main remains the qualified published `a82be84`; older
+reference failures remain FAIL. Content-part validation/conversion, call IDs/
+names/output, instructions-only input and remaining request/response controls
+still require audit and executable proof. Gemini Compact, executable session/
+turn continuation, native macOS/Windows and live authentication remain unproven.
+Global 1:1 parity is not claimed.

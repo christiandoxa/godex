@@ -386,6 +386,12 @@ omitted role and escaped user, preserving exact canonical request bytes;
 earlier candidate/tool errors and invalid Unicode retain their prior outcomes.
 All rejected cases require plain terminal 502, exit 2 and zero upstream work.
 
+Gemini `request-primitive-message-content-*` places null/boolean/numeric
+explicit-message content before a valid message, preventing silent discard
+followed by an ordinary upstream attempt. String and text-part-array controls
+retain exact canonical bytes; earlier candidate/tool errors and invalid Unicode
+retain their exact terminal outcomes and independent mutation checks.
+
 DeepSeek scenario workers evaluate their complete independent invariants as
 each scenario finishes, preserving failures in the ordered report. The strict
 five-minute generated SSE timestamp window is unchanged; later cases cannot
