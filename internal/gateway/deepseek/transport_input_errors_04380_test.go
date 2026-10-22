@@ -52,6 +52,14 @@ func TestProdex04380DeepSeekInvalidInputIsTerminalBeforeUpstream(t *testing.T) {
 		{"boolean-stop", `{"input":"same request","stop":false}`},
 		{"mixed-stop", `{"input":"same request","stop":["STOP",1]}`},
 		{"shadow-null-stop", `{"input":"same request","stop":null,"stop_sequences":"SECOND"}`},
+		{"null-stream", `{"input":"same request","stream":null}`},
+		{"string-stream", `{"input":"same request","stream":"true"}`},
+		{"numeric-stream", `{"input":"same request","stream":7}`},
+		{"null-instructions", `{"input":"same request","instructions":null}`},
+		{"array-instructions", `{"input":"same request","instructions":[]}`},
+		{"null-previous-response", `{"input":"same request","previous_response_id":null}`},
+		{"array-previous-response", `{"input":"same request","previous_response_id":[]}`},
+		{"numeric-previous-response", `{"input":"same request","previous_response_id":7}`},
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
 			calls.Store(0)

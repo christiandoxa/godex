@@ -304,6 +304,14 @@ must not override a valid selected value, while a selected null cannot fall
 through to a valid alias. Both products must satisfy independent fixed request,
 response, authentication, exit/stdout, attempt and durable-state contracts.
 
+The DeepSeek-only `deepseek-request-primitive-admission-*` suffixes cover
+`stream-false`, `stream-null`, `stream-string`, `stream-number`,
+`instructions-null`, `instructions-array`, `previous-null`, `previous-array`
+and `previous-number`. The valid false control must retain the exact original
+authenticated request and response; wrong types require terminal plain 502,
+exit 2 and zero attempts. The existing primitive mutation contracts also cover
+these fixtures. They add no duplicate cases to the Gemini executable matrix.
+
 DeepSeek scenario workers evaluate their complete independent invariants as
 each scenario finishes, preserving failures in the ordered report. The strict
 five-minute generated SSE timestamp window is unchanged; later cases cannot

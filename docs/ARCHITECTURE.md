@@ -421,8 +421,12 @@ presence and type: `stream` must be a boolean, and `instructions` and
 `previous_response_id` must be strings. Invalid values return the existing
 terminal preparation 502 before a previous ID is removed or an ignored field
 is normalized. A non-string previous ID cannot become a fresh request.
-The same adapter preserves the released admission outcomes for the complete
-body: parse/serde failures use the terminal plain 502, while a valid nonobject
+DeepSeek independently checks present `stream` as a boolean and present
+`instructions`/`previous_response_id` as strings before constructing its
+translated request. Invalid types use its existing terminal preparation class,
+so a malformed control cannot become a default non-streaming or fresh request.
+The Gemini adapter preserves the released complete-body admission outcomes:
+parse/serde failures use the terminal plain 502, while a valid nonobject
 JSON root produces an empty 500 with no content type. The latter response
 carries local non-retryable precommit evidence, so a status normally associated
 with provider failure cannot trigger model or credential attempts. Neither

@@ -22,6 +22,11 @@ func requestPrimitiveSuffixes04384() []string {
 		"stop-shadow-null", "stop-null", "stop-bool", "stop-array-number", "stop-limit", "stop-over"}
 }
 
+func deepSeekAdmissionSuffixes04384() []string {
+	return []string{"admission-stream-false", "admission-stream-null", "admission-stream-string", "admission-stream-number",
+		"admission-instructions-null", "admission-instructions-array", "admission-previous-null", "admission-previous-array", "admission-previous-number"}
+}
+
 func requestPrimitiveCase04384(scenario string) (requestPrimitiveFixture04384, bool) {
 	if !strings.HasPrefix(scenario, "request-primitive-") && !strings.HasPrefix(scenario, "deepseek-request-primitive-") {
 		return requestPrimitiveFixture04384{}, false
@@ -117,6 +122,24 @@ func requestPrimitiveCase04384(scenario string) (requestPrimitiveFixture04384, b
 		return requestPrimitiveFixture04384{fields: `"stop":` + stops16, wireStop: stops16}, true
 	case "stop-over":
 		return requestPrimitiveFixture04384{fields: `"stop":` + strings.TrimSuffix(stops16, "]") + `,"s17"]`, reject: true}, true
+	case "admission-stream-false":
+		return requestPrimitiveFixture04384{fields: `"stream":false`}, true
+	case "admission-stream-null":
+		return requestPrimitiveFixture04384{fields: `"stream":null`, reject: true}, true
+	case "admission-stream-string":
+		return requestPrimitiveFixture04384{fields: `"stream":"true"`, reject: true}, true
+	case "admission-stream-number":
+		return requestPrimitiveFixture04384{fields: `"stream":7`, reject: true}, true
+	case "admission-instructions-null":
+		return requestPrimitiveFixture04384{fields: `"instructions":null`, reject: true}, true
+	case "admission-instructions-array":
+		return requestPrimitiveFixture04384{fields: `"instructions":[]`, reject: true}, true
+	case "admission-previous-null":
+		return requestPrimitiveFixture04384{fields: `"previous_response_id":null`, reject: true}, true
+	case "admission-previous-array":
+		return requestPrimitiveFixture04384{fields: `"previous_response_id":[]`, reject: true}, true
+	case "admission-previous-number":
+		return requestPrimitiveFixture04384{fields: `"previous_response_id":7`, reject: true}, true
 	}
 	return requestPrimitiveFixture04384{}, false
 }
@@ -209,7 +232,7 @@ func geminiPrimitiveInvariant04384(scenario string, result geminiCandidateResult
 }
 
 func requestPrimitiveNegativeControl04384() bool {
-	for _, suffix := range requestPrimitiveSuffixes04384() {
+	for _, suffix := range append(requestPrimitiveSuffixes04384(), deepSeekAdmissionSuffixes04384()...) {
 		scenario := "request-primitive-" + suffix
 		gemini := geminiPrimitiveExpected04384(scenario)
 		deepseek := deepSeekPrimitiveExpected04384(scenario)

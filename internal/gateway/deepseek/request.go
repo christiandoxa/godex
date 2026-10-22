@@ -80,6 +80,9 @@ func parseResponsesObject(body []byte) (map[string]any, error) {
 	if err := checkRequestPolicySize(object); err != nil {
 		return nil, err
 	}
+	if err := validateDeepSeekControlTypes04384(object); err != nil {
+		return nil, err
+	}
 	if err := rejectRequestFields(object); err != nil {
 		return nil, err
 	}

@@ -352,7 +352,7 @@ func run() error {
 			return runRecoverAfter503(root, mock, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit)
 		}},
 	}
-	for _, suffix := range requestPrimitiveSuffixes04384() {
+	for _, suffix := range append(requestPrimitiveSuffixes04384(), deepSeekAdmissionSuffixes04384()...) {
 		name := "deepseek-request-primitive-" + suffix
 		specs = append(specs, differentialScenario043713{name, func(mock *mockServer) (scenarioResult, error) {
 			return runPair(root, mock, name, mockPlan{}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{primitiveControl: name})

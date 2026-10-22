@@ -5514,3 +5514,91 @@ Clean-commit 185-case Gemini and 169-case DeepSeek matrices follow.
 Other controls, combined-error ordering, Gemini Compact, executable session/
 turn continuation, native macOS/Windows and live authentication remain open.
 Global 1:1 parity is not claimed.
+
+
+## Validated ignored-sampling and committed-oracle checkpoint: 0ad214c
+
+Clean `0ad214cb731dae535f330e530accb2eb6c2ec028` passes all 174 Gemini cases
+and all 169 DeepSeek scenarios, including independent mutation checks:
+`/tmp/gdx-04384-gemini-ignored-sampling-oracle.json` and
+`/tmp/gdx-04384-gemini-ignored-sampling-deepseek-oracle.json`.
+Both reports use the committed completion-time invariant repair, unchanged
+published 0.438.4 reference and exact clean candidate. Earlier reference-state
+and late-clock FAIL reports remain FAIL and are retained above.
+
+The clean binaries were built with
+`rtk go build -trimpath -o /tmp/gdx-04384-gemini-ignored-sampling-godex ./cmd/godex` and
+`rtk go build -trimpath -o /tmp/gdx-04384-gemini-ignored-sampling-final-differential ./tools/differential`.
+Commands use `--gemini`, or `--scenario all --scenario-workers 3`.
+Commits `54dad09`, `0ad214c` and documentation-only `c74bdcc` were checked,
+fast-forwarded through the clean primary worktree and pushed directly to
+`origin/main`, without waiting for CI. No force push, tag, release or
+editor-checkout change occurred.
+
+The next clean model-input candidate `8d618e0` already passes all 169 DeepSeek
+scenarios: `/tmp/gdx-04384-gemini-model-input-deepseek-oracle.json`.
+Its targeted numeric-model, raw-UTF-8-model and null-model cases also PASS:
+`/tmp/gdx-04384-gemini-control-model-<number|utf8|null>-targeted-oracle.json`.
+Its full 185-case Gemini report is pending:
+`/tmp/gdx-04384-gemini-model-input-oracle.json`.
+A new full default gate is running from the separate protected clean
+`8d618e097c8549015785bce1e23c89999198d42f` worktree:
+`rtk proxy scripts/verify-release-parity.sh > /tmp/gdx-04384-release-8d618e0.log 2>&1`.
+That process is not advanced or modified while it executes. The completed
+default-gate PASS remains scoped to `293b1b6` until this entire invocation
+exits 0, including stages after its phase marker. Global parity is unproven.
+
+
+## DeepSeek top-level control types before request construction
+
+The actual pinned DeepSeek runtime first invokes
+`runtime_deepseek_chat_request_body_with_options`, which uses the shared
+`runtime_provider_chat_compatible_request_body` validation, even when the
+simple-request conformance body is selected later. A present `stream` must be
+a boolean, and present `instructions`/`previous_response_id` must be strings.
+Reading only the later compiled simple-request projection misses that gate.
+
+Godex defaulted wrong-type streams to false, ignored wrong-type instructions
+and treated wrong-type previous IDs as absent. Each could create valid fresh
+upstream work from an input the released runtime rejected. The concrete
+DeepSeek gateway now checks those types at its existing Responses-object
+admission point, after its input-size guard and before request construction.
+Failures use the existing terminal preparation class and plain 502 mapping;
+the routing use case retains ownership of retries and dispatch. The focused
+private file owns only this protocol type invariant. No shared production
+helper, package, exported API, interface, dependency, config, worker or
+persisted format is added. Gemini production code is unchanged in this stage.
+
+Before repair 34 regression controls pass and 27 tests fail, including parents:
+`rtk go test ./internal/gateway/deepseek -run '^TestProdex(04384DeepSeekControlTypesAreCheckedBeforeTranslation|04380DeepSeekInvalidInputIsTerminalBeforeUpstream)$' -count=1`;
+`/tmp/gdx-04384-deepseek-control-types-before.log`.
+The same command passes all 61 tests after repair:
+`/tmp/gdx-04384-deepseek-control-types-focused.log`.
+The transport table proves wrong types never reach upstream and retain the
+generic terminal presentation. Valid boolean/string controls remain accepted.
+
+Nine executable baselines pin unchanged clean `8d618e0`, the unchanged
+reference and `/tmp/gdx-04384-deepseek-control-types-differential`:
+`/tmp/gdx-04384-deepseek-control-<suffix>-before-oracle.json`.
+The stream-false control PASSes. All eight wrong-type cases FAIL only Godex;
+each incorrectly produces a 200 response after one authenticated upstream
+attempt, while the reference returns plain 502, exit 2 and zero attempts.
+All reference and independent mutation invariants pass. The existing strict
+primitive fixture family supplies the exact original request/response, status/
+type/stdout/exit, retry, credential and safe-state checks. These cases are
+registered only in the DeepSeek executable matrix; no Gemini cases are repeated.
+
+`rtk go test ./tools/differential -count=1` passes 280 tests:
+`/tmp/gdx-04384-deepseek-control-types-oracle-tests.log`.
+`rtk go test -race ./internal/gateway/deepseek ./internal/usecase/routing ./tools/differential -count=1`
+passes 2,894 tests: `/tmp/gdx-04384-deepseek-control-types-race.log`.
+`rtk proxy go test -json ./...` passes 9,703 tests across 81 packages
+(71 passing packages and ten with no tests):
+`/tmp/gdx-04384-deepseek-control-types-test-all.jsonl`.
+`rtk proxy make verify` passes the complete local gate:
+`/tmp/gdx-04384-deepseek-control-types-verify.log`.
+Clean-commit 178-case DeepSeek qualification follows. The separate 185-case
+Gemini run remains scoped to unchanged Gemini source in clean `8d618e0`.
+Other controls, combined-error ordering, complete DeepSeek JSON admission,
+Gemini Compact, executable session/turn continuation, native macOS/Windows
+and live authentication remain open. Global 1:1 parity is not claimed.

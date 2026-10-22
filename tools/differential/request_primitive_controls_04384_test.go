@@ -6,7 +6,7 @@ import (
 )
 
 func TestProdex04384RequestPrimitiveOracleFixtures(t *testing.T) {
-	for _, suffix := range requestPrimitiveSuffixes04384() {
+	for _, suffix := range append(requestPrimitiveSuffixes04384(), deepSeekAdmissionSuffixes04384()...) {
 		scenario := "request-primitive-" + suffix
 		if !json.Valid(requestPrimitiveInput04384(scenario, "gemini-3.1-pro-preview")) {
 			t.Fatal("primitive fixture lost its original JSON")
