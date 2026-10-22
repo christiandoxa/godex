@@ -9820,3 +9820,19 @@ and the build. Exact commands:
 `rtk proxy go test -json ./... > /tmp/gdx-04384-deepseek-tool-id-full.jsonl 2>&1`
 and `rtk proxy make verify > /tmp/gdx-04384-deepseek-tool-id-verify.log 2>&1`.
 Exact clean candidate executable qualification follows before publication.
+
+Exact clean 382b3a7b4bcced5f35cb1f64c6e67de5a9be5730 executable qualification
+PASSes all 16 cases (original session 58398, exit 0): twelve baseline scenarios
+and four prior tool-call, paired SSE, RTK history and pending-history controls.
+All five Godex-only request-byte failures now match the original independent
+invariants. Audit: /tmp/gdx-04384-deepseek-tool-id-targeted-audit.json.
+Reference source/binary/manifest, immutable clean candidate source, embedded VCS
+metadata and artifact SHA-256, original exact requests, response/stdout/status,
+attempts/auth/slot, durable state and matching-corruption checks were verified.
+Full DeepSeek232 is running in original session 19735 at that immutable source,
+with report /tmp/gdx-04384-deepseek-tool-id-oracle.json; it is not a full232
+PASS. Candidate 382b3a7b was pushed directly to origin/main after fetch, clean
+primary and ancestry checks, without waiting for CI. Gemini production code
+remains at 3399a8c; its full974 and other later matrices remain pending. The
+latest completed full-Gemini qualification is still exact e9d88ce/full918,
+and the e9d88ce entire default gate remains pending. No overall 1:1 claim follows.
