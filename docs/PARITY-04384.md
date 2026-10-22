@@ -3880,3 +3880,30 @@ race tests, cross-platform build/test compilation, installers and build:
 `/tmp/gdx-04384-body-terminal-verify.log`.
 Clean-commit executable verification follows before pushing either admission
 commit; the failed 11203a0 matrix remains incomplete.
+
+
+## Validated buffered admission checkpoint: 2a36859
+
+Clean `2a36859568bf5c54ae9409c42f20cb64099100af` passes all 106 DeepSeek
+executable cases and independent status/header/event/state/retry/cancellation/
+stdout mutations: `/tmp/gdx-04384-terminal-oracle.json`.
+All four exact-size buffered-body scenarios satisfy the reference and candidate
+contracts, including the two-key terminal 502 with one primary attempt and no
+retry. The isolated two-key run also PASSes:
+`/tmp/gdx-04384-terminal-rotation-oracle.json`.
+The earlier aborted 11203a0 run remains incomplete; it is not a parity pass.
+
+The binaries were built from that clean commit with
+`rtk go build -trimpath -o /tmp/gdx-04384-terminal-godex ./cmd/godex` and
+`rtk go build -trimpath -o /tmp/gdx-04384-terminal-differential ./tools/differential`.
+The full oracle uses `--scenario all --scenario-workers 3`, the pinned released
+0.438.4 binary/source/digest and exact clean Godex VCS provenance retained in
+the report. Latest local checks are 2,673 focused race tests, 9,298 full-suite
+tests and `rtk proxy make verify`, all PASS.
+
+This admission stage is ready for direct fast-forward push after checking the
+primary worktree and remote. No force push, tag, release, dependency change or
+editor-worktree modification is part of this stage. Latest Gemini 51-case PASS
+remains on `625fac5`; complete default-script PASS remains on `e9ccedc`.
+Structured search output-envelope diagnostics and runtime depth are in a
+separate follow-up. Global 1:1 parity is not claimed.
