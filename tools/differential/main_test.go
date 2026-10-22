@@ -69,6 +69,14 @@ func TestComparisonUsesSemanticFixtureStateAcrossPrivateLayouts(t *testing.T) {
 			{Path: "codex/sessions/.prodex-maintenance.lock"},
 			{Path: "state/runtime-housekeeping.last-run", Size: 11},
 			{Path: "state/runtime-scores.json", Size: 30},
+			{Path: "state/state.json", Size: 500},
+			{Path: "state/state.json.last-good", Size: 500},
+			{Path: "state/runtime-continuations.json", Size: 600},
+			{Path: "state/runtime-continuations.json.last-good", Size: 600},
+			{Path: "state/runtime-continuations.json.lock"},
+			{Path: "state/runtime-continuation-journal.json", Size: 600},
+			{Path: "state/runtime-continuation-journal.json.last-good", Size: 600},
+			{Path: "state/runtime-continuation-journal.json.lock"},
 		},
 	}
 	godex := productRun{
@@ -87,6 +95,14 @@ func TestComparisonUsesSemanticFixtureStateAcrossPrivateLayouts(t *testing.T) {
 	godex.Files = append(godex.Files, fileState{Path: "state/unknown.json"})
 	if differences := compare(prodex, godex); !contains(differences, "durable_files") {
 		t.Fatalf("unknown durable state escaped comparison: %v", differences)
+	}
+}
+
+func TestComparisonCannotBypassAuditedStateFilenamePolicy(t *testing.T) {
+	for _, path := range []string{"state/runtime-scores.json.evil.1.2.tmp", "state/runtime-continuations.json.extra", "state/runtime-broker-live-runtime-x.json.lock"} {
+		if differences := compare(productRun{}, productRun{Files: []fileState{{Path: path}}}); !contains(differences, "durable_files") {
+			t.Fatalf("filename escaped shared state policy: %s", path)
+		}
 	}
 }
 

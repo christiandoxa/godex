@@ -62,6 +62,11 @@ func fixtureBindingDigest(kind, value string) string {
 	return "sha256:" + hex.EncodeToString(digest[:])
 }
 
+func fixturePreviousDigest(value string) string {
+	digest := sha256.Sum256([]byte("previous:" + value))
+	return hex.EncodeToString(digest[:])
+}
+
 func validFixtureRoutingBindings(data []byte, expected map[string]fixtureContinuationOwner) bool {
 	var snapshot struct {
 		Version  int `json:"version"`
@@ -79,8 +84,7 @@ func validFixtureRoutingBindings(data []byte, expected map[string]fixtureContinu
 	for _, binding := range snapshot.Bindings {
 		known := false
 		for id := range expected {
-			digest := sha256.Sum256([]byte("previous:" + id))
-			known = known || binding.Key == hex.EncodeToString(digest[:])
+			known = known || binding.Key == fixturePreviousDigest(id)
 		}
 		if !known || binding.Kind != "previous" || binding.AccountID != fixtureConflictOwner ||
 			!fixtureBindingTimestamp(binding.UpdatedUnix) || seen[binding.Key] {

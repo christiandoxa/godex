@@ -125,12 +125,12 @@ func rawKeyInProcessProbeInvariants(scenario scenarioResult) []string {
 	return failures
 }
 
-func waitRawKeyProbePersistence(root string, prodex bool) {
+func waitRawKeyProbePersistence(root string, prodex bool, responseID string) {
 	deadline := time.NewTimer(15 * time.Second)
 	defer deadline.Stop()
 	tick := time.NewTicker(50 * time.Millisecond)
 	defer tick.Stop()
-	for !rawKeyProbeBindingExists(root, prodex) {
+	for !rawKeyProbeBindingExists(root, prodex, responseID) {
 		select {
 		case <-deadline.C:
 			return
@@ -139,7 +139,7 @@ func waitRawKeyProbePersistence(root string, prodex bool) {
 	}
 }
 
-func rawKeyProbeBindingExists(root string, prodex bool) bool {
+func rawKeyProbeBindingExists(root string, prodex bool, responseID string) bool {
 	name := "routing.json"
 	if prodex {
 		name = "runtime-continuations.json"
@@ -160,12 +160,12 @@ func rawKeyProbeBindingExists(root string, prodex bool) bool {
 	if prodex {
 		value, _ := state["value"].(map[string]any)
 		bindings, _ := value["response_profile_bindings"].(map[string]any)
-		return bindings["chatcmpl-differential"] != nil
+		return bindings[responseID] != nil
 	}
 	bindings, _ := state["bindings"].([]any)
 	for _, raw := range bindings {
 		binding, _ := raw.(map[string]any)
-		if kind, _ := binding["kind"].(string); kind == "previous" {
+		if kind, _ := binding["kind"].(string); kind == "previous" && binding["key"] == fixturePreviousDigest(responseID) {
 			return true
 		}
 	}

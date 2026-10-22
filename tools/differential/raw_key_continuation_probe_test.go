@@ -71,18 +71,21 @@ func TestRawKeyInProcessOracleRejectsIndependentMutations(t *testing.T) {
 func TestRawKeyProbeWaitObservesOnlyWrittenBinding(t *testing.T) {
 	for _, prodex := range []bool{false, true} {
 		root := t.TempDir()
-		if rawKeyProbeBindingExists(root, prodex) {
+		if rawKeyProbeBindingExists(root, prodex, "chatcmpl-differential") {
 			t.Fatal("absent state accepted")
 		}
-		name, body := "routing.json", `{"bindings":[{"kind":"previous"}]}`
+		name, body := "routing.json", `{"bindings":[{"kind":"previous","key":"`+fixturePreviousDigest("chatcmpl-differential")+`"}]}`
 		if prodex {
 			name, body = "runtime-continuations.json", `{"generation":1,"value":{"response_profile_bindings":{"chatcmpl-differential":{}}}}`
 		}
 		if err := os.WriteFile(filepath.Join(root, name), []byte(body), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		if !rawKeyProbeBindingExists(root, prodex) {
+		if !rawKeyProbeBindingExists(root, prodex, "chatcmpl-differential") {
 			t.Fatal("written fixture binding not observed")
+		}
+		if rawKeyProbeBindingExists(root, prodex, "chatcmpl-unknown") {
+			t.Fatal("another response's binding satisfied persistence evidence")
 		}
 	}
 }

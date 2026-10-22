@@ -3090,3 +3090,42 @@ full shuffled race suite, cross-platform build/test compilation, installers
 and build. Log: `/tmp/gdx-04384-raw-key-continuation-final-verify.log`.
 Clean-commit released-executable validation follows this candidate.
 No whole-project 1:1 parity claim is made.
+
+
+## Audit accepted previous-response identities and shared file policy
+
+The first clean `8edd81124c75ff7de4c65f45a531a41d0e638b17` full DeepSeek
+run finishes 65 cases but remains FAIL on the unknown-response discovery
+phase's state audit. All wire, status, attempt, credential and other scenario
+contracts match. Report: `/tmp/gdx-04384-raw-key-continuation-oracle.json`.
+The corresponding Gemini executable gate passes 46/46 cases and mutations:
+`/tmp/gdx-04384-raw-key-continuation-gemini-oracle.json`.
+
+The reference accepted-binding recorder also owns the successfully accepted
+request's previous_response_id. That ID was omitted from the new oracle's
+response-only evidence. The discovery probe now waits for the exact requested
+ID to appear in durable state on both products, bounded at 15 seconds, and
+requires that evidence. It authorizes that one request ID only after observing
+the successful fixture response and its exact credential/endpoint owner.
+Persistence polling also checks the exact Godex key hash; another response's
+marker cannot satisfy it.
+
+The first delayed proof confirms all twelve persistence/behavior observations,
+but still fails the separate state comparison because its old duplicated file
+allowlist rejects sidecars already validated by the strict content auditor.
+Report: `/tmp/gdx-04384-accepted-previous-evidence-oracle.json`. The signature
+now reuses the auditor's bounded filename policy, removing the duplicated list.
+Unknown files, forged temp/lock names, payload corruption, credential/profile
+owners and divergent recovery copies remain failures. No integrity assertion
+or production routing behavior is removed or weakened.
+
+The final delayed proof passes on the exact clean `8edd811` product binary:
+`/tmp/gdx-04384-accepted-previous-final-evidence-oracle.json`. Both products
+persist the accepted unknown request ID, reject all three known restart
+continuations without upstream attempts, and accept fresh/discovery controls.
+`rtk go test -race ./tools/differential -count=1` passes 244 tests, including
+shared-filename spoofing and exact-key persistence controls. Log:
+`/tmp/gdx-04384-accepted-previous-final-oracle-tests.log`.
+The earlier failed reports remain failed evidence. `rtk go test ./...` passes
+9,138 tests across 81 packages: `/tmp/gdx-04384-accepted-previous-test-all.log`.
+Final local and clean-commit executable gates follow this oracle correction.

@@ -651,6 +651,15 @@ func runProduct(root string, mock *mockServer, name, binary, commit string, plan
 	}
 	events := mock.eventsSince(eventStart)
 	expectedBindings := fixtureContinuationOwners(clientExchange, upstream, endpoint, options.priorBindings)
+	if options.continuationProbe == "unknown" {
+		if owner, verified := expectedBindings["chatcmpl-fresh"]; verified {
+			expectedBindings["chatcmpl-unknown"] = owner
+		}
+	}
+	persistedID := "chatcmpl-differential"
+	if options.continuationProbe == "unknown" {
+		persistedID = "chatcmpl-unknown"
+	}
 	return productRun{
 		Name: name, Binary: resolved, Version: version, Commit: commit, SHA256: digest,
 		Command:    redactedScenarioCommand(name, options.rotate),
@@ -658,7 +667,7 @@ func runProduct(root string, mock *mockServer, name, binary, commit string, plan
 		Client: clientExchange, Upstream: upstream, Events: events,
 		Retries: max(0, len(upstream)-1), Cancelled: options.cancel && hasEvent(events, "upstream.cancelled"),
 		Files: snapshot(productRoot), StateIntegrity: auditFixtureDurableStateWithBindings(productRoot, expectedBindings),
-		ContinuationPersisted: options.continuationProbe != "" && rawKeyProbeBindingExists(stateHome, isProdex(name)),
+		ContinuationPersisted: options.continuationProbe != "" && rawKeyProbeBindingExists(stateHome, isProdex(name), persistedID),
 	}, nil
 }
 
@@ -1114,7 +1123,10 @@ func runCodexShim(arguments []string) int {
 		return shimFailure("synthetic Codex shim could not encode response")
 	}
 	if os.Getenv("DIFFERENTIAL_CONTINUATION_PHASE") == "seed" {
-		waitRawKeyProbePersistence(os.Getenv("DIFFERENTIAL_STATE_HOME"), os.Getenv("PRODEX_HOME") != "")
+		waitRawKeyProbePersistence(os.Getenv("DIFFERENTIAL_STATE_HOME"), os.Getenv("PRODEX_HOME") != "", "chatcmpl-differential")
+	}
+	if os.Getenv("DIFFERENTIAL_CONTINUATION_PHASE") == "unknown" {
+		waitRawKeyProbePersistence(os.Getenv("DIFFERENTIAL_STATE_HOME"), os.Getenv("PRODEX_HOME") != "", "chatcmpl-unknown")
 	}
 	if resultPath := os.Getenv("DIFFERENTIAL_CHILD_RESULT"); resultPath != "" {
 		if err := os.WriteFile(resultPath, encoded, 0o600); err != nil {
@@ -1475,8 +1487,8 @@ func compare(left, right productRun) []string {
 
 // The two products intentionally use different private lock, guard, logging,
 // and state-file layouts. The fixture's durable contract is audited
-// independently after every process: history and active routing state must be
-// empty, health snapshots must be valid and empty, and every file must be
+// independently after every process: history and health snapshots stay empty,
+// continuation ownership must match observed requests/responses, and every file is
 // allowlisted, bounded, and secret-free. Compare that semantic contract while
 // retaining raw files in the report for review; private layout equality would
 // reject equivalent state without proving a user-visible difference.
@@ -1497,40 +1509,8 @@ func fixtureDurableStateSignature(run productRun) string {
 			if file.Size != 0 {
 				issues = append(issues, "unexpected_codex_history")
 			}
-		case "codex/sessions/.prodex-maintenance.lock",
-			"state/profile-lifecycle.json.lock", "state/runtime-housekeeping.last-run",
-			"state/runtime-housekeeping.lock", "state/update-check.lock",
-			"state/logs/runtime.guard", "state/logs/runtime.jsonl",
-			"state/previous-response-failures.guard", "state/profile-import-lifecycle.guard",
-			"state/profiles.guard", "state/routing-health.guard", "state/routing-memory.guard",
-			"state/routing-auth-backoff.guard",
-			"state/routing-retry-backoff.guard", "state/routing-transport-backoff.guard",
-			"state/routing.guard", "state/state.guard", "state/state.json.lock",
-			"state/runtime-scores.json.lock", "state/runtime-backoffs.json.lock":
-			// Coordination and diagnostic artifacts have no durable routing
-			// semantics; their integrity is checked by the state auditor.
-		case "state/routing.json", "state/routing.json.last-good",
-			"state/retry-backoff.json", "state/retry-backoff.json.last-good",
-			"state/route-memory.json", "state/route-memory.json.last-good",
-			"state/route-health.json", "state/route-health.json.last-good",
-			"state/transport-backoff.json", "state/transport-backoff.json.last-good",
-			"state/route-circuits.json", "state/route-circuits.json.last-good",
-			"state/continuation-status.json", "state/continuation-status.json.last-good",
-			"state/previous-response-failures.json", "state/previous-response-failures.json.last-good",
-			"state/runtime-scores.json", "state/runtime-scores.json.last-good",
-			"state/runtime-backoffs.json", "state/runtime-backoffs.json.last-good":
-			// These snapshots are semantically empty in this fixture; their
-			// contents and recovery invariants are checked independently.
 		default:
-			if strings.HasPrefix(file.Path, "state/runtime-broker-live-runtime-") &&
-				strings.HasSuffix(file.Path, ".json.lock") {
-				continue
-			}
-			if strings.HasPrefix(file.Path, "state/runtime-scores.json.") &&
-				strings.HasSuffix(file.Path, ".tmp") {
-				continue
-			}
-			if runtimeBackoffsTempFile(file.Path) {
+			if allowedFixtureStateFile(file.Path) {
 				continue
 			}
 			if strings.HasPrefix(file.Path, "codex/sessions/") {
