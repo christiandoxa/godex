@@ -592,7 +592,13 @@ projection and deduplication, and named choices bind to projected functions.
 Early local-media exemptions recurse within each original tool, preserve path-key
 presence and never suppress another tool's validation. Later host admission
 still applies. Native builtin validation/conversion retains its independent
-contract; search and unknown kinds remain under audit.
+contract. Search declarations share early/final projection, with a fixed
+tool_search function name, optional nonblank description and present raw
+parameters; raw strict is host-validated but omitted from that function.
+An MCP-prefixed flat search name/schema additionally projects its MCP function.
+Final function normalization preserves absent parameters after an early
+function/media/builtin validation exemption, while rejecting present nonobjects.
+Unknown kinds and broader media combinations remain under audit.
 All supported call/tool-output items require a nonblank identity selected from
 the first string `call_id`, `tool_call_id`, then `id`. This local admission runs
 before conversion or orphan filtering can silently drop the malformed item.

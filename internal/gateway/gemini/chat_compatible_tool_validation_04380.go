@@ -49,12 +49,14 @@ func validateGeminiChatCompatibleTools04380(body []byte) error {
 		if kind != "function" && geminiChatBuiltinTool04384(tool) {
 			continue
 		}
-		if kind == "custom" || kind == "namespace" || strings.HasPrefix(kind, "mcp") {
+		if kind == "custom" || kind == "namespace" || kind == "tool_search" || strings.HasPrefix(kind, "mcp") {
 			var converted []any
 			if kind == "custom" {
 				converted = projectGeminiChatCustomDeclarations04384(tool)
 			} else if kind == "namespace" {
 				converted = projectGeminiChatNamespaceDeclarations04384(tool)
+			} else if kind == "tool_search" {
+				converted = projectGeminiChatSearchDeclarations04384(tool)
 			} else {
 				converted = projectGeminiChatMCPDeclarations04384(tool)
 			}

@@ -84,6 +84,10 @@ function precedence, later host field types, omitted tools, MCP-prefixed
 functions, projected counts/choices and SSE. Per-tool recursive media controls
 require path-key presence and preserve invalid earlier/later tool errors.
 Matching mutations reject incorrect tool presence, names, types and choices.
+The 27 `request-primitive-search-declaration-*` cases verify fixed search names,
+raw schemas, strict/description admission, early translated errors, duplicate
+selection, MCP-prefixed extra functions, named choices and SSE. Function/media/
+builtin precedence distinguishes absent schemas from present null values.
 
 Build and run from a clean, committed Godex worktree:
 

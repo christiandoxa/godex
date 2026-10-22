@@ -33,7 +33,7 @@ func normalizeGeminiChatFunctionDeclarations04384(root map[string]any) bool {
 			}
 			continue
 		}
-		if kind == "custom" || kind == "namespace" || strings.HasPrefix(kind, "mcp") {
+		if kind == "custom" || kind == "namespace" || kind == "tool_search" || strings.HasPrefix(kind, "mcp") {
 			function, _ := tool["function"].(map[string]any)
 			if !validGeminiChatFunctionFields04384(tool) || !validGeminiChatFunctionFields04384(function) {
 				return false
@@ -49,6 +49,8 @@ func normalizeGeminiChatFunctionDeclarations04384(root map[string]any) bool {
 					return false
 				}
 				projected = projectGeminiChatNamespaceDeclarations04384(tool)
+			} else if kind == "tool_search" {
+				projected = projectGeminiChatSearchDeclarations04384(tool)
 			} else {
 				projected = projectGeminiChatMCPDeclarations04384(tool)
 			}
@@ -68,7 +70,7 @@ func normalizeGeminiChatFunctionDeclarations04384(root map[string]any) bool {
 			}
 			tools = append(tools, converted)
 		} else {
-			// shortcut: search/unknown kinds retain existing conversion until their wire is qualified.
+			// shortcut: unknown kinds retain existing conversion until their wire is qualified.
 			tools = append(tools, raw)
 		}
 	}
@@ -94,11 +96,15 @@ func geminiChatFunctionDeclaration04384(tool map[string]any) (map[string]any, bo
 	}
 	name, _ := function["name"].(string)
 	strict, _ := function["strict"].(bool)
-	parameters, ok := function["parameters"].(map[string]any)
-	if !validGeminiChatFunctionName04384(name) || strict || !ok {
+	rawParameters, present := function["parameters"]
+	parameters, ok := rawParameters.(map[string]any)
+	if !validGeminiChatFunctionName04384(name) || strict || present && !ok {
 		return nil, false
 	}
-	converted := map[string]any{"name": name, "parameters": parameters}
+	converted := map[string]any{"name": name}
+	if present {
+		converted["parameters"] = parameters
+	}
 	if description, _ := function["description"].(string); strings.TrimSpace(description) != "" {
 		converted["description"] = description
 	}

@@ -4255,7 +4255,6 @@ Other controls, combined-error ordering, Gemini Compact, executable session/
 turn continuation, native macOS/Windows and live authentication remain open.
 Global 1:1 parity is not claimed.
 
-
 ## Validated common DeepSeek preparation boundary: 18f7ad3
 
 Clean `18f7ad39733e8a5a033a5766d6d14ecd934401bd` passes all 213 DeepSeek
@@ -8233,3 +8232,56 @@ Four protected larger Gemini matrices remain pending. Search tools, unknown
 kinds, broader media combinations, Gemini Compact, executable session/turn continuation,
 native macOS/Windows and live authentication remain unproven.
 Global 1:1 parity is not claimed.
+
+## Gemini Chat search declaration projection and absent schemas
+
+Pinned `chat_tool_shapes.mojo:138-154` projects tool_search with the fixed name
+tool_search, optional nonblank description and present raw parameters. It does
+not project strict or schema aliases. A flat MCP-prefixed name/schema can also
+produce a function before that search declaration. Early Gemini validation
+checks the projected functions with original/translated error indexes; later
+ToolsShape still validates raw description/strict types. A nested function,
+builtin-key presence or per-tool local media can exempt that early projection.
+The later `deepseek_function_tools.mojo:48-63` policy accepts absent parameters
+but rejects present nonobjects, without inventing a schema in the final wire.
+
+Twenty-seven independent executable baselines pin clean old production
+`617ae566e3f6d4b4b8f3682aa51a1dd3700fd94e` and the unchanged official 0.438.4
+source/binary/manifest. Twenty-one FAIL only Godex; six controls PASS. Reference,
+independent mutation and durable-state assertions all pass. Reports:
+`/tmp/gdx-04384-gemini-search-declaration-<suffix>-before-oracle.json`.
+Commands: `/tmp/gdx-04384-gemini-search-declarations-before-commands.json` and
+`/tmp/gdx-04384-gemini-search-media-before-commands.json`; aggregate audit:
+`/tmp/gdx-04384-gemini-search-declarations-complete-before-audit.json`.
+The final gateway regression copied alone to the same old production in
+`/tmp/gdx-04384-gemini-search-declarations-before-work` FAILs 31 tests including
+the parent, with eight controls PASS:
+`rtk proxy go test -json ./internal/gateway/gemini -run '^TestProdex04384GeminiChatSearchDeclarationsPreservePipeline$' -count=1`.
+Log: `/tmp/gdx-04384-gemini-search-declarations-gateway-before.jsonl`.
+The repaired gateway PASSes all 39:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiChatSearchDeclarationsPreservePipeline$' -count=1`.
+Log: `/tmp/gdx-04384-gemini-search-declarations-gateway-focused.log`.
+These verify exact buffered/SSE wire, client output, attempts, status, structured
+early errors and terminal later rejection without upstream dispatch.
+
+Private `request_chat_search_declarations_04384.go` owns projection reused by
+early validation and final normalization. It reuses the existing MCP projector
+and function/name/schema/duplicate/choice boundary. Final function admission
+now preserves absent schemas after an early exemption and still rejects null.
+No shared helper, package, exported API, dependency, option, goroutine, routing
+policy or durable format is introduced. Native conversion remains separate.
+The independent executable gate rejects matching raw/decoded tool-name, tool
+presence, type and schema corruptions. `rtk proxy go test -json ./...` PASSes
+10,588 tests in 71 packages; ten packages have no tests and 18 optional
+installed-Codex/executable tests are skipped.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+PASSes 3,767 tests. Logs use `/tmp/gdx-04384-gemini-search-declarations-`.
+`rtk proxy make verify` PASSes with exit 0, including format/source-size,
+cross-compilation, installers, vet, full shuffled race tests and the build.
+All 292 differential self-tests pass. Exact clean executable qualification
+follows; global 1:1 parity remains unproven.
+
+Clean 617ae56 separately PASSes all 46 targeted builtin/media cases with exact
+source pins, state and mutations. Its full 764-case matrix remains pending:
+`/tmp/gdx-04384-gemini-builtin-declarations-oracle.json`. Published main remains
+qualified ea27e1f (626 Gemini); no larger matrix is attributed yet.
