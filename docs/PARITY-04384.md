@@ -7321,3 +7321,66 @@ Older protected matrices and the full `20a7d41` default gate remain pending.
 Shell projection, remaining controls, Gemini Compact, executable session/turn
 continuation, native macOS/Windows and live authentication remain unproven.
 No force push, tag, release or editor edit occurred. Global 1:1 parity is not claimed.
+
+## Historical shell calls separate validation from rendered command precedence
+
+Pinned `deepseek_input_item_validation` validates nested action.command as a
+nonempty array of nonblank strings, and a top-level command as a nonblank
+string only when action is not an object. The later
+`deepseek_raw_put_local_shell_call_message_from_item` still projects the first
+present root command before the action value. A validated nested command can
+therefore accompany a selected root null or mixed array: these render empty
+text or joined string entries. Top-level arrays alone and invalid/missing
+commands inside a present action object fail terminally. The original command
+history is translated into a provider tool call; Godex does not execute it.
+
+Godex's shared shell converter admitted some invalid forms, rejected valid
+root-null/mixed-array forms and selected null IDs, and wrote different embedded
+JSON. A private `gateway/gemini` shell projector now validates first, renders
+the tagged root/action precedence, and reuses canonical serde values plus
+wire-ID fallback. Optional cwd/timeout/env fields retain present-null barriers
+and exact tagged field order inside the argument string. The projector discards
+ignored shell signatures and namespaces before shared function conversion.
+No shared Chat policy, helper, package, public API, dependency, option, worker,
+filesystem command or durable format is introduced.
+
+Before repair eight gateway cases and their parent FAIL; three controls PASS:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiShellCallSeparatesAdmissionFromProjection$' -count=1`;
+`/tmp/gdx-04384-gemini-shell-projection-before.log`.
+The same command PASSes all 12 tests after repair:
+`/tmp/gdx-04384-gemini-shell-projection-focused.log`.
+It checks terminal rejection without upstream work, accepted exact request
+bytes, IDs, nested optional values and one authenticated request.
+
+Eighteen executable baselines pin clean
+`2bd9081ac16a436f4ba0bbcfda632ab568436cab`, unchanged official reference and
+`/tmp/gdx-04384-gemini-shell-projection-before-differential`.
+Nine FAIL only Godex; nine controls PASS. Every reference and independent
+mutation invariant passes. Reports:
+`/tmp/gdx-04384-gemini-shell-projection-<suffix>-before-oracle.json`;
+exact argument arrays: `/tmp/gdx-04384-gemini-shell-projection-before-commands.json`.
+Commands use `--gemini --scenario request-primitive-shell-call-<suffix>` with
+exact source/commit pins. Full independent expectations preserve rejection
+status/zero attempts, accepted command and optional-field bytes/order,
+Unicode and serde numbers, ignored signatures, response/status/headers/stdout/
+exit, authenticated attempts and safe durable state. Matching-corruption
+assertions remain mandatory; fixtures never execute their command strings.
+
+`rtk go test ./tools/differential -count=1` PASSes 282 tests:
+`/tmp/gdx-04384-gemini-shell-projection-oracle-tests.log`.
+`rtk proxy go test -json ./...` PASSes 10,093 tests in 71 packages; ten packages
+have no tests and 18 optional installed-Codex/executable tests are skipped:
+`/tmp/gdx-04384-gemini-shell-projection-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+PASSes 3,272 tests: `/tmp/gdx-04384-gemini-shell-projection-race.log`.
+`rtk proxy make verify` PASSes:
+`/tmp/gdx-04384-gemini-shell-projection-verify.log`.
+Clean-commit 486-case Gemini qualification follows. Larger protected matrices
+and the full `20a7d41` default gate remain pending. The immediately preceding
+MCP candidate separately PASSes seven exact clean targets with independent
+mutations: `/tmp/gdx-04384-gemini-mcp-empty-name-<suffix>-targeted-oracle.json`
+for null, earlier-object, earlier-no-result, earlier-content, earlier-result,
+earlier-error and implicit-tool-control. Its full Gemini/DeepSeek matrices
+remain pending. Remaining controls, Gemini Compact, executable session/turn
+continuation, native macOS/Windows and live authentication remain unproven.
+No force push, tag, release or editor edit occurred. Global 1:1 parity is not claimed.

@@ -504,6 +504,13 @@ preserving Chat entry point retains raw bridge-output content; its default
 entry point keeps legacy text conversion. Standalone Gemini outputs have
 already been projected to canonical function outputs, so their text contract
 remains separate. No raw message metadata bypass is introduced.
+Historical `local_shell_call` items use a private Gemini projection, not a
+shell executor. Admission validates nested action command arrays independently
+of the root-first command value later rendered onto the Chat wire. Optional
+cwd/timeout/env retain present-null barriers and the tagged embedded field
+order; their values reuse canonical serde serialization. Shell thought
+signatures are ignored as in the reference. Shared Chat shell policy stays
+independent.
 All supported call/tool-output items require a nonblank identity selected from
 the first string `call_id`, `tool_call_id`, then `id`. This local admission runs
 before conversion or orphan filtering can silently drop the malformed item.

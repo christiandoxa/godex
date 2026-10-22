@@ -21,6 +21,10 @@ The 16 `request-primitive-mcp-name-*` cases cover empty-name MCP messages,
 retained inline raw results, earlier-call adjacency, signature ownership,
 content/result/error alias capture, absent-result controls and implicit-tool
 metadata. Original legacy Chat conversion is checked independently.
+The 18 `request-primitive-shell-call-*` cases compare historical shell-call
+admission separately from root-first command rendering, selected null/mixed
+values, ID fallback, embedded optional-field order, serde/Unicode values and
+ignored signatures. These fixtures never execute the recorded commands.
 
 Build and run from a clean, committed Godex worktree:
 

@@ -8,6 +8,8 @@ func projectGeminiChatFunctionItem04384(kind any, item map[string]any) bool {
 		return projectGeminiChatFunctionCall04384(item)
 	case "custom_tool_call":
 		return projectGeminiChatCustomCall04384(item)
+	case "local_shell_call":
+		return projectGeminiChatShellCall04384(item)
 	case "function_call_output", "custom_tool_call_output", "mcp_tool_result", "mcp_call_output":
 		item["type"] = "function_call_output"
 		output, _ := firstPresent(item, "output", "content", "result", "error")
