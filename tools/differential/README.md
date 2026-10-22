@@ -239,6 +239,14 @@ The existing strict accepted/preparation-failure fixture contracts are reused,
 including body/type/status/exit/stdout, credential, raw request and safe state.
 Matching corruptions cannot turn an invalid control into fresh work.
 
+Gemini `request-ignored-<field>-<kind>` cases cover `presence_penalty`,
+`frequency_penalty`, `seed` and `n` with true, false, null, number, string,
+array and object values. Every case requires one exact original authenticated
+request without the ignored field and the same exact native response. Even
+`n:7` is ignored by the tagged Gemini bridge. The preceding `request-parallel-*`
+cases use the same fixture runner and independent raw-request/state/response
+invariants; matching leaked controls cannot pass.
+
 Gemini `request-json-*` fixtures cover a valid Unicode control; null, array,
 number, boolean and string roots; malformed/trailing JSON; invalid surrogate/
 UTF-8; numeric overflow and excess depth. Parse failures require exact terminal
@@ -287,6 +295,13 @@ require terminal plain 502 with no attempt. Lower-priority invalid aliases
 must not override a valid selected value, while a selected null cannot fall
 through to a valid alias. Both products must satisfy independent fixed request,
 response, authentication, exit/stdout, attempt and durable-state contracts.
+
+DeepSeek scenario workers evaluate their complete independent invariants as
+each scenario finishes, preserving failures in the ordered report. The strict
+five-minute generated SSE timestamp window is unchanged; later cases cannot
+age already observed valid frames into a false failure. Stale/future timestamp
+mutations must still fail when observed. This changes test-harness timing,
+not product clock, stream, retry or comparison policy.
 
 The 0.438.4 `deepseek-sse-error-presence`, `deepseek-sse-error-i64` and
 `deepseek-sse-error-float` scenarios verify embedded-error primary-field

@@ -52,6 +52,10 @@ func executeDifferentialScenarios043713(
 					continue
 				}
 				result, err := spec.run(mock)
+				if err == nil {
+					// Check time-bound evidence before later scenarios can age it.
+					result.Comparison = uniqueStrings(append(result.Comparison, scenarioInvariants(result)...))
+				}
 				mock.close()
 				results[index] = result
 				problems[index] = err

@@ -453,10 +453,6 @@ func run() error {
 	if !negativeControl() {
 		return errors.New("negative control failed: status mismatch escaped comparison")
 	}
-	for _, scenario := range scenarios {
-		differences = append(differences, scenarioInvariants(scenario)...)
-	}
-	differences = uniqueStrings(differences)
 	status := "PASS"
 	if len(differences) > 0 {
 		status = "FAIL"
@@ -1145,8 +1141,8 @@ func runCodexShim(arguments []string) int {
 	if scenario := os.Getenv("DIFFERENTIAL_GEMINI_USER_ID"); scenario != "" {
 		requestBody = geminiUserIDInput04384(scenario)
 	}
-	if scenario := os.Getenv("DIFFERENTIAL_GEMINI_PARALLEL"); scenario != "" {
-		requestBody = geminiParallelInput04384(scenario)
+	if scenario := os.Getenv("DIFFERENTIAL_GEMINI_IGNORED_CONTROL"); scenario != "" {
+		requestBody = geminiIgnoredInput04384(scenario)
 	}
 	if scenario := os.Getenv("DIFFERENTIAL_GEMINI_CONTROL_TYPES"); scenario != "" {
 		requestBody = geminiControlTypeInput04384(scenario)

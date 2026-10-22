@@ -95,11 +95,11 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 		Slot: slot,
 	}
 	_, userID := geminiUserIDCase04384(mock.scenario)
-	_, parallel := geminiParallelControl04384(mock.scenario)
+	_, _, ignored := geminiIgnoredControl04384(mock.scenario)
 	_, _, _, controlTypes := geminiControlTypeCase04384(mock.scenario)
 	_, _, jsonAdmission := geminiJSONAdmission04384(mock.scenario)
 	_, primitive := requestPrimitiveCase04384(mock.scenario)
-	if geminiRequestNumberCase04384(mock.scenario) || userID || parallel || controlTypes || jsonAdmission || primitive {
+	if geminiRequestNumberCase04384(mock.scenario) || userID || ignored || controlTypes || jsonAdmission || primitive {
 		record.RawBody = string(body)
 	}
 	mock.mu.Lock()
@@ -165,7 +165,7 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, response)
 		return
 	}
-	if geminiContinuationCase04384(mock.scenario) || geminiRequestNumberCase04384(mock.scenario) || userID || parallel || controlTypes || jsonAdmission || primitive {
+	if geminiContinuationCase04384(mock.scenario) || geminiRequestNumberCase04384(mock.scenario) || userID || ignored || controlTypes || jsonAdmission || primitive {
 		_, _ = io.WriteString(w, geminiContinuationResponse04384())
 		return
 	}
@@ -240,7 +240,6 @@ func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit, selec
 		"request-json-trailing", "request-json-surrogate", "request-json-utf8", "request-json-overflow", "request-json-depth",
 		"request-control-stream-false", "request-control-stream-null", "request-control-stream-string", "request-control-stream-number",
 		"request-control-instructions-null", "request-control-instructions-array", "request-control-previous-null", "request-control-previous-array", "request-control-previous-number",
-		"request-parallel-true", "request-parallel-false", "request-parallel-null", "request-parallel-number", "request-parallel-string", "request-parallel-array", "request-parallel-object",
 		"request-user-id-absent", "request-user-id-canonical", "request-user-id-user-alias", "request-user-id-safety-alias", "request-user-id-blank",
 		"request-user-id-trim-limit", "request-user-id-null", "request-user-id-number", "request-user-id-over-limit", "request-user-id-invalid-character",
 		"request-user-id-number-rotation",
@@ -310,6 +309,7 @@ func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit, selec
 	for _, suffix := range requestPrimitiveSuffixes04384() {
 		cases = append(cases, "request-primitive-"+suffix)
 	}
+	cases = append(cases, geminiIgnoredControlCases04384()...)
 	if selected != "all" {
 		if !slices.Contains(cases, selected) {
 			return fmt.Errorf("unknown Gemini scenario %q", selected)
@@ -391,11 +391,11 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	continuation := geminiContinuationCase04384(scenario)
 	requestNumbers := geminiRequestNumberCase04384(scenario)
 	_, userID := geminiUserIDCase04384(scenario)
-	_, parallel := geminiParallelControl04384(scenario)
+	_, _, ignored := geminiIgnoredControl04384(scenario)
 	_, _, _, controlTypes := geminiControlTypeCase04384(scenario)
 	_, _, jsonAdmission := geminiJSONAdmission04384(scenario)
 	_, primitive := requestPrimitiveCase04384(scenario)
-	auditState := rawIdentity || bodyBoundary || continuation || requestNumbers || userID || parallel || controlTypes || jsonAdmission || primitive
+	auditState := rawIdentity || bodyBoundary || continuation || requestNumbers || userID || ignored || controlTypes || jsonAdmission || primitive
 	if auditState {
 		childResult = filepath.Join(home, "child-exchange.json")
 	}
@@ -420,8 +420,8 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	if controlTypes {
 		env = append(env, "DIFFERENTIAL_GEMINI_CONTROL_TYPES="+scenario)
 	}
-	if parallel {
-		env = append(env, "DIFFERENTIAL_GEMINI_PARALLEL="+scenario)
+	if ignored {
+		env = append(env, "DIFFERENTIAL_GEMINI_IGNORED_CONTROL="+scenario)
 	}
 	if userID {
 		env = append(env, "DIFFERENTIAL_GEMINI_USER_ID="+scenario)
@@ -487,7 +487,7 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 		exitCode = childExit.ExitCode()
 	}
 	result, readErr := readExchange(childResult)
-	if readErr != nil && !continuation && !userID && !parallel && !controlTypes && !jsonAdmission && !primitive {
+	if readErr != nil && !continuation && !userID && !ignored && !controlTypes && !jsonAdmission && !primitive {
 		return geminiCandidateResult{}, fmt.Errorf("child response missing: %w stderr=%q upstream=%v",
 			readErr, redact(stderr.String()), mock.recorded())
 	}
@@ -531,7 +531,7 @@ func geminiCompare(scenario string, prodex, godex geminiCandidateResult) []strin
 	if _, known := geminiUserIDCase04384(scenario); known {
 		return differences
 	}
-	if _, known := geminiParallelControl04384(scenario); known {
+	if _, _, known := geminiIgnoredControl04384(scenario); known {
 		return differences
 	}
 	if _, _, _, known := geminiControlTypeCase04384(scenario); known {
@@ -656,8 +656,8 @@ func geminiFixtureInvariant(scenario string, result geminiCandidateResult) error
 		}
 		return nil
 	}
-	if _, known := geminiParallelControl04384(scenario); known {
-		return geminiParallelInvariant04384(result)
+	if _, _, known := geminiIgnoredControl04384(scenario); known {
+		return geminiIgnoredInvariant04384(result)
 	}
 	if _, known := geminiUserIDCase04384(scenario); known {
 		return geminiUserIDInvariant04384(scenario, result)
