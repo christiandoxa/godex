@@ -3714,3 +3714,44 @@ command passes 849 tests and the full suite passes 9,278 tests. Logs:
 vet, full shuffled race tests, cross-platform build/test compilation, installers
 and build: `/tmp/gdx-04384-buffered-eof-final-verify.log`.
 Clean-commit executable gates follow.
+
+
+## Validated buffered EOF checkpoint: 138ce84
+
+Clean `138ce847179a9f203542296a174ee251b5e5b145` passes all 102 released
+DeepSeek scenarios and independent status/header/event/state/retry/cancellation/
+stdout mutations: `/tmp/gdx-04384-buffered-eof-oracle.json`.
+The exact clean-commit binary/source provenance and pinned 0.438.4 checks are
+retained in that report. Latest local checks are 849 focused race tests,
+9,278 full-suite tests and final `rtk proxy make verify`, all PASS.
+The most recent Gemini 51-case PASS remains on `625fac5`; the complete default
+release gate PASS remains on `e9ccedc`. Neither is presented as a new run on
+this EOF commit.
+
+After checking the primary worktree and unchanged remote, this commit was
+fast-forwarded and pushed directly to `origin/main`. No force push, tag,
+release or unrelated editor-worktree change occurred.
+
+A separate exploratory `tool_search` overflow probe records another boundary:
+Prodex emits `DeepSeek Mojo returned invalid response tool-call JSON: number
+out of range at line 1 column 95`, while Godex retains the generic malformed
+argument message. The locked serde probe confirms column 95 for the kernel's
+emitted envelope. Artifacts:
+`/tmp/gdx-04384-search-output-overflow-exploratory.json` (FAIL with deliberately
+unsuitable generic success expectations) and
+`/tmp/gdx-04384-search-output-serde-probe.jsonl`.
+This is diagnostic evidence, not a qualified parity pass or a production fix.
+
+Before implementing that follow-up, account for the full pinned admission flow:
+ResponseToolCallItem sums all optional input string byte lengths with a 16 MiB
+aggregate bound. Call ID/name/signature each have a 4 MiB view bound; arguments
+have a 16 MiB view bound. Its output allocation is six times input bytes plus
+2,048. Kernel rejection uses the inner argument's serde diagnostic, while a
+successful kernel's invalid structured output uses the outer envelope's
+position and different prefix. The next strict oracle must distinguish those
+paths and preserve ordinary opaque argument acceptance. Audit notes are saved
+at `/tmp/gdx-04384-search-output-audit.txt`.
+
+Global 1:1 parity remains unproven. Quoted-string/literal EOF, other lexical
+classes, valid Gemini continuation/Compact ownership, native macOS/Windows
+execution and live authentication remain open.
