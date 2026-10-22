@@ -8793,10 +8793,10 @@ optional SKIP and shuffled race/cross-build checks. Original reports, terminal
 exit observations, binary/source pins and independent mutation/state assertions
 are retained in the corresponding /tmp/gdx-04384-*-audit.json records.
 
-The broader Gemini 851/857/862 matrices remain running on their original
+The broader Gemini 857/862 matrices remain running on their original
 immutable source worktrees. Targeted PASS does not imply those full matrices
-passed. The latest full Gemini matrix and entire default-gate PASS remain the
-837-case and completed default gate at exact 78d256d. The two original full
+passed. The full Gemini matrix subsequently qualifies 851 cases at exact
+05a61ff. The latest entire default-gate PASS remains exact 78d256d. The two original full
 DeepSeek failures on c32018d remain FAIL due to reference temporary state files;
 later source-qualified PASSes do not relabel them. Reasoning above 64 MiB, tool
 stream caching, live authentication, native macOS/Windows execution and overall
@@ -8926,11 +8926,49 @@ is recorded separately under /tmp/gdx-04384-gemini-compact-stream-endpoint-rerun
 The original 844 and 847 full FAILs remain retained and are not replaced by
 targeted results.
 
-The broader Gemini 851/857/862/874 matrices and the entire default gate at
+The broader Gemini 857/862/874 matrices and the entire default gate at
 ae685d1 remain running on their original immutable worktrees. The default gate
 includes the full 869-case Gemini and 224-case DeepSeek scopes; phase completion
-is not whole-gate success. The latest complete default gate and full Gemini
-PASS remain exact 78d256d (837 Gemini cases). The latest full DeepSeek PASS is
+is not whole-gate success. The latest complete default-gate PASS remains exact
+78d256d; the latest full Gemini PASS subsequently advances to 851 cases at
+exact 05a61ff. The latest full DeepSeek PASS is
 exact 807607b (224 cases). No larger or later full PASS is implied. Global 1:1
 parity, full continuation, tool-stream snapshots, reasoning above 64 MiB, live
 authentication and native macOS/Windows execution remain unqualified.
+
+### Preserve explicitly empty Gemini SSE finish reasons
+
+Five exact clean executable baselines on 4f9699ee3f1d809d173c160b32fce0003214d59d
+qualify two Godex-only metadata failures and three PASS controls. Empty strings
+must replace a prior finish reason and remain present when later chunks omit or
+null the field. Null, wrong-type and absent controls keep their existing behavior.
+Exact original requests, status, stdout, SSE lifecycle, attempt count, durable
+state and matching corruption assertions qualify independently. Records:
+/tmp/gdx-04384-gemini-stream-finish-presence-before-audit.json and
+/tmp/gdx-04384-gemini-stream-finish-presence-before-commands.json.
+
+Pinned deepseek/stream.rs deserializes optional strings with as_str, preserving
+empty strings and ignoring wrong types. deepseek_sse.rs retains each accepted
+finish reason as Some, and the stream metadata/optional-string Mojo emitters
+retain that presence. Godex's existing Gemini SSE owner now tracks a private
+presence bit separately from the string value. Completion still waits for DONE;
+trailing usage, the single terminal event, failure and EOF semantics keep their
+existing owners. No helper, exported API, dependency, option, persisted format or
+background work is added. The narrow gateway regression fails both empty cases
+before the fix and keeps three controls; focused Gemini/differential tests pass
+2,068 cases afterward. The full Gemini matrix adds five cases, reaching 879.
+`rtk proxy go test -json ./...` PASSes 10,780 tests with 18 optional SKIP.
+`rtk proxy make verify` PASSes with exit 0, including shuffled race tests,
+cross-builds, format/source guards, vet and the build. Logs:
+/tmp/gdx-04384-gemini-stream-finish-presence-full.jsonl and
+/tmp/gdx-04384-gemini-stream-finish-presence-verify.log. Exact clean executable
+qualification follows; overall 1:1 parity and complete continuation remain unproven.
+
+The original full 851-case Gemini matrix on exact clean
+05a61ffbb7c46a8f0204d5a2413fc8c9507de695 completes PASS with exit 0. It includes
+every previous 847 case, has unique names, and passes original byte/state and
+matching corruption invariants. Reference binary/manifest pins and the clean
+candidate VCS metadata are verified. Audit:
+/tmp/gdx-04384-gemini-compact-namespace-audit.json. This is the latest complete
+Gemini matrix PASS; it does not qualify later revisions or erase the original
+844/847 FAIL reports. The latest entire default-gate PASS remains exact 78d256d.

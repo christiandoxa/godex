@@ -1003,6 +1003,10 @@ Five model-presence stream cases distinguish explicit empty model strings from
 absent/null/wrong-type fields, including replacing a previous model. Exact client
 wire and matching model-injection mutations remain independent assertions.
 
+Five finish-reason presence cases preserve explicit empty strings, including
+replacement and later null/absent updates. Null, wrong-type and absent controls
+retain the strict terminal-sentinel lifecycle and independent state checks.
+
 ### Tagged 0.438.2 Gemini function-tool rejection parity
 
 Two additional **source/binary-pinned** cases, `invalid-wrapped-tool-parameters`

@@ -52,6 +52,7 @@ type geminiChatCompatibleStream043711 struct {
 	model        string
 	modelPresent bool
 	finishReason string
+	finishSet    bool
 	fingerprint  string
 	logprobs     any
 	usage        map[string]any
@@ -119,7 +120,7 @@ func (state *geminiChatCompatibleStream043711) complete(writer io.Writer) error 
 		completed["model"] = state.model
 	}
 	provider := make(map[string]any)
-	if state.finishReason != "" {
+	if state.finishSet {
 		provider["finish_reason"] = state.finishReason
 	}
 	if state.reasoning.Len() > 0 {
@@ -199,8 +200,8 @@ func (state *geminiChatCompatibleStream043711) observeChatChunk(chunk map[string
 			if len(calls) > 0 {
 				state.complexDelta = true
 			}
-			if finish, ok := first["finish_reason"].(string); ok && finish != "" {
-				state.finishReason = finish
+			if finish, ok := first["finish_reason"].(string); ok {
+				state.finishReason, state.finishSet = finish, true
 			}
 		}
 	}
