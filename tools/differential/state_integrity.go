@@ -63,6 +63,10 @@ func auditFixtureDurableStateWithBindings(root string, expected map[string]fixtu
 			(info.Size() != 0 || runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0) {
 			violations = append(violations, "auth_guard_invalid")
 		}
+		if relative == "state/routing-conversation.guard" &&
+			(info.Size() != 0 || runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0) {
+			violations = append(violations, "conversation_guard_invalid")
+		}
 		// Go file mode bits do not describe Windows ACL permissions.
 		// Apply POSIX permission assertions only where their semantics hold;
 		// Windows still gets type, bounds, content, path, and secret checks.
@@ -219,7 +223,7 @@ func allowedFixtureStateFile(name string) bool {
 		"state/profiles.guard", "state/retry-backoff.json",
 		"state/route-memory.json", "state/routing-health.guard",
 		"state/routing-memory.guard", "state/routing-auth-backoff.guard", "state/routing-retry-backoff.guard",
-		"state/routing-transport-backoff.guard", "state/routing.guard",
+		"state/routing-transport-backoff.guard", "state/routing.guard", "state/routing-conversation.guard",
 		"state/routing.json", "state/routing.json.last-good",
 		"state/route-health.json", "state/route-health.json.last-good",
 		"state/route-memory.json.last-good", "state/retry-backoff.json.last-good",

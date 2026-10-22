@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -213,61 +214,67 @@ func (mock *geminiMock) recorded() []geminiCapturedRequest {
 	return append([]geminiCapturedRequest(nil), mock.requests...)
 }
 
-func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit string) error {
-	return runGeminiDifferentialCases04384(prodexBin, godexBin, prodexCommit, godexCommit,
-		[]string{
-			"raw-key-session-limit",
-			"raw-key-session-over-limit",
-			"raw-key-session-unicode-limit",
-			"raw-key-session-unicode-over",
-			"raw-key-session-control",
-			"chat-request",
-			"orphan-tool",
-			"chat-response",
-			"wrapped-response-no-trace",
-			"wrapped-response-trace",
-			"stream-native",
-			"stream-chat",
-			"stream-chat-eof",
-			"stream-chat-error",
-			"stream-chat-bom",
-			"stream-chat-bom-repeat",
-			"stream-chat-data-lines",
-			"stream-chat-json-fragments",
-			"multi-turn-tool",
-			"quota-plain-429",
-			"quota-structured-429",
-			"invalid-wrapped-tool-parameters",
-			"invalid-flat-tool-parameters",
-			"buffered-null-tool-text",
-			"buffered-media-invalid-inline",
-			"buffered-media-invalid-code",
-			"buffered-media-suppressed-code",
-			"buffered-grounding-null-status",
-			"buffered-args-null",
-			"buffered-args-absent",
-			"buffered-args-empty",
-			"buffered-args-wrapped-null",
-			"buffered-args-canonical-wire",
-			"buffered-args-patch-fallback",
-			"buffered-envelope-null",
-			"buffered-envelope-array",
-			"buffered-envelope-scalar",
-			"buffered-value-array",
-			"buffered-value-number",
-			"buffered-source-id-string",
-			"buffered-source-id-empty",
-			"buffered-source-id-wrapped",
-			"buffered-source-id-null",
-			"buffered-tool-dotted",
-			"buffered-tool-padded",
-			"buffered-tool-empty",
-			"buffered-tool-mcp-empty-prefix",
-			"buffered-tool-trailing-separator",
-			"buffered-patch-unified-update",
-			"buffered-patch-unified-files",
-			"buffered-patch-literal-crlf",
-		})
+func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit, selected string) error {
+	cases := []string{
+		"raw-key-session-limit",
+		"raw-key-session-over-limit",
+		"raw-key-session-unicode-limit",
+		"raw-key-session-unicode-over",
+		"raw-key-session-control",
+		"chat-request",
+		"orphan-tool",
+		"chat-response",
+		"wrapped-response-no-trace",
+		"wrapped-response-trace",
+		"stream-native",
+		"stream-chat",
+		"stream-chat-eof",
+		"stream-chat-error",
+		"stream-chat-bom",
+		"stream-chat-bom-repeat",
+		"stream-chat-data-lines",
+		"stream-chat-json-fragments",
+		"multi-turn-tool",
+		"quota-plain-429",
+		"quota-structured-429",
+		"invalid-wrapped-tool-parameters",
+		"invalid-flat-tool-parameters",
+		"buffered-null-tool-text",
+		"buffered-media-invalid-inline",
+		"buffered-media-invalid-code",
+		"buffered-media-suppressed-code",
+		"buffered-grounding-null-status",
+		"buffered-args-null",
+		"buffered-args-absent",
+		"buffered-args-empty",
+		"buffered-args-wrapped-null",
+		"buffered-args-canonical-wire",
+		"buffered-args-patch-fallback",
+		"buffered-envelope-null",
+		"buffered-envelope-array",
+		"buffered-envelope-scalar",
+		"buffered-value-array",
+		"buffered-value-number",
+		"buffered-source-id-string",
+		"buffered-source-id-empty",
+		"buffered-source-id-wrapped",
+		"buffered-source-id-null",
+		"buffered-tool-dotted",
+		"buffered-tool-padded",
+		"buffered-tool-empty",
+		"buffered-tool-mcp-empty-prefix",
+		"buffered-tool-trailing-separator",
+		"buffered-patch-unified-update",
+		"buffered-patch-unified-files",
+		"buffered-patch-literal-crlf",
+	}
+	if selected != "all" {
+		if !slices.Contains(cases, selected) {
+			return fmt.Errorf("unknown Gemini scenario %q", selected)
+		}
+		cases = []string{selected}
+	}
+	return runGeminiDifferentialCases04384(prodexBin, godexBin, prodexCommit, godexCommit, cases)
 }
 
 func runGeminiDifferentialCases04384(prodexBin, godexBin, prodexCommit, godexCommit string, cases []string) error {

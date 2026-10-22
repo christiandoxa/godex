@@ -118,6 +118,13 @@ The array-comma, array-separator and trailing suffixes, plus their search-
 prefixed equivalents, require the exact serde array/trailing-input diagnostics
 for ordinary tools and structured tool-search calls.
 
+Gemini raw-key session identity cases cover ASCII/Unicode byte limits,
+overflow and embedded controls. Run one with
+`--gemini --scenario raw-key-session-over-limit`; `--scenario all` remains the
+default. Gemini model catalogs still require all cases and no DeepSeek workers.
+The raw-key cases also audit stdout and durable state. The existing Godex
+conversation-selection lock is accepted only as an empty private guard file.
+
 The 0.438.4 `deepseek-sse-error-presence`, `deepseek-sse-error-i64` and
 `deepseek-sse-error-float` scenarios verify embedded-error primary-field
 presence and signed numeric kinds. Each must produce one failure frame

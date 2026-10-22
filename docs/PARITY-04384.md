@@ -3571,3 +3571,64 @@ translation timeouts and Compact unknown-owner rejection. Reports:
 `/tmp/gdx-04384-gemini-continuation-native-exploratory.json`.
 They are diagnostic observations, not qualified parity passes. Native valid
 continuation/replay and Compact ownership remain separate audit targets.
+
+
+## Complete default release gate passes on e9ccedc
+
+The unmodified default gate now exits zero on clean
+`e9ccedcdfe82afd01707a37260d79a1db6ebc1e1`:
+
+```bash
+rtk proxy bash scripts/verify-release-parity.sh > /tmp/gdx-04384-buffered-fragment-full-release-parity.log 2>&1
+```
+
+The final HTTP profile/status and raw-429 tests after the script's all-phase
+marker also complete successfully. This is a complete default-script PASS,
+not an inferred combination of phase results. The earlier failed default
+runs remain retained. This pass covers that pinned commit and the script's
+synthetic/native Linux test surface; later Gemini identity cases and global
+1:1 parity are not implied.
+
+
+## Recognize the existing private conversation-selection lock
+
+The first 51-case Gemini baseline report is FAIL:
+`/tmp/gdx-04384-gemini-identity-before-oracle.json`. All five new cases flag
+Godex's `state/routing-conversation.guard` as unknown. The two accepted
+byte-limit controls otherwise match; the three invalid sessions additionally
+show the expected product mismatch. Reference traces meet every invariant.
+The 51-case candidate run on `0287578` used the same incomplete allowlist;
+it fails only those two accepted controls and is retained as FAIL:
+`/tmp/gdx-04384-gemini-identity-oracle.json`.
+
+`repository/routing.Store.AcquireConversation` owns this first-owner lock.
+`helper/lockfile` creates it empty with mode 0600 and never writes payload data.
+The differential auditor now accepts this exact path only while it remains an
+empty private regular file. Populated and public guards still fail, with the
+existing Windows mode-bit exception; other file, secret and binding checks
+are unchanged. No production policy or persistence format is changed.
+
+The guard regression passes both rejection controls and fails the empty-lock
+control before repair:
+`/tmp/gdx-04384-gemini-guard-before.log`.
+`rtk go test ./tools/differential -count=1` then passes 254 tests:
+`/tmp/gdx-04384-gemini-guard-focused.log`.
+The existing `--scenario` flag can now select one known Gemini case, while
+unknown names fail before launching products. The default remains the full
+matrix; model catalogs still require all cases and forbid DeepSeek workers.
+No assertion is disabled for focused execution.
+
+Five corrected strict baseline invocations on clean `d43855b` use
+`--gemini --scenario raw-key-session-<suffix>`. ASCII and Unicode limit
+controls PASS; over-limit, unicode-over and control satisfy the reference
+contract and FAIL only Godex. Reports:
+`/tmp/gdx-04384-gemini-session-<suffix>-before-oracle.json`.
+The candidate `0287578` separately passes all 95 DeepSeek cases with independent
+mutations: `/tmp/gdx-04384-gemini-identity-deepseek-oracle.json`.
+
+`rtk go test ./...` passes 9,246 tests across 81 packages:
+`/tmp/gdx-04384-gemini-guard-test-all.log`.
+`rtk proxy make verify` passes formatting, source/TUI guards, vet, full shuffled
+race tests, cross-platform build/test compilation, installers and build:
+`/tmp/gdx-04384-gemini-guard-verify.log`.
+Clean-commit executable gates follow.
