@@ -10018,3 +10018,60 @@ raw-key, restart and recovery run shapes. Its earlier name-only audit rejected
 valid specialized labels; no executable run or oracle assertion was changed.
 The retained full-audit file now records exact per-run pins and raw-key phase
 persistence, exits, attempts, retries and credential ownership checks.
+
+### Full DeepSeek236 qualifies exact 0c78e259
+
+Original session 26903 exits 0. All 236 unique scenarios PASS at exact clean
+0c78e2592eaf02fcaba06d0db0d4c220ae49c6fa, including every prior232 case.
+Audit: /tmp/gdx-04384-deepseek-history-call-id-full-audit.json. The complete
+original strict report, specialized raw-key/restart/recovery contracts,
+independent invariants, matching-corruption controls, per-run source/hash pins,
+both artifacts and clean embedded VCS metadata were checked. This qualifies
+that revision only; the a05e1cbc entire default gate remains pending.
+
+### DeepSeek custom input uses a string wrapper and ignores argument aliases
+
+The pinned Rust input-item pipeline serializes the source item with Serde
+before RawBridgeInputItem invokes the Mojo custom-call helper. That helper
+reads only input, preserves string contents, stringifies nonstring JSON and
+defaults an absent field to an empty string inside the input argument wrapper.
+The original executable baseline at a05e1cbc proves 14 Godex-only request-byte
+FAILs and 10 PASS controls in 24 cases (original session 16774, exit 0).
+Audit: /tmp/gdx-04384-deepseek-custom-input-before-audit.json. Reference
+original invariants all PASS; only Godex original-request bytes differ.
+Responses/stdout/status, exact ordered attempts/retries, auth/credential slots,
+durable state and matching-corruption guards remain independently checked.
+The history-rtk control retains its established two-request/retry-count contract.
+
+Godex previously wrapped null/objects/arrays/scalars directly and allowed
+arguments to override input. The private gateway/deepseek projector now reads
+input by presence, defaults only absence, and reuses existing compactValue and
+helper/jsonutil Serde formatting before constructing the wrapper. No new helper,
+interface, dependency, worker, option, layer or persisted format is introduced.
+Function/MCP argument semantics remain covered by prior executable controls.
+Twenty unit regressions first FAIL across simple and developer-role input
+shapes; eight string/empty/escape/Unicode controls PASS. The original log is
+/tmp/gdx-04384-deepseek-custom-input-unit-before.jsonl. Focused gateway and
+differential tests then PASS 1,328 tests. Eighteen new executable cases extend
+default DeepSeek255 to 273; Gemini remains 974. Full local and exact clean
+executable qualification follow before publication. Overall 1:1 remains unproven.
+
+Full local validation PASSes 11,069 tests with 18 optional SKIP (original
+session 34547, exit 0). make verify also exits 0 (original session 88899),
+including shuffled race tests, cross-builds, vet, source/format guards and the
+build. Exact commands:
+`rtk proxy go test -json ./... > /tmp/gdx-04384-deepseek-custom-input-full.jsonl 2>&1`
+and `rtk proxy make verify > /tmp/gdx-04384-deepseek-custom-input-verify.log 2>&1`.
+Exact clean executable qualification follows before publication.
+
+### Full Gemini940 qualifies exact 56fb3ba
+
+Original session 97523 exits 0. All 940 unique cases PASS at exact clean
+56fb3ba2293e92a41ff2fd6eb214535d176255ac, including every prior934 case.
+Audit: /tmp/gdx-04384-gemini-stream-tool-snapshot-full-audit.json. Original
+strict invariants and matching-corruption guards, immutable source, both
+artifact hashes and embedded clean VCS metadata were checked. There are no
+per-case or durable-state errors. This result qualifies only that revision;
+later matrices and the a05e1cbc entire default gate remain pending. Earlier
+failed captures, reference state-integrity failures and fixture errors remain
+retained. Overall 1:1 parity remains unproven.

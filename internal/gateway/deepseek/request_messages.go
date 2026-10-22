@@ -232,10 +232,11 @@ func deepSeekToolCallItems(item map[string]any, kind string) ([]any, error) {
 	case "function_call", "mcp_call":
 		arguments = deepSeekCallArguments04384(item)
 	case "custom_tool_call":
-		if arguments == nil {
-			arguments = firstValue(item, "input", deepSeekArgumentsKey)
+		input := ""
+		if value, present := item["input"]; present {
+			input = compactValue(value)
 		}
-		arguments = map[string]any{"input": arguments}
+		arguments = map[string]any{"input": input}
 	}
 	message := assistantToolCall(callID, name, arguments)
 	if signature, _ := item["gemini_thought_signature"].(string); strings.TrimSpace(signature) != "" {

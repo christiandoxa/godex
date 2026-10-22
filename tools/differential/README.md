@@ -1149,3 +1149,12 @@ its existing wrapping contract. Golden upstream bodies do not reuse the
 production serializer. Original responses, attempts, auth/slot and durable state
 remain independent assertions, with matching argument corruption rejected.
 The default DeepSeek matrix reaches 255; Gemini remains 974.
+
+Eighteen DeepSeek `deepseek-request-primitive-custom-input-*` cases compare
+the exact string wrapper for absent/null, string/empty/escaped/Unicode,
+object/array/boolean/u64 input, ignored argument aliases and input priority.
+Developer-role controls force normal reconstruction alongside simple-request
+overrides. Structured inputs retain canonical Serde ordering and number bytes
+inside the string. Independent complete request/response, status/stdout,
+attempt/auth/state invariants and matching-corruption controls apply.
+The default DeepSeek matrix reaches 273; Gemini remains 974.
