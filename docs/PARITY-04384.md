@@ -5275,3 +5275,109 @@ Clean-commit 146-case Gemini and 169-case DeepSeek matrices follow.
 Other controls, combined-error ordering, Gemini Compact, executable session/
 turn continuation, native macOS/Windows and live authentication remain open.
 Global 1:1 parity is not claimed.
+
+
+## Complete default release gate checkpoint: 293b1b6
+
+The full unchanged default command exits 0 from protected clean
+`293b1b6cb6d543875847b6aeec0a5e8750a1360b`:
+`rtk proxy scripts/verify-release-parity.sh > /tmp/gdx-04384-release-293b1b6-rerun.log 2>&1`.
+The process completed every stage, including HTTP profile-status and raw-429
+checks after its `PASS: ... phase all` marker. The worktree remains clean at
+that exact revision. This advances the complete default-gate checkpoint from
+`8730116` to `293b1b6`, not to any subsequent gateway change.
+The first invocation remains FAIL in `/tmp/gdx-04384-release-293b1b6.log`;
+its reference leftover-file invariant and narrow scenario rerun remain recorded
+above. No assertion or state allowlist was relaxed. Global parity is unproven.
+
+
+## Preserve time-bound oracle evidence at scenario completion
+
+The original clean `f4bf577` DeepSeek matrix returns FAIL in
+`/tmp/gdx-04384-request-logprobs-deepseek-oracle.json`, with exactly
+`deepseek-sse-terminal.prodex.embedded_stream_error` and its Godex counterpart.
+Both products supplied the expected one terminal SSE frame, exact provider
+code/message, one primary-key attempt, exit 0 and safe state. The raw report
+remains FAIL: its evidence is not retroactively relabeled.
+
+`stream_error_contract.go` correctly requires a generated timestamp within
+five minutes of observation. The runner incorrectly evaluated independent
+invariants again after every parallel scenario had finished. A long matrix
+aged the early valid SSE result beyond that window. The scenario executor now
+checks all independent invariants immediately after each scenario completes,
+stores failures in that scenario's existing ordered comparison, and the final
+report consumes those results. The late repeated check is removed. Timestamp
+limits, strict fields, request/response bytes, state checks and negative
+controls are unchanged; this is test-harness ownership, not product policy.
+
+The new deterministic executor regression uses fresh, stale and future frames
+without sleeping. Before repair one control passes and three tests fail,
+including the parent:
+`rtk go test ./tools/differential -run '^TestProdex04384ScenarioCompletionChecksTimeBoundSSEInvariant$' -count=1`;
+`/tmp/gdx-04384-scenario-invariants-before.log`.
+After repair, `rtk go test ./tools/differential -count=1` passes 280 tests:
+`/tmp/gdx-04384-gemini-ignored-sampling-final-oracle-tests.log`.
+Stale and future timestamps retain their exact two product-specific failing
+invariants. Existing concurrent isolation and ordered-report tests still pass.
+
+A separate temporary oracle checkout at `f4bf577` contains only this executor
+timing repair and its regression, retaining the exact 156-case vocabulary.
+`rtk go test ./tools/differential -count=1` passes 280 tests there:
+`/tmp/gdx-04384-logprobs-oracle-clock-tests.log`.
+Its harness is `/tmp/gdx-04384-logprobs-oracle-clock-differential`.
+The unchanged clean `f4bf577` product binary/source are being rechecked in
+`/tmp/gdx-04384-request-logprobs-deepseek-clock-oracle.json`.
+The equivalent repaired harness with the 169-case stop vocabulary is
+`/tmp/gdx-04384-scenario-invariants-fixed-differential`; its clean `ffca69a`
+candidate rerun is `/tmp/gdx-04384-request-stop-deepseek-clock-oracle.json`.
+Both reruns are pending. Candidate source and binary pins are unchanged;
+the temporary oracle patches do not modify either protected candidate.
+
+
+## Gemini ignores unprojected sampling controls
+
+The pinned chat-compatible runtime invokes the shared primitive projection,
+whose `deepseek.mojo:1177–1213` emits only temperature, top-p, maximum tokens
+and logprobs. It omits `presence_penalty`, `frequency_penalty`, `seed` and `n`.
+Gemini skips DeepSeek's unsupported-field rejection, so these controls are
+ignored regardless of their valid JSON type. Godex forwarded the first three
+through its shared Claude converter and incorrectly rejected `n:7`.
+
+The Gemini normalization step now removes these four fields alongside its
+already ignored parallel-tool control, after complete serde admission. Invalid
+Unicode, overflow or malformed ignored values still fail terminally. The
+three-line removal loop is private gateway protocol behavior; no shared Claude
+or DeepSeek policy, production helper, API, interface, package, dependency,
+config, worker or persisted format is added or changed.
+
+Before repair six controls pass and 23 tests fail, including the parent:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiChatIgnoresUnprojectedSamplingControls$' -count=1`;
+`/tmp/gdx-04384-gemini-ignored-sampling-before.log`.
+The new and prior ignored-field regressions pass 37 tests after repair:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiChatIgnores(UnprojectedSamplingControls|ParallelToolControl)$' -count=1`;
+`/tmp/gdx-04384-gemini-ignored-sampling-focused.log`.
+
+Twenty-eight executable baseline reports use clean `ffca69a`, the pinned
+reference and `/tmp/gdx-04384-gemini-ignored-sampling-differential`:
+`/tmp/gdx-04384-gemini-ignored-<presence_penalty|frequency_penalty|seed|n>-<kind>-before-oracle.json`.
+Twenty-two cases FAIL only Godex; six nonnumeric n controls PASS. Every
+reference and independent matching-leak invariant passes. The existing parallel
+fixture runner is extended and renamed for ignored controls, retaining its
+seven old scenario names. New cases require exact authenticated original
+request bytes with ignored fields absent, one attempt, exact native output/
+status/type/stdout/exit and safe state. Matching leaked controls still fail.
+
+`rtk go test ./tools/differential -count=1` passes 276 tests before the separate
+executor regression: `/tmp/gdx-04384-gemini-ignored-sampling-oracle-tests.log`.
+The final oracle suite passes 280 tests as recorded above.
+`rtk proxy go test -json ./...` passes 9,658 tests across 81 packages
+(71 passing packages and ten with no tests):
+`/tmp/gdx-04384-gemini-ignored-sampling-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+passes 2,944 tests: `/tmp/gdx-04384-gemini-ignored-sampling-race.log`.
+`rtk proxy make verify` passes the complete local gate:
+`/tmp/gdx-04384-gemini-ignored-sampling-verify.log`.
+Clean-commit 174-case Gemini and 169-case DeepSeek matrices follow.
+Other controls, combined-error ordering, Gemini Compact, executable session/
+turn continuation, native macOS/Windows and live authentication remain open.
+Global 1:1 parity is not claimed.
