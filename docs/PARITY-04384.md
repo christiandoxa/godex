@@ -4028,6 +4028,54 @@ valid Gemini continuation/Compact ownership, native macOS/Windows and live
 authentication remain open. Global 1:1 parity is not claimed.
 
 
+## Validated Gemini control admission checkpoint: 293b1b6
+
+Clean `293b1b6cb6d543875847b6aeec0a5e8750a1360b` passes all 89 Gemini cases
+and all 125 DeepSeek scenarios, with independent mutation controls:
+`/tmp/gdx-04384-gemini-control-types-oracle.json` and
+`/tmp/gdx-04384-gemini-control-types-deepseek-oracle.json`.
+Invalid stream/instructions/previous-response types remain terminal before
+normalization or upstream dispatch. The stream-false control and all earlier
+request/response, ownership and retry cases remain matched.
+
+Clean builds use
+`rtk go build -trimpath -o /tmp/gdx-04384-gemini-control-types-godex ./cmd/godex` and
+`rtk go build -trimpath -o /tmp/gdx-04384-gemini-control-types-final-differential ./tools/differential`.
+Commands use the same pinned reference, `--gemini`, or
+`--scenario all --scenario-workers 3`. After checking the primary worktree and
+unchanged remote, this commit was fast-forwarded and pushed directly to main.
+A full default `rtk proxy scripts/verify-release-parity.sh` invocation started
+on an isolated clean 293b1b6 checkout at 2026-10-22 04:47:18 UTC:
+`/tmp/gdx-04384-release-293b1b6.log`. Until its complete exit, including stages
+after phase-all, the complete-default PASS remains scoped to clean `8730116`.
+
+
+## Validated Gemini complete-body checkpoint: 3398cd9
+
+Clean `3398cd9cb33aa5af28dccf7358c5882f8eb76dc2` passes all 102 Gemini cases
+and all 125 DeepSeek scenarios, including independent matching corruptions:
+`/tmp/gdx-04384-gemini-json-admission-oracle.json` and
+`/tmp/gdx-04384-gemini-json-admission-deepseek-oracle.json`.
+Three initial targeted clean-commit invocations also PASS:
+`/tmp/gdx-04384-gemini-json-<root-null|root-null-rotation|syntax>-targeted-oracle.json`.
+The exact empty 500 survives the HTTP delivery layer without a content type;
+parse failures retain the terminal plain 502. Both stop before any upstream
+attempt, including two-key rejection, and the valid Unicode control remains
+an exact authenticated successful request with safe durable state.
+
+Clean binaries were built with
+`rtk go build -trimpath -o /tmp/gdx-04384-gemini-json-admission-godex ./cmd/godex` and
+`rtk go build -trimpath -o /tmp/gdx-04384-gemini-json-admission-final-differential ./tools/differential`.
+Commands use the unchanged pinned reference, `--gemini`, or
+`--scenario all --scenario-workers 3`. The checked clean primary worktree and
+unchanged remote were fast-forwarded and pushed directly to `origin/main` at
+`3398cd9`. No CI wait, force push, tag, release or editor-worktree change
+occurred. The separate full default script on 293b1b6 remains in progress;
+it is not evidence for later commits. Other controls, combined-error ordering,
+Gemini Compact, session/turn executable continuation, native macOS/Windows
+and live authentication remain open. Global 1:1 parity is not claimed.
+
+
 ## Validated string EOF checkpoint: c1f0e5a
 
 Clean `c1f0e5a45b7705d21d95e6181663da3a9ffa5895` passes all 125 DeepSeek
