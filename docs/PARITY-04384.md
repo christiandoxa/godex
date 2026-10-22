@@ -4445,3 +4445,44 @@ Clean-commit 60-case Gemini/125-case DeepSeek matrices follow.
 Gemini Compact and session/turn executable continuation,
 other lexical classes, native macOS/Windows execution and live authentication
 remain separate audits. Global 1:1 parity is not claimed.
+
+
+## Same-process Gemini seed evidence in the durable-state oracle
+
+The same-process fixture on clean
+`ec806250e53c3dd646e4d946e8479a29113943f5` returned the exact required 503
+for both products but FAILed the old auditor's Godex state check:
+`/tmp/gdx-04384-gemini-durable-same-process-initial-oracle.json`.
+Its final exchange alone could not authorize the durable binding established
+by the successful first exchange. Inferring success from the final rejection
+would weaken the independent evidence.
+
+The shared synthetic Codex shim now retains the actual first successful
+exchange in its existing private result file. The Gemini fixture independently
+checks that seed's exact body, status and content type before deriving owner
+evidence. A missing, failed, mutated or nested seed is rejected; matching
+corruptions must fail for both products. The ordinary client stdout and
+final exchange remain unchanged, and no new persistent path is permitted.
+This is developer-only evidence; no Godex production code changes.
+
+An initial regression draft did not compile and is not behavioral evidence.
+The corrected regression passes the failed-seed control and fails the
+successful-seed case plus parent before repair:
+`rtk go test ./tools/differential -run '^TestProdex04384SameProcessProbeRequiresSuccessfulSeed$' -count=1`;
+`/tmp/gdx-04384-gemini-same-process-seed-qualified-before.log`.
+With the strengthened harness, the same clean ec80625 executable PASSes:
+`/tmp/gdx-04384-gemini-durable-same-process-reviewed-oracle.json`.
+Its immutable source is `/tmp/gdx-04384-gemini-durable-candidate-work`, the
+harness is `/tmp/gdx-04384-gemini-seed-evidence-differential`, and the command
+uses the unchanged pinned reference with
+`--gemini --scenario raw-key-bound-response-same-process`.
+
+`rtk go test ./tools/differential -count=1` passes 270 tests:
+`/tmp/gdx-04384-gemini-same-process-seed-oracle-tests.log`.
+`rtk go test -race ./tools/differential -count=1` passes 270 tests:
+`/tmp/gdx-04384-gemini-seed-evidence-race.log`.
+`rtk go test ./...` passes 9,402 tests across 81 packages:
+`/tmp/gdx-04384-gemini-seed-evidence-test-all.log`.
+`rtk proxy make verify` passes all local completion gates:
+`/tmp/gdx-04384-gemini-seed-evidence-verify.log`.
+Clean-commit full matrices follow; global 1:1 parity remains unproven.

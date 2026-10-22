@@ -198,6 +198,9 @@ observed response IDs and the exact accepted fixture session. The state auditor
 checks the binding kind and its independent hash namespace, pins provider/key/
 endpoint identities for reference snapshots, and requires Godex's conflict
 sentinel. Unauthenticated or failed responses authorize no new binding.
+The same-process fixture records the actual successful first exchange inside
+the existing child-result file and checks its exact body, status and type.
+A terminal rejection alone never authorizes durable seed ownership.
 
 The 0.438.4 `deepseek-sse-error-presence`, `deepseek-sse-error-i64` and
 `deepseek-sse-error-float` scenarios verify embedded-error primary-field

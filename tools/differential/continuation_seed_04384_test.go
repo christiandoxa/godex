@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -39,9 +40,18 @@ func TestProdex04384SameProcessProbeRequiresSuccessfulSeed(t *testing.T) {
 				}
 				return
 			}
-			exchange, err := readExchange(path)
-			if err != nil || exit != 2 || calls.Load() != 2 || exchange.Status != 503 {
+			final, err := readExchange(path)
+			if err != nil || exit != 2 || calls.Load() != 2 || final.Status != 503 {
 				t.Fatalf("successful seed lost second response: exit=%d calls=%d error=%v", exit, calls.Load(), err)
+			}
+			var record struct {
+				Seed *exchange `json:"successful_seed"`
+			}
+			data, err := os.ReadFile(path)
+			if err != nil || json.Unmarshal(data, &record) != nil || record.Seed == nil ||
+				record.Seed.Status != 200 || record.Seed.Body != `{"id":"chatcmpl-differential"}` ||
+				record.Seed.Headers.Get("Content-Type") != "application/json" {
+				t.Fatal("successful same-process seed exchange was not retained exactly")
 			}
 		})
 	}

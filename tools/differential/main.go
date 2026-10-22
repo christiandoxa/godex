@@ -55,6 +55,7 @@ type exchange struct {
 	Status  int         `json:"status"`
 	Headers http.Header `json:"headers"`
 	Body    string      `json:"body"`
+	Seed    *exchange   `json:"successful_seed,omitempty"`
 }
 
 type fileState struct {
@@ -1161,6 +1162,7 @@ func runCodexShim(arguments []string) int {
 		maxAttempts = 2
 	}
 	var clientResult exchange
+	var successfulSeed *exchange
 	var body []byte
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		request, err := http.NewRequest(method, endpoint.String(), bytes.NewReader(requestBody))
@@ -1188,6 +1190,8 @@ func runCodexShim(arguments []string) int {
 			if response.StatusCode != http.StatusOK {
 				return shimFailure("synthetic continuation seed did not succeed")
 			}
+			seed := clientResult
+			successfulSeed = &seed
 			requestBody = []byte(strings.TrimSuffix(string(requestBody), "}") + `,"previous_response_id":"chatcmpl-differential"}`)
 			continue
 		}
@@ -1195,6 +1199,7 @@ func runCodexShim(arguments []string) int {
 			break
 		}
 	}
+	clientResult.Seed = successfulSeed
 	encoded, err := json.Marshal(clientResult)
 	if err != nil {
 		return shimFailure("synthetic Codex shim could not encode response")

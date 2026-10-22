@@ -25,6 +25,9 @@ func geminiContinuationOwners04384(scenario string, result geminiCandidateResult
 	if result.Seed != nil {
 		result = *result.Seed
 	}
+	if result.Client.Seed != nil {
+		result.Client = *result.Client.Seed
+	}
 	if len(result.Upstream) == 0 || !result.Upstream[len(result.Upstream)-1].Auth {
 		return nil
 	}
@@ -68,6 +71,12 @@ func geminiContinuationInvariant04384(scenario string, result geminiCandidateRes
 		return errors.New("Gemini raw-key lineage changed original request or credential")
 	}
 	body := strings.Replace(geminiBufferedBodySuccess04384, "response-uuid", "chatcmpl-differential", 1)
+	if scenario == geminiBoundResponseCase04384 {
+		seed := result.Client.Seed
+		if seed == nil || seed.Seed != nil || seed.Status != 200 || seed.Body != body || seed.Headers.Get("Content-Type") != "application/json; charset=utf-8" {
+			return errors.New("Gemini same-process continuation lost its exact successful seed")
+		}
+	}
 	status, exit, contentType := 200, 0, "application/json; charset=utf-8"
 	if scenario != geminiUnboundResponseCase04384 {
 		body = `{"error":{"code":"bound_continuation_unavailable","message":"bound continuation provider is unavailable"}}`
@@ -87,6 +96,11 @@ func geminiContinuationNegativeControl04384() bool {
 			Upstream: []geminiCapturedRequest{{Method: "POST", Path: "/v1beta/openai/chat/completions", Auth: true, Slot: "single",
 				Body: map[string]any{"model": "gemini-3.1-pro-preview", "stream": false,
 					"messages": []any{map[string]any{"role": "user", "content": "same request"}}}}}}
+		if scenario == geminiBoundResponseCase04384 {
+			seed := run.Client
+			seed.Headers = run.Client.Headers.Clone()
+			run.Client.Seed = &seed
+		}
 		if geminiRestartCase04384(scenario) {
 			seed := run
 			seed.Client.Headers = run.Client.Headers.Clone()
@@ -128,9 +142,21 @@ func geminiContinuationNegativeControl04384() bool {
 				func(r *geminiCandidateResult) { r.Seed.Stdout = "changed" },
 				func(r *geminiCandidateResult) { r.Seed.StateIntegrity = []string{"changed"} })
 		}
+		if scenario == geminiBoundResponseCase04384 {
+			mutations = append(mutations,
+				func(r *geminiCandidateResult) { r.Client.Seed = nil },
+				func(r *geminiCandidateResult) { r.Client.Seed.Status = 503 },
+				func(r *geminiCandidateResult) { r.Client.Seed.Body = `{}` },
+				func(r *geminiCandidateResult) { r.Client.Seed.Headers.Set("Content-Type", "text/plain") })
+		}
 		for _, mutate := range mutations {
 			changed := run
 			changed.Client.Headers = run.Client.Headers.Clone()
+			if run.Client.Seed != nil {
+				seed := *run.Client.Seed
+				seed.Headers = run.Client.Seed.Headers.Clone()
+				changed.Client.Seed = &seed
+			}
 			changed.Upstream = append([]geminiCapturedRequest(nil), run.Upstream...)
 			if run.Seed != nil {
 				seed := *run.Seed
