@@ -3998,3 +3998,31 @@ passes 2,688 tests: `/tmp/gdx-04384-search-envelope-race.log`.
 race tests, cross-platform build/test compilation, installers and build:
 `/tmp/gdx-04384-search-envelope-verify.log`.
 Clean-commit executable verification follows. Global 1:1 parity remains unproven.
+
+
+## Validated structured search envelope checkpoint: fca1a1a
+
+Clean `fca1a1a4d229fbf8f295277f9af78f868956e687` passes all 115 DeepSeek
+executable scenarios and the independent corruption controls:
+`/tmp/gdx-04384-search-envelope-oracle.json`.
+The new output-envelope failures retain exact serde prefixes and positions;
+the 124-array public control succeeds, while the two 125-array runtime cases
+return empty HTTP 500, exit 2, one authenticated attempt and no retry/rotation.
+The focused overflow and two-key runtime-depth probes also PASS:
+`/tmp/gdx-04384-search-envelope-overflow-oracle.json` and
+`/tmp/gdx-04384-search-envelope-runtime-rotation-oracle.json`.
+
+Both binaries were built from the clean commit with
+`rtk go build -trimpath -o /tmp/gdx-04384-search-envelope-godex ./cmd/godex` and
+`rtk go build -trimpath -o /tmp/gdx-04384-search-envelope-final-differential ./tools/differential`.
+The full run uses `--scenario all --scenario-workers 3` and retains the exact
+pinned reference source/binary digest and clean Godex VCS evidence in the report.
+Latest local checks are 2,688 focused race tests, 9,313 full-suite tests and
+`rtk proxy make verify`, all PASS. The prior 106-case checkpoint remains valid
+on `2a36859`; no broader Gemini/default-script rerun is implied here.
+
+This envelope stage is ready for direct fast-forward push after checking the
+primary worktree and remote. Quoted-string/literal EOF and second-surrogate
+escape positions are the next isolated follow-up. Other lexical diagnostics,
+valid Gemini continuation/Compact ownership, native macOS/Windows and live
+authentication remain open. Global 1:1 parity is not claimed.
