@@ -9403,3 +9403,15 @@ fixture writer's framing and independent matching-corruption self-tests pass
 with count 1 after repairing an initial no-op mutation in a terminal-error
 case. The original failed local fixture log is retained. Full local checks and
 clean-commit executable controls follow before publication of this tooling.
+
+Exact clean ffb6bc78ba28063bad04724ad1180fa72dc9616f passes 10,895 local
+tests with 18 optional SKIP; make verify exits 0 including race tests, guards,
+vet and cross-builds. Exact commands:
+`rtk proxy go test -json ./... > /tmp/gdx-04384-gemini-stream-tool-fixture-full.jsonl 2>&1`
+and `rtk proxy make verify > /tmp/gdx-04384-gemini-stream-tool-fixture-verify.log 2>&1`.
+Two exact executable controls PASS; an explicit simple-tool probe remains the
+expected Godex-only FAIL and is retained as FAIL. Audit:
+/tmp/gdx-04384-gemini-stream-tool-fixture-audit.json. Both binaries embed the
+clean revision; cmd/internal production code equals exact 5c15397. This
+qualifies the diagnostic tooling only. The fixture commit is pushed directly
+to origin/main after fetch, cleanliness and ancestry checks; no CI wait.

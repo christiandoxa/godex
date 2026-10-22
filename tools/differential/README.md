@@ -1091,3 +1091,10 @@ independent successes. Original request bytes, auth/slot, attempts, stdout and
 durable state are asserted separately for each product; matching corruption of
 those values or of the failure/continuation wire must fail. Successful tool
 lifecycles, accumulated arguments and tool snapshots remain outside this scope.
+
+The new streamed-tool lifecycle diagnostics are explicit `--scenario` probes
+while their producer correction is in progress. They cover raw argument
+fragments, item/index ordering, validation, shell completion and search/patch
+items. Their documented Godex mismatches remain FAIL; they join the default
+matrix only with the qualified producer correction. The current default stays
+at 924 Gemini cases. Continuation snapshots remain a separate qualification.
