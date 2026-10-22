@@ -9685,3 +9685,19 @@ and `rtk proxy make verify > /tmp/gdx-04384-gemini-stream-tool-fields-verify.log
 The final sentinel also rejects matching ID/name/index/signature field
 corruption. Exact clean executable fixture qualification follows before
 publication; cmd/internal production code is unchanged.
+
+Exact clean c42bd28c0422cfe698eb006691b0392c21c2f2d6 fixture qualification
+PASSes all 28 cases (original session 85598, exit 0): the 24 baseline scenarios
+plus whole-frame/first-choice pending, finish-then-EOF Compact and shell-tool
+controls. Audit: /tmp/gdx-04384-gemini-stream-tool-fields-targeted-audit.json.
+Reference source, release manifest and binary hashes, both artifacts' embedded
+clean VCS metadata, original independent invariants and matching-corruption
+guards were verified. Production cmd/internal remains identical to d670339.
+The full 968-case Gemini oracle is running in original session 88702 against
+that immutable source, with output retained at
+/tmp/gdx-04384-gemini-stream-tool-fields-oracle.json. This is not a full968
+PASS. The latest completed full-Gemini qualification remains 912 at exact
+9e4b808; later full matrices and the e9d88ce default release gate remain
+pending. Candidate c42bd28c was pushed directly to origin/main after fetch,
+cleanliness and ancestry checks, without waiting for CI. No production
+correction, dependency, state format or ownership change was needed.
