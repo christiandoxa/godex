@@ -9380,3 +9380,26 @@ is pushed to origin/main after fetch, cleanliness and ancestry checks without
 waiting for CI. Full Gemini 924 now runs on that unchanged source (original
 session 85538); it is not yet a PASS. Earlier 912/918 matrices and the entire
 e9d88ce release gate retain their original handles and immutable checkouts.
+
+### Qualify explicit Gemini streamed-tool lifecycle diagnostics
+
+Thirteen exact clean 5c15397254dd781bf8e28e5d3f29be5482471bd1 baselines
+qualify ten Godex-only failures and three PASS controls. The independent
+reference wire covers ordinary tools, argument fragments, multiple input-order
+indices and sorted completion, mixed text/tools, malformed JSON, missing names,
+raw shell deltas with final RTK arguments, search/patch items and empty
+arguments. All streams read fully with SSE 200 and child exit 0; expected
+semantic failures retain their exact terminal error. Request bytes (except the
+legacy decoded-native control), stdout, attempts/auth/slot, state and matching
+corruption assertions qualify independently. Audit:
+/tmp/gdx-04384-gemini-stream-tool-lifecycle-before-audit.json. This is a
+one-turn lifecycle qualification; continuation snapshots remain open.
+
+The fixture stage exposes the ten new names only through explicit --scenario
+selection. The default matrix stays at the previously qualified 924 cases;
+the producer fix will add the new cases after exact executable qualification.
+These documented Godex failures remain FAIL, not hidden or relabeled. The
+fixture writer's framing and independent matching-corruption self-tests pass
+with count 1 after repairing an initial no-op mutation in a terminal-error
+case. The original failed local fixture log is retained. Full local checks and
+clean-commit executable controls follow before publication of this tooling.
