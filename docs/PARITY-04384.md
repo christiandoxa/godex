@@ -8774,6 +8774,34 @@ cross-builds, format/source guards, vet and the build. Logs:
 /tmp/gdx-04384-gemini-stream-reasoning-verify.log. Exact clean executable
 qualification follows. Global continuation and overall 1:1 parity remain unproven.
 
+### Executable qualification checkpoint for history and SSE descendants
+
+Exact clean executable results now qualify the implemented descendant workflows:
+
+- c32018d: seven Gemini buffered Compact history cases PASS.
+- 0ea01e9: three completed-text-stream Compact cases and 213 DeepSeek cases PASS.
+- 05a61ff: four local/shared history-scope cases PASS.
+- 7a2b7f5: thirteen assistant replay controls and the full 218 DeepSeek cases PASS.
+- 3ca1616: nine request-override/history controls and full 222 DeepSeek cases PASS.
+- 807607b: four numeric pending-history controls and full 224 DeepSeek cases PASS.
+- ac597d4: eleven reasoning lifecycle/Compact and existing stream controls PASS.
+- 6818d40: eight logprobs/fingerprint and prior reasoning/Compact/error controls PASS.
+
+Each source revision passed its local full tests and make verify before its
+clean product build. The latest source, 6818d40, passes 10,757 tests with 18
+optional SKIP and shuffled race/cross-build checks. Original reports, terminal
+exit observations, binary/source pins and independent mutation/state assertions
+are retained in the corresponding /tmp/gdx-04384-*-audit.json records.
+
+The broader Gemini 844/847/851/857/862 matrices remain running on their original
+immutable source worktrees. Targeted PASS does not imply those full matrices
+passed. The latest full Gemini matrix and entire default-gate PASS remain the
+837-case and completed default gate at exact 78d256d. The two original full
+DeepSeek failures on c32018d remain FAIL due to reference temporary state files;
+later source-qualified PASSes do not relabel them. Reasoning above 64 MiB, tool
+stream caching, live authentication, native macOS/Windows execution and overall
+continuation/1:1 parity remain unqualified.
+
 ### Preserve latest Gemini SSE logprobs and system fingerprint
 
 Five exact clean executable baselines on ac597d49f7f8d3f8eb802a36234f0878de329c7c
