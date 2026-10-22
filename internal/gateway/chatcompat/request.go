@@ -10,6 +10,16 @@ import (
 )
 
 func ResponsesRequest(body []byte, defaultModel, inputModel string) ([]byte, error) {
+	return responsesRequest(body, defaultModel, inputModel, false)
+}
+
+// ResponsesRequestPreservingMessages retains empty and system-only messages.
+// Callers still own provider-specific input validation and content projection.
+func ResponsesRequestPreservingMessages(body []byte, defaultModel, inputModel string) ([]byte, error) {
+	return responsesRequest(body, defaultModel, inputModel, true)
+}
+
+func responsesRequest(body []byte, defaultModel, inputModel string, preserveMessages bool) ([]byte, error) {
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.UseNumber()
 	var root any
@@ -26,7 +36,7 @@ func ResponsesRequest(body []byte, defaultModel, inputModel string) ([]byte, err
 	if err := rejectUnsupportedRequest(object); err != nil {
 		return nil, err
 	}
-	messages, err := responseInputMessages(object)
+	messages, err := responseInputMessages(object, preserveMessages)
 	if err != nil {
 		return nil, err
 	}

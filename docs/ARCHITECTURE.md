@@ -469,6 +469,13 @@ protocol invariant, so it does not belong in a shared helper package.
 Present content on an explicit message must be a string, object or array.
 Null, boolean and numeric roots fail before shared conversion can discard
 the invalid message and execute only the remaining valid input.
+The private Gemini content projector validates explicit message parts before
+flattening them. Selected string/text/input_text/output_text entries retain
+empty strings and newline separators; standalone objects use canonical serde
+JSON text. It also maps developer to system, normalizes implicit roles and
+preserves empty messages. Shared `gateway/chatcompat` exposes a narrow message-
+preserving entry point used by Gemini; its original Claude entry point retains
+its empty/system-only admission behavior. No provider policy moves into a helper.
 DeepSeek independently checks present `stream` as a boolean and present
 `instructions`/`previous_response_id` as strings before constructing its
 translated request. Invalid types use its common terminal preparation boundary,

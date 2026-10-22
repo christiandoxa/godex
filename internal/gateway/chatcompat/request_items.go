@@ -6,12 +6,15 @@ import (
 	"strings"
 )
 
-func responseInputMessages(object map[string]any) ([]any, error) {
+func responseInputMessages(object map[string]any, preserveMessages bool) ([]any, error) {
 	messages := make([]any, 0)
 	if instructions, ok := object["instructions"].(string); ok && instructions != "" {
 		messages = append(messages, map[string]any{"role": "system", "content": instructions})
 	}
 	input, exists := object["input"]
+	if !exists && preserveMessages && len(messages) > 0 {
+		return messages, nil
+	}
 	if !exists || input == nil {
 		return nil, errors.New("Responses request must include a textual input or messages array")
 	}
@@ -19,7 +22,7 @@ func responseInputMessages(object map[string]any) ([]any, error) {
 	case string:
 		messages = append(messages, map[string]any{"role": "user", "content": value})
 	case []any:
-		converted, err := convertResponseItems(value)
+		converted, err := convertResponseItems(value, preserveMessages)
 		if err != nil {
 			return nil, err
 		}
@@ -27,13 +30,13 @@ func responseInputMessages(object map[string]any) ([]any, error) {
 	default:
 		return nil, errors.New("Responses request must include a textual input or messages array")
 	}
-	if len(messages) == 0 || (len(messages) == 1 && messages[0].(map[string]any)["role"] == "system") {
+	if len(messages) == 0 || (!preserveMessages && len(messages) == 1 && messages[0].(map[string]any)["role"] == "system") {
 		return nil, errors.New("Responses request must include a textual input or messages array")
 	}
 	return messages, nil
 }
 
-func convertResponseItems(items []any) ([]any, error) {
+func convertResponseItems(items []any, preserveMessages bool) ([]any, error) {
 	result := make([]any, 0, len(items))
 	var looseText []string
 	for _, raw := range items {
@@ -41,7 +44,7 @@ func convertResponseItems(items []any) ([]any, error) {
 		if !ok {
 			continue
 		}
-		converted, text, flush, err := convertResponseItem(item)
+		converted, text, flush, err := convertResponseItem(item, preserveMessages)
 		if err != nil {
 			return nil, err
 		}
@@ -56,11 +59,11 @@ func convertResponseItems(items []any) ([]any, error) {
 	return appendLooseText(result, &looseText), nil
 }
 
-func convertResponseItem(item map[string]any) ([]any, string, bool, error) {
+func convertResponseItem(item map[string]any, preserveMessages bool) ([]any, string, bool, error) {
 	kind, _ := item["type"].(string)
 	switch kind {
 	case "message":
-		message, err := convertMessageItem(item)
+		message, err := convertMessageItem(item, preserveMessages)
 		if message == nil {
 			return nil, "", true, err
 		}
@@ -108,7 +111,7 @@ func appendLooseText(result []any, looseText *[]string) []any {
 	return result
 }
 
-func convertMessageItem(item map[string]any) (map[string]any, error) {
+func convertMessageItem(item map[string]any, preserveMessages bool) (map[string]any, error) {
 	role, _ := item["role"].(string)
 	if role == "" {
 		role = "user"
@@ -117,7 +120,7 @@ func convertMessageItem(item map[string]any) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	if content == "" {
+	if content == "" && !preserveMessages {
 		return nil, nil
 	}
 	return map[string]any{"role": role, "content": content}, nil

@@ -8,10 +8,10 @@ import (
 )
 
 type requestPrimitiveFixture04384 struct {
-	fields, limit, wireFields, wirePrefix, wireStop, text, body string
-	reject                                                      bool
-	failureStatus                                               int
-	geminiValidationError                                       string
+	fields, limit, wireFields, wirePrefix, wireStop, text, body, wireBody string
+	reject                                                                bool
+	failureStatus                                                         int
+	geminiValidationError                                                 string
 }
 
 func requestPrimitiveSuffixes04384() []string {
@@ -41,6 +41,7 @@ func geminiPreparationSuffixes04384() []string {
 	suffixes = append(suffixes, geminiInputKindSuffixes04384()...)
 	suffixes = append(suffixes, geminiMessageRoleSuffixes04384()...)
 	suffixes = append(suffixes, geminiContentTypeSuffixes04384()...)
+	suffixes = append(suffixes, geminiMessageProjectionSuffixes04384()...)
 	return append(suffixes, []string{"preparation-tools", "preparation-reasoning", "preparation-tool-params", "preparation-tool-missing-params",
 		"preparation-tool-missing-name", "preparation-tool-description", "preparation-input",
 		"tool-priority-stream", "tool-priority-temperature", "tool-priority-tokens", "tool-priority-user", "tool-priority-input", "tool-priority-reasoning", "tool-priority-serde"}...)
@@ -52,6 +53,9 @@ func requestPrimitiveCase04384(scenario string) (requestPrimitiveFixture04384, b
 	}
 	const stops16 = `["s01","s02","s03","s04","s05","s06","s07","s08","s09","s10","s11","s12","s13","s14","s15","s16"]`
 	suffix := strings.TrimPrefix(strings.TrimPrefix(scenario, "deepseek-"), "request-primitive-")
+	if strings.HasPrefix(suffix, "projection-") {
+		return geminiMessageProjectionFixture04384(suffix)
+	}
 	if strings.HasPrefix(suffix, "message-content-") {
 		return geminiContentTypeFixture04384(suffix)
 	}
@@ -260,6 +264,9 @@ func requestPrimitiveInput04384(scenario, model string) []byte {
 
 func requestPrimitiveWire04384(scenario, model string) string {
 	fixture, _ := requestPrimitiveCase04384(scenario)
+	if fixture.wireBody != "" {
+		return strings.Replace(fixture.wireBody, "gemini-3.1-pro-preview", model, 1)
+	}
 	body := "{" + fixture.wirePrefix
 	if fixture.limit != "" {
 		body += `"max_tokens":` + fixture.limit + ","

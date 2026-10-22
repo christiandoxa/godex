@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 	"github.com/christiandoxa/godex/internal/helper/jsonutil"
@@ -35,7 +36,7 @@ func (transport *RuntimeTransport) executeChatCompatibleResponses(
 		}
 		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
-	body, err := chatcompat.ResponsesRequest(normalized, requestModel(input.Body), "")
+	body, err := chatcompat.ResponsesRequestPreservingMessages(normalized, requestModel(input.Body), "")
 	if err != nil {
 		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
@@ -143,6 +144,9 @@ func normalizeGeminiChatInput043711(body []byte) ([]byte, map[string]any, error)
 	delete(root, "previous_response_id")
 	for _, field := range []string{"parallel_tool_calls", "presence_penalty", "frequency_penalty", "seed", "n"} {
 		delete(root, field)
+	}
+	if instructions, ok := root["instructions"].(string); ok && strings.TrimSpace(instructions) == "" {
+		delete(root, "instructions")
 	}
 	if !normalizeGeminiChatInputItems04384(root["input"]) {
 		return nil, nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}

@@ -6517,3 +6517,90 @@ Developer-to-system role projection and empty/system-only message preservation
 also need executable baselines before repair. Remaining controls, Gemini
 Compact, executable session/turn continuation, native macOS/Windows and live
 authentication remain unproven. Global 1:1 parity is not claimed.
+
+
+## Qualified message-role/content checkpoints and retained reference replay
+
+Clean `fc5e60cc72d0833e0a029f5725ff0b691ba04126` passes all 286 Gemini
+cases and 213 DeepSeek scenarios, including independent mutation controls:
+`/tmp/gdx-04384-gemini-content-types-oracle.json` and
+`/tmp/gdx-04384-gemini-content-types-deepseek-oracle.json`.
+Its clean binaries were built with
+`rtk go build -trimpath -o /tmp/gdx-04384-gemini-content-types-godex ./cmd/godex` and
+`rtk go build -trimpath -o /tmp/gdx-04384-gemini-content-types-final-differential ./tools/differential`.
+Commands use `--gemini`, or `--scenario all --scenario-workers 3`, with exact
+clean source/commit pins and the unchanged published reference. The passing
+Gemini matrix includes every scenario from the earlier 278-case role matrix.
+After fetching/checking the clean primary and remote, both code commits and
+the documentation-only descendant `c651bff590a1577c56df1803ec63a2c2d36058ac`
+were fast-forwarded and pushed directly to `origin/main` without CI wait.
+Main is `c651bff59`; its production code is the qualified `fc5e60c` tree.
+
+The earlier `0830ef5` 278-case Gemini report remains FAIL:
+`/tmp/gdx-04384-gemini-message-roles-oracle.json`.
+Only reference `raw-key-bound-response-restart-key` differs: the changed-key
+restart returns 200 with a second attempt while Godex returns expected 503,
+exit 2 and only the seed attempt. Cause remains unexplained. The isolated
+unchanged rerun PASSes:
+`/tmp/gdx-04384-gemini-message-roles-restart-key-rerun-oracle.json`.
+No owner, state, status/header or mutation assertion was changed. The later
+complete PASS is scoped to `fc5e60c`; no earlier FAIL is relabeled.
+The complete default-gate PASS remains scoped to `5f49a5f`.
+
+
+## Gemini message projection preserves content and accepted empty input
+
+The pinned runtime validates explicit message parts before its bridge projector.
+Text/string/input_text/output_text entries select the first string, retaining
+empty entries and newline separators; standalone objects become canonical serde
+JSON strings. Media parts without selected text and nontext scalar array parts
+are ignored. Present cache_control or invalid object parts reject the request.
+It maps developer to system, defaults implicit unknown roles to user, preserves
+empty messages and accepts instructions-only/system-only work. Explicit null
+input remains invalid. Whitespace-only instructions are omitted.
+
+The private Gemini item/content files now perform that validation/projection
+before shared conversion. `gateway/chatcompat` gains one narrow message-
+preserving entry point, sharing its existing conversion implementation; the
+original Claude entry point retains its admission and empty-message behavior.
+The public entry point enforces a real protocol boundary without duplicating
+conversion or adding a provider selector/configuration. Focused tests exercise
+both entry points, including controls that must continue rejecting input.
+No helper, package, interface, dependency, worker or persisted format is added.
+Canonical object text reuses the existing technical serde writer.
+
+Before repair the gateway-wire command FAILs with two controls passing and
+11 failures including the parent:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiChatProjectsMessageContentBeforeSending$' -count=1`;
+`/tmp/gdx-04384-gemini-message-projection-before.log`.
+The expanded shared/Gemini contract command PASSes all 44 tests:
+`rtk go test ./internal/gateway/gemini ./internal/gateway/chatcompat -run '^(TestMessageRetentionKeepsDefaultRequestContract|TestProdex04384Gemini(ChatProjectsMessageContentBeforeSending|ContentProjectionKeepsSelectedEmptyText|ContentPartValidationMatchesTaggedOrder))$' -count=1`;
+`/tmp/gdx-04384-gemini-message-projection-expanded-controls.log`.
+
+Twenty executable baselines pin clean `fc5e60c` and unchanged reference.
+The initial twelve reports use `/tmp/gdx-04384-gemini-message-projection-probe-differential`:
+`/tmp/gdx-04384-gemini-projection-<suffix>-probe-oracle.json`.
+The eight added controls use `/tmp/gdx-04384-gemini-message-projection-expanded-before-differential`:
+`/tmp/gdx-04384-gemini-projection-<suffix>-expanded-before-oracle.json`.
+Sixteen FAIL only Godex; four PASS. Every reference and independent mutation
+invariant passes. Commands use `--gemini --scenario request-primitive-projection-<suffix>`
+with exact clean source/commit pins. Complete independent expected request
+bodies retain exact wire bytes, status/body/headers/stdout/exit, attempts and
+safe durable state; all prior matching-corruption mutations stay active.
+
+`rtk go test ./tools/differential -count=1` PASSes 281 tests:
+`/tmp/gdx-04384-gemini-message-projection-expanded-probe-tests.log`.
+`rtk go test ./internal/gateway/gemini ./internal/gateway/chatcompat ./internal/gateway/claude -count=1`
+PASSes 1,091 tests before the eight additional gateway controls:
+`/tmp/gdx-04384-gemini-message-projection-gateway-tests.log`.
+`rtk proxy go test -json ./...` PASSes 9,899 tests in 71 packages; ten packages
+have no tests and 18 optional installed-Codex/executable tests are skipped:
+`/tmp/gdx-04384-gemini-message-projection-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/gateway/chatcompat ./internal/gateway/claude ./internal/usecase/routing ./tools/differential -count=1`
+PASSes 3,210 tests: `/tmp/gdx-04384-gemini-message-projection-race.log`.
+`rtk proxy make verify` PASSes: `/tmp/gdx-04384-gemini-message-projection-verify.log`.
+Clean-commit 306-case Gemini and 213-case DeepSeek qualification follows.
+Broader call-ID/name/output, metadata and remaining controls need executable
+proof. Gemini Compact, executable session/turn continuation, native macOS/
+Windows and live authentication remain unproven. No force push, tag, release
+or editor-checkout edit occurred. Global 1:1 parity is not claimed.

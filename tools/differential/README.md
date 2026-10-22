@@ -392,6 +392,14 @@ followed by an ordinary upstream attempt. String and text-part-array controls
 retain exact canonical bytes; earlier candidate/tool errors and invalid Unicode
 retain their exact terminal outcomes and independent mutation checks.
 
+Gemini `request-primitive-projection-*` checks exact message wire bytes for
+string/alias arrays, empty separators, standalone canonical objects, empty/
+system/developer messages, implicit roles and instructions-only requests.
+Part cache-control and malformed objects fail with zero attempts; ignored media,
+scalar parts, nested prefix metadata and whitespace instructions retain the
+tagged behavior. A complete expected request body keeps these checks independent
+of the production content projector and preserves matching-corruption mutations.
+
 DeepSeek scenario workers evaluate their complete independent invariants as
 each scenario finishes, preserving failures in the ordered report. The strict
 five-minute generated SSE timestamp window is unchanged; later cases cannot
