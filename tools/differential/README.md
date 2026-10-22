@@ -983,6 +983,13 @@ The 0.438.4 DeepSeek history matrix also checks three-call numeric pending
 snapshots at 2^53+1 and uint64 maximum. Its independent expected bytes detect
 rounding on the third request even when the preceding request matches.
 
+The Gemini reasoning SSE cases compare exact summary lifecycle and completion
+metadata for separate, mixed, empty and reasoning-only deltas. Two streamed
+Compact seeds verify retained user/assistant history, including null assistant
+content for reasoning-only output. Equal-but-wrong wire, request, metadata and
+state mutations must fail independently. Local reasoning retention is capped at
+64 MiB; executable parity above that safety ceiling remains unqualified.
+
 ### Tagged 0.438.2 Gemini function-tool rejection parity
 
 Two additional **source/binary-pinned** cases, `invalid-wrapped-tool-parameters`

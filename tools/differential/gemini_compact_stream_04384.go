@@ -10,7 +10,18 @@ import (
 )
 
 func geminiCompactStreamSeed04384(scenario string) bool {
-	return scenario == "compact-owner-stream" || scenario == "compact-owner-stream-eof" || scenario == "compact-owner-stream-unbound"
+	return scenario == "compact-owner-stream" || scenario == "compact-owner-stream-eof" || scenario == "compact-owner-stream-unbound" || geminiCompactReasoningStream04384(scenario) != ""
+}
+
+func geminiCompactReasoningStream04384(scenario string) string {
+	switch scenario {
+	case "compact-owner-stream-reasoning":
+		return "stream-chat-reasoning"
+	case "compact-owner-stream-reasoning-only":
+		return "stream-chat-reasoning-only"
+	default:
+		return ""
+	}
 }
 
 func geminiCompactStreamInput04384(scenario string, seed exchange) ([]byte, error) {
@@ -43,6 +54,9 @@ func geminiCompactStreamInput04384(scenario string, seed exchange) ([]byte, erro
 
 func geminiCompactStreamSeedExchange04384(scenario string) exchange {
 	body := geminiChatSSEFixture043711("resp_deepseek_fixture", "msg_gemini_fixture", 111)
+	if reasoning := geminiCompactReasoningStream04384(scenario); reasoning != "" {
+		body = geminiReasoningStreamFixture04384(reasoning, "resp_deepseek_fixture", "msg_gemini_fixture", 111)
+	}
 	if scenario == "compact-owner-stream-eof" {
 		body = geminiChatEOFFixture04384("resp_deepseek_fixture", "msg_gemini_fixture", 111)
 	}
@@ -55,6 +69,9 @@ func geminiCompactStreamSeedValid04384(scenario string, seed *exchange) bool {
 	}
 	if scenario == "compact-owner-stream-eof" {
 		return geminiChatEOFWireValid04384(seed.Body)
+	}
+	if reasoning := geminiCompactReasoningStream04384(scenario); reasoning != "" {
+		return geminiReasoningStreamWireValid04384(reasoning, seed.Body)
 	}
 	_, err := geminiChatSSEProjection043711(seed.Body)
 	return err == nil

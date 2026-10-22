@@ -99,7 +99,7 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 	_, _, _, controlTypes := geminiControlTypeCase04384(mock.scenario)
 	_, _, jsonAdmission := geminiJSONAdmission04384(mock.scenario)
 	primitiveFixture, primitive := requestPrimitiveCase04384(mock.scenario)
-	if geminiRequestNumberCase04384(mock.scenario) || userID || ignored || controlTypes || jsonAdmission || primitive || geminiCompactCase04384(mock.scenario) {
+	if geminiRequestNumberCase04384(mock.scenario) || userID || ignored || controlTypes || jsonAdmission || primitive || geminiCompactCase04384(mock.scenario) || geminiReasoningStreamCase04384(mock.scenario) {
 		record.RawBody = string(body)
 	}
 	mock.mu.Lock()
@@ -160,11 +160,31 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 			separator = "\n"
 		}
 		first := `{"id":"chat-synthetic","model":"gemini-3.1-pro-preview","choices":[{"delta":{"content":"synthetic-"},"finish_reason":null}]}`
+		reasoningScenario := mock.scenario
+		if compactReasoning := geminiCompactReasoningStream04384(mock.scenario); compactReasoning != "" {
+			reasoningScenario = compactReasoning
+		}
+		if geminiReasoningStreamCase04384(reasoningScenario) {
+			reasoning, _ := json.Marshal(geminiStreamReasoning04384)
+			if reasoningScenario == "stream-chat-reasoning-empty" {
+				reasoning = []byte(`""`)
+			}
+			if reasoningScenario == "stream-chat-reasoning" {
+				_, _ = io.WriteString(w, "data: "+`{"choices":[{"delta":{"reasoning_content":`+string(reasoning)+`}}]}`+"\n\n")
+			} else {
+				first = strings.Replace(first, `"delta":{`, `"delta":{"reasoning_content":`+string(reasoning)+`,`, 1)
+			}
+			if reasoningScenario == "stream-chat-reasoning-only" {
+				first = strings.Replace(first, `,"content":"synthetic-"`, "", 1)
+			}
+		}
 		if mock.scenario == "stream-chat-json-fragments" {
 			first = strings.Replace(first, "synthetic-", "synthe\n\ndata: tic-", 1)
 		}
 		_, _ = io.WriteString(w, "data: "+first+separator)
-		_, _ = io.WriteString(w, "data: "+`{"id":"chat-synthetic","model":"gemini-3.1-pro-preview","choices":[{"delta":{"content":"ok<>&/🌍\u2028\u2029"},"finish_reason":null}]}`+"\n\n")
+		if reasoningScenario != "stream-chat-reasoning-only" {
+			_, _ = io.WriteString(w, "data: "+`{"id":"chat-synthetic","model":"gemini-3.1-pro-preview","choices":[{"delta":{"content":"ok<>&/🌍\u2028\u2029"},"finish_reason":null}]}`+"\n\n")
+		}
 		_, _ = io.WriteString(w, "data: "+`{"id":"chat-synthetic","model":"gemini-3.1-pro-preview","choices":[{"delta":{},"finish_reason":"stop"}]}`+"\n\n")
 		_, _ = io.WriteString(w, "data: "+`{"choices":[],"usage":{"prompt_tokens":9007199254740993,"completion_tokens":1,"total_tokens":9007199254740994}}`+"\n\n")
 		if mock.scenario != "stream-chat-eof" && mock.scenario != "compact-owner-stream-eof" {
@@ -339,6 +359,7 @@ func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit, selec
 		cases = append(cases, "request-primitive-"+suffix)
 	}
 	cases = append(cases, geminiCompactCases04384()...)
+	cases = append(cases, geminiReasoningStreamCases04384()...)
 	cases = append(cases, geminiIgnoredControlCases04384()...)
 	for _, suffix := range geminiControlTypeSuffixes04384() {
 		cases = append(cases, "request-control-"+suffix)
@@ -428,7 +449,7 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	_, _, _, controlTypes := geminiControlTypeCase04384(scenario)
 	_, _, jsonAdmission := geminiJSONAdmission04384(scenario)
 	_, primitive := requestPrimitiveCase04384(scenario)
-	auditState := rawIdentity || bodyBoundary || continuation || requestNumbers || userID || ignored || controlTypes || jsonAdmission || primitive || geminiCompactCase04384(scenario)
+	auditState := rawIdentity || bodyBoundary || continuation || requestNumbers || userID || ignored || controlTypes || jsonAdmission || primitive || geminiCompactCase04384(scenario) || geminiReasoningStreamCase04384(scenario)
 	if auditState {
 		childResult = filepath.Join(home, "child-exchange.json")
 	}
@@ -561,7 +582,7 @@ func geminiCompare(scenario string, prodex, godex geminiCandidateResult) []strin
 	if prodex.ExitCode != godex.ExitCode {
 		differences = append(differences, "product child process exit status differs")
 	}
-	if geminiCompactCase04384(scenario) {
+	if geminiCompactCase04384(scenario) || geminiReasoningStreamCase04384(scenario) {
 		return differences
 	}
 	if geminiContinuationCase04384(scenario) {
@@ -686,6 +707,9 @@ func geminiSemanticEqual043711(left, right map[string]any) bool {
 }
 
 func geminiFixtureInvariant(scenario string, result geminiCandidateResult) error {
+	if geminiReasoningStreamCase04384(scenario) {
+		return geminiReasoningStreamInvariant04384(scenario, result)
+	}
 	if geminiCompactCase04384(scenario) {
 		return geminiCompactInvariant04384(scenario, result)
 	}

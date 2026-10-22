@@ -48,6 +48,7 @@ type geminiChatCompatibleStream043711 struct {
 	done         bool
 	itemOpened   bool
 	text         strings.Builder
+	reasoning    strings.Builder
 	model        string
 	finishReason string
 	usage        map[string]any
@@ -88,6 +89,9 @@ func (state *geminiChatCompatibleStream043711) complete(writer io.Writer) error 
 	if state.done {
 		return nil
 	}
+	if err := state.completeReasoning(writer); err != nil {
+		return err
+	}
 	output := make([]any, 0)
 	if state.itemOpened {
 		contents := []any{map[string]any{
@@ -111,10 +115,15 @@ func (state *geminiChatCompatibleStream043711) complete(writer io.Writer) error 
 	if state.model != "" {
 		completed["model"] = state.model
 	}
+	provider := make(map[string]any)
 	if state.finishReason != "" {
-		completed["metadata"] = map[string]any{
-			"gemini": map[string]any{"finish_reason": state.finishReason},
-		}
+		provider["finish_reason"] = state.finishReason
+	}
+	if state.reasoning.Len() > 0 {
+		provider["reasoning_content"] = state.reasoning.String()
+	}
+	if len(provider) > 0 {
+		completed["metadata"] = map[string]any{"gemini": provider}
 	}
 	if len(state.metadata) != 0 {
 		metadata, _ := completed["metadata"].(map[string]any)
@@ -127,9 +136,16 @@ func (state *geminiChatCompatibleStream043711) complete(writer io.Writer) error 
 	if state.usage != nil {
 		completed["usage"] = state.usage
 	}
-	// shortcut: tool/reasoning snapshots need complete capture; qualify those paths before caching them.
+	// shortcut: tool snapshots need complete argument capture; qualify those paths before caching them.
 	if !state.complexDelta {
-		source := map[string]any{"choices": []any{map[string]any{"message": map[string]any{"content": state.text.String()}}}}
+		message := map[string]any{"content": state.text.String()}
+		if state.reasoning.Len() > 0 {
+			message["reasoning_content"] = state.reasoning.String()
+			if state.text.Len() == 0 {
+				message["content"] = nil
+			}
+		}
+		source := map[string]any{"choices": []any{map[string]any{"message": message}}}
 		state.conversation.remember(completed, source)
 	}
 	return state.send(writer, "response.completed", map[string]any{
@@ -162,8 +178,7 @@ func (state *geminiChatCompatibleStream043711) observeChatChunk(chunk map[string
 		if first, ok := choices[0].(map[string]any); ok {
 			delta, _ := first["delta"].(map[string]any)
 			calls, _ := delta["tool_calls"].([]any)
-			reasoning, _ := delta["reasoning_content"].(string)
-			if len(calls) > 0 || reasoning != "" {
+			if len(calls) > 0 {
 				state.complexDelta = true
 			}
 			if finish, ok := first["finish_reason"].(string); ok && finish != "" {
@@ -216,6 +231,9 @@ func (state *geminiChatCompatibleStream043711) accept(writer io.Writer, data []b
 		}
 	}
 	state.observeChatChunk(root)
+	if err := state.observeReasoning(writer, root); err != nil || state.done {
+		return err
+	}
 	translated, supported, err := chatcompat.TranslateChatSSEData(bytes.TrimSpace(data))
 	if err != nil {
 		return err

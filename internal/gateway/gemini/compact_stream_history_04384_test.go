@@ -14,13 +14,13 @@ import (
 
 func TestProdex04384GeminiCompactReplaysCompletedTextStream(t *testing.T) {
 	for _, fixture := range []struct {
-		name, account                                    string
-		incomplete, unknown, providerError, complexDelta bool
+		name, account                                 string
+		incomplete, unknown, providerError, reasoning bool
 	}{
 		{name: "completed"}, {name: "incomplete", incomplete: true},
 		{name: "unbound", unknown: true}, {name: "different credential", account: "secondary"},
 		{name: "provider failure", providerError: true},
-		{name: "complex stream keeps existing uncached path", complexDelta: true},
+		{name: "completed reasoning history", reasoning: true},
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
 			requests := make(chan map[string]any, 2)
@@ -32,7 +32,7 @@ func TestProdex04384GeminiCompactReplaysCompletedTextStream(t *testing.T) {
 				requests <- request
 				if request["stream"] == true {
 					w.Header().Set("Content-Type", "text/event-stream")
-					if fixture.complexDelta {
+					if fixture.reasoning {
 						_, _ = io.WriteString(w, "data: "+`{"choices":[{"delta":{"reasoning_content":"synthetic reasoning"}}]}`+"\n\n")
 					}
 					_, _ = io.WriteString(w, "data: "+`{"choices":[{"delta":{"content":"cached stream text"}}]}`+"\n\n")
@@ -96,8 +96,12 @@ func TestProdex04384GeminiCompactReplaysCompletedTextStream(t *testing.T) {
 			<-requests
 			actual := <-requests
 			want := []any{map[string]any{"role": "system", "content": compactInstructions}}
-			if !fixture.incomplete && !fixture.unknown && !fixture.providerError && !fixture.complexDelta && fixture.account == "" {
-				want = append(want, map[string]any{"role": "user", "content": "stream request"}, map[string]any{"role": "assistant", "content": "cached stream text"})
+			if !fixture.incomplete && !fixture.unknown && !fixture.providerError && fixture.account == "" {
+				assistant := map[string]any{"role": "assistant", "content": "cached stream text"}
+				if fixture.reasoning {
+					assistant["reasoning_content"] = "synthetic reasoning"
+				}
+				want = append(want, map[string]any{"role": "user", "content": "stream request"}, assistant)
 			}
 			want = append(want, map[string]any{"role": "user", "content": compactInstructions})
 			if !reflect.DeepEqual(actual["messages"], want) {

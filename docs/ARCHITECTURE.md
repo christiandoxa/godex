@@ -248,7 +248,11 @@ and reuses matching history for API-key Compact before adjacency repair. Current
 cached context; input duplicates and repeated instructions are removed. Native
 Gemini response text is not fabricated into a cached Chat assistant message.
 The existing Gemini SSE owner records completed text before the terminal event;
-EOF and provider failures do not record snapshots. Tool/reasoning streams retain their
+EOF and provider failures do not record snapshots. Completed reasoning streams
+use the same owner to emit summary lifecycle events, retain completion metadata,
+and cache assistant reasoning for Compact, including reasoning-only responses.
+Reasoning retention is bounded at 64 MiB; excess terminates the existing stream
+with one failure and no completion or cache update. Tool streams retain their
 existing uncached behavior until complete argument snapshots are qualified.
 DeepSeek's runtime preparation retains the tagged distinction between emitted
 stateless messages and pending reconstructed history. The request-shape policy

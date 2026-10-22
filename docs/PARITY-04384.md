@@ -8697,7 +8697,11 @@ origin/main. The original full 213-case DeepSeek failures on c32018d remain
 FAIL: reference temporary state files violate independent state invariants.
 An unchanged serial 213-case run on 0ea01e9 separately passes; it does not replace
 those reports or qualify a different source revision. The complete default gate
-on 78d256d remains running; the latest complete default-gate PASS is 15d1c55.
+on 78d256d subsequently completes with exit 0: seven strict report phases PASS,
+including 213 DeepSeek and 837 Gemini cases, followed by the final HTTP profile
+status and raw-429 stages. It is the latest complete default-gate PASS;
+no later revision inherits that qualification. The audit and extracted reports
+are under /tmp/gdx-04384-release-78d256d-.
 
 ### Preserve numeric values across DeepSeek pending-history snapshots
 
@@ -8731,3 +8735,41 @@ cross-builds, format/source guards, vet and the build. Logs:
 /tmp/gdx-04384-deepseek-pending-numbers-full.jsonl and
 /tmp/gdx-04384-deepseek-pending-numbers-verify.log. Exact clean executable
 qualification follows. Global continuation and 1:1 parity remain unproven.
+
+### Preserve Gemini Chat SSE reasoning lifecycle and Compact history
+
+Six pinned executable baselines on 807607b8e8750759e1d3a2f5418f65b5f78d18ad
+qualify five Godex-only failures and one empty-reasoning PASS. Separate reasoning
+chunks, mixed text/reasoning chunks and reasoning-only streams omit the source's
+summary-part added, summary-text delta/done events and completed Gemini reasoning
+metadata. Two Compact probes also show missing cached user/assistant history.
+The reference preserves reasoning-only assistant content as null. Exact requests,
+client status/stdout, seed lifecycle, attempts, durable state and matching
+corruption controls qualify the reference independently. The initial three
+reports omitted fixture stdout capture and remain unqualified FAIL; corrected
+unchanged-product reruns use separate paths. Records:
+/tmp/gdx-04384-gemini-stream-reasoning-before-audit.json,
+/tmp/gdx-04384-gemini-stream-reasoning-qualified-before-commands.json and
+/tmp/gdx-04384-gemini-stream-reasoning-only-before-commands.json.
+
+Pinned deepseek_sse.rs and deepseek_sse/completion.rs own the shared Chat-compatible
+reasoning state used by the Gemini adapter. Godex's Gemini SSE owner now retains
+reasoning across chunks, emits the exact indexed lifecycle, attaches completed
+metadata and records completed reasoning snapshots through the existing bounded,
+credential-isolated conversation store. Plain text, empty and wrong-type controls
+keep their existing semantics. EOF and provider failure still avoid cache updates;
+tool snapshots retain their documented uncached limit. The focused regressions
+fail the two reasoning lifecycle cases and Compact history before the fix.
+
+The new private reasoning methods stay in gateway/gemini with the existing stream
+owner, cancellation and I/O lifecycle. No exported API, helper package, dependency,
+goroutine, CLI setting or persisted format is added. Retention is capped at 64 MiB
+and a focused overflow test requires one failure before later content, with no
+completion. Executable equivalence above that safety ceiling is not claimed.
+The matrix adds four standalone stream cases and two Compact cases, reaching 857
+Gemini cases. `rtk proxy go test -json ./...` PASSes 10,746 tests with 18 optional
+SKIP. `rtk proxy make verify` PASSes with exit 0, including shuffled race tests,
+cross-builds, format/source guards, vet and the build. Logs:
+/tmp/gdx-04384-gemini-stream-reasoning-full.jsonl and
+/tmp/gdx-04384-gemini-stream-reasoning-verify.log. Exact clean executable
+qualification follows. Global continuation and overall 1:1 parity remain unproven.
