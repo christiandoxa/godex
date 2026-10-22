@@ -6604,3 +6604,62 @@ Broader call-ID/name/output, metadata and remaining controls need executable
 proof. Gemini Compact, executable session/turn continuation, native macOS/
 Windows and live authentication remain unproven. No force push, tag, release
 or editor-checkout edit occurred. Global 1:1 parity is not claimed.
+
+
+## Tool-item identity admission precedes conversion and orphan filtering
+
+Pinned `deepseek_input_item_validation` requires a nonblank call identity for
+function/custom/MCP/shell calls and corresponding output items. The selected
+identity is the first string among call_id, tool_call_id and id; an empty
+selected string cannot hide behind a later nonblank alias. This validation runs
+before message shaping/adjacency and becomes terminal plain 502 in the API-key
+pipeline. Earlier Gemini candidate/tool validation retains structured 400.
+
+Godex's shared function call/output converters could silently emit/drop items
+with missing, wrong-type or blank IDs, then execute only the remaining valid
+message. The concrete Gemini item admission now checks the invariant once for
+all eight supported tool-item kinds. Its private function owns provider policy;
+no generic helper, package, exported API, interface, dependency, worker,
+configuration or durable-state format is added. Shared conversion and native
+Gemini policies remain independent. Valid ID-alias projection and call-name/
+argument/output semantics remain separate unqualified audits.
+
+Before repair 16 controls pass and 43 tests fail, including parents:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384Gemini(ToolItemsRequireNonblankCallIdentity|RequestAdmissionDoesNotRetryModelOrCredential)$' -count=1`;
+`/tmp/gdx-04384-gemini-call-identity-before.log`.
+The same command passes all 59 tests after repair:
+`/tmp/gdx-04384-gemini-call-identity-focused.log`.
+Unit controls retain valid aliases and null-before-string selection. The
+existing real two-key gateway/router test proves missing function IDs cause
+zero upstream attempts and no retry wait.
+
+Sixteen executable baselines pin clean
+`175091ff89e61059c796639225dc5880530a1efe`, the unchanged reference and
+`/tmp/gdx-04384-gemini-call-identity-before-differential`:
+`/tmp/gdx-04384-gemini-call-id-<suffix>-before-oracle.json`.
+Six function call/output cases FAIL only Godex, which executes remaining input.
+Ten controls PASS, including existing custom/MCP/shell rejections, a valid ID,
+earlier tools/candidates and invalid Unicode. Every reference and independent
+mutation invariant passes. Commands use `--gemini --scenario request-primitive-call-id-<suffix>`
+with exact clean source/commit pins. Original JSON, canonical upstream bytes,
+response/status/headers/stdout/exit, zero attempts and safe durable state retain
+all existing independent matching-corruption checks.
+
+`rtk go test ./tools/differential -count=1` PASSes 281 tests:
+`/tmp/gdx-04384-gemini-call-identity-oracle-tests.log`.
+`rtk proxy go test -json ./...` PASSes 9,941 tests in 71 packages; ten packages
+have no tests and 18 optional installed-Codex/executable tests are skipped:
+`/tmp/gdx-04384-gemini-call-identity-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+PASSes 3,133 tests: `/tmp/gdx-04384-gemini-call-identity-race.log`.
+`rtk proxy make verify` PASSes the complete local gate:
+`/tmp/gdx-04384-gemini-call-identity-verify.log`.
+Clean-commit 322-case Gemini and 213-case DeepSeek qualification follows.
+Protected `175091f` passes six exact clean projection targets:
+`/tmp/gdx-04384-gemini-projection-<empty-separators|object|system-only|instructions-only|invalid-part|media-ignored>-targeted-oracle.json`.
+Its 306-case Gemini/213-case DeepSeek matrices and complete default gate remain
+pending. Main is the qualified `c651bff59`; old reference FAILs remain FAIL.
+Remaining tool aliases/names/output, Gemini Compact, executable session/turn
+continuation, native macOS/Windows and live authentication remain unproven.
+No force push, tag, release or editor-checkout edit occurred. Global 1:1 parity
+is not claimed.

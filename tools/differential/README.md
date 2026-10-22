@@ -400,6 +400,12 @@ scalar parts, nested prefix metadata and whitespace instructions retain the
 tagged behavior. A complete expected request body keeps these checks independent
 of the production content projector and preserves matching-corruption mutations.
 
+Gemini `request-primitive-call-id-*` rejects missing, wrong-type, blank or
+empty-shadowed tool identities before conversion/orphan filtering. Function,
+custom, MCP, shell and output controls share the exact terminal admission
+contract; ordinary valid IDs and earlier candidate/tool/serde outcomes remain
+checked with exact wire bytes, zero attempts and independent mutations.
+
 DeepSeek scenario workers evaluate their complete independent invariants as
 each scenario finishes, preserving failures in the ordered report. The strict
 five-minute generated SSE timestamp window is unchanged; later cases cannot

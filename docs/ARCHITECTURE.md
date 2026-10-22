@@ -476,6 +476,9 @@ JSON text. It also maps developer to system, normalizes implicit roles and
 preserves empty messages. Shared `gateway/chatcompat` exposes a narrow message-
 preserving entry point used by Gemini; its original Claude entry point retains
 its empty/system-only admission behavior. No provider policy moves into a helper.
+All supported call/tool-output items require a nonblank identity selected from
+the first string `call_id`, `tool_call_id`, then `id`. This local admission runs
+before conversion or orphan filtering can silently drop the malformed item.
 DeepSeek independently checks present `stream` as a boolean and present
 `instructions`/`previous_response_id` as strings before constructing its
 translated request. Invalid types use its common terminal preparation boundary,

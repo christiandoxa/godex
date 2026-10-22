@@ -1,5 +1,7 @@
 package gemini
 
+import "strings"
+
 func normalizeGeminiChatInputItems04384(value any) bool {
 	entries, _ := value.([]any)
 	for _, raw := range entries {
@@ -24,6 +26,9 @@ func normalizeGeminiChatInputItems04384(value any) bool {
 				}
 			case "function_call", "custom_tool_call", "mcp_call", "local_shell_call",
 				"function_call_output", "custom_tool_call_output", "mcp_tool_result", "mcp_call_output":
+				if !validGeminiChatCallIdentity04384(item) {
+					return false
+				}
 				continue
 			default:
 				return false
@@ -34,6 +39,15 @@ func normalizeGeminiChatInputItems04384(value any) bool {
 		}
 	}
 	return true
+}
+
+func validGeminiChatCallIdentity04384(item map[string]any) bool {
+	for _, field := range []string{"call_id", "tool_call_id", "id"} {
+		if identity, ok := item[field].(string); ok {
+			return strings.TrimSpace(identity) != ""
+		}
+	}
+	return false
 }
 
 func projectGeminiChatMessage04384(item map[string]any) bool {
