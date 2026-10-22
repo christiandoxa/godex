@@ -7125,3 +7125,61 @@ Other protected matrices remain pending. MCP name/inline-result edge cases,
 other call/output projection, Gemini Compact, executable session/turn
 continuation, native macOS/Windows and live login remain unproven. No force
 push, tag, release or editor edit occurred. Global 1:1 parity is not claimed.
+
+## Standalone custom/MCP outputs share the tagged function-output projection
+
+Pinned `deepseek_raw_bridge_input_item` routes all four supported standalone
+output kinds through `deepseek_raw_put_tool_output_message_from_item`.
+Their first-present IDs, output/content/result/error aliases, text-part arrays
+and serde-canonical nonarray JSON therefore have the same wire contract.
+Inline results on an MCP call deliberately retain a separate raw-value path.
+
+Godex used its private projection only for `function_call_output`. The other
+three kinds still used shared Chat behavior that rejected selected null IDs,
+lost string/empty/input_text array parts, and serialized embedded object text
+with different JSON bytes. Two production lines now normalize those admitted
+kinds to the existing function-output shape in `gateway/gemini`. All existing
+admission gates run first. No shared converter, helper, package, interface,
+dependency, option, worker or persisted format is added or changed.
+
+The gateway regression covers all four output kinds with string, null,
+false, empty-array, mixed text-parts, canonical object and error-alias cases.
+Before repair six cases plus their parent FAIL while 22 controls PASS:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiToolOutputKindsShareWireProjection$' -count=1`;
+`/tmp/gdx-04384-gemini-bridge-output-before.log`.
+The same command PASSes all 29 tests after repair:
+`/tmp/gdx-04384-gemini-bridge-output-focused.log`.
+It checks the real gateway's exact outgoing JSON, one attempt and HTTP 200.
+
+Twenty-seven executable baselines pin clean
+`20a7d41c9fbcc6012300fb2b7975a64a70aba5b2`, the unchanged official reference
+and `/tmp/gdx-04384-gemini-bridge-output-before-differential`.
+Nine FAIL only Godex; 18 controls PASS. Every reference and independent
+mutation invariant passes. Null-ID failures return 502 without upstream work
+instead of one successful `call_1` request; the other failures are exact
+text-parts or embedded canonical JSON mismatches. Reports:
+`/tmp/gdx-04384-gemini-bridge-output-<suffix>-before-oracle.json`;
+exact argument arrays: `/tmp/gdx-04384-gemini-bridge-output-before-commands.json`.
+Commands use `--gemini --scenario request-primitive-bridge-output-<suffix>`
+with exact source/commit pins. Independent function alias fixtures are reused
+for the source-equivalent output kinds, with explicit scalar/object additions.
+Full request/response/status/headers/stdout/exit, authenticated attempt counts,
+safe durable state and matching-corruption assertions remain mandatory.
+
+`rtk go test ./tools/differential -count=1` PASSes 282 tests:
+`/tmp/gdx-04384-gemini-bridge-output-oracle-tests.log`.
+`rtk proxy go test -json ./...` PASSes 10,047 tests in 71 packages; ten packages
+have no tests and 18 optional installed-Codex/executable tests are skipped:
+`/tmp/gdx-04384-gemini-bridge-output-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+PASSes 3,239 tests: `/tmp/gdx-04384-gemini-bridge-output-race.log`.
+`rtk proxy make verify` PASSes:
+`/tmp/gdx-04384-gemini-bridge-output-verify.log`.
+Clean-commit 436-case Gemini qualification follows. The previous MCP candidate
+`20a7d41` separately PASSes targeted null-id, canonical-arguments and control
+oracles: `/tmp/gdx-04384-gemini-mcp-projection-<suffix>-targeted-oracle.json`.
+Its complete default gate and larger protected Gemini matrices remain pending.
+No new full DeepSeek matrix is attributed to these Gemini-only revisions.
+Custom/MCP call-name and shell projection, Gemini Compact, executable session/
+turn continuation, native macOS/Windows and live login remain unproven. No
+force push, tag, release or editor edit occurred. Global 1:1 parity is not claimed.

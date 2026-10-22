@@ -487,6 +487,10 @@ MCP call IDs and argument aliases use the same private wire projection as
 function calls before shared conversion. Structured arguments use the existing
 serde-compatible writer; embedded MCP result content retains its separate raw
 JSON contract. MCP name admission/projection remains an independent concern.
+Standalone custom/MCP tool-result items normalize to the same private
+function-output shape after admission, sharing first-present ID fallback,
+text-array projection and canonical serde JSON content. Inline MCP results
+remain raw values and do not enter this standalone-output projection.
 All supported call/tool-output items require a nonblank identity selected from
 the first string `call_id`, `tool_call_id`, then `id`. This local admission runs
 before conversion or orphan filtering can silently drop the malformed item.

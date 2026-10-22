@@ -10,7 +10,8 @@ func projectGeminiChatFunctionItem04384(kind any, item map[string]any) bool {
 		arguments, valid := geminiChatFunctionArguments04384(item)
 		item["call_id"], item["arguments"] = geminiChatWireCallIdentity04384(item), arguments
 		return valid
-	case "function_call_output":
+	case "function_call_output", "custom_tool_call_output", "mcp_tool_result", "mcp_call_output":
+		item["type"] = "function_call_output"
 		output, _ := firstPresent(item, "output", "content", "result", "error")
 		text, err := geminiChatContentText04384(output)
 		item["call_id"], item["output"] = geminiChatWireCallIdentity04384(item), text

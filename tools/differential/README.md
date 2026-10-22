@@ -11,6 +11,9 @@ state against the pinned official release with synthetic credentials.
 The `request-primitive-mcp-wire-*` cases reuse the source-equivalent function
 alias fixtures for MCP identities and arguments, retaining complete independent
 wire/response/state expectations and all matching-corruption checks.
+The 27 `request-primitive-bridge-output-*` cases extend those independent
+expectations to custom/MCP standalone output kinds: IDs, content/result
+aliases, selected text parts, structured JSON and null/false/empty controls.
 
 Build and run from a clean, committed Godex worktree:
 
