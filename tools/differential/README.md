@@ -1158,3 +1158,11 @@ overrides. Structured inputs retain canonical Serde ordering and number bytes
 inside the string. Independent complete request/response, status/stdout,
 attempt/auth/state invariants and matching-corruption controls apply.
 The default DeepSeek matrix reaches 273; Gemini remains 974.
+
+Nine DeepSeek `deepseek-request-primitive-message-arguments-*` cases cover
+embedded assistant `tool_calls` on simple requests. Missing arguments default
+to `{}`; explicit null survives; an input alias is ignored. Opaque strings,
+structured Unicode/numeric JSON, arrays and u64 values retain their exact wire
+bytes. Complete independent invariants and matching argument-corruption
+controls apply. These cases do not qualify normal embedded-call projection.
+The default DeepSeek matrix reaches 282; Gemini remains 974.

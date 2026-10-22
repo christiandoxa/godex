@@ -10096,3 +10096,49 @@ that immutable source. Its retained exact command is
 the separate a05e1cbc entire default gate is claimed PASS. Earlier qualified
 full236/full940 scopes apply only to their recorded revisions. The complete
 default gate last qualified remains e9d88ce. Overall 1:1 remains unproven.
+
+### Full Gemini943 qualifies exact d82cb09
+
+Original session 65534 exits 0. All 943 unique cases PASS at exact clean
+d82cb0972ae6201c6ee34273c460e60dd9b2e07f, including every prior940 case.
+Audit: /tmp/gdx-04384-gemini-stream-repaired-snapshot-full-audit.json.
+Original strict invariants and matching-corruption controls, immutable source,
+both artifact hashes and clean embedded VCS metadata were checked. There are
+no per-case or durable-state errors. This qualifies only that revision; later
+matrices and the a05e1cbc entire default gate remain pending. Earlier failures
+remain retained. Overall 1:1 parity remains unproven.
+
+### DeepSeek embedded call arguments default only an absent field
+
+The pinned simple-request raw message projector invokes
+deepseek_raw_put_generic_tool_calls and deepseek_raw_put_argument_string.
+Only an absent arguments field defaults to an empty object; present null
+becomes the opaque argument string null. Unlike top-level function/MCP items,
+the embedded function does not acquire arguments from an input alias.
+The exact clean 596e89c baseline proves two Godex-only original-request FAILs
+and thirteen PASS controls across fifteen cases (original session 42024,
+exit 0). Audit: /tmp/gdx-04384-deepseek-message-arguments-before-audit.json.
+The two mismatches independently decode to null instead of the reference's
+empty object. Pinned reference originals, responses/stdout/status, exact
+attempts/retries, auth/slots, durable state and corruption guards all PASS.
+
+The private gateway/deepseek embedded-call projector now tests argument
+presence and defaults only absence. It reuses the existing compactValue
+Serde formatter; no new helper, interface, layer, dependency, option, worker
+or persisted format is added. The unshared presence check stays local because
+embedded calls intentionally have different alias rules from top-level calls.
+Two unit regressions first FAIL and three controls PASS; the original log is
+/tmp/gdx-04384-deepseek-message-arguments-unit-before.jsonl. Focused gateway
+and differential tests then PASS 1,344 tests. Nine new simple-request cases
+extend default DeepSeek273 to 282; Gemini remains 974. Normal embedded-call
+projection and broader continuation/account/restart combinations still need
+separate executable qualification. Full local and exact clean candidate
+validation follow before publication. Overall 1:1 remains unproven.
+
+Full local validation PASSes 11,085 tests with 18 optional SKIP (original
+session 85670, exit 0). make verify also exits 0 (original session 13482),
+including shuffled race tests, cross-builds, vet, source/format guards and the
+build. Exact commands:
+`rtk proxy go test -json ./... > /tmp/gdx-04384-deepseek-message-arguments-full.jsonl 2>&1`
+and `rtk proxy make verify > /tmp/gdx-04384-deepseek-message-arguments-verify.log 2>&1`.
+Exact clean executable qualification follows before publication.

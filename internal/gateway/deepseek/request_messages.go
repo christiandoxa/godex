@@ -145,10 +145,14 @@ func deepSeekMessageToolCalls(value any) ([]any, error) {
 		if strings.TrimSpace(id) == "" || strings.TrimSpace(name) == "" {
 			return nil, errors.New("DeepSeek message tool call requires an id and function name")
 		}
+		arguments, present := function[deepSeekArgumentsKey]
+		if !present {
+			arguments = map[string]any{}
+		}
 		result = append(result, map[string]any{
 			"id": id, "type": deepSeekFunctionKey,
 			deepSeekFunctionKey: map[string]any{
-				"name": name, deepSeekArgumentsKey: compactValue(function[deepSeekArgumentsKey]),
+				"name": name, deepSeekArgumentsKey: compactValue(arguments),
 			},
 		})
 	}

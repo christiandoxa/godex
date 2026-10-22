@@ -38,6 +38,7 @@ func deepSeekAdmissionSuffixes04384() []string {
 		"preparation-frequency", "preparation-presence", "preparation-seed", "preparation-n", "preparation-include", "preparation-store",
 		"preparation-background", "preparation-truncation", "preparation-text", "preparation-tools", "preparation-tool-choice", "preparation-reasoning", "preparation-web-search"}, deepSeekToolIDSuffixes04384()...)
 	suffixes = append(suffixes, deepSeekCustomInputSuffixes04384()...)
+	suffixes = append(suffixes, deepSeekMessageArgumentSuffixes04384()...)
 	return append(suffixes, deepSeekFunctionArgumentSuffixes04384()...)
 }
 
@@ -84,6 +85,9 @@ func requestPrimitiveCase04384(scenario string) (requestPrimitiveFixture04384, b
 	}
 	const stops16 = `["s01","s02","s03","s04","s05","s06","s07","s08","s09","s10","s11","s12","s13","s14","s15","s16"]`
 	suffix := strings.TrimPrefix(strings.TrimPrefix(scenario, "deepseek-"), "request-primitive-")
+	if strings.HasPrefix(suffix, "message-arguments-") {
+		return deepSeekMessageArgumentFixture04384(suffix)
+	}
 	if strings.HasPrefix(suffix, "custom-input-") {
 		return deepSeekCustomInputFixture04384(suffix)
 	}
