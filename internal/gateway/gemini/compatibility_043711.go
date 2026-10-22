@@ -22,7 +22,7 @@ const bufferedChatResponseMaxBytes = 4 << 20
 func (transport *RuntimeTransport) executeChatCompatibleResponses(
 	ctx context.Context, input proxymodel.Request, current route,
 ) (*proxymodel.Response, error) {
-	normalized, controls, err := normalizeGeminiChatInput043711(input.Body)
+	body, metadata, err := prepareGeminiChatCompatibleRequest04384(input.Body)
 	if err != nil {
 		var failure *proxymodel.Error
 		if errors.As(err, &failure) {
@@ -34,22 +34,6 @@ func (transport *RuntimeTransport) executeChatCompatibleResponses(
 			}
 			return nil, failure
 		}
-		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
-	}
-	metadata, err := geminiChatResponseMetadata04384(input.Body, controls)
-	if err != nil {
-		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
-	}
-	body, err := chatcompat.ResponsesRequestPreservingMessages(normalized, requestModel(input.Body), "")
-	if err != nil {
-		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
-	}
-	body, err = filterGeminiOrphanToolMessages043711(body)
-	if err != nil {
-		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
-	}
-	body, err = geminiChatRequestOptions04384(body, normalized, controls)
-	if err != nil {
 		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
 	response, err := transport.send(ctx, input, current, body)
@@ -72,6 +56,27 @@ func (transport *RuntimeTransport) executeChatCompatibleResponses(
 		}, nil
 	}
 	return translated, nil
+}
+
+func prepareGeminiChatCompatibleRequest04384(input []byte) ([]byte, map[string]any, error) {
+	normalized, controls, err := normalizeGeminiChatInput043711(input)
+	if err != nil {
+		return nil, nil, err
+	}
+	metadata, err := geminiChatResponseMetadata04384(input, controls)
+	if err != nil {
+		return nil, nil, err
+	}
+	body, err := chatcompat.ResponsesRequestPreservingMessages(normalized, requestModel(input), "")
+	if err != nil {
+		return nil, nil, err
+	}
+	body, err = filterGeminiOrphanToolMessages043711(body)
+	if err != nil {
+		return nil, nil, err
+	}
+	body, err = geminiChatRequestOptions04384(body, normalized, controls)
+	return body, metadata, err
 }
 
 // Tagged Gemini uses user_id on the Chat wire and requests final token
