@@ -60,6 +60,10 @@ func TestProdex04380DeepSeekInvalidInputIsTerminalBeforeUpstream(t *testing.T) {
 		{"null-previous-response", `{"input":"same request","previous_response_id":null}`},
 		{"array-previous-response", `{"input":"same request","previous_response_id":[]}`},
 		{"numeric-previous-response", `{"input":"same request","previous_response_id":7}`},
+		{"null-user-id", `{"input":"same request","user_id":null,"user":"ignored_user"}`},
+		{"numeric-user-id", `{"input":"same request","user_id":7}`},
+		{"invalid-user-id", `{"input":"same request","user_id":"user.has.dot"}`},
+		{"over-limit-user-id", `{"input":"same request","user_id":"` + strings.Repeat("u", 513) + `"}`},
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
 			calls.Store(0)

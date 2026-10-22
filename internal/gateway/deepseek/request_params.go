@@ -96,7 +96,7 @@ func copyStopField(target, source map[string]any) error {
 func copyUserField(target, source map[string]any) error {
 	user, err := deepSeekUserID(source)
 	if err != nil {
-		return err
+		return &invalidResponsesInputError{err}
 	}
 	if user != "" {
 		target["user_id"] = user

@@ -340,6 +340,10 @@ The complete DeepSeek Chat request also uses that existing serde writer, so
 numeric controls, tool/schema values and text retain the pinned number and
 UTF-8 wire representation. Invalid `temperature`/`top_p` types use the existing
 terminal preparation-error boundary before any upstream attempt.
+DeepSeek identity normalization retains first-present `user_id`, `user`, then
+`safety_identifier`, Unicode trimming, a 512-byte ASCII allowlist and omission
+of blank selected values. Its existing validation errors now use the same
+terminal preparation class; invalid identities cannot enter routing recovery.
 DeepSeek's complete Responses JSON decoder lives with its private admission
 classification. Parse/serde failures retain the existing terminal 502 class;
 valid nonobject roots retain a separate private error kind until the runtime

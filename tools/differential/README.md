@@ -320,6 +320,14 @@ malformed bodies require plain terminal 502. Both require exit 2 and zero
 attempts. Rejected bytes are never re-encoded by the fixture; equal empty-header,
 status/body/exit/stdout/retry/state mutations cannot satisfy its invariants.
 
+DeepSeek `deepseek-request-primitive-user-id-*` reuses the existing identity
+fixtures for absent, canonical, user/safety aliases, blank, Unicode-trimmed
+512-byte values, null, number, over-limit and invalid-character cases.
+Accepted controls require exact canonical `user_id` wire bytes or omission;
+invalid identities require terminal plain 502, exit 2 and zero attempts.
+Selected null/blank values suppress lower-priority aliases. Existing independent
+auth/slot, response, retry, stdout and durable-state mutation checks apply.
+
 DeepSeek scenario workers evaluate their complete independent invariants as
 each scenario finishes, preserving failures in the ordered report. The strict
 five-minute generated SSE timestamp window is unchanged; later cases cannot

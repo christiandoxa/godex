@@ -4183,6 +4183,60 @@ turn continuation, native macOS/Windows and live authentication remain open.
 Global 1:1 parity is not claimed.
 
 
+## DeepSeek invalid user identities are terminal preparation failures
+
+The pinned shared optional-field path calls
+`deepseek_provider_core_user_id_from_responses_request`: first-present
+`user_id`, `user`, then `safety_identifier`, requiring a string and compiled
+Mojo normalization. Empty selected values omit the field; invalid types or
+nonempty values outside the 512-byte ASCII letters/digits/underscore/dash
+contract fail preparation. The released runtime presents plain terminal 502
+before any provider dispatch.
+
+Godex already normalized and validated identities correctly, but returned an
+ordinary error that could enter routing recovery. `gateway/deepseek` now wraps
+that error in its existing terminal preparation class at `copyUserField`.
+The identity rules and detailed internal error remain unchanged. No new
+production helper, file, package, exported API, interface, dependency, config,
+worker or persisted format is added. This one-line boundary correction leaves
+account routing and retry decisions in the use case.
+
+Before repair 42 controls pass and ten tests fail, including parents:
+`rtk go test ./internal/gateway/deepseek -run '^TestProdex(04384DeepSeekUserIDUsesAliasesAndTerminalValidation|04380DeepSeekInvalidInputIsTerminalBeforeUpstream)$' -count=1`;
+`/tmp/gdx-04384-deepseek-user-id-before.log`.
+The same command passes 52 tests after repair:
+`/tmp/gdx-04384-deepseek-user-id-focused.log`.
+The transport table proves invalid identity input produces no upstream attempt.
+Positive controls require exact canonical request bytes, first-alias priority,
+blank suppression and Unicode trimming at the 512-byte limit.
+
+Ten executable baseline reports pin unchanged clean
+`09790dca9375f389578f5f921998c77a515dc6e5`, the unchanged reference and
+`/tmp/gdx-04384-deepseek-user-id-differential`:
+`/tmp/gdx-04384-deepseek-user-id-<suffix>-before-oracle.json`.
+Six valid controls PASS; four invalid identity cases FAIL only Godex.
+Every reference and independent mutation invariant passes. The existing strict
+primitive runner reuses the prior Gemini identity fixture data, with exact
+DeepSeek output/auth/slot/request bytes and safe state; it adds no production
+cross-gateway dependency and no duplicate Gemini executable cases.
+
+`rtk go test ./tools/differential -count=1` passes 281 tests:
+`/tmp/gdx-04384-deepseek-user-id-oracle-tests.log`.
+`rtk go test -race ./internal/gateway/deepseek ./internal/usecase/routing ./tools/differential -count=1`
+passes 2,925 tests: `/tmp/gdx-04384-deepseek-user-id-race.log`.
+`rtk proxy go test -json ./...` passes 9,734 tests across 81 packages
+(71 passing packages and ten with no tests):
+`/tmp/gdx-04384-deepseek-user-id-test-all.jsonl`.
+`rtk proxy make verify` passes the complete local gate:
+`/tmp/gdx-04384-deepseek-user-id-verify.log`.
+Clean-commit 200-case DeepSeek qualification follows. The separate 185-case
+Gemini PASS remains scoped to clean `8d618e0`; Gemini production is unchanged.
+The completed default release gate remains `293b1b6` while the protected
+full `8d618e0` invocation is pending. Other controls, combined-error ordering,
+Gemini Compact, executable session/turn continuation, native macOS/Windows
+and live authentication remain open. Global 1:1 parity is not claimed.
+
+
 ## Primitive request oracle: token aliases, uint64 and ignored parallel input
 
 The pinned Gemini and DeepSeek Chat bridges share the primitive-field kernel.

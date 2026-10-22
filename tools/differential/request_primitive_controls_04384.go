@@ -27,7 +27,9 @@ func deepSeekAdmissionSuffixes04384() []string {
 	return []string{"admission-stream-false", "admission-stream-null", "admission-stream-string", "admission-stream-number",
 		"admission-instructions-null", "admission-instructions-array", "admission-previous-null", "admission-previous-array", "admission-previous-number",
 		"json-valid-unicode", "json-root-null", "json-root-array", "json-root-number", "json-root-boolean", "json-root-string",
-		"json-syntax", "json-trailing", "json-surrogate", "json-utf8", "json-overflow", "json-depth"}
+		"json-syntax", "json-trailing", "json-surrogate", "json-utf8", "json-overflow", "json-depth",
+		"user-id-absent", "user-id-canonical", "user-id-user-alias", "user-id-safety-alias", "user-id-blank", "user-id-trim-limit",
+		"user-id-null", "user-id-number", "user-id-over-limit", "user-id-invalid-character"}
 }
 
 func requestPrimitiveCase04384(scenario string) (requestPrimitiveFixture04384, bool) {
@@ -36,6 +38,14 @@ func requestPrimitiveCase04384(scenario string) (requestPrimitiveFixture04384, b
 	}
 	const stops16 = `["s01","s02","s03","s04","s05","s06","s07","s08","s09","s10","s11","s12","s13","s14","s15","s16"]`
 	suffix := strings.TrimPrefix(strings.TrimPrefix(scenario, "deepseek-"), "request-primitive-")
+	if strings.HasPrefix(suffix, "user-id-") {
+		identity, known := geminiUserIDCase04384("request-" + suffix)
+		fixture := requestPrimitiveFixture04384{fields: identity.fields, reject: identity.message != ""}
+		if identity.value != "" {
+			fixture.wireFields = `"user_id":"` + identity.value + `"`
+		}
+		return fixture, known
+	}
 	if strings.HasPrefix(suffix, "json-") {
 		body, reject, known := geminiJSONAdmission04384("request-" + suffix)
 		fixture := requestPrimitiveFixture04384{body: body, reject: reject}
@@ -165,7 +175,11 @@ func requestPrimitiveInput04384(scenario, model string) []byte {
 		text = fixture.text
 	}
 	encoded, _ := json.Marshal(text)
-	return []byte(`{"model":"` + model + `","input":` + string(encoded) + `,` + fixture.fields + `}`)
+	body := `{"model":"` + model + `","input":` + string(encoded)
+	if fixture.fields != "" {
+		body += "," + fixture.fields
+	}
+	return []byte(body + `}`)
 }
 
 func requestPrimitiveWire04384(scenario, model string) string {
