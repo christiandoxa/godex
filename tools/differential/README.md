@@ -1080,3 +1080,12 @@ original requests, one upstream attempt and state; matching failure-tuple,
 status, bytes, auth, attempt and state corruption must fail. PASS qualifies the
 expected failed-read contract, never a successful response. Object entries
 missing a function object are a separate admission behavior.
+
+Six semantic-failure cases cover object tool entries with absent/null/wrong
+function objects, a tool-only rejection, and embedded errors before/after text.
+They require exact failed-event sequencing and subsequent text, no completion,
+full reads, status 200 and child exit 0. Existing ignored-tool controls remain
+independent successes. Original request bytes, auth/slot, attempts, stdout and
+durable state are asserted separately for each product; matching corruption of
+those values or of the failure/continuation wire must fail. Successful tool
+lifecycles, accumulated arguments and tool snapshots remain outside this scope.

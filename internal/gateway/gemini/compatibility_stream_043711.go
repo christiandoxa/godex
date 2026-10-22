@@ -52,6 +52,7 @@ type geminiChatCompatibleStream043711 struct {
 	sequence     int
 	started      bool
 	done         bool
+	eof          bool
 	itemOpened   bool
 	text         strings.Builder
 	reasoning    strings.Builder
@@ -70,6 +71,7 @@ type geminiChatCompatibleStream043711 struct {
 	refusal              strings.Builder
 	annotations          []any
 	messageMetadataBytes int
+	toolIndices          map[uint64]struct{}
 }
 
 func (state *geminiChatCompatibleStream043711) send(writer io.Writer, event string, fields map[string]any) error {
@@ -227,10 +229,11 @@ func (state *geminiChatCompatibleStream043711) observeChatChunk(chunk map[string
 }
 
 func (state *geminiChatCompatibleStream043711) accept(writer io.Writer, data []byte) error {
-	if state.done {
+	if state.eof {
 		return nil
 	}
 	if sse.JSONDone(data) {
+		state.eof = true
 		if state.json.Pending() {
 			return state.failure(writer, "provider_stream_error", "incomplete JSON segment")
 		}
@@ -240,6 +243,7 @@ func (state *geminiChatCompatibleStream043711) accept(writer io.Writer, data []b
 	if !valid {
 		values, err := state.json.Observe(data)
 		if err != nil {
+			state.eof = true
 			return state.failure(writer, "provider_stream_error", err.Error())
 		}
 		for _, value := range values {
@@ -265,10 +269,10 @@ func (state *geminiChatCompatibleStream043711) accept(writer io.Writer, data []b
 			return err
 		}
 	}
-	if err := state.observeReasoning(writer, root); err != nil || state.done {
+	if err := state.observeReasoning(writer, root); err != nil || state.eof {
 		return err
 	}
-	if err := state.observeMessageMetadata(writer, root); err != nil || state.done {
+	if err := state.observeMessageMetadata(writer, root); err != nil || state.eof {
 		return err
 	}
 	translated, supported, err := chatcompat.TranslateChatSSEData(bytes.TrimSpace(data))
@@ -276,7 +280,7 @@ func (state *geminiChatCompatibleStream043711) accept(writer io.Writer, data []b
 		return err
 	}
 	if !supported {
-		return nil
+		return state.observeToolAdmission(writer, root)
 	}
 	// TranslateChatSSEData returns a single Responses SSE frame. Decode its
 	// bounded payload, attach the canonical sequence, and retain visible text
@@ -301,7 +305,7 @@ func (state *geminiChatCompatibleStream043711) accept(writer io.Writer, data []b
 			if err := state.openTextItem(writer); err != nil {
 				return err
 			}
-			if text, ok := event["delta"].(string); ok {
+			if text, ok := event["delta"].(string); ok && !state.done {
 				state.text.WriteString(text)
 			}
 			event["created_at"] = state.created
@@ -315,7 +319,7 @@ func (state *geminiChatCompatibleStream043711) accept(writer io.Writer, data []b
 			}
 		}
 	}
-	return nil
+	return state.observeToolAdmission(writer, root)
 }
 
 func pumpGeminiChatCompatibleStream043711(ctx context.Context, source io.ReadCloser, writer *io.PipeWriter, requestMetadata map[string]any, conversation *geminiChatConversation04384) {
@@ -338,7 +342,7 @@ func pumpGeminiChatCompatibleStream043711(ctx context.Context, source io.ReadClo
 					return
 				}
 			}
-			if state.done {
+			if state.eof {
 				return
 			}
 		}

@@ -9245,3 +9245,65 @@ wire match; the reference state-integrity guard fails. Audit:
 /tmp/gdx-04384-gemini-stream-model-full-failure-audit.json. Its root cause is
 unproven and no isolated rerun has been started. Earlier 844/847 failures are
 also retained. Later complete PASS reports do not erase those observations.
+
+### Preserve Gemini semantic-failure streams and reject new malformed tools
+
+Fresh exact-clean 9e4b80807f4a3a79201f4208852c241351a2f4d5 baselines qualify
+six Godex-only failures and three PASS controls. Object entries with absent,
+null or wrong-typed function values fail in the reference with the exact
+invalid_tool_call_arguments label and Gemini OpenAI-compatible message. A
+tool-only rejection also qualifies. Embedded errors before and after text prove
+that the reader continues later text after the single response.failed event.
+All six streams read to completion with SSE 200 and child exit 0; they are
+distinct from the non-object pending projections. Original request bytes,
+stdout, attempts/auth/slot, durable state and matching-corruption assertions
+qualify independently. Before audit:
+/tmp/gdx-04384-gemini-stream-object-admission-before-audit.json. The immutable
+fixture-only driver fingerprint is retained separately; the Godex binary and
+source are exact clean 9e4b808. Earlier dirty tool-admission experiments remain
+preserved and are not merged or relabeled.
+
+Pinned deepseek_sse/tool_calls.rs requires a function object only for a new
+projected index. Its failed_event marks the response completed, not reader EOF;
+observe_chat_chunk still accepts later content, while complete_event suppresses
+another terminal outcome and its completion snapshot. Godex now keeps those
+two states separate in the existing Gemini producer. It validates object tool
+entries after preceding text, retains accepted index ownership with the pinned
+Serde unsigned/default rules, and continues later text after semantic failures
+without retaining unused completion text.
+DONE, decode/retention failures, request/body cancellation and the existing
+single upstream close owner retain their stop behavior. No worker, dependency,
+public option, shared helper or persisted format is added. A private ownership
+map is bounded at 524,288 indices; excess fails explicitly. Larger streams and
+full successful tool lifecycle/argument snapshots remain unqualified.
+
+The old embedded-error unit expectation that discarded later packets was
+incorrect. The executable before-text probe proves the correction; the revised
+test still asserts same-frame error precedence, exact error classification,
+sequence zero, redaction and absence of completion. Focused tests PASS 4,335
+cases across Gemini, routing, HTTP delivery and differential. Full local and
+exact clean executable qualification follow; global 1:1 parity remains unproven.
+
+Final local validation PASSes 10,871 tests with 18 optional SKIP. make verify
+exits 0, including shuffled race tests, cross-builds, vet and source/format
+guards. Final commands:
+`rtk proxy go test ./internal/gateway/gemini -run 'TestProdex04384Gemini(ChatSSE|APIKeyEmbeddedError)' -count=1 > /tmp/gdx-04384-gemini-stream-object-admission-final-regression.log 2>&1`,
+`rtk proxy go test -json ./... > /tmp/gdx-04384-gemini-stream-object-admission-full-final.jsonl 2>&1`
+and `rtk proxy make verify > /tmp/gdx-04384-gemini-stream-object-admission-verify-final.log 2>&1`.
+The default Gemini matrix adds six cases, reaching 918. Exact executable
+qualification follows on a clean committed source; the original baseline
+failures are retained.
+
+Full Gemini 902 subsequently completes PASS with original session 62032 exit 0
+at exact clean 78078cb980d920d1b279b13d239ee8148af7c8bb. All prior 894 cases,
+original independent invariants and matching mutations qualify, with source and
+binary provenance retained in
+/tmp/gdx-04384-gemini-stream-message-metadata-full-audit.json. This result does
+not qualify the current semantic-failure change or the still-running 912 matrix.
+
+An unchanged isolated diagnostic for the earlier full-874 failing case also
+PASSes with session 81490 exit 0 on its original exact 4f9699e source and
+artifacts. Audit:
+/tmp/gdx-04384-gemini-stream-model-generic-first-isolated-audit.json. The
+original full 874 remains FAIL; the underlying reference temporary-file fault
+is unproven and is not explained by this separate isolated PASS.

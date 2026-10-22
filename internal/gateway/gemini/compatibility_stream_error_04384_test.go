@@ -24,7 +24,7 @@ func TestProdex04384GeminiAPIKeyEmbeddedErrorPrecedesCreatedAndContent(t *testin
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			chunk := `{"error":` + tc.raw + `,"choices":[{"delta":{"content":"must-not-emit"}}]}`
-			wire := "data: " + chunk + "\n\ndata: " + `{"choices":[{"delta":{"content":"must-not-emit-later"}}]}` + "\n\ndata: [DONE]\n\n"
+			wire := "data: " + chunk + "\n\ndata: " + `{"choices":[{"delta":{"content":"after-error"}}]}` + "\n\ndata: [DONE]\n\n"
 			response := translateGeminiChatCompatibleStream043711(context.Background(), &http.Response{StatusCode: http.StatusOK,
 				Header: http.Header{"Content-Type": {"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(wire))}, nil, nil)
 			defer response.Body.Close()
@@ -34,8 +34,8 @@ func TestProdex04384GeminiAPIKeyEmbeddedErrorPrecedesCreatedAndContent(t *testin
 			}
 			decoder := sse.NewDecoder(1 << 20)
 			frames := append(decoder.Feed(data), decoder.Finish()...)
-			if len(frames) != 1 || !bytes.HasPrefix(data, []byte("event: response.failed\r\n")) {
-				t.Fatalf("embedded error leaked creation/content/completion: %s", data)
+			if len(frames) != 4 || !bytes.HasPrefix(data, []byte("event: response.failed\r\n")) || bytes.Contains(data, []byte("must-not-emit")) || !bytes.Contains(data, []byte(`"delta":"after-error"`)) || bytes.Contains(data, []byte("event: response.completed")) {
+				t.Fatalf("embedded error changed same-frame precedence or subsequent content: %s", data)
 			}
 			var event map[string]any
 			if err := json.Unmarshal(frames[0], &event); err != nil {

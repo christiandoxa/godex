@@ -14,6 +14,7 @@ func (state *geminiChatCompatibleStream043711) observeReasoning(writer io.Writer
 		return nil
 	}
 	if len(text) > geminiStreamMetadataMaxBytes04384-state.reasoning.Len() {
+		state.eof = true
 		return state.failure(writer, "provider_stream_error", "provider reasoning exceeded safe size limit (67108864)")
 	}
 	if state.reasoning.Len() == 0 {

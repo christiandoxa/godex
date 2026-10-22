@@ -268,6 +268,14 @@ The routing use case passes successful Gemini SSE headers directly to delivery,
 matching the tagged API-key bridge's commitment boundary. Other providers keep
 their existing precommit body inspection; explicit precommit failures retain
 priority over the Gemini stream policy.
+The same Gemini stream owner distinguishes a terminal response outcome from
+reader EOF. Semantic failures emit one failed event, preserve later chunk text,
+and suppress completion/cache; the terminal sentinel still stops upstream reads.
+Post-failure visible text is forwarded without retaining unused completion text.
+New tool indices require a function object, while known indices may omit it.
+Index projection retains Serde's unsigned integer/default rules. A private
+index-ownership map is bounded at 524,288 entries; excess ends the stream with
+an explicit failure. This adds no package, port, worker or persisted state.
 Refusal strings and annotation arrays accumulate in first-choice chunk order;
 completion retains nonempty values and exact opaque annotation numbers. The
 same stream owner bounds combined refusal/annotation retention at 64 MiB of

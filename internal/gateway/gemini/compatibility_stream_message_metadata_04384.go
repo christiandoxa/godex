@@ -22,11 +22,13 @@ func (state *geminiChatCompatibleStream043711) observeMessageMetadata(writer io.
 	if len(annotations) > 0 {
 		wire, err := jsonutil.MarshalSerdeValue04384(annotations)
 		if err != nil {
+			state.eof = true
 			return state.failure(writer, "provider_stream_error", "provider annotations exceeded safe JSON limits")
 		}
 		size += len(wire)
 	}
 	if size > geminiStreamMetadataMaxBytes04384-state.messageMetadataBytes {
+		state.eof = true
 		return state.failure(writer, "provider_stream_error", "provider message metadata exceeded safe size limit (67108864)")
 	}
 	state.messageMetadataBytes += size
