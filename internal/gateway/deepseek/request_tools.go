@@ -142,6 +142,9 @@ func applyDeepSeekStrictTool(
 		return fmt.Errorf("DeepSeek strict function tool `%s` requires deepseek.strict_tools=true", name)
 	}
 	if !strictTools {
+		if _, present := function[deepSeekStrictKey]; present {
+			resultFunction[deepSeekStrictKey] = strict
+		}
 		return nil
 	}
 	if err := normalizeStrictSchema(parameters, name); err != nil {

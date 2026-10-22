@@ -10671,3 +10671,47 @@ the build. Exact commands:
 `rtk proxy go test -json ./... > /tmp/gdx-04384-deepseek-schema-equality-full.jsonl 2>&1`
 and `rtk proxy make verify > /tmp/gdx-04384-deepseek-schema-equality-verify.log 2>&1`.
 Exact clean combined candidate qualification follows before publication.
+
+### DeepSeek preserves an explicitly false function strict flag
+
+The pinned complete provider-tools pipeline preserves strict:false on function
+declarations, also covered by the tagged app-level translation test. Godex's
+existing strict-mode policy validated the flag but omitted explicit false in
+default mode. This changed original request bytes and collapsed a declaration
+with no strict field into one explicitly declaring false.
+
+Exact clean 8e765ce535f32ea1186527738e6eb81cce2d7626 proves five Godex-only
+executable FAILs and seven PASS controls across twelve cases (original session
+91822, exit 0). Four default/normal/nested/duplicate false declarations lose the
+flag in Godex's original request. A missing/false conflict is rejected by Prodex
+with HTTP 502, exit 2 and zero upstream attempts, while Godex incorrectly
+dispatches and succeeds. Absent and true controls, integer precision, signed
+floating-zero equality, integer/float conflict, numeric history and previous-ID
+rejection PASS. Every reference original invariant PASSes, with unchanged
+auth/owner/state and active matching-corruption guards. Audit:
+/tmp/gdx-04384-deepseek-tool-strict-before-audit.json. Exact command:
+`rtk proxy python3 /tmp/gdx-04384-deepseek-tool-strict-before.py > /tmp/gdx-04384-deepseek-tool-strict-before.log 2>&1`.
+
+The existing private applyDeepSeekStrictTool now copies the validated flag when
+present in default mode. Existing strict-mode opt-in/normalization and absent
+field behavior stay in their current owner, gateway/deepseek. No new helper,
+application layer, exported API, interface, dependency, option, worker or durable
+format is introduced. Four default-mode public-boundary regressions first FAIL,
+while eight absent/true/strict-mode controls PASS (original session 46750,
+exit 1; retained log /tmp/gdx-04384-deepseek-tool-strict-unit-before.jsonl).
+Focused checks then PASS 1,532 tests (original session 22571, exit 0). Exact
+command:
+`rtk proxy go test -json ./internal/gateway/deepseek ./tools/differential > /tmp/gdx-04384-deepseek-tool-strict-focused.jsonl 2>&1`.
+Fixture registry/golden JSON and matching flag/admission corruption PASS eight
+tests (original session 98459, exit 0). Seven default executable cases extend
+DeepSeek362 to 369; Gemini remains 974. Full local and exact clean executable
+qualification follow before publication. No live authentication or overall 1:1
+parity claim is made.
+
+Full local validation PASSes 11,273 tests with 18 optional SKIP (original session
+62303, exit 0). make verify PASSes (original session 44064, exit 0), including
+shuffled race tests, cross-builds, vet, formatting/source guards and the build.
+Exact commands:
+`rtk proxy go test -json ./... > /tmp/gdx-04384-deepseek-tool-strict-full.jsonl 2>&1`
+and `rtk proxy make verify > /tmp/gdx-04384-deepseek-tool-strict-verify.log 2>&1`.
+Exact clean executable qualification follows before publication.

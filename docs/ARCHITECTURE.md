@@ -348,6 +348,8 @@ The copier uses the existing Serde value writer before decoding number tokens,
 so echoed metadata and schema comparison share canonical number spellings. A
 private recursive tool-value comparison treats floating signed zeros equally
 while retaining integer/float kinds, strings, array order and member presence.
+Function-tool normalization also retains an explicitly present false strict
+flag in default mode; strict runtime mode continues to normalize it to true.
 Runtime gateway startup marks the proxy model's internal GatewayMode field;
 ordinary local launches keep invocation-local history. The composition root
 selects Gemini's local pool constructor or its request-scoped shared gateway

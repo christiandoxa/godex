@@ -1232,3 +1232,12 @@ requiring HTTP 502/exit 2 before upstream dispatch. Four additional
 fraction bytes in metadata/client metadata. Independent original bytes and
 matching request/response/admission corruption guards remain active. Default
 DeepSeek reaches 362; Gemini remains 974.
+
+Seven DeepSeek `deepseek-request-primitive-tool-strict-*` cases cover absent,
+false and true function strict flags. Flat/nested/normal requests and exact
+duplicates retain explicit false; absent and false declarations with the same
+name remain distinct and fail before upstream dispatch. True still requires
+the existing strict-mode opt-in. Exact request/client/admission/auth/state and
+matching strict-flag corruption guards apply. Strict-mode normalization is
+separately unit qualified for absent/false/true and duplicate declarations.
+Default DeepSeek reaches 369; Gemini remains 974.
