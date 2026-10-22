@@ -9836,3 +9836,38 @@ primary and ancestry checks, without waiting for CI. Gemini production code
 remains at 3399a8c; its full974 and other later matrices remain pending. The
 latest completed full-Gemini qualification is still exact e9d88ce/full918,
 and the e9d88ce entire default gate remains pending. No overall 1:1 claim follows.
+
+### Preserve opaque tool-output IDs when finding DeepSeek history
+
+Eight exact clean 382b3a7b4bcced5f35cb1f64c6e67de5a9be5730 executable
+baselines qualify three Godex-only FAILs and five PASS controls (original
+session 28695, exit 0). Audit:
+/tmp/gdx-04384-deepseek-history-call-id-before-audit.json. A matching padded
+ID loses its cached context, and a padded output falsely selects an unpadded
+cached call. A three-request simple-override case initially emits matching
+second requests, but Godex's third request has no reconstructed history while
+the reference retains four messages. The padded-stored-ID mismatch is an
+uncached PASS control. Four prior exact/numeric/simple/pending controls also
+PASS. All original seed, response/stdout/status, ordered attempts/events, auth,
+credential slot, state and artifact checks pass; only the Godex history request
+bytes fail. The pinned Mojo ResponsesHistoryCallId validates nonblankness and
+returns the original string; the existing store compares call IDs exactly.
+
+The private gateway/deepseek acquisition function now returns the original ID
+to the existing scoped store after the same blankness validation. This changes
+one production line. It adds no shared helper, layer, interface, export, worker,
+configuration, dependency or persisted format. The emitted simple-request body
+keeps its contract while pending reconstructed history can retain its owner.
+Unit regressions first FAIL on padded IDs, aliases including Unicode, and the
+false padded-output owner selection:
+/tmp/gdx-04384-deepseek-history-call-id-unit-before.log. Four new executable
+cases extend DeepSeek232 to 236; Gemini remains 974. Full local and exact clean
+candidate qualification follow before publication.
+
+Focused gateway/tooling validation PASSes 1,242 tests. Full local validation
+PASSes 10,983 tests with 18 optional SKIP. make verify exits 0, including
+shuffled race tests, cross-builds, vet, source/format guards and the build.
+Exact commands:
+`rtk proxy go test -json ./... > /tmp/gdx-04384-deepseek-history-call-id-full.jsonl 2>&1`
+and `rtk proxy make verify > /tmp/gdx-04384-deepseek-history-call-id-verify.log 2>&1`.
+Exact clean candidate executable qualification follows before publication.

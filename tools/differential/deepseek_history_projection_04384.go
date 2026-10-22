@@ -8,7 +8,20 @@ import (
 )
 
 func deepSeekHistoryCases04384() []string {
-	return []string{"deepseek-history-extra", "deepseek-history-rtk", "deepseek-history-null", "deepseek-history-empty", "deepseek-history-numeric", "deepseek-history-simple", "deepseek-history-simple-inline", "deepseek-history-simple-unbound", "deepseek-history-simple-pending", "deepseek-history-numeric-pending", "deepseek-history-u64-pending"}
+	return []string{"deepseek-history-extra", "deepseek-history-rtk", "deepseek-history-null", "deepseek-history-empty", "deepseek-history-numeric", "deepseek-history-simple", "deepseek-history-simple-inline", "deepseek-history-simple-unbound", "deepseek-history-simple-pending", "deepseek-history-numeric-pending", "deepseek-history-u64-pending", "deepseek-history-id-padded", "deepseek-history-id-output-padded", "deepseek-history-id-call-padded", "deepseek-history-simple-padded-pending"}
+}
+
+func deepSeekHistoryCallIDs04384(scenario string) (string, string) {
+	switch scenario {
+	case "deepseek-history-id-padded", "deepseek-history-simple-padded-pending":
+		return " call-history ", " call-history "
+	case "deepseek-history-id-output-padded":
+		return "call-history", " call-history "
+	case "deepseek-history-id-call-padded":
+		return " call-history ", "call-history"
+	default:
+		return "call-history", "call-history"
+	}
 }
 
 func deepSeekHistoryPending04384(scenario string) bool {
@@ -36,6 +49,11 @@ func deepSeekHistoryInput04384(scenario string, phase int) []byte {
 		if phase == 2 || !strings.HasPrefix(scenario, "deepseek-history-simple") {
 			body = strings.TrimSuffix(body, "}") + `,"safety_identifier":"synthetic_user"}`
 		}
+		if strings.HasPrefix(scenario, "deepseek-history-id-") {
+			body = strings.Replace(body, `"output":"synthetic result"}]`, `"output":"synthetic result"},{"type":"message","role":"user","content":"current request"}]`, 1)
+		}
+		_, outputID := deepSeekHistoryCallIDs04384(scenario)
+		body = strings.ReplaceAll(body, "call-history", outputID)
 		return []byte(body)
 	}
 	return []byte(`{"model":"deepseek-v4-pro","input":"history request","stream":false}`)
@@ -49,7 +67,8 @@ func deepSeekHistoryCall04384(scenario string, wrapped bool) map[string]any {
 			arguments = `{"cmd":"rtk ls"}`
 		}
 	}
-	call := map[string]any{"id": "call-history", "type": "function", "function": map[string]any{"name": name, "arguments": arguments}}
+	callID, _ := deepSeekHistoryCallIDs04384(scenario)
+	call := map[string]any{"id": callID, "type": "function", "function": map[string]any{"name": name, "arguments": arguments}}
 	if scenario == "deepseek-history-numeric" || scenario == "deepseek-history-numeric-pending" {
 		call["priority"] = json.Number("9007199254740993")
 	}
@@ -83,17 +102,24 @@ func deepSeekHistoryExpected04384(scenario string) productRun {
 	body, _ := json.Marshal(map[string]any{
 		"created_at": 1, "id": "chatcmpl-history-seed", "model": "deepseek-v4-pro", "object": "response",
 		"metadata": map[string]any{"deepseek": map[string]any{"finish_reason": "tool_calls"}},
-		"output":   []any{map[string]any{"type": "function_call", "call_id": "call-history", "name": function["name"], "arguments": function["arguments"]}},
+		"output":   []any{map[string]any{"type": "function_call", "call_id": call["id"], "name": function["name"], "arguments": function["arguments"]}},
 		"usage":    map[string]any{"input_tokens": 2, "output_tokens": 1, "total_tokens": 3},
 	})
 	run.Client.Seed = &exchange{Status: 200, Body: string(body), Headers: http.Header{"Content-Type": {"application/json; charset=utf-8"}}}
 	user := map[string]any{"role": "user", "content": "history request"}
 	assistant := map[string]any{"role": "assistant", "content": "", "tool_calls": []any{call}}
-	tool := map[string]any{"role": "tool", "tool_call_id": "call-history", "content": "synthetic result"}
+	_, outputID := deepSeekHistoryCallIDs04384(scenario)
+	tool := map[string]any{"role": "tool", "tool_call_id": outputID, "content": "synthetic result"}
 	if scenario == "deepseek-history-simple-unbound" {
 		tool["tool_call_id"] = "call-unknown"
 	}
 	requests := [][]any{{user}, {user, assistant, tool}}
+	if strings.HasPrefix(scenario, "deepseek-history-id-") {
+		if scenario != "deepseek-history-id-padded" {
+			requests[1] = nil
+		}
+		requests[1] = append(requests[1], map[string]any{"role": "user", "content": "current request"})
+	}
 	if strings.HasPrefix(scenario, "deepseek-history-simple") && scenario != "deepseek-history-simple-inline" {
 		requests[1] = []any{tool}
 	}

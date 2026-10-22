@@ -1132,3 +1132,11 @@ stateless override. Original request bytes, response/stdout/status, attempt and
 credential ownership, and durable state remain independently checked. Matching
 ID corruption and injected orphan outputs are rejected. The default DeepSeek
 matrix grows from 224 to 232 cases; the Gemini matrix remains 974.
+
+Four DeepSeek history cases retain original call IDs through cache lookup:
+matching padding, a padded-output false match, a padded stored-ID negative
+control, and a simple-request override followed by a third request that observes
+its reconstructed pending history. The original seed, two/three ordered upstream
+requests, exact bodies and IDs, events, stdout/status, credentials and durable
+state remain independent assertions, including matching forged-owner mutations.
+The default DeepSeek matrix reaches 236; Gemini remains 974.

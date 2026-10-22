@@ -145,7 +145,7 @@ func deepSeekFirstToolOutputCallID(object map[string]any) string {
 		switch kind {
 		case "function_call_output", "custom_tool_call_output", "mcp_tool_result", "mcp_call_output":
 			if id := firstStringValue(item, deepSeekCallIDKey, deepSeekToolCallIDKey, "id"); strings.TrimSpace(id) != "" {
-				return strings.TrimSpace(id)
+				return id
 			}
 		}
 	}
