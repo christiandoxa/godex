@@ -397,13 +397,19 @@ the API-key pool, Gemini OpenAI-compatible URL/auth behavior, and Responses
 request and buffered/SSE response translation. `usecase/routing` selects the
 bounded Gemini model chain and decides whether an uncommitted error permits the
 next model; `entity/provider` supplies the chain and error classification.
-The API-key request path preserves indexed tool-declaration failures as
-structured 400 errors. Other request translation/normalization failures use
+The API-key request path preserves candidate-count and indexed tool-declaration
+failures as structured 400 errors. Other request translation/normalization failures use
 the existing plain terminal 502 preparation boundary before dispatch. The
 native GenerateContent adapter remains separate. The existing tool validator
 runs on the original complete serde-valid object before control normalization
 or shared Chat conversion. A malformed tool therefore wins over other shape
 errors, while invalid JSON/Unicode still fails before tool inspection.
+Candidate-count aliases are checked first: null values are inactive, active
+aliases compare canonical serde fragments, and the selected value must be
+integer 1. The gateway reuses its native validator and existing technical serde
+writer. Routing and HTTP delivery recognize only the three exact candidate
+diagnostics, preserving terminal 400 presentation without widening unrelated
+upstream-error handling.
 Before substituting a Responses model, the routing use case reuses the existing
 stateless serde boundary/number checks on the original body. Invalid values
 stay unchanged for terminal admission by the concrete gateway. Valid non-string

@@ -15,9 +15,19 @@ import (
 	"github.com/christiandoxa/godex/internal/usecase/routing"
 )
 
-func TestProdex04384GeminiJSONAdmissionDoesNotRetryModelOrCredential(t *testing.T) {
-	for _, body := range []string{"null", "{bad"} {
-		t.Run(body, func(t *testing.T) {
+func TestProdex04384GeminiRequestAdmissionDoesNotRetryModelOrCredential(t *testing.T) {
+	for _, fixture := range []struct {
+		body, message string
+		status        int
+	}{
+		{"null", "", 500},
+		{"{bad", "upstream request failed", 502},
+		{`{"input":"synthetic","candidate_count":2}`, "invalid_candidate_count: Gemini request field `candidate_count` must be omitted, null, or 1", 400},
+		{`{"input":"synthetic","candidateCount":2}`, "invalid_candidate_count: Gemini request field `candidateCount` must be omitted, null, or 1", 400},
+		{`{"input":"synthetic","candidate_count":1,"candidateCount":2}`, "invalid_candidate_count: Gemini request fields `candidate_count` and `candidateCount` conflict", 400},
+		{`{"input":7,"candidate_count":2,"tools":false}`, "invalid_candidate_count: Gemini request field `candidate_count` must be omitted, null, or 1", 400},
+	} {
+		t.Run(fixture.body, func(t *testing.T) {
 			var attempts, waits atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				attempts.Add(1)
@@ -44,18 +54,19 @@ func TestProdex04384GeminiJSONAdmissionDoesNotRetryModelOrCredential(t *testing.
 			if err != nil {
 				t.Fatal(err)
 			}
+			defer router.Close()
 			exchange, err := router.Forward(t.Context(), proxymodel.Request{Method: http.MethodPost,
-				Path: "/backend-api/godex/responses", Header: make(http.Header), Body: []byte(body)})
+				Path: "/backend-api/godex/responses", Header: make(http.Header), Body: []byte(fixture.body)})
 			if exchange != nil {
 				defer exchange.Close()
 			}
 			if attempts.Load() != 0 || waits.Load() != 0 {
 				t.Fatalf("invalid JSON admission entered upstream or wait: attempts=%d waits=%d", attempts.Load(), waits.Load())
 			}
-			if body != "null" {
+			if fixture.status != 500 {
 				var failure *proxymodel.Error
-				if exchange != nil || !errors.As(err, &failure) || failure.StatusCode != 502 || failure.Message != "upstream request failed" {
-					t.Fatalf("malformed JSON lost terminal preparation failure: %v", err)
+				if exchange != nil || !errors.As(err, &failure) || failure.StatusCode != fixture.status || failure.Message != fixture.message {
+					t.Fatalf("invalid request lost terminal preparation failure: %v", err)
 				}
 				return
 			}

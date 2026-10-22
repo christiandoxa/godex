@@ -353,6 +353,14 @@ surrogate and must preserve plain terminal 502 before tool validation.
 The original raw body is retained and existing independent error/state/header/
 attempt mutations cover every combination.
 
+Gemini `request-primitive-candidate-*` covers null/one acceptance, both aliases,
+strict integer admission, canonical equal booleans/strings/arrays/objects and
+floating values, and alias conflicts including integer versus float. Candidate
+errors win over malformed tools, controls, input and reasoning; invalid Unicode
+still wins first. Rejections require exact structured 400 messages, terminal
+headers, exit 2 and zero attempts. Accepted counts are omitted on the Chat wire.
+The same independent body/header/exit/attempt/state mutations cover these cases.
+
 DeepSeek scenario workers evaluate their complete independent invariants as
 each scenario finishes, preserving failures in the ordered report. The strict
 five-minute generated SSE timestamp window is unchanged; later cases cannot

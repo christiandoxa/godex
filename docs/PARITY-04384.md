@@ -6022,3 +6022,78 @@ Gemini run remains scoped to unchanged Gemini source in clean `8d618e0`.
 Other controls, combined-error ordering, complete DeepSeek JSON admission,
 Gemini Compact, executable session/turn continuation, native macOS/Windows
 and live authentication remain open. Global 1:1 parity is not claimed.
+
+
+## Validated Gemini preparation checkpoint: a7fabe9
+
+Clean `a7fabe987e50e30330599c534367323254db8f00` passes all 192 Gemini
+cases and 213 DeepSeek scenarios, including independent mutation controls:
+`/tmp/gdx-04384-gemini-preparation-errors-oracle.json` and
+`/tmp/gdx-04384-gemini-preparation-errors-deepseek-oracle.json`.
+The exact clean product and harness were built with
+`rtk go build -trimpath -o /tmp/gdx-04384-gemini-preparation-errors-godex ./cmd/godex` and
+`rtk go build -trimpath -o /tmp/gdx-04384-gemini-preparation-errors-final-differential ./tools/differential`.
+The matrices use `--gemini`, or `--scenario all --scenario-workers 3`, matching
+clean source/commit pins and the unchanged published 0.438.4 reference.
+After fetching and checking the clean primary worktree and remote, `a7fabe9`
+was fast-forwarded and pushed directly to `origin/main` without waiting for CI.
+The separate `4c270db` 213-case DeepSeek matrix also PASSes; its 199-case Gemini
+matrix is still pending. The complete default gate remains scoped to `8d618e0`.
+No force push, tag, release or editor-checkout change occurred.
+
+
+## Gemini candidate-count admission precedes tool and shape validation
+
+Pinned `local_rewrite_gemini.rs:31-41` and `local_rewrite_gemini_send.rs:147-158`
+validate candidate-count aliases before tools, returning structured terminal
+400 `invalid_request_error`. Complete serde admission runs first. The Mojo
+`gemini_bridge_request_write_candidate_validation` compares raw fragments
+from serialized serde Values: equivalent floats, decoded strings and ordered
+objects compare equal, while integer 1 and float 1.0 remain distinct. Null
+aliases are inactive and every active selected value must be integer 1.
+
+The API-key adapter omitted this check. Its existing native validator also
+compared only integer types and lexical number spellings, reporting an alias
+conflict for canonical equal booleans, strings, arrays, objects and floats.
+The Gemini gateway now reuses its private validator before tools and controls,
+and compares aliases through the existing technical serde Value writer.
+Routing and HTTP delivery recognize exactly the three local candidate-count
+messages, preserving terminal status/body/headers without treating unrelated
+upstream failures as local errors. The existing two-key real-gateway/router
+test proves zero upstream attempts and no retry wait. No new production
+helper, package, exported API, interface, dependency, configuration, worker or
+persisted format is introduced. Claude and DeepSeek policies are unchanged.
+
+The focused command below first FAILs with eight controls passing and 26
+failures, including parents, then PASSes all 34 tests:
+`rtk go test ./internal/gateway/gemini ./internal/usecase/routing ./internal/delivery/http/proxy -run '^TestProdex(04384Gemini(CandidateValidationPrecedesToolsAndControls|NativeCandidateAliasesCompareCanonicalSerdeValues|RequestAdmissionDoesNotRetryModelOrCredential)|04380(LocalGeminiToolValidationErrorMatchIsFailClosed|GeminiInvalidFunctionToolRejectionWireMatchesTaggedJSON))$' -count=1`.
+Logs: `/tmp/gdx-04384-gemini-candidate-count-cross-before.log` and
+`/tmp/gdx-04384-gemini-candidate-count-focused.log`.
+
+Twenty-two executable baselines pin unchanged clean `4c270db`, the unchanged
+reference and `/tmp/gdx-04384-gemini-candidate-count-before-differential`:
+`/tmp/gdx-04384-gemini-candidate-<suffix>-before-oracle.json`.
+Seventeen cases FAIL only Godex. Five controls PASS: null aliases, integer one,
+null/one aliases, valid candidate plus invalid tools, and malformed Unicode.
+All reference and independent mutation invariants pass. Commands use
+`--gemini --scenario request-primitive-candidate-<suffix>` with the exact clean
+source/commit pins. Fixtures retain original bodies, canonical upstream bytes,
+exact 400/502 body/type/headers, stdout/exit, attempts and safe durable state.
+The existing fixture error field is renamed to cover both tools and candidates;
+all prior assertions and header/attempt/state mutations remain active.
+
+`rtk go test ./tools/differential -count=1` passes 281 oracle tests:
+`/tmp/gdx-04384-gemini-candidate-count-oracle-tests.log`.
+`rtk go test ./internal/gateway/gemini -count=1` passes 894 tests:
+`/tmp/gdx-04384-gemini-candidate-count-gateway-tests.log`.
+`rtk proxy go test -json ./...` passes 9,792 tests in 71 packages; ten packages
+have no tests and 18 optional installed-Codex/executable tests are skipped:
+`/tmp/gdx-04384-gemini-candidate-count-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./internal/delivery/http/proxy ./tools/differential -count=1`
+passes 3,348 tests: `/tmp/gdx-04384-gemini-candidate-count-race.log`.
+`rtk proxy make verify` PASSes the complete local gate:
+`/tmp/gdx-04384-gemini-candidate-count-verify.log`.
+Clean-commit 221-case Gemini and 213-case DeepSeek qualification follows.
+Native OAuth execution, other controls and combined errors, Gemini Compact,
+executable session/turn continuation, native macOS/Windows and live login
+remain unproven. Global 1:1 parity is not claimed.

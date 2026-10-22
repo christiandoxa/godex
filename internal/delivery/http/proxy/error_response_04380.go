@@ -7,11 +7,7 @@ import (
 )
 
 func writeProxyError(writer http.ResponseWriter, path string, status int, message string) {
-	// The exact Prodex 0.438.0 Gemini bridge uses a structured
-	// invalid_request_error for a locally rejected function tool. Preserve
-	// its indexed message and reject it without inventing another provider
-	// attempt. Unrelated 400 errors and non-Responses routes retain their
-	// original text response contract.
+	// Tagged Gemini local tool/candidate failures use a structured Responses error.
 	code := ""
 	if status == http.StatusGatewayTimeout && message == requestRecoveryTimeoutMessage {
 		code = "request_timeout"
@@ -20,8 +16,16 @@ func writeProxyError(writer http.ResponseWriter, path string, status int, messag
 		if status == http.StatusServiceUnavailable {
 			code = "service_unavailable"
 		}
-		if status == http.StatusBadRequest && strings.HasPrefix(message, "invalid_tool_declaration: Gemini request field `tools") {
-			code = "invalid_request_error"
+		if status == http.StatusBadRequest {
+			switch message {
+			case "invalid_candidate_count: Gemini request field `candidate_count` must be omitted, null, or 1",
+				"invalid_candidate_count: Gemini request field `candidateCount` must be omitted, null, or 1",
+				"invalid_candidate_count: Gemini request fields `candidate_count` and `candidateCount` conflict":
+				code = "invalid_request_error"
+			}
+			if strings.HasPrefix(message, "invalid_tool_declaration: Gemini request field `tools") {
+				code = "invalid_request_error"
+			}
 		}
 	}
 	if status == http.StatusServiceUnavailable && message == "bound continuation provider is unavailable" {

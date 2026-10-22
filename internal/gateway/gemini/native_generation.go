@@ -1,9 +1,12 @@
 package gemini
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"strings"
+
+	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 )
 
 func geminiNativeGenerationConfig(original, chat map[string]any) (map[string]any, error) {
@@ -127,19 +130,10 @@ func geminiCandidateCount(request map[string]any) (int64, bool, error) {
 }
 
 func geminiCandidateValuesEqual(left, right any) bool {
-	switch left := left.(type) {
-	case json.Number:
-		right, ok := right.(json.Number)
-		return ok && left.String() == right.String()
-	case int:
-		right, ok := right.(int)
-		return ok && left == right
-	case int64:
-		right, ok := right.(int64)
-		return ok && left == right
-	default:
-		return false
-	}
+	// The tagged Mojo validator compares raw fragments after serde Value serialization.
+	leftJSON, leftErr := jsonutil.MarshalSerdeValue04384(left)
+	rightJSON, rightErr := jsonutil.MarshalSerdeValue04384(right)
+	return leftErr == nil && rightErr == nil && bytes.Equal(leftJSON, rightJSON)
 }
 
 func geminiCandidateCountIsOne(value any) bool {

@@ -288,13 +288,17 @@ func isProxyPreparationError(err error) bool {
 		presentation.Message == "upstream request failed" {
 		return true
 	}
-	// An invalid Gemini API-key function tool is rejected by the *local*
-	// tagged 0.438.0 bridge before upstream HTTP. Waiting or selecting a new
-	// provider credential cannot repair the submitted request, and could
-	// falsely turn its exact 400 into a 503/timeout. Preserve local invalid-
-	// tool error semantics for both fresh and hard-affinity routing paths.
-	return presentation.StatusCode == http.StatusBadRequest &&
-		strings.HasPrefix(presentation.Message, "invalid_tool_declaration: Gemini request field `tools")
+	// Local Gemini tool/candidate errors cannot be repaired by changing credentials.
+	if presentation.StatusCode != http.StatusBadRequest {
+		return false
+	}
+	switch presentation.Message {
+	case "invalid_candidate_count: Gemini request field `candidate_count` must be omitted, null, or 1",
+		"invalid_candidate_count: Gemini request field `candidateCount` must be omitted, null, or 1",
+		"invalid_candidate_count: Gemini request fields `candidate_count` and `candidateCount` conflict":
+		return true
+	}
+	return strings.HasPrefix(presentation.Message, "invalid_tool_declaration: Gemini request field `tools")
 }
 
 // applyRetryOutcome preserves historical durable retry backoff for managed

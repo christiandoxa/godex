@@ -11,7 +11,7 @@ type requestPrimitiveFixture04384 struct {
 	fields, limit, wireFields, wirePrefix, wireStop, text, body string
 	reject                                                      bool
 	failureStatus                                               int
-	geminiToolError                                             string
+	geminiValidationError                                       string
 }
 
 func requestPrimitiveSuffixes04384() []string {
@@ -36,9 +36,9 @@ func deepSeekAdmissionSuffixes04384() []string {
 }
 
 func geminiPreparationSuffixes04384() []string {
-	return []string{"preparation-tools", "preparation-reasoning", "preparation-tool-params", "preparation-tool-missing-params",
+	return append(geminiCandidateCountSuffixes04384(), []string{"preparation-tools", "preparation-reasoning", "preparation-tool-params", "preparation-tool-missing-params",
 		"preparation-tool-missing-name", "preparation-tool-description", "preparation-input",
-		"tool-priority-stream", "tool-priority-temperature", "tool-priority-tokens", "tool-priority-user", "tool-priority-input", "tool-priority-reasoning", "tool-priority-serde"}
+		"tool-priority-stream", "tool-priority-temperature", "tool-priority-tokens", "tool-priority-user", "tool-priority-input", "tool-priority-reasoning", "tool-priority-serde"}...)
 }
 
 func requestPrimitiveCase04384(scenario string) (requestPrimitiveFixture04384, bool) {
@@ -47,6 +47,9 @@ func requestPrimitiveCase04384(scenario string) (requestPrimitiveFixture04384, b
 	}
 	const stops16 = `["s01","s02","s03","s04","s05","s06","s07","s08","s09","s10","s11","s12","s13","s14","s15","s16"]`
 	suffix := strings.TrimPrefix(strings.TrimPrefix(scenario, "deepseek-"), "request-primitive-")
+	if strings.HasPrefix(suffix, "candidate-") {
+		return geminiCandidateCountFixture04384(suffix)
+	}
 	if strings.HasPrefix(suffix, "tool-priority-") {
 		return geminiToolPriorityFixture04384(suffix)
 	}
@@ -193,7 +196,7 @@ func requestPrimitiveCase04384(scenario string) (requestPrimitiveFixture04384, b
 		return requestPrimitiveFixture04384{fields: `"text":null`, reject: true}, true
 	case "preparation-tools":
 		return requestPrimitiveFixture04384{fields: `"tools":"opaque"`, reject: true,
-			geminiToolError: "invalid_tool_declaration: Gemini request field `tools` must be an array"}, true
+			geminiValidationError: "invalid_tool_declaration: Gemini request field `tools` must be an array"}, true
 	case "preparation-tool-choice":
 		return requestPrimitiveFixture04384{fields: `"tool_choice":{"type":"function","name":"missing_tool"}`, reject: true}, true
 	case "preparation-reasoning":
@@ -202,16 +205,16 @@ func requestPrimitiveCase04384(scenario string) (requestPrimitiveFixture04384, b
 		return requestPrimitiveFixture04384{fields: `"web_search_options":{"search_context_size":"huge"}`, reject: true}, true
 	case "preparation-tool-params":
 		return requestPrimitiveFixture04384{fields: `"tools":[{"type":"function","function":{"name":"synthetic_lookup","parameters":false}}]`, reject: true,
-			geminiToolError: "invalid_tool_declaration: Gemini request field `tools[0].function.parameters` must be an object"}, true
+			geminiValidationError: "invalid_tool_declaration: Gemini request field `tools[0].function.parameters` must be an object"}, true
 	case "preparation-tool-missing-params":
 		return requestPrimitiveFixture04384{fields: `"tools":[{"type":"function","name":"synthetic_lookup"}]`, reject: true,
-			geminiToolError: "invalid_tool_declaration: Gemini request field `tools[0].function.parameters` is required"}, true
+			geminiValidationError: "invalid_tool_declaration: Gemini request field `tools[0].function.parameters` is required"}, true
 	case "preparation-tool-missing-name":
 		return requestPrimitiveFixture04384{fields: `"tools":[{"type":"function","function":{"parameters":{}}}]`, reject: true,
-			geminiToolError: "invalid_tool_declaration: Gemini request field `tools[0].function.name` must be a non-empty string"}, true
+			geminiValidationError: "invalid_tool_declaration: Gemini request field `tools[0].function.name` must be a non-empty string"}, true
 	case "preparation-tool-description":
 		return requestPrimitiveFixture04384{fields: `"tools":[{"type":"function","name":"synthetic_lookup","parameters":{},"description":7}]`, reject: true,
-			geminiToolError: "invalid_tool_declaration: Gemini request field `tools[0].function.description` must be a string"}, true
+			geminiValidationError: "invalid_tool_declaration: Gemini request field `tools[0].function.description` must be a string"}, true
 	case "preparation-input":
 		return requestPrimitiveFixture04384{body: `{"input":7,"model":"gemini-3.1-pro-preview"}`, reject: true}, true
 	}
@@ -261,10 +264,10 @@ func geminiPrimitiveExpected04384(scenario string) geminiCandidateResult {
 	fixture, _ := requestPrimitiveCase04384(scenario)
 	if fixture.reject {
 		result := geminiUserIDExpected04384("request-user-id-number")
-		if fixture.geminiToolError != "" {
+		if fixture.geminiValidationError != "" {
 			result.Client = exchange{Status: 400, Headers: http.Header{"Content-Type": {"application/json"},
 				"Cache-Control": {"no-store"}, "X-Content-Type-Options": {"nosniff"}},
-				Body: `{"error":{"code":"invalid_request_error","message":"` + fixture.geminiToolError + `"}}`}
+				Body: `{"error":{"code":"invalid_request_error","message":"` + fixture.geminiValidationError + `"}}`}
 			result.Stdout = result.Client.Body + "\n"
 		}
 		if fixture.failureStatus == http.StatusInternalServerError {
@@ -322,8 +325,8 @@ func deepSeekPrimitiveInvariants04384(scenario scenarioResult) []string {
 
 func geminiPrimitiveInvariant04384(scenario string, result geminiCandidateResult) error {
 	fixture, _ := requestPrimitiveCase04384(scenario)
-	if fixture.geminiToolError != "" && (result.Client.Headers.Get("Cache-Control") != "no-store" || result.Client.Headers.Get("X-Content-Type-Options") != "nosniff") {
-		return errors.New("invalid tool declaration lost terminal response headers")
+	if fixture.geminiValidationError != "" && (result.Client.Headers.Get("Cache-Control") != "no-store" || result.Client.Headers.Get("X-Content-Type-Options") != "nosniff") {
+		return errors.New("invalid Gemini request lost terminal response headers")
 	}
 	if fixture.failureStatus == 500 && len(result.Client.Headers["Content-Type"]) != 0 {
 		return errors.New("nonobject root invented a content type")

@@ -116,6 +116,9 @@ func normalizeGeminiChatInput043711(body []byte) ([]byte, map[string]any, error)
 	if err != nil {
 		return nil, nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
+	if _, _, err := geminiCandidateCount(root); err != nil {
+		return nil, nil, &proxymodel.Error{StatusCode: http.StatusBadRequest, Message: err.Error()}
+	}
 	if err := validateGeminiChatCompatibleTools04380(body); err != nil {
 		return nil, nil, &proxymodel.Error{StatusCode: http.StatusBadRequest, Message: err.Error()}
 	}

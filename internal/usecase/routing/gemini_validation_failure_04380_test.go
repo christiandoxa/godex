@@ -62,6 +62,12 @@ func TestProdex04380LocalGeminiToolValidationErrorMatchIsFailClosed(t *testing.T
 	}{
 		{err: &proxymodel.Error{StatusCode: 400, Message: "invalid_tool_declaration: Gemini request field `tools[0].function.name` must be a non-empty string"}, valid: true},
 		{err: &proxymodel.Error{StatusCode: 400, Message: "invalid_tool_declaration: Gemini request field `tools[0].function.parameters` is required"}, valid: true},
+		{err: &proxymodel.Error{StatusCode: 400, Message: "invalid_candidate_count: Gemini request field `candidate_count` must be omitted, null, or 1"}, valid: true},
+		{err: &proxymodel.Error{StatusCode: 400, Message: "invalid_candidate_count: Gemini request field `candidateCount` must be omitted, null, or 1"}, valid: true},
+		{err: &proxymodel.Error{StatusCode: 400, Message: "invalid_candidate_count: Gemini request fields `candidate_count` and `candidateCount` conflict"}, valid: true},
+		{err: &proxymodel.Error{StatusCode: 400, Message: "invalid_candidate_count: unrelated upstream error"}},
+		{err: &proxymodel.Error{StatusCode: 400, Message: "invalid_candidate_count: Gemini request field `other` must be omitted, null, or 1"}},
+		{err: &proxymodel.Error{StatusCode: 502, Message: "invalid_candidate_count: Gemini request field `candidate_count` must be omitted, null, or 1"}},
 		{err: &proxymodel.Error{StatusCode: 400, Message: "ordinary malformed upstream input"}},
 		{err: &proxymodel.Error{StatusCode: 400, Message: "invalid_tool_declaration: unrelated adapter"}},
 		{err: &proxymodel.Error{StatusCode: 502, Message: "invalid_tool_declaration: Gemini request field `tools[0].function.name` must be a string"}},
