@@ -3632,3 +3632,29 @@ mutations: `/tmp/gdx-04384-gemini-identity-deepseek-oracle.json`.
 race tests, cross-platform build/test compilation, installers and build:
 `/tmp/gdx-04384-gemini-guard-verify.log`.
 Clean-commit executable gates follow.
+
+
+## Validated Gemini identity checkpoint: 625fac5
+
+Clean `625fac5f7c88ebf8b05ed224592b2c589c8eae9f` passes all 51 Gemini
+cases and all 95 DeepSeek scenarios. Both executable negative-control sets
+PASS, including the new independent raw-key identity/stdout/state mutations.
+The corrected auditor accepts both legitimate byte-limit controls and rejects
+all three invalid-session requests exactly before any upstream attempt.
+Reports:
+`/tmp/gdx-04384-gemini-guard-oracle.json` and
+`/tmp/gdx-04384-gemini-guard-deepseek-oracle.json`.
+Both binaries were built from the clean commit and checked against the same
+pinned 0.438.4 source, binary digest and exact Go VCS provenance.
+
+The complete default-script PASS reported above applies to `e9ccedc`, not a
+new default run on this checkpoint. Latest local verification is 9,246 tests
+and `rtk proxy make verify` PASS. The retained intermediate FAIL reports
+remain FAIL; no mismatch was silently discarded or converted into a pass.
+Native macOS/Windows execution, live authentication, valid Gemini continuation
+replay/Compact ownership and additional buffered lexical diagnostics remain
+open. Global 1:1 parity is not claimed.
+
+After checking the primary worktree and unchanged remote, the Gemini policy
+and oracle commits were fast-forwarded and pushed directly to `origin/main`.
+No force push, tag, release or unrelated editor-worktree change occurred.
