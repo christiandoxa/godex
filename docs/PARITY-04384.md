@@ -6465,3 +6465,55 @@ names/output, instructions-only input and remaining request/response controls
 still require audit and executable proof. Gemini Compact, executable session/
 turn continuation, native macOS/Windows and live authentication remain unproven.
 Global 1:1 parity is not claimed.
+
+
+## Published input-admission and complete default-gate checkpoint
+
+Clean `f4a277da9fd00ac5d45dfd570875e793cd7114d7` passes all 247 Gemini
+cases and 213 DeepSeek scenarios with independent mutation controls:
+`/tmp/gdx-04384-gemini-input-items-oracle.json` and
+`/tmp/gdx-04384-gemini-input-items-deepseek-oracle.json`.
+Clean `105d3fde3505f5d0a93ceb2ef24d53099735c86a` passes all 263 Gemini
+cases and 213 DeepSeek scenarios with independent mutation controls:
+`/tmp/gdx-04384-gemini-input-kinds-oracle.json` and
+`/tmp/gdx-04384-gemini-input-kinds-deepseek-oracle.json`.
+Each matrix pins its exact clean source/commit and the unchanged published
+0.438.4 reference, using `--gemini`, or `--scenario all --scenario-workers 3`.
+Their product/harness builds use `rtk go build -trimpath -o` with respectively
+`/tmp/gdx-04384-gemini-input-items-{godex,final-differential}` and
+`/tmp/gdx-04384-gemini-input-kinds-{godex,final-differential}` from their
+protected source checkouts. Each qualified commit was fetched/checked,
+fast-forwarded through the clean primary and pushed directly to `origin/main`
+without CI wait. Published main is `105d3fde3`.
+
+The entire default gate on protected clean
+`5f49a5ff86b6399fadb65ddb18ba649097ffe6b0` now exits 0:
+`rtk proxy scripts/verify-release-parity.sh > /tmp/gdx-04384-release-5f49a5f.log 2>&1`.
+The final HTTP 402/403 profile-status and Mojo raw-429 checks actually PASS
+before completion; the earlier phase marker alone was never treated as success.
+The worktree remains clean at that exact revision. This replaces `8d618e0` as
+the latest complete default-gate PASS, and does not certify later commits.
+
+Protected clean `0830ef5b92c001e36bae6e3a223cbfdd8ddba76a` and
+`fc5e60cc72d0833e0a029f5725ff0b691ba04126` each pass all 213 DeepSeek
+cases and independent mutations:
+`/tmp/gdx-04384-gemini-message-roles-deepseek-oracle.json` and
+`/tmp/gdx-04384-gemini-content-types-deepseek-oracle.json`.
+Their 278-case and 286-case Gemini matrices remain pending:
+`/tmp/gdx-04384-gemini-message-roles-oracle.json` and
+`/tmp/gdx-04384-gemini-content-types-oracle.json`.
+Both earlier `4c270db` reference FAIL reports remain FAIL; no owner policy,
+state allowlist, terminal status/header or mutation requirement was relaxed.
+No force push, tag, release or editor-checkout change occurred.
+
+The next unqualified source audit is content projection through
+`deepseek_raw_put_bridge_message` and `deepseek_raw_put_content_text_string`:
+selected strings and text/input_text/output_text aliases retain empty entries
+and join with newlines; standalone objects become canonical JSON strings.
+Explicit part validation rejects present cache_control and invalid object
+shapes, while nonobject array parts are allowed and nontext scalars are ignored.
+The generic content helper alone is not the whole runtime pipeline.
+Developer-to-system role projection and empty/system-only message preservation
+also need executable baselines before repair. Remaining controls, Gemini
+Compact, executable session/turn continuation, native macOS/Windows and live
+authentication remain unproven. Global 1:1 parity is not claimed.
