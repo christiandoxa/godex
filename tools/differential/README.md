@@ -92,6 +92,12 @@ The 30 `request-primitive-tool-kind-*` cases distinguish missing/non-string
 types from unsupported strings. They cover early bridge rejection, nested
 function validation, omitted declarations, MCP aliases, skipped host metadata,
 late schema/strict/name rejection, media, choices, mixed tools and actual SSE.
+The 16 `compact-*` cases compare the API-key Compact Chat path, selected model,
+exact rewrite and raw summary formats, trace-gated envelopes, fallback headers,
+original-request summaries, 4 MiB boundaries and bounded model-attempt order.
+One ordinary Responses control verifies that its independent mapping survives.
+Matching-corruption tests cover request/client bytes, status, headers, stdout,
+exit, authenticated attempts and durable-state integrity.
 
 Build and run from a clean, committed Godex worktree:
 

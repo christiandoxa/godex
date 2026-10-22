@@ -1174,6 +1174,15 @@ func runCodexShim(arguments []string) int {
 	if os.Getenv("DIFFERENTIAL_CONTINUATION_PHASE") == "resume-compact" {
 		endpoint.Path += "/compact"
 	}
+	if scenario := os.Getenv("DIFFERENTIAL_GEMINI_COMPACT"); scenario != "" {
+		if !geminiCompactCase04384(scenario) {
+			return shimFailure("unknown Gemini Compact fixture")
+		}
+		requestBody = []byte(geminiCompactInput04384(scenario))
+		if scenario != "compact-control-responses" {
+			endpoint.Path += "/compact"
+		}
+	}
 	if strings.HasPrefix(os.Getenv("DIFFERENTIAL_CONTINUATION_PHASE"), "resume-models") {
 		endpoint.Path = strings.TrimSuffix(endpoint.Path, "/responses") + "/models"
 		if os.Getenv("DIFFERENTIAL_CONTINUATION_PHASE") == "resume-models-single" {

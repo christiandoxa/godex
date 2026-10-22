@@ -419,6 +419,14 @@ Error bodies retained for that decision are capped at 8 MiB, and a final non-ret
 response keeps its status, headers, trailers, and body. Compact HTTP errors use
 the same retry boundary before `gateway/compact` produces its bounded local
 fallback; transport errors and invalid summaries go directly to that fallback.
+API-key Compact reuses the private Chat request preparation boundary, then reads
+raw upstream JSON under its own 4 MiB limit. Its summary projector follows the
+tagged OpenAI/Responses/Gemini/output_text precedence and trace-gated envelope
+rule; ordinary Responses retain their separate response normalization. Model
+selection stays in `usecase/routing`; the gateway preserves each selected model.
+The routing use case rebuilds a degraded Compact response from the original
+request, retaining its public model/body and the classified fallback reason.
+Compact continuation/ownership qualification remains separately incomplete.
 The API-key chat-compatible gateway caps the complete successful buffered body
 at 4 MiB before native-response normalization. Read/parse/translation failures
 produce the exact local plain HTTP 502 and the existing terminal precommit code.

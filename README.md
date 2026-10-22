@@ -264,8 +264,9 @@ Key precedence is `--api-key`, `GEMINI_API_KEYS`, `GOOGLE_API_KEYS`,
 or newline separators. The defaults are model `auto` and
 `https://generativelanguage.googleapis.com/v1beta`; `--base-url` may override
 the endpoint. Responses are translated to Gemini's OpenAI-compatible Chat
-endpoint with model fallback and buffered/SSE response mapping. Compact attempts
-semantic summarization and returns the bounded local fallback when that fails.
+endpoint with model fallback and buffered/SSE response mapping. Compact uses
+the same endpoint for semantic summarization and returns a bounded local fallback
+based on the original request when that fails.
 For Responses, only structured Gemini quota/rate 429s advance the model chain;
 other 429 responses retain their original status and body.
 Messages and Embeddings pass through to their requested paths. Raw API keys stay

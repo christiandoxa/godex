@@ -25,8 +25,11 @@ const (
 )
 
 func (transport *RuntimeTransport) executeCompact(ctx context.Context, input proxymodel.Request) (*proxymodel.Response, error) {
+	if transport.chatCompatible {
+		return transport.executeChatCompatibleCompact04384(ctx, input)
+	}
 	original := input.Body
-	body, err := semanticCompactRequest(input.Body)
+	body, err := semanticCompactRequest(input.Body, compactModel)
 	if err != nil {
 		return compactgateway.LocalFallback(original, "gemini", "invalid-request")
 	}
@@ -51,7 +54,7 @@ func (transport *RuntimeTransport) executeCompact(ctx context.Context, input pro
 	return compactgateway.Semantic(summary, "gemini")
 }
 
-func semanticCompactRequest(body []byte) ([]byte, error) {
+func semanticCompactRequest(body []byte, model string) ([]byte, error) {
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.UseNumber()
 	var value map[string]any
@@ -67,7 +70,7 @@ func semanticCompactRequest(body []byte) ([]byte, error) {
 	}})
 	value["input"] = input
 	value["instructions"] = compactInstructions
-	value["model"] = compactModel
+	value["model"] = model
 	value["stream"] = false
 	value["store"] = false
 	value["parallel_tool_calls"] = false
@@ -80,32 +83,6 @@ func semanticCompactRequest(body []byte) ([]byte, error) {
 		return nil, errors.New("failed to serialize Gemini compact request")
 	}
 	return encoded, nil
-}
-
-func compactSummary(body []byte) string {
-	var response map[string]any
-	if json.Unmarshal(body, &response) != nil {
-		return ""
-	}
-	output, _ := response["output"].([]any)
-	var text []string
-	for _, raw := range output {
-		item, _ := raw.(map[string]any)
-		if item["type"] != "message" {
-			continue
-		}
-		content, _ := item["content"].([]any)
-		for _, rawPart := range content {
-			part, _ := rawPart.(map[string]any)
-			if kind, _ := part["type"].(string); kind != "output_text" && kind != "input_text" {
-				continue
-			}
-			if value, ok := part["text"].(string); ok && strings.TrimSpace(value) != "" {
-				text = append(text, strings.TrimSpace(value))
-			}
-		}
-	}
-	return strings.Join(text, "\n")
 }
 
 func semanticCompactContinuationSummary(semantic string, body []byte) string {

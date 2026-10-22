@@ -34,10 +34,13 @@ func (router *Router) executeGeminiModelFallback(
 			return nil, errors.New("Gemini runtime returned no response")
 		}
 		if !compact || response.StatusCode >= http.StatusOK && response.StatusCode < http.StatusMultipleChoices {
+			if compact {
+				return router.restoreGeminiCompactFallback04384(request.Body, response)
+			}
 			return response, nil
 		}
 		closeResponse(response)
-		return router.localGeminiCompactFallback(request.Body)
+		return router.localGeminiCompactFallback(request.Body, "provider-error")
 	}
 	for index, model := range models {
 		attempt := request
@@ -57,6 +60,9 @@ func (router *Router) executeGeminiModelFallback(
 			return nil, errors.New("Gemini runtime returned no response")
 		}
 		if response.StatusCode >= http.StatusOK && response.StatusCode < http.StatusMultipleChoices {
+			if compact {
+				return router.restoreGeminiCompactFallback04384(request.Body, response)
+			}
 			return response, nil
 		}
 		if !compact && response.StatusCode < http.StatusBadRequest {
@@ -66,7 +72,7 @@ func (router *Router) executeGeminiModelFallback(
 			retry, err := retryGeminiModelResponse(response)
 			if err != nil {
 				if compact {
-					return router.localGeminiCompactFallback(request.Body)
+					return router.localGeminiCompactFallback(request.Body, "provider-error")
 				}
 				return nil, err
 			}
@@ -77,7 +83,7 @@ func (router *Router) executeGeminiModelFallback(
 		}
 		if compact {
 			closeResponse(response)
-			return router.localGeminiCompactFallback(request.Body)
+			return router.localGeminiCompactFallback(request.Body, "provider-error")
 		}
 		return response, nil
 	}
@@ -107,14 +113,23 @@ func geminiModelFallbacks(request proxymodel.Request) ([]string, map[string]json
 	return providerentity.ModelFallbackChain("gemini", model), fields, compact, true
 }
 
-func (router *Router) localGeminiCompactFallback(body []byte) (*proxymodel.Response, error) {
+func (router *Router) restoreGeminiCompactFallback04384(body []byte, response *proxymodel.Response) (*proxymodel.Response, error) {
+	if response.Header.Get("X-Prodex-Compact-Mode") != "local-fallback" {
+		return response, nil
+	}
+	reason := response.Header.Get("X-Prodex-Compact-Reason")
+	closeResponse(response)
+	return router.localGeminiCompactFallback(body, reason)
+}
+
+func (router *Router) localGeminiCompactFallback(body []byte, reason string) (*proxymodel.Response, error) {
 	fallback, ok := router.gateway.(interface {
 		LocalCompactFallback([]byte, string) (*proxymodel.Response, error)
 	})
 	if !ok {
 		return nil, errors.New("Gemini compact fallback is unavailable")
 	}
-	return fallback.LocalCompactFallback(body, "upstream-error")
+	return fallback.LocalCompactFallback(body, reason)
 }
 
 func withModel(fields map[string]json.RawMessage, model string) ([]byte, error) {

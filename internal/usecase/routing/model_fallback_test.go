@@ -21,6 +21,7 @@ type modelFallbackGateway struct {
 	models         []string
 	fallbackReason string
 	fallbackBody   string
+	header         http.Header
 }
 
 func (gateway *modelFallbackGateway) Execute(
@@ -38,7 +39,7 @@ func (gateway *modelFallbackGateway) Execute(
 	result := gateway.results[len(gateway.models)-1]
 	return &proxymodel.Response{
 		StatusCode: result.status,
-		Header:     make(http.Header),
+		Header:     gateway.header.Clone(),
 		Body:       io.NopCloser(strings.NewReader(result.body)),
 	}, nil
 }
@@ -136,8 +137,29 @@ func TestGeminiModelFallbackRetriesOnlyBeforeResponseCommit(t *testing.T) {
 			if string(body) != fixture.wantBody {
 				t.Fatalf("response body length=%d, want %d", len(body), len(fixture.wantBody))
 			}
-			if fixture.fallback && (gateway.fallbackReason != "upstream-error" || gateway.fallbackBody != `{"model":"auto","input":"hello"}`) {
+			if fixture.fallback && (gateway.fallbackReason != "provider-error" || gateway.fallbackBody != `{"model":"auto","input":"hello"}`) {
 				t.Fatalf("compact fallback reason=%q body=%q", gateway.fallbackReason, gateway.fallbackBody)
+			}
+		})
+	}
+}
+
+func TestProdex04384GeminiCompactFallbackPreservesOriginalRequest(t *testing.T) {
+	for _, reason := range []string{"invalid-response", "provider-error"} {
+		t.Run(reason, func(t *testing.T) {
+			original := `{"model":"gemini-3.1-pro-preview","input":[]}`
+			gateway := &modelFallbackGateway{results: []modelFallbackResult{{200, "selected-model fallback"}},
+				header: http.Header{"X-Prodex-Compact-Mode": {"local-fallback"}, "X-Prodex-Compact-Reason": {reason}}}
+			router := &Router{gateway: gateway}
+			response, err := router.execute(t.Context(), proxymodel.Request{Path: "/backend-api/godex/responses/compact", Body: []byte(original)},
+				proxymodel.Account{Provider: proxymodel.Provider{Kind: "gemini"}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer response.Body.Close()
+			body, err := io.ReadAll(response.Body)
+			if err != nil || string(body) != "local fallback" || response.StatusCode != 200 || gateway.fallbackBody != original || gateway.fallbackReason != reason || strings.Join(gateway.models, ",") != "gemini-3.8-flash" {
+				t.Fatal("Compact fallback lost original model/body or reason after model selection")
 			}
 		})
 	}

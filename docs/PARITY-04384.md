@@ -8340,3 +8340,76 @@ No broader matrix or new full DeepSeek gate is attributed to this revision.
 Global 1:1 parity, broader media/tool combinations, Gemini Compact, executable
 session/turn continuation, native macOS/Windows and live authentication remain
 unproven.
+
+## Gemini API-key Compact transport, raw summaries and original fallback
+
+Pinned local_rewrite_gemini_compact.rs:58-264 sends semantic Compact through
+send_runtime_gemini_upstream_request. API keys use the Chat bridge, while Compact
+reads the raw response rather than the ordinary Responses normalization.
+rich_fallback.mojo:311 selects the compressed-model chain before each attempt.
+gemini_compact_rewrite.mojo:184-345 prefers first OpenAI choice content, then
+Responses messages, first Gemini candidate without thought:true, and output_text.
+A response envelope unwraps only with an object response and string traceId.
+core_constants.rs:132 bounds the body at 4 MiB. Empty/invalid summaries and request
+rewrite failures use invalid-response; HTTP-model exhaustion and oversized bodies
+use provider-error. Fallback body/header construction uses the original request.
+
+Sixteen executable baselines pin clean old production
+03750e3176cef7b2cccc4ea71a7c064d0a66a2f6 and the unchanged official 0.438.4
+source/binary/manifest. Fifteen FAIL only Godex; one normal Responses control PASSes.
+All reference, independent mutation and durable-state assertions pass. Reports:
+/tmp/gdx-04384-gemini-compact-<suffix>-before-oracle.json; command arrays:
+/tmp/gdx-04384-gemini-compact-before-commands.json and
+/tmp/gdx-04384-gemini-compact-corrected-before-commands.json. Aggregate:
+/tmp/gdx-04384-gemini-compact-before-audit.json. Two original wrong-expectation
+reports remain unqualified FAIL: the HTTP 500 case actually tries all four
+compression models, and the normal Responses control needed a fixed synthetic
+response ID. Corrected unchanged-product reruns retain exact scope separately.
+
+Final gateway/routing regressions copied alone to the old source in
+/tmp/gdx-04384-gemini-compact-before-work FAIL 19 tests including parents, with
+six controls PASS:
+`rtk proxy go test -json ./internal/gateway/gemini ./internal/usecase/routing -run 'Test(Prodex04384GeminiAPIKeyCompactUsesRawChatPipeline|GeminiModelFallbackRetriesOnlyBeforeResponseCommit|Prodex04384GeminiCompactFallbackPreservesOriginalRequest)$' -count=1`.
+Log: /tmp/gdx-04384-gemini-compact-final-before.jsonl. After repair,
+`rtk go test ./internal/gateway/gemini ./internal/usecase/routing -run 'Test(Prodex04384GeminiAPIKeyCompactUsesRawChatPipeline|GeminiModelFallbackRetriesOnlyBeforeResponseCommit|Prodex04384GeminiCompactFallbackPreservesOriginalRequest)$' -count=1`
+PASSes 25. Cases require exact request/response bytes, selected model, raw summary,
+removed query, headers, body bounds, one dispatch and original fallback ownership.
+A separate classifier table covers error-category priority without network sleeps.
+
+Private gateway/gemini files own API-key Compact sending and raw summary parsing.
+The request preparation extraction is the separate mechanical commit d948365;
+ordinary Responses keep their exact terminal error and response contracts. The
+API-key path shares preparation but never passes raw Chat summaries through the
+ordinary native-response normalizer. Native GenerateContent keeps its independent
+transport path. usecase/routing retains bounded model retry and regenerates local
+fallback with the original public request and unchanged classified reason. The
+existing local Compact formatter/serde writer is reused. No new dependency,
+exported API, shared helper package, option, goroutine or durable format is added.
+
+`rtk proxy go test -json ./...` PASSes 10,662 tests in 71 packages; ten packages
+have no tests and 18 optional installed-Codex/executable tests are skipped.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+PASSes 3,841 tests. `rtk proxy make verify` PASSes exit 0. All 294 differential
+self-tests pass. Logs use /tmp/gdx-04384-gemini-compact-. Exact clean executable
+qualification follows. This stage qualifies transport/summary/fallback controls;
+Compact continuation/session/turn ownership cases remain a required next audit.
+No global 1:1 or production-readiness claim is made.
+
+Exact clean 073ad2e independently PASSes all 680 Gemini cases, including every
+prior 655 and published 626, with independent state/mutation checks:
+/tmp/gdx-04384-gemini-mcp-declarations-oracle.json. Primary fast-forwarded and
+pushed it directly to origin/main after fetch/cleanliness/ancestry checks. The
+original 1a87802 full 655-case report remains FAIL due to reference restart replay;
+an unchanged isolated rerun PASS does not relabel it. Later full matrices retain
+their own exact source scopes. No new full DeepSeek/default gate is attributed.
+
+Exact d948365 separately PASSes `rtk proxy make verify` with exit 0 in its clean
+worktree and ten pinned executable request controls (ordinary/SSE, strict JSON,
+nonobject-root errors, metadata, reasoning, format, declarations, choices and MCP).
+Commands: /tmp/gdx-04384-gemini-chat-preparation-targeted-commands.json;
+log /tmp/gdx-04384-gemini-chat-preparation-verify.log. This is a mechanical
+request-preparation qualification, not a new full Gemini/DeepSeek certificate.
+Exact c086278 now independently PASSes all 700 Gemini cases, including all prior
+680, state and mutations: /tmp/gdx-04384-gemini-namespace-declarations-oracle.json.
+Primary fast-forwarded and pushed it directly to origin/main after fetched remote,
+cleanliness and ancestry checks. No broader result is attributed to later code.
