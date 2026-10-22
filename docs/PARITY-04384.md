@@ -9764,3 +9764,21 @@ fetch, clean-primary and ancestry checks, without waiting for CI. Later
 matrix results remain source-scoped; the latest completed full-Gemini
 qualification remains 912 at 9e4b808. Original fixture errors, prior full
 reference state-integrity failures and other unqualified limits stay retained.
+
+### Full Gemini 918 qualifies exact e9d88ce
+
+Original full-matrix session 63259 exits 0. Its retained report
+/tmp/gdx-04384-gemini-stream-object-admission-oracle.json PASSes all 918
+unique cases at exact clean e9d88ce35fbe4bf1f6dcabbb3f7869b1f0106642,
+including every case from the previous full912 report. Audit:
+/tmp/gdx-04384-gemini-stream-object-admission-full-audit.json. Pinned reference
+source/binary/manifest, immutable source and both artifacts' SHA-256 and embedded
+clean VCS metadata were checked. Every original independent fixture invariant,
+per-case comparison, state guard and matching-corruption control PASSes. This
+is the latest completed full-Gemini qualification only at that revision.
+Full924/934/940/943/948/968/974 and the e9d88ce entire default release gate
+remain pending on their original sources and handles. Its separately qualified
+DeepSeek224 phase is unchanged. Older b80d capture failures, full844/847/874
+reference state-integrity failures and the initial failed-text fixture errors
+remain retained; a later PASS does not explain or erase them. Global 1:1
+parity remains unproven.
