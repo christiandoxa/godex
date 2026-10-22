@@ -381,8 +381,13 @@ Gemini raw-key runtime follows the same routing boundary. `gateway/gemini` owns
 the API-key pool, Gemini OpenAI-compatible URL/auth behavior, and Responses
 request and buffered/SSE response translation. `usecase/routing` selects the
 bounded Gemini model chain and decides whether an uncommitted error permits the
-next model; `entity/provider` supplies the chain and error classification. Error
-bodies retained for that decision are capped at 8 MiB, and a final non-retryable
+next model; `entity/provider` supplies the chain and error classification.
+Before substituting a Responses model, the routing use case reuses the existing
+stateless serde boundary/number checks on the original body. Invalid values
+stay unchanged for terminal admission by the concrete gateway. Valid non-string
+model values use the tagged default chain, matching selection before protocol
+shape validation; this does not change Compact selection or gateway ownership.
+Error bodies retained for that decision are capped at 8 MiB, and a final non-retryable
 response keeps its status, headers, trailers, and body. Compact HTTP errors use
 the same retry boundary before `gateway/compact` produces its bounded local
 fallback; transport errors and invalid summaries go directly to that fallback.

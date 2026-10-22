@@ -5425,3 +5425,92 @@ The full 174-case Gemini/169-case DeepSeek matrices are pending:
 The source-pin worktrees remain clean and unchanged while these execute.
 The complete default-gate PASS remains scoped to `293b1b6`.
 Global 1:1 parity is not claimed.
+
+
+## Validated stop-control checkpoint: ffca69a
+
+Clean `ffca69a56287e082b076f4ba52711a95af8e9a29` passes all 146 Gemini cases
+and all 169 DeepSeek scenarios, including independent mutation controls:
+`/tmp/gdx-04384-request-stop-gemini-oracle.json` and
+`/tmp/gdx-04384-request-stop-deepseek-clock-oracle.json`.
+The DeepSeek report uses the explicitly qualified completion-time oracle
+repair described above; its original timestamp-window FAIL is retained.
+The preceding `f4bf577` 133-case Gemini reference-state FAIL and strict isolated
+PASS also remain separate evidence, not a retrospectively successful matrix.
+The broader clean stop candidate includes and passes all those request and
+continuation scenarios. The product binaries and candidate-source pins remain
+exact and unchanged throughout qualification.
+
+The clean stop binaries were built with
+`rtk go build -trimpath -o /tmp/gdx-04384-request-stop-godex ./cmd/godex` and
+`rtk go build -trimpath -o /tmp/gdx-04384-request-stop-final-differential ./tools/differential`.
+The targeted empty-array Gemini and shadow-null DeepSeek reports also PASS:
+`/tmp/gdx-04384-request-gemini-stop-empty-array-targeted-oracle.json` and
+`/tmp/gdx-04384-request-deepseek-stop-shadow-null-targeted-oracle.json`.
+The clean primary worktree and unchanged remote were checked and fast-forwarded;
+commits `f4bf577` and `ffca69a` were pushed directly to `origin/main` without
+waiting for CI. No force push, tag, release or editor-checkout change occurred.
+Clean `0ad214c` also passes its complete 169-case DeepSeek matrix with the
+committed repaired oracle:
+`/tmp/gdx-04384-gemini-ignored-sampling-deepseek-oracle.json`.
+Its 174-case Gemini invocation remains pending. The complete default-script
+PASS remains scoped to `293b1b6`; global 1:1 parity is not claimed.
+
+
+## Gemini model selection precedes shape admission without repairing invalid JSON
+
+The pinned `fallback/body.rs` reads a model through serde Value `as_str` and
+filters blank strings. The runtime then substitutes the selected fallback model
+before the chat-compatible adapter validates model shape. Thus a valid
+non-string model is treated as absent and uses the default chain. That same
+substitution first requires parsing the complete original serde Value; failed
+parses return the original body unchanged, which the adapter rejects terminally.
+
+Godex instead skipped model fallback for non-string values. Five executable
+cases reached the provider with an empty model instead of the tagged default.
+Malformed surrogate/UTF-8 strings had the opposite problem: Go replaced their
+invalid text before model substitution and the gateway saw a valid new request.
+The routing use case now defaults valid non-string models and checks whether
+the whole original body is safe to rewrite using existing stateless
+`helper/jsonutil` boundary and numeric-token checks. Invalid bodies reach the
+existing concrete-gateway terminal admission unchanged. Model selection remains
+in `usecase/routing`; protocol errors remain in `gateway/gemini`. Compact policy,
+account selection and continuation ownership are unchanged. There is no new
+helper API, package, interface, dependency, config, worker or persisted format.
+
+Before repair six controls pass and nine tests fail, including two parents:
+`rtk go test ./internal/usecase/routing -run '^TestProdex04384GeminiModel(TypesUseDefaultBeforeGateway|RewritePreservesInvalidSerdeInput)$' -count=1`;
+`/tmp/gdx-04384-gemini-model-input-before.log`.
+The same command passes all 15 tests after repair:
+`/tmp/gdx-04384-gemini-model-input-focused.log`.
+The regressions require one selected default-model invocation and prevent
+malformed original Unicode/numbers from becoming eligible for model repair.
+
+Eleven executable baselines pin clean
+`0ad214cb731dae535f330e530accb2eb6c2ec028` and the unchanged reference:
+`/tmp/gdx-04384-gemini-control-model-<suffix>-before-oracle.json`.
+Null, empty/blank string and overflow controls PASS. Five non-string model
+cases and two malformed-Unicode cases FAIL only Godex. All reference and
+independent corruption invariants pass. The first ten use
+`/tmp/gdx-04384-gemini-model-input-differential`; the added raw-UTF-8 case uses
+`/tmp/gdx-04384-gemini-model-input-qualified-differential`.
+The existing control-type fixture family now builds an original model member
+without a duplicate key, checks the exact selected upstream model, and retains
+status/body/type/stdout/exit, authenticated original request, attempts and safe
+state. Invalid original serde must return plain 502, exit 2 and zero attempts.
+
+`rtk go test ./tools/differential -count=1` passes 280 tests before and after
+the raw-UTF-8 fixture addition:
+`/tmp/gdx-04384-gemini-model-input-oracle-tests.log` and
+`/tmp/gdx-04384-gemini-model-input-qualified-oracle-tests.log`.
+`rtk proxy go test -json ./...` passes 9,673 tests across 81 packages
+(71 passing packages and ten with no tests):
+`/tmp/gdx-04384-gemini-model-input-test-all.jsonl`.
+`rtk go test -race ./internal/usecase/routing ./internal/gateway/gemini ./internal/helper/jsonutil ./tools/differential -count=1`
+passes 3,053 tests: `/tmp/gdx-04384-gemini-model-input-race.log`.
+`rtk proxy make verify` passes the complete local gate:
+`/tmp/gdx-04384-gemini-model-input-verify.log`.
+Clean-commit 185-case Gemini and 169-case DeepSeek matrices follow.
+Other controls, combined-error ordering, Gemini Compact, executable session/
+turn continuation, native macOS/Windows and live authentication remain open.
+Global 1:1 parity is not claimed.

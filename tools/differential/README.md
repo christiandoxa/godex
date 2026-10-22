@@ -239,6 +239,14 @@ The existing strict accepted/preparation-failure fixture contracts are reused,
 including body/type/status/exit/stdout, credential, raw request and safe state.
 Matching corruptions cannot turn an invalid control into fresh work.
 
+The same `request-control-model-*` family requires the selected default model
+for null, number, boolean, array, object, empty/blank string and unsigned-limit
+values. The pinned pipeline substitutes its selected model before adapter
+shape validation. A malformed surrogate, raw invalid UTF-8 or numeric overflow
+must instead remain a terminal plain 502 with zero attempts; model substitution
+cannot repair an invalid original serde body. These cases retain the existing
+exact request/response/state and independent corruption checks.
+
 Gemini `request-ignored-<field>-<kind>` cases cover `presence_penalty`,
 `frequency_penalty`, `seed` and `n` with true, false, null, number, string,
 array and object values. Every case requires one exact original authenticated

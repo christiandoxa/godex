@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	providerentity "github.com/christiandoxa/godex/internal/entity/provider"
+	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
@@ -94,9 +95,13 @@ func geminiModelFallbacks(request proxymodel.Request) ([]string, map[string]json
 	}
 	model := "chat-compression-default"
 	if !compact {
+		if jsonutil.CheckSerdeBoundary(string(request.Body)) != nil || !jsonutil.CheckSerdeNumberTokens(request.Body) {
+			return nil, nil, false, false
+		}
 		model = ""
 		if raw, exists := fields["model"]; exists && json.Unmarshal(raw, &model) != nil {
-			return nil, nil, false, false
+			// The tagged selector treats non-string models as absent.
+			model = ""
 		}
 	}
 	return providerentity.ModelFallbackChain("gemini", model), fields, compact, true

@@ -1,5 +1,10 @@
 package main
 
+func geminiControlTypeSuffixes04384() []string {
+	return []string{"stream-false", "stream-null", "stream-string", "stream-number", "instructions-null", "instructions-array", "previous-null", "previous-array", "previous-number",
+		"model-null", "model-number", "model-bool", "model-array", "model-object", "model-empty", "model-blank", "model-u64", "model-surrogate", "model-utf8", "model-overflow"}
+}
+
 func geminiControlTypeCase04384(scenario string) (field, value string, reject, known bool) {
 	switch scenario {
 	case "request-control-stream-false":
@@ -20,12 +25,37 @@ func geminiControlTypeCase04384(scenario string) (field, value string, reject, k
 		return "previous_response_id", "[]", true, true
 	case "request-control-previous-number":
 		return "previous_response_id", "7", true, true
+	case "request-control-model-null":
+		return "model", "null", false, true
+	case "request-control-model-number":
+		return "model", "7", false, true
+	case "request-control-model-bool":
+		return "model", "false", false, true
+	case "request-control-model-array":
+		return "model", "[]", false, true
+	case "request-control-model-object":
+		return "model", "{}", false, true
+	case "request-control-model-empty":
+		return "model", `""`, false, true
+	case "request-control-model-blank":
+		return "model", `" \t "`, false, true
+	case "request-control-model-u64":
+		return "model", "18446744073709551615", false, true
+	case "request-control-model-surrogate":
+		return "model", `"\ud800"`, true, true
+	case "request-control-model-utf8":
+		return "model", "\"\xff\"", true, true
+	case "request-control-model-overflow":
+		return "model", "1e309", true, true
 	}
 	return "", "", false, false
 }
 
 func geminiControlTypeInput04384(scenario string) []byte {
 	field, value, _, _ := geminiControlTypeCase04384(scenario)
+	if field == "model" {
+		return []byte(`{"input":"same request","model":` + value + `}`)
+	}
 	return []byte(`{"model":"gemini-3.1-pro-preview","input":"same request","` + field + `":` + value + `}`)
 }
 
@@ -38,7 +68,7 @@ func geminiControlTypeExpectation04384(scenario string) string {
 }
 
 func geminiControlTypeNegativeControl04384() bool {
-	for _, suffix := range []string{"stream-false", "stream-null", "stream-string", "stream-number", "instructions-null", "instructions-array", "previous-null", "previous-array", "previous-number"} {
+	for _, suffix := range geminiControlTypeSuffixes04384() {
 		scenario := "request-control-" + suffix
 		run := geminiUserIDExpected04384(geminiControlTypeExpectation04384(scenario))
 		if len(geminiCompare(scenario, run, run)) != 0 {

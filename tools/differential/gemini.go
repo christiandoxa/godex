@@ -238,8 +238,6 @@ func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit, selec
 	cases := []string{
 		"request-json-valid-unicode", "request-json-root-null", "request-json-root-null-rotation", "request-json-root-array", "request-json-root-number", "request-json-root-boolean", "request-json-root-string", "request-json-syntax",
 		"request-json-trailing", "request-json-surrogate", "request-json-utf8", "request-json-overflow", "request-json-depth",
-		"request-control-stream-false", "request-control-stream-null", "request-control-stream-string", "request-control-stream-number",
-		"request-control-instructions-null", "request-control-instructions-array", "request-control-previous-null", "request-control-previous-array", "request-control-previous-number",
 		"request-user-id-absent", "request-user-id-canonical", "request-user-id-user-alias", "request-user-id-safety-alias", "request-user-id-blank",
 		"request-user-id-trim-limit", "request-user-id-null", "request-user-id-number", "request-user-id-over-limit", "request-user-id-invalid-character",
 		"request-user-id-number-rotation",
@@ -310,6 +308,9 @@ func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit, selec
 		cases = append(cases, "request-primitive-"+suffix)
 	}
 	cases = append(cases, geminiIgnoredControlCases04384()...)
+	for _, suffix := range geminiControlTypeSuffixes04384() {
+		cases = append(cases, "request-control-"+suffix)
+	}
 	if selected != "all" {
 		if !slices.Contains(cases, selected) {
 			return fmt.Errorf("unknown Gemini scenario %q", selected)
