@@ -10142,3 +10142,24 @@ build. Exact commands:
 `rtk proxy go test -json ./... > /tmp/gdx-04384-deepseek-message-arguments-full.jsonl 2>&1`
 and `rtk proxy make verify > /tmp/gdx-04384-deepseek-message-arguments-verify.log 2>&1`.
 Exact clean executable qualification follows before publication.
+
+### Exact embedded-message argument qualification
+
+Exact clean 516505882029e60373f316c04cec9802c004bff3 PASSes all 19 executable
+cases (original session 14664, exit 0): all fifteen baseline cases plus prior
+tool, paired SSE, numeric-pending and inline-history controls. Both original
+Godex-only failures now satisfy the original independent invariants. Audit:
+/tmp/gdx-04384-deepseek-message-arguments-targeted-audit.json. Pinned source,
+reference and clean artifacts, original requests, message identities/content,
+argument absence/null, responses/stdout/status, attempts/auth/slots, state and
+matching-corruption guards were checked. Exact command:
+`rtk proxy python3 /tmp/gdx-04384-deepseek-message-arguments-targeted.py > /tmp/gdx-04384-deepseek-message-arguments-targeted.log 2>&1`.
+
+The complete DeepSeek282 matrix is running in original session 90654 against
+that immutable source. Retained command:
+/tmp/gdx-04384-deepseek-message-arguments-full-command.json. Report:
+/tmp/gdx-04384-deepseek-message-arguments-oracle.json. It is not claimed PASS.
+The prior full273 and the separate a05e1cbc entire default gate remain pending.
+Latest completed qualifications remain exact full236 and full943; the entire
+default gate last qualified remains e9d88ce. Normal embedded-call projection
+still needs executable qualification. Overall 1:1 parity remains unproven.
