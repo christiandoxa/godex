@@ -10359,3 +10359,39 @@ Exact commands:
 `rtk proxy go test -json ./... > /tmp/gdx-04384-deepseek-message-text-full.jsonl 2>&1`
 and `rtk proxy make verify > /tmp/gdx-04384-deepseek-message-text-verify.log 2>&1`.
 Exact clean combined executable qualification follows before publication.
+
+### Exact combined message/output qualification and current gate
+
+Exact clean ecd6a6eb918303f40211c371801dcede7260aba2 PASSes all 53 executable
+cases (original session 19327, exit 0): both complete before-fix matrices, all
+sixteen history cases and tool/paired-SSE controls. Every original Godex-only
+request failure now satisfies the unchanged independent invariants. Original
+candidate requests also match retained baseline reference bytes. Empty-only
+and alias fallback, raw MCP types, source/reference/artifact pins, responses,
+stdout/status, attempts/events/auth/slots, durable state and corruption guards
+were checked. Audit: /tmp/gdx-04384-deepseek-message-text-targeted-audit.json.
+Exact command:
+`rtk proxy python3 /tmp/gdx-04384-deepseek-message-text-targeted.py > /tmp/gdx-04384-deepseek-message-text-targeted.log 2>&1`.
+This combined qualification closes the confirmed blank regression before
+publishing the held output correction and the message-view correction.
+
+Full DeepSeek282 also PASSes at exact clean
+516505882029e60373f316c04cec9802c004bff3 (original session 90654, exit 0),
+including every prior273 scenario and the previous qualified236 scope.
+Audit: /tmp/gdx-04384-deepseek-message-arguments-full-audit.json. Specialized
+raw-key/restart/recovery shapes, all original independent invariants and
+matching-corruption guards, per-run source/hash pins and clean artifacts were
+checked; no per-case/state errors remain in this run. This does not erase or
+explain the retained full273/full968 failures. It qualifies only 5165058;
+newer output/message corrections are qualified by the exact 53 cases above.
+
+The entire default release gate now runs in original session 92269 against
+immutable ecd6a6e, without a phase option. Exact nested command:
+`rtk proxy scripts/verify-release-parity.sh`. Log:
+/tmp/gdx-04384-release-ecd6a6e.log. Its registry includes DeepSeek321/Gemini974;
+no new full phase or this whole gate is claimed PASS, and no redundant
+standalone full306/321 run was started. Earlier a05e1cbc/a0b94af default gates
+and full Gemini974 retain their original handles and immutable sources.
+Latest qualified complete default gate remains e9d88ce; latest qualified full
+Gemini remains948/d670339 and full DeepSeek is282/5165058. Overall 1:1 remains
+unproven, including broader normal message-content shapes and live auth.
