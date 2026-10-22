@@ -30,6 +30,11 @@ func TestProdex04380DeepSeekInvalidInputIsTerminalBeforeUpstream(t *testing.T) {
 		{"empty-tool-name", `{"input":[{"type":"function_call","call_id":"call-fixture","name":"","function":{"name":"lookup"}}]}`},
 		{"invalid-shell-action", `{"input":[{"type":"local_shell_call","call_id":"call-fixture","action":{"command":[]},"command":"fallback"}]}`},
 		{"blank-shell-id", `{"input":[{"type":"local_shell_call","call_id":"  ","action":{"command":["echo","ok"]}}]}`},
+		{"zero-token-limit", `{"input":"same request","max_tokens":0}`},
+		{"overflow-token-limit", `{"input":"same request","max_tokens":18446744073709551616}`},
+		{"shadow-null-token-limit", `{"input":"same request","max_output_tokens":null,"max_completion_tokens":31}`},
+		{"shadow-zero-token-limit", `{"input":"same request","max_tokens":0,"max_completion_tokens":31}`},
+		{"shadow-fraction-token-limit", `{"input":"same request","max_output_tokens":1.0,"max_completion_tokens":31}`},
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
 			calls.Store(0)

@@ -4124,6 +4124,52 @@ and their focused regression/local completion evidence are the next stage;
 these fixtures alone do not claim repaired executable parity.
 
 
+## Primitive token-limit repair in the concrete gateways
+
+The Gemini gateway now validates all three maximum-token aliases as positive
+serde integer values through uint64 maximum and reduces them to canonical
+`max_tokens` before the shared Chat converter runs. Its private normalizer
+stays in `gateway/gemini`. DeepSeek's owning `copyMaxTokenField` validates every
+present alias in tagged order, retains unsigned 64-bit values and gives the
+completion alias highest priority. Invalid token input uses the existing
+`invalidResponsesInputError`, so transport presents the exact terminal 502
+instead of an ordinary 400 that can enter routing recovery. The unrelated
+web-search integer helper keeps its existing separate contract.
+
+DeepSeek's obsolete parallel-field copier is removed: validated true remains
+tolerated but never reaches upstream. The advanced-control test now asserts
+absence instead of preserving its old incorrect expectation; all other
+advanced-control assertions remain. There is no alternate implementation,
+cross-gateway import, new production shared helper/package/interface, exported
+identifier, dependency, configuration, persistent format or worker. Each
+integration owns its protocol normalization and terminal error presentation.
+
+Before repair,
+`rtk go test ./internal/gateway/deepseek ./internal/gateway/gemini -run '^TestProdex04384(DeepSeekTokenLimitPrecedenceAndAdmission|GeminiTokenLimitPrecedenceAndAdmission|DeepSeekParallelTrueIsIgnored)$' -count=1`
+passes 13 controls and fails 16 tests including parents:
+`/tmp/gdx-04384-request-token-limits-before.log`.
+After only the value/precedence repair, the expanded terminal-error test still
+fails five invalid token cases plus parent while its eight older controls pass:
+`rtk go test ./internal/gateway/deepseek -run '^TestProdex04380DeepSeekInvalidInputIsTerminalBeforeUpstream$' -count=1`;
+`/tmp/gdx-04384-request-token-limits-deepseek-terminal-before.log`.
+This catches the entire transport error path rather than merely a parser result.
+After error mapping, the focused command passes 44 tests across both gateways:
+`rtk go test ./internal/gateway/deepseek ./internal/gateway/gemini -run '^Test(Prodex04384(DeepSeekTokenLimitPrecedenceAndAdmission|GeminiTokenLimitPrecedenceAndAdmission|DeepSeekParallelTrueIsIgnored)|DeepSeekResponsesRequestMapsAdvancedControls|Prodex04380DeepSeekInvalidInputIsTerminalBeforeUpstream)$' -count=1`;
+`/tmp/gdx-04384-request-token-limits-reviewed-focused.log`.
+
+`rtk go test -race ./internal/gateway/deepseek ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+passes 3,562 tests: `/tmp/gdx-04384-request-token-limits-race.log`.
+`rtk proxy go test -json ./...` passes 9,522 tests across 81 packages:
+`/tmp/gdx-04384-request-token-limits-test-all.jsonl`.
+`rtk proxy make verify` passes all local completion gates:
+`/tmp/gdx-04384-request-token-limits-verify.log`.
+The preceding oracle-only commit and this gateway repair are separate useful,
+compiling stages. Clean-commit 111-case Gemini and 134-case DeepSeek executable
+matrices follow before either is pushed. Other primitive fields, combined-error
+ordering, Gemini Compact, session/turn executable continuation, native macOS/
+Windows and live authentication remain open. Global 1:1 parity is not claimed.
+
+
 ## Validated string EOF checkpoint: c1f0e5a
 
 Clean `c1f0e5a45b7705d21d95e6181663da3a9ffa5895` passes all 125 DeepSeek

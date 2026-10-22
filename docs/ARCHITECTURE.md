@@ -418,6 +418,14 @@ JSON root produces an empty 500 with no content type. The latter response
 carries local non-retryable precommit evidence, so a status normally associated
 with provider failure cannot trigger model or credential attempts. Neither
 outcome needs an upstream call, panic or persistence-format change.
+DeepSeek and Gemini validate every present maximum-token alias before selecting
+one. The canonical outbound `max_tokens` uses `max_completion_tokens`, then
+`max_tokens`, then `max_output_tokens`; all must be positive serde integer
+values through uint64 maximum. An invalid lower-priority alias cannot hide
+behind a valid winner. Each concrete gateway owns its protocol normalization
+and existing terminal preparation-error mapping; no cross-gateway dependency
+or generic shared policy helper is introduced. DeepSeek tolerates true
+`parallel_tool_calls` on input but omits that ignored field on the provider wire.
 `gateway/gemini` reuses `gateway/chatcompat` for shared message/history
 and Chat response conversion, while Gemini-specific reasoning, metadata, tool
 shapes, and thought signatures stay in the Gemini gateway. Native Messages and

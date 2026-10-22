@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -15,7 +16,6 @@ func copyPrimitiveFields(target, source map[string]any) error {
 		copyMaxTokenField,
 		copyLogprobFields,
 		copyStopField,
-		copyParallelToolField,
 		copyUserField,
 	} {
 		if err := copier(target, source); err != nil {
@@ -40,16 +40,17 @@ func copyNumericFields(target, source map[string]any) error {
 }
 
 func copyMaxTokenField(target, source map[string]any) error {
-	for _, key := range []string{"max_completion_tokens", "max_output_tokens", "max_tokens"} {
+	for _, key := range []string{"max_output_tokens", "max_tokens", "max_completion_tokens"} {
 		value, ok := source[key]
 		if !ok {
 			continue
 		}
-		if !positiveInteger(value) {
-			return fmt.Errorf("DeepSeek %s must be a positive integer", key)
+		number, valid := value.(json.Number)
+		count, err := strconv.ParseUint(string(number), 10, 64)
+		if !valid || err != nil || count == 0 {
+			return &invalidResponsesInputError{fmt.Errorf("DeepSeek %s must be a positive integer", key)}
 		}
 		target["max_tokens"] = value
-		return nil
 	}
 	return nil
 }
@@ -87,13 +88,6 @@ func copyStopField(target, source map[string]any) error {
 	}
 	if ok {
 		target["stop"] = stop
-	}
-	return nil
-}
-
-func copyParallelToolField(target, source map[string]any) error {
-	if value, ok := source["parallel_tool_calls"]; ok {
-		target["parallel_tool_calls"] = value
 	}
 	return nil
 }

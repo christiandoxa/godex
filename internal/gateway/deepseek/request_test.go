@@ -30,8 +30,11 @@ func TestDeepSeekResponsesRequestMapsAdvancedControls(t *testing.T) {
 	if got["model"] != "deepseek-chat" || got["stream"] != true || got["temperature"] != 0.2 || got["top_p"] != 0.8 || got["max_tokens"] != float64(512) {
 		t.Fatalf("translated controls = %#v", got)
 	}
-	if got["logprobs"] != true || got["top_logprobs"] != float64(5) || got["parallel_tool_calls"] != true || got["user_id"] != "user_123" {
+	if got["logprobs"] != true || got["top_logprobs"] != float64(5) || got["user_id"] != "user_123" {
 		t.Fatalf("translated optional controls = %#v", got)
+	}
+	if _, present := got["parallel_tool_calls"]; present {
+		t.Fatal("ignored parallel control reached the provider")
 	}
 	if _, present := got["user"]; present {
 		t.Fatalf("translated request must use DeepSeek's user_id field: %#v", got)
