@@ -453,6 +453,10 @@ The same private admission rejects every present top-level `prefix`, `suffix`
 or `prompt`, including null, false and empty values: beta completion requests
 cannot become ordinary Responses work. Earlier candidate/tool errors retain
 their structured 400 precedence; unrelated nested metadata remains unchanged.
+Before adding implicit message types, this adapter rejects nonobject `input`
+array entries and any item with a present `prefix`. These bytes cannot disappear
+inside the shared Chat converter and turn into a different accepted request.
+Item-level `suffix`/`prompt` and nested metadata retain their separate contract.
 DeepSeek independently checks present `stream` as a boolean and present
 `instructions`/`previous_response_id` as strings before constructing its
 translated request. Invalid types use its common terminal preparation boundary,

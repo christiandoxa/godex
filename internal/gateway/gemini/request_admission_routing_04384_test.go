@@ -22,6 +22,8 @@ func TestProdex04384GeminiRequestAdmissionDoesNotRetryModelOrCredential(t *testi
 	}{
 		{"null", "", 500},
 		{"{bad", "upstream request failed", 502},
+		{`{"input":[7,{"role":"user","content":"synthetic"}]}`, "upstream request failed", 502},
+		{`{"input":[{"role":"user","content":"synthetic","prefix":null}]}`, "upstream request failed", 502},
 		{`{"input":"synthetic","prefix":null}`, "upstream request failed", 502},
 		{`{"input":"synthetic","suffix":""}`, "upstream request failed", 502},
 		{`{"input":"synthetic","prompt":false}`, "upstream request failed", 502},

@@ -147,8 +147,8 @@ func normalizeGeminiChatInput043711(body []byte) ([]byte, map[string]any, error)
 	if entries, ok := root["input"].([]any); ok {
 		for _, raw := range entries {
 			item, ok := raw.(map[string]any)
-			if !ok {
-				continue
+			if _, hasPrefix := item["prefix"]; !ok || hasPrefix {
+				return nil, nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 			}
 			if _, hasKind := item["type"]; hasKind {
 				continue

@@ -367,6 +367,13 @@ plain terminal 502 and zero attempts. Controls retain unrelated nested metadata,
 earlier candidate/tool structured 400s and complete serde failure precedence.
 Original request bytes and all existing independent mutations remain checked.
 
+Gemini `request-primitive-input-item-*` rejects nonobject entries before or
+after a valid message, and any present item `prefix`, including null/false on
+messages or function calls. Controls retain ordinary message arrays, ignored
+item metadata, earlier candidate/tool 400s and complete serde failure behavior.
+Plain 502/exit 2/zero-attempt expectations and matching-corruption mutations
+prevent silently dropping an invalid item before sending the remaining input.
+
 DeepSeek scenario workers evaluate their complete independent invariants as
 each scenario finishes, preserving failures in the ordered report. The strict
 five-minute generated SSE timestamp window is unchanged; later cases cannot

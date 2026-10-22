@@ -6180,3 +6180,61 @@ stage exits successfully, including the final HTTP stages after the phase
 marker. Other input/response controls, Gemini Compact, executable session/turn
 continuation, native macOS/Windows and live authentication remain unproven.
 Global 1:1 parity is not claimed.
+
+
+## Gemini input arrays cannot discard invalid entries or beta prefixes
+
+Pinned `deepseek_provider_core_messages_from_responses_request` rejects every
+nonobject array entry. Before examining an object's type, the compiled
+`deepseek_input_item_validation` rejects a present `prefix`, including null or
+false. Gemini API-key translation uses these same validators. Later preparation
+errors become plain terminal 502 before any upstream attempt; candidate/tool
+errors keep their earlier structured 400 boundary.
+
+Godex's shared Chat converter silently discarded nonobject array entries and
+ignored item prefixes. A malformed history could therefore execute using only
+the remaining valid message. The Gemini adapter's existing item-normalization
+loop now rejects either condition before adding implicit message types. This
+is a two-line replacement in the owning concrete gateway. No shared converter
+policy, helper, interface, package, dependency, configuration, worker, exported
+API or persisted format changes. Ordinary message arrays, item suffix/prompt
+fields and nested metadata retain their separate accepted behavior.
+
+The focused command below first FAILs with nine controls passing and 14
+failures, including parents, then PASSes all 23 tests:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384Gemini(InputItemsCannotBeDiscardedOrLosePrefix|RequestAdmissionDoesNotRetryModelOrCredential)$' -count=1`.
+Logs: `/tmp/gdx-04384-gemini-input-items-before.log` and
+`/tmp/gdx-04384-gemini-input-items-focused.log`.
+Existing two-key gateway/router coverage now includes mixed number/message
+arrays and null item prefixes, proving zero upstream work and no retry wait.
+
+Fifteen executable baselines pin clean
+`a82be84bb77f124ac2f02fa3fc01a43c1be13918`, the unchanged reference and
+`/tmp/gdx-04384-gemini-input-items-before-differential`:
+`/tmp/gdx-04384-gemini-input-item-<suffix>-before-oracle.json`.
+Ten invalid-item cases FAIL only Godex. Five controls PASS: ordinary arrays,
+ignored item metadata, earlier tools, earlier candidates and invalid Unicode.
+All reference and independent mutation invariants pass. Commands use
+`--gemini --scenario request-primitive-input-item-<suffix>` with the exact clean
+source/commit pins. Fixtures retain original arrays, original canonical
+upstream bytes, exact status/body/type/headers/stdout/exit, attempt counts and
+safe durable state; existing independent matching-corruption checks stay active.
+
+`rtk go test ./tools/differential -count=1` passes 281 tests:
+`/tmp/gdx-04384-gemini-input-items-oracle-tests.log`.
+`rtk proxy go test -json ./...` passes 9,821 tests in 71 packages; ten packages
+have no tests and 18 optional installed-Codex/executable tests are skipped:
+`/tmp/gdx-04384-gemini-input-items-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+passes 3,034 tests: `/tmp/gdx-04384-gemini-input-items-race.log`.
+`rtk proxy make verify` PASSes the complete local gate:
+`/tmp/gdx-04384-gemini-input-items-verify.log`.
+Clean-commit 247-case Gemini and 213-case DeepSeek qualification follows.
+Protected `5f49a5f` now passes all 213 DeepSeek scenarios with independent
+mutations: `/tmp/gdx-04384-gemini-candidate-count-deepseek-oracle.json`.
+Its Gemini matrix and complete default gate, the unchanged `4c270db` Gemini
+rerun and clean `a82be84` matrices remain pending. The first `4c270db` reference
+restart mismatch remains a retained FAIL. Main remains published at `a7fabe9`.
+Unsupported item kinds and per-item fields/content, other controls, Gemini
+Compact, executable session/turn continuation, native macOS/Windows and live
+authentication remain open. Global 1:1 parity is not claimed.
