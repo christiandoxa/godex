@@ -1176,3 +1176,12 @@ wire request, then checks normal pending history alongside the valid upstream
 seed call. Independent exact requests, seed/client output, attempts/events,
 auth/state and matching leaked-history corruption controls apply.
 The default DeepSeek matrix reaches 290; Gemini remains 974.
+
+Sixteen DeepSeek `deepseek-request-primitive-output-text-*` cases distinguish
+separate tool-output text extraction from raw inline MCP results. Array parts
+join valid strings and text/input_text/output_text aliases with newlines,
+including empty strings; unrelated JSON values are ignored. Inline MCP
+array/object/null/string values remain JSON values. String/null/object outputs,
+normal reconstruction and custom/MCP output aliases are controlled separately.
+Complete independent request/client/state assertions and matching-corruption
+guards apply. The default DeepSeek matrix reaches 306; Gemini remains 974.

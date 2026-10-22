@@ -10241,3 +10241,55 @@ a05e1cbc default gate and standalone full273/282 remain pending. No redundant
 standalone full290 was started. The entire default gate last qualified remains
 e9d88ce. Broader output-array semantics need separate executable proof before
 any production change. Overall 1:1 parity remains unproven.
+
+### DeepSeek tool output extracts text while inline MCP preserves JSON
+
+Pinned RawBridgeInputItem and simple-request helpers have two explicit output
+contracts. Separate function/custom/MCP output items use content-text
+extraction: array strings and string-valued text/input_text/output_text fields
+join with newlines, including empty strings, while unrelated values are
+ignored. Nonarray values retain opaque string or Serde JSON-text formatting.
+Inline mcp_call results instead preserve their original JSON value and type.
+
+Exact clean a0b94af executable baseline proves twelve Godex-only original
+request FAILs and eight PASS controls across twenty cases (original session
+51633, exit 0). Audit: /tmp/gdx-04384-deepseek-output-text-before-audit.json.
+The pinned reference passes every independent invariant. Godex stringifies
+whole arrays and inline MCP values. Reference originals, client responses/
+stdout/status, exact attempts/retries/events, auth/slots, durable state and
+matching-corruption controls PASS. The initial seventeen-case run (original
+25663, exit 0) remains retained: its inline-MCP golden incorrectly expected
+flattened text and therefore failed both products' independent request checks.
+Only after that run completed was the golden corrected to the pinned raw-MCP
+helper contract; null/object/string controls were added and the full baseline
+rerun. No earlier report is relabeled and no assertion was weakened.
+
+The private gateway/deepseek tool-output projection now lives in the focused
+request_tool_output.go with its local array formatter. It preserves existing
+call-ID/content validation and uses compactValue for nonarray text, while
+inline MCP values retain their JSON type. Empty text entries are retained;
+alias selection follows string type, including empty strings. The formatter
+is local protocol behavior, not a shared helper. No layer, package, exported
+API, dependency, interface, option, worker or persisted format is added. The
+message source shrinks to 355 lines and the cohesive output source has 44.
+Eleven unit regressions first FAIL and four controls PASS; retained log:
+/tmp/gdx-04384-deepseek-output-text-unit-before.jsonl. Focused gateway and
+differential tests then PASS 1,391 tests. Sixteen new executable cases extend
+default DeepSeek290 to 306; Gemini remains 974. Full local and exact clean
+candidate qualification follow before publication. Overall 1:1 remains unproven.
+
+The now-unused firstValue helper, superseded by explicit presence rules, is
+removed after checking every package-local caller. Before that dead-code
+removal, full local validation PASSes 11,132 tests with 18 optional SKIP
+(original session 56652, exit 0), and make verify exits 0 (original session
+28509). Exact commands:
+`rtk proxy go test -json ./... > /tmp/gdx-04384-deepseek-output-text-full.jsonl 2>&1`
+and `rtk proxy make verify > /tmp/gdx-04384-deepseek-output-text-verify.log 2>&1`.
+Final focused compilation and make verify are repeated after the deletion;
+exact clean executable qualification follows before publication.
+
+Final focused tests PASS 1,391 tests (original session 97433, exit 0), and
+final make verify exits 0 after the dead-helper deletion (original session
+20524), including all race tests and the build. Exact final commands:
+`rtk proxy go test -json ./internal/gateway/deepseek ./tools/differential > /tmp/gdx-04384-deepseek-output-text-focused-final.jsonl 2>&1`
+and `rtk proxy make verify > /tmp/gdx-04384-deepseek-output-text-verify-final.log 2>&1`.
