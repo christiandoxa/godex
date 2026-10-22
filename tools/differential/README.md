@@ -406,6 +406,11 @@ custom, MCP, shell and output controls share the exact terminal admission
 contract; ordinary valid IDs and earlier candidate/tool/serde outcomes remain
 checked with exact wire bytes, zero attempts and independent mutations.
 
+Gemini `request-primitive-call-name-*` rejects missing, wrong-type, blank and
+empty-shadowed names before conversion/orphan filtering. Function, custom and
+MCP cases retain terminal 502 behavior, valid-name controls and earlier local
+tool/candidate/serde precedence with independent matching-corruption checks.
+
 DeepSeek scenario workers evaluate their complete independent invariants as
 each scenario finishes, preserving failures in the ordered report. The strict
 five-minute generated SSE timestamp window is unchanged; later cases cannot

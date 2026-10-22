@@ -6663,3 +6663,58 @@ Remaining tool aliases/names/output, Gemini Compact, executable session/turn
 continuation, native macOS/Windows and live authentication remain unproven.
 No force push, tag, release or editor-checkout edit occurred. Global 1:1 parity
 is not claimed.
+
+
+## Tool-call name admission precedes conversion and orphan filtering
+
+Pinned `deepseek_input_item_validation` requires nonblank names on function,
+custom and MCP calls. Its scanner selects the first string name/tool_name/
+literal __missing__ field, then falls back to nested function.name only when
+none is a string. An empty selected name cannot hide behind a later alias.
+The API-key pipeline returns terminal plain 502 before upstream work, while
+earlier candidate/tool structured 400 validation retains its precedence.
+
+Godex's function converter could drop missing/wrong-type/blank-name calls and
+execute only the remaining message. The concrete Gemini item-admission step
+now checks this invariant beside call-ID admission. A private function owns
+only this protocol validation; shell/output kinds retain their separate rules.
+No generic helper, package, exported API, interface, dependency, worker,
+configuration or persisted format is introduced. Valid alias projection,
+argument conversion and output-presence rules remain separate audits.
+
+Before repair 17 controls pass and 18 tests fail, including parents:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384Gemini(ToolCallsRequireNonblankName|RequestAdmissionDoesNotRetryModelOrCredential)$' -count=1`;
+`/tmp/gdx-04384-gemini-call-names-before.log`.
+The same command passes all 35 tests after repair:
+`/tmp/gdx-04384-gemini-call-names-focused.log`.
+Unit controls retain the pinned alias/nested selection, including its literal
+sentinel behavior, without claiming executable alias projection. The real
+two-key gateway/router regression proves zero attempts and no retry wait.
+
+Eleven executable baselines pin clean
+`1791a7ed64180a8875e51dfc15824feb2f73a87c`, unchanged reference and
+`/tmp/gdx-04384-gemini-call-names-before-differential`:
+`/tmp/gdx-04384-gemini-call-name-<suffix>-before-oracle.json`.
+Five function-name cases FAIL only Godex, which executes remaining input.
+Six controls PASS: existing custom/MCP rejection, valid name, earlier tools/
+candidates and invalid Unicode. Every reference and independent mutation
+invariant passes. Commands use `--gemini --scenario request-primitive-call-name-<suffix>`
+with exact clean source/commit pins. Original input/wire bytes, exact response/
+status/headers/stdout/exit, zero attempts and safe durable state retain all
+existing independent matching-corruption checks.
+
+`rtk go test ./tools/differential -count=1` PASSes 281 tests:
+`/tmp/gdx-04384-gemini-call-names-oracle-tests.log`.
+`rtk proxy go test -json ./...` PASSes 9,958 tests in 71 packages; ten packages
+have no tests and 18 optional installed-Codex/executable tests are skipped:
+`/tmp/gdx-04384-gemini-call-names-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+PASSes 3,150 tests: `/tmp/gdx-04384-gemini-call-names-race.log`.
+`rtk proxy make verify` PASSes: `/tmp/gdx-04384-gemini-call-names-verify.log`.
+Clean-commit 333-case Gemini and 213-case DeepSeek qualification follows.
+The protected projection/ID matrices and complete default gate remain pending.
+Main remains `c651bff59`; earlier reference failures remain FAIL. Output
+presence, valid alias projection and argument semantics remain separate audits.
+Gemini Compact, executable session/turn continuation, native macOS/Windows and
+live authentication remain unproven. No force push, tag, release or editor edit
+occurred. Global 1:1 parity is not claimed.

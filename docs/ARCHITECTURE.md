@@ -479,6 +479,9 @@ its empty/system-only admission behavior. No provider policy moves into a helper
 All supported call/tool-output items require a nonblank identity selected from
 the first string `call_id`, `tool_call_id`, then `id`. This local admission runs
 before conversion or orphan filtering can silently drop the malformed item.
+Function, custom and MCP calls also require a nonblank selected name before
+conversion. The owning gateway preserves the pinned validator's string-alias
+and nested-function precedence; output and shell items retain separate rules.
 DeepSeek independently checks present `stream` as a boolean and present
 `instructions`/`previous_response_id` as strings before constructing its
 translated request. Invalid types use its common terminal preparation boundary,

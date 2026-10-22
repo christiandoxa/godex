@@ -26,7 +26,7 @@ func normalizeGeminiChatInputItems04384(value any) bool {
 				}
 			case "function_call", "custom_tool_call", "mcp_call", "local_shell_call",
 				"function_call_output", "custom_tool_call_output", "mcp_tool_result", "mcp_call_output":
-				if !validGeminiChatCallIdentity04384(item) {
+				if !validGeminiChatCallIdentity04384(item) || !validGeminiChatCallName04384(kind, item) {
 					return false
 				}
 				continue
@@ -48,6 +48,23 @@ func validGeminiChatCallIdentity04384(item map[string]any) bool {
 		}
 	}
 	return false
+}
+
+func validGeminiChatCallName04384(kind any, item map[string]any) bool {
+	switch kind {
+	case "function_call", "custom_tool_call", "mcp_call":
+	default:
+		return true
+	}
+	// The tagged scanner probes its literal sentinel before nested function.name.
+	for _, field := range []string{"name", "tool_name", "__missing__"} {
+		if name, ok := item[field].(string); ok {
+			return strings.TrimSpace(name) != ""
+		}
+	}
+	function, _ := item["function"].(map[string]any)
+	name, _ := function["name"].(string)
+	return strings.TrimSpace(name) != ""
 }
 
 func projectGeminiChatMessage04384(item map[string]any) bool {
