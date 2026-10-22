@@ -39,6 +39,16 @@ func bufferedFragmentCases04384() []string {
 		"deepseek-buffered-view-search-depth-kernel-reject",
 		"deepseek-buffered-view-search-runtime-depth-over",
 		"deepseek-buffered-view-search-runtime-depth-over-rotation",
+		"deepseek-buffered-view-eof-string",
+		"deepseek-buffered-view-eof-key",
+		"deepseek-buffered-view-eof-string-unicode",
+		"deepseek-buffered-view-eof-string-escape",
+		"deepseek-buffered-view-search-eof-string",
+		"deepseek-buffered-view-eof-string-surrogate",
+		"deepseek-buffered-view-eof-string-surrogate-pair",
+		"deepseek-buffered-view-eof-literal-value",
+		"deepseek-buffered-view-eof-string-early-range",
+		"deepseek-buffered-view-search-output-surrogate-quote",
 	}
 }
 
@@ -107,6 +117,26 @@ func bufferedFragmentFixture04384(phase string) (name, arguments, diagnostic str
 		return "tool_search", deep, "recursion limit exceeded at line 1 column 128"
 	case "deepseek-buffered-view-search-runtime-depth-over", "deepseek-buffered-view-search-runtime-depth-over-rotation":
 		return "tool_search", strings.Repeat("[", 125) + "0" + strings.Repeat("]", 125), ""
+	case "deepseek-buffered-view-eof-string":
+		return "lookup", `"abc`, "EOF while parsing a string at line 1 column 4"
+	case "deepseek-buffered-view-eof-key":
+		return "lookup", `{"ke`, "EOF while parsing a string at line 1 column 4"
+	case "deepseek-buffered-view-eof-string-unicode":
+		return "lookup", "\n\"雪", "EOF while parsing a string at line 2 column 4"
+	case "deepseek-buffered-view-eof-string-escape":
+		return "lookup", `"abc\`, "EOF while parsing a string at line 1 column 5"
+	case "deepseek-buffered-view-search-eof-string":
+		return "tool_search", `"abc`, "EOF while parsing a string at line 1 column 4"
+	case "deepseek-buffered-view-eof-string-surrogate":
+		return "lookup", `"\uD800x`, "unexpected end of hex escape at line 1 column 8"
+	case "deepseek-buffered-view-eof-string-surrogate-pair":
+		return "lookup", `"\uD800\u0041`, "lone leading surrogate in hex escape at line 1 column 13"
+	case "deepseek-buffered-view-eof-literal-value":
+		return "lookup", `{"a":tru`, "EOF while parsing a value at line 1 column 8"
+	case "deepseek-buffered-view-eof-string-early-range":
+		return "lookup", `{"v":1e309,"s":"abc`, "number out of range at line 1 column 10"
+	case "deepseek-buffered-view-search-output-surrogate-quote":
+		return "tool_search", `"\uD800\""`, "unexpected end of hex escape at line 1 column 99"
 	}
 	return "", "", ""
 }

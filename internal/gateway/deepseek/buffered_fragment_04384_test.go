@@ -7,7 +7,7 @@ import (
 
 func TestProdex04384BufferedOrdinaryArgumentsUseBoundedRawView(t *testing.T) {
 	for _, arguments := range []string{
-		`truex`, `NaN`, `1e309`, `"\uD800"`, `"\q"`, `[truex]`, `{"v":NaN}`,
+		`truex`, `NaN`, `1e309`, `"\uD800"`, `"\uD800\""`, `"\q"`, `[truex]`, `{"v":NaN}`,
 		strings.Repeat("[", 256) + "0" + strings.Repeat("]", 256),
 		strings.Repeat("[", 257) + strings.Repeat("]", 257),
 		"", " \t\n ", `{"cmd":"echo harmless"}`,

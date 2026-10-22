@@ -120,8 +120,17 @@ for ordinary tools and structured tool-search calls.
 The eof-list, eof-object, eof-value, eof-array-value and search-eof-value
 suffixes require the exact container/value EOF message and byte position.
 The eof-early-range and eof-early-surrogate controls retain the first serde
-failure before truncated input. Quoted-string EOF and other lexical classes
-remain separate audit targets.
+failure before truncated input. Other lexical classes remain separate audit
+targets.
+
+The eof-string, eof-key, eof-string-unicode, eof-string-escape and
+search-eof-string suffixes require exact quoted-string EOF diagnostics for
+ordinary and structured tools. The eof-string-surrogate and
+eof-string-surrogate-pair cases retain the earlier surrogate error within an
+unfinished string; eof-literal-value requires value EOF. The
+eof-string-early-range control retains the numeric error before a later string
+EOF. The search-output-surrogate-quote case requires the consumed second-escape
+position in the full item envelope (column 99).
 
 The `deepseek-buffered-body-under`, `deepseek-buffered-body-limit`,
 `deepseek-buffered-body-over` and `deepseek-buffered-body-over-rotation` cases

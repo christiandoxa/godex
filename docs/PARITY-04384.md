@@ -4026,3 +4026,71 @@ primary worktree and remote. Quoted-string/literal EOF and second-surrogate
 escape positions are the next isolated follow-up. Other lexical diagnostics,
 valid Gemini continuation/Compact ownership, native macOS/Windows and live
 authentication remain open. Global 1:1 parity is not claimed.
+
+
+## Quoted-string EOF preserves earlier errors and consumed escape bytes
+
+The structured envelope stage was fast-forwarded and pushed directly to
+`origin/main` at `50b5f47787bb25a8d5a2be134c3e5955779e8c7c` after checking
+the clean primary worktree and unchanged remote. No CI wait, force push, tag,
+release or editor-worktree modification occurred.
+
+Pinned serde reports `EOF while parsing a string` for truncated quoted values
+or keys, dangling escapes and incomplete Unicode escapes. It reports value EOF
+for a truncated literal in a rejected container. Go's token decoder returns
+`io.ErrUnexpectedEOF` for both classes. The private DeepSeek error walk now
+distinguishes the incomplete token and counts all consumed UTF-8 bytes.
+The walk remains behind the existing kernel/output error gates; valid ordinary
+opaque fragments are not reinterpreted or rejected.
+
+A string may contain an invalid surrogate before it ends. The existing private
+surrogate check now accepts a token ending at EOF and retains that earlier
+failure. It also counts the second consumed escape byte when a high surrogate
+is followed by an escape other than `u`: the structured item's locked serde
+diagnostic is column 99, not 98, for the synthetic escaped-quote fixture.
+Completed valid pairs and ordinary opaque tool strings keep their behavior.
+This is one focused gateway file change, with no new parser on valid ordinary
+inputs, shared helper, exported API, interface, dependency, state format,
+configuration or background work.
+
+The locked Rust and independent Go token probes are retained at:
+`/tmp/gdx-04384-string-eof-audit-probe.jsonl`,
+`/tmp/gdx-04384-string-eof-extended-serde-probe.jsonl`,
+`/tmp/gdx-04384-string-eof-priority-serde-probe.jsonl` and
+`/tmp/gdx-04384-string-eof-go-token-probe.jsonl`.
+They establish diagnostics and byte offsets, not released-executable parity
+by themselves.
+
+Before repair,
+`rtk go test ./internal/gateway/deepseek -run '^TestProdex04384Buffered(StringEOF|SearchSurrogateEscape)' -count=1`
+passes six earlier-error controls and fails 47 tests including parents:
+`/tmp/gdx-04384-string-eof-before.log`.
+The regressions exercise ordinary, structured search and apply-patch tools,
+partial keys/values, UTF-8/newline columns, dangling and Unicode escapes,
+earlier numeric/surrogate errors and the outer item position.
+
+Ten strict baseline invocations on clean
+`fca1a1a4d229fbf8f295277f9af78f868956e687` use eof-string, eof-key,
+eof-string-unicode, eof-string-escape, search-eof-string,
+eof-string-surrogate, eof-string-surrogate-pair, eof-literal-value,
+eof-string-early-range and search-output-surrogate-quote suffixes.
+All reference traces satisfy exact failed Responses, status/type, stdout,
+child exit, original authenticated request, one attempt, no retry and safe
+durable-state invariants. The early-range control PASSes both products; the
+other nine FAIL only Godex. Reports:
+`/tmp/gdx-04384-string-eof-<suffix>-before-oracle.json`.
+Exact invocations are retained in `/tmp/gdx-04384-string-eof-baseline.py`.
+The existing independent mutation tests cover all ten new fixtures.
+
+`rtk go test ./internal/gateway/deepseek -run '^TestProdex04384Buffered' -count=1`
+passes 167 tests: `/tmp/gdx-04384-string-eof-focused.log`.
+`rtk go test -race ./internal/gateway/deepseek ./tools/differential -count=1`
+passes 937 tests: `/tmp/gdx-04384-string-eof-race.log`.
+`rtk go test ./...` passes 9,366 tests across 81 packages:
+`/tmp/gdx-04384-string-eof-test-all.log`.
+`rtk proxy make verify` passes formatting, source/TUI guards, vet, full shuffled
+race tests, cross-platform build/test compilation, installers and build:
+`/tmp/gdx-04384-string-eof-verify.log`.
+Clean-commit executable verification follows. Other lexical classes, valid
+Gemini continuation/Compact ownership, native macOS/Windows and live
+authentication remain open. Global 1:1 parity is not claimed.

@@ -332,7 +332,10 @@ private byte-position formatter is also used by the buffered serde error path.
 Private `buffered_fragment.go` reproduces the tagged 256-depth structural view
 for ordinary buffered arguments without interpreting primitive or escape contents.
 `buffered_fragment_error.go` preserves earlier serde range/surrogate failures,
-recursion and container/value EOF diagnostics after that view rejects input.
+recursion and container/value/string EOF diagnostics after that view rejects
+input. Partial strings retain surrogate errors encountered before EOF, including
+the consumed second-escape byte position. The same error walk serves invalid
+structured search output after its item parse fails.
 Private `search_output.go` parses structured tool-search arguments inside the
 kernel's complete item envelope, retaining its serde depth and byte positions.
 The formatter in `tool_argument_error.go` serves both inner-argument and outer

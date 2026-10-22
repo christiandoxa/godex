@@ -30,6 +30,16 @@ func deepSeekBufferedSerdeFailure(raw string) (string, int) {
 	for {
 		token, err := decoder.Token()
 		if err != nil {
+			if errors.Is(err, io.ErrUnexpectedEOF) {
+				if quote := strings.IndexByte(raw[previous:], '"'); quote >= 0 {
+					start := previous + quote
+					if reason, offset := deepSeekBufferedSurrogateFailure(raw[start:]); reason != "" {
+						return reason, start + offset
+					}
+					return "EOF while parsing a string", len(raw)
+				}
+				return "EOF while parsing a value", len(raw)
+			}
 			if errors.Is(err, io.EOF) && (len(containers) != 0 || previous == 0) {
 				kind := "a value"
 				trimmed := strings.TrimRight(raw, " \t\r\n")
@@ -70,8 +80,8 @@ func deepSeekBufferedSerdeFailure(raw string) (string, int) {
 	}
 }
 
-// The decoder already proved the quoted token's syntax. Only serde's surrogate
-// rule remains; these offsets count the bytes consumed by its hex-escape parser.
+// Go proved escape syntax through this token or its EOF. Preserve serde's first
+// surrogate error and the bytes consumed while expecting a second escape.
 func deepSeekBufferedSurrogateFailure(quoted string) (string, int) {
 	for index := 1; index+1 < len(quoted); index++ {
 		if quoted[index] != '\\' {
@@ -86,11 +96,24 @@ func deepSeekBufferedSurrogateFailure(quoted string) (string, int) {
 		case unit >= 0xdc00 && unit <= 0xdfff:
 			return "lone leading surrogate in hex escape", index + 6
 		case unit >= 0xd800 && unit <= 0xdbff:
-			if index+12 > len(quoted) || quoted[index+6:index+8] != `\u` {
-				return "unexpected end of hex escape", min(len(quoted), index+7)
+			next := index + 6
+			if next == len(quoted) {
+				return "", 0
 			}
-			next, _ := strconv.ParseUint(quoted[index+8:index+12], 16, 16)
-			if next < 0xdc00 || next > 0xdfff {
+			if quoted[next] != '\\' {
+				return "unexpected end of hex escape", next + 1
+			}
+			if next+1 == len(quoted) {
+				return "", 0
+			}
+			if quoted[next+1] != 'u' {
+				return "unexpected end of hex escape", next + 2
+			}
+			if next+6 > len(quoted) {
+				return "", 0
+			}
+			nextUnit, _ := strconv.ParseUint(quoted[index+8:index+12], 16, 16)
+			if nextUnit < 0xdc00 || nextUnit > 0xdfff {
 				return "lone leading surrogate in hex escape", index + 12
 			}
 			index += 11
