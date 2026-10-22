@@ -2,6 +2,7 @@ package gemini
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"strings"
@@ -49,7 +50,7 @@ func TestProdex04384GeminiSSEIncompleteJSONFailsAtDoneAndEOF(t *testing.T) {
 			if native {
 				body = translateGeminiNativeStream(upstream, nil).Body
 			} else {
-				body = translateGeminiChatCompatibleStream043711(upstream, nil, nil).Body
+				body = translateGeminiChatCompatibleStream043711(context.Background(), upstream, nil, nil).Body
 			}
 			output, err := io.ReadAll(body)
 			body.Close()

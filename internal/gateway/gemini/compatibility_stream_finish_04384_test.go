@@ -2,6 +2,7 @@ package gemini
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -50,7 +51,7 @@ func TestProdex04384GeminiAPIKeyFinishWithoutDoneFailsAtEOF(t *testing.T) {
 		if finish {
 			wire += "data: " + `{"choices":[{"delta":{},"finish_reason":"stop"}]}` + "\n\n"
 		}
-		response := translateGeminiChatCompatibleStream043711(&http.Response{StatusCode: http.StatusOK,
+		response := translateGeminiChatCompatibleStream043711(context.Background(), &http.Response{StatusCode: http.StatusOK,
 			Header: http.Header{"Content-Type": {"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(wire))}, nil, nil)
 		data, err := io.ReadAll(response.Body)
 		response.Body.Close()

@@ -48,6 +48,9 @@ func (proxy *Proxy) forwardResponse(ctx context.Context, writer http.ResponseWri
 	lifecycle.commit()
 	writer.WriteHeader(response.StatusCode)
 	if stream {
+		if flusher, ok := writer.(http.Flusher); ok {
+			flusher.Flush()
+		}
 		providerKind := ""
 		if len(providerKinds) > 0 {
 			providerKind = providerKinds[0]

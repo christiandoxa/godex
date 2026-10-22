@@ -1070,3 +1070,13 @@ status, headers, bounded partial bytes and a nonempty `read_error`, still exits
 limit remains mandatory even in this mode. A read-error record alone is never
 parity evidence: a focused invariant must verify the expected error, wire,
 status, upstream attempts and state for each product independently.
+
+Ten Gemini tool-projection cases distinguish five non-object array-entry kinds
+from empty, null, object, boolean and absent `tool_calls` controls. The negative
+cases require the tagged pending response: header 200, the exact SSE content
+type, empty partial bytes, the explicit read deadline, stdout newline and child
+exit 1. Successful controls retain complete exact SSE bytes. Every case checks
+original requests, one upstream attempt and state; matching failure-tuple,
+status, bytes, auth, attempt and state corruption must fail. PASS qualifies the
+expected failed-read contract, never a successful response. Object entries
+missing a function object are a separate admission behavior.

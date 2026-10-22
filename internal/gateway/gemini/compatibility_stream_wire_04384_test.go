@@ -2,6 +2,7 @@ package gemini
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"strings"
@@ -12,7 +13,7 @@ func TestProdex04384GeminiAPIKeySSEPreservesLiteralSerdeCharacters(t *testing.T)
 	for _, text := range []string{"plain-control", "<>&/🌍\u2028\u2029", `literal \u2028 \u003c`} {
 		t.Run(text, func(t *testing.T) {
 			chunk := `{"choices":[{"delta":{"content":` + jsonLiteral04384(t, text) + `}}]}`
-			response := translateGeminiChatCompatibleStream043711(&http.Response{StatusCode: http.StatusOK,
+			response := translateGeminiChatCompatibleStream043711(context.Background(), &http.Response{StatusCode: http.StatusOK,
 				Header: http.Header{"Content-Type": {"text/event-stream"}}, Body: io.NopCloser(strings.NewReader("data: " + chunk + "\n\ndata: [DONE]\n\n"))}, nil, nil)
 			defer response.Body.Close()
 			data, err := io.ReadAll(response.Body)

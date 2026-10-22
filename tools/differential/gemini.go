@@ -99,7 +99,7 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 	_, _, _, controlTypes := geminiControlTypeCase04384(mock.scenario)
 	_, _, jsonAdmission := geminiJSONAdmission04384(mock.scenario)
 	primitiveFixture, primitive := requestPrimitiveCase04384(mock.scenario)
-	if geminiRequestNumberCase04384(mock.scenario) || userID || ignored || controlTypes || jsonAdmission || primitive || geminiCompactCase04384(mock.scenario) || geminiReasoningStreamCase04384(mock.scenario) || geminiStreamMetadataCase04384(mock.scenario) || geminiStreamCreatedCase04384(mock.scenario) || geminiStreamModelCase04384(mock.scenario) || geminiStreamFinishPresenceCase04384(mock.scenario) || geminiStreamUsageCase04384(mock.scenario) || geminiStreamMessageMetadataCase04384(mock.scenario) {
+	if geminiRequestNumberCase04384(mock.scenario) || userID || ignored || controlTypes || jsonAdmission || primitive || geminiCompactCase04384(mock.scenario) || geminiReasoningStreamCase04384(mock.scenario) || geminiStreamMetadataCase04384(mock.scenario) || geminiStreamCreatedCase04384(mock.scenario) || geminiStreamModelCase04384(mock.scenario) || geminiStreamFinishPresenceCase04384(mock.scenario) || geminiStreamUsageCase04384(mock.scenario) || geminiStreamMessageMetadataCase04384(mock.scenario) || geminiStreamProjectionCase04384(mock.scenario) {
 		record.RawBody = string(body)
 	}
 	mock.mu.Lock()
@@ -206,6 +206,12 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 		if geminiStreamMessageMetadataCase04384(mock.scenario) {
 			f := geminiStreamMessageMetadataFixtureFor04384(mock.scenario)
 			first = geminiStreamMessageMetadataPacket04384(first, f.firstRefusal, f.firstAnnotations, f.only)
+		}
+		if geminiStreamProjectionCase04384(mock.scenario) {
+			calls, _ := geminiStreamProjectionFixture04384(mock.scenario)
+			if calls != "" {
+				first = strings.Replace(first, `"delta":{`, `"delta":{"tool_calls":`+calls+",", 1)
+			}
 		}
 		_, _ = io.WriteString(w, "data: "+first+separator)
 		if reasoningScenario != "stream-chat-reasoning-only" {
@@ -427,6 +433,7 @@ func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit, selec
 	cases = append(cases, geminiStreamFinishPresenceCases04384()...)
 	cases = append(cases, geminiStreamUsageCases04384()...)
 	cases = append(cases, geminiStreamMessageMetadataCases04384()...)
+	cases = append(cases, geminiStreamProjectionCases04384()...)
 	cases = append(cases, geminiIgnoredControlCases04384()...)
 	for _, suffix := range geminiControlTypeSuffixes04384() {
 		cases = append(cases, "request-control-"+suffix)
@@ -516,7 +523,7 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	_, _, _, controlTypes := geminiControlTypeCase04384(scenario)
 	_, _, jsonAdmission := geminiJSONAdmission04384(scenario)
 	_, primitive := requestPrimitiveCase04384(scenario)
-	auditState := rawIdentity || bodyBoundary || continuation || requestNumbers || userID || ignored || controlTypes || jsonAdmission || primitive || geminiCompactCase04384(scenario) || geminiReasoningStreamCase04384(scenario) || geminiStreamMetadataCase04384(scenario) || geminiStreamCreatedCase04384(scenario) || geminiStreamModelCase04384(scenario) || geminiStreamFinishPresenceCase04384(scenario) || geminiStreamUsageCase04384(scenario) || geminiStreamMessageMetadataCase04384(scenario)
+	auditState := rawIdentity || bodyBoundary || continuation || requestNumbers || userID || ignored || controlTypes || jsonAdmission || primitive || geminiCompactCase04384(scenario) || geminiReasoningStreamCase04384(scenario) || geminiStreamMetadataCase04384(scenario) || geminiStreamCreatedCase04384(scenario) || geminiStreamModelCase04384(scenario) || geminiStreamFinishPresenceCase04384(scenario) || geminiStreamUsageCase04384(scenario) || geminiStreamMessageMetadataCase04384(scenario) || geminiStreamProjectionCase04384(scenario)
 	if auditState {
 		childResult = filepath.Join(home, "child-exchange.json")
 	}
@@ -531,6 +538,9 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	ctx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
 	defer cancel()
 	env := productEnv(name, stateHome, codexHome, userHome, shim, childResult, runOptions{})
+	if _, pending := geminiStreamProjectionFixture04384(scenario); pending {
+		env = append(env, "DIFFERENTIAL_CAPTURE_READ_ERROR=1")
+	}
 	env = append(env, "DIFFERENTIAL_PROVIDER=gemini")
 	if geminiCompactCase04384(scenario) {
 		env = append(env, "DIFFERENTIAL_GEMINI_COMPACT="+scenario)
@@ -649,7 +659,7 @@ func geminiCompare(scenario string, prodex, godex geminiCandidateResult) []strin
 	if prodex.ExitCode != godex.ExitCode {
 		differences = append(differences, "product child process exit status differs")
 	}
-	if geminiCompactCase04384(scenario) || geminiReasoningStreamCase04384(scenario) || geminiStreamMetadataCase04384(scenario) || geminiStreamCreatedCase04384(scenario) || geminiStreamModelCase04384(scenario) || geminiStreamFinishPresenceCase04384(scenario) || geminiStreamUsageCase04384(scenario) || geminiStreamMessageMetadataCase04384(scenario) {
+	if geminiCompactCase04384(scenario) || geminiReasoningStreamCase04384(scenario) || geminiStreamMetadataCase04384(scenario) || geminiStreamCreatedCase04384(scenario) || geminiStreamModelCase04384(scenario) || geminiStreamFinishPresenceCase04384(scenario) || geminiStreamUsageCase04384(scenario) || geminiStreamMessageMetadataCase04384(scenario) || geminiStreamProjectionCase04384(scenario) {
 		return differences
 	}
 	if geminiContinuationCase04384(scenario) {
@@ -774,6 +784,13 @@ func geminiSemanticEqual043711(left, right map[string]any) bool {
 }
 
 func geminiFixtureInvariant(scenario string, result geminiCandidateResult) error {
+	_, pendingProjection := geminiStreamProjectionFixture04384(scenario)
+	if result.Client.ReadError != "" && !pendingProjection {
+		return fmt.Errorf("unexpected Gemini response read error")
+	}
+	if geminiStreamProjectionCase04384(scenario) {
+		return geminiStreamProjectionInvariant04384(scenario, result)
+	}
 	if geminiStreamMessageMetadataCase04384(scenario) {
 		return geminiStreamMessageMetadataInvariant04384(scenario, result)
 	}

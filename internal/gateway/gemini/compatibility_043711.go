@@ -45,7 +45,7 @@ func (transport *RuntimeTransport) executeChatCompatibleResponses(
 	}
 	conversation := &geminiChatConversation04384{store: transport.conversationsForRequest(input), messages: geminiChatConversationMessages04384(body)}
 	if geminiContentTypeIsSSE04384(response.Header.Get("Content-Type")) {
-		return translateGeminiChatCompatibleStream043711(response, metadata, conversation), nil
+		return translateGeminiChatCompatibleStream043711(ctx, response, metadata, conversation), nil
 	}
 	translated, err := translateGeminiChatOrNativeResponse043711(response, metadata, conversation)
 	if err != nil {

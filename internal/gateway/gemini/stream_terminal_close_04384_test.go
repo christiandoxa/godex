@@ -1,6 +1,7 @@
 package gemini
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"sync/atomic"
@@ -37,7 +38,7 @@ func TestProdex04384GeminiSSEDoneStopsReadingUpstream(t *testing.T) {
 		if native {
 			body = translateGeminiNativeStream(upstream, nil).Body
 		} else {
-			body = translateGeminiChatCompatibleStream043711(upstream, nil, nil).Body
+			body = translateGeminiChatCompatibleStream043711(context.Background(), upstream, nil, nil).Body
 		}
 		if _, err := io.ReadAll(body); err != nil {
 			t.Fatal(err)

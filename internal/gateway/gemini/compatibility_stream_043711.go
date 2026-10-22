@@ -2,6 +2,7 @@ package gemini
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,12 +25,13 @@ import (
 // Chat Completions SSE rather than interpreting the stream as native Gemini
 // GenerateContent. Native Gemini chunks contain no choices and therefore
 // cannot materialize output_text delta events.
-func translateGeminiChatCompatibleStream043711(response *http.Response, requestMetadata map[string]any, conversation *geminiChatConversation04384) *proxymodel.Response {
+func translateGeminiChatCompatibleStream043711(ctx context.Context, response *http.Response, requestMetadata map[string]any, conversation *geminiChatConversation04384) *proxymodel.Response {
+	ctx, cancel := context.WithCancel(ctx)
 	reader, writer := io.Pipe()
-	body := sse.NewPipeBody(reader, response.Body)
+	body := sse.NewPipeBody(reader, &geminiChatStreamSource04384{source: response.Body, cancel: cancel})
 	go func() {
 		defer body.CloseSource()
-		pumpGeminiChatCompatibleStream043711(response.Body, writer, requestMetadata, conversation)
+		pumpGeminiChatCompatibleStream043711(ctx, response.Body, writer, requestMetadata, conversation)
 	}()
 	return &proxymodel.Response{
 		StatusCode: response.StatusCode,
@@ -251,6 +253,9 @@ func (state *geminiChatCompatibleStream043711) accept(writer io.Writer, data []b
 		code, message := chatcompat.ChatStreamError(value)
 		return state.failure(writer, code, message)
 	}
+	if pendingGeminiChatToolProjection04384(root) {
+		return geminiChatProjectionPending04384{}
+	}
 	state.observeChatChunk(root)
 	if !state.started {
 		state.started = true
@@ -313,7 +318,7 @@ func (state *geminiChatCompatibleStream043711) accept(writer io.Writer, data []b
 	return nil
 }
 
-func pumpGeminiChatCompatibleStream043711(source io.ReadCloser, writer *io.PipeWriter, requestMetadata map[string]any, conversation *geminiChatConversation04384) {
+func pumpGeminiChatCompatibleStream043711(ctx context.Context, source io.ReadCloser, writer *io.PipeWriter, requestMetadata map[string]any, conversation *geminiChatConversation04384) {
 	defer writer.Close()
 	responseID := "resp_deepseek_" + uuid.NewString()
 	if value, err := uuid.NewV7(); err == nil {
@@ -329,7 +334,7 @@ func pumpGeminiChatCompatibleStream043711(source io.ReadCloser, writer *io.PipeW
 		if n > 0 {
 			for _, payload := range decoder.Feed(buffer[:n]) {
 				if failure := state.accept(writer, payload); failure != nil {
-					_ = state.failure(writer, "provider_stream_error", "provider stream failed")
+					state.handleTranslationFailure(ctx, writer, failure)
 					return
 				}
 			}
@@ -345,7 +350,7 @@ func pumpGeminiChatCompatibleStream043711(source io.ReadCloser, writer *io.PipeW
 			if errors.Is(err, io.EOF) {
 				for _, payload := range decoder.Finish() {
 					if failure := state.accept(writer, payload); failure != nil {
-						_ = state.failure(writer, "provider_stream_error", "provider stream failed")
+						state.handleTranslationFailure(ctx, writer, failure)
 						return
 					}
 				}

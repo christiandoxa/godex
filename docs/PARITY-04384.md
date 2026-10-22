@@ -9134,3 +9134,42 @@ and original state/wire/matching-corruption assertions qualify in
 /tmp/gdx-04384-gemini-stream-metadata-audit.json. This is the latest full Gemini
 PASS and does not qualify later revisions or erase earlier FAIL reports. The
 latest complete default-gate PASS remains exact 78d256d.
+
+### Preserve pending non-object Gemini SSE tool projections
+
+Ten exact clean executable baselines on
+841b373dc933cf0f81045078783304b87923b09d qualify five Godex-only failures
+and five PASS controls. Null, boolean, numeric, string and array tool entries
+leave the reference response pending after its SSE 200 headers, with no current
+frame bytes, until the synthetic client cancels. The expected failed-read tuple
+is exact: empty body, explicit read deadline, stdout newline and child exit 1.
+Controls with empty/null/object/boolean/absent tool_calls retain their full
+successful SSE wire. Independent request bytes, attempts, auth/state and matching
+corruption assertions qualify both products; a matching timeout alone cannot
+pass. Audit: /tmp/gdx-04384-gemini-stream-projection-before-audit.json.
+
+The pinned StreamToolCallDelta kernel rejects non-object roots before function
+validation, and its Rust wrapper panics before returning the chunk's event batch.
+Godex preserves the observed pending connection through a quiescent cancellable
+wait in the existing Gemini producer. It checks entry shapes before emitting
+current-frame events, preserves earlier bytes, and records no completion or
+snapshot. A private child context follows request cancellation and the existing
+PipeBody close owner; upstream still closes once. No panic, spin, extra worker,
+exported API, generic helper, dependency, option or persisted format is added.
+The existing HTTP delivery owner flushes SSE headers before waiting for body
+bytes. Narrow regressions fail five entry shapes plus the deferred-header case
+before the fix, then cover request/body cancellation, embedded-error priority,
+prior-frame retention, buffered header controls and ordinary stream EOF.
+
+Focused Gemini/HTTP delivery/differential tests PASS 2,474 cases before adding
+the prior-frame regression. The default Gemini matrix adds ten cases, reaching
+912. Full local validation PASSes 10,844 tests with 18 optional SKIP, and
+make verify exits 0 including race tests, cross-builds, vet and source/format
+guards. Exact commands:
+`rtk proxy go test -json ./... > /tmp/gdx-04384-gemini-stream-projection-full.jsonl 2>&1`
+and `rtk proxy make verify > /tmp/gdx-04384-gemini-stream-projection-verify.log 2>&1`.
+Exact clean executable qualification follows. The
+separately qualified object-admission mismatch and full successful tool
+lifecycle/snapshots remain open; neither is hidden by this projection stage.
+Earlier v1/v2/v3/v4 tool-admission diagnostic reports remain retained and are not
+relabeled. Overall 1:1 parity remains unproven.
