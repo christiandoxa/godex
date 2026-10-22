@@ -7932,3 +7932,88 @@ The latest entire default-gate PASS remains exact 20a7d41. Remaining declaration
 kinds, other controls, Gemini Compact, executable session/turn continuation,
 native macOS/Windows and live login remain unproven. No force push, tag, release
 or editor edit occurred. Global 1:1 parity is not claimed.
+
+## Gemini Chat MCP declaration validation and projection
+
+Pinned `gemini_validate_openai_tools_with_kind` runs before the Chat rewrite.
+For an unsupported MCP declaration it projects that original tool through
+`chat_tools.mojo`, requires a nonempty result, validates every translated
+function, then continues checking later original tools. A declaration producing
+no function returns structured HTTP 400 with the original index. Invalid
+translated parameters retain both original and translated-index context.
+Later DeepSeek ToolsShape validation separately rejects present null description
+and nonboolean strict as terminal 502. These stages cannot be collapsed.
+
+MCP/mcp_toolset projection combines allowed/configured names, applies default
+config enablement, sorts and deduplicates original names, preserves selected
+server alias presence, and uses the tagged ASCII segment transform. Non-ASCII
+and punctuation between the first/last ASCII alphanumeric become underscores.
+Already prefixed names avoid a second server prefix. Generated descriptions
+retain raw server context and selected raw tool names; nonblank explicit
+strings retain their original whitespace. Single MCP tools use first-present
+parameters/parametersJsonSchema/input_schema/schema and preserve a present-null
+barrier. Selected strict:true singles fail with the existing disabled-strict
+policy; set-level strict is not forwarded to generated functions. The resulting
+function declarations reuse the current stable duplicate/name/count policy and
+named-choice binding.
+
+Twenty-five unique qualified executable baselines pin clean old production
+`1a878023bdcde8dae59b66a54fc40fd76c078e91` and the unchanged official 0.438.4
+source/binary/manifest: 22 FAIL only Godex and three controls PASS. All reference,
+state and independent mutation invariants pass. Reports are
+`/tmp/gdx-04384-gemini-mcp-declaration-<suffix>-before-oracle.json`;
+commands `/tmp/gdx-04384-gemini-mcp-declarations-before-commands.json`.
+Eight original no-projection/invalid-schema fixtures expected the wrong error
+stage after auditing only the later Chat rewrite. Complete early validation
+source and executable evidence require structured 400s. Those original reports
+remain FAIL and unqualified. Unchanged before binaries were rerun with the
+corrected expectations:
+`...-<suffix>-corrected-before-oracle.json` and
+`/tmp/gdx-04384-gemini-mcp-declarations-corrected-before-commands.json`.
+The 25-case total substitutes those eight reports and does not double-count.
+
+The final gateway regressions were copied alone to old production source in
+`/tmp/gdx-04384-gemini-mcp-declarations-before-work`.
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384Gemini(ChatMCPDeclarationsPreserveCompletePipeline|MCPValidationRetainsOriginalIndexAndLaterFailures)$' -count=1`
+FAILs 42 tests including parents, with six controls PASS:
+`/tmp/gdx-04384-gemini-mcp-declarations-gateway-before.log`.
+The same command PASSes all 48 after repair:
+`/tmp/gdx-04384-gemini-mcp-declarations-gateway-focused.log`.
+It verifies exact buffered/SSE upstream wire, names/order/descriptions, alias
+barriers, distinct error stages, no dispatch and later invalid-tool indexes.
+The two index-continuation checks are source-aligned local coverage; the 25
+executable cases keep their separately recorded scope.
+
+Private `request_chat_mcp_declarations_04384.go` owns projection shared by
+Gemini's early validation and final request normalization. The existing local
+name/config collection, first-string presence helper, first-present selector,
+function validation/deduplication and choice binding are reused. No new shared
+helper, package, exported API, dependency, option, goroutine, routing policy or
+durable format is added. Native MCP conversion stays independent; the local
+shortcut now names the remaining custom/namespace declaration audit.
+
+The 25 independent executable cases retain complete request/client bytes,
+status/header/stdout/exit, authenticated attempts and durable state. Matching
+corruptions alter raw and decoded requests together, including names,
+descriptions, segment normalization, schema markers, original index and error
+wording. They also run in the standalone negative-control gate.
+`rtk proxy go test -json ./...` PASSes 10,400 tests in 71 packages; ten packages
+have no tests and 18 optional installed-Codex/executable tests are skipped:
+`/tmp/gdx-04384-gemini-mcp-declarations-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+PASSes 3,579 tests: `/tmp/gdx-04384-gemini-mcp-declarations-race.log`.
+`rtk proxy make verify` PASSes with exit 0:
+`/tmp/gdx-04384-gemini-mcp-declarations-verify.log`.
+Exact clean-commit executable qualification follows local verification.
+
+Clean `15d1c558a740a04b4da0638650b221606d0f96d4` now PASSes all 559 Gemini
+cases, including every earlier 528, with independent mutations/state:
+`/tmp/gdx-04384-gemini-request-metadata-oracle.json`. Its exact completed
+213-case DeepSeek phase remains retained; the entire default gate is pending.
+Primary fast-forwarded and pushed 15d1c55 directly to origin/main after
+fetch/cleanliness/ancestry checks. Clean `1a87802` separately PASSes all 29
+targeted function-declaration cases, with exact pins, independent mutations and
+state. Full later matrices retain exact revision scope. Remaining declaration
+kinds, other controls, Gemini Compact, executable session/turn continuation,
+native macOS/Windows and live login remain unproven. No force push, tag, release
+or editor edit occurred. Global 1:1 parity is not claimed.

@@ -560,6 +560,16 @@ canonical serde bytes with signed floating-zero equivalence outside quoted
 strings. The 128-function limit follows deduplication. A package-local name
 validator serves both declarations and named choices; broader declaration
 kinds retain their existing conversion pending executable qualification.
+MCP declarations use a private projector shared by the early Gemini validation
+and the Chat request normalizer. Early validation requires at least one valid
+projected declaration per MCP input and preserves the original tool index and
+translated-parameter error context. Later host shape validation retains its
+separate terminal 502 behavior for metadata types. MCP sets combine sorted,
+deduplicated allowed/configured names, preserve server alias presence and raw
+description context, and use the tagged ASCII segment transform. Singles keep
+first-present schema aliases. The resulting functions reuse name/strict/schema
+validation, stable duplicate policy and named-choice binding. Native MCP
+conversion remains separate; custom/namespace declarations await qualification.
 All supported call/tool-output items require a nonblank identity selected from
 the first string `call_id`, `tool_call_id`, then `id`. This local admission runs
 before conversion or orphan filtering can silently drop the malformed item.

@@ -62,6 +62,12 @@ strict mode, name limits, stable duplicate/generic-schema selection, serde
 number kinds, 128-function limits after deduplication, named choices and actual
 SSE. Their original three wrong-admission expectations remain unqualified FAIL;
 corrected unchanged-binary reruns prove those terminal 502s independently.
+The 25 `request-primitive-mcp-declaration-*` cases cover MCP sets/single tools,
+sorted allowed/config unions, defaults, alias barriers, segment normalization,
+description preservation, schema aliases, named choices and real SSE. They also
+distinguish early structured 400s for unsupported/invalid translated tools from
+later terminal 502 shape failures. Eight original wrong-stage expectations stay
+unqualified FAIL; corrected unchanged-binary reruns carry their actual scope.
 
 Build and run from a clean, committed Godex worktree:
 

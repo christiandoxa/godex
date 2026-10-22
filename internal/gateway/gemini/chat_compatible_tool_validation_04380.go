@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // The 0.438.0 API-key Gemini Chat-compatible bridge validates declarations
@@ -36,6 +37,18 @@ func validateGeminiChatCompatibleTools04380(body []byte) error {
 		}
 		kind, _ := tool["type"].(string)
 		_, nested := tool["function"]
+		if strings.HasPrefix(kind, "mcp") && !nested {
+			converted := projectGeminiChatMCPDeclarations04384(tool)
+			if len(converted) == 0 {
+				return fmt.Errorf("invalid_tool_declaration: Gemini request field `tools[%d]` is not a supported tool declaration", index)
+			}
+			for translatedIndex, raw := range converted {
+				if err := validateGeminiToolDeclaration(raw, translatedIndex); err != nil {
+					return fmt.Errorf("invalid_tool_declaration: Gemini request field `tools[%d]` translates to an invalid declaration: %w", index, err)
+				}
+			}
+			continue
+		}
 		if kind == "function" && !nested {
 			function := make(map[string]any, 3)
 			for _, key := range []string{"name", "parameters", "description"} {
