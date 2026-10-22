@@ -9900,3 +9900,22 @@ full934/940/943/948/968/974, DeepSeek232/236 and the e9d88ce entire default
 release gate remain pending on their original handles. Earlier reference
 state-integrity failures, capture failures and fixture errors remain retained;
 this result does not explain or erase them. Overall 1:1 parity is unproven.
+
+### Entire default release gate qualifies exact e9d88ce
+
+Original session 29510 exits 0 for `rtk proxy scripts/verify-release-parity.sh`,
+with no phase option. All seven strict embedded reports PASS at exact clean
+e9d88ce35fbe4bf1f6dcabbb3f7869b1f0106642, including DeepSeek224 and
+Gemini918. The remaining WebSocket and HTTP phases also finish successfully,
+including exact terminal markers for HTTP402/403 profile/quota policy and raw
+HTTP429 policy across both binaries. Audit:
+/tmp/gdx-04384-release-e9d88ce-audit.json. Original log:
+/tmp/gdx-04384-release-e9d88ce.log. The pinned source, binary and manifest match
+the 0.438.4 oracle; per-case/state comparisons and independent matching-mutation
+checks PASS. This is the latest completed entire default gate only at that
+revision, superseding ae685d1 for that distinction. It does not qualify later
+production changes. The original script verifies clean build provenance; its
+EXIT trap removes temporary artifacts, so this record relies on the successful
+original run, embedded pins and unchanged clean source. Existing independent
+reference state failures and fixture errors remain retained. Overall 1:1 parity
+is still unproven; later broader matrices remain pending.
