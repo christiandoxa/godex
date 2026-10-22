@@ -212,6 +212,7 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 			if calls != "" {
 				first = strings.Replace(first, `"delta":{`, `"delta":{"tool_calls":`+calls+",", 1)
 			}
+			first = geminiStreamChoicePacket04384(mock.scenario, first)
 		}
 		first = geminiStreamToolAdmissionFirst04384(mock.scenario, first)
 		_, _ = io.WriteString(w, "data: "+first+separator)

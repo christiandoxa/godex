@@ -3,12 +3,13 @@ package main
 import (
 	"errors"
 	"slices"
+	"strings"
 )
 
 const geminiProjectionReadError04384 = "context deadline exceeded (Client.Timeout or context cancellation while reading body)"
 
 func geminiStreamProjectionCases04384() []string {
-	return []string{"stream-chat-tool-entry-null", "stream-chat-tool-entry-bool", "stream-chat-tool-entry-number", "stream-chat-tool-entry-string", "stream-chat-tool-entry-array", "stream-chat-tool-calls-empty-control", "stream-chat-tool-calls-null-control", "stream-chat-tool-calls-object-control", "stream-chat-tool-calls-bool-control", "stream-chat-tool-calls-absent-control"}
+	return []string{"stream-chat-tool-entry-null", "stream-chat-tool-entry-bool", "stream-chat-tool-entry-number", "stream-chat-tool-entry-string", "stream-chat-tool-entry-array", "stream-chat-tool-calls-empty-control", "stream-chat-tool-calls-null-control", "stream-chat-tool-calls-object-control", "stream-chat-tool-calls-bool-control", "stream-chat-tool-calls-absent-control", "stream-chat-choice-null", "stream-chat-choice-bool", "stream-chat-choice-number", "stream-chat-choice-string", "stream-chat-choice-array", "stream-chat-choice-tail-control"}
 }
 
 func geminiStreamProjectionCase04384(scenario string) bool {
@@ -17,6 +18,8 @@ func geminiStreamProjectionCase04384(scenario string) bool {
 
 func geminiStreamProjectionFixture04384(scenario string) (calls string, pending bool) {
 	switch scenario {
+	case "stream-chat-choice-null", "stream-chat-choice-bool", "stream-chat-choice-number", "stream-chat-choice-string", "stream-chat-choice-array":
+		return "", true
 	case "stream-chat-tool-entry-null":
 		return `[null]`, true
 	case "stream-chat-tool-entry-bool":
@@ -39,6 +42,28 @@ func geminiStreamProjectionFixture04384(scenario string) (calls string, pending 
 	return "", false
 }
 
+func geminiStreamChoicePacket04384(scenario, packet string) string {
+	first := ""
+	switch scenario {
+	case "stream-chat-choice-null":
+		first = "null"
+	case "stream-chat-choice-bool":
+		first = "false"
+	case "stream-chat-choice-number":
+		first = "0"
+	case "stream-chat-choice-string":
+		first = `""`
+	case "stream-chat-choice-array":
+		first = "[]"
+	case "stream-chat-choice-tail-control":
+		return strings.TrimSuffix(packet, "]}") + `,null,false,0,"",[]]}`
+	}
+	if first == "" {
+		return packet
+	}
+	return strings.Replace(packet, `"choices":[`, `"choices":[`+first+",", 1)
+}
+
 func geminiStreamProjectionExpected04384(scenario string) geminiCandidateResult {
 	run := geminiReasoningStreamExpected04384("stream-chat-reasoning-empty")
 	if _, pending := geminiStreamProjectionFixture04384(scenario); pending {
@@ -50,7 +75,7 @@ func geminiStreamProjectionExpected04384(scenario string) geminiCandidateResult 
 func geminiStreamProjectionInvariant04384(scenario string, run geminiCandidateResult) error {
 	if _, pending := geminiStreamProjectionFixture04384(scenario); pending {
 		if run.ExitCode != 1 || run.Client.Body != "" || run.Stdout != "\n" || run.Client.ReadError != geminiProjectionReadError04384 {
-			return errors.New("Gemini nonobject tool projection changed pending response or cancellation")
+			return errors.New("Gemini nonobject projection changed pending response or cancellation")
 		}
 		// Verify the failed-read tuple before reusing the independent request/state guard.
 		baseline := geminiReasoningStreamExpected04384("stream-chat-reasoning-empty")

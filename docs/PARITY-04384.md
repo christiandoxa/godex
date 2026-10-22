@@ -9326,3 +9326,43 @@ unchanged clean e9d88ce source. Reports are
 /tmp/gdx-04384-release-e9d88ce.log. Neither is a PASS yet; keep that checkout
 and HEAD immutable until both finish. The earlier full 912 remains on its
 original session 70523. All earlier FAIL observations remain retained.
+
+### Preserve pending non-object Gemini first-choice projections
+
+Nine exact-clean e9d88ce35fbe4bf1f6dcabbb3f7869b1f0106642 executable baselines
+qualify five Godex-only failures and four PASS controls. Null, boolean, numeric,
+string and array first choices leave the reference pending after SSE 200 with
+empty partial bytes, an exact read deadline, stdout newline and child exit 1.
+Godex instead completes normally. A valid first choice with all five malformed
+shapes in later positions remains a normal success; prior tool-pending,
+ignored-tool and native controls also PASS. Audit:
+/tmp/gdx-04384-gemini-stream-choice-projection-before-audit.json. Raw request
+bytes qualify for all eight projection cases; the legacy native control retains
+its existing decoded-request comparisons. The initial manual audit incorrectly
+required its absent raw_body and failed; the corrected audit makes no raw-native
+claim and changes no report, source fixture or invariant.
+
+Pinned StreamChoiceMetadata requires an object root and the Rust typed wrapper
+fails before returning the current chunk's event batch. The existing Gemini
+projection guard now preflights the first choice using the same quiescent
+pending path as non-object tool entries. Embedded errors retain priority;
+non-array/empty choices and later entries stay ignored. No worker, helper
+package, export, option or persisted state is added. The existing request/body
+cancellation owner still releases upstream exactly once. Narrow regressions
+fail the five shapes before the fix, then cover ignored shapes and embedded
+error priority. The existing independent failure-tuple/request/state/mutation
+invariants now cover six new cases, reaching 924 default Gemini cases.
+
+Focused Gemini and differential tests PASS 2,162 cases. An initial fixture-test
+regex selected no tests and is not qualification; the correctly selected
+TestGeminiStreamProjectionRejectsMatchingCorruption04384 rerun PASSes with
+count 1. Full local and exact clean executable qualification follow. Full
+successful tool lifecycle and continuation snapshots remain open.
+
+Full local validation PASSes 10,883 tests with 18 optional SKIP. make verify
+exits 0 including race tests, cross-builds, vet and source/format guards. Exact
+commands:
+`rtk proxy go test -json ./... > /tmp/gdx-04384-gemini-stream-choice-projection-full.jsonl 2>&1`
+and `rtk proxy make verify > /tmp/gdx-04384-gemini-stream-choice-projection-verify.log 2>&1`.
+Exact clean executable qualification follows; the five original failures remain
+retained and the preceding larger matrices stay on their unchanged sources.

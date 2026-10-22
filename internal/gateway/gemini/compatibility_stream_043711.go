@@ -257,7 +257,7 @@ func (state *geminiChatCompatibleStream043711) accept(writer io.Writer, data []b
 		code, message := chatcompat.ChatStreamError(value)
 		return state.failure(writer, code, message)
 	}
-	if pendingGeminiChatToolProjection04384(root) {
+	if pendingGeminiChatProjection04384(root) {
 		return geminiChatProjectionPending04384{}
 	}
 	state.observeChatChunk(root)

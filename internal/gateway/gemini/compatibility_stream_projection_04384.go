@@ -8,7 +8,7 @@ import (
 
 type geminiChatProjectionPending04384 struct{}
 
-func (geminiChatProjectionPending04384) Error() string { return "unsupported Gemini tool projection" }
+func (geminiChatProjectionPending04384) Error() string { return "unsupported Gemini stream projection" }
 
 type geminiChatStreamSource04384 struct {
 	source io.Closer
@@ -21,12 +21,15 @@ func (source *geminiChatStreamSource04384) Close() error {
 	return source.source.Close()
 }
 
-func pendingGeminiChatToolProjection04384(chunk map[string]any) bool {
+func pendingGeminiChatProjection04384(chunk map[string]any) bool {
 	choices, _ := chunk["choices"].([]any)
 	if len(choices) == 0 {
 		return false
 	}
-	choice, _ := choices[0].(map[string]any)
+	choice, object := choices[0].(map[string]any)
+	if !object {
+		return true
+	}
 	delta, _ := choice["delta"].(map[string]any)
 	calls, _ := delta["tool_calls"].([]any)
 	for _, call := range calls {

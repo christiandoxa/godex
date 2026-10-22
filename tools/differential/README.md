@@ -1071,8 +1071,10 @@ limit remains mandatory even in this mode. A read-error record alone is never
 parity evidence: a focused invariant must verify the expected error, wire,
 status, upstream attempts and state for each product independently.
 
-Ten Gemini tool-projection cases distinguish five non-object array-entry kinds
-from empty, null, object, boolean and absent `tool_calls` controls. The negative
+Sixteen Gemini stream-projection cases distinguish five non-object tool-entry
+kinds and five non-object first-choice kinds from ignored/empty tool-call and
+valid-first-choice controls. Non-first choices retain their ignored behavior.
+The negative
 cases require the tagged pending response: header 200, the exact SSE content
 type, empty partial bytes, the explicit read deadline, stdout newline and child
 exit 1. Successful controls retain complete exact SSE bytes. Every case checks
