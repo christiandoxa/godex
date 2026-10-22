@@ -9366,3 +9366,17 @@ commands:
 and `rtk proxy make verify > /tmp/gdx-04384-gemini-stream-choice-projection-verify.log 2>&1`.
 Exact clean executable qualification follows; the five original failures remain
 retained and the preceding larger matrices stay on their unchanged sources.
+
+Exact clean 5c15397254dd781bf8e28e5d3f29be5482471bd1 subsequently PASSes all
+15 targeted executable scenarios: five new choice projections, one previous
+tool projection, and nine semantic-failure/metadata/usage/native/error/EOF
+controls. Original independent invariants and matching-corruption guards pass;
+both binaries embed that revision with vcs.modified=false, and reference pins
+remain unchanged. The legacy native control keeps its existing decoded-request
+scope. Commands and audit:
+/tmp/gdx-04384-gemini-stream-choice-projection-targeted-commands.json and
+/tmp/gdx-04384-gemini-stream-choice-projection-targeted-audit.json. The change
+is pushed to origin/main after fetch, cleanliness and ancestry checks without
+waiting for CI. Full Gemini 924 now runs on that unchanged source (original
+session 85538); it is not yet a PASS. Earlier 912/918 matrices and the entire
+e9d88ce release gate retain their original handles and immutable checkouts.
