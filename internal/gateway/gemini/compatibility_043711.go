@@ -25,6 +25,12 @@ func (transport *RuntimeTransport) executeChatCompatibleResponses(
 	if err != nil {
 		var failure *proxymodel.Error
 		if errors.As(err, &failure) {
+			// The released API-key bridge returns an empty 500 for valid nonobject roots.
+			if failure.StatusCode == http.StatusInternalServerError {
+				return &proxymodel.Response{StatusCode: http.StatusInternalServerError,
+					Header: make(http.Header), Body: io.NopCloser(bytes.NewReader(nil)),
+					PrecommitFailure: &proxymodel.PrecommitFailure{Code: "invalid_request_error"}}, nil
+			}
 			return nil, failure
 		}
 		return nil, &proxymodel.Error{StatusCode: http.StatusBadRequest, Message: err.Error()}
@@ -100,11 +106,15 @@ func normalizeGeminiChatInput043711(body []byte) ([]byte, error) {
 	// Go normalized/re-serialized an unrelated ignored field into U+FFFD
 	// or a differently rounded f64 before calling the provider.
 	if !geminiSerdeJSONValid04384(body) {
-		return nil, errors.New("invalid Gemini Responses request")
+		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
 	root, err := decodeGeminiChatRequest04384(body)
+	var wrongRoot *json.UnmarshalTypeError
+	if err == nil && root == nil || errors.As(err, &wrongRoot) {
+		return nil, &proxymodel.Error{StatusCode: http.StatusInternalServerError}
+	}
 	if err != nil {
-		return nil, errors.New("invalid Gemini Responses request")
+		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
 	if !validGeminiChatControlTypes04384(root) {
 		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}

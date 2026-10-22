@@ -4757,6 +4757,98 @@ session/turn executable continuation, native macOS/Windows and live
 authentication remain separate audits. Global 1:1 parity is not claimed.
 
 
+## Validated Gemini ignored-control checkpoint: 163d67e
+
+Clean `163d67eb9043439554e7a5dd9662c939db7bdb27` passes all 80 Gemini cases
+and all 125 DeepSeek scenarios, with both independent mutation sets:
+`/tmp/gdx-04384-gemini-parallel-control-oracle.json` and
+`/tmp/gdx-04384-gemini-parallel-control-deepseek-oracle.json`.
+All seven parallel-control value kinds disappear from the exact authenticated
+upstream request. The false control no longer becomes a local rejection,
+and preceding request/response, state, continuation and retry cases remain
+matched. The source/binary provenance gates use the unchanged pinned reference.
+
+The clean binaries were built with
+`rtk go build -trimpath -o /tmp/gdx-04384-gemini-parallel-control-godex ./cmd/godex` and
+`rtk go build -trimpath -o /tmp/gdx-04384-gemini-parallel-control-final-differential ./tools/differential`.
+Commands use `--gemini`, or `--scenario all --scenario-workers 3`.
+The checked clean primary worktree and unchanged remote were fast-forwarded
+and pushed directly to `origin/main` at `163d67e`, without CI wait, force push,
+tag, release or editor-checkout changes. The complete default-script milestone
+remains scoped to `8730116`; global 1:1 parity remains unproven.
+
+
+## Gemini complete-body admission and valid nonobject outcomes
+
+The API-key path parses a complete serde Value before request-shape validation.
+Godex's complete boundary check already rejected invalid Unicode, numeric
+range and depth, and its decoder rejected malformed/trailing JSON, but its
+ordinary 400 error entered routing recovery and could time out. A null root
+also normalized without error before the shared converter rejected it.
+
+Released-executable observations distinguish two outcomes. Malformed/trailing
+JSON, invalid surrogate/UTF-8, numeric overflow and excess depth return exact
+terminal plain 502 `upstream request failed`. Valid null, array, number,
+boolean and string roots return exact empty 500 with no content type.
+Both have exit 2 and zero upstream attempts. The latter result is an observed
+public contract; the repair does not emulate an upstream panic or infer one.
+
+`gateway/gemini/compatibility_043711.go` now preserves the terminal parse error
+and distinguishes a decoder type error/null map from a syntax/completeness
+failure. A valid nonobject is presented as the exact empty 500, carrying local
+`invalid_request_error` precommit evidence so ordinary status-500 model/key
+retry cannot apply. All logic stays in the existing gateway and model boundary;
+the routing use case consumes its existing terminal classification. No new
+production helper, package, exported identifier, dependency, configuration,
+state format or worker was introduced. Native OAuth/GenerateContent admission
+remains a separate surface.
+
+The initial regression assumed every invalid root returned 502. The first
+executable root reports correctly FAIL that expectation on the reference:
+`/tmp/gdx-04384-gemini-json-<root-null|root-array|root-number>-before-oracle.json`.
+They remain unqualified. Corrected regression expectations fail all eleven
+admission cases plus parent before repair:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiChatJSONAdmissionReturnsTerminalPreparationError$' -count=1`;
+`/tmp/gdx-04384-gemini-json-admission-qualified-before.log`.
+The first repair incorrectly grouped syntax/trailing decode errors with root
+type errors. Two focused tests plus parent caught that mistake:
+`/tmp/gdx-04384-gemini-json-admission-reviewed-focused.log`.
+After distinguishing the actual decoder error class, the final focused command
+passes 98 tests, including two-key pool/router no-attempt/no-wait coverage:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384Gemini(ChatJSONAdmissionReturnsTerminalPreparationError|JSONAdmissionDoesNotRetryModelOrCredential|ControlTypesAreCheckedBeforeNormalization|RequestRequiresCompleteSerdeJSON|Chat(IgnoresParallelToolControl|UserIDUsesTaggedAliasesAndValidation|RequestPreservesSerdeToolNumbers|RequestDecodersRequireCompleteObject))$' -count=1 -timeout=30s`;
+`/tmp/gdx-04384-gemini-json-admission-final-focused.log`.
+
+Twelve qualified baseline cases use clean
+`293b1b6cb6d543875847b6aeec0a5e8750a1360b`, the unchanged pinned reference and
+`/tmp/gdx-04384-gemini-json-admission-qualified-differential`.
+The valid-unicode control PASSes both products; five valid nonobject root
+kinds and six malformed/serde classes FAIL only Godex. All reference and
+independent mutation invariants pass:
+`/tmp/gdx-04384-gemini-json-<suffix>-qualified-before-oracle.json`.
+The null-rotation case also FAILs only Godex with the same exact reference
+500 and no attempt despite two configured keys:
+`/tmp/gdx-04384-gemini-json-root-null-rotation-qualified-before-oracle.json`.
+Its harness is `/tmp/gdx-04384-gemini-json-admission-qualified-rotation-differential`.
+Commands use the clean control-types candidate/source and
+`--gemini --scenario request-json-<suffix>`. Independent strict contracts retain
+status, empty or exact body, type presence/absence, child exit, stdout,
+attempts, original authenticated request for the positive control and safe
+durable state. Equal corruptions and missing exchanges fail.
+
+`rtk go test ./tools/differential -count=1` passes 275 tests after correcting
+the root expectation: `/tmp/gdx-04384-gemini-json-admission-qualified-oracle-tests.log`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+passes 2,846 tests: `/tmp/gdx-04384-gemini-json-admission-race.log`.
+`rtk proxy go test -json ./...` passes 9,487 tests across 81 packages:
+`/tmp/gdx-04384-gemini-json-admission-test-all.jsonl`.
+`rtk proxy make verify` passes all local completion gates:
+`/tmp/gdx-04384-gemini-json-admission-verify.log`.
+Clean-commit 102-case Gemini/125-case DeepSeek matrices follow.
+Combined-error ordering, other controls, Gemini Compact,
+session/turn executable continuation, native macOS/Windows and live
+authentication remain open. Global 1:1 parity is not claimed.
+
+
 ## Gemini control-type admission before continuation normalization
 
 The pinned `provider_core_chat_compatible_validate_top_level_request_shape`

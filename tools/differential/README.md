@@ -239,6 +239,15 @@ The existing strict accepted/preparation-failure fixture contracts are reused,
 including body/type/status/exit/stdout, credential, raw request and safe state.
 Matching corruptions cannot turn an invalid control into fresh work.
 
+Gemini `request-json-*` fixtures cover a valid Unicode control; null, array,
+number, boolean and string roots; malformed/trailing JSON; invalid surrogate/
+UTF-8; numeric overflow and excess depth. Parse failures require exact terminal
+plain 502; valid nonobject roots require exact empty 500 with no content type.
+Both require exit 2 and zero upstream attempts, and the null-rotation fixture
+configures two synthetic keys. The valid control requires one exact original
+authenticated request and exact native response. All retain strict stdout and
+durable-state checks; equal status/body/type/exit/attempt/state corruptions fail.
+
 The 0.438.4 `deepseek-sse-error-presence`, `deepseek-sse-error-i64` and
 `deepseek-sse-error-float` scenarios verify embedded-error primary-field
 presence and signed numeric kinds. Each must produce one failure frame
