@@ -4,10 +4,12 @@ import (
 	"io"
 	"strings"
 	"testing"
+
+	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 )
 
 func TestProdex04384DeepSeekSSEReassemblesJSONBeforeEmitting(t *testing.T) {
-	state := newDeepSeekChatStreamState(1, nil, nil, deepSeekConversationStore{})
+	state := newDeepSeekChatStreamState(1, nil, nil, chatcompat.ConversationStore{})
 	first, last := `{"choices":[{"delta":{"content":"frag`, `ment"}}]}`
 	if output, supported, err := state.observe([]byte(first)); err != nil || supported || len(output) != 0 {
 		t.Fatalf("partial JSON failed or emitted before reassembly: err=%v output=%s", err, output)

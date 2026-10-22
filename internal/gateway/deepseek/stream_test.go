@@ -3,10 +3,12 @@ package deepseek
 import (
 	"strings"
 	"testing"
+
+	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 )
 
 func TestTranslateDeepSeekSSEDataRejectsRetainedMalformedJSONAtDone(t *testing.T) {
-	state := newDeepSeekChatStreamState(1, nil, nil, deepSeekConversationStore{})
+	state := newDeepSeekChatStreamState(1, nil, nil, chatcompat.ConversationStore{})
 	if output, supported, err := state.observe([]byte("{bad")); err != nil || supported || len(output) != 0 {
 		t.Fatalf("partial JSON was committed or rejected before DONE: output=%s error=%v", output, err)
 	}
@@ -32,7 +34,7 @@ func TestTranslateDeepSeekSSEDataAddsToolItemBeforeArgumentDelta(t *testing.T) {
 }
 
 func TestProdex04361DeepSeekStreamPreservesWhitespaceBytesAndTerminalOrder(t *testing.T) {
-	state := newDeepSeekChatStreamState(7, nil, nil, deepSeekConversationStore{})
+	state := newDeepSeekChatStreamState(7, nil, nil, chatcompat.ConversationStore{})
 	state.createdAt = 123
 	var stream strings.Builder
 	for _, chunk := range []string{

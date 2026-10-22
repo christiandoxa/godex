@@ -3,12 +3,14 @@ package deepseek
 import (
 	"strings"
 	"testing"
+
+	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 )
 
 func TestProdex04384DeepSeekFinishCompletesToolsBeforeDoneAndUsage(t *testing.T) {
 	for _, finish := range []string{`"tool_calls"`, `""`, `"  stop  "`} {
 		t.Run(finish, func(t *testing.T) {
-			state := newDeepSeekChatStreamState(1, nil, nil, deepSeekConversationStore{})
+			state := newDeepSeekChatStreamState(1, nil, nil, chatcompat.ConversationStore{})
 			first, _, err := state.observe([]byte(`{"id":"chat-finish","choices":[{"delta":{"tool_calls":[{"index":0,"id":"call-finish","function":{"name":"lookup","arguments":"{}"}}]},"finish_reason":` + finish + `}]}`))
 			if err != nil || strings.Count(string(first), "event: response.output_item.done") != 1 || strings.Contains(string(first), "event: response.completed") {
 				t.Fatalf("tool finish did not complete its item immediately: error=%v output=%s", err, first)
@@ -28,7 +30,7 @@ func TestProdex04384DeepSeekFinishCompletesToolsBeforeDoneAndUsage(t *testing.T)
 
 func TestProdex04384DeepSeekInvalidToolFailsAtFinishWithoutDone(t *testing.T) {
 	for _, finish := range []string{`"tool_calls"`, `""`} {
-		state := newDeepSeekChatStreamState(1, nil, nil, deepSeekConversationStore{})
+		state := newDeepSeekChatStreamState(1, nil, nil, chatcompat.ConversationStore{})
 		output, _, err := state.observe([]byte(`{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call-bad","function":{"name":"lookup","arguments":"{bad"}}]},"finish_reason":` + finish + `}]}`))
 		if err != nil || strings.Count(string(output), "event: response.failed") != 1 || strings.Contains(string(output), "event: response.output_item.done") {
 			t.Fatalf("invalid tool was not failed at finish: error=%v output=%s", err, output)
@@ -41,7 +43,7 @@ func TestProdex04384DeepSeekInvalidToolFailsAtFinishWithoutDone(t *testing.T) {
 
 func TestProdex04384DeepSeekAbsentFinishDoesNotCompleteTool(t *testing.T) {
 	for _, field := range []string{"", `,"finish_reason":null`, `,"finish_reason":false`} {
-		state := newDeepSeekChatStreamState(1, nil, nil, deepSeekConversationStore{})
+		state := newDeepSeekChatStreamState(1, nil, nil, chatcompat.ConversationStore{})
 		output, _, err := state.observe([]byte(`{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call-later","function":{"name":"lookup","arguments":"{}"}}]}` + field + `}]}`))
 		if err != nil || strings.Contains(string(output), "event: response.output_item.done") || strings.Contains(string(output), "event: response.failed") {
 			t.Fatalf("missing/non-string finish prematurely completed tool: output=%s error=%v", output, err)

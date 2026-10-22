@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
@@ -14,14 +15,14 @@ func translateAnthropicResponse(response *http.Response, requestMetadata map[str
 }
 
 func translateAnthropicResponseWithRequestID(response *http.Response, requestMetadata map[string]any, requestID uint64) (*proxymodel.Response, error) {
-	return translateAnthropicResponseWithConversation(response, requestMetadata, requestID, deepSeekConversationStore{}, nil)
+	return translateAnthropicResponseWithConversation(response, requestMetadata, requestID, chatcompat.ConversationStore{}, nil)
 }
 
 func translateAnthropicResponseWithConversation(
 	response *http.Response,
 	requestMetadata map[string]any,
 	requestID uint64,
-	conversations deepSeekConversationStore,
+	conversations chatcompat.ConversationStore,
 	conversationMessages []any,
 ) (*proxymodel.Response, error) {
 	if deepSeekContentTypeIsSSE04384(response.Header.Get(contentTypeHeader)) {

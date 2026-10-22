@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 )
 
 // An executable-vs-executable Prodex 0.437.13 SSE probe showed that the
@@ -28,7 +30,7 @@ func TestProdex043713DeepSeekInvalidJSONFailureMatchesOfficialWireMessage(t *tes
 			t.Fatalf("failure message differs from exact Prodex 0.437.13: %v", err)
 		}
 	}
-	state := newDeepSeekChatStreamState(5, nil, nil, deepSeekConversationStore{})
+	state := newDeepSeekChatStreamState(5, nil, nil, chatcompat.ConversationStore{})
 	chunk, _ := json.Marshal(map[string]any{"choices": []any{map[string]any{
 		"delta": map[string]any{"tool_calls": []any{map[string]any{
 			"index": 0, "id": "call-toolargs", "function": map[string]any{"name": "shell", "arguments": `{"cmd":"\uD800"}`},

@@ -1,19 +1,23 @@
 package deepseek
 
-import "strings"
+import (
+	"strings"
 
-func deepSeekConversationHistoryForRequest(body []byte, store deepSeekConversationStore) []any {
+	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
+)
+
+func deepSeekConversationHistoryForRequest(body []byte, store chatcompat.ConversationStore) []any {
 	object, err := parseResponsesObjectWithoutValidation(body)
 	if err != nil {
 		return nil
 	}
 	if previous, _ := object["previous_response_id"].(string); strings.TrimSpace(previous) != "" {
-		if history := store.history(strings.TrimSpace(previous)); len(history) > 0 {
+		if history := store.History(strings.TrimSpace(previous)); len(history) > 0 {
 			return history
 		}
 	}
 	if callID := deepSeekFirstToolOutputCallID(object); callID != "" {
-		return store.findHistoryByCallID(callID)
+		return store.FindHistoryByCallID(callID)
 	}
 	return nil
 }
@@ -22,7 +26,7 @@ func mergeDeepSeekHistory(history, current []any) []any {
 	if len(history) == 0 {
 		return current
 	}
-	result := cloneDeepSeekMessages(history)
+	result := chatcompat.CloneMessages(history)
 	toolCalls := deepSeekToolCallIDs(history)
 	toolOutputs := deepSeekToolOutputIDs(history)
 	signatures := deepSeekMessageSignatures(history)
@@ -112,7 +116,7 @@ func deepSeekMessageSignatures(messages []any) map[string]bool {
 }
 
 func cloneDeepSeekMap(value map[string]any) map[string]any {
-	cloned := cloneDeepSeekMessages([]any{value})
+	cloned := chatcompat.CloneMessages([]any{value})
 	if len(cloned) != 1 {
 		return map[string]any{}
 	}
@@ -205,7 +209,7 @@ func deepSeekValueHasContent(value any) bool {
 }
 
 func normalizeDeepSeekThinkingToolCallMessages(messages []any) []any {
-	result := cloneDeepSeekMessages(messages)
+	result := chatcompat.CloneMessages(messages)
 	for index, raw := range result {
 		message, _ := raw.(map[string]any)
 		if message == nil || message["role"] != "assistant" {
@@ -225,4 +229,19 @@ func normalizeDeepSeekThinkingToolCallMessages(messages []any) []any {
 		result[index] = copy
 	}
 	return result
+}
+
+func deepSeekFirstToolOutputCallID(object map[string]any) string {
+	items, _ := object["input"].([]any)
+	for _, raw := range items {
+		item, _ := raw.(map[string]any)
+		kind, _ := item["type"].(string)
+		switch kind {
+		case "function_call_output", "custom_tool_call_output", "mcp_tool_result", "mcp_call_output":
+			if id := firstStringValue(item, deepSeekCallIDKey, deepSeekToolCallIDKey, "id"); strings.TrimSpace(id) != "" {
+				return strings.TrimSpace(id)
+			}
+		}
+	}
+	return ""
 }

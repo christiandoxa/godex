@@ -6,13 +6,15 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 )
 
 // The exact Prodex 0.436.1 binary emits these five events for one text chunk.
 // In particular it does not append response.output_text.done and it keeps
 // created_at/object out of the nested completed response.
 func TestProdex04361DeepSeekStreamExactEventSequence(t *testing.T) {
-	state := newDeepSeekChatStreamState(123, nil, nil, deepSeekConversationStore{})
+	state := newDeepSeekChatStreamState(123, nil, nil, chatcompat.ConversationStore{})
 	state.createdAt = 1
 	var wire strings.Builder
 	for _, value := range []string{
@@ -88,7 +90,7 @@ func TestProdex04361DeepSeekSSEHeadersRejectUpstreamFingerprintLeak(t *testing.T
 		},
 		Body: io.NopCloser(strings.NewReader("data: [DONE]\n\n")),
 	}
-	result, err := translateResponseWithConversation(upstream, nil, deepSeekConversationStore{}, nil, 1)
+	result, err := translateResponseWithConversation(upstream, nil, chatcompat.ConversationStore{}, nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}

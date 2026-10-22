@@ -5,6 +5,8 @@ import (
 	"io"
 	"strings"
 	"testing"
+
+	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 )
 
 func TestProdex04384StreamToolNamespaceSplittingRetainsOriginalBytes(t *testing.T) {
@@ -40,7 +42,7 @@ func TestProdex04384StreamToolPaddedSpecialNameRemainsFunctionCall(t *testing.T)
 
 func TestProdex04384StreamToolNamePresenceReplacesEarlierValue(t *testing.T) {
 	for _, name := range []any{"", " \u3000\t", nil, 7} {
-		state := newDeepSeekChatStreamState(1, nil, nil, deepSeekConversationStore{})
+		state := newDeepSeekChatStreamState(1, nil, nil, chatcompat.ConversationStore{})
 		first := []byte(`{"id":"chat-name","created":1,"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call-name","function":{"name":"lookup","arguments":"{}"}}]}}]}`)
 		if _, _, err := state.observe(first); err != nil {
 			t.Fatal(err)

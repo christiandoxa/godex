@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 	"github.com/christiandoxa/godex/internal/helper/sse"
 )
 
@@ -24,7 +25,7 @@ func TestProdex04384StreamToolIDPresenceAndFallbackReachEveryEvent(t *testing.T)
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
 			chunk := `{"id":"chat-tool-id","created":1,"choices":[{"delta":{"tool_calls":[{` + fixture.member + `"index":0,"function":{"name":"lookup","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}`
-			body := deepSeekChatSSEWithConversation(io.NopCloser(strings.NewReader("data: "+chunk+"\n\ndata: [DONE]\n\n")), 42, nil, nil, deepSeekConversationStore{})
+			body := deepSeekChatSSEWithConversation(io.NopCloser(strings.NewReader("data: "+chunk+"\n\ndata: [DONE]\n\n")), 42, nil, nil, chatcompat.ConversationStore{})
 			defer body.Close()
 			output, err := io.ReadAll(body)
 			if err != nil {
@@ -54,7 +55,7 @@ func TestProdex04384StreamToolIDPresenceAndFallbackReachEveryEvent(t *testing.T)
 }
 
 func TestProdex04384StreamToolFallbackIsUUIDv7EvenAtMaximumIndices(t *testing.T) {
-	state := newDeepSeekChatStreamState(^uint64(0), nil, nil, deepSeekConversationStore{})
+	state := newDeepSeekChatStreamState(^uint64(0), nil, nil, chatcompat.ConversationStore{})
 	state.observeToolCallDelta(map[string]any{
 		"index": json.Number("18446744073709551615"), "function": map[string]any{"name": "lookup"},
 	})
@@ -62,7 +63,7 @@ func TestProdex04384StreamToolFallbackIsUUIDv7EvenAtMaximumIndices(t *testing.T)
 }
 
 func TestProdex04384StreamToolPresentEmptyIDReplacesEarlierIdentity(t *testing.T) {
-	state := newDeepSeekChatStreamState(7, nil, nil, deepSeekConversationStore{})
+	state := newDeepSeekChatStreamState(7, nil, nil, chatcompat.ConversationStore{})
 	for _, callID := range []any{"original", nil, 7, ""} {
 		state.observeToolCallDelta(map[string]any{
 			"index": json.Number("2"), "id": callID, "function": map[string]any{"name": "lookup"},

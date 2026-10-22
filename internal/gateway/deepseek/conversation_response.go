@@ -3,6 +3,8 @@ package deepseek
 import (
 	"encoding/json"
 	"strings"
+
+	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 )
 
 func deepSeekTranslatedConversationMessages(body []byte) []any {
@@ -11,7 +13,7 @@ func deepSeekTranslatedConversationMessages(body []byte) []any {
 		return nil
 	}
 	messages, _ := value["messages"].([]any)
-	return cloneDeepSeekMessages(messages)
+	return chatcompat.CloneMessages(messages)
 }
 
 func deepSeekChatAssistantMessages(body []byte) []any {
@@ -39,7 +41,7 @@ func deepSeekChatAssistantMessages(body []byte) []any {
 }
 
 func deepSeekStoreBufferedConversation(
-	store deepSeekConversationStore,
+	store chatcompat.ConversationStore,
 	conversationMessages []any,
 	upstreamBody, translatedBody []byte,
 ) {
@@ -51,9 +53,9 @@ func deepSeekStoreBufferedConversation(
 	if strings.TrimSpace(responseID) == "" {
 		return
 	}
-	messages := cloneDeepSeekMessages(conversationMessages)
+	messages := chatcompat.CloneMessages(conversationMessages)
 	messages = append(messages, deepSeekChatAssistantMessages(upstreamBody)...)
-	store.insert(responseID, messages)
+	store.Insert(responseID, messages)
 }
 
 func deepSeekAnthropicAssistantMessages(body []byte) []any {
@@ -105,7 +107,7 @@ func deepSeekAnthropicAssistantMessages(body []byte) []any {
 }
 
 func deepSeekStoreAnthropicConversation(
-	store deepSeekConversationStore,
+	store chatcompat.ConversationStore,
 	conversationMessages []any,
 	upstreamBody, translatedBody []byte,
 ) {
@@ -117,7 +119,7 @@ func deepSeekStoreAnthropicConversation(
 	if strings.TrimSpace(responseID) == "" {
 		return
 	}
-	messages := cloneDeepSeekMessages(conversationMessages)
+	messages := chatcompat.CloneMessages(conversationMessages)
 	messages = append(messages, deepSeekAnthropicAssistantMessages(upstreamBody)...)
-	store.insert(responseID, messages)
+	store.Insert(responseID, messages)
 }

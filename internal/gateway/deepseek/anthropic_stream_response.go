@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 )
 
 type anthropicStreamState struct {
@@ -26,7 +28,7 @@ type anthropicStreamState struct {
 	hasStopReason        bool
 	requestMetadata      map[string]any
 	conversationMessages []any
-	conversations        deepSeekConversationStore
+	conversations        chatcompat.ConversationStore
 	completed            bool
 }
 
@@ -287,77 +289,6 @@ func (state *anthropicStreamState) ensureSyntheticBlock(index uint64, kind strin
 	state.blocks[index] = block
 	state.blockOrder = append(state.blockOrder, block)
 	return block
-}
-
-func (state *anthropicStreamState) messageStopped(now time.Time) ([]byte, bool, error) {
-	if state.completed {
-		return nil, false, nil
-	}
-	content := make([]any, 0, len(state.blockOrder))
-	for _, block := range state.blockOrder {
-		if block.kind == "text" && stringOr(block.value["text"], "") == "" {
-			continue
-		}
-		if block.partialJSON.Len() > 0 {
-			var input any
-			if err := json.Unmarshal([]byte(block.partialJSON.String()), &input); err != nil {
-				if block.kind != "server_tool_use" {
-					return nil, false, fmt.Errorf("failed to parse Anthropic tool input JSON: %w", err)
-				}
-				input = map[string]any{}
-			}
-			block.value["input"] = input
-		}
-		content = append(content, block.value)
-	}
-	createdAt := state.createdAt
-	if createdAt.IsZero() {
-		createdAt = now
-	}
-	if state.id == "" {
-		state.id = anthropicStreamFallbackID(now)
-	}
-	usage := map[string]any{"input_tokens": state.inputTokens, "output_tokens": state.outputTokens}
-	if state.serverToolUse != nil {
-		usage["server_tool_use"] = state.serverToolUse
-	}
-	responseSource := map[string]any{
-		"id": state.id, "model": state.model, "content": content, "usage": usage,
-	}
-	if state.hasStopReason {
-		responseSource["stop_reason"] = state.stopReason
-	}
-	encoded, err := json.Marshal(responseSource)
-	if err != nil {
-		return nil, false, errors.New("failed to serialize native DeepSeek Messages stream response")
-	}
-	completed, err := deepSeekAnthropicResponse(encoded, createdAt)
-	if err != nil {
-		return nil, false, err
-	}
-	completed, err = mergeAnthropicResponseMetadata(completed, state.requestMetadata)
-	if err != nil {
-		return nil, false, err
-	}
-	var response map[string]any
-	if err := json.Unmarshal(completed, &response); err != nil {
-		return nil, false, errors.New("failed to parse completed native DeepSeek Messages response")
-	}
-	events, err := state.outputDoneEvents()
-	if err != nil {
-		return nil, false, err
-	}
-	events = append(events, anthropicStreamEvent("response.completed", map[string]any{
-		"type": "response.completed", "sequence_number": state.nextSequenceNumber(),
-		"created_at": createdAt.Unix(), "response": response,
-	}))
-	if encodedSource, encodeErr := json.Marshal(responseSource); encodeErr == nil {
-		messages := cloneDeepSeekMessages(state.conversationMessages)
-		messages = append(messages, deepSeekAnthropicAssistantMessages(encodedSource)...)
-		state.conversations.insert(state.id, messages)
-	}
-	state.completed = true
-	return bytes.Join(events, nil), true, nil
 }
 
 func (state *anthropicStreamState) observeUsage(value any) {

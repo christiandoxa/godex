@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 	"github.com/christiandoxa/godex/internal/helper/sse"
 )
 
@@ -69,7 +70,7 @@ func TestProdex04384DeepSeekUsageKeepsFullUnsignedCounters(t *testing.T) {
 
 func TestProdex04384DeepSeekStreamCreationEpochKeepsUnsignedRange(t *testing.T) {
 	for _, created := range []string{"0", "9223372036854775808", "18446744073709551615"} {
-		state := newDeepSeekChatStreamState(1, nil, nil, deepSeekConversationStore{})
+		state := newDeepSeekChatStreamState(1, nil, nil, chatcompat.ConversationStore{})
 		data, _, err := state.observe([]byte(`{"created":` + created + `,"choices":[{"delta":{"content":"epoch-control"}}]}`))
 		if err != nil {
 			t.Fatal(err)

@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 )
 
 // Published 0.438.4 response_transform.rs parses the complete upstream
@@ -67,7 +69,7 @@ func TestProdex04384DeepSeekSSEChunkRequiresCompleteSerdeJSON(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			payload := []byte(`{"id":"chatcmpl-synthetic","choices":[{"delta":{"content":"stream-text"}}]` + tc.extra + `}`)
-			state := newDeepSeekChatStreamState(42, nil, nil, deepSeekConversationStore{})
+			state := newDeepSeekChatStreamState(42, nil, nil, chatcompat.ConversationStore{})
 			wire, _, err := state.observe(payload)
 			if err != nil {
 				t.Fatal(err)

@@ -17,13 +17,13 @@ import (
 )
 
 func translateResponseWithMetadata(response *http.Response, requestMetadata map[string]any) (*proxymodel.Response, error) {
-	return translateResponseWithConversation(response, requestMetadata, deepSeekConversationStore{}, nil, 0)
+	return translateResponseWithConversation(response, requestMetadata, chatcompat.ConversationStore{}, nil, 0)
 }
 
 func translateResponseWithConversation(
 	response *http.Response,
 	requestMetadata map[string]any,
-	conversations deepSeekConversationStore,
+	conversations chatcompat.ConversationStore,
 	conversationMessages []any,
 	requestID uint64,
 ) (*proxymodel.Response, error) {

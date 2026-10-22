@@ -2,7 +2,6 @@ package deepseek
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -141,29 +140,6 @@ func TestProdex04355DeepSeekToolOutputReplaysNewestHistoryByCallID(t *testing.T)
 	messages, _ := requests[2]["messages"].([]any)
 	if len(messages) != 3 || messages[0].(map[string]any)["content"] != "new prompt" || messages[2].(map[string]any)["tool_call_id"] != "call-shared" {
 		t.Fatalf("call-id replay = %#v", messages)
-	}
-}
-
-func TestProdex04355DeepSeekConversationScopesDoNotLeak(t *testing.T) {
-	store := newDeepSeekConversationStore()
-	left := store.scoped("tenant-a")
-	right := store.scoped("tenant-b")
-	left.insert("resp-1", []any{map[string]any{"role": "user", "content": "secret-a"}})
-	if got := right.history("resp-1"); len(got) != 0 {
-		t.Fatalf("cross-scope history leaked = %#v", got)
-	}
-}
-
-func TestProdex04355DeepSeekConversationStoreEvictsOldestPerScope(t *testing.T) {
-	store := newDeepSeekConversationStore().scoped("tenant-a")
-	for index := 0; index <= deepSeekConversationsPerScope; index++ {
-		store.insert(fmt.Sprintf("resp-%d", index), []any{map[string]any{"role": "user", "content": index}})
-	}
-	if got := store.history("resp-0"); len(got) != 0 {
-		t.Fatalf("oldest conversation survived scope cap = %#v", got)
-	}
-	if got := store.history(fmt.Sprintf("resp-%d", deepSeekConversationsPerScope)); len(got) == 0 {
-		t.Fatal("newest conversation was evicted")
 	}
 }
 

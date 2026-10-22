@@ -18,7 +18,6 @@
 706	internal/delivery/cli/superexpose/session_output_read.go
 470	internal/delivery/http/proxy/broker_admin.go
 471	internal/delivery/http/proxy/smart_context.go
-407	internal/gateway/deepseek/anthropic_stream_response.go
 558	internal/gateway/presidio/engine.go
 421	internal/usecase/routing/broker_metrics.go
 460	internal/usecase/runtime/activity.go

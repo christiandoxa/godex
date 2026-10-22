@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 )
 
 func TestProdex04384BufferedSearchRuntimeDepthBoundary(t *testing.T) {
@@ -19,7 +21,7 @@ func TestProdex04384BufferedSearchRuntimeDepthBoundary(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		store := newDeepSeekConversationStore()
+		store := chatcompat.NewConversationStore()
 		response, err := translateResponseWithConversation(&http.Response{StatusCode: 200,
 			Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(bytes.NewReader(body))},
 			nil, store, []any{map[string]any{"role": "user", "content": "synthetic"}}, 1)
@@ -38,7 +40,7 @@ func TestProdex04384BufferedSearchRuntimeDepthBoundary(t *testing.T) {
 		} else if response.StatusCode != 500 || len(output) != 0 || len(response.Header.Values("Content-Type")) != 0 {
 			t.Fatalf("runtime depth %d response = status %d, body bytes %d", depth, response.StatusCode, len(output))
 		}
-		if store.contains("resp-depth") != (depth == 124) {
+		if store.Contains("resp-depth") != (depth == 124) {
 			t.Fatalf("runtime depth %d stored the wrong conversation ownership", depth)
 		}
 	}

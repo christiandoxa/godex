@@ -5,6 +5,8 @@ import (
 	"io"
 	"strings"
 	"testing"
+
+	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 )
 
 func TestProdex04384StreamToolThoughtSignaturePreservesNonblankBytes(t *testing.T) {
@@ -22,7 +24,7 @@ func TestProdex04384StreamToolThoughtSignaturePreservesNonblankBytes(t *testing.
 
 func TestProdex04384StreamToolThoughtSignatureSurvivesItemsAndSnapshot(t *testing.T) {
 	const signature = "\t sig_🧭 \n"
-	state := newDeepSeekChatStreamState(1, nil, nil, deepSeekConversationStore{})
+	state := newDeepSeekChatStreamState(1, nil, nil, chatcompat.ConversationStore{})
 	chunk, err := json.Marshal(map[string]any{
 		"id": "chat-signature", "created": 1, "choices": []any{map[string]any{
 			"delta": map[string]any{"tool_calls": []any{map[string]any{
@@ -61,7 +63,7 @@ func TestProdex04384StreamToolThoughtSignatureSurvivesItemsAndSnapshot(t *testin
 }
 
 func TestProdex04384StreamToolBlankSignatureDoesNotReplaceEarlierValue(t *testing.T) {
-	state := newDeepSeekChatStreamState(1, nil, nil, deepSeekConversationStore{})
+	state := newDeepSeekChatStreamState(1, nil, nil, chatcompat.ConversationStore{})
 	for _, signature := range []string{"original", " \u3000\t", ""} {
 		state.observeToolCallDelta(map[string]any{
 			"index": json.Number("0"), "function": map[string]any{"name": "lookup"},

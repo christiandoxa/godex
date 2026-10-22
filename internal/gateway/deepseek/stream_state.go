@@ -48,7 +48,7 @@ type deepSeekChatStreamState struct {
 	reasoningPartAdded   bool
 	toolCalls            map[uint64]*deepSeekChatStreamToolCall
 	conversationMessages []any
-	conversations        deepSeekConversationStore
+	conversations        chatcompat.ConversationStore
 	responseMetadata     map[string]any
 }
 
@@ -57,10 +57,10 @@ type deepSeekCompletedStreamTool struct {
 	item  map[string]any
 }
 
-func newDeepSeekChatStreamState(requestID uint64, messages []any, metadata map[string]any, conversations deepSeekConversationStore) *deepSeekChatStreamState {
+func newDeepSeekChatStreamState(requestID uint64, messages []any, metadata map[string]any, conversations chatcompat.ConversationStore) *deepSeekChatStreamState {
 	return &deepSeekChatStreamState{
 		requestID: requestID, responseID: deepSeekResponseFallbackID(), createdAt: uint64(time.Now().Unix()),
-		toolCalls: make(map[uint64]*deepSeekChatStreamToolCall), conversationMessages: cloneDeepSeekMessages(messages),
+		toolCalls: make(map[uint64]*deepSeekChatStreamToolCall), conversationMessages: chatcompat.CloneMessages(messages),
 		conversations: conversations, responseMetadata: metadata,
 	}
 }
@@ -343,9 +343,9 @@ func (state *deepSeekChatStreamState) storeConversationSnapshot() {
 	if assistant["content"] == nil && len(state.toolCalls) == 0 && state.reasoning.Len() == 0 {
 		return
 	}
-	messages := cloneDeepSeekMessages(state.conversationMessages)
+	messages := chatcompat.CloneMessages(state.conversationMessages)
 	messages = append(messages, assistant)
-	state.conversations.insert(state.responseID, messages)
+	state.conversations.Insert(state.responseID, messages)
 }
 
 func (state *deepSeekChatStreamState) nextSequenceNumber() uint64 {

@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 )
 
 // Prodex 0.437.0 emits one terminal provider_stream_error when a syntactically
@@ -36,7 +38,7 @@ func TestProdex04370DeepSeekTranslatedSSECommitsBeforeProviderError(t *testing.T
 		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
 		Body:       io.NopCloser(strings.NewReader(wire)),
 	}
-	response, err := translateResponseWithConversation(upstream, nil, newDeepSeekConversationStore(), nil, 123)
+	response, err := translateResponseWithConversation(upstream, nil, chatcompat.NewConversationStore(), nil, 123)
 	if err != nil {
 		t.Fatal(err)
 	}

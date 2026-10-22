@@ -6,6 +6,8 @@ import (
 	"io"
 	"strings"
 	"testing"
+
+	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 )
 
 func TestProdex04384StreamToolValidationUsesLowestInvalidIndex(t *testing.T) {
@@ -58,7 +60,7 @@ func TestProdex04384StreamToolValidationUsesLowestInvalidIndex(t *testing.T) {
 }
 
 func TestProdex04384StreamToolValidationKeepsValidAndSingleFailureControls(t *testing.T) {
-	state := newDeepSeekChatStreamState(1, nil, nil, deepSeekConversationStore{})
+	state := newDeepSeekChatStreamState(1, nil, nil, chatcompat.ConversationStore{})
 	for _, index := range []uint64{^uint64(0), 17, 0} {
 		call := &deepSeekChatStreamToolCall{name: "shell"}
 		call.arguments.WriteString(`{}`)

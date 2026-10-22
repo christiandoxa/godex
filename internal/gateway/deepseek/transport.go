@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	providerentity "github.com/christiandoxa/godex/internal/entity/provider"
+	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 	compactgateway "github.com/christiandoxa/godex/internal/gateway/compact"
 	"github.com/christiandoxa/godex/internal/helper/httpheader"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
@@ -32,7 +33,7 @@ type RuntimeTransport struct {
 	betaUpstream  *url.URL
 	apiKey        string
 	options       RequestOptions
-	conversations deepSeekConversationStore
+	conversations chatcompat.ConversationStore
 }
 
 func NewRuntimeTransport(apiURL, apiKey string, client *http.Client) (*RuntimeTransport, error) {
@@ -65,7 +66,7 @@ func NewRuntimeTransportWithOptions(apiURL, apiKey string, options RequestOption
 	}
 	return &RuntimeTransport{
 		client: cloneClient(client), upstream: parsed, betaUpstream: betaUpstream, apiKey: apiKey, options: options,
-		conversations: newDeepSeekConversationStore(),
+		conversations: chatcompat.NewConversationStore(),
 	}, nil
 }
 
@@ -92,7 +93,7 @@ type deepSeekResponseAttempt struct {
 	nativeMessages       bool
 	metadata             map[string]any
 	conversationMessages []any
-	conversations        deepSeekConversationStore
+	conversations        chatcompat.ConversationStore
 }
 
 type deepSeekPrecommitState struct {
@@ -108,7 +109,7 @@ func (transport *RuntimeTransport) executeResponses(ctx context.Context, input p
 		models = []string{"deepseek-v4-pro", "deepseek-v4-flash"}
 	}
 	firstEventRetryUsed := input.FirstEventRetryUsed
-	conversations := transport.conversationsForRequest(input)
+	conversations := transport.conversations.ForRequest(input)
 	for index := 0; index < len(models); index++ {
 		candidate := models[index]
 		attempt, err := transport.prepareResponseAttempt(input, current, candidate, conversations)
@@ -143,7 +144,7 @@ func (transport *RuntimeTransport) executeResponses(ctx context.Context, input p
 	return nil, errors.New("DeepSeek runtime model fallback produced no attempts")
 }
 
-func (transport *RuntimeTransport) prepareResponseAttempt(input proxymodel.Request, current route, candidate string, conversations deepSeekConversationStore) (deepSeekResponseAttempt, error) {
+func (transport *RuntimeTransport) prepareResponseAttempt(input proxymodel.Request, current route, candidate string, conversations chatcompat.ConversationStore) (deepSeekResponseAttempt, error) {
 	history := deepSeekConversationHistoryForRequest(input.Body, conversations)
 	translated, err := translateResponsesRequestWithHistory(input.Body, RequestOptions{
 		Model: candidate, StrictTools: transport.options.StrictTools, WebSearchMode: transport.options.WebSearchMode,

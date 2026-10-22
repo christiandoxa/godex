@@ -232,6 +232,11 @@ transport and credential; a runtime pool exposes only accounts whose private
 Claude auth-status probe with provider credential environment variables removed.
 gateway/chatcompat owns the reusable Responses-to-Chat request transform and Chat
 JSON/SSE-to-Responses transform. It contains no credential or routing policy.
+It also owns the bounded Chat conversation snapshots previously private to
+DeepSeek: 256 entries per request namespace, 2048 entries overall and a 64 MiB
+serde-size estimate. Request namespace selection and snapshot cloning remain
+protocol concerns; each credential transport owns its cache lifetime. DeepSeek
+still owns history reconstruction, assistant projection and response eligibility.
 Its shared Chat Completions stream-error classifier owns exact field-presence
 and numeric-kind rules for the DeepSeek and Gemini adapters. Each adapter
 acquires its own input, preserves JSON number types, and controls response

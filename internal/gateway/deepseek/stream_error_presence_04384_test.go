@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 	"github.com/christiandoxa/godex/internal/helper/sse"
 )
 
@@ -35,7 +36,7 @@ func TestProdex04384DeepSeekEmbeddedErrorPreservesPresenceAndIntegerType(t *test
 		{"secondary-message", `{"detail":"详情 🚀"}`, fallback, "详情 🚀"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			state := newDeepSeekChatStreamState(1, nil, nil, deepSeekConversationStore{})
+			state := newDeepSeekChatStreamState(1, nil, nil, chatcompat.ConversationStore{})
 			ownedID := state.responseID
 			wire := `{"id":"must-not-own","model":"must-not-adopt","error":` + tc.errorJSON + `,"Error":{"type":"WRONG_CASE","message":"must-not-emit"},"choices":[{"delta":{"content":"must-not-emit"}}]}`
 			output, supported, err := state.observe([]byte(wire))

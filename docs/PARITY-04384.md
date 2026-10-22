@@ -8413,3 +8413,35 @@ Exact c086278 now independently PASSes all 700 Gemini cases, including all prior
 680, state and mutations: /tmp/gdx-04384-gemini-namespace-declarations-oracle.json.
 Primary fast-forwarded and pushed it directly to origin/main after fetched remote,
 cleanliness and ancestry checks. No broader result is attributed to later code.
+
+### Reuse the bounded Chat protocol conversation cache
+
+The Gemini Compact previous-response executable baseline exposes missing cached
+messages: the reference prepends the successful seed's user message, whereas
+Godex omits it. Session-only and unknown-ID controls already match. Corrected
+before reports remain under
+/tmp/gdx-04384-gemini-compact-owner-*-corrected-before-oracle.json. Initial
+wrong-rejection expectations remain unqualified FAIL; this refactor adds no
+Compact guard or replay fix.
+
+The existing DeepSeek cache moves into the established gateway/chatcompat
+protocol boundary. DeepSeek keeps response eligibility, assistant reconstruction
+and input history policy. Cache limits, scoped storage keys, clones, eviction,
+mutex ownership and zero-value behavior are unchanged. The normalized core
+comparison is recorded in
+/tmp/gdx-04384-chat-history-store-mechanical-audit.json. Oversized replacement
+ordering and existing numeric clone normalization are deliberately preserved;
+source findings about those behaviors require separately qualified fixes.
+The stream completion method moves intact into the existing completion file,
+bringing its former owner below 400 lines and removing its legacy size baseline.
+No dependency, generic helper, durable format, option or goroutine is added.
+
+`rtk go test ./internal/gateway/chatcompat ./internal/gateway/deepseek -count=1`
+PASSes 925 before two additional snapshot/global-cap controls.
+`rtk proxy go test -json ./...` PASSes 10,664 tests across 71 packages; 18
+optional tests are skipped. `rtk proxy make verify` PASSes on the corrected
+final tree, including race tests and cross-builds. Initial runs failed the source
+size guard and then an omitted import after moving the completion method; both
+are corrected without changing the guard. Logs use
+/tmp/gdx-04384-chat-history-store-. Exact clean executable qualification follows.
+No global 1:1 claim is made.

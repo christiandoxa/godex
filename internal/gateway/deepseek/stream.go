@@ -4,11 +4,12 @@ import (
 	"errors"
 	"io"
 
+	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 	"github.com/christiandoxa/godex/internal/helper/sse"
 )
 
 func deepSeekChatSSE(body io.ReadCloser) io.ReadCloser {
-	return deepSeekChatSSEWithConversation(body, 0, nil, nil, deepSeekConversationStore{})
+	return deepSeekChatSSEWithConversation(body, 0, nil, nil, chatcompat.ConversationStore{})
 }
 
 func deepSeekChatSSEWithConversation(
@@ -16,7 +17,7 @@ func deepSeekChatSSEWithConversation(
 	requestID uint64,
 	conversationMessages []any,
 	responseMetadata map[string]any,
-	conversations deepSeekConversationStore,
+	conversations chatcompat.ConversationStore,
 ) io.ReadCloser {
 	reader, writer := io.Pipe()
 	state := newDeepSeekChatStreamState(requestID, conversationMessages, responseMetadata, conversations)
@@ -119,7 +120,7 @@ func pumpDeepSeekChatSSE(body io.ReadCloser, writer *io.PipeWriter, state *deepS
 }
 
 func translateDeepSeekSSEData(data []byte) ([]byte, bool, error) {
-	state := newDeepSeekChatStreamState(0, nil, nil, deepSeekConversationStore{})
+	state := newDeepSeekChatStreamState(0, nil, nil, chatcompat.ConversationStore{})
 	state.createdAt = 0
 	return state.observe(data)
 }

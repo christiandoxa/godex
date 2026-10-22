@@ -3,12 +3,14 @@ package deepseek
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 )
 
 func TestProdex04355DeepSeekReplayEdgeCases(t *testing.T) {
 	t.Run("duplicate function call is not replayed twice", func(t *testing.T) {
-		store := newDeepSeekConversationStore().scoped("gateway")
-		store.insert("chatcmpl_1", []any{
+		store := chatcompat.NewConversationStore().Scoped("gateway")
+		store.Insert("chatcmpl_1", []any{
 			map[string]any{"role": "user", "content": "read commit history"},
 			deepSeekEdgeAssistant("call_1", "shell", `{"cmd":"git log --oneline -3"}`, "Need recent commits."),
 		})
@@ -29,7 +31,7 @@ func TestProdex04355DeepSeekReplayEdgeCases(t *testing.T) {
 	})
 
 	t.Run("function call preserves Gemini thought signature", func(t *testing.T) {
-		store := newDeepSeekConversationStore().scoped("gateway")
+		store := chatcompat.NewConversationStore().Scoped("gateway")
 		body := translateDeepSeekEdgeRequest(t, store, `{
 			"model":"gemini-3.1-pro-preview",
 			"input":[
@@ -46,8 +48,8 @@ func TestProdex04355DeepSeekReplayEdgeCases(t *testing.T) {
 	})
 
 	t.Run("thinking tool turn repairs missing content and reasoning", func(t *testing.T) {
-		store := newDeepSeekConversationStore().scoped("gateway")
-		store.insert("chatcmpl_1", []any{
+		store := chatcompat.NewConversationStore().Scoped("gateway")
+		store.Insert("chatcmpl_1", []any{
 			map[string]any{"role": "user", "content": "read commit history"},
 			deepSeekEdgeAssistant("call_1", "shell", `{"cmd":"git log --oneline -3"}`, ""),
 		})
@@ -65,8 +67,8 @@ func TestProdex04355DeepSeekReplayEdgeCases(t *testing.T) {
 	})
 
 	t.Run("unanswered parallel calls are trimmed", func(t *testing.T) {
-		store := newDeepSeekConversationStore().scoped("gateway")
-		store.insert("chatcmpl_1", []any{
+		store := chatcompat.NewConversationStore().Scoped("gateway")
+		store.Insert("chatcmpl_1", []any{
 			map[string]any{"role": "user", "content": "inspect repo"},
 			map[string]any{
 				"role": "assistant", "content": nil, "reasoning_content": "Need two reads.",
@@ -92,8 +94,8 @@ func TestProdex04355DeepSeekReplayEdgeCases(t *testing.T) {
 	})
 
 	t.Run("late tool output moves adjacent to its call", func(t *testing.T) {
-		store := newDeepSeekConversationStore().scoped("gateway")
-		store.insert("chatcmpl_1", []any{
+		store := chatcompat.NewConversationStore().Scoped("gateway")
+		store.Insert("chatcmpl_1", []any{
 			map[string]any{"role": "user", "content": "read commit history"},
 			deepSeekEdgeAssistant("call_1", "shell", `{"cmd":"git log --oneline -3"}`, "Need recent commits."),
 		})
@@ -114,8 +116,8 @@ func TestProdex04355DeepSeekReplayEdgeCases(t *testing.T) {
 	})
 
 	t.Run("duplicate output after final answer is skipped", func(t *testing.T) {
-		store := newDeepSeekConversationStore().scoped("gateway")
-		store.insert("chatcmpl_2", []any{
+		store := chatcompat.NewConversationStore().Scoped("gateway")
+		store.Insert("chatcmpl_2", []any{
 			map[string]any{"role": "user", "content": "read commit history"},
 			deepSeekEdgeAssistant("call_1", "shell", `{"cmd":"git log --oneline -3"}`, "Need recent commits."),
 			map[string]any{"role": "tool", "tool_call_id": "call_1", "content": "335a5dd release"},
@@ -146,7 +148,7 @@ func TestProdex04355DeepSeekReplayEdgeCases(t *testing.T) {
 	})
 }
 
-func translateDeepSeekEdgeRequest(t *testing.T, store deepSeekConversationStore, body string, thinking bool) map[string]any {
+func translateDeepSeekEdgeRequest(t *testing.T, store chatcompat.ConversationStore, body string, thinking bool) map[string]any {
 	t.Helper()
 	history := deepSeekConversationHistoryForRequest([]byte(body), store)
 	translated, err := translateResponsesRequestWithHistory([]byte(body), RequestOptions{Model: "deepseek-v4-pro"}, history)

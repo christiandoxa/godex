@@ -5,6 +5,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 	"github.com/christiandoxa/godex/internal/helper/sse"
 )
 
@@ -13,14 +14,14 @@ func deepSeekAnthropicSSE(body io.ReadCloser, requestMetadata map[string]any) io
 }
 
 func deepSeekAnthropicSSEWithRequestID(body io.ReadCloser, requestMetadata map[string]any, requestID uint64) io.ReadCloser {
-	return deepSeekAnthropicSSEWithConversation(body, requestMetadata, requestID, deepSeekConversationStore{}, nil)
+	return deepSeekAnthropicSSEWithConversation(body, requestMetadata, requestID, chatcompat.ConversationStore{}, nil)
 }
 
 func deepSeekAnthropicSSEWithConversation(
 	body io.ReadCloser,
 	requestMetadata map[string]any,
 	requestID uint64,
-	conversations deepSeekConversationStore,
+	conversations chatcompat.ConversationStore,
 	conversationMessages []any,
 ) io.ReadCloser {
 	reader, writer := io.Pipe()
@@ -39,13 +40,13 @@ func pumpDeepSeekAnthropicSSE(
 	writer *io.PipeWriter,
 	requestMetadata map[string]any,
 	requestID uint64,
-	conversations deepSeekConversationStore,
+	conversations chatcompat.ConversationStore,
 	conversationMessages []any,
 ) {
 	decoder := sse.NewDecoder(nativeMessagesMaxBytes)
 	state := anthropicStreamState{
 		requestID: requestID, requestMetadata: requestMetadata,
-		conversations: conversations, conversationMessages: cloneDeepSeekMessages(conversationMessages),
+		conversations: conversations, conversationMessages: chatcompat.CloneMessages(conversationMessages),
 	}
 	buffer := make([]byte, 32<<10)
 	for {
