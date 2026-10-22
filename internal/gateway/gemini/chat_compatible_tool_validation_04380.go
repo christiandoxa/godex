@@ -37,9 +37,11 @@ func validateGeminiChatCompatibleTools04380(body []byte) error {
 		}
 		kind, _ := tool["type"].(string)
 		_, nested := tool["function"]
-		if (kind == "namespace" || strings.HasPrefix(kind, "mcp")) && !nested {
+		if (kind == "custom" || kind == "namespace" || strings.HasPrefix(kind, "mcp")) && !nested {
 			var converted []any
-			if kind == "namespace" {
+			if kind == "custom" {
+				converted = projectGeminiChatCustomDeclarations04384(tool)
+			} else if kind == "namespace" {
 				converted = projectGeminiChatNamespaceDeclarations04384(tool)
 			} else {
 				converted = projectGeminiChatMCPDeclarations04384(tool)

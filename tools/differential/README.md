@@ -73,6 +73,12 @@ delimiters, selected whitespace, child fields, duplicate functions, named
 choices and actual SSE. They separately require early structured 400s and later
 terminal 502s. Matching-corruption checks change raw/decoded names and delimiters
 together, description whitespace, error indexes and exact error wording.
+The 18 `request-primitive-custom-declaration-*` cases compare complete custom
+and apply_patch descriptions/input schemas, selected whitespace, strict/format
+admission, canonical embedded numeric/Unicode JSON, duplicate policy, named
+choice and real SSE. Matching corruptions change raw and decoded requests
+together, including grammar, schema limits, description separators and numeric
+text inside the embedded format string.
 
 Build and run from a clean, committed Godex worktree:
 

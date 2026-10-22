@@ -577,6 +577,13 @@ named choices reuse one package-local tagged namespace formatter, preserving
 the separate MCP prefix rule. Functions then use existing name/schema/strict
 validation and stable duplicate policy. No generic helper layer is introduced.
 Custom declaration conversion remains the explicit pending audit.
+Custom/freeform declarations now share early translated-function validation
+and final normalization. Their private projector emits the exact raw-input
+schema and tagged guidance, including apply_patch's case-sensitive grammar and
+canonical original-format JSON embedded in the description. Later admission
+keeps description/strict types, rejects enabled strict and validates the format
+object/type before normal function validation and duplicate/choice binding.
+Native custom conversion remains separate; builtin/unknown kinds await audit.
 All supported call/tool-output items require a nonblank identity selected from
 the first string `call_id`, `tool_call_id`, then `id`. This local admission runs
 before conversion or orphan filtering can silently drop the malformed item.

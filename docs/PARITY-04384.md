@@ -8084,3 +8084,79 @@ revision scope. Remaining custom/other controls, Gemini Compact, executable
 session/turn continuation, native macOS/Windows and live login remain unproven.
 No force push, tag, release or editor edit occurred. Global 1:1 parity is not
 claimed.
+
+## Gemini Chat custom/freeform declarations and exact patch grammar
+
+Pinned `chat_tool_shapes.mojo:45-85` turns custom declarations into one function
+whose input is a required raw string with additionalProperties:false. The
+complete description preserves a nonblank original string, otherwise starts
+with Freeform custom tool input., then exactly two newlines and tagged raw-input
+guidance. Exact case-sensitive apply_patch adds its complete Codex patch grammar
+and distinct input description. Every present format is appended as canonical
+serde JSON text after the exact Original custom tool format JSON label, retaining
+numeric kinds, full unsigned values and Unicode inside the string.
+Early Gemini validation rejects missing/blank custom names as structured 400s.
+Later ToolsShape validates description/strict types, rejects enabled custom
+strict and requires an object-valued format with optional string type. ASCII
+name limits, stable deduplication and named-choice binding then reuse the
+function boundary. Native custom behavior remains separately owned.
+
+Eighteen executable baselines pin clean old production
+`c086278633004a1e35ae8b0fa0bb4e6503665203` and the unchanged official 0.438.4
+source/binary/manifest: thirteen FAIL only Godex, five controls PASS. All
+reference, independent mutation and durable-state invariants pass. Reports:
+`/tmp/gdx-04384-gemini-custom-declaration-<suffix>-before-oracle.json`;
+commands `/tmp/gdx-04384-gemini-custom-declarations-before-commands.json`;
+summary `/tmp/gdx-04384-gemini-custom-declarations-before-summary.log`.
+The final gateway regression was copied alone to the same old source in
+`/tmp/gdx-04384-gemini-custom-declarations-before-work`.
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiChatCustomDeclarationsPreserveCompletePipeline$' -count=1`
+FAILs 19 tests including the parent, with ten controls PASS:
+`/tmp/gdx-04384-gemini-custom-declarations-gateway-before.log`.
+The same command PASSes all 29 after repair:
+`/tmp/gdx-04384-gemini-custom-declarations-gateway-focused.log`.
+The table verifies complete generated descriptions, exact input schema,
+case-sensitive grammar, embedded format bytes, buffered/SSE output and
+validation stages with no upstream work on rejection.
+
+Private `request_chat_custom_declarations_04384.go` owns projection and custom
+format/strict admission. Early Gemini validation and final request normalization
+share that projector. The existing serde writer handles embedded canonical JSON;
+function admission, stable duplicate policy and choice binding remain reused.
+No new shared helper, package, exported API, dependency, option, goroutine,
+routing policy or durable format is added. Native custom conversion stays
+independent. The local shortcut now names pending builtin/unknown-kind behavior.
+
+The eighteen independent executable cases retain complete original wire/client
+bytes, status/header/stdout/exit, authenticated attempts and safe durable state.
+Matching corruptions change raw/decoded requests together, including the exact
+patch grammar, input descriptions, additionalProperties, newline separators,
+format label and numeric text inside the embedded JSON string. These also run
+inside the standalone negative-control gate.
+`rtk proxy go test -json ./...` PASSes 10,466 tests in 71 packages; ten packages
+have no tests and 18 optional installed-Codex/executable tests are skipped:
+`/tmp/gdx-04384-gemini-custom-declarations-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+PASSes 3,645 tests: `/tmp/gdx-04384-gemini-custom-declarations-race.log`.
+`rtk proxy make verify` PASSes with exit 0:
+`/tmp/gdx-04384-gemini-custom-declarations-verify.log`.
+Exact clean-commit executable qualification follows local verification.
+
+Clean `074d7393e7a2ec6aedd5f6bcffe603c4713b7333` now PASSes all 589 Gemini
+cases, including every prior 559, with independent state/mutation checks:
+`/tmp/gdx-04384-gemini-response-format-oracle.json`. It is pushed directly to
+origin/main after fetched remote/cleanliness/ancestry checks. No new full
+DeepSeek run is attributed to this Gemini-only revision; the prior exact
+15d1c55 213-case gate phase remains separately retained. The complete 15d1c55
+default gate also has an exact completed 559-case Gemini PASS, extracted without
+alteration from byte offset 2980243 in `/tmp/gdx-04384-release-15d1c55.log` to
+`/tmp/gdx-04384-gemini-request-metadata-release-gemini-oracle.json`; the entire
+default gate still awaits final completion. Later protected full matrices keep
+their own exact revision scope. Remaining builtin/other controls, Gemini
+Compact, executable session/turn continuation, native macOS/Windows and live
+login remain unproven. No force push, tag, release or editor edit occurred.
+Global 1:1 parity is not claimed.
+
+Clean c086278 separately PASSes all 20 targeted namespace-declaration cases,
+with exact source/reference pins, state and independent mutations. Its full
+700-case matrix remains pending; no broader qualification is attributed.
