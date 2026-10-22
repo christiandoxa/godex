@@ -7049,3 +7049,79 @@ pending until actual completion. Custom/MCP/shell projection beyond these
 signature controls, Gemini Compact, executable session/turn continuation,
 native macOS/Windows and live authentication remain unproven. No force push,
 tag, release or editor-checkout edit occurred. Global 1:1 parity is not claimed.
+
+## MCP call identity fallback and canonical arguments
+
+Clean `fd82f5cad3cbf68c0c5be24944babe89367d8abe` now PASSes all 343 Gemini
+cases, including every earlier 333 case, and all 213 DeepSeek scenarios:
+`/tmp/gdx-04384-gemini-tool-output-oracle.json` and
+`/tmp/gdx-04384-gemini-tool-output-deepseek-oracle.json`.
+It is pushed directly to `origin/main`; retained reference failures keep their
+original FAIL status. Clean `6263eb851ccc133650130ce84201424c436fa9df`
+separately PASSes seven targeted signature oracles with independent mutations:
+`/tmp/gdx-04384-gemini-thought-signature-<suffix>-targeted-oracle.json`
+for gemini, blank, control-space, mcp, custom, duplicate-none and stream.
+Its full 399-case matrix remains pending.
+
+The pinned `deepseek_raw_bridge_input_item` sends function and MCP calls to
+the same `deepseek_raw_put_tool_call_message_from_item`. MCP therefore shares
+first-present ID fallback and argument alias/canonical serde semantics.
+Godex had applied that projection only to function calls: a selected null ID
+with a valid later alias failed rather than becoming `call_1`, and structured
+arguments used Go JSON serialization inside their string instead of serde.
+
+MCP now reuses the existing private wire-ID projection and argument conversion
+before shared Chat conversion. The argument step is factored locally within
+`gateway/gemini` for its two real call consumers. This is provider protocol
+behavior, not a shared technical helper. Inline MCP result values retain
+their separate raw JSON contract. Name admission/projection and other call
+kinds remain independent work; no new package, public API, dependency, option,
+worker or persisted format is introduced.
+
+The real gateway alias table now runs for both function and MCP calls. Before
+repair, two MCP cases and their parent FAIL while 20 controls PASS:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiFunctionItemsUseTaggedAliasesOnWire$' -count=1`;
+`/tmp/gdx-04384-gemini-mcp-projection-before.log`.
+The same command PASSes all 23 tests after repair:
+`/tmp/gdx-04384-gemini-mcp-projection-focused.log`.
+
+Ten executable baselines pin clean `6263eb851ccc133650130ce84201424c436fa9df`,
+the unchanged official reference, and
+`/tmp/gdx-04384-gemini-mcp-projection-before-differential`.
+Two FAIL only Godex: null-ID fallback yields terminal 502 with no attempt
+instead of one successful request, and structured argument bytes differ.
+Eight controls PASS. Every reference and independent mutation invariant passes.
+Reports: `/tmp/gdx-04384-gemini-mcp-projection-<suffix>-before-oracle.json`;
+exact argument arrays: `/tmp/gdx-04384-gemini-mcp-projection-before-commands.json`.
+Commands use `--gemini --scenario request-primitive-mcp-wire-<suffix>` with
+exact source/commit pins. The new fixtures reuse the independent function
+alias expectations because the tagged executable uses the same projection;
+full wire/response/status/header/stdout/exit, attempt/authentication and safe
+durable-state checks retain all matching-corruption controls.
+
+`rtk go test ./tools/differential -count=1` PASSes 282 tests:
+`/tmp/gdx-04384-gemini-mcp-projection-oracle-tests.log`.
+`rtk proxy go test -json ./...` PASSes 10,018 tests in 71 packages; ten packages
+have no tests and 18 optional installed-Codex/executable tests are skipped:
+`/tmp/gdx-04384-gemini-mcp-projection-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+PASSes 3,210 tests: `/tmp/gdx-04384-gemini-mcp-projection-race.log`.
+`rtk proxy make verify` PASSes:
+`/tmp/gdx-04384-gemini-mcp-projection-verify.log`.
+Clean-commit 409-case Gemini qualification follows.
+
+Clean `dc0e44fc6600811b8e0e6c5046e42d4f1565d700` separately PASSes all
+350 Gemini cases with independent mutations, including every earlier 343:
+`/tmp/gdx-04384-gemini-orphan-output-oracle.json`. It is pushed to `origin/main`.
+No new full DeepSeek run is attributed to that Gemini-only revision.
+The complete default command `rtk proxy scripts/verify-release-parity.sh`
+also finishes with exit 0 on protected clean
+`175091ff89e61059c796639225dc5880530a1efe`:
+`/tmp/gdx-04384-release-175091f.log`. Final HTTP profile-status and raw-429
+stages PASS after the WebSocket stages. Earlier failed reference-state reports
+for that same revision remain retained FAILs; they are not relabeled.
+This complete gate belongs to its exact revision, not every later descendant.
+Other protected matrices remain pending. MCP name/inline-result edge cases,
+other call/output projection, Gemini Compact, executable session/turn
+continuation, native macOS/Windows and live login remain unproven. No force
+push, tag, release or editor edit occurred. Global 1:1 parity is not claimed.

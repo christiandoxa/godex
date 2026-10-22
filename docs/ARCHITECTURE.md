@@ -483,6 +483,10 @@ tagged nonempty-string alias selection before the separate Mojo whitespace
 test. Nonblank signatures become exact Google `extra_content`; selected blank
 strings retain their legacy field. The existing package-local Unicode
 classifier is reused; shared Chat conversion owns no Gemini signature policy.
+MCP call IDs and argument aliases use the same private wire projection as
+function calls before shared conversion. Structured arguments use the existing
+serde-compatible writer; embedded MCP result content retains its separate raw
+JSON contract. MCP name admission/projection remains an independent concern.
 All supported call/tool-output items require a nonblank identity selected from
 the first string `call_id`, `tool_call_id`, then `id`. This local admission runs
 before conversion or orphan filtering can silently drop the malformed item.

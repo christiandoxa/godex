@@ -8,6 +8,9 @@ matching-corruption controls reject modified signature values/fields and IDs
 even when both products change identically. Each case also checks response,
 status, headers, child exit, stdout, authenticated attempts and safe durable
 state against the pinned official release with synthetic credentials.
+The `request-primitive-mcp-wire-*` cases reuse the source-equivalent function
+alias fixtures for MCP identities and arguments, retaining complete independent
+wire/response/state expectations and all matching-corruption checks.
 
 Build and run from a clean, committed Godex worktree:
 

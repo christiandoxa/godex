@@ -6,6 +6,10 @@ func projectGeminiChatFunctionItem04384(kind any, item map[string]any) bool {
 	switch kind {
 	case "function_call":
 		return projectGeminiChatFunctionCall04384(item)
+	case "mcp_call":
+		arguments, valid := geminiChatFunctionArguments04384(item)
+		item["call_id"], item["arguments"] = geminiChatWireCallIdentity04384(item), arguments
+		return valid
 	case "function_call_output":
 		output, _ := firstPresent(item, "output", "content", "result", "error")
 		text, err := geminiChatContentText04384(output)
@@ -27,6 +31,14 @@ func projectGeminiChatFunctionCall04384(item map[string]any) bool {
 		item["type"], item["role"], item["content"] = "message", "assistant", ""
 		return true
 	}
+	arguments, valid := geminiChatFunctionArguments04384(item)
+	item["call_id"], item["name"], item["arguments"] = geminiChatWireCallIdentity04384(item), textName, arguments
+	delete(item, "namespace")
+	return valid
+}
+
+func geminiChatFunctionArguments04384(item map[string]any) (string, bool) {
+	function, _ := item["function"].(map[string]any)
 	arguments, present := firstPresent(item, "arguments", "input")
 	if !present {
 		arguments, present = function["arguments"]
@@ -38,14 +50,12 @@ func projectGeminiChatFunctionCall04384(item map[string]any) bool {
 		if !ok {
 			encoded, err := jsonutil.MarshalSerdeValue04384(arguments)
 			if err != nil {
-				return false
+				return "", false
 			}
 			textArguments = string(encoded)
 		}
 	}
-	item["call_id"], item["name"], item["arguments"] = geminiChatWireCallIdentity04384(item), textName, textArguments
-	delete(item, "namespace")
-	return true
+	return textArguments, true
 }
 
 func geminiChatWireCallIdentity04384(item map[string]any) string {
