@@ -4076,6 +4076,54 @@ Gemini Compact, session/turn executable continuation, native macOS/Windows
 and live authentication remain open. Global 1:1 parity is not claimed.
 
 
+## Primitive request oracle: token aliases, uint64 and ignored parallel input
+
+The pinned Gemini and DeepSeek Chat bridges share the primitive-field kernel.
+`mojo/prodex_core/deepseek.mojo:1177–1213` scans maximum-token fields in output,
+maximum, completion order, with each later present value replacing the prior
+selection. Its policy at 2153–2187 validates every present alias first. Positive
+integer digits are checked at 1722–1734 after serde Value parsing, so uint64
+maximum remains valid but a decimal/exponent value or uint64 overflow does not.
+The kernel omits `parallel_tool_calls`; DeepSeek separately rejects false,
+but tolerates and ignores true. Gemini's ignored-control policy was already
+qualified in the preceding stage.
+
+New developer-only fixtures use the same technical input data in the existing
+Gemini and DeepSeek harnesses. Cases pin canonical raw request bytes, original
+credential slot, authenticated attempt count, exact response/type/exit/stdout,
+zero retries and safe durable state. Invalid aliases must return terminal
+plain 502 with no upstream attempt. Accepted cases require one original
+request, including exact uint64 bytes. Missing exchanges are retained explicitly
+and fail. Matching wire, auth, slot, response, retry, stdout and state corruptions
+are rejected independently; no state allowlist or assertion is weakened.
+The exact Gemini request/result matcher now has two real fixture consumers
+within this developer package; no production helper or provider abstraction
+was extracted.
+
+Eighteen baseline runs use clean
+`3398cd9cb33aa5af28dccf7358c5882f8eb76dc2`, the unchanged pinned reference and
+`/tmp/gdx-04384-request-token-limits-differential`.
+Six controls PASS: output/all for both products, plus Gemini u64/parallel-true.
+Five Gemini and seven DeepSeek cases FAIL only Godex, while all reference and
+independent invariants pass:
+`/tmp/gdx-04384-request-primitive-<gemini|deepseek>-<suffix>-before-oracle.json`.
+The suffixes are output, precedence, all, shadow-null, shadow-zero,
+shadow-fraction, u64, overflow and parallel-true. Gemini runs use
+`--gemini --scenario request-primitive-<suffix>`; DeepSeek uses
+`--scenario deepseek-request-primitive-<suffix>`. The candidate/source are the
+clean JSON-admission binary/worktree, with the corresponding pinned commit.
+Both adapters choose the wrong output/maximum precedence and mask invalid
+lower-priority aliases. DeepSeek additionally rejects uint64 maximum and leaks
+the tolerated parallel control. Its overflow case times out after a local 400;
+the reference returns the exact terminal 502.
+
+`rtk go test ./tools/differential -count=1` passes 276 oracle tests before
+production repair: `/tmp/gdx-04384-request-token-limits-final-oracle-tests.log`.
+This commit establishes the checked fail-before contract. The gateway repairs
+and their focused regression/local completion evidence are the next stage;
+these fixtures alone do not claim repaired executable parity.
+
+
 ## Validated string EOF checkpoint: c1f0e5a
 
 Clean `c1f0e5a45b7705d21d95e6181663da3a9ffa5895` passes all 125 DeepSeek

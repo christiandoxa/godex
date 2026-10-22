@@ -84,6 +84,7 @@ type productRun struct {
 	Files                 []fileState       `json:"durable_files"`
 	StateIntegrity        []string          `json:"state_integrity_errors,omitempty"`
 	ContinuationPersisted bool              `json:"continuation_persisted,omitempty"`
+	ClientError           string            `json:"client_error,omitempty"`
 }
 
 type scenarioResult struct {
@@ -130,6 +131,7 @@ type runOptions struct {
 	stream            bool
 	userID            bool
 	invalidInput      string
+	primitiveControl  string
 }
 
 type mockServer struct {
@@ -349,6 +351,12 @@ func run() error {
 		{"recover-after-503", func(mock *mockServer) (scenarioResult, error) {
 			return runRecoverAfter503(root, mock, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit)
 		}},
+	}
+	for _, suffix := range requestPrimitiveSuffixes04384() {
+		name := "deepseek-request-primitive-" + suffix
+		specs = append(specs, differentialScenario043713{name, func(mock *mockServer) (scenarioResult, error) {
+			return runPair(root, mock, name, mockPlan{}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{primitiveControl: name})
+		}})
 	}
 	for _, name := range deepSeekInvalidInputScenarioNames()[1:] {
 		scenario := name
@@ -660,14 +668,14 @@ func runProduct(root string, mock *mockServer, name, binary, commit string, plan
 	}
 	clientExchange, readErr := readExchange(childResult)
 	if readErr != nil && !options.cancel {
-		if !isKnownDeepSeekInvalidInput(options.invalidInput) {
+		if !isKnownDeepSeekInvalidInput(options.invalidInput) && options.primitiveControl == "" {
 			return productRun{}, fmt.Errorf("%s missing valid child response (exit %d, stderr %q): %w", name, exit, redact(stderr.String()), readErr)
 		}
 		clientExchange = exchange{}
 	}
 	upstream := mock.since(requestStart)
 	identityFixture, identityKnown := rawKeyIdentityCase04384(options.rawKeyIdentity)
-	if len(upstream) == 0 && !isKnownDeepSeekInvalidInput(options.invalidInput) && !strings.HasPrefix(options.continuationProbe, "resume") &&
+	if len(upstream) == 0 && !isKnownDeepSeekInvalidInput(options.invalidInput) && options.primitiveControl == "" && !strings.HasPrefix(options.continuationProbe, "resume") &&
 		!(identityKnown && (identityFixture.reject || identityFixture.compact)) {
 		return productRun{}, fmt.Errorf("%s produced no upstream requests", name)
 	}
@@ -687,6 +695,10 @@ func runProduct(root string, mock *mockServer, name, binary, commit string, plan
 	if options.continuationProbe == "unknown" {
 		persistedID = "chatcmpl-unknown"
 	}
+	clientError := ""
+	if readErr != nil {
+		clientError = redact(readErr.Error())
+	}
 	return productRun{
 		Name: name, Binary: resolved, Version: version, Commit: commit, SHA256: digest,
 		Command:    redactedScenarioCommand(name, options.rotate),
@@ -695,6 +707,7 @@ func runProduct(root string, mock *mockServer, name, binary, commit string, plan
 		Retries: max(0, len(upstream)-1), Cancelled: options.cancel && hasEvent(events, "upstream.cancelled"),
 		Files: snapshot(productRoot), StateIntegrity: auditFixtureDurableStateWithBindings(productRoot, expectedBindings),
 		ContinuationPersisted: options.continuationProbe != "" && rawKeyProbeBindingExists(stateHome, isProdex(name), persistedID),
+		ClientError:           clientError,
 	}, nil
 }
 
@@ -738,6 +751,9 @@ func productEnv(name, stateHome, codexHome, userHome, shim, childResult string, 
 	}
 	if options.userID {
 		env = append(env, "DIFFERENTIAL_USER_ID=1")
+	}
+	if options.primitiveControl != "" {
+		env = append(env, "DIFFERENTIAL_REQUEST_PRIMITIVE="+options.primitiveControl)
 	}
 	if options.invalidInput != "" {
 		env = append(env, "DIFFERENTIAL_INVALID_INPUT="+options.invalidInput)
@@ -1139,6 +1155,13 @@ func runCodexShim(arguments []string) int {
 		body, _, _ := geminiJSONAdmission04384(scenario)
 		requestBody = []byte(body)
 	}
+	if scenario := os.Getenv("DIFFERENTIAL_REQUEST_PRIMITIVE"); scenario != "" {
+		model := "deepseek-v4-pro"
+		if os.Getenv("DIFFERENTIAL_PROVIDER") == "gemini" {
+			model = "gemini-3.1-pro-preview"
+		}
+		requestBody = requestPrimitiveInput04384(scenario, model)
+	}
 	if strings.HasPrefix(os.Getenv("DIFFERENTIAL_CONTINUATION_PHASE"), "resume") {
 		requestBody = []byte(strings.TrimSuffix(string(requestBody), "}") + `,"previous_response_id":"chatcmpl-differential"}`)
 	}
@@ -1299,6 +1322,9 @@ func shimFailure(message string) int {
 // product failures, skipped upstream calls, and missing cancellations must not
 // turn into parity successes just because both implementations behave alike.
 func scenarioInvariants(scenario scenarioResult) []string {
+	if _, known := requestPrimitiveCase04384(scenario.Name); known {
+		return deepSeekPrimitiveInvariants04384(scenario)
+	}
 	if bufferedSearchRuntimeDepthCase04384(scenario.Name) {
 		slot := "single"
 		if strings.HasSuffix(scenario.Name, "-rotation") {
@@ -1668,7 +1694,7 @@ func negativeControl() bool {
 			return false
 		}
 	}
-	return true
+	return requestPrimitiveNegativeControl04384()
 }
 
 func hasEvent(events []upstreamEvent, kind string) bool {

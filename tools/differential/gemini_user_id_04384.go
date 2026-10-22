@@ -70,12 +70,16 @@ func geminiUserIDExpected04384(scenario string) geminiCandidateResult {
 
 func geminiUserIDInvariant04384(scenario string, result geminiCandidateResult) error {
 	want := geminiUserIDExpected04384(scenario)
-	if result.ClientError != "" || len(result.StateIntegrity) != 0 || result.Client.Status != want.Client.Status || result.Client.Body != want.Client.Body ||
-		result.Client.Headers.Get("Content-Type") != want.Client.Headers.Get("Content-Type") || result.ExitCode != want.ExitCode || result.Stdout != want.Stdout ||
-		!reflect.DeepEqual(result.Upstream, want.Upstream) {
+	if !geminiExactRequestResult04384(result, want) {
 		return errors.New("Gemini user ID lost exact input, alias priority, rejection, credential, response or safe state")
 	}
 	return nil
+}
+
+func geminiExactRequestResult04384(result, want geminiCandidateResult) bool {
+	return result.ClientError == "" && len(result.StateIntegrity) == 0 && result.Client.Status == want.Client.Status && result.Client.Body == want.Client.Body &&
+		result.Client.Headers.Get("Content-Type") == want.Client.Headers.Get("Content-Type") && result.ExitCode == want.ExitCode && result.Stdout == want.Stdout &&
+		reflect.DeepEqual(result.Upstream, want.Upstream)
 }
 
 func geminiUserIDNegativeControl04384() bool {

@@ -98,7 +98,8 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 	_, parallel := geminiParallelControl04384(mock.scenario)
 	_, _, _, controlTypes := geminiControlTypeCase04384(mock.scenario)
 	_, _, jsonAdmission := geminiJSONAdmission04384(mock.scenario)
-	if geminiRequestNumberCase04384(mock.scenario) || userID || parallel || controlTypes || jsonAdmission {
+	_, primitive := requestPrimitiveCase04384(mock.scenario)
+	if geminiRequestNumberCase04384(mock.scenario) || userID || parallel || controlTypes || jsonAdmission || primitive {
 		record.RawBody = string(body)
 	}
 	mock.mu.Lock()
@@ -164,7 +165,7 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, response)
 		return
 	}
-	if geminiContinuationCase04384(mock.scenario) || geminiRequestNumberCase04384(mock.scenario) || userID || parallel || controlTypes || jsonAdmission {
+	if geminiContinuationCase04384(mock.scenario) || geminiRequestNumberCase04384(mock.scenario) || userID || parallel || controlTypes || jsonAdmission || primitive {
 		_, _ = io.WriteString(w, geminiContinuationResponse04384())
 		return
 	}
@@ -306,6 +307,9 @@ func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit, selec
 		"buffered-patch-unified-files",
 		"buffered-patch-literal-crlf",
 	}
+	for _, suffix := range requestPrimitiveSuffixes04384() {
+		cases = append(cases, "request-primitive-"+suffix)
+	}
 	if selected != "all" {
 		if !slices.Contains(cases, selected) {
 			return fmt.Errorf("unknown Gemini scenario %q", selected)
@@ -390,7 +394,8 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	_, parallel := geminiParallelControl04384(scenario)
 	_, _, _, controlTypes := geminiControlTypeCase04384(scenario)
 	_, _, jsonAdmission := geminiJSONAdmission04384(scenario)
-	auditState := rawIdentity || bodyBoundary || continuation || requestNumbers || userID || parallel || controlTypes || jsonAdmission
+	_, primitive := requestPrimitiveCase04384(scenario)
+	auditState := rawIdentity || bodyBoundary || continuation || requestNumbers || userID || parallel || controlTypes || jsonAdmission || primitive
 	if auditState {
 		childResult = filepath.Join(home, "child-exchange.json")
 	}
@@ -406,6 +411,9 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	defer cancel()
 	env := productEnv(name, stateHome, codexHome, userHome, shim, childResult, runOptions{})
 	env = append(env, "DIFFERENTIAL_PROVIDER=gemini")
+	if primitive {
+		env = append(env, "DIFFERENTIAL_REQUEST_PRIMITIVE="+scenario)
+	}
 	if jsonAdmission {
 		env = append(env, "DIFFERENTIAL_GEMINI_JSON_ADMISSION="+scenario)
 	}
@@ -479,7 +487,7 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 		exitCode = childExit.ExitCode()
 	}
 	result, readErr := readExchange(childResult)
-	if readErr != nil && !continuation && !userID && !parallel && !controlTypes && !jsonAdmission {
+	if readErr != nil && !continuation && !userID && !parallel && !controlTypes && !jsonAdmission && !primitive {
 		return geminiCandidateResult{}, fmt.Errorf("child response missing: %w stderr=%q upstream=%v",
 			readErr, redact(stderr.String()), mock.recorded())
 	}
@@ -530,6 +538,9 @@ func geminiCompare(scenario string, prodex, godex geminiCandidateResult) []strin
 		return differences
 	}
 	if _, _, known := geminiJSONAdmission04384(scenario); known {
+		return differences
+	}
+	if _, known := requestPrimitiveCase04384(scenario); known {
 		return differences
 	}
 	if _, known := geminiBufferedBodyCase04384(scenario); known {
@@ -633,6 +644,9 @@ func geminiSemanticEqual043711(left, right map[string]any) bool {
 }
 
 func geminiFixtureInvariant(scenario string, result geminiCandidateResult) error {
+	if _, known := requestPrimitiveCase04384(scenario); known {
+		return geminiPrimitiveInvariant04384(scenario, result)
+	}
 	if _, _, known := geminiJSONAdmission04384(scenario); known {
 		return geminiJSONAdmissionInvariant04384(scenario, result)
 	}

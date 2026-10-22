@@ -248,6 +248,18 @@ configures two synthetic keys. The valid control requires one exact original
 authenticated request and exact native response. All retain strict stdout and
 durable-state checks; equal status/body/type/exit/attempt/state corruptions fail.
 
+Gemini `request-primitive-*` and DeepSeek `deepseek-request-primitive-*` cases
+cover output, precedence, all, shadow-null, shadow-zero, shadow-fraction, u64,
+overflow and parallel-true suffixes. The fixtures pin exact canonical request
+bytes, all-alias admission and the absence of an ignored parallel control.
+Invalid maximum-token aliases require terminal plain 502 and no upstream
+attempt. Positive controls require one authenticated original request and
+exact native Responses output/type/status/exit/stdout. Both providers retain
+safe durable-state checks. Matching raw-body, auth, slot, response, retry,
+stdout and state mutations fail independent invariants; missing exchanges are
+explicit failures. The same technical fixture data serves both existing
+provider harnesses without introducing a production provider abstraction.
+
 The 0.438.4 `deepseek-sse-error-presence`, `deepseek-sse-error-i64` and
 `deepseek-sse-error-float` scenarios verify embedded-error primary-field
 presence and signed numeric kinds. Each must produce one failure frame
