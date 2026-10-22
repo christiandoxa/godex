@@ -32,21 +32,6 @@ func filterGeminiOrphanToolMessages043711(body []byte) ([]byte, error) {
 			firstOutput[id] = i
 		}
 	}
-	// Output may precede its call in a repaired history. Reserve every
-	// first matching output before emitting anything, so the original
-	// location (and duplicates) are not replayed a second time.
-	eligible := make(map[string]bool)
-	for _, raw := range messages {
-		message, _ := raw.(map[string]any)
-		calls, _ := message["tool_calls"].([]any)
-		for _, candidate := range calls {
-			call, _ := candidate.(map[string]any)
-			id, _ := call["id"].(string)
-			if _, found := firstOutput[id]; found && strings.TrimSpace(id) != "" {
-				eligible[id] = true
-			}
-		}
-	}
 	matchedID := make(map[string]bool)
 	claimedOutput := make(map[int]bool)
 	result := make([]any, 0, len(messages))
@@ -56,16 +41,12 @@ func filterGeminiOrphanToolMessages043711(body []byte) ([]byte, error) {
 			result = append(result, raw)
 			continue
 		}
+		// With indexed outputs, only matched call/output pairs are re-emitted.
+		if message["role"] == "tool" && len(firstOutput) > 0 {
+			continue
+		}
 		calls, hasCalls := message["tool_calls"].([]any)
 		if !hasCalls || len(calls) == 0 {
-			// Skip matched tool results here: they have already been
-			// emitted next to their corresponding call.
-			if message["role"] == "tool" {
-				id, _ := message["tool_call_id"].(string)
-				if eligible[id] && strings.TrimSpace(id) != "" {
-					continue
-				}
-			}
 			result = append(result, raw)
 			continue
 		}
@@ -97,6 +78,9 @@ func filterGeminiOrphanToolMessages043711(body []byte) ([]byte, error) {
 			// prose is not a usable continuation. Other messages are
 			// retained by geminiMessageHasIndependentContent043711.
 		}
+	}
+	if len(result) == 0 {
+		result = append(result, map[string]any{"role": "user", "content": ""})
 	}
 	request["messages"] = result
 	return jsonutil.MarshalSerdeValue04384(request)

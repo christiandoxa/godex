@@ -417,6 +417,12 @@ and string payloads with exact call/output wire bytes. Existing custom/MCP
 rejections and earlier local errors remain checked with zero-attempt and
 independent mutation requirements. Orphan-output shaping is a separate audit.
 
+Gemini `request-primitive-orphan-output-*` requires unmatched function/custom/
+MCP results to disappear before the exact upstream request. Null/empty/string
+orphan results retain the ordinary user message; output-only requests require
+the tagged empty-user fallback. The ordinary control, matched-output scenarios
+and all independent wire/status/attempt/state mutations remain active.
+
 DeepSeek scenario workers evaluate their complete independent invariants as
 each scenario finishes, preserving failures in the ordered report. The strict
 five-minute generated SSE timestamp window is unchanged; later cases cannot

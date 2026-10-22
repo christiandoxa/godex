@@ -485,6 +485,11 @@ and nested-function precedence; output and shell items retain separate rules.
 Function/custom/MCP output items require the presence of output, content,
 result or error. Present null, false and empty values remain distinct from
 missing output; local admission cannot invent a successful null tool result.
+Gemini adjacency indexes nonblank output IDs, drops original tool-role messages
+when that index is nonempty, and re-emits only matched call/output pairs. With
+no valid output IDs it retains untouched malformed tool messages as the tagged
+kernel does. If repair removes every message, the adapter sends one empty user
+message, matching the runtime's post-repair fallback.
 DeepSeek independently checks present `stream` as a boolean and present
 `instructions`/`previous_response_id` as strings before constructing its
 translated request. Invalid types use its common terminal preparation boundary,

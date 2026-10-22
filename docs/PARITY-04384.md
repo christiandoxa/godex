@@ -6794,3 +6794,59 @@ remain separate audits. The full default-gate PASS remains scoped to `5f49a5f`.
 Gemini Compact, executable session/turn continuation, native macOS/Windows and
 live authentication remain unproven. No force push, tag, release or editor edit
 occurred. Global 1:1 parity is not claimed.
+
+
+## Gemini adjacency drops unmatched tool outputs and restores empty input
+
+Pinned `ds_repair_adjacency` distinguishes zero valid output IDs from a nonempty
+output index. In the latter case it drops every original tool-role message and
+re-emits only matched call/output pairs. With zero valid IDs it retains untouched
+malformed tool-role messages. The runtime's caller inserts one empty user
+message if adjacency removes everything.
+
+Godex retained unmatched outputs even when it indexed their nonblank IDs. The
+concrete Gemini filter now applies the tagged gate before examining calls,
+removes the redundant eligibility map/traversal, and restores the caller's
+empty-user fallback. Existing first-result selection, reverse ordering,
+duplicates and independent assistant prose remain covered. No helper, package,
+interface, dependency, configuration, worker, exported API or persisted format
+is added. Message shaping stays in the owning gateway; routing is unchanged.
+
+The final regression copied alone onto isolated unchanged `fd82f5c` source
+FAILs with one control passing and four failures including the parent:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiAdjacencyDropsAllUnmatchedToolOutputsWhenIndexed$' -count=1`;
+`/tmp/gdx-04384-gemini-orphan-output-final-before.log`.
+The focused new/existing adjacency command PASSes all 11 tests:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex(04384GeminiAdjacencyDropsAllUnmatchedToolOutputsWhenIndexed|043711Gemini(AdjacencyConsumesEarlyDuplicateOutputOnlyOnce|AdjacencyRetainsMalformedAndUnicodeContent|MultiTurnToolAdjacencyMatchesMojo|AdjacencyHandles2048ReverseOrderToolResults))$' -count=1`;
+`/tmp/gdx-04384-gemini-orphan-output-focused.log`.
+
+Seven executable baselines pin clean
+`fd82f5cad3cbf68c0c5be24944babe89367d8abe` and unchanged reference:
+`/tmp/gdx-04384-gemini-orphan-output-<suffix>-before-oracle.json`.
+The first six use `/tmp/gdx-04384-gemini-orphan-output-before-differential`;
+the added output-only case uses
+`/tmp/gdx-04384-gemini-orphan-output-final-before-differential`.
+Six orphan cases FAIL only Godex on exact upstream bytes. The ordinary user
+control PASSes. Every reference and independent mutation invariant passes.
+Commands use `--gemini --scenario request-primitive-orphan-output-<suffix>`
+with exact clean source/commit pins. Complete expected wire/status/body/headers/
+stdout/exit, one authenticated attempt and safe durable state remain checked.
+No failed fixture is relabeled and no mutation or assertion is relaxed.
+
+`rtk go test ./tools/differential -count=1` PASSes 281 tests before and after
+the extra fallback case: `/tmp/gdx-04384-gemini-orphan-output-oracle-tests.log`
+and `/tmp/gdx-04384-gemini-orphan-output-final-oracle-tests.log`.
+`rtk proxy go test -json ./...` PASSes 9,969 tests in 71 packages; ten packages
+have no tests and 18 optional installed-Codex/executable tests are skipped:
+`/tmp/gdx-04384-gemini-orphan-output-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+PASSes 3,161 tests: `/tmp/gdx-04384-gemini-orphan-output-race.log`.
+`rtk proxy make verify` PASSes: `/tmp/gdx-04384-gemini-orphan-output-verify.log`.
+Clean-commit 350-case Gemini qualification follows. DeepSeek production is
+unchanged; the existing exact 213-case reports retain their original revision
+scope, and no new full DeepSeek matrix is attributed to this Gemini-only filter.
+Earlier protected Gemini/default gates remain pending. Valid alias projection,
+shell commands and remaining metadata/argument controls need separate proof.
+Gemini Compact, executable session/turn continuation, native macOS/Windows and
+live authentication remain unproven. No force push, tag, release or editor edit
+occurred. Global 1:1 parity is not claimed.
