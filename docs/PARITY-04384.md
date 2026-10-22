@@ -9454,3 +9454,22 @@ The producer stage replaces the old incomplete event adapter and its admission
 map together so every intermediate commit compiles; diagnostic fixtures were
 published separately to keep this protocol change reviewable. Exact clean
 executable qualification follows before promotion.
+
+Exact clean c0d02b7099df3ed1c47a290030129c30c933485a subsequently PASSes all
+21 targeted executable scenarios: ten newly qualified one-turn tool cases and
+eleven prior controls, including two expected pending/read-failure tuples.
+Original independent request/wire/stdout, HTTP, attempts/auth/slot, state,
+usage/finish and matching-corruption guards pass. Both binaries embed the exact
+revision with vcs.modified=false; reference pins remain unchanged. Commands and
+audit:
+/tmp/gdx-04384-gemini-stream-tool-lifecycle-targeted-commands.json and
+/tmp/gdx-04384-gemini-stream-tool-lifecycle-targeted-audit.json. The producer
+commit is pushed directly to origin/main after fetch, cleanliness and ancestry
+checks, without waiting for CI. Full Gemini 934 now runs on that unchanged
+source (original session 57587); it is not yet a PASS. No tool snapshot or
+continuation path is qualified by these one-turn results. The producer commit
+contains 450 insertions and 102 deletions, including removal of the superseded
+adapter and its admission map; the independent fixture stage was published
+separately. Earlier 912/918/924 matrices and the e9d88ce entire default gate
+remain on their original handles and immutable sources. Overall parity remains
+unproven.
