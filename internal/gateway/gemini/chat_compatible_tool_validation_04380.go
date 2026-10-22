@@ -9,7 +9,8 @@ import (
 // The 0.438.0 API-key Gemini Chat-compatible bridge validates declarations
 // before an upstream request. Flat OpenAI tools are projected to the nested
 // function shape *for validation only*, matching the tagged provider's
-// tools[index].function.* error paths. The outbound Chat wire is unchanged.
+// tools[index].function.* error paths. The separate Chat declaration projector
+// owns the outbound shape.
 // Native generateContent/OAuth validation remains independently owned.
 func validateGeminiChatCompatibleTools04380(body []byte) error {
 	var request map[string]json.RawMessage

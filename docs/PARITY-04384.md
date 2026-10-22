@@ -7848,3 +7848,87 @@ with its 495-case Gemini PASS. Remaining declaration/other controls, Gemini
 Compact, executable session/turn continuation, native macOS/Windows and live
 login remain unproven. No force push, tag, release or editor edit occurred.
 Global 1:1 parity is not claimed.
+
+## Gemini Chat function declaration projection and duplicate policy
+
+Pinned `chat_compatible_request.rs` validates the complete tools shape before
+`chat_tool_shapes.mojo` projects function declarations. Present null description
+and nonboolean strict fail ToolsShape admission, even when a later projector
+would omit them. The API-key Gemini caller uses default strict_tools=false, so
+selected strict:true also fails. Flat and nested function declarations become
+canonical nested objects containing only name, parameters, optional nonblank
+description and optional boolean strict. Names use the provider's 128-byte ASCII
+contract. Empty projected arrays omit tools. The bound of 128 functions applies
+only after stable duplicate selection.
+
+`deepseek_function_tools.mojo` retains equal canonical declarations, prefers a
+specific schema over one with additionalProperties:true and no properties or
+required member, and rejects conflicting specific definitions. Presence matters:
+properties:null is specific. A later specific declaration replaces the earlier
+generic declaration at its own original position, retaining other tool order.
+Canonical signed floating zero compares equal, while integer/float kinds and
+quoted zero text remain distinct. Final wire bytes retain the chosen original
+signed zero. These are protocol rules owned privately by gateway/gemini.
+
+Twenty-nine unique qualified executable baselines pin old clean production
+`ea27e1fd5615e2bafd292468301dbc4657e0733c` and the unchanged official 0.438.4
+source/binary/manifest: 25 FAIL only Godex, four controls PASS. All reference,
+state and independent mutation invariants pass. Original reports are
+`/tmp/gdx-04384-gemini-function-declaration-<suffix>-before-oracle.json` and
+commands `/tmp/gdx-04384-gemini-function-declarations-before-commands.json`.
+The initial description-null/strict-string/strict-null fixtures incorrectly
+expected acceptance from projector-only reasoning. Complete-host source and
+executable evidence require terminal 502. Their original reports remain FAIL
+and unqualified; unchanged before binaries were rerun with corrected admission:
+`...-<suffix>-corrected-before-oracle.json` and
+`/tmp/gdx-04384-gemini-function-declarations-corrected-before-commands.json`.
+The 29-case total uses those three corrected reports instead of their originals;
+these reruns are not counted twice.
+
+The final gateway regression was copied alone to the old source in
+`/tmp/gdx-04384-gemini-function-declarations-before-work`.
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiChatFunctionDeclarationsPreserveCompletePipeline$' -count=1`
+FAILs 23 tests including the parent, with three controls PASS:
+`/tmp/gdx-04384-gemini-function-declarations-gateway-final-before.log`.
+The repaired declaration and existing choice regressions, new number-kind tests
+and independent oracle mutation test PASS all 106 tests in two packages:
+`rtk go test ./internal/gateway/gemini ./tools/differential -run '^(TestProdex04384GeminiChat(FunctionDeclarationsPreserveCompletePipeline|ToolChoicePreservesCompletePipeline)|TestProdex04384GeminiFunctionEqualityPreservesSerdeNumberKinds|TestGeminiFunctionDeclarationOracleRejectsMatchingCorruption04384)$' -count=1`;
+`/tmp/gdx-04384-gemini-function-declarations-focused-final.log`.
+They check exact wire, stable survivors and ordering, null presence barriers,
+no-attempt failure, zero/string/escape distinctions and the post-dedup limit.
+The gateway ordering and null-presence checks are source-aligned local tests;
+the 29 executable cases keep their separately recorded scope.
+
+Private `request_chat_function_declarations_04384.go` owns projection,
+admission and duplicate policy. The existing serde writer supplies canonical
+number/string bytes. A small package-local 128-byte ASCII name validator now
+serves both declarations and choices, removing the prior duplicate check. No new
+shared helper, package, exported API, dependency, option, goroutine, routing
+policy or durable format is added. Non-function declaration conversion remains
+an explicit open audit and a local shortcut comment records that limit.
+
+The executable harness adds 29 independent cases plus matching-corruption
+checks that change raw/decoded requests together, including declaration names,
+strict flags, field names, signed-zero bytes and generic-schema markers. These
+also execute inside the standalone negative-control gate.
+`rtk proxy go test -json ./...` PASSes 10,351 tests in 71 packages; ten packages
+have no tests and 18 optional installed-Codex/executable tests are skipped:
+`/tmp/gdx-04384-gemini-function-declarations-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+PASSes 3,530 tests: `/tmp/gdx-04384-gemini-function-declarations-race.log`.
+`rtk proxy make verify` PASSes with exit 0:
+`/tmp/gdx-04384-gemini-function-declarations-verify.log`.
+Exact clean-commit executable qualification follows local verification.
+
+Clean `e031ae874da8bb814e341ed127129e869a9be033` now PASSes all 528 Gemini
+cases, including every earlier 495, with independent mutations and state:
+`/tmp/gdx-04384-gemini-reasoning-shape-oracle.json`. Its exact DeepSeek 213
+and clean make-verify PASSes remain separately recorded. Primary fast-forwarded
+and pushed e031ae8 directly to origin/main after fetch/cleanliness/ancestry checks.
+Clean `ea27e1f` separately PASSes all 37 targeted tool-choice cases with exact
+source/reference pins, mutations and state checks. Its full 626-case matrix is
+pending, as are the 559/589-case matrices and the complete 15d1c55 default gate.
+The latest entire default-gate PASS remains exact 20a7d41. Remaining declaration
+kinds, other controls, Gemini Compact, executable session/turn continuation,
+native macOS/Windows and live login remain unproven. No force push, tag, release
+or editor edit occurred. Global 1:1 parity is not claimed.

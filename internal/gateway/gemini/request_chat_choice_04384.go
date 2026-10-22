@@ -59,15 +59,7 @@ func geminiChatChoiceName04384(choice map[string]any) (string, bool) {
 	if strings.TrimSpace(namespace) != "" {
 		name = geminiChatNamespacedChoice04384(namespace, name, strings.HasPrefix(kind, "mcp") && !strings.HasPrefix(namespace, "mcp__"))
 	}
-	if len(name) > 128 {
-		return "", false
-	}
-	for _, char := range []byte(name) {
-		if !(char >= 'a' && char <= 'z' || char >= 'A' && char <= 'Z' || char >= '0' && char <= '9' || char == '_' || char == '-') {
-			return "", false
-		}
-	}
-	return name, true
+	return name, validGeminiChatFunctionName04384(name)
 }
 
 func geminiChatNamespacedChoice04384(namespace, name string, addMCPPrefix bool) string {

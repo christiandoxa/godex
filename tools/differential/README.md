@@ -56,6 +56,12 @@ aliases, namespace separator/prefix rules, 128-byte names, thinking omission and
 actual SSE. They use nonblank source-supported declaration descriptions to
 isolate choice behavior. Matching-corruption checks change raw and decoded
 requests together, including tool names/declarations and namespace delimiters.
+The 29 `request-primitive-declaration-*` cases cover function projection,
+blank descriptions, extra fields, typed strict/description admission, disabled
+strict mode, name limits, stable duplicate/generic-schema selection, serde
+number kinds, 128-function limits after deduplication, named choices and actual
+SSE. Their original three wrong-admission expectations remain unqualified FAIL;
+corrected unchanged-binary reruns prove those terminal 502s independently.
 
 Build and run from a clean, committed Godex worktree:
 

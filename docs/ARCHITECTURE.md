@@ -550,6 +550,16 @@ Only the canonical nested function choice reaches shared Chat conversion.
 Original thinking omissions still use the original request metadata. Declaration
 translation remains separately owned; the native choice adapter keeps its own
 contract. The package-local first-string presence helper is reused.
+Function declarations have a separate private Chat projector before named
+choice binding. It validates present description/strict types, uses the tagged
+disabled-strict default, drops unsupported outer/function fields and blank
+descriptions, and produces canonical nested function objects. Stable duplicate
+selection retains equal declarations, prefers specific schemas over generic
+schemas and rejects conflicting specific definitions. Its equality follows
+canonical serde bytes with signed floating-zero equivalence outside quoted
+strings. The 128-function limit follows deduplication. A package-local name
+validator serves both declarations and named choices; broader declaration
+kinds retain their existing conversion pending executable qualification.
 All supported call/tool-output items require a nonblank identity selected from
 the first string `call_id`, `tool_call_id`, then `id`. This local admission runs
 before conversion or orphan filtering can silently drop the malformed item.
