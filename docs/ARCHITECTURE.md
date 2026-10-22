@@ -340,6 +340,12 @@ The complete DeepSeek Chat request also uses that existing serde writer, so
 numeric controls, tool/schema values and text retain the pinned number and
 UTF-8 wire representation. Invalid `temperature`/`top_p` types use the existing
 terminal preparation-error boundary before any upstream attempt.
+DeepSeek's complete Responses JSON decoder lives with its private admission
+classification. Parse/serde failures retain the existing terminal 502 class;
+valid nonobject roots retain a separate private error kind until the runtime
+gateway presents the released empty 500 with no content type and terminal
+precommit evidence. History parsing shares the decoder and cannot extract
+context from rejected input. Retry decisions remain in the routing use case.
 Private `gateway/deepseek/tool_argument_error.go` formats buffered object/array
 and trailing-input syntax diagnostics after argument validation fails. Its
 private byte-position formatter is also used by the buffered serde error path.

@@ -2,13 +2,15 @@ package main
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
 func TestProdex04384RequestPrimitiveOracleFixtures(t *testing.T) {
 	for _, suffix := range append(requestPrimitiveSuffixes04384(), deepSeekAdmissionSuffixes04384()...) {
 		scenario := "request-primitive-" + suffix
-		if !json.Valid(requestPrimitiveInput04384(scenario, "gemini-3.1-pro-preview")) {
+		fixture, _ := requestPrimitiveCase04384(scenario)
+		if (fixture.body == "" || !fixture.reject) && !json.Valid(requestPrimitiveInput04384(scenario, "gemini-3.1-pro-preview")) {
 			t.Fatal("primitive fixture lost its original JSON")
 		}
 		gemini := geminiPrimitiveExpected04384(scenario)
@@ -27,5 +29,20 @@ func TestProdex04384RequestPrimitiveOracleFixtures(t *testing.T) {
 	}
 	if !requestPrimitiveNegativeControl04384() {
 		t.Fatal("matching primitive corruptions escaped independent invariants")
+	}
+}
+
+func TestProdex04384RawRequestFixturesPreserveRejectedJSONBytes(t *testing.T) {
+	for _, fixture := range []struct{ suffix, raw string }{
+		{"syntax", `{"input":`},
+		{"surrogate", `"unused":"\ud800"`},
+		{"utf8", string([]byte{0xff})},
+		{"trailing", `} {}`},
+		{"overflow", `1e309`},
+	} {
+		body := requestPrimitiveInput04384("deepseek-request-primitive-json-"+fixture.suffix, "deepseek-v4-pro")
+		if !strings.Contains(string(body), fixture.raw) {
+			t.Fatalf("raw JSON fixture was repaired before admission: %s", fixture.suffix)
+		}
 	}
 }

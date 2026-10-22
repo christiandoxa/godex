@@ -4076,6 +4076,113 @@ Gemini Compact, session/turn executable continuation, native macOS/Windows
 and live authentication remain open. Global 1:1 parity is not claimed.
 
 
+## Validated model-input and DeepSeek control-type checkpoints
+
+Clean `8d618e097c8549015785bce1e23c89999198d42f` passes all 185 Gemini cases
+and 169 DeepSeek scenarios with independent mutation controls:
+`/tmp/gdx-04384-gemini-model-input-oracle.json` and
+`/tmp/gdx-04384-gemini-model-input-deepseek-oracle.json`.
+The clean binaries were built with
+`rtk go build -trimpath -o /tmp/gdx-04384-gemini-model-input-godex ./cmd/godex` and
+`rtk go build -trimpath -o /tmp/gdx-04384-gemini-model-input-final-differential ./tools/differential`.
+The three targeted model reports recorded above PASS on that exact candidate.
+
+Clean `d0b4f56999e0de585f4ffd9fe325b6bc88878986` passes all 178 DeepSeek
+scenarios with independent mutations:
+`/tmp/gdx-04384-deepseek-control-types-oracle.json`.
+The binaries were built with
+`rtk go build -trimpath -o /tmp/gdx-04384-deepseek-control-types-godex ./cmd/godex` and
+`rtk go build -trimpath -o /tmp/gdx-04384-deepseek-control-types-final-differential ./tools/differential`.
+Null-stream and previous-array targeted reports PASS:
+`/tmp/gdx-04384-deepseek-control-stream-null-targeted-oracle.json` and
+`/tmp/gdx-04384-deepseek-control-previous-array-targeted-oracle.json`.
+Commands use `--gemini`, or `--scenario all --scenario-workers 3`, with the
+matching clean candidate/source and unchanged pinned reference.
+The clean primary worktree and remote were checked and fast-forwarded;
+`8d618e0` and `d0b4f56` were pushed directly to `origin/main` without CI wait.
+No force push, tag, release or editor-checkout change occurred.
+The full default gate on protected clean `8d618e0` remains pending;
+the last completed full default gate is still `293b1b6`.
+
+
+## DeepSeek complete-JSON admission and valid nonobject outcomes
+
+Released-executable probes distinguish complete parse/serde failures from
+valid nonobject JSON. Null, array, number, boolean and string roots return
+an empty HTTP 500 with no Content-Type; malformed/trailing JSON, invalid
+Unicode/UTF-8, numeric overflow and excess depth return exact plain HTTP 502
+`upstream request failed`. Both have exit 2 and zero upstream attempts.
+The valid-Unicode control produces one authenticated request and the exact
+successful DeepSeek Responses output.
+
+Godex already rejected invalid JSON in its complete decoder, but classified
+that rejection as an ordinary error that entered routing recovery. Valid
+nonobject roots likewise entered recovery, leaving no child exchange in
+executable observations. The gateway now classifies parse failures through
+its existing terminal preparation error and preserves valid nonobject roots
+as a distinct private error until runtime presentation. The latter becomes
+the exact empty 500 with existing `invalid_request_error` precommit evidence,
+preventing both model and credential retries. It does not reproduce a panic
+or weaken ordinary provider-500 policy.
+
+The complete decoder and its two admission classes now live together in
+`gateway/deepseek/request_json_admission_04384.go`, reducing the broad request
+file. Existing history parsing shares that decoder, so rejected bytes cannot
+contribute conversation context. All code remains in the concrete integration
+gateway; no new production package, shared helper, exported API, interface,
+dependency, configuration, worker or persisted format is introduced.
+
+Three preliminary executable reports record the observed outcomes, all
+failing only Godex:
+`/tmp/gdx-04384-deepseek-json-<root-null|root-array|syntax>-unqualified-before-oracle.json`.
+The twelve qualified baseline reports pin clean `d0b4f56` and the unchanged
+reference, using `/tmp/gdx-04384-deepseek-json-admission-unqualified-differential`:
+`/tmp/gdx-04384-deepseek-json-<suffix>-qualified-before-oracle.json`.
+One Unicode control PASSes; all eleven rejection cases FAIL only Godex.
+Every reference and independent mutation invariant passes. The original raw
+fixture bytes remain intact, including malformed UTF-8; accepted control wire,
+response/status/type/stdout/exit, auth/slot, attempts and durable state remain
+strict. An explicitly present empty Content-Type is rejected for empty-500
+outcomes rather than treated as an absent header.
+
+Before repair one regression control passes and sixteen tests fail, including
+parents and the two-key no-retry/no-wait checks:
+`rtk go test ./internal/gateway/deepseek -run '^TestProdex04384DeepSeekJSONAdmission(ReturnsTerminalOutcome|DoesNotRetryModelOrCredential)$' -count=1 -timeout=30s`;
+`/tmp/gdx-04384-deepseek-json-admission-before.log`.
+The same command passes 17 tests after repair:
+`/tmp/gdx-04384-deepseek-json-admission-focused.log`.
+`rtk go test ./tools/differential -count=1` passes 281 tests:
+`/tmp/gdx-04384-deepseek-json-admission-unqualified-oracle-tests.log`.
+
+The first full gateway run correctly exposes an older 400 expectation:
+`rtk go test ./internal/gateway/deepseek -count=1`;
+`/tmp/gdx-04384-deepseek-json-admission-gateway-tests.log` has 800 passing tests
+and one failing `TestProdex04373DeepSeekLoopbackToolRequestAndMalformedGuard`.
+The concurrent first full suite likewise records 9,720 passes and one failure
+in `/tmp/gdx-04384-deepseek-json-admission-test-all.jsonl`.
+The first race run also FAILs that old expectation:
+`/tmp/gdx-04384-deepseek-json-admission-race.log`.
+That regression now requires the independently observed plain terminal 502
+message while preserving its upstream-attempt guard.
+`rtk go test ./internal/gateway/deepseek -count=1` passes all 801 tests:
+`/tmp/gdx-04384-deepseek-json-admission-final-gateway-tests.log`.
+`rtk go test -race ./internal/gateway/deepseek ./internal/usecase/routing ./tools/differential -count=1`
+passes 2,912 tests: `/tmp/gdx-04384-deepseek-json-admission-final-race.log`.
+`rtk proxy go test -json ./...` passes 9,721 tests across 81 packages
+(71 passing packages and ten with no tests):
+`/tmp/gdx-04384-deepseek-json-admission-final-test-all.jsonl`.
+The first `rtk proxy make verify` invocation completes successfully after the
+corrected expectation is on disk:
+`/tmp/gdx-04384-deepseek-json-admission-verify.log`.
+The final unchanged-source `rtk proxy make verify` rerun also PASSes:
+`/tmp/gdx-04384-deepseek-json-admission-final-verify.log`.
+Clean-commit 190-case DeepSeek qualification follows. The separate 185-case
+Gemini PASS remains scoped to clean `8d618e0`; Gemini production is unchanged.
+Other controls, combined-error ordering, Gemini Compact, executable session/
+turn continuation, native macOS/Windows and live authentication remain open.
+Global 1:1 parity is not claimed.
+
+
 ## Primitive request oracle: token aliases, uint64 and ignored parallel input
 
 The pinned Gemini and DeepSeek Chat bridges share the primitive-field kernel.

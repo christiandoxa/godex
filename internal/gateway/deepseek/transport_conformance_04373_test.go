@@ -64,7 +64,7 @@ func TestProdex04373DeepSeekLoopbackToolRequestAndMalformedGuard(t *testing.T) {
 		Body:   []byte(`{"input":"hello"} {}`),
 	}, proxymodel.Account{})
 	var proxyErr *proxymodel.Error
-	if !errors.As(err, &proxyErr) || proxyErr.StatusCode != http.StatusBadRequest {
+	if !errors.As(err, &proxyErr) || proxyErr.StatusCode != http.StatusBadGateway || proxyErr.Message != "upstream request failed" {
 		t.Fatalf("malformed request error = %v", err)
 	}
 	if requests != 1 {

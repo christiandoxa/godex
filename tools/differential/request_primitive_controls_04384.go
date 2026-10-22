@@ -8,8 +8,9 @@ import (
 )
 
 type requestPrimitiveFixture04384 struct {
-	fields, limit, wireFields, wirePrefix, wireStop, text string
-	reject                                                bool
+	fields, limit, wireFields, wirePrefix, wireStop, text, body string
+	reject                                                      bool
+	failureStatus                                               int
 }
 
 func requestPrimitiveSuffixes04384() []string {
@@ -24,7 +25,9 @@ func requestPrimitiveSuffixes04384() []string {
 
 func deepSeekAdmissionSuffixes04384() []string {
 	return []string{"admission-stream-false", "admission-stream-null", "admission-stream-string", "admission-stream-number",
-		"admission-instructions-null", "admission-instructions-array", "admission-previous-null", "admission-previous-array", "admission-previous-number"}
+		"admission-instructions-null", "admission-instructions-array", "admission-previous-null", "admission-previous-array", "admission-previous-number",
+		"json-valid-unicode", "json-root-null", "json-root-array", "json-root-number", "json-root-boolean", "json-root-string",
+		"json-syntax", "json-trailing", "json-surrogate", "json-utf8", "json-overflow", "json-depth"}
 }
 
 func requestPrimitiveCase04384(scenario string) (requestPrimitiveFixture04384, bool) {
@@ -33,6 +36,14 @@ func requestPrimitiveCase04384(scenario string) (requestPrimitiveFixture04384, b
 	}
 	const stops16 = `["s01","s02","s03","s04","s05","s06","s07","s08","s09","s10","s11","s12","s13","s14","s15","s16"]`
 	suffix := strings.TrimPrefix(strings.TrimPrefix(scenario, "deepseek-"), "request-primitive-")
+	if strings.HasPrefix(suffix, "json-") {
+		body, reject, known := geminiJSONAdmission04384("request-" + suffix)
+		fixture := requestPrimitiveFixture04384{body: body, reject: reject}
+		if strings.HasPrefix(suffix, "json-root-") {
+			fixture.failureStatus = http.StatusInternalServerError
+		}
+		return fixture, known
+	}
 	switch suffix {
 	case "output":
 		return requestPrimitiveFixture04384{fields: `"max_output_tokens":11`, limit: "11"}, true
@@ -146,6 +157,9 @@ func requestPrimitiveCase04384(scenario string) (requestPrimitiveFixture04384, b
 
 func requestPrimitiveInput04384(scenario, model string) []byte {
 	fixture, _ := requestPrimitiveCase04384(scenario)
+	if fixture.body != "" {
+		return []byte(strings.Replace(fixture.body, "gemini-3.1-pro-preview", model, 1))
+	}
 	text := "same request"
 	if fixture.text != "" {
 		text = fixture.text
@@ -179,7 +193,12 @@ func requestPrimitiveWire04384(scenario, model string) string {
 func geminiPrimitiveExpected04384(scenario string) geminiCandidateResult {
 	fixture, _ := requestPrimitiveCase04384(scenario)
 	if fixture.reject {
-		return geminiUserIDExpected04384("request-user-id-number")
+		result := geminiUserIDExpected04384("request-user-id-number")
+		if fixture.failureStatus == http.StatusInternalServerError {
+			result.Client = exchange{Status: 500, Headers: make(http.Header)}
+			result.Stdout = "\n"
+		}
+		return result
 	}
 	result := geminiUserIDExpected04384("request-user-id-absent")
 	result.Upstream[0].RawBody = requestPrimitiveWire04384(scenario, "gemini-3.1-pro-preview")
@@ -194,6 +213,9 @@ func deepSeekPrimitiveExpected04384(scenario string) productRun {
 	if fixture.reject {
 		result.ExitStatus = 2
 		result.Client = exchange{Status: 502, Headers: http.Header{"Content-Type": {"text/plain; charset=utf-8"}}, Body: "upstream request failed"}
+		if fixture.failureStatus == http.StatusInternalServerError {
+			result.Client = exchange{Status: 500, Headers: make(http.Header)}
+		}
 	} else {
 		result.Upstream = []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, KeySlot: "single", Body: requestPrimitiveWire04384(scenario, "deepseek-v4-pro")}}
 	}
@@ -210,6 +232,7 @@ func deepSeekPrimitiveInvariants04384(scenario scenarioResult) []string {
 	for _, run := range scenario.Runs {
 		if run.ClientError != "" || len(run.StateIntegrity) != 0 || run.Retries != 0 || run.Cancelled || run.ExitStatus != want.ExitStatus ||
 			run.Client.Status != want.Client.Status || run.Client.Body != want.Client.Body || run.Client.Headers.Get("Content-Type") != want.Client.Headers.Get("Content-Type") ||
+			want.Client.Status == 500 && len(run.Client.Headers["Content-Type"]) != 0 ||
 			run.Stdout != want.Stdout || len(run.Upstream) != len(want.Upstream) {
 			failures = append(failures, scenario.Name+"."+run.Name+".exact_admission_or_response")
 			continue
@@ -225,6 +248,10 @@ func deepSeekPrimitiveInvariants04384(scenario scenarioResult) []string {
 }
 
 func geminiPrimitiveInvariant04384(scenario string, result geminiCandidateResult) error {
+	fixture, _ := requestPrimitiveCase04384(scenario)
+	if fixture.failureStatus == 500 && len(result.Client.Headers["Content-Type"]) != 0 {
+		return errors.New("nonobject root invented a content type")
+	}
 	if !geminiExactRequestResult04384(result, geminiPrimitiveExpected04384(scenario)) {
 		return errors.New("Gemini primitive controls lost exact limit, admission, request or response")
 	}
@@ -243,6 +270,7 @@ func requestPrimitiveNegativeControl04384() bool {
 			func(r *geminiCandidateResult) { r.Client.Status++ },
 			func(r *geminiCandidateResult) { r.Client.Body = `{}` },
 			func(r *geminiCandidateResult) { r.Client.Headers.Set("Content-Type", "application/json") },
+			func(r *geminiCandidateResult) { r.Client.Headers.Set("Content-Type", "") },
 			func(r *geminiCandidateResult) { r.ExitCode++ },
 			func(r *geminiCandidateResult) { r.Stdout = "changed" },
 			func(r *geminiCandidateResult) { r.StateIntegrity = []string{"changed"} },
@@ -260,6 +288,7 @@ func requestPrimitiveNegativeControl04384() bool {
 			func(r *productRun) { r.Client.Status++ },
 			func(r *productRun) { r.Client.Body = `{}` },
 			func(r *productRun) { r.Client.Headers.Set("Content-Type", "application/json") },
+			func(r *productRun) { r.Client.Headers.Set("Content-Type", "") },
 			func(r *productRun) { r.ExitStatus++ },
 			func(r *productRun) { r.Stdout = "changed" },
 			func(r *productRun) { r.StateIntegrity = []string{"changed"} },

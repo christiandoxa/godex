@@ -113,6 +113,12 @@ func (transport *RuntimeTransport) executeResponses(ctx context.Context, input p
 		candidate := models[index]
 		attempt, err := transport.prepareResponseAttempt(input, current, candidate, conversations)
 		if err != nil {
+			var nonobject *nonobjectResponsesInputError04384
+			if errors.As(err, &nonobject) {
+				return &proxymodel.Response{StatusCode: http.StatusInternalServerError,
+					Header: make(http.Header), Body: io.NopCloser(bytes.NewReader(nil)),
+					PrecommitFailure: &proxymodel.PrecommitFailure{Code: "invalid_request_error"}}, nil
+			}
 			return nil, err
 		}
 		response, err := transport.send(ctx, input, attempt.route, attempt.body)
@@ -143,6 +149,10 @@ func (transport *RuntimeTransport) prepareResponseAttempt(input proxymodel.Reque
 		Model: candidate, StrictTools: transport.options.StrictTools, WebSearchMode: transport.options.WebSearchMode,
 	}, history)
 	if err != nil {
+		var nonobject *nonobjectResponsesInputError04384
+		if errors.As(err, &nonobject) {
+			return deepSeekResponseAttempt{}, err
+		}
 		var invalidInput *invalidResponsesInputError
 		if errors.As(err, &invalidInput) {
 			return deepSeekResponseAttempt{}, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
