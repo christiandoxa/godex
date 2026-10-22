@@ -8962,7 +8962,13 @@ before the fix and keeps three controls; focused Gemini/differential tests pass
 cross-builds, format/source guards, vet and the build. Logs:
 /tmp/gdx-04384-gemini-stream-finish-presence-full.jsonl and
 /tmp/gdx-04384-gemini-stream-finish-presence-verify.log. Exact clean executable
-qualification follows; overall 1:1 parity and complete continuation remain unproven.
+qualification subsequently passes eleven targeted scenarios on exact clean
+0243472efa2b8f19f49b0f7172e7bfacf02b1d82. The five new finish-presence cases and
+four previous detailed SSE cases preserve exact request/stdout/state assertions;
+two legacy error/EOF controls retain their prior wire/lifecycle scope. Audit:
+/tmp/gdx-04384-gemini-stream-finish-presence-targeted-audit.json. The full
+879-case matrix remains running on its original immutable worktree. Overall
+1:1 parity and complete continuation remain unproven.
 
 The original full 851-case Gemini matrix on exact clean
 05a61ffbb7c46a8f0204d5a2413fc8c9507de695 completes PASS with exit 0. It includes
@@ -8972,3 +8978,37 @@ candidate VCS metadata are verified. Audit:
 /tmp/gdx-04384-gemini-compact-namespace-audit.json. This is the latest complete
 Gemini matrix PASS; it does not qualify later revisions or erase the original
 844/847 FAIL reports. The latest entire default-gate PASS remains exact 78d256d.
+
+### Normalize present Gemini Chat-compatible SSE usage
+
+Fifteen executable baselines on exact clean
+0243472efa2b8f19f49b0f7172e7bfacf02b1d82 qualify ten Godex-only usage failures
+and five PASS controls. Empty/null/non-object usage must normalize to zero
+counters; missing or invalid totals default to saturating unsigned input plus
+output. Explicit zero totals remain zero. Cache and reasoning detail presence,
+including zero and full unsigned precision, must survive under the Gemini
+provider key. Valid counters, null-then-valid, absent, retained and explicit-zero
+controls keep their existing behavior. Independent exact original request,
+stdout, status, single attempt, durable state and matching corruption assertions
+pass outside the usage mismatch. Records:
+/tmp/gdx-04384-gemini-stream-usage-before-audit.json and
+/tmp/gdx-04384-gemini-stream-usage-before-commands.json.
+
+The pinned pipeline retains present usage in Mojo StreamChunkMetadata,
+normalizes it through provider-core response.rs ResponseUsage, then replaces
+the runtime stream's optional usage. Missing usage does not replace it. Godex
+now observes member presence in the existing Gemini SSE owner and calls the
+existing Chat-compatible usage normalizer. That implementation is renamed and
+exported as ResponsesUsage for two actual protocol consumers, buffered Chat
+responses and Gemini SSE. No wrapper, generic helper, new package, dependency,
+option, background work or persisted format is added. Native GenerateContent
+usage keeps its separate converter. The gateway regression checks completed
+SSE bytes and sentinel lifecycle; it fails thirteen edge cases before the fix
+and keeps five controls. Focused chatcompat/Gemini/DeepSeek/differential tests
+pass 3,062 cases afterward. The full Gemini matrix adds fifteen cases, reaching
+894. `rtk proxy go test -json ./...` PASSes 10,800 tests with 18 optional
+SKIP. `rtk proxy make verify` PASSes with exit 0, including shuffled race tests,
+cross-builds, format/source guards, vet and the build. Logs:
+/tmp/gdx-04384-gemini-stream-usage-full.jsonl and
+/tmp/gdx-04384-gemini-stream-usage-verify.log. Exact clean executable
+qualification follows; overall 1:1 parity remains unproven.

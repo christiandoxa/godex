@@ -59,7 +59,7 @@ func ChatResponseWithOptions(body []byte, now time.Time, options ResponseOptions
 		}
 	}
 	if usage, present := root["usage"]; present {
-		result["usage"] = chatUsage(usage, options.ProviderKey)
+		result["usage"] = ResponsesUsage(usage, options.ProviderKey)
 	}
 	if metadata := chatResponseMetadata(root, choice, message); len(metadata) > 0 && options.ProviderKey != "" {
 		result["metadata"] = map[string]any{options.ProviderKey: metadata}

@@ -1007,6 +1007,13 @@ Five finish-reason presence cases preserve explicit empty strings, including
 replacement and later null/absent updates. Null, wrong-type and absent controls
 retain the strict terminal-sentinel lifecycle and independent state checks.
 
+Fifteen Gemini Chat-compatible SSE usage cases compare independent exact usage
+bytes for null, empty/non-object values, unsigned counters, invalid numeric
+kinds, saturating/default totals and cache/reasoning detail presence. Five
+controls retain valid counters, explicit zero totals and absent usage. Original
+requests, stdout, single attempts and durable state remain strict; matching
+usage, request, auth, attempt and state mutations must fail the oracle.
+
 ### Tagged 0.438.2 Gemini function-tool rejection parity
 
 Two additional **source/binary-pinned** cases, `invalid-wrapped-tool-parameters`

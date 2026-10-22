@@ -718,7 +718,12 @@ empty strings/arrays and whitespace remain intact. Gemini carries canonical
 reusing its existing package-local presence lookup. DeepSeek preserves its
 existing projection and makes invalid selected values terminal before dispatch.
 `gateway/gemini` reuses `gateway/chatcompat` for shared message/history
-and Chat response conversion, while Gemini-specific reasoning, metadata, tool
+and Chat response conversion. The same protocol-owned `ResponsesUsage`
+normalizer serves buffered Chat responses and Gemini Chat-compatible SSE,
+preserving unsigned counters, saturating totals and cache/reasoning detail
+presence. Gemini observes usage member presence, including null, and supplies
+its provider key; native GenerateContent usage keeps its existing converter.
+Gemini-specific reasoning, metadata, tool
 shapes, and thought signatures stay in the Gemini gateway. Native Messages and
 Embeddings requests retain their paths and use `x-goog-api-key`; Responses and
 Chat use the OpenAI-compatible endpoint with Bearer auth. Model catalog data

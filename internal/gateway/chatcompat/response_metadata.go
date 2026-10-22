@@ -38,7 +38,8 @@ func appendStringMetadata(target, source map[string]any, key string) {
 	}
 }
 
-func chatUsage(value any, providerKey string) map[string]any {
+// ResponsesUsage normalizes present Chat Completion usage, including null.
+func ResponsesUsage(value any, providerKey string) map[string]any {
 	usage, _ := value.(map[string]any)
 	input := uintValueOr(usage["prompt_tokens"], 0)
 	output := uintValueOr(usage["completion_tokens"], 0)

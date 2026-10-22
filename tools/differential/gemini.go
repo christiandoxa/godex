@@ -99,7 +99,7 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 	_, _, _, controlTypes := geminiControlTypeCase04384(mock.scenario)
 	_, _, jsonAdmission := geminiJSONAdmission04384(mock.scenario)
 	primitiveFixture, primitive := requestPrimitiveCase04384(mock.scenario)
-	if geminiRequestNumberCase04384(mock.scenario) || userID || ignored || controlTypes || jsonAdmission || primitive || geminiCompactCase04384(mock.scenario) || geminiReasoningStreamCase04384(mock.scenario) || geminiStreamMetadataCase04384(mock.scenario) || geminiStreamCreatedCase04384(mock.scenario) || geminiStreamModelCase04384(mock.scenario) || geminiStreamFinishPresenceCase04384(mock.scenario) {
+	if geminiRequestNumberCase04384(mock.scenario) || userID || ignored || controlTypes || jsonAdmission || primitive || geminiCompactCase04384(mock.scenario) || geminiReasoningStreamCase04384(mock.scenario) || geminiStreamMetadataCase04384(mock.scenario) || geminiStreamCreatedCase04384(mock.scenario) || geminiStreamModelCase04384(mock.scenario) || geminiStreamFinishPresenceCase04384(mock.scenario) || geminiStreamUsageCase04384(mock.scenario) {
 		record.RawBody = string(body)
 	}
 	mock.mu.Lock()
@@ -197,6 +197,12 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 			value, _, _, _ := geminiStreamFinishPresenceFixture04384(mock.scenario)
 			first = geminiStreamFinishPresencePacket04384(first, value)
 		}
+		if geminiStreamUsageCase04384(mock.scenario) {
+			usage, _, _ := geminiStreamUsageFixture04384(mock.scenario)
+			if usage != "" {
+				first = strings.TrimSuffix(first, "}") + `,"usage":` + usage + "}"
+			}
+		}
 		_, _ = io.WriteString(w, "data: "+first+separator)
 		if reasoningScenario != "stream-chat-reasoning-only" {
 			second := `{"id":"chat-synthetic","model":"gemini-3.1-pro-preview","choices":[{"delta":{"content":"ok<>&/🌍\u2028\u2029"},"finish_reason":null}]}`
@@ -227,7 +233,13 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 			finish = geminiStreamFinishPresencePacket04384(finish, value)
 		}
 		_, _ = io.WriteString(w, "data: "+finish+"\n\n")
-		_, _ = io.WriteString(w, "data: "+`{"choices":[],"usage":{"prompt_tokens":9007199254740993,"completion_tokens":1,"total_tokens":9007199254740994}}`+"\n\n")
+		usage := `{"prompt_tokens":9007199254740993,"completion_tokens":1,"total_tokens":9007199254740994}`
+		if geminiStreamUsageCase04384(mock.scenario) {
+			_, usage, _ = geminiStreamUsageFixture04384(mock.scenario)
+		}
+		if usage != "" {
+			_, _ = io.WriteString(w, "data: "+`{"choices":[],"usage":`+usage+"}\n\n")
+		}
 		if mock.scenario != "stream-chat-eof" && mock.scenario != "compact-owner-stream-eof" {
 			_, _ = io.WriteString(w, "data: [DONE]\n\n")
 		}
@@ -405,6 +417,7 @@ func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit, selec
 	cases = append(cases, geminiStreamCreatedCases04384()...)
 	cases = append(cases, geminiStreamModelCases04384()...)
 	cases = append(cases, geminiStreamFinishPresenceCases04384()...)
+	cases = append(cases, geminiStreamUsageCases04384()...)
 	cases = append(cases, geminiIgnoredControlCases04384()...)
 	for _, suffix := range geminiControlTypeSuffixes04384() {
 		cases = append(cases, "request-control-"+suffix)
@@ -494,7 +507,7 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	_, _, _, controlTypes := geminiControlTypeCase04384(scenario)
 	_, _, jsonAdmission := geminiJSONAdmission04384(scenario)
 	_, primitive := requestPrimitiveCase04384(scenario)
-	auditState := rawIdentity || bodyBoundary || continuation || requestNumbers || userID || ignored || controlTypes || jsonAdmission || primitive || geminiCompactCase04384(scenario) || geminiReasoningStreamCase04384(scenario) || geminiStreamMetadataCase04384(scenario) || geminiStreamCreatedCase04384(scenario) || geminiStreamModelCase04384(scenario) || geminiStreamFinishPresenceCase04384(scenario)
+	auditState := rawIdentity || bodyBoundary || continuation || requestNumbers || userID || ignored || controlTypes || jsonAdmission || primitive || geminiCompactCase04384(scenario) || geminiReasoningStreamCase04384(scenario) || geminiStreamMetadataCase04384(scenario) || geminiStreamCreatedCase04384(scenario) || geminiStreamModelCase04384(scenario) || geminiStreamFinishPresenceCase04384(scenario) || geminiStreamUsageCase04384(scenario)
 	if auditState {
 		childResult = filepath.Join(home, "child-exchange.json")
 	}
@@ -627,7 +640,7 @@ func geminiCompare(scenario string, prodex, godex geminiCandidateResult) []strin
 	if prodex.ExitCode != godex.ExitCode {
 		differences = append(differences, "product child process exit status differs")
 	}
-	if geminiCompactCase04384(scenario) || geminiReasoningStreamCase04384(scenario) || geminiStreamMetadataCase04384(scenario) || geminiStreamCreatedCase04384(scenario) || geminiStreamModelCase04384(scenario) || geminiStreamFinishPresenceCase04384(scenario) {
+	if geminiCompactCase04384(scenario) || geminiReasoningStreamCase04384(scenario) || geminiStreamMetadataCase04384(scenario) || geminiStreamCreatedCase04384(scenario) || geminiStreamModelCase04384(scenario) || geminiStreamFinishPresenceCase04384(scenario) || geminiStreamUsageCase04384(scenario) {
 		return differences
 	}
 	if geminiContinuationCase04384(scenario) {
@@ -752,6 +765,9 @@ func geminiSemanticEqual043711(left, right map[string]any) bool {
 }
 
 func geminiFixtureInvariant(scenario string, result geminiCandidateResult) error {
+	if geminiStreamUsageCase04384(scenario) {
+		return geminiStreamUsageInvariant04384(scenario, result)
+	}
 	if geminiStreamFinishPresenceCase04384(scenario) {
 		return geminiStreamFinishPresenceInvariant04384(scenario, result)
 	}

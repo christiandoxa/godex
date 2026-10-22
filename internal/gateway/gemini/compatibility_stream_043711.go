@@ -205,12 +205,8 @@ func (state *geminiChatCompatibleStream043711) observeChatChunk(chunk map[string
 			}
 		}
 	}
-	if provider, ok := chunk["usage"].(map[string]any); ok {
-		state.usage = map[string]any{
-			"input_tokens":  provider["prompt_tokens"],
-			"output_tokens": provider["completion_tokens"],
-			"total_tokens":  provider["total_tokens"],
-		}
+	if usage, present := chunk["usage"]; present {
+		state.usage = chatcompat.ResponsesUsage(usage, "gemini")
 	}
 }
 
