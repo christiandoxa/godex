@@ -9307,3 +9307,22 @@ artifacts. Audit:
 /tmp/gdx-04384-gemini-stream-model-generic-first-isolated-audit.json. The
 original full 874 remains FAIL; the underlying reference temporary-file fault
 is unproven and is not explained by this separate isolated PASS.
+
+Exact clean e9d88ce35fbe4bf1f6dcabbb3f7869b1f0106642 then PASSes all 16
+targeted executable scenarios: six semantic-failure cases, two pending
+projection controls, three ignored-tool successes and five prior metadata,
+usage, native/error/EOF controls. Original independent wire/request/stdout,
+HTTP, attempts/auth/slot, state and matching-corruption invariants pass; both
+binaries embed the exact revision with vcs.modified=false. Commands and audit:
+/tmp/gdx-04384-gemini-stream-object-admission-targeted-commands.json and
+/tmp/gdx-04384-gemini-stream-object-admission-targeted-audit.json. The change
+is pushed directly to origin/main after fetch, clean-primary and ancestry
+checks, without waiting for CI. Global parity remains unproven.
+
+Full Gemini 918 (original session 63259) and the entire default release gate
+with no phase option (original session 29510) are now running on the same
+unchanged clean e9d88ce source. Reports are
+/tmp/gdx-04384-gemini-stream-object-admission-oracle.json and
+/tmp/gdx-04384-release-e9d88ce.log. Neither is a PASS yet; keep that checkout
+and HEAD immutable until both finish. The earlier full 912 remains on its
+original session 70523. All earlier FAIL observations remain retained.
