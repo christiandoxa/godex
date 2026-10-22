@@ -515,6 +515,15 @@ On Gemini Responses, top-level Chat `messages` is ignored after complete JSON
 and earlier provider validation. Only Responses input/instructions construct
 the request history. The private normalizer removes that field before shared
 Chat conversion; null input and malformed JSON cannot become valid fallbacks.
+Gemini Chat reasoning validates the strict object/effort shape before reusing
+the local ASCII effort parser. Gemini wire effort and thinking mode are kept
+separate: minimal/none do not enable thinking. After adjacency and signature
+restoration, thinking normalizes assistant tool-call content and omits explicit
+tool-choice. The original choice travels as response metadata through explicit
+buffered/SSE parameters; it never enters the outbound control map. Native
+responses, Chat fallback envelopes and completed SSE retain that metadata.
+Failed SSE keeps its tagged failure envelope. API-key SSE includes the tagged
+UTF-8 charset in Content-Type. All policy remains private to `gateway/gemini`.
 All supported call/tool-output items require a nonblank identity selected from
 the first string `call_id`, `tool_call_id`, then `id`. This local admission runs
 before conversion or orphan filtering can silently drop the malformed item.

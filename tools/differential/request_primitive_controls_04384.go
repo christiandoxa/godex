@@ -12,6 +12,9 @@ type requestPrimitiveFixture04384 struct {
 	reject                                                                bool
 	failureStatus                                                         int
 	geminiValidationError                                                 string
+	geminiOmittedChoice                                                   string
+	geminiChatStream                                                      bool
+	geminiChatFallback                                                    bool
 }
 
 func requestPrimitiveSuffixes04384() []string {
@@ -55,6 +58,8 @@ func geminiPreparationSuffixes04384() []string {
 	suffixes = append(suffixes, geminiMCPNameSuffixes04384()...)
 	suffixes = append(suffixes, geminiShellCallSuffixes04384()...)
 	suffixes = append(suffixes, geminiIgnoredMessagesSuffixes04384()...)
+	suffixes = append(suffixes, geminiReasoningSuffixes04384()...)
+	suffixes = append(suffixes, geminiReasoningChoiceSuffixes04384()...)
 	return append(suffixes, []string{"preparation-tools", "preparation-reasoning", "preparation-tool-params", "preparation-tool-missing-params",
 		"preparation-tool-missing-name", "preparation-tool-description", "preparation-input",
 		"tool-priority-stream", "tool-priority-temperature", "tool-priority-tokens", "tool-priority-user", "tool-priority-input", "tool-priority-reasoning", "tool-priority-serde"}...)
@@ -66,6 +71,12 @@ func requestPrimitiveCase04384(scenario string) (requestPrimitiveFixture04384, b
 	}
 	const stops16 = `["s01","s02","s03","s04","s05","s06","s07","s08","s09","s10","s11","s12","s13","s14","s15","s16"]`
 	suffix := strings.TrimPrefix(strings.TrimPrefix(scenario, "deepseek-"), "request-primitive-")
+	if strings.HasPrefix(suffix, "reasoning-") {
+		if fixture, known := geminiReasoningChoiceFixture04384(suffix); known {
+			return fixture, true
+		}
+		return geminiReasoningFixture04384(suffix)
+	}
 	if strings.HasPrefix(suffix, "ignored-messages-") {
 		return geminiIgnoredMessagesFixture04384(suffix)
 	}
@@ -356,6 +367,19 @@ func geminiPrimitiveExpected04384(scenario string) geminiCandidateResult {
 		return result
 	}
 	result := geminiUserIDExpected04384("request-user-id-absent")
+	if fixture.geminiOmittedChoice != "" {
+		result.Client.Body = strings.Replace(result.Client.Body, `"finishReason":"STOP",`, `"finishReason":"STOP",`+geminiReasoningChoiceNote04384(fixture.geminiOmittedChoice)+`,`, 1)
+		result.Stdout = result.Client.Body + "\n"
+	}
+	if fixture.geminiChatFallback {
+		result.Client.Body = `{"error":{"code":"gemini_empty_response","message":"Gemini returned no visible response content."},"id":"gemini_resp_prodex","metadata":{"gemini":{` + geminiReasoningChoiceNote04384(fixture.geminiOmittedChoice) + `}},"model":"gemini-2.5-pro","object":"response","output":[],"status":"failed","usage":{}}`
+		result.Stdout = result.Client.Body + "\n"
+	}
+	if fixture.geminiChatStream {
+		result.Client.Body = geminiReasoningChoiceStreamFixture04384(fixture.geminiOmittedChoice)
+		result.Client.Headers.Set("Content-Type", "text/event-stream; charset=utf-8")
+		result.Stdout = result.Client.Body + "\n"
+	}
 	result.Upstream[0].RawBody = requestPrimitiveWire04384(scenario, "gemini-3.1-pro-preview")
 	_ = json.Unmarshal([]byte(result.Upstream[0].RawBody), &result.Upstream[0].Body)
 	return result
@@ -404,6 +428,9 @@ func deepSeekPrimitiveInvariants04384(scenario scenarioResult) []string {
 
 func geminiPrimitiveInvariant04384(scenario string, result geminiCandidateResult) error {
 	fixture, _ := requestPrimitiveCase04384(scenario)
+	if fixture.geminiChatStream {
+		return geminiReasoningChoiceStreamInvariant04384(scenario, result)
+	}
 	if fixture.geminiValidationError != "" && (result.Client.Headers.Get("Cache-Control") != "no-store" || result.Client.Headers.Get("X-Content-Type-Options") != "nosniff") {
 		return errors.New("invalid Gemini request lost terminal response headers")
 	}

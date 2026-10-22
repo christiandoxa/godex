@@ -17,7 +17,7 @@ func TestProdex04384GeminiBufferedBodyBoundary(t *testing.T) {
 		t.Run(fixture.name, func(t *testing.T) {
 			body := prefix + strings.Repeat(" ", fixture.size-len(prefix)-len(suffix)) + suffix
 			response, err := translateGeminiChatOrNativeResponse043711(&http.Response{StatusCode: 200,
-				Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(body))})
+				Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(body))}, nil)
 			if fixture.size > limit {
 				if err == nil || response != nil {
 					t.Fatal("Gemini body above 4 MiB reached translation")

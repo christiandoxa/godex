@@ -48,6 +48,10 @@ func (transport *RuntimeTransport) executeChatCompatibleResponses(
 	if err != nil {
 		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
+	metadata, err := geminiChatReasoningMetadata04384(input.Body, controls)
+	if err != nil {
+		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
+	}
 	response, err := transport.send(ctx, input, current, body)
 	if err != nil {
 		return nil, err
@@ -56,9 +60,9 @@ func (transport *RuntimeTransport) executeChatCompatibleResponses(
 		return proxyResponse(response), nil
 	}
 	if geminiContentTypeIsSSE04384(response.Header.Get("Content-Type")) {
-		return translateGeminiChatCompatibleStream043711(response), nil
+		return translateGeminiChatCompatibleStream043711(response, metadata), nil
 	}
-	translated, err := translateGeminiChatOrNativeResponse043711(response)
+	translated, err := translateGeminiChatOrNativeResponse043711(response, metadata)
 	if err != nil {
 		return &proxymodel.Response{
 			StatusCode:       http.StatusBadGateway,
@@ -79,6 +83,9 @@ func geminiChatRequestOptions04384(body, input []byte, controls map[string]any) 
 	}
 	if err := restoreGeminiChatCallSignatures04384(request, input); err != nil {
 		return nil, err
+	}
+	if geminiChatThinking04384(controls) {
+		normalizeGeminiChatThinkingMessages04384(request)
 	}
 	user, hasUser := request["user"]
 	if hasUser {
@@ -134,6 +141,10 @@ func normalizeGeminiChatInput043711(body []byte) ([]byte, map[string]any, error)
 		return nil, nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
 	controls, valid = extractGeminiChatStop04384(root, controls)
+	if !valid {
+		return nil, nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
+	}
+	controls, valid = normalizeGeminiChatReasoning04384(root, controls)
 	if !valid {
 		return nil, nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
@@ -208,10 +219,10 @@ func validGeminiChatControlTypes04384(request map[string]any) bool {
 // official provider-transform fallback does NOT reuse the chat completion's
 // ID, model, or usage: it emits an empty Gemini error envelope.
 func translateGeminiChatOrNativeResponse043711(
-	response *http.Response,
+	response *http.Response, requestMetadata map[string]any,
 ) (*proxymodel.Response, error) {
 	if geminiContentTypeIsSSE04384(response.Header.Get("Content-Type")) {
-		return translateResponse(response, nil)
+		return translateResponse(response, requestMetadata)
 	}
 	defer response.Body.Close()
 	payload, err := io.ReadAll(io.LimitReader(response.Body, bufferedChatResponseMaxBytes+1))
@@ -231,12 +242,14 @@ func translateGeminiChatOrNativeResponse043711(
 			// This is the exact tagged provider translator's fallback for
 			// an upstream Chat Completion that cannot be decoded as native
 			// Gemini GenerateContent. Never fabricate successful text.
+			metadata := make(map[string]any, len(requestMetadata))
+			mergeMetadataFields(metadata, requestMetadata)
 			return jsonResponse(response.StatusCode, map[string]any{
 				"id":       "gemini_resp_prodex",
 				"model":    "gemini-2.5-pro",
 				"object":   "response",
 				"output":   []any{},
-				"metadata": map[string]any{},
+				"metadata": metadata,
 				"usage":    map[string]any{},
 				"status":   "failed",
 				"error": map[string]any{
@@ -248,7 +261,7 @@ func translateGeminiChatOrNativeResponse043711(
 	}
 	native := *response
 	native.Body = io.NopCloser(bytes.NewReader(payload))
-	translated, err := translateResponseWithCallFallback04380(&native, nil, true)
+	translated, err := translateResponseWithCallFallback04380(&native, requestMetadata, true)
 	if err != nil {
 		return nil, err
 	}

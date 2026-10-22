@@ -22,7 +22,7 @@ func TestProdex04384GeminiProviderPayloadBOMStaysInvalid(t *testing.T) {
 			if native {
 				body = translateGeminiNativeStream(upstream, nil).Body
 			} else {
-				body = translateGeminiChatCompatibleStream043711(upstream).Body
+				body = translateGeminiChatCompatibleStream043711(upstream, nil).Body
 			}
 			output, err := io.ReadAll(body)
 			body.Close()

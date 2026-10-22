@@ -7454,3 +7454,154 @@ earlier-error and implicit-tool-control. Its full Gemini/DeepSeek matrices
 remain pending. Remaining controls, Gemini Compact, executable session/turn
 continuation, native macOS/Windows and live authentication remain unproven.
 No force push, tag, release or editor edit occurred. Global 1:1 parity is not claimed.
+
+## Published 409-case qualification and the next reasoning audit
+
+Clean `20a7d41c9fbcc6012300fb2b7975a64a70aba5b2` PASSes all 409 Gemini
+cases and independent mutations, including every case from the earlier
+399-case reference-state failure:
+`/tmp/gdx-04384-gemini-mcp-projection-oracle.json`.
+The complete DeepSeek phase of the default gate on the same exact source also
+PASSes all 213 scenarios and independent mutations. Its exact JSON report is
+extracted without alteration from byte offset 26497 in
+`/tmp/gdx-04384-release-20a7d41.log` to
+`/tmp/gdx-04384-gemini-mcp-projection-release-deepseek-oracle.json`.
+The entire default gate is still pending; a passing phase is not its final
+completion. Primary fast-forwarded and pushed `20a7d41` directly to `origin/main`.
+The earlier `6263eb8` full 399-case report remains FAIL, with its isolated
+unchanged numeric-unicode rerun PASS; neither report is relabeled.
+
+Clean `2bd9081ac16a436f4ba0bbcfda632ab568436cab` separately PASSes all 213
+DeepSeek scenarios: `/tmp/gdx-04384-gemini-mcp-empty-name-deepseek-oracle.json`.
+The published source still owns its own exact qualification; this later PASS
+does not imply that every intervening full matrix completed. Protected later
+Gemini matrices remain running on clean committed worktrees.
+
+The next source audit confirms missing Gemini Chat reasoning shape/parameter
+behavior. Twenty-three unique executable baselines pin clean
+`3784eba7ceeee5da9694cf91047bf0db666dc6c0`, unchanged official reference and
+the reasoning before/expanded-before drivers. Nineteen FAIL only Godex; four
+controls PASS. Every reference and independent mutation invariant passes.
+Reports: `/tmp/gdx-04384-gemini-reasoning-shape-<suffix>-before-oracle.json`
+and three `-expanded-before-oracle.json` paired-tool reports.
+Exact argument arrays are in the corresponding `before-commands.json` and
+`expanded-before-commands.json`. Do not double-count expanded reports through
+overlapping filename globs. `rtk go test ./tools/differential -count=1` PASSes
+282 self-tests before and after the added paired-tool fixtures:
+`/tmp/gdx-04384-gemini-reasoning-shape-oracle-tests.log` and
+`/tmp/gdx-04384-gemini-reasoning-shape-expanded-oracle-tests.log`.
+
+The actual API-key caller enables reasoning parameters. Strict shape permits
+only the effort key in a reasoning object; nested effort presence wins over
+the top-level alias, while an empty object falls back to that alias. Null,
+wrong types, unknown/blank/non-ASCII efforts remain invalid. Gemini maps
+xhigh/max/high to high and preserves medium/low/minimal/none. The paired-tool
+baselines also establish that high adds empty reasoning_content while minimal
+and none do not. DeepSeek thinking state differs from Gemini's wire mapping.
+An eventual repair must also audit explicit tool-choice omission, preserved
+response metadata and actual Chat SSE before changing production. Existing
+native reasoning helpers allow different shapes and cannot be reused blindly.
+This audit preceded the complete reasoning repair described below.
+Remaining reasoning/format/metadata controls, Gemini Compact, executable
+session/turn continuation, native macOS/Windows and live login remain unproven.
+No force push, tag, release or editor edit occurred. Global 1:1 parity is not claimed.
+
+## Complete Gemini Chat reasoning, thinking history and response metadata
+
+Pinned strict ReasoningShape admits only an object with optional effort.
+Nested effort presence wins over the top-level alias, while an empty object
+falls back to that alias. Null, wrong types, unknown keys and unsupported/
+blank/non-ASCII efforts fail terminal admission. Gemini maps xhigh/max/high
+to high and preserves medium/low/minimal/none. Separately, the DeepSeek
+thinking policy enables high/medium/low but disables minimal/none.
+After adjacency and signature preservation, enabled thinking normalizes
+assistant tool-call content/reasoning_content, omits any explicit tool-choice
+and records its original value and exact tagged reason in response metadata.
+Buffered native output, the failed Chat fallback envelope and completed
+Chat SSE all retain this note; failed SSE retains its own failure shape.
+
+The private `gateway/gemini` adapter now follows that complete pipeline.
+It reuses the existing ASCII effort parser after stricter shape admission,
+passes canonical effort through the existing explicit outbound control map,
+and passes omission metadata separately through buffered/SSE response adapters.
+The existing metadata merge and serde writer are reused. It also sends the
+observed `text/event-stream; charset=utf-8` API-key SSE content type.
+Updated tests pass explicit nil metadata to preserve their original scope.
+No new shared helper, package, public API, dependency, option, goroutine or
+durable format is introduced. Existing stream ownership/cancellation and
+terminal no-replay policy remain in their original layers.
+
+The final real gateway regression was copied alone to old clean production
+source `3784eba7ceeee5da9694cf91047bf0db666dc6c0` in isolated
+`/tmp/gdx-04384-gemini-reasoning-shape-before-work`.
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiChatReasoningPreservesCompletePipeline$' -count=1`
+FAILs 25 tests including the parent, with four controls PASS:
+`/tmp/gdx-04384-gemini-reasoning-shape-gateway-final-before.log`.
+The same command PASSes all 29 tests after repair:
+`/tmp/gdx-04384-gemini-reasoning-shape-gateway-focused.log`.
+The table checks exact paired-tool wire bytes, effort aliases, omission versus
+retention of tool-choice, generic terminal 502 without upstream work, buffered
+and real SSE final metadata, and the exact streaming content type.
+
+Thirty-three unique executable baselines pin that same old clean source and
+unchanged official reference: 29 FAIL only Godex, four controls PASS. Every
+reference/state invariant passes. Reports use
+`/tmp/gdx-04384-gemini-reasoning-shape-<suffix>-before-oracle.json`, including
+the paired-tool `-expanded-before-oracle.json` reports. Exact argument arrays
+are in the original/expanded/choice before-command JSON files. Additional
+fallback, signature and streaming-control commands use the corresponding
+before drivers and `--gemini --scenario request-primitive-reasoning-<suffix>`
+with unchanged exact source/binary pins. All original reports remain retained.
+
+Independent mutation coverage exposed a hole in the new SSE oracle: moving
+correct omission metadata into the created event was incorrectly accepted.
+`rtk go test ./tools/differential -run '^TestGeminiReasoningOracleRejectsMatchingOmissionCorruption04384$' -count=1`
+FAILs before hardening:
+`/tmp/gdx-04384-gemini-reasoning-shape-metadata-position-before.log`.
+The oracle now requires the exact terminal metadata location before removing
+the verified note for its existing canonical six-event projection. All 283
+oracle self-tests PASS after hardening:
+`rtk go test ./tools/differential -count=1`;
+`/tmp/gdx-04384-gemini-reasoning-shape-final-oracle-tests.log`.
+Unchanged before binaries were rerun for stream, stream-minimal and
+stream-control with the stricter oracle. These remain Godex-only FAILs; all
+reference and mutation checks PASS:
+`/tmp/gdx-04384-gemini-reasoning-shape-choice-<suffix>-strict-before-oracle.json`.
+Exact argument arrays: `...-strict-before-commands.json`.
+The same matching-corruption checks also run in the standalone executable's
+negative-control gate; they are not limited to Go unit-test execution.
+These overlap the original cases and are not counted again in the 33 total.
+The no-reasoning stream control isolates Godex's missing charset; other SSE
+cases also fail earlier on reasoning. Full independent request/response,
+status/header/stdout/exit, authenticated attempts and durable-state checks
+remain mandatory. No assertion is weakened.
+
+`rtk proxy go test -json ./...` PASSes 10,134 tests in 71 packages; ten packages
+have no tests and 18 optional installed-Codex/executable tests are skipped:
+`/tmp/gdx-04384-gemini-reasoning-shape-test-all-final.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+PASSes 3,313 tests: `/tmp/gdx-04384-gemini-reasoning-shape-race-final.log`.
+`rtk go test -race ./tools/differential -count=1` separately PASSes all 283
+tests after the metadata-position hardening:
+`/tmp/gdx-04384-gemini-reasoning-shape-strict-oracle-race.log`.
+`rtk proxy make verify` PASSes:
+`/tmp/gdx-04384-gemini-reasoning-shape-verify-final.log`.
+An exact clean-commit verification and 528-case Gemini qualification follow.
+The change spans admission, request projection and buffered/SSE metadata
+because enabling reasoning without the latter would lose tagged behavior.
+
+Clean `677e792bad3bfe94431e61335280f8ca3efa522a` now separately PASSes all
+452 Gemini cases, including every earlier 436, with independent mutations:
+`/tmp/gdx-04384-gemini-custom-call-oracle.json`. It is pushed to origin/main.
+Later source-qualified matrices keep their own exact revision scope.
+
+Clean `cf40eb1feeb273e4008c4a05103f8db5f12754b3` separately PASSes all 436
+Gemini cases with independent mutations, including every earlier 409:
+`/tmp/gdx-04384-gemini-bridge-output-oracle.json`. It is pushed to origin/main.
+Exact DeepSeek qualification remains scoped to 213-case PASS reports at
+`20a7d41` and `2bd9081`; no new full run is attributed to the intermediate
+Gemini-only source. Other protected matrices and the full `20a7d41` default
+gate remain pending. Remaining format/metadata controls, Gemini Compact,
+executable session/turn continuation, native macOS/Windows and live login
+remain unproven. No force push, tag, release or editor edit occurred. Global
+1:1 parity is not claimed.

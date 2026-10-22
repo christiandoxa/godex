@@ -37,7 +37,7 @@ func TestProdex04384GeminiSSEDoneStopsReadingUpstream(t *testing.T) {
 		if native {
 			body = translateGeminiNativeStream(upstream, nil).Body
 		} else {
-			body = translateGeminiChatCompatibleStream043711(upstream).Body
+			body = translateGeminiChatCompatibleStream043711(upstream, nil).Body
 		}
 		if _, err := io.ReadAll(body); err != nil {
 			t.Fatal(err)

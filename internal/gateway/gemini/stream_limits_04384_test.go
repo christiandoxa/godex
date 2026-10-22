@@ -32,7 +32,7 @@ func TestProdex04384GeminiSSEEnforcesProviderWireLimits(t *testing.T) {
 				if native {
 					body = translateGeminiNativeStream(upstream, nil).Body
 				} else {
-					body = translateGeminiChatCompatibleStream043711(upstream).Body
+					body = translateGeminiChatCompatibleStream043711(upstream, nil).Body
 				}
 				output, err := io.ReadAll(body)
 				body.Close()
@@ -56,7 +56,7 @@ func TestProdex04384GeminiChatSSEKeepsAdmittedLargeText(t *testing.T) {
 	text := strings.Repeat("a", 2<<20) + "large-text-end"
 	packet := `{"choices":[{"delta":{"content":"` + text + `"}}]}`
 	upstream := &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"text/event-stream"}}, Body: io.NopCloser(strings.NewReader("data: " + packet + "\n\ndata: [DONE]\n\n"))}
-	response := translateGeminiChatCompatibleStream043711(upstream)
+	response := translateGeminiChatCompatibleStream043711(upstream, nil)
 	body, err := io.ReadAll(response.Body)
 	response.Body.Close()
 	if err != nil {

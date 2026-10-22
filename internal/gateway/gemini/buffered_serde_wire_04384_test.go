@@ -28,7 +28,7 @@ func TestProdex04384GeminiBufferedWireUsesSerdeJSON(t *testing.T) {
 				var translated *proxymodel.Response
 				var err error
 				if chat {
-					translated, err = translateGeminiChatOrNativeResponse043711(upstream)
+					translated, err = translateGeminiChatOrNativeResponse043711(upstream, nil)
 				} else {
 					translated, err = translateResponse(upstream, nil)
 				}

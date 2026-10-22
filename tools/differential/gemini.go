@@ -98,7 +98,7 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 	_, _, ignored := geminiIgnoredControl04384(mock.scenario)
 	_, _, _, controlTypes := geminiControlTypeCase04384(mock.scenario)
 	_, _, jsonAdmission := geminiJSONAdmission04384(mock.scenario)
-	_, primitive := requestPrimitiveCase04384(mock.scenario)
+	primitiveFixture, primitive := requestPrimitiveCase04384(mock.scenario)
 	if geminiRequestNumberCase04384(mock.scenario) || userID || ignored || controlTypes || jsonAdmission || primitive {
 		record.RawBody = string(body)
 	}
@@ -118,7 +118,7 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	if geminiChatStreamScenario04384(mock.scenario) {
+	if geminiChatStreamScenario04384(mock.scenario) || primitiveFixture.geminiChatStream {
 		w.Header().Set("Content-Type", "text/event-stream")
 		if geminiProviderBOMScenario04384(mock.scenario) {
 			_, _ = io.WriteString(w, providerBOMUpstream04384(mock.scenario == "stream-chat-bom-repeat"))
@@ -153,6 +153,10 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	if primitiveFixture.geminiChatFallback {
+		_, _ = io.WriteString(w, `{"id":"ignored-id","model":"ignored-model","choices":[{"message":{"role":"assistant","content":"must-not-emit"}}]}`)
+		return
+	}
 	if response, ok := geminiPatchResponse04384(mock.scenario); ok {
 		_, _ = io.WriteString(w, response)
 		return

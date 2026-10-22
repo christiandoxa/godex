@@ -29,6 +29,12 @@ The nine `request-primitive-ignored-messages-*` cases require Gemini Responses
 to ignore an unrelated top-level Chat messages field while retaining actual
 input, absent-input fallback, null-input rejection and earlier serde/candidate
 validation. Full independent wire/response/state expectations remain required.
+The Gemini `request-primitive-reasoning-*` cases cover strict shape and alias
+precedence, ASCII effort mapping, thinking tool history with signatures, and
+tool-choice omission. Real Chat SSE checks canonical framing/IDs/usage, exact
+terminal omission metadata and UTF-8 content type, while buffered native and
+Chat fallback responses retain the same request metadata. Mutation tests reject
+metadata moved to another SSE event as well as changed fields/values.
 
 Build and run from a clean, committed Godex worktree:
 

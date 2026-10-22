@@ -51,7 +51,7 @@ func TestProdex04384GeminiAPIKeyFinishWithoutDoneFailsAtEOF(t *testing.T) {
 			wire += "data: " + `{"choices":[{"delta":{},"finish_reason":"stop"}]}` + "\n\n"
 		}
 		response := translateGeminiChatCompatibleStream043711(&http.Response{StatusCode: http.StatusOK,
-			Header: http.Header{"Content-Type": {"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(wire))})
+			Header: http.Header{"Content-Type": {"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(wire))}, nil)
 		data, err := io.ReadAll(response.Body)
 		response.Body.Close()
 		if err != nil {

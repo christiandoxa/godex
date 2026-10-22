@@ -24,16 +24,16 @@ import (
 // Chat Completions SSE rather than interpreting the stream as native Gemini
 // GenerateContent. Native Gemini chunks contain no choices and therefore
 // cannot materialize output_text delta events.
-func translateGeminiChatCompatibleStream043711(response *http.Response) *proxymodel.Response {
+func translateGeminiChatCompatibleStream043711(response *http.Response, requestMetadata map[string]any) *proxymodel.Response {
 	reader, writer := io.Pipe()
 	body := sse.NewPipeBody(reader, response.Body)
 	go func() {
 		defer body.CloseSource()
-		pumpGeminiChatCompatibleStream043711(response.Body, writer)
+		pumpGeminiChatCompatibleStream043711(response.Body, writer, requestMetadata)
 	}()
 	return &proxymodel.Response{
 		StatusCode: response.StatusCode,
-		Header:     translatedHeaders(response.Header, "text/event-stream"),
+		Header:     translatedHeaders(response.Header, "text/event-stream; charset=utf-8"),
 		Body:       body,
 		Trailer:    response.Trailer,
 	}
@@ -51,6 +51,7 @@ type geminiChatCompatibleStream043711 struct {
 	model        string
 	finishReason string
 	usage        map[string]any
+	metadata     map[string]any
 	json         sse.JSONFrames
 }
 
@@ -112,6 +113,13 @@ func (state *geminiChatCompatibleStream043711) complete(writer io.Writer) error 
 		completed["metadata"] = map[string]any{
 			"gemini": map[string]any{"finish_reason": state.finishReason},
 		}
+	}
+	if len(state.metadata) != 0 {
+		metadata := make(map[string]any, len(state.metadata))
+		mergeMetadataFields(metadata, state.metadata)
+		provider, _ := completed["metadata"].(map[string]any)
+		mergeMetadataFields(metadata, provider)
+		completed["metadata"] = metadata
 	}
 	if state.usage != nil {
 		completed["usage"] = state.usage
@@ -241,14 +249,14 @@ func (state *geminiChatCompatibleStream043711) accept(writer io.Writer, data []b
 	return nil
 }
 
-func pumpGeminiChatCompatibleStream043711(source io.ReadCloser, writer *io.PipeWriter) {
+func pumpGeminiChatCompatibleStream043711(source io.ReadCloser, writer *io.PipeWriter, requestMetadata map[string]any) {
 	defer writer.Close()
 	responseID := "resp_deepseek_" + uuid.NewString()
 	if value, err := uuid.NewV7(); err == nil {
 		responseID = "resp_deepseek_" + value.String()
 	}
 	state := &geminiChatCompatibleStream043711{
-		id: responseID, created: time.Now().Unix(),
+		id: responseID, created: time.Now().Unix(), metadata: requestMetadata,
 	}
 	decoder := sse.NewStrictDecoder(4 << 20)
 	buffer := make([]byte, 32<<10)
