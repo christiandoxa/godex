@@ -7764,3 +7764,87 @@ retain their exact revision scope. Remaining controls, Gemini Compact,
 executable session/turn continuation, native macOS/Windows and live login
 remain unproven. No force push, tag, release or editor edit occurred. Global
 1:1 parity is not claimed.
+
+## Gemini Chat tool-choice admission and named projection
+
+Pinned `chat_compatible_request.rs:240-265` first validates tool-choice shape,
+then applies `chat_tools.mojo` projection, the provider's 128-byte ASCII name
+limit and target membership among translated function declarations. Only exact
+auto/none/required strings, or named function/MCP objects, survive admission.
+Top-level string name presence wins over the nested function name; an empty
+or blank selected name cannot borrow a nested name. Namespace aliases use the
+same first-string presence barrier. Named choices become one canonical nested
+function object, with tagged MCP prefix and double-hyphen/double-underscore
+rules. MCP prefixing retains leading namespace whitespace until name validation.
+Thinking bypasses explicit choice validation after recording the original value.
+
+Initial executable fixtures incorrectly expected an empty declaration description
+to remain on the wire. Source `chat_tool_shapes.mojo:20-25` and the actual
+reference both omit that empty field. Those original reports remain FAIL and
+unqualified: `/tmp/gdx-04384-gemini-tool-choice-<suffix>-before-oracle.json`.
+Fixtures now use a nonblank description to isolate choice behavior. The observed
+empty-description declaration mismatch remains a separate open audit.
+
+Thirty-seven corrected executable baselines pin clean old production
+`074d7393e7a2ec6aedd5f6bcffe603c4713b7333` and the unchanged official 0.438.4
+source/binary/manifest. Thirty FAIL only Godex; seven controls PASS. Every
+reference, independent mutation and durable-state invariant passes. Reports:
+`/tmp/gdx-04384-gemini-tool-choice-<suffix>-qualified-before-oracle.json`;
+commands: `/tmp/gdx-04384-gemini-tool-choice-qualified-before-commands.json`;
+summary: `/tmp/gdx-04384-gemini-tool-choice-qualified-before-summary.log`.
+A stricter raw-leading-namespace control supplies the canonical trimmed target,
+so accidentally stripping the leading whitespace would dispatch work. Both
+unchanged before products reject it; the isolated report remains PASS:
+`/tmp/gdx-04384-gemini-tool-choice-namespace-raw-leading-strict-before-oracle.json`.
+This strengthens an existing control and is not counted again in the 37 cases.
+
+The final gateway regression was copied alone to the old production source in
+`/tmp/gdx-04384-gemini-tool-choice-before-work`.
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiChatToolChoicePreservesCompletePipeline$' -count=1`
+FAILs 55 tests including the parent, with twelve controls PASS:
+`/tmp/gdx-04384-gemini-tool-choice-gateway-strict-before.log`.
+The same command PASSes all 67 after repair:
+`/tmp/gdx-04384-gemini-tool-choice-gateway-focused.log`.
+It checks exact buffered/SSE upstream wire, no-attempt rejection, target
+binding, aliases, namespace edge cases, byte limits and original omission notes.
+
+Private `gateway/gemini/request_chat_choice_04384.go` owns admission,
+projection and target binding for function declarations admitted by the current
+Chat converter. It reuses the package-local first-string helper and existing
+thinking/control/metadata boundaries. Direct native choice behavior stays
+separately owned. No new shared helper, package, exported API, dependency,
+option, goroutine, routing policy or durable format is added. Broader tool
+declaration translation, including the observed empty-description omission,
+remains an open audit.
+
+The 37 independent executable cases retain exact original requests, client
+output, status/header/stdout/exit, authenticated attempts and safe durable state.
+Matching-corruption controls alter both raw and decoded requests together,
+including names in choices and declarations, namespace delimiters, choice fields
+and thinking controls. They also run in the standalone negative-control gate.
+`rtk go test ./tools/differential -count=1` PASSes all 286 self-tests after the
+corrected description and stricter namespace control:
+`/tmp/gdx-04384-gemini-tool-choice-strict-oracle-tests.log`.
+`rtk proxy go test -json ./...` PASSes 10,312 tests in 71 packages, with ten
+packages without tests and 18 optional installed-Codex/executable tests skipped:
+`/tmp/gdx-04384-gemini-tool-choice-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+PASSes 3,491 tests: `/tmp/gdx-04384-gemini-tool-choice-race.log`.
+`rtk proxy make verify` PASSes with exit 0:
+`/tmp/gdx-04384-gemini-tool-choice-verify.log`.
+Exact clean-commit executable qualification follows local verification.
+
+Clean `074d739` PASSes all 30 targeted format cases with exact source pins,
+independent mutations and state checks. Its full 589-case matrix remains pending:
+`/tmp/gdx-04384-gemini-response-format-oracle.json`. Clean `15d1c55` separately
+PASSes all 213 DeepSeek scenarios and independent mutations in its completed
+DeepSeek default-gate phase. The exact JSON report is extracted from byte offset
+26497 in `/tmp/gdx-04384-release-15d1c55.log` to
+`/tmp/gdx-04384-gemini-request-metadata-release-deepseek-oracle.json`.
+All durable-state audits pass; the cancel scenario intentionally has no child
+exchange in either product. The entire default gate remains pending, as do
+later full Gemini matrices. Published origin/main remains exact `3784eba`
+with its 495-case Gemini PASS. Remaining declaration/other controls, Gemini
+Compact, executable session/turn continuation, native macOS/Windows and live
+login remain unproven. No force push, tag, release or editor edit occurred.
+Global 1:1 parity is not claimed.

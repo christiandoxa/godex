@@ -542,6 +542,14 @@ Schema/structured-output formats record the tagged degradation note, replacing
 the same request-provider key while retaining thinking omission metadata. The
 existing response-metadata path carries both notes through native output,
 Chat fallback and completed SSE; direct native schema enforcement is separate.
+The private Chat tool-choice adapter validates string/object shape after
+thinking has omitted explicit choices. Named choices select the first string
+name/namespace aliases, normalize the tagged function/MCP namespace delimiters,
+enforce 128-byte ASCII identifiers and require an admitted function declaration.
+Only the canonical nested function choice reaches shared Chat conversion.
+Original thinking omissions still use the original request metadata. Declaration
+translation remains separately owned; the native choice adapter keeps its own
+contract. The package-local first-string presence helper is reused.
 All supported call/tool-output items require a nonblank identity selected from
 the first string `call_id`, `tool_call_id`, then `id`. This local admission runs
 before conversion or orphan filtering can silently drop the malformed item.

@@ -155,6 +155,9 @@ func normalizeGeminiChatInput043711(body []byte) ([]byte, map[string]any, error)
 	if !valid {
 		return nil, nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
+	if !normalizeGeminiChatChoice04384(root) {
+		return nil, nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
+	}
 	if err := normalizeGeminiUserID04384(root); err != nil {
 		return nil, nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}

@@ -50,6 +50,12 @@ split text, degradation-note collisions, thinking and buffered/fallback/real
 SSE responses. Expected complete wire bytes and metadata remain independent
 of production code. Matching-corruption controls reject changed JSON guidance,
 format controls and degradation notes in both products.
+The 37 `request-primitive-choice-*` cases check tool-choice admission and
+canonical projection, explicit null/scalars, named target binding, first-string
+aliases, namespace separator/prefix rules, 128-byte names, thinking omission and
+actual SSE. They use nonblank source-supported declaration descriptions to
+isolate choice behavior. Matching-corruption checks change raw and decoded
+requests together, including tool names/declarations and namespace delimiters.
 
 Build and run from a clean, committed Godex worktree:
 
