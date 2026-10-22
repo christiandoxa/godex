@@ -5048,3 +5048,85 @@ Clean-commit 89-case Gemini/125-case DeepSeek matrices follow.
 Other controls, combined validation-error
 ordering, Gemini Compact, session/turn executable continuation, native
 macOS/Windows and live authentication remain open. Global 1:1 parity is not claimed.
+
+
+## Validated maximum-token alias checkpoint: eb82ab8
+
+Clean `eb82ab80ad593b68b0e60ea3736dabc18a3241d6` passes all 111 Gemini cases
+and all 134 DeepSeek scenarios, including independent mutation controls:
+`/tmp/gdx-04384-request-token-limits-gemini-oracle.json` and
+`/tmp/gdx-04384-request-token-limits-deepseek-oracle.json`.
+Each report pins the unchanged 0.438.4 source/binary and exact clean candidate.
+The previously recorded 44 focused tests, 3,562 race tests, 9,522 full tests
+and `make verify` also pass. Commits `767edea` and `eb82ab8` were fast-forwarded
+through the clean primary worktree and pushed directly to `origin/main`,
+without waiting for CI. No force push, tag, release or editor-checkout changes
+occurred. This checkpoint covers the named matrices, not global 1:1 parity.
+
+The complete default gate was separately attempted from protected clean
+`293b1b6cb6d543875847b6aeec0a5e8750a1360b`:
+`rtk proxy scripts/verify-release-parity.sh > /tmp/gdx-04384-release-293b1b6.log 2>&1`.
+That invocation FAILed with exit 1 on
+`single-key-503.prodex.state_integrity`: the reference left an empty
+`state/runtime-scores.json.last-good.480291.1792644775456955623.3.tmp`,
+correctly rejected as `nonempty_or_corrupt_prodex_health_scores`.
+The strict isolated scenario rerun PASSes:
+`/tmp/gdx-04384-release-293b1b6-single-key-503-rerun.json`.
+The full unchanged-script rerun remains pending:
+`rtk proxy scripts/verify-release-parity.sh > /tmp/gdx-04384-release-293b1b6-rerun.log 2>&1`.
+No assertion or state allowlist was weakened; the first report remains FAIL.
+Until a complete invocation exits 0, the complete default-gate PASS remains
+scoped to historical `8730116`, not any later commit or a partial phase marker.
+
+
+## Numeric-control admission and canonical DeepSeek request bytes
+
+The pinned `deepseek_primitive_core_plan` requires every present `temperature`
+and `top_p` to be a JSON number. Rust's complete chat-compatible path parses
+serde Value before policy and serializes the final Value with `serde_json`.
+DeepSeek already rejected wrong types but returned an ordinary error that
+could enter routing recovery. Gemini admitted wrong types. DeepSeek's final
+standard-library encoder also preserved original numeric lexemes and escaped
+HTML-sensitive and Unicode line-separator characters differently from serde.
+
+`gateway/deepseek` now maps numeric-type failures through the existing terminal
+preparation boundary and reuses `helper/jsonutil.MarshalSerdeValue04384` for
+the complete outbound request. `gateway/gemini` checks present numeric types
+before normalization. These are concrete protocol-adapter responsibilities;
+the existing stateless JSON helper already has real consumers and owns no
+routing policy or I/O. No dependency, exported API, package, interface, config,
+worker or persisted format is added. The shared Claude converter is unchanged.
+
+The new narrow regressions and existing terminal-admission table fail before
+repair: 23 tests pass and 21 fail, including parents:
+`rtk go test ./internal/gateway/deepseek ./internal/gateway/gemini -run '^TestProdex(04384(DeepSeekRequestUsesCanonicalSerdeNumbersAndText|GeminiNumericControlsRequireNumberTypes)|04380DeepSeekInvalidInputIsTerminalBeforeUpstream)$' -count=1`;
+`/tmp/gdx-04384-request-numeric-fields-before.log`.
+The same command passes 44 tests after repair:
+`/tmp/gdx-04384-request-numeric-fields-focused.log`.
+An offline locked-dependency serde probe retains seven JSON records:
+`/tmp/gdx-04384-request-numeric-fields-serde-probe.jsonl`.
+
+Twenty executable baseline cases use clean `eb82ab8`, the pinned reference
+and `/tmp/gdx-04384-request-numeric-fields-differential`:
+`/tmp/gdx-04384-request-<gemini|deepseek>-<numeric-suffix>-before-oracle.json`.
+All six accepted Gemini controls PASS; four invalid-type cases FAIL only Godex.
+DeepSeek's ordinary and u64 controls PASS; four canonical-wire and four
+invalid-type cases FAIL only Godex. Every reference and independent mutation
+invariant passes. Numeric suffixes and byte-exact expectations are documented
+in `tools/differential/README.md`; invalid types require plain 502, exit 2 and
+zero attempts. Accepted cases retain authenticated original raw input, exact
+response/status/type/stdout/exit and safe durable-state checks.
+
+`rtk go test ./tools/differential -count=1` passes 276 tests:
+`/tmp/gdx-04384-request-numeric-fields-oracle-tests.log`.
+`rtk go test -race ./internal/gateway/deepseek ./internal/gateway/gemini ./internal/helper/jsonutil ./internal/usecase/routing ./tools/differential -count=1`
+passes 3,686 tests: `/tmp/gdx-04384-request-numeric-fields-race.log`.
+`rtk proxy go test -json ./...` passes 9,552 tests across 81 packages
+(71 passing packages and ten with no tests):
+`/tmp/gdx-04384-request-numeric-fields-test-all.jsonl`.
+`rtk proxy make verify` passes the local completion gate:
+`/tmp/gdx-04384-request-numeric-fields-verify.log`.
+Clean-commit 121-case Gemini and 144-case DeepSeek matrices follow.
+Other controls, combined-error ordering, Gemini Compact, executable session/
+turn continuation, native macOS/Windows and live authentication remain open.
+Global 1:1 parity is not claimed.

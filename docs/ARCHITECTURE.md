@@ -336,6 +336,10 @@ history). Shared RTK argument shaping stays in `gateway/chatcompat`.
 Private `gateway/deepseek/tool_arguments.go` owns structured tool-search and
 streamed apply-patch argument decoding; generic serde number serialization
 stays in `helper/jsonutil`.
+The complete DeepSeek Chat request also uses that existing serde writer, so
+numeric controls, tool/schema values and text retain the pinned number and
+UTF-8 wire representation. Invalid `temperature`/`top_p` types use the existing
+terminal preparation-error boundary before any upstream attempt.
 Private `gateway/deepseek/tool_argument_error.go` formats buffered object/array
 and trailing-input syntax diagnostics after argument validation fails. Its
 private byte-position formatter is also used by the buffered serde error path.
@@ -426,6 +430,9 @@ behind a valid winner. Each concrete gateway owns its protocol normalization
 and existing terminal preparation-error mapping; no cross-gateway dependency
 or generic shared policy helper is introduced. DeepSeek tolerates true
 `parallel_tool_calls` on input but omits that ignored field on the provider wire.
+Both adapters require present `temperature` and `top_p` values to be JSON
+numbers. Gemini checks their types before request normalization, keeping this
+protocol admission private rather than changing the shared Claude converter.
 `gateway/gemini` reuses `gateway/chatcompat` for shared message/history
 and Chat response conversion, while Gemini-specific reasoning, metadata, tool
 shapes, and thought signatures stay in the Gemini gateway. Native Messages and

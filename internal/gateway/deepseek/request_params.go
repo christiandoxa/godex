@@ -32,7 +32,7 @@ func copyNumericFields(target, source map[string]any) error {
 			continue
 		}
 		if !jsonNumber(value) {
-			return fmt.Errorf("DeepSeek %s must be a number", key)
+			return &invalidResponsesInputError{fmt.Errorf("DeepSeek %s must be a number", key)}
 		}
 		target[key] = value
 	}

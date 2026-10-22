@@ -159,6 +159,13 @@ func decodeGeminiChatRequest04384(body []byte) (map[string]any, error) {
 }
 
 func validGeminiChatControlTypes04384(request map[string]any) bool {
+	for _, field := range []string{"temperature", "top_p"} {
+		if value, present := request[field]; present {
+			if _, valid := value.(json.Number); !valid {
+				return false
+			}
+		}
+	}
 	if value, present := request["stream"]; present {
 		if _, valid := value.(bool); !valid {
 			return false

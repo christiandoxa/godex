@@ -35,6 +35,10 @@ func TestProdex04380DeepSeekInvalidInputIsTerminalBeforeUpstream(t *testing.T) {
 		{"shadow-null-token-limit", `{"input":"same request","max_output_tokens":null,"max_completion_tokens":31}`},
 		{"shadow-zero-token-limit", `{"input":"same request","max_tokens":0,"max_completion_tokens":31}`},
 		{"shadow-fraction-token-limit", `{"input":"same request","max_output_tokens":1.0,"max_completion_tokens":31}`},
+		{"null-temperature", `{"input":"same request","temperature":null}`},
+		{"string-temperature", `{"input":"same request","temperature":"0.2"}`},
+		{"boolean-top-p", `{"input":"same request","top_p":false}`},
+		{"array-top-p", `{"input":"same request","top_p":[]}`},
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
 			calls.Store(0)

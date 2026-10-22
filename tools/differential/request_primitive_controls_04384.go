@@ -8,12 +8,14 @@ import (
 )
 
 type requestPrimitiveFixture04384 struct {
-	fields, limit string
-	reject        bool
+	fields, limit, wireFields, text string
+	reject                          bool
 }
 
 func requestPrimitiveSuffixes04384() []string {
-	return []string{"output", "precedence", "all", "shadow-null", "shadow-zero", "shadow-fraction", "u64", "overflow", "parallel-true"}
+	return []string{"output", "precedence", "all", "shadow-null", "shadow-zero", "shadow-fraction", "u64", "overflow", "parallel-true",
+		"numeric-control", "numeric-exponent", "numeric-negative-zero", "numeric-fraction", "numeric-u64", "numeric-unicode",
+		"numeric-temperature-null", "numeric-temperature-string", "numeric-top-p-bool", "numeric-top-p-array"}
 }
 
 func requestPrimitiveCase04384(scenario string) (requestPrimitiveFixture04384, bool) {
@@ -40,13 +42,38 @@ func requestPrimitiveCase04384(scenario string) (requestPrimitiveFixture04384, b
 		return requestPrimitiveFixture04384{fields: `"max_tokens":18446744073709551616`, reject: true}, true
 	case "parallel-true":
 		return requestPrimitiveFixture04384{fields: `"parallel_tool_calls":true`}, true
+	case "numeric-control":
+		return requestPrimitiveFixture04384{fields: `"temperature":0.2,"top_p":0.8`, wireFields: `"temperature":0.2,"top_p":0.8`}, true
+	case "numeric-exponent":
+		return requestPrimitiveFixture04384{fields: `"temperature":1e3`, wireFields: `"temperature":1000.0`}, true
+	case "numeric-negative-zero":
+		return requestPrimitiveFixture04384{fields: `"top_p":-0`, wireFields: `"top_p":-0.0`}, true
+	case "numeric-fraction":
+		return requestPrimitiveFixture04384{fields: `"temperature":0.123456789012345678901234567890`, wireFields: `"temperature":0.12345678901234568`}, true
+	case "numeric-u64":
+		return requestPrimitiveFixture04384{fields: `"temperature":18446744073709551615`, wireFields: `"temperature":18446744073709551615`}, true
+	case "numeric-unicode":
+		return requestPrimitiveFixture04384{fields: `"temperature":0.2`, wireFields: `"temperature":0.2`, text: "<>&/🌍" + string([]rune{0x2028, 0x2029})}, true
+	case "numeric-temperature-null":
+		return requestPrimitiveFixture04384{fields: `"temperature":null`, reject: true}, true
+	case "numeric-temperature-string":
+		return requestPrimitiveFixture04384{fields: `"temperature":"0.2"`, reject: true}, true
+	case "numeric-top-p-bool":
+		return requestPrimitiveFixture04384{fields: `"top_p":false`, reject: true}, true
+	case "numeric-top-p-array":
+		return requestPrimitiveFixture04384{fields: `"top_p":[]`, reject: true}, true
 	}
 	return requestPrimitiveFixture04384{}, false
 }
 
 func requestPrimitiveInput04384(scenario, model string) []byte {
 	fixture, _ := requestPrimitiveCase04384(scenario)
-	return []byte(`{"model":"` + model + `","input":"same request",` + fixture.fields + `}`)
+	text := "same request"
+	if fixture.text != "" {
+		text = fixture.text
+	}
+	encoded, _ := json.Marshal(text)
+	return []byte(`{"model":"` + model + `","input":` + string(encoded) + `,` + fixture.fields + `}`)
 }
 
 func requestPrimitiveWire04384(scenario, model string) string {
@@ -55,7 +82,16 @@ func requestPrimitiveWire04384(scenario, model string) string {
 	if fixture.limit != "" {
 		body += `"max_tokens":` + fixture.limit + ","
 	}
-	return body + `"messages":[{"content":"same request","role":"user"}],"model":"` + model + `","stream":false}`
+	text := "same request"
+	if fixture.text != "" {
+		text = fixture.text
+	}
+	// Fixture text has no quotes, backslashes or control bytes; expected wire escaping stays independent.
+	body += `"messages":[{"content":"` + text + `","role":"user"}],"model":"` + model + `","stream":false`
+	if fixture.wireFields != "" {
+		body += "," + fixture.wireFields
+	}
+	return body + "}"
 }
 
 func geminiPrimitiveExpected04384(scenario string) geminiCandidateResult {

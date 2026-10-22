@@ -65,7 +65,7 @@ func translateResponsesRequestWithHistory(body []byte, options RequestOptions, h
 	if err != nil {
 		return TranslatedRequest{}, err
 	}
-	content, err := json.Marshal(result)
+	content, err := jsonutil.MarshalSerdeValue04384(result)
 	if err != nil {
 		return TranslatedRequest{}, err
 	}

@@ -260,6 +260,15 @@ stdout and state mutations fail independent invariants; missing exchanges are
 explicit failures. The same technical fixture data serves both existing
 provider harnesses without introducing a production provider abstraction.
 
+The same family adds `numeric-control`, `numeric-exponent`,
+`numeric-negative-zero`, `numeric-fraction`, `numeric-u64`, `numeric-unicode`,
+`numeric-temperature-null`, `numeric-temperature-string`, `numeric-top-p-bool`
+and `numeric-top-p-array`. Accepted requests must preserve exact pinned serde
+number bytes, literal HTML-sensitive characters and Unicode line separators.
+Invalid numeric-control types require plain terminal 502, exit 2 and zero
+attempts. Fixed expected wire bytes remain independent of production encoding;
+the existing response, credential, state and matching-corruption checks apply.
+
 The 0.438.4 `deepseek-sse-error-presence`, `deepseek-sse-error-i64` and
 `deepseek-sse-error-float` scenarios verify embedded-error primary-field
 presence and signed numeric kinds. Each must produce one failure frame
