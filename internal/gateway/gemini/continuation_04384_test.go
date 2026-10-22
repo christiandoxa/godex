@@ -13,7 +13,7 @@ func TestProdex04384GeminiUnboundPreviousResponseUsesFreshInput(t *testing.T) {
 		t.Run(fixture.name, func(t *testing.T) {
 			body, _ := json.Marshal(map[string]any{"model": "gemini-3.1-pro-preview",
 				"input": "keep fresh input", "previous_response_id": fixture.previous})
-			normalized, err := normalizeGeminiChatInput043711(body)
+			normalized, _, err := normalizeGeminiChatInput043711(body)
 			if err != nil {
 				t.Fatal(err)
 			}

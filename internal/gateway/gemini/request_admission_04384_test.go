@@ -23,7 +23,7 @@ func TestProdex04384GeminiChatJSONAdmissionReturnsTerminalPreparationError(t *te
 		{"depth", `{"input":"same request","unused":` + strings.Repeat("[", 140) + "0" + strings.Repeat("]", 140) + "}"},
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
-			_, err := normalizeGeminiChatInput043711([]byte(fixture.body))
+			_, _, err := normalizeGeminiChatInput043711([]byte(fixture.body))
 			var failure *proxymodel.Error
 			status, message := 502, "upstream request failed"
 			if fixture.name == "null" || fixture.name == "array" || fixture.name == "number" || fixture.name == "boolean" || fixture.name == "string" {

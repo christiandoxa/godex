@@ -26,7 +26,7 @@ func TestProdex04384GeminiTokenLimitPrecedenceAndAdmission(t *testing.T) {
 		{"overflow", `"max_tokens":18446744073709551616`, ""},
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
-			body, err := normalizeGeminiChatInput043711([]byte(`{"input":"same request",` + fixture.fields + `}`))
+			body, _, err := normalizeGeminiChatInput043711([]byte(`{"input":"same request",` + fixture.fields + `}`))
 			if fixture.want == "" {
 				var failure *proxymodel.Error
 				if !errors.As(err, &failure) || failure.StatusCode != 502 || failure.Message != "upstream request failed" {

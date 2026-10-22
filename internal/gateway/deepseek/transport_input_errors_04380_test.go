@@ -39,6 +39,15 @@ func TestProdex04380DeepSeekInvalidInputIsTerminalBeforeUpstream(t *testing.T) {
 		{"string-temperature", `{"input":"same request","temperature":"0.2"}`},
 		{"boolean-top-p", `{"input":"same request","top_p":false}`},
 		{"array-top-p", `{"input":"same request","top_p":[]}`},
+		{"null-logprobs", `{"input":"same request","logprobs":null}`},
+		{"string-logprobs", `{"input":"same request","logprobs":"true"}`},
+		{"null-top-logprobs", `{"input":"same request","logprobs":true,"top_logprobs":null}`},
+		{"negative-top-logprobs", `{"input":"same request","logprobs":true,"top_logprobs":-1}`},
+		{"fraction-top-logprobs", `{"input":"same request","logprobs":true,"top_logprobs":1.0}`},
+		{"large-top-logprobs", `{"input":"same request","logprobs":true,"top_logprobs":21}`},
+		{"unsigned-top-logprobs", `{"input":"same request","logprobs":true,"top_logprobs":18446744073709551615}`},
+		{"missing-logprobs-flag", `{"input":"same request","top_logprobs":2}`},
+		{"false-logprobs-flag", `{"input":"same request","logprobs":false,"top_logprobs":0}`},
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
 			calls.Store(0)

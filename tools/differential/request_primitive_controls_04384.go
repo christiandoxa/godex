@@ -8,14 +8,16 @@ import (
 )
 
 type requestPrimitiveFixture04384 struct {
-	fields, limit, wireFields, text string
-	reject                          bool
+	fields, limit, wireFields, wirePrefix, text string
+	reject                                      bool
 }
 
 func requestPrimitiveSuffixes04384() []string {
 	return []string{"output", "precedence", "all", "shadow-null", "shadow-zero", "shadow-fraction", "u64", "overflow", "parallel-true",
 		"numeric-control", "numeric-exponent", "numeric-negative-zero", "numeric-fraction", "numeric-u64", "numeric-unicode",
-		"numeric-temperature-null", "numeric-temperature-string", "numeric-top-p-bool", "numeric-top-p-array"}
+		"numeric-temperature-null", "numeric-temperature-string", "numeric-top-p-bool", "numeric-top-p-array",
+		"logprobs-false", "logprobs-zero", "logprobs-max", "logprobs-null", "logprobs-string", "logprobs-top-null",
+		"logprobs-top-negative", "logprobs-top-float", "logprobs-top-over", "logprobs-top-u64", "logprobs-top-missing-flag", "logprobs-top-false-flag"}
 }
 
 func requestPrimitiveCase04384(scenario string) (requestPrimitiveFixture04384, bool) {
@@ -62,6 +64,30 @@ func requestPrimitiveCase04384(scenario string) (requestPrimitiveFixture04384, b
 		return requestPrimitiveFixture04384{fields: `"top_p":false`, reject: true}, true
 	case "numeric-top-p-array":
 		return requestPrimitiveFixture04384{fields: `"top_p":[]`, reject: true}, true
+	case "logprobs-false":
+		return requestPrimitiveFixture04384{fields: `"logprobs":false`, wirePrefix: `"logprobs":false,`}, true
+	case "logprobs-zero":
+		return requestPrimitiveFixture04384{fields: `"logprobs":true,"top_logprobs":0`, wirePrefix: `"logprobs":true,`, wireFields: `"top_logprobs":0`}, true
+	case "logprobs-max":
+		return requestPrimitiveFixture04384{fields: `"logprobs":true,"top_logprobs":20`, wirePrefix: `"logprobs":true,`, wireFields: `"top_logprobs":20`}, true
+	case "logprobs-null":
+		return requestPrimitiveFixture04384{fields: `"logprobs":null`, reject: true}, true
+	case "logprobs-string":
+		return requestPrimitiveFixture04384{fields: `"logprobs":"true"`, reject: true}, true
+	case "logprobs-top-null":
+		return requestPrimitiveFixture04384{fields: `"logprobs":true,"top_logprobs":null`, reject: true}, true
+	case "logprobs-top-negative":
+		return requestPrimitiveFixture04384{fields: `"logprobs":true,"top_logprobs":-1`, reject: true}, true
+	case "logprobs-top-float":
+		return requestPrimitiveFixture04384{fields: `"logprobs":true,"top_logprobs":1.0`, reject: true}, true
+	case "logprobs-top-over":
+		return requestPrimitiveFixture04384{fields: `"logprobs":true,"top_logprobs":21`, reject: true}, true
+	case "logprobs-top-u64":
+		return requestPrimitiveFixture04384{fields: `"logprobs":true,"top_logprobs":18446744073709551615`, reject: true}, true
+	case "logprobs-top-missing-flag":
+		return requestPrimitiveFixture04384{fields: `"top_logprobs":2`, reject: true}, true
+	case "logprobs-top-false-flag":
+		return requestPrimitiveFixture04384{fields: `"logprobs":false,"top_logprobs":0`, reject: true}, true
 	}
 	return requestPrimitiveFixture04384{}, false
 }
@@ -78,7 +104,7 @@ func requestPrimitiveInput04384(scenario, model string) []byte {
 
 func requestPrimitiveWire04384(scenario, model string) string {
 	fixture, _ := requestPrimitiveCase04384(scenario)
-	body := "{"
+	body := "{" + fixture.wirePrefix
 	if fixture.limit != "" {
 		body += `"max_tokens":` + fixture.limit + ","
 	}

@@ -433,6 +433,12 @@ or generic shared policy helper is introduced. DeepSeek tolerates true
 Both adapters require present `temperature` and `top_p` values to be JSON
 numbers. Gemini checks their types before request normalization, keeping this
 protocol admission private rather than changing the shared Claude converter.
+Both adapters also require boolean `logprobs`; a present `top_logprobs` must
+be a serde unsigned integer from zero through 20 with `logprobs:true`.
+DeepSeek owns its validation and terminal preparation errors. Gemini privately
+extracts validated controls before the shared Chat converter, then restores
+them during final serde encoding. The controls travel as explicit local data;
+the shared Claude converter retains its independent supported-field contract.
 `gateway/gemini` reuses `gateway/chatcompat` for shared message/history
 and Chat response conversion, while Gemini-specific reasoning, metadata, tool
 shapes, and thought signatures stay in the Gemini gateway. Native Messages and

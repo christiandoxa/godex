@@ -59,7 +59,7 @@ func copyLogprobFields(target, source map[string]any) error {
 	if value, ok := source[deepSeekLogprobsKey]; ok {
 		flag, valid := value.(bool)
 		if !valid {
-			return errors.New("DeepSeek logprobs must be a boolean")
+			return &invalidResponsesInputError{errors.New("DeepSeek logprobs must be a boolean")}
 		}
 		target[deepSeekLogprobsKey] = flag
 	}
@@ -67,15 +67,16 @@ func copyLogprobFields(target, source map[string]any) error {
 	if !ok {
 		return nil
 	}
-	count, valid := integer(value)
-	if !valid {
-		return errors.New("DeepSeek top_logprobs must be an integer")
+	number, valid := value.(json.Number)
+	count, err := strconv.ParseUint(string(number), 10, 64)
+	if !valid || err != nil {
+		return &invalidResponsesInputError{errors.New("DeepSeek top_logprobs must be an integer")}
 	}
 	if count > 20 {
-		return errors.New("DeepSeek top_logprobs must be <= 20")
+		return &invalidResponsesInputError{errors.New("DeepSeek top_logprobs must be <= 20")}
 	}
 	if enabled, _ := source[deepSeekLogprobsKey].(bool); !enabled {
-		return errors.New("DeepSeek top_logprobs requires logprobs=true")
+		return &invalidResponsesInputError{errors.New("DeepSeek top_logprobs requires logprobs=true")}
 	}
 	target["top_logprobs"] = value
 	return nil

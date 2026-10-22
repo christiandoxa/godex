@@ -5130,3 +5130,66 @@ Clean-commit 121-case Gemini and 144-case DeepSeek matrices follow.
 Other controls, combined-error ordering, Gemini Compact, executable session/
 turn continuation, native macOS/Windows and live authentication remain open.
 Global 1:1 parity is not claimed.
+
+
+## Logprobs control admission and Gemini request preservation
+
+The pinned chat-compatible optional-field path invokes primitive validation
+and `deepseek_provider_core_top_logprobs_from_responses_request` for both
+DeepSeek and Gemini. `deepseek.mojo:2190–2213` requires unsigned integer digits
+from zero through 20 and an explicit true `logprobs` flag. Present `logprobs`
+must be a boolean. Signed negative zero is a serde float, not an integer.
+
+Godex's shared Claude converter rejects all logprobs controls, so Gemini
+incorrectly rejected even valid false/zero/20 inputs. Invalid fields also
+entered ordinary routing recovery. DeepSeek accepted negative counts and
+negative zero, used signed parsing for unsigned values and returned ordinary
+errors for invalid types, range and flag dependency.
+
+The concrete DeepSeek adapter now parses unsigned counts and uses its existing
+terminal preparation-error class for all four failures. The Gemini adapter
+validates and extracts its two controls before shared conversion, carries
+them explicitly as a private local map and restores them during final serde
+encoding. The existing private normalization signatures and their real tests
+are updated together. The shared Claude converter retains its independent
+contract. All production policy stays in the concrete protocol gateways;
+no new shared helper, package, exported API, interface, dependency, config,
+worker or state format is introduced. The private Gemini file owns one
+cohesive request-control concern and avoids a cross-gateway dependency.
+
+Before repair, 20 regression controls pass and 37 tests fail, including parents:
+`rtk go test ./internal/gateway/deepseek ./internal/gateway/gemini -run '^TestProdex(04384(DeepSeekLogprobsAdmission|GeminiLogprobsAdmissionAndWire)|04380DeepSeekInvalidInputIsTerminalBeforeUpstream)$' -count=1`;
+`/tmp/gdx-04384-request-logprobs-before.log`.
+The same command passes the original 57 tests after repair:
+`/tmp/gdx-04384-request-logprobs-focused.log`.
+The final gateway suite additionally covers a true flag alone and valid
+stream/identity controls together, asserting exact wire bytes, one
+upstream attempt and a successful native response. Invalid cases require
+the existing terminal 502 with zero attempts.
+
+Twenty-four executable baselines use clean
+`bb98216f698b6a018d19c8b9c45534b57936a973`, the pinned reference and
+`/tmp/gdx-04384-request-logprobs-differential`:
+`/tmp/gdx-04384-request-<gemini|deepseek>-<logprobs-suffix>-before-oracle.json`.
+All twelve Gemini cases FAIL only Godex. Three accepted DeepSeek controls PASS;
+nine invalid-field cases FAIL only Godex. Every reference contract and
+independent matching-corruption control passes. The existing strict primitive
+fixture family now covers exact valid false/zero/20 requests and terminal
+null/string/count/range/dependency outcomes without accepting missing child
+exchanges, equal corruptions or unsafe durable state.
+
+`rtk go test ./tools/differential -count=1` passes 276 tests:
+`/tmp/gdx-04384-request-logprobs-oracle-tests.log`.
+`rtk go test ./internal/gateway/deepseek ./internal/gateway/gemini ./internal/gateway/chatcompat -count=1`
+passes 1,606 tests: `/tmp/gdx-04384-request-logprobs-gateway-tests.log`.
+`rtk go test -race ./internal/gateway/deepseek ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+passes 3,633 tests: `/tmp/gdx-04384-request-logprobs-race.log`.
+`rtk proxy go test -json ./...` passes 9,593 tests across 81 packages
+(71 passing packages and ten with no tests):
+`/tmp/gdx-04384-request-logprobs-test-all.jsonl`.
+`rtk proxy make verify` passes the complete local gate:
+`/tmp/gdx-04384-request-logprobs-verify.log`.
+Clean-commit 133-case Gemini and 156-case DeepSeek matrices follow.
+Other controls, combined-error ordering, Gemini Compact, executable session/
+turn continuation, native macOS/Windows and live authentication remain open.
+Global 1:1 parity is not claimed.

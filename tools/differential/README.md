@@ -269,6 +269,15 @@ Invalid numeric-control types require plain terminal 502, exit 2 and zero
 attempts. Fixed expected wire bytes remain independent of production encoding;
 the existing response, credential, state and matching-corruption checks apply.
 
+The `logprobs-false`, `logprobs-zero` and `logprobs-max` suffixes require exact
+accepted request bytes and responses. `logprobs-null`, `logprobs-string`,
+`logprobs-top-null`, `logprobs-top-negative`, `logprobs-top-float`,
+`logprobs-top-over`, `logprobs-top-u64`, `logprobs-top-missing-flag` and
+`logprobs-top-false-flag` require terminal plain 502, exit 2 and zero attempts.
+Both provider runners reuse the same fixed fixture data and independent
+matching-corruption contracts; a shared incorrect rejection or dropped valid
+control cannot satisfy the oracle.
+
 The 0.438.4 `deepseek-sse-error-presence`, `deepseek-sse-error-i64` and
 `deepseek-sse-error-float` scenarios verify embedded-error primary-field
 presence and signed numeric kinds. Each must produce one failure frame

@@ -21,7 +21,7 @@ const bufferedChatResponseMaxBytes = 4 << 20
 func (transport *RuntimeTransport) executeChatCompatibleResponses(
 	ctx context.Context, input proxymodel.Request, current route,
 ) (*proxymodel.Response, error) {
-	normalized, err := normalizeGeminiChatInput043711(input.Body)
+	normalized, logprobs, err := normalizeGeminiChatInput043711(input.Body)
 	if err != nil {
 		var failure *proxymodel.Error
 		if errors.As(err, &failure) {
@@ -46,7 +46,7 @@ func (transport *RuntimeTransport) executeChatCompatibleResponses(
 	if err != nil {
 		return nil, &proxymodel.Error{StatusCode: http.StatusBadRequest, Message: err.Error()}
 	}
-	body, err = geminiChatRequestOptions04384(body)
+	body, err = geminiChatRequestOptions04384(body, logprobs)
 	if err != nil {
 		return nil, &proxymodel.Error{StatusCode: http.StatusBadRequest, Message: err.Error()}
 	}
@@ -74,7 +74,7 @@ func (transport *RuntimeTransport) executeChatCompatibleResponses(
 
 // Tagged Gemini uses user_id on the Chat wire and requests final token
 // usage for streaming requests.
-func geminiChatRequestOptions04384(body []byte) ([]byte, error) {
+func geminiChatRequestOptions04384(body []byte, logprobs map[string]any) ([]byte, error) {
 	request, err := decodeGeminiChatRequest04384(body)
 	if err != nil {
 		return nil, errors.New("invalid Gemini chat-compatible stream request")
@@ -84,8 +84,11 @@ func geminiChatRequestOptions04384(body []byte) ([]byte, error) {
 		request["user_id"] = user
 		delete(request, "user")
 	}
+	for key, value := range logprobs {
+		request[key] = value
+	}
 	stream, _ := request["stream"].(bool)
-	if !stream && !hasUser {
+	if !stream && !hasUser && len(logprobs) == 0 {
 		return body, nil
 	}
 	if stream {
@@ -101,29 +104,33 @@ func geminiChatRequestOptions04384(body []byte) ([]byte, error) {
 
 // Responses input entries may specify only a role and content, with no
 // explicit "type":"message". The tagged provider treats them as messages.
-func normalizeGeminiChatInput043711(body []byte) ([]byte, error) {
+func normalizeGeminiChatInput043711(body []byte) ([]byte, map[string]any, error) {
 	// A malformed complete JSON value cannot become valid merely because
 	// Go normalized/re-serialized an unrelated ignored field into U+FFFD
 	// or a differently rounded f64 before calling the provider.
 	if !geminiSerdeJSONValid04384(body) {
-		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
+		return nil, nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
 	root, err := decodeGeminiChatRequest04384(body)
 	var wrongRoot *json.UnmarshalTypeError
 	if err == nil && root == nil || errors.As(err, &wrongRoot) {
-		return nil, &proxymodel.Error{StatusCode: http.StatusInternalServerError}
+		return nil, nil, &proxymodel.Error{StatusCode: http.StatusInternalServerError}
 	}
 	if err != nil {
-		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
+		return nil, nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
 	if !validGeminiChatControlTypes04384(root) {
-		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
+		return nil, nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
 	if !normalizeGeminiTokenLimit04384(root) {
-		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
+		return nil, nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
+	}
+	logprobs, valid := extractGeminiChatLogprobs04384(root)
+	if !valid {
+		return nil, nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
 	if err := normalizeGeminiUserID04384(root); err != nil {
-		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
+		return nil, nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
 	// Routing rejects bound raw-key IDs; unbound IDs use the tagged fresh-input fallback.
 	delete(root, "previous_response_id")
@@ -142,7 +149,8 @@ func normalizeGeminiChatInput043711(body []byte) ([]byte, error) {
 			}
 		}
 	}
-	return json.Marshal(root)
+	normalized, err := json.Marshal(root)
+	return normalized, logprobs, err
 }
 
 func decodeGeminiChatRequest04384(body []byte) (map[string]any, error) {

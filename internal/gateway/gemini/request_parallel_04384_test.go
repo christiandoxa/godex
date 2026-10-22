@@ -12,7 +12,7 @@ func TestProdex04384GeminiChatIgnoresParallelToolControl(t *testing.T) {
 	for _, value := range []string{"true", "false", "null", "7", `"opaque"`, `[]`, `{}`} {
 		t.Run(value, func(t *testing.T) {
 			input := []byte(`{"model":"gemini-3.1-pro-preview","input":"same request","parallel_tool_calls":` + value + `}`)
-			body, err := normalizeGeminiChatInput043711(input)
+			body, _, err := normalizeGeminiChatInput043711(input)
 			if err == nil {
 				body, err = chatcompat.ResponsesRequest(body, "gemini-3.1-pro-preview", "")
 			}
@@ -31,7 +31,7 @@ func TestProdex04384GeminiChatIgnoresParallelToolControl(t *testing.T) {
 		})
 	}
 	for _, invalid := range []string{`"\ud800"`, `1e309`, `{"unfinished":`} {
-		if _, err := normalizeGeminiChatInput043711([]byte(`{"input":"same request","parallel_tool_calls":` + invalid + `}`)); err == nil {
+		if _, _, err := normalizeGeminiChatInput043711([]byte(`{"input":"same request","parallel_tool_calls":` + invalid + `}`)); err == nil {
 			t.Fatal("ignored parallel control bypassed complete serde validation")
 		}
 	}

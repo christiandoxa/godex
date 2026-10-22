@@ -16,7 +16,7 @@ func TestProdex04384GeminiControlTypesAreCheckedBeforeNormalization(t *testing.T
 				t.Fatal(err)
 			}
 			t.Run(field+"/"+string(body), func(t *testing.T) {
-				_, err := normalizeGeminiChatInput043711(body)
+				_, _, err := normalizeGeminiChatInput043711(body)
 				_, valid := value.(string)
 				if field == "stream" {
 					_, valid = value.(bool)

@@ -11,7 +11,7 @@ func TestProdex04384GeminiNumericControlsRequireNumberTypes(t *testing.T) {
 	for _, field := range []string{"temperature", "top_p"} {
 		for _, value := range []string{"null", "false", `"0.2"`, "[]", "{}", "0.2", "-0", "1e3", "18446744073709551615"} {
 			t.Run(field+"/"+value, func(t *testing.T) {
-				_, err := normalizeGeminiChatInput043711([]byte(`{"model":"gemini-3.1-pro-preview","input":"same request","` + field + `":` + value + `}`))
+				_, _, err := normalizeGeminiChatInput043711([]byte(`{"model":"gemini-3.1-pro-preview","input":"same request","` + field + `":` + value + `}`))
 				valid := value == "0.2" || value == "-0" || value == "1e3" || value == "18446744073709551615"
 				if valid {
 					if err != nil {

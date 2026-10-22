@@ -33,7 +33,7 @@ func TestProdex04384GeminiRequestRequiresCompleteSerdeJSON(t *testing.T) {
 			}
 			t.Run(label, func(t *testing.T) {
 				if chat {
-					result, err := normalizeGeminiChatInput043711(body)
+					result, _, err := normalizeGeminiChatInput043711(body)
 					if accepted := err == nil; accepted != tc.valid {
 						t.Fatalf("serde invalid Gemini Chat request accepted=%t want=%t error=%v output=%q", accepted, tc.valid, err, result)
 					}
