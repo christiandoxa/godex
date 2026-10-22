@@ -8793,7 +8793,7 @@ optional SKIP and shuffled race/cross-build checks. Original reports, terminal
 exit observations, binary/source pins and independent mutation/state assertions
 are retained in the corresponding /tmp/gdx-04384-*-audit.json records.
 
-The broader Gemini 844/847/851/857/862 matrices remain running on their original
+The broader Gemini 847/851/857/862 matrices remain running on their original
 immutable source worktrees. Targeted PASS does not imply those full matrices
 passed. The latest full Gemini matrix and entire default-gate PASS remain the
 837-case and completed default gate at exact 78d256d. The two original full
@@ -8867,3 +8867,39 @@ race tests, cross-builds, format/source guards, vet and the build. Logs:
 /tmp/gdx-04384-gemini-stream-created-full.jsonl and
 /tmp/gdx-04384-gemini-stream-created-verify.log. Exact clean executable
 qualification follows. Global continuation and overall 1:1 parity remain unproven.
+
+### Preserve explicitly empty Gemini SSE model values
+
+Five exact clean executable baselines on ae685d1fbbde970c9d70dc1eae05634975b156ca
+qualify two Godex-only failures and three PASS controls. A later empty model must
+replace a prior model, and an initially empty model must remain present in the
+completed response. Null, wrong-type and absent controls retain their existing
+behavior. The reference's exact lifecycle, request, stdout, status, attempts,
+state and matching corruption assertions qualify independently. Records:
+/tmp/gdx-04384-gemini-stream-model-before-audit.json and
+/tmp/gdx-04384-gemini-stream-model-before-commands.json.
+
+Pinned stream/shaping.rs retains every model string, including empty strings;
+response_values.rs and deepseek.mojo's optional-string emitter preserve that
+presence. Godex previously used nonemptiness both when observing and emitting
+the model. Its existing Gemini stream owner now keeps one private presence bit
+and updates the string only for string-valued input. The narrow gateway test
+fails both empty cases before the fix and keeps three controls. The change adds
+no helper, exported API, option, dependency, background work or state format.
+The full executable Gemini matrix adds five cases, reaching 874.
+`rtk proxy go test -json ./...` PASSes 10,773 tests with 18 optional SKIP.
+`rtk proxy make verify` PASSes with exit 0, including shuffled race tests,
+cross-builds, format/source guards, vet and the build. Logs:
+/tmp/gdx-04384-gemini-stream-model-full.jsonl and
+/tmp/gdx-04384-gemini-stream-model-verify.log. Exact clean executable qualification
+follows; global 1:1 parity and complete continuation remain unproven.
+
+The original 844-case Gemini matrix on c32018d completes FAIL for
+raw-key-bound-response-restart-key: the reference sends a second upstream request
+with the changed key and returns 200 despite continuation_persisted true in the
+seed. Godex preserves the bound owner and returns 503 with one attempt. Original
+report: /tmp/gdx-04384-gemini-compact-history-oracle.json. An unchanged isolated
+rerun on the same exact binaries PASSes with both returning 503 and one attempt:
+/tmp/gdx-04384-gemini-compact-history-changed-key-rerun-oracle.json. The original
+full report remains FAIL; its cause is unexplained, and the isolated PASS does
+not qualify the entire matrix. No ownership or retry assertion was weakened.

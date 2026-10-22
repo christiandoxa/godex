@@ -999,6 +999,10 @@ The unsigned Gemini stream timestamp cases require upstream created values befor
 the first emitted event, covering zero, 2^53+1, uint64 maximum, chunk updates and
 invalid numeric controls. The oracle checks timestamp order before normalization.
 
+Five model-presence stream cases distinguish explicit empty model strings from
+absent/null/wrong-type fields, including replacing a previous model. Exact client
+wire and matching model-injection mutations remain independent assertions.
+
 ### Tagged 0.438.2 Gemini function-tool rejection parity
 
 Two additional **source/binary-pinned** cases, `invalid-wrapped-tool-parameters`

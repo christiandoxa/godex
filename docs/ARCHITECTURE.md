@@ -255,6 +255,8 @@ The stream owner also retains the latest nonempty fingerprint and nonnull
 logprobs value, preserving JSON numeric kinds and replacing prior metadata whole.
 Unsigned upstream creation timestamps are applied before the first event and
 retained through all 64 bits; invalid values preserve the current clock value.
+Model presence is retained separately from its string value, so an explicit
+empty upstream model survives completion while absent values remain absent.
 Reasoning retention is bounded at 64 MiB; excess terminates the existing stream
 with one failure and no completion or cache update. Tool streams retain their
 existing uncached behavior until complete argument snapshots are qualified.

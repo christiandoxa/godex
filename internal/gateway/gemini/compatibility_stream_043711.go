@@ -50,6 +50,7 @@ type geminiChatCompatibleStream043711 struct {
 	text         strings.Builder
 	reasoning    strings.Builder
 	model        string
+	modelPresent bool
 	finishReason string
 	fingerprint  string
 	logprobs     any
@@ -114,7 +115,7 @@ func (state *geminiChatCompatibleStream043711) complete(writer io.Writer) error 
 	}
 	state.done = true
 	completed := map[string]any{"id": state.id, "output": output}
-	if state.model != "" {
+	if state.modelPresent {
 		completed["model"] = state.model
 	}
 	provider := make(map[string]any)
@@ -185,8 +186,8 @@ func (state *geminiChatCompatibleStream043711) observeChatChunk(chunk map[string
 	if fingerprint, _ := chunk["system_fingerprint"].(string); fingerprint != "" {
 		state.fingerprint = fingerprint
 	}
-	if model, ok := chunk["model"].(string); ok && model != "" {
-		state.model = model
+	if model, ok := chunk["model"].(string); ok {
+		state.model, state.modelPresent = model, true
 	}
 	if choices, ok := chunk["choices"].([]any); ok && len(choices) > 0 {
 		if first, ok := choices[0].(map[string]any); ok {
