@@ -10352,14 +10352,6 @@ then PASS 1,417 tests. Fifteen new executable cases extend DeepSeek306 to 321;
 Gemini remains 974. Full local and exact clean qualification follow before
 publication. Overall 1:1 parity remains unproven.
 
-Full local validation PASSes 11,179 tests with 18 optional SKIP (original
-session 22170, exit 0). make verify exits 0 (original session 54711), including
-shuffled race tests, cross-builds, vet, source/format guards and the build.
-Exact commands:
-`rtk proxy go test -json ./... > /tmp/gdx-04384-deepseek-message-content-full.jsonl 2>&1`
-and `rtk proxy make verify > /tmp/gdx-04384-deepseek-message-content-verify.log 2>&1`.
-Exact clean executable qualification follows before publication.
-
 Full local validation PASSes 11,158 tests with 18 optional SKIP (original
 session 75698, exit 0). make verify exits 0 (original session 68852), including
 shuffled race tests, cross-builds, vet, source/format guards and the build.
@@ -10449,3 +10441,38 @@ any candidate qualification. Final focused tests PASS 1,438 tests (original
 49566, exit 0). Twelve new executable cases extend DeepSeek321 to 333;
 Gemini remains 974. Full local and exact clean qualification follow before
 publication. Overall 1:1 parity remains unproven.
+
+Full local validation PASSes 11,179 tests with 18 optional SKIP (original
+session 22170, exit 0). make verify exits 0 (original session 54711), including
+shuffled race tests, cross-builds, vet, source/format guards and the build.
+Exact commands:
+`rtk proxy go test -json ./... > /tmp/gdx-04384-deepseek-message-content-full.jsonl 2>&1`
+and `rtk proxy make verify > /tmp/gdx-04384-deepseek-message-content-verify.log 2>&1`.
+Exact clean executable qualification follows before publication.
+
+### Exact runtime-content qualification
+
+Exact clean 54976f4182bdcf96b9e28f08d2fed74c12da52fc PASSes all 65 executable
+cases (original session 57767, exit 0), including all seventeen baseline cases
+and the complete previous53 scope. All seven original Godex-only failures
+now satisfy the unchanged original invariants. Every original candidate
+request also matches retained pinned-reference bytes. Image/cache rejection
+retains zero attempts; normal object JSON text and message/history/output
+controls retain their independent checks. Source/reference/manifest/artifact
+pins, clean VCS metadata, status/exit/stdout/response, attempts/events/auth/slots,
+state and active matching-corruption guards PASS. Audit:
+/tmp/gdx-04384-deepseek-message-content-targeted-audit.json. Exact command:
+`rtk proxy python3 /tmp/gdx-04384-deepseek-message-content-targeted.py > /tmp/gdx-04384-deepseek-message-content-targeted.log 2>&1`.
+
+Full DeepSeek333 is running in original session 57004 against that immutable
+source. Exact retained command:
+/tmp/gdx-04384-deepseek-message-content-full-command.json. Report:
+/tmp/gdx-04384-deepseek-message-content-oracle.json. It is not claimed PASS.
+The a05e1cbc, a0b94af and ecd6a6e entire default gates retain their original
+handles and immutable sources. Latest completed default gate remains exact
+e9d88ce; latest qualified full scopes remain DeepSeek282/5165058 and
+Gemini974/3399a8c. The earlier full273/full968 reference state failures remain
+FAIL and retained. Opaque previous-response-ID ownership still needs an
+end-to-end audit, alongside broader continuation/account/restart combinations,
+streams above the retained bounds and live authentication. Overall 1:1 parity
+remains unproven.
