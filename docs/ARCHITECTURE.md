@@ -511,6 +511,10 @@ cwd/timeout/env retain present-null barriers and the tagged embedded field
 order; their values reuse canonical serde serialization. Shell thought
 signatures are ignored as in the reference. Shared Chat shell policy stays
 independent.
+On Gemini Responses, top-level Chat `messages` is ignored after complete JSON
+and earlier provider validation. Only Responses input/instructions construct
+the request history. The private normalizer removes that field before shared
+Chat conversion; null input and malformed JSON cannot become valid fallbacks.
 All supported call/tool-output items require a nonblank identity selected from
 the first string `call_id`, `tool_call_id`, then `id`. This local admission runs
 before conversion or orphan filtering can silently drop the malformed item.

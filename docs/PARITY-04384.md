@@ -7322,6 +7322,76 @@ Shell projection, remaining controls, Gemini Compact, executable session/turn
 continuation, native macOS/Windows and live authentication remain unproven.
 No force push, tag, release or editor edit occurred. Global 1:1 parity is not claimed.
 
+## Gemini Responses ignore the unrelated top-level Chat messages field
+
+Pinned `deepseek_provider_core_messages_from_responses_request` reconstructs
+messages only from Responses input, instructions and resolved history. The
+top-level request-shape validator does not reject a Chat messages field.
+Godex instead forwarded its presence to the shared Chat converter's stricter
+admission and returned terminal 502 for requests the reference executes once.
+
+One line in the private Gemini normalizer now removes top-level messages
+after complete serde JSON and earlier provider gates. It never promotes the
+ignored Chat content into a Responses input. Missing input retains the tagged
+empty-user fallback; explicit null input still fails. Invalid JSON/Unicode and
+earlier candidate validation retain their precedence. Shared Chat and other
+provider policies, raw Chat endpoints and durable formats remain independent.
+No helper, package, public API, interface, dependency, option or worker is added.
+
+Before repair every gateway case plus its parent FAIL:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiResponsesIgnoreChatMessages$' -count=1`;
+`/tmp/gdx-04384-gemini-ignored-messages-before.log`.
+The same command PASSes all 11 tests after repair:
+`/tmp/gdx-04384-gemini-ignored-messages-focused.log`.
+Null/false/object/array/string messages values are tested with real input and
+without input, checking exact outgoing content, one attempt and HTTP 200.
+
+Nine executable baselines pin clean
+`f1f5bbaef7b4a8fa3b09e614b8d6e04d6b0fa8ae`, unchanged official reference and
+`/tmp/gdx-04384-gemini-ignored-messages-before-differential`.
+Six FAIL only Godex; three controls PASS. Every reference and independent
+mutation invariant passes. Reports:
+`/tmp/gdx-04384-gemini-ignored-messages-<suffix>-before-oracle.json`;
+exact argument arrays: `/tmp/gdx-04384-gemini-ignored-messages-before-commands.json`.
+Commands use `--gemini --scenario request-primitive-ignored-messages-<suffix>`
+with exact source/commit pins. Complete independent expectations retain
+actual input rather than ignored message content, empty fallback, null-input
+and malformed-serde rejection, candidate error precedence, exact request/
+response/status/headers/stdout/exit, authenticated attempts and safe durable
+state. Matching-corruption checks remain mandatory.
+
+`rtk go test ./tools/differential -count=1` PASSes 282 tests:
+`/tmp/gdx-04384-gemini-ignored-messages-oracle-tests.log`.
+`rtk proxy go test -json ./...` PASSes 10,104 tests in 71 packages; ten packages
+have no tests and 18 optional installed-Codex/executable tests are skipped:
+`/tmp/gdx-04384-gemini-ignored-messages-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+PASSes 3,283 tests: `/tmp/gdx-04384-gemini-ignored-messages-race.log`.
+
+Protected `2bd9081ac16a436f4ba0bbcfda632ab568436cab` separately PASSes all
+213 DeepSeek cases with independent mutations:
+`/tmp/gdx-04384-gemini-mcp-empty-name-deepseek-oracle.json`.
+Protected `6263eb8` full 399-case Gemini report remains FAIL:
+`/tmp/gdx-04384-gemini-thought-signature-oracle.json`.
+Only the reference numeric-unicode case fails independent state integrity:
+`state/runtime-continuation-journal.json.484141.1792662484360180881.2.tmp`
+and `state/runtime-continuations.json.484141.1792662484360235801.3.tmp`
+remain unexpectedly. Request bytes, response, status and child exit match;
+no Godex invariant fails. The cause of the reference leftover files is not
+established. No state/owner or mutation assertion is relaxed; the report is
+retained as FAIL and an unchanged isolated rerun follows.
+The exact same source/binary pair PASSes isolated
+`--gemini --scenario request-primitive-numeric-unicode` with all state and
+mutation checks: `/tmp/gdx-04384-gemini-thought-signature-numeric-unicode-rerun-oracle.json`.
+This isolated PASS does not relabel the original full FAIL.
+`rtk proxy make verify` PASSes:
+`/tmp/gdx-04384-gemini-ignored-messages-verify.log`.
+Clean-commit 495-case Gemini qualification follows. Larger protected matrices
+and the `20a7d41` default gate remain pending. Remaining reasoning/format/
+metadata controls, Gemini Compact, executable session/turn continuation,
+native macOS/Windows and live authentication remain unproven. No force push,
+tag, release or editor edit occurred. Global 1:1 parity is not claimed.
+
 ## Historical shell calls separate validation from rendered command precedence
 
 Pinned `deepseek_input_item_validation` validates nested action.command as a

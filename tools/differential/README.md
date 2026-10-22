@@ -25,6 +25,10 @@ The 18 `request-primitive-shell-call-*` cases compare historical shell-call
 admission separately from root-first command rendering, selected null/mixed
 values, ID fallback, embedded optional-field order, serde/Unicode values and
 ignored signatures. These fixtures never execute the recorded commands.
+The nine `request-primitive-ignored-messages-*` cases require Gemini Responses
+to ignore an unrelated top-level Chat messages field while retaining actual
+input, absent-input fallback, null-input rejection and earlier serde/candidate
+validation. Full independent wire/response/state expectations remain required.
 
 Build and run from a clean, committed Godex worktree:
 
