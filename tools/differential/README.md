@@ -1200,3 +1200,15 @@ preserved. Simple/normal text, mixed-value and standalone unit controls retain
 their contracts. Image and cache-control inputs still fail before upstream
 attempts. Exact original request/response/state and matching-corruption guards
 apply. Default DeepSeek reaches 333; Gemini remains 974.
+
+Six DeepSeek `deepseek-history-*previous-*` cases cover exact, request-padded,
+seed-padded, unpadded and simple previous IDs. A known external raw-key owner
+must reject the continuation with HTTP 503 and exit 2 after only the successful
+seed attempt. An unknown ID permits a fresh request. Client seed bytes retain
+padding, while the external binding recorder trims response IDs before durable
+ownership recording. The owner audit accepts that normalized digest and rejects
+the original padded digest; a successful authenticated response must prove an
+unknown accepted ID's owner. Exact requests, responses, attempts/events, state
+and active matching-corruption guards apply. These controls change no production
+code and do not qualify cache lookup beyond the earlier routing rejection.
+Default DeepSeek reaches 339; Gemini remains 974.

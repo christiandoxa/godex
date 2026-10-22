@@ -47,6 +47,7 @@ func fixtureContinuationOwners(client exchange, upstream []upstreamRequest, endp
 			continue
 		}
 		for _, id := range []string{value.ID, value.Response.ID} {
+			id = strings.TrimSpace(id)
 			if id != "" {
 				owners[id] = owner
 			}

@@ -688,6 +688,11 @@ func runProduct(root string, mock *mockServer, name, binary, commit string, plan
 		seedOwners := fixtureContinuationOwners(*clientExchange.Seed, upstream[:1], endpoint, options.priorBindings)
 		expectedBindings = fixtureContinuationOwners(clientExchange, upstream, endpoint, seedOwners)
 	}
+	if _, previous, known := deepSeekPreviousResponseIDs04384(options.historyProjection); known && clientExchange.Status == http.StatusOK {
+		if owner, verified := expectedBindings["chatcmpl-differential"]; verified {
+			expectedBindings[previous] = owner
+		}
+	}
 	if identityKnown && !identityFixture.reject && !identityFixture.compact && strings.TrimSpace(identityFixture.previous) != "" {
 		if owner, verified := expectedBindings["chatcmpl-differential"]; verified {
 			expectedBindings[identityFixture.previous] = owner

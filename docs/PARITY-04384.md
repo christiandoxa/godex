@@ -10476,3 +10476,54 @@ FAIL and retained. Opaque previous-response-ID ownership still needs an
 end-to-end audit, alongside broader continuation/account/restart combinations,
 streams above the retained bounds and live authentication. Overall 1:1 parity
 remains unproven.
+
+### External previous-ID routing controls correct an invalid fixture assumption
+
+The external DeepSeek response pipeline differs from generic native metadata:
+local_rewrite_response_chat_compatible.rs calls
+runtime_copilot_remember_bindings_from_responses_body, whose response-ID parser
+in local_rewrite_copilot_bindings.rs trims before recording the binding. The
+client response still retains the original padded ID. The initial owner fixture
+incorrectly required an original padded digest. Its three baseline state alarms
+were fixture false positives, not qualified production bugs. The interpretation
+in /tmp/gdx-04384-deepseek-previous-id-before-audit.json is superseded by
+/tmp/gdx-04384-deepseek-previous-id-rejected-audit.json. All original reports and
+failed tests remain retained. Candidate 1e303c302e92f0312f2de61b4dcb193afe7514d9
+failed exact executable qualification (original session 31991, exit 1): three
+required 503 rejections became fresh upstream dispatches. It remains unpublished
+and excluded from this change.
+
+This stage changes only tools/differential and documentation. The external
+observed-owner fixture now normalizes response IDs and actively rejects an
+original padded digest. Failed/blank responses cannot invent an owner. An unknown
+accepted previous ID is whitelisted only after a successful authenticated
+response proves its credential and endpoint owner. Six default routing controls
+cover exact, padded-request, padded-seed, unpadded-request, simple padded and
+simple unknown IDs. Known owners require exit 2/HTTP 503 and only one successful
+seed upstream attempt; unknown owners permit the independently asserted fresh
+request. Existing history cases keep their original exit/status expectations,
+and matching-corruption guards remain active for single-request rejection cases.
+No production layer, helper, dependency, API, option or durable format changes.
+Default DeepSeek grows from 333 to 339; Gemini remains 974. Cache lookup cannot
+be qualified by these known-owner cases because routing rejects them first.
+
+Against exact clean published production
+54976f4182bdcf96b9e28f08d2fed74c12da52fc, original session 88556 exits 0 and
+all eleven cases PASS: six new controls plus padded tool IDs, numeric/message
+pending history, runtime object content and the raw-key in-process probe.
+Audit: /tmp/gdx-04384-previous-id-routing-controls-before-audit.json. The pinned
+reference binary/source/manifest, clean baseline VCS metadata, unchanged fixture
+fingerprint, independent seed/client/request/exit/status/attempt/auth/state
+checks and active mutation controls were verified. Exact command:
+`rtk proxy python3 /tmp/gdx-04384-previous-id-routing-controls-before.py > /tmp/gdx-04384-previous-id-routing-controls-before.log 2>&1`.
+
+Focused fixture checks PASS 27 tests (original session 58389, exit 0). Full local
+validation PASSes 11,187 tests with 18 optional SKIP (original session 75153,
+exit 0). make verify PASSes (original session 45985, exit 0), including shuffled
+race tests, cross-builds, vet, formatting/source guards and the build. Exact
+commands:
+`rtk proxy go test -json ./... > /tmp/gdx-04384-previous-id-routing-controls-full.jsonl 2>&1`
+and `rtk proxy make verify > /tmp/gdx-04384-previous-id-routing-controls-verify.log 2>&1`.
+Exact clean tools-candidate qualification follows before publication. The older
+full333 and three entire default gates retain their original running handles
+and immutable sources. Overall 1:1 parity remains unproven.

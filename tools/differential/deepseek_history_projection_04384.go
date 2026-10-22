@@ -8,7 +8,7 @@ import (
 )
 
 func deepSeekHistoryCases04384() []string {
-	return []string{"deepseek-history-extra", "deepseek-history-rtk", "deepseek-history-null", "deepseek-history-empty", "deepseek-history-numeric", "deepseek-history-simple", "deepseek-history-simple-inline", "deepseek-history-simple-unbound", "deepseek-history-simple-pending", "deepseek-history-numeric-pending", "deepseek-history-u64-pending", "deepseek-history-id-padded", "deepseek-history-id-output-padded", "deepseek-history-id-call-padded", "deepseek-history-simple-padded-pending", "deepseek-history-message-pending"}
+	return append([]string{"deepseek-history-extra", "deepseek-history-rtk", "deepseek-history-null", "deepseek-history-empty", "deepseek-history-numeric", "deepseek-history-simple", "deepseek-history-simple-inline", "deepseek-history-simple-unbound", "deepseek-history-simple-pending", "deepseek-history-numeric-pending", "deepseek-history-u64-pending", "deepseek-history-id-padded", "deepseek-history-id-output-padded", "deepseek-history-id-call-padded", "deepseek-history-simple-padded-pending", "deepseek-history-message-pending"}, deepSeekPreviousResponseCases04384()...)
 }
 
 func deepSeekHistoryCallIDs04384(scenario string) (string, string) {
@@ -38,6 +38,9 @@ func deepSeekHistoryCase04384(scenario string) bool {
 }
 
 func deepSeekHistoryInput04384(scenario string, phase int) []byte {
+	if _, _, known := deepSeekPreviousResponseIDs04384(scenario); known && phase > 0 {
+		return deepSeekPreviousResponseInput04384(scenario, phase)
+	}
 	if phase > 0 {
 		body := `{"model":"deepseek-v4-pro","input":[{"type":"function_call_output","call_id":"call-history","output":"synthetic result"}],"stream":false}`
 		if scenario == "deepseek-history-simple-unbound" {
@@ -82,6 +85,10 @@ func deepSeekHistoryCall04384(scenario string, wrapped bool) map[string]any {
 }
 
 func deepSeekHistorySeed04384(scenario string) string {
+	responseID := "chatcmpl-history-seed"
+	if seed, _, known := deepSeekPreviousResponseIDs04384(scenario); known {
+		responseID = seed
+	}
 	var content any
 	if scenario == "deepseek-history-empty" {
 		content = ""
@@ -91,7 +98,7 @@ func deepSeekHistorySeed04384(scenario string) string {
 		message["provider_decoy"] = map[string]any{"value": "must-not-replay"}
 	}
 	body, _ := json.Marshal(map[string]any{
-		"id": "chatcmpl-history-seed", "object": "chat.completion", "created": 1, "model": "deepseek-v4-pro",
+		"id": responseID, "object": "chat.completion", "created": 1, "model": "deepseek-v4-pro",
 		"choices": []any{map[string]any{"index": 0, "message": message, "finish_reason": "tool_calls"}},
 		"usage":   map[string]any{"prompt_tokens": 2, "completion_tokens": 1, "total_tokens": 3},
 	})
@@ -102,8 +109,12 @@ func deepSeekHistoryExpected04384(scenario string) productRun {
 	run := deepSeekPrimitiveExpected04384("deepseek-request-primitive-output")
 	call := deepSeekHistoryCall04384(scenario, true)
 	function := call["function"].(map[string]any)
+	responseID := "chatcmpl-history-seed"
+	if seed, _, known := deepSeekPreviousResponseIDs04384(scenario); known {
+		responseID = seed
+	}
 	body, _ := json.Marshal(map[string]any{
-		"created_at": 1, "id": "chatcmpl-history-seed", "model": "deepseek-v4-pro", "object": "response",
+		"created_at": 1, "id": responseID, "model": "deepseek-v4-pro", "object": "response",
 		"metadata": map[string]any{"deepseek": map[string]any{"finish_reason": "tool_calls"}},
 		"output":   []any{map[string]any{"type": "function_call", "call_id": call["id"], "name": function["name"], "arguments": function["arguments"]}},
 		"usage":    map[string]any{"input_tokens": 2, "output_tokens": 1, "total_tokens": 3},
@@ -140,6 +151,9 @@ func deepSeekHistoryExpected04384(scenario string) productRun {
 			{preface, user, assistant, tool, map[string]any{"role": "assistant", "content": "synthetic-ok"}},
 		}
 	}
+	if _, _, known := deepSeekPreviousResponseIDs04384(scenario); known {
+		requests = deepSeekPreviousResponseRequests04384(scenario)
+	}
 	run.Upstream = nil
 	for index, messages := range requests {
 		request := map[string]any{"model": "deepseek-v4-pro", "stream": false, "messages": messages}
@@ -155,6 +169,14 @@ func deepSeekHistoryExpected04384(scenario string) productRun {
 		run.Retries = 2
 		run.Events = append(run.Events, upstreamEvent{Kind: "upstream.request", Attempt: 3}, upstreamEvent{Kind: "upstream.response", Attempt: 3, Status: 200})
 	}
+	if _, _, known := deepSeekPreviousResponseIDs04384(scenario); known && scenario != "deepseek-history-simple-previous-unknown" {
+		run.ExitStatus, run.Retries = 2, 0
+		run.Client.Status = http.StatusServiceUnavailable
+		run.Client.Headers = http.Header{"Content-Type": {"application/json"}, "Cache-Control": {"no-store"}, "X-Content-Type-Options": {"nosniff"}}
+		run.Client.Body = `{"error":{"code":"bound_continuation_unavailable","message":"bound continuation provider is unavailable"}}`
+		run.Stdout = run.Client.Body + "\n"
+		run.Events = run.Events[:2]
+	}
 	return run
 }
 
@@ -167,7 +189,7 @@ func deepSeekHistoryInvariants04384(scenario scenarioResult) []string {
 	for _, run := range scenario.Runs {
 		seed := run.Client.Seed
 		validSeed := seed != nil && seed.Seed == nil && seed.Status == 200 && seed.Body == want.Client.Seed.Body && seed.Headers.Get("Content-Type") == want.Client.Seed.Headers.Get("Content-Type")
-		if !validSeed || run.ClientError != "" || len(run.StateIntegrity) != 0 || run.ExitStatus != 0 || run.Cancelled || run.Retries != want.Retries || run.Client.Status != 200 || run.Client.Body != want.Client.Body || run.Client.Headers.Get("Content-Type") != want.Client.Headers.Get("Content-Type") || run.Stdout != want.Stdout || !reflect.DeepEqual(run.Events, want.Events) || len(run.Upstream) != len(want.Upstream) {
+		if !validSeed || run.ClientError != "" || len(run.StateIntegrity) != 0 || run.ExitStatus != want.ExitStatus || run.Cancelled || run.Retries != want.Retries || run.Client.Status != want.Client.Status || run.Client.Body != want.Client.Body || run.Client.Headers.Get("Content-Type") != want.Client.Headers.Get("Content-Type") || run.Stdout != want.Stdout || !reflect.DeepEqual(run.Events, want.Events) || len(run.Upstream) != len(want.Upstream) {
 			failures = append(failures, scenario.Name+"."+run.Name+".seed_response_attempt_or_state")
 			continue
 		}
