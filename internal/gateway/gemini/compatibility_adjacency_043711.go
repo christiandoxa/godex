@@ -1,9 +1,10 @@
 package gemini
 
 import (
-	"encoding/json"
 	"errors"
 	"strings"
+
+	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 )
 
 // The tagged 0.437.11 Gemini API-key chat-compatible bridge invokes the
@@ -12,8 +13,8 @@ import (
 // received out of order. Unanswered calls are removed; assistant prose
 // is preserved separately after the tool sequence.
 func filterGeminiOrphanToolMessages043711(body []byte) ([]byte, error) {
-	var request map[string]any
-	if err := json.Unmarshal(body, &request); err != nil {
+	request, err := decodeGeminiChatRequest04384(body)
+	if err != nil {
 		return nil, errors.New("invalid Gemini chat-compatible request")
 	}
 	messages, _ := request["messages"].([]any)
@@ -98,7 +99,7 @@ func filterGeminiOrphanToolMessages043711(body []byte) ([]byte, error) {
 		}
 	}
 	request["messages"] = result
-	return json.Marshal(request)
+	return jsonutil.MarshalSerdeValue04384(request)
 }
 
 func copyGeminiMessage043711(value map[string]any) map[string]any {

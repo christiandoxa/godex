@@ -4486,3 +4486,94 @@ uses the unchanged pinned reference with
 `rtk proxy make verify` passes all local completion gates:
 `/tmp/gdx-04384-gemini-seed-evidence-verify.log`.
 Clean-commit full matrices follow; global 1:1 parity remains unproven.
+
+
+## Validated Gemini durable continuation checkpoint: 82fe6c2
+
+Clean `82fe6c2dfb04ceb7c8961ef40c870991a1ea4415` passes all 60 Gemini cases
+and all 125 DeepSeek scenarios, including both independent mutation sets:
+`/tmp/gdx-04384-gemini-durable-oracle.json` and
+`/tmp/gdx-04384-gemini-durable-deepseek-oracle.json`.
+The successful same-process seed is checked exactly, the three restart cases
+retain durable ownership across launches, and known work is rejected before
+another upstream attempt even after key/endpoint changes. The fresh/unbound
+and buffered/session boundary controls also pass the qualified state auditor.
+
+The clean binaries were built using
+`rtk go build -trimpath -o /tmp/gdx-04384-gemini-durable-final-godex ./cmd/godex` and
+`rtk go build -trimpath -o /tmp/gdx-04384-gemini-durable-final-differential ./tools/differential`.
+The executable commands use the unchanged pinned reference, `--gemini`, or
+`--scenario all --scenario-workers 3`. The checked local/remote main was
+fast-forwarded and pushed directly to `origin/main` at `82fe6c2`, including
+the production restart repair and two focused oracle qualification commits.
+No CI wait, force push, tag, release or editor-worktree change occurred.
+The complete default-script milestone remains scoped to clean `8730116`.
+
+
+## Gemini chat request integer preservation and serde numeric bytes
+
+The pinned `chat_compatible_request.rs:44–137` parses a complete serde JSON
+Value and serializes the constructed request with `serde_json::to_vec`.
+Tool-schema numeric values pass through that pipeline. Godex instead decoded
+the same request into float64 values three times: input normalization,
+message adjacency and stream-option rewriting. An integer such as
+9007199254740993 became 9007199254740992; signed/unsigned limits and the
+wire spellings of integral f64 values, negative zero and unsigned overflow
+also changed before reaching upstream.
+
+The private Gemini request decoder now uses `UseNumber` and still rejects
+trailing JSON and non-object roots. Its three actual consumers stay within
+`gateway/gemini`. Adjacency and stream-option serialization reuse the existing
+`helper/jsonutil.MarshalSerdeValue04384`, preserving integer kinds and the
+pinned default f64 parser/formatter. No policy moved out of the gateway;
+there is no new shared helper package, exported API, dependency, configuration,
+interface, state field or worker. The complete request serde admission gate
+still runs before normalization.
+
+Locked Rust diagnostics for nine tokens are retained at
+`/tmp/gdx-04384-gemini-request-numeric-serde-probe.jsonl`, produced by the
+existing offline Cargo probe with the pinned serde/serde_json/zmij lockfile.
+They cover a safe-integer control, integers above 2^53, signed/unsigned 64-bit
+limits, exponent notation, negative zero, a long fraction and unsigned overflow
+into f64. These local parser results alone are not executable parity evidence.
+
+Before repair,
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiChatRequestPreservesSerdeToolNumbers$' -count=1`
+passes four safe/fraction controls and fails fourteen changed-number cases
+plus parent: `/tmp/gdx-04384-gemini-request-numbers-before.log`.
+Each case exercises the actual HTTP pool for both request stream flags.
+After repair,
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiChatRequest(PreservesSerdeToolNumbers|DecodersRequireCompleteObject)$' -count=1`
+passes 20 tests, including complete-input controls:
+`/tmp/gdx-04384-gemini-request-numbers-focused.log`.
+
+Two strict baseline executable cases on clean `82fe6c2` FAIL only Godex:
+`/tmp/gdx-04384-gemini-request-numbers-buffered-before-oracle.json` and
+`/tmp/gdx-04384-gemini-request-numbers-stream-before-oracle.json`.
+All reference and independent mutation invariants pass. Both require exact
+original upstream request bytes, one authenticated single-key attempt, exact
+native response/body/type/status/exit/stdout and safe durable state. Raw request
+bytes are retained because decoded float64 maps cannot distinguish the
+rounded large-integer mismatch. The true stream-flag request must also contain
+the exact usage option; both mocks deliberately return buffered native JSON,
+so these fixtures do not claim numeric SSE response coverage.
+The baseline harness is `/tmp/gdx-04384-gemini-request-numbers-differential`
+with `/tmp/gdx-04384-gemini-durable-final-godex`, the clean state-oracle
+source worktree and `--gemini --scenario request-tool-numbers-buffered` or
+`--gemini --scenario request-tool-numbers-stream`.
+
+`rtk go test ./tools/differential -count=1` passes 271 tests:
+`/tmp/gdx-04384-gemini-request-numbers-oracle-tests.log`.
+`rtk go test -race ./internal/gateway/gemini ./internal/helper/jsonutil ./tools/differential -count=1`
+passes 1,061 tests: `/tmp/gdx-04384-gemini-request-numbers-race.log`.
+`rtk go test ./...` exits 0, but RTK reports a 10 MiB filter truncation and an
+incomplete test count: `/tmp/gdx-04384-gemini-request-numbers-test-all.log`.
+The unfiltered cached replay `rtk proxy go test -json ./...` exits 0 and records
+9,423 test passes, zero failures and 81 package results:
+`/tmp/gdx-04384-gemini-request-numbers-test-all-raw.jsonl`.
+`rtk proxy make verify` passes all local completion gates:
+`/tmp/gdx-04384-gemini-request-numbers-verify.log`.
+Clean-commit 62-case Gemini and 125-case DeepSeek executable matrices follow.
+Global 1:1 parity remains unproven; other lexical classes, Gemini Compact,
+session/turn executable continuation, native macOS/Windows execution and live
+authentication remain separate audits.

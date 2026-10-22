@@ -389,6 +389,12 @@ Model fallback consumes non-retryable precommit classification before examining
 HTTP error bodies; credential routing uses the same evidence. An upstream 502
 retains its existing retry policy. The gateway owns the read gate and failure
 evidence, while `usecase/routing` owns both model and credential retry decisions.
+Gemini chat request normalization, tool adjacency and stream-option rewriting
+share one private complete-object decoder with `UseNumber`. These adapter
+steps retain signed/unsigned integer values and reuse the existing
+`helper/jsonutil` serde writer for final outbound numeric and string bytes.
+The helper stays in the Gemini gateway because all three consumers belong to
+that request pipeline; no new shared package or application policy is involved.
 `gateway/gemini` reuses `gateway/chatcompat` for shared message/history
 and Chat response conversion, while Gemini-specific reasoning, metadata, tool
 shapes, and thought signatures stay in the Gemini gateway. Native Messages and

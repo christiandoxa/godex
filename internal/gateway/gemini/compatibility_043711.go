@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
+	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
@@ -64,8 +65,8 @@ func (transport *RuntimeTransport) executeChatCompatibleResponses(
 // The tagged 0.437.11 Super Gemini chat-compatible provider asks the
 // upstream to return final token usage in all streaming requests.
 func geminiChatStreamOptions043711(body []byte) ([]byte, error) {
-	var request map[string]any
-	if err := json.Unmarshal(body, &request); err != nil {
+	request, err := decodeGeminiChatRequest04384(body)
+	if err != nil {
 		return nil, errors.New("invalid Gemini chat-compatible stream request")
 	}
 	if stream, _ := request["stream"].(bool); !stream {
@@ -77,7 +78,7 @@ func geminiChatStreamOptions043711(body []byte) ([]byte, error) {
 	}
 	options["include_usage"] = true
 	request["stream_options"] = options
-	return json.Marshal(request)
+	return jsonutil.MarshalSerdeValue04384(request)
 }
 
 // Responses input entries may specify only a role and content, with no
@@ -89,8 +90,8 @@ func normalizeGeminiChatInput043711(body []byte) ([]byte, error) {
 	if !geminiSerdeJSONValid04384(body) {
 		return nil, errors.New("invalid Gemini Responses request")
 	}
-	var root map[string]any
-	if err := json.Unmarshal(body, &root); err != nil {
+	root, err := decodeGeminiChatRequest04384(body)
+	if err != nil {
 		return nil, errors.New("invalid Gemini Responses request")
 	}
 	// Routing rejects bound raw-key IDs; unbound IDs use the tagged fresh-input fallback.
@@ -110,6 +111,19 @@ func normalizeGeminiChatInput043711(body []byte) ([]byte, error) {
 		}
 	}
 	return json.Marshal(root)
+}
+
+func decodeGeminiChatRequest04384(body []byte) (map[string]any, error) {
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.UseNumber()
+	var request map[string]any
+	if err := decoder.Decode(&request); err != nil {
+		return nil, err
+	}
+	if err := decoder.Decode(new(any)); err != io.EOF {
+		return nil, errors.New("Gemini chat request must contain one JSON value")
+	}
+	return request, nil
 }
 
 // Tagged Prodex 0.437.11 uses the Gemini *native* response normalizer

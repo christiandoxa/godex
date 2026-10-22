@@ -202,6 +202,18 @@ The same-process fixture records the actual successful first exchange inside
 the existing child-result file and checks its exact body, status and type.
 A terminal rejection alone never authorizes durable seed ownership.
 
+Gemini `request-tool-numbers-buffered` and `request-tool-numbers-stream` require
+exact original upstream request bytes for a function schema containing signed
+and unsigned 64-bit boundaries, integers above 2^53, exponents, negative zero,
+a long fraction and unsigned overflow into serde's f64 representation. Both
+request stream-flag values use a buffered native response; these are not SSE
+response fixtures. The streaming request must include the exact usage option.
+The mock retains raw request bytes for these cases because a decoded float64
+map cannot detect rounded large integers. Both products must independently
+satisfy exact body/type/status/exit/stdout, authenticated credential slot,
+one original attempt and safe durable state. Equal rounded or reclassified
+number tokens fail even when their decoded float64 maps are identical.
+
 The 0.438.4 `deepseek-sse-error-presence`, `deepseek-sse-error-i64` and
 `deepseek-sse-error-float` scenarios verify embedded-error primary-field
 presence and signed numeric kinds. Each must produce one failure frame

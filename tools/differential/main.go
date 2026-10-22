@@ -1123,6 +1123,9 @@ func runCodexShim(arguments []string) int {
 		object["session_id"] = value
 		requestBody, _ = json.Marshal(object)
 	}
+	if scenario := os.Getenv("DIFFERENTIAL_GEMINI_REQUEST_NUMBERS"); scenario != "" {
+		requestBody = geminiRequestNumberInput04384(scenario)
+	}
 	if strings.HasPrefix(os.Getenv("DIFFERENTIAL_CONTINUATION_PHASE"), "resume") {
 		requestBody = []byte(strings.TrimSuffix(string(requestBody), "}") + `,"previous_response_id":"chatcmpl-differential"}`)
 	}
