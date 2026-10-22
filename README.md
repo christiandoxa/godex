@@ -223,6 +223,8 @@ upstream attempt, including after restart. Fresh self-contained requests and
 unknown response discovery remain available. Routing state stores hashed
 rejection markers without provider credentials.
 Local Compact and Models endpoints remain available with bound context.
+DeepSeek continuation IDs are limited to 1,024 UTF-8 bytes and reject control
+characters before provider dispatch.
 Compact compatibility responses use the reference `x-prodex-compact-*` headers
 and summary text.
 

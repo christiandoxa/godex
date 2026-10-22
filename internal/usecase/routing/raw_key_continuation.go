@@ -20,6 +20,12 @@ func (router *Router) resolveRequestOwner(ctx context.Context, request proxymode
 	if rawKeyLocalRoute(request) {
 		return "", nil, nil
 	}
+	for _, value := range []string{keys.previous, keys.turn, keys.session} {
+		if strings.TrimSpace(value) != "" && !validHardBindingComponent04383(value) {
+			return "", nil, &proxymodel.Error{StatusCode: http.StatusServiceUnavailable,
+				Message: "bound continuation provider is unavailable"}
+		}
+	}
 	// Local-rewrite dispatch checks response, turn and session lineage before
 	// credential selection; an unresolved bound identity never becomes fresh work.
 	keys.thread = ""

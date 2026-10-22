@@ -3315,3 +3315,88 @@ tests across 81 packages: `/tmp/gdx-04384-buffered-framing-test-all.log`.
 shuffled race tests, cross-platform build/test compilation, installers and build.
 Log: `/tmp/gdx-04384-buffered-framing-verify.log`.
 Clean-commit executable gates follow.
+
+
+## Validated pushed checkpoint: 6695c9b
+
+Clean `6695c9b0e05788201b7af5e04397a34e80a7bd33` passes 71/71 released
+DeepSeek scenarios and independent mutations, including all eighteen restart,
+identity-change, local-route and fresh/discovery observations. It also passes
+46/46 Gemini cases and their independent mutations. Reports:
+`/tmp/gdx-04384-buffered-framing-oracle.json` and
+`/tmp/gdx-04384-buffered-framing-gemini-oracle.json`.
+
+The exact clean-commit HTTP release phases also pass with exit zero:
+
+```bash
+rtk proxy bash scripts/verify-release-parity.sh --phase=http-keepalive > /tmp/gdx-04384-buffered-framing-http-keepalive.log 2>&1
+rtk proxy bash scripts/verify-release-parity.sh --phase=http-compact > /tmp/gdx-04384-buffered-framing-http-compact.log 2>&1
+```
+
+The earlier default run on `869ca483` remains FAIL on the now-fixed Models-list
+Content-Length mismatch:
+`/tmp/gdx-04384-compact-buffered-full-release-parity.log`. It is not reported
+as a complete release pass. Native macOS/Windows execution, live authentication,
+other providers' raw-key continuation identities and additional serde diagnostic
+classes remain outside this checkpoint's executable proof. No full 1:1 parity
+claim is made.
+
+After checking the primary worktree and unchanged remote, all eight validated
+commits from `c18c799` through `6695c9b` were fast-forwarded and pushed directly
+to `origin/main`. The primary worktree is clean at this checkpoint. No force
+push, tag, release or unrelated editor-worktree change occurred.
+
+
+## Validate DeepSeek continuation components before dispatch
+
+A separate raw-key probe proves that an oversized nonblank previous_response_id
+returns HTTP 503/exit 2 with zero upstream attempts on Prodex, while Godex
+returns 200 after one attempt. Diagnostic report:
+`/tmp/gdx-04384-raw-key-invalid-previous-probe.json` (FAIL, its generic success
+invariant is not a qualified rejection gate). The pinned
+`RuntimeHardBindingIdentity::new` rejects any invalid nonblank response, turn
+or session component. The established bound is 1,024 UTF-8 bytes, with C0/C1
+control characters forbidden.
+
+The private DeepSeek raw-key resolver now applies the existing component
+validator before owner lookup or credential selection. Invalid requests use
+the same exact `bound_continuation_unavailable` rejection as unavailable owners.
+Local Compact/Models still dispatch earlier. No new validator, helper, exported
+API, dependency, setting, persisted field or worker is introduced. Policy stays
+in `usecase/routing`; input/output models and repositories are unchanged.
+
+Exact fail-before
+`rtk go test ./internal/usecase/routing -run '^TestProdex04384RawKeyRejectsInvalidContinuationIdentity$' -count=1`
+passes nine length/blank controls and fails nine invalid component cases plus
+the parent test: `/tmp/gdx-04384-raw-key-identity-before.log`.
+After repair all nineteen tests pass:
+`/tmp/gdx-04384-raw-key-identity-focused.log`.
+The cases cover response/session/turn, byte limits with ASCII and Unicode,
+blank components and internal controls. Turn-header control cases are use-case
+checks, not evidence that HTTP accepts illegal header bytes.
+
+Eight strict executable cases independently verify exact client body/status,
+Content-Type, stdout, child exit, credential slot, original request, zero retry,
+upstream attempt count and safe durable state. On clean `6695c9b`, the 1,024-byte
+ASCII/Unicode, blank and local-Compact controls all PASS:
+`/tmp/gdx-04384-raw-key-identity-limit-before-oracle.json`,
+`/tmp/gdx-04384-raw-key-identity-unicode-limit-before-oracle.json`,
+`/tmp/gdx-04384-raw-key-identity-blank-before-oracle.json` and
+`/tmp/gdx-04384-raw-key-identity-local-compact-before-oracle.json`.
+The 1,025-byte ASCII, oversized Unicode, control-bearing response ID and mixed
+valid-response/invalid-session cases all satisfy the reference rejection and
+fail only Godex:
+`/tmp/gdx-04384-raw-key-identity-over-limit-before-oracle.json`,
+`/tmp/gdx-04384-raw-key-identity-unicode-over-before-oracle.json`,
+`/tmp/gdx-04384-raw-key-identity-control-before-oracle.json` and
+`/tmp/gdx-04384-raw-key-identity-mixed-before-oracle.json`.
+The mixed case also prevents an invalid session from creating durable state.
+Independent oracle mutations reject equal corrupt executions.
+`rtk go test -race ./internal/usecase/routing ./internal/repository/routing ./internal/delivery/http/proxy ./tools/differential -count=1`
+passes 2,440 tests. `rtk go test ./...` passes 9,199 tests across 81 packages.
+Logs: `/tmp/gdx-04384-raw-key-identity-race.log` and
+`/tmp/gdx-04384-raw-key-identity-test-all.log`.
+`rtk proxy make verify` passes formatting, source/TUI guards, vet, the full
+shuffled race suite, cross-platform build/test compilation, installers and build.
+Log: `/tmp/gdx-04384-raw-key-identity-verify.log`.
+Clean-commit executable gates follow.
