@@ -132,6 +132,7 @@ type runOptions struct {
 	userID            bool
 	invalidInput      string
 	primitiveControl  string
+	historyProjection string
 }
 
 type mockServer struct {
@@ -440,6 +441,11 @@ func run() error {
 				prodexSourceCommit, godexSourceCommit, runOptions{rotate: name == "deepseek-buffered-body-over-rotation" || name == "deepseek-buffered-view-search-runtime-depth-over-rotation"})
 		}})
 	}
+	for _, scenario := range deepSeekHistoryCases04384() {
+		specs = append(specs, differentialScenario043713{scenario, func(mock *mockServer) (scenarioResult, error) {
+			return runPair(root, mock, scenario, mockPlan{SSEFraming: scenario}, *prodexBin, *godexBin, prodexSourceCommit, godexSourceCommit, runOptions{historyProjection: scenario})
+		}})
+	}
 	scenarios, err := executeDifferentialScenarios043713(specs, *scenarioName, *scenarioWorkers)
 	if err != nil {
 		return err
@@ -677,6 +683,10 @@ func runProduct(root string, mock *mockServer, name, binary, commit string, plan
 	}
 	events := mock.eventsSince(eventStart)
 	expectedBindings := fixtureContinuationOwners(clientExchange, upstream, endpoint, options.priorBindings)
+	if options.historyProjection != "" && clientExchange.Seed != nil && len(upstream) >= 1 {
+		seedOwners := fixtureContinuationOwners(*clientExchange.Seed, upstream[:1], endpoint, options.priorBindings)
+		expectedBindings = fixtureContinuationOwners(clientExchange, upstream, endpoint, seedOwners)
+	}
 	if identityKnown && !identityFixture.reject && !identityFixture.compact && strings.TrimSpace(identityFixture.previous) != "" {
 		if owner, verified := expectedBindings["chatcmpl-differential"]; verified {
 			expectedBindings[identityFixture.previous] = owner
@@ -750,6 +760,9 @@ func productEnv(name, stateHome, codexHome, userHome, shim, childResult string, 
 	}
 	if options.primitiveControl != "" {
 		env = append(env, "DIFFERENTIAL_REQUEST_PRIMITIVE="+options.primitiveControl)
+	}
+	if options.historyProjection != "" {
+		env = append(env, "DIFFERENTIAL_HISTORY_PROJECTION="+options.historyProjection, "DIFFERENTIAL_CONTINUATION_PHASE=same-process")
 	}
 	if options.invalidInput != "" {
 		env = append(env, "DIFFERENTIAL_INVALID_INPUT="+options.invalidInput)
@@ -884,6 +897,9 @@ func (mock *mockServer) serveHTTP(writer http.ResponseWriter, request *http.Requ
 		status = http.StatusOK
 	}
 	responseBody := `{"id":"chatcmpl-differential","object":"chat.completion","created":1,"model":"deepseek-v4-pro","choices":[{"index":0,"message":{"role":"assistant","content":"synthetic-ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":2,"completion_tokens":1,"total_tokens":3}}`
+	if deepSeekHistoryCase04384(plan.SSEFraming) && attempt == 1 {
+		responseBody = deepSeekHistorySeed04384(plan.SSEFraming)
+	}
 	if plan.SSEFraming == "raw-key-fresh" {
 		responseBody = strings.Replace(responseBody, "chatcmpl-differential", "chatcmpl-fresh", 1)
 	}
@@ -1204,6 +1220,12 @@ func runCodexShim(arguments []string) int {
 	if os.Getenv("DIFFERENTIAL_RETRY") == "1" {
 		maxAttempts = 2
 	}
+	if scenario := os.Getenv("DIFFERENTIAL_HISTORY_PROJECTION"); scenario != "" {
+		if !deepSeekHistoryCase04384(scenario) {
+			return shimFailure("unknown history projection fixture")
+		}
+		requestBody = deepSeekHistoryInput04384(false)
+	}
 	if os.Getenv("DIFFERENTIAL_CONTINUATION_PHASE") == "same-process" {
 		maxAttempts = 2
 	}
@@ -1244,6 +1266,8 @@ func runCodexShim(arguments []string) int {
 				if err != nil {
 					return shimFailure("synthetic Compact seed could not supply its public ID")
 				}
+			} else if os.Getenv("DIFFERENTIAL_HISTORY_PROJECTION") != "" {
+				requestBody = deepSeekHistoryInput04384(true)
 			} else {
 				requestBody = []byte(strings.TrimSuffix(string(requestBody), "}") + `,"previous_response_id":"chatcmpl-differential"}`)
 			}
@@ -1337,6 +1361,9 @@ func shimFailure(message string) int {
 // product failures, skipped upstream calls, and missing cancellations must not
 // turn into parity successes just because both implementations behave alike.
 func scenarioInvariants(scenario scenarioResult) []string {
+	if deepSeekHistoryCase04384(scenario.Name) {
+		return deepSeekHistoryInvariants04384(scenario)
+	}
 	if _, known := requestPrimitiveCase04384(scenario.Name); known {
 		return deepSeekPrimitiveInvariants04384(scenario)
 	}
@@ -1709,7 +1736,7 @@ func negativeControl() bool {
 			return false
 		}
 	}
-	return requestPrimitiveNegativeControl04384()
+	return requestPrimitiveNegativeControl04384() && deepSeekHistoryNegativeControl04384()
 }
 
 func hasEvent(events []upstreamEvent, kind string) bool {

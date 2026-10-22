@@ -8593,3 +8593,53 @@ the composition extraction, including race tests and cross-builds. Logs use
 /tmp/gdx-04384-gemini-compact-namespace-. Exact clean executable qualification
 follows. Shared gateway scoping has local integration coverage; its executable
 CLI path and global parity remain unproven.
+
+
+### Share exact buffered Chat assistant replay projection
+
+Five pinned DeepSeek reconstruction cases establish three Godex-only request
+mismatches (retained provider-only metadata, unwrapped cached shell arguments and
+rounded tool-call integers above 2^53) plus null/empty controls that already PASS.
+The synthetic safety_identifier is a valid request field selecting the reference
+runtime reconstruction path; it becomes user_id upstream. All original seed and
+final response bytes, request bodies, attempts, authentication, state and matching
+mutations are independently checked. Before evidence:
+/tmp/gdx-04384-chat-assistant-replay-before-audit.json. These are real executable
+cases, not a provider-kernel diagnostic.
+
+The initial four expectations omitted that field and wrongly expected runtime
+history on the source's simple-request override. Their unqualified FAIL reports
+remain retained. They reveal a separate real pipeline gap: tagged
+local_rewrite_deepseek_send.rs:481-497 preserves pending runtime messages while
+replacing only the emitted body with provider-core conformance for simple input.
+Godex currently emits its runtime body. A projector fix does not close that gap;
+the detailed source audit is
+/tmp/gdx-04384-chat-assistant-replay-fastpath-audit.md. No stateless behavior is
+claimed certified by the reconstructed-history cases.
+
+The existing source-aligned Gemini Chat assistant projector moves mechanically
+into gateway/chatcompat and serves both concrete adapters. Only string content,
+nonempty reasoning and present tool_calls survive; role is assistant, shell
+arguments use the existing RTK transformation, and the cloned call values retain
+number tokens. DeepSeek acquires upstream JSON with UseNumber while preserving
+its prior single-complete-value validation. Response eligibility, cache bounds,
+request policies and native Anthropic handling stay in their owning adapters.
+No generic helper, dependency, option, interface or goroutine is added. Audit:
+/tmp/gdx-04384-chat-assistant-replay-mechanical-audit.json.
+
+The narrow before regression fails projected fields, empty-message omission,
+reasoning/content normalization, RTK and number snapshots, with missing-choice
+control PASS:
+`rtk proxy go test -json ./internal/gateway/deepseek -run '^TestProdex04384DeepSeekBufferedChatHistoryProjection$' -count=1`.
+The final file is also copied alone to old base e01a8e8; logs are
+/tmp/gdx-04384-chat-assistant-replay-{unit-before,final-unit-before}.jsonl.
+After repair, `rtk go test ./internal/gateway/deepseek ./internal/gateway/gemini ./internal/gateway/chatcompat -count=1`
+PASSes 2,665 before additional shared isolation and JSON-validation controls.
+All 297 oracle self-tests pass. `rtk proxy go test -json ./...` on final code
+PASSes 10,704 tests in 71 packages, with 18 optional SKIP.
+`rtk proxy make verify` PASSes exit 0, including race tests and cross-builds.
+Logs use /tmp/gdx-04384-chat-assistant-replay-. The final regression also keeps
+trailing-JSON and nonobject controls; its unchanged-base run is
+/tmp/gdx-04384-chat-assistant-replay-final-unit-before-complete.jsonl.
+Exact clean executable qualification
+follows. Global continuation and 1:1 parity remain unproven.

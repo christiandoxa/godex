@@ -1,7 +1,9 @@
 package deepseek
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"strings"
 
 	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
@@ -18,26 +20,15 @@ func deepSeekTranslatedConversationMessages(body []byte) []any {
 
 func deepSeekChatAssistantMessages(body []byte) []any {
 	var value map[string]any
-	if json.Unmarshal(body, &value) != nil {
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.UseNumber()
+	if decoder.Decode(&value) != nil {
 		return nil
 	}
-	choices, _ := value["choices"].([]any)
-	if len(choices) == 0 {
+	if decoder.Decode(new(any)) != io.EOF {
 		return nil
 	}
-	choice, _ := choices[0].(map[string]any)
-	message, _ := choice["message"].(map[string]any)
-	if message == nil {
-		return nil
-	}
-	result := cloneDeepSeekMap(message)
-	result["role"] = "assistant"
-	if calls, _ := result["tool_calls"].([]any); len(calls) > 0 {
-		if content, ok := result[deepSeekContentKey]; !ok || content == nil {
-			result[deepSeekContentKey] = ""
-		}
-	}
-	return []any{result}
+	return chatcompat.ChatAssistantMessages(value)
 }
 
 func deepSeekStoreBufferedConversation(

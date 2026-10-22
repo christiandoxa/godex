@@ -114,6 +114,13 @@ from gateway request namespaces: same, changed, omitted and newly supplied
 session IDs use the same exact authenticated seed and public previous ID.
 Only the local Super executable path is certified by those cases; separate
 composition/runtime tests retain shared-gateway and credential isolation.
+Five `deepseek-history-*` cases seed a successful buffered tool call, then send
+a tool result with a synthetic safety_identifier. That valid field selects the
+reference runtime reconstruction path. Exact seed/client output, both original
+request bodies, order/count, credential, state and matching-corruption checks
+cover projected fields, RTK shell arguments, large integer fields and null/empty
+controls. Plain input without the field uses a separate tagged stateless
+request override and is not certified by these reconstruction cases.
 
 Build and run from a clean, committed Godex worktree:
 

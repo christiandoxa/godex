@@ -236,8 +236,13 @@ It also owns the bounded Chat conversation snapshots previously private to
 DeepSeek: 256 entries per request namespace, 2048 entries overall and a 64 MiB
 serde-size estimate. Request namespace selection, exact-number snapshot cloning
 and deduplication of replayed Chat input remain protocol concerns; each credential
-transport owns its cache lifetime. DeepSeek still owns request admission,
-assistant projection and response eligibility. Gemini records successful buffered
+transport owns its cache lifetime. DeepSeek still owns request admission and
+response eligibility. The common Chat assistant snapshot projector retains only
+string content, nonempty reasoning and present tool calls, using the existing
+RTK argument transform; DeepSeek and Gemini acquire validated JSON independently.
+DeepSeek preserves JSON number tokens while acquiring buffered replay context.
+The projector is a pure protocol function with isolated call snapshots; it does
+not select accounts or change response eligibility. Gemini records successful buffered
 Chat requests and completed text streams under their final public Responses ID
 and reuses matching history for API-key Compact before adjacency repair. Current Compact instructions precede
 cached context; input duplicates and repeated instructions are removed. Native
