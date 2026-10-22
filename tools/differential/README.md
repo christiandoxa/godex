@@ -1140,3 +1140,12 @@ its reconstructed pending history. The original seed, two/three ordered upstream
 requests, exact bodies and IDs, events, stdout/status, credentials and durable
 state remain independent assertions, including matching forged-owner mutations.
 The default DeepSeek matrix reaches 236; Gemini remains 974.
+
+Nineteen DeepSeek function/MCP argument cases check absent versus null values,
+input/nested aliases and null priority, opaque string bytes and escapes,
+HTML/Unicode JSON objects, arrays, u64, exponent and negative-zero formatting.
+Normal and simple-request paths are separate cases; a custom-tool control keeps
+its existing wrapping contract. Golden upstream bodies do not reuse the
+production serializer. Original responses, attempts, auth/slot and durable state
+remain independent assertions, with matching argument corruption rejected.
+The default DeepSeek matrix reaches 255; Gemini remains 974.

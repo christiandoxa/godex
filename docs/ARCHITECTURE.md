@@ -319,6 +319,10 @@ classification only rejects blank IDs. Distinct padded IDs retain separate
 first-output and emitted-call ownership, without changing the stateless override.
 Tool-output history lookup likewise passes the original nonblank ID to the
 existing scoped cache, including when reconstructing pending history before an override.
+Function/MCP argument acquisition stays private to the DeepSeek input projector:
+present arguments, input and nested function arguments precede an absent-field
+empty-object default. Explicit null survives. Structured values reuse the
+existing Serde JSON writer; string arguments remain opaque, including escapes.
 The pending snapshot decoder preserves JSON number kinds and integer precision,
 so repeated replay does not round cached tool-call fields through float64.
 Runtime gateway startup marks the proxy model's internal GatewayMode field;

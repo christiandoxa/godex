@@ -1,10 +1,11 @@
 package deepseek
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 )
 
 func deepSeekMessages(object map[string]any) ([]any, error) {
@@ -227,12 +228,13 @@ func deepSeekToolCallItems(item map[string]any, kind string) ([]any, error) {
 		return nil, errors.New("DeepSeek input tool call items require a function name")
 	}
 	arguments := item[deepSeekArgumentsKey]
-	if kind == "custom_tool_call" || kind == "mcp_call" {
+	switch kind {
+	case "function_call", "mcp_call":
+		arguments = deepSeekCallArguments04384(item)
+	case "custom_tool_call":
 		if arguments == nil {
 			arguments = firstValue(item, "input", deepSeekArgumentsKey)
 		}
-	}
-	if kind == "custom_tool_call" {
 		arguments = map[string]any{"input": arguments}
 	}
 	message := assistantToolCall(callID, name, arguments)
@@ -255,6 +257,17 @@ func deepSeekToolCallItems(item map[string]any, kind string) ([]any, error) {
 		}
 	}
 	return messages, nil
+}
+
+func deepSeekCallArguments04384(item map[string]any) any {
+	if value, present := firstExistingValue(item, deepSeekArgumentsKey, "input"); present {
+		return value
+	}
+	function, _ := item[deepSeekFunctionKey].(map[string]any)
+	if value, present := function[deepSeekArgumentsKey]; present {
+		return value
+	}
+	return map[string]any{}
 }
 
 func deepSeekShellCallItem(item map[string]any) (map[string]any, error) {
@@ -320,7 +333,7 @@ func compactValue(value any) string {
 	if text, ok := value.(string); ok {
 		return text
 	}
-	content, err := json.Marshal(value)
+	content, err := jsonutil.MarshalSerdeValue04384(value)
 	if err != nil {
 		return ""
 	}

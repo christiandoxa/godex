@@ -9919,3 +9919,44 @@ EXIT trap removes temporary artifacts, so this record relies on the successful
 original run, embedded pins and unchanged clean source. Existing independent
 reference state failures and fixture errors remain retained. Overall 1:1 parity
 is still unproven; later broader matrices remain pending.
+
+### Preserve DeepSeek function/MCP argument presence, aliases and Serde bytes
+
+Twenty-two exact clean 0c78e2592eaf02fcaba06d0db0d4c220ae49c6fa executable
+baselines qualify eleven Godex-only FAILs and eleven PASS controls (original
+session 15444, exit 0). Audit:
+/tmp/gdx-04384-deepseek-function-arguments-before-mcp-audit.json. Earlier
+sixteen-case and eighteen-case baseline audits remain retained with their
+original results. Godex loses absent-field defaults and input/nested argument
+aliases, overwrites an explicit MCP null with input, escapes HTML/Unicode inside
+structured argument JSON differently, and preserves 1e0/-0 spellings instead
+of Serde's 1.0/-0.0. Reference original request bytes pass every independent
+invariant; only Godex request-byte comparisons fail. Opaque string/escape,
+null, array, u64, custom-tool and prior ID/admission/history controls PASS.
+All responses/stdout/status, ordered attempts/events, auth/credential slot,
+durable state and pinned artifacts satisfy their independent checks. Both
+ordinary simple-request and developer-role normal reconstruction are covered.
+
+Pinned Mojo RawBridgeInputItem chooses present arguments, then input, then
+nested function.arguments, defaulting only absent values to an empty object.
+Function and MCP calls share that acquisition rule. The private DeepSeek
+projector now follows that presence order; its small local function names a
+protocol invariant rather than exporting another helper. The existing local
+compactValue formatter reuses helper/jsonutil.MarshalSerdeValue04384 for
+decoded structured JSON. String arguments remain opaque. No shared helper is
+created, and no layer, interface, dependency, worker, option or persisted
+format changes. All consumers were checked, including shell-generated maps,
+message calls and tool outputs. The Serde helper already has focused tests and
+multiple production consumers. Nine unit subcases first FAIL on the lost
+argument fields and byte differences:
+/tmp/gdx-04384-deepseek-function-arguments-unit-before.log. Focused gateway
+and differential tests then PASS 1,280 tests. Nineteen new executable cases
+extend default DeepSeek236 to 255; Gemini remains 974. Full local and exact
+clean executable validation follow before publication.
+
+Full local validation PASSes 11,021 tests with 18 optional SKIP. make verify
+exits 0, including shuffled race tests, cross-builds, vet, source/format guards
+and the build. Exact commands:
+`rtk proxy go test -json ./... > /tmp/gdx-04384-deepseek-function-arguments-full.jsonl 2>&1`
+and `rtk proxy make verify > /tmp/gdx-04384-deepseek-function-arguments-verify.log 2>&1`.
+Exact clean candidate executable qualification follows before publication.
