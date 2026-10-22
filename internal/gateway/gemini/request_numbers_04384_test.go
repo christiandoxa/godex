@@ -66,7 +66,7 @@ func TestProdex04384GeminiChatRequestPreservesSerdeToolNumbers(t *testing.T) {
 
 func TestProdex04384GeminiChatRequestDecodersRequireCompleteObject(t *testing.T) {
 	for _, normalize := range []func([]byte) ([]byte, error){normalizeGeminiChatInput043711,
-		filterGeminiOrphanToolMessages043711, geminiChatStreamOptions043711} {
+		filterGeminiOrphanToolMessages043711, geminiChatRequestOptions04384} {
 		for _, body := range []string{`{"stream":true,"messages":[]} {"extra":true}`, `[{"stream":true}]`} {
 			if _, err := normalize([]byte(body)); err == nil {
 				t.Fatal("chat request normalization accepted trailing JSON or an array root")

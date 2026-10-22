@@ -214,6 +214,16 @@ satisfy exact body/type/status/exit/stdout, authenticated credential slot,
 one original attempt and safe durable state. Equal rounded or reclassified
 number tokens fail even when their decoded float64 maps are identical.
 
+Gemini `request-user-id-*` cases cover absent, canonical, user-alias,
+safety-alias, blank, trim-limit, null, number, over-limit, invalid-character
+and number-rotation suffixes. Exact original requests require canonical
+`user_id` and field-presence priority; Unicode-trimmed 512-byte input is
+accepted, while blank selected input blocks lower-priority aliases. Invalid
+input requires the released executable's plain HTTP 502 before any upstream
+attempt, including two configured keys. The fixtures compare exact response,
+type, exit, stdout, authenticated request bytes and safe durable state.
+Missing child exchanges remain explicit failing observations.
+
 The 0.438.4 `deepseek-sse-error-presence`, `deepseek-sse-error-i64` and
 `deepseek-sse-error-float` scenarios verify embedded-error primary-field
 presence and signed numeric kinds. Each must produce one failure frame

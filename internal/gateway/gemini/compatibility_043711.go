@@ -23,6 +23,10 @@ func (transport *RuntimeTransport) executeChatCompatibleResponses(
 ) (*proxymodel.Response, error) {
 	normalized, err := normalizeGeminiChatInput043711(input.Body)
 	if err != nil {
+		var failure *proxymodel.Error
+		if errors.As(err, &failure) {
+			return nil, failure
+		}
 		return nil, &proxymodel.Error{StatusCode: http.StatusBadRequest, Message: err.Error()}
 	}
 	body, err := chatcompat.ResponsesRequest(normalized, requestModel(input.Body), "")
@@ -36,7 +40,7 @@ func (transport *RuntimeTransport) executeChatCompatibleResponses(
 	if err != nil {
 		return nil, &proxymodel.Error{StatusCode: http.StatusBadRequest, Message: err.Error()}
 	}
-	body, err = geminiChatStreamOptions043711(body)
+	body, err = geminiChatRequestOptions04384(body)
 	if err != nil {
 		return nil, &proxymodel.Error{StatusCode: http.StatusBadRequest, Message: err.Error()}
 	}
@@ -62,22 +66,30 @@ func (transport *RuntimeTransport) executeChatCompatibleResponses(
 	return translated, nil
 }
 
-// The tagged 0.437.11 Super Gemini chat-compatible provider asks the
-// upstream to return final token usage in all streaming requests.
-func geminiChatStreamOptions043711(body []byte) ([]byte, error) {
+// Tagged Gemini uses user_id on the Chat wire and requests final token
+// usage for streaming requests.
+func geminiChatRequestOptions04384(body []byte) ([]byte, error) {
 	request, err := decodeGeminiChatRequest04384(body)
 	if err != nil {
 		return nil, errors.New("invalid Gemini chat-compatible stream request")
 	}
-	if stream, _ := request["stream"].(bool); !stream {
+	user, hasUser := request["user"]
+	if hasUser {
+		request["user_id"] = user
+		delete(request, "user")
+	}
+	stream, _ := request["stream"].(bool)
+	if !stream && !hasUser {
 		return body, nil
 	}
-	options, _ := request["stream_options"].(map[string]any)
-	if options == nil {
-		options = make(map[string]any)
+	if stream {
+		options, _ := request["stream_options"].(map[string]any)
+		if options == nil {
+			options = make(map[string]any)
+		}
+		options["include_usage"] = true
+		request["stream_options"] = options
 	}
-	options["include_usage"] = true
-	request["stream_options"] = options
 	return jsonutil.MarshalSerdeValue04384(request)
 }
 
@@ -93,6 +105,9 @@ func normalizeGeminiChatInput043711(body []byte) ([]byte, error) {
 	root, err := decodeGeminiChatRequest04384(body)
 	if err != nil {
 		return nil, errors.New("invalid Gemini Responses request")
+	}
+	if err := normalizeGeminiUserID04384(root); err != nil {
+		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
 	// Routing rejects bound raw-key IDs; unbound IDs use the tagged fresh-input fallback.
 	delete(root, "previous_response_id")

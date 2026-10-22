@@ -395,6 +395,14 @@ steps retain signed/unsigned integer values and reuse the existing
 `helper/jsonutil` serde writer for final outbound numeric and string bytes.
 The helper stays in the Gemini gateway because all three consumers belong to
 that request pipeline; no new shared package or application policy is involved.
+Gemini user identity remains adapter-specific: direct field presence selects
+`user_id`, then `user`, then `safety_identifier`; the first value must be a
+string, trims Unicode whitespace and permits at most 512 ASCII letters,
+digits, underscores or dashes. Blank selected values omit the outbound field.
+The gateway presents invalid identities as the tagged terminal plain HTTP 502
+before upstream dispatch, using the existing preparation-error boundary so
+routing cannot repair the request by waiting or changing credentials.
+The shared Claude Chat converter retains its existing user-field behavior.
 `gateway/gemini` reuses `gateway/chatcompat` for shared message/history
 and Chat response conversion, while Gemini-specific reasoning, metadata, tool
 shapes, and thought signatures stay in the Gemini gateway. Native Messages and

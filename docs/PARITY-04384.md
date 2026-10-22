@@ -4577,3 +4577,98 @@ Clean-commit 62-case Gemini and 125-case DeepSeek executable matrices follow.
 Global 1:1 parity remains unproven; other lexical classes, Gemini Compact,
 session/turn executable continuation, native macOS/Windows execution and live
 authentication remain separate audits.
+
+
+## Validated Gemini request numeric checkpoint: c66dd1a
+
+Clean `c66dd1a60df3dfebfc9ac973e85c2a970ac4ec0d` passes all 62 Gemini cases
+and all 125 DeepSeek scenarios, including independent matching-corruption
+controls: `/tmp/gdx-04384-gemini-request-numbers-oracle.json` and
+`/tmp/gdx-04384-gemini-request-numbers-deepseek-oracle.json`.
+Both request stream flags preserve every locked numeric token in the exact
+authenticated original upstream body, with one attempt and unchanged native
+response/type/status/exit/stdout and safe durable state.
+The binaries were built from that clean commit with
+`rtk go build -trimpath -o /tmp/gdx-04384-gemini-request-numbers-godex ./cmd/godex` and
+`rtk go build -trimpath -o /tmp/gdx-04384-gemini-request-numbers-final-differential ./tools/differential`.
+Commands use the unchanged pinned reference with `--gemini`, or
+`--scenario all --scenario-workers 3`. After checking the clean primary
+worktree and unchanged remote, this commit was fast-forwarded and pushed
+directly to `origin/main`. No CI wait, force push, tag, release or editor
+checkout change occurred. The complete default-script milestone remains
+scoped to clean `8730116`; global 1:1 parity remains unproven.
+
+
+## Gemini user identity aliases and terminal invalid-request behavior
+
+The pinned `chat_compatible_request.rs:268–309` calls
+`deepseek_provider_core_user_id_from_responses_request` with the Gemini label.
+`deepseek_bridge/request_params.rs:134–162` selects by direct field presence:
+`user_id`, then `user`, then `safety_identifier`. The selected value must be
+a string. `mojo/prodex_core/deepseek.mojo:1327–1357` trims Unicode whitespace,
+accepts at most 512 bytes of ASCII letters, digits, underscores or dashes,
+and omits a blank selected value. A null/blank primary never borrows a lower
+alias. The exact released public failure for an invalid selected identity is
+plain HTTP 502 `upstream request failed`, exit 2, with no upstream attempt;
+the internal diagnostic is not the public 400 invalid-tool envelope.
+
+Godex's shared Chat converter forwarded `user`, discarded `user_id`, and
+rejected `safety_identifier`. That left valid identities lost/renamed or
+turned into a timeout, and allowed invalid canonical identities upstream.
+The Gemini gateway now normalizes only its own user aliases before the shared
+converter and emits the canonical outbound `user_id` in its existing final
+request-options step. Invalid identities return the existing terminal
+preparation error; routing already preserves that error without model/key
+retry or recovery waits. Claude's shared converter behavior is unchanged.
+The normalization stays private in `gateway/gemini`, with no new shared
+production helper, package, exported API, dependency, configuration, state
+field or background work. The complete serde gate still precedes this logic.
+
+The original HTTP pool regression passes the absent-ID control and fails the
+nine alias/validation cases plus parent:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiChatUserIDUsesTaggedAliasesAndValidation$' -count=1`;
+`/tmp/gdx-04384-gemini-user-id-before.log`.
+An initial repaired test expected internal 400 diagnostics. The released
+executable disproved that public expectation; the public-502 regression then
+fails four invalid cases plus parent before error mapping:
+`/tmp/gdx-04384-gemini-user-id-public-errors-before.log`.
+After repair, the user-ID, previous numeric and complete-input regressions
+pass 31 tests:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiChat(UserIDUsesTaggedAliasesAndValidation|RequestPreservesSerdeToolNumbers|RequestDecodersRequireCompleteObject)$' -count=1`;
+`/tmp/gdx-04384-gemini-user-id-reviewed-focused.log`.
+A separate two-key pool/router test requires zero upstream attempts, no wait
+and the exact terminal preparation error, without production test hooks.
+
+The first executable reports used the incorrect 400 expectation for invalid
+identities; canonical/safety failures also stopped before reporting missing
+child exchanges. These unqualified results remain at
+`/tmp/gdx-04384-gemini-user-id-<suffix>-before-oracle.json` and `.stderr`.
+The qualified harness retains a missing exchange as explicit failing evidence
+and requires the actual released 502. Ten clean-c66dd1a baseline cases PASS
+the absent control and FAIL only Godex for canonical, user-alias, safety-alias,
+blank, trim-limit, null, number, over-limit and invalid-character suffixes:
+`/tmp/gdx-04384-gemini-user-id-<suffix>-qualified-before-oracle.json`.
+The two-key number-rotation case also FAILs only Godex, with exact terminal
+502 and no reference upstream attempt:
+`/tmp/gdx-04384-gemini-user-id-number-rotation-qualified-before-oracle.json`.
+All reference and independent mutation contracts pass. Commands use
+`/tmp/gdx-04384-gemini-user-id-qualified-differential` (the rotation case uses
+`/tmp/gdx-04384-gemini-user-id-qualified-rotation-differential`), the clean
+numeric-request candidate/source and `--gemini --scenario request-user-id-<suffix>`.
+The fixtures require exact original authenticated request bytes, alias
+priority, status/type/body/exit/stdout, zero or one upstream attempt and safe
+durable state. Equal corrupted requests and responses must fail independently.
+
+`rtk go test ./tools/differential -count=1` passes 272 tests after correcting
+the public oracle contract:
+`/tmp/gdx-04384-gemini-user-id-qualified-oracle-tests.log`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+passes 2,795 tests: `/tmp/gdx-04384-gemini-user-id-race.log`.
+`rtk proxy go test -json ./...` passes 9,436 tests across 81 packages:
+`/tmp/gdx-04384-gemini-user-id-test-all.jsonl`.
+`rtk proxy make verify` passes all local completion gates:
+`/tmp/gdx-04384-gemini-user-id-verify.log`.
+Clean-commit 73-case Gemini/125-case DeepSeek matrices follow.
+Other request controls, combined validation-error ordering,
+Gemini Compact, session/turn executable continuation, native macOS/Windows
+and live authentication remain separate audits. Global 1:1 parity is not claimed.
