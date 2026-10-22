@@ -9871,3 +9871,32 @@ Exact commands:
 `rtk proxy go test -json ./... > /tmp/gdx-04384-deepseek-history-call-id-full.jsonl 2>&1`
 and `rtk proxy make verify > /tmp/gdx-04384-deepseek-history-call-id-verify.log 2>&1`.
 Exact clean candidate executable qualification follows before publication.
+
+Exact clean 0c78e2592eaf02fcaba06d0db0d4c220ae49c6fa executable qualification
+PASSes all 17 cases (original session 49436, exit 0): all fifteen history
+scenarios and two prior exact/padded raw-ID controls. All three original
+Godex-only failures now satisfy the original independent seed, two/three ordered
+requests, pending history, exact IDs and wire, response/stdout/status/events,
+attempt/auth/slot and durable-state checks. Audit:
+/tmp/gdx-04384-deepseek-history-call-id-targeted-audit.json. Reference pins,
+immutable source and clean artifact VCS metadata plus hashes were verified.
+Full DeepSeek236 is running in original session 26903 at that immutable source;
+report: /tmp/gdx-04384-deepseek-history-call-id-oracle.json. It is not a full236
+PASS. Candidate 0c78e259 was pushed to origin/main after fetch, clean-primary
+and ancestry checks without waiting for CI. Full232 and later Gemini matrices
+remain source-scoped and pending.
+
+### Full Gemini 924 qualifies exact 5c15397
+
+Original session 85538 exits 0. Its full Gemini report PASSes all 924 unique
+cases at exact clean 5c15397254dd781bf8e28e5d3f29be5482471bd1, including
+every previous918 case. Audit:
+/tmp/gdx-04384-gemini-stream-choice-projection-full-audit.json. All original
+independent invariants, per-case/state comparisons and matching-corruption
+controls PASS. Pinned reference source/binary/manifest, immutable source,
+artifact hashes and embedded clean VCS metadata were verified. This is the
+latest completed full-Gemini qualification only at that revision. Later
+full934/940/943/948/968/974, DeepSeek232/236 and the e9d88ce entire default
+release gate remain pending on their original handles. Earlier reference
+state-integrity failures, capture failures and fixture errors remain retained;
+this result does not explain or erase them. Overall 1:1 parity is unproven.
