@@ -10671,3 +10671,19 @@ the build. Exact commands:
 `rtk proxy go test -json ./... > /tmp/gdx-04384-deepseek-schema-equality-full.jsonl 2>&1`
 and `rtk proxy make verify > /tmp/gdx-04384-deepseek-schema-equality-verify.log 2>&1`.
 Exact clean combined candidate qualification follows before publication.
+
+Exact clean 8e765ce535f32ea1186527738e6eb81cce2d7626 subsequently PASSes all
+96 executable cases (original session 19009, exit 0), including every previous85
+case and all sixteen expanded baseline cases. All ten original integer-copy
+failures and seven additional canonical-equality/metadata failures now satisfy
+the unchanged independent reference invariants. Original request/client/seed
+bytes, admission status/exit, attempts/events, auth/slots, state and active
+matching-corruption controls PASS. Pinned source/reference binary/manifest,
+candidate/driver artifacts and clean VCS metadata were checked. Audit:
+/tmp/gdx-04384-deepseek-schema-equality-targeted-audit.json. Exact command:
+`rtk proxy python3 /tmp/gdx-04384-deepseek-schema-equality-targeted.py > /tmp/gdx-04384-deepseek-schema-equality-targeted.log 2>&1`.
+Both numeric commits are promoted together; the held intermediate was not
+published separately. This does not qualify full362, an entire default gate,
+live authentication or native macOS/Windows execution. Full DeepSeek333 remains
+qualified only at 54976f4, full Gemini974 only at 3399a8c and the latest complete
+default gate only at e9d88ce. Earlier failed reports remain retained.
