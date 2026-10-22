@@ -47,6 +47,10 @@ func TestProdex04384DeepSeekRequestMetadataRetainsNumbersThroughResponse(t *test
 		{"client", `"client_metadata":{"value":9007199254740993}`, `{"metadata":{"client_metadata":{"value":9007199254740993}}}`},
 		{"nested", `"metadata":{"probe":[{"value":-9223372036854775808}]}`, `{"metadata":{"probe":[{"value":-9223372036854775808}]}}`},
 		{"float_control", `"metadata":{"probe":{"value":1.5}}`, `{"metadata":{"probe":{"value":1.5}}}`},
+		{"exponent", `"metadata":{"probe":{"value":1e0}}`, `{"metadata":{"probe":{"value":1.0}}}`},
+		{"negative_zero", `"metadata":{"probe":{"value":-0}}`, `{"metadata":{"probe":{"value":-0.0}}}`},
+		{"fraction", `"metadata":{"probe":{"value":0.123456789012345678901234567890}}`, `{"metadata":{"probe":{"value":0.12345678901234568}}}`},
+		{"client_negative_zero", `"client_metadata":{"value":-0}`, `{"metadata":{"client_metadata":{"value":-0.0}}}`},
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
 			request, err := TranslateResponsesRequest([]byte(`{"input":"same request",`+fixture.fields+`}`), RequestOptions{})

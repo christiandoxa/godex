@@ -10598,3 +10598,76 @@ build. Exact commands:
 `rtk proxy go test -json ./... > /tmp/gdx-04384-deepseek-schema-numbers-full.jsonl 2>&1`
 and `rtk proxy make verify > /tmp/gdx-04384-deepseek-schema-numbers-verify.log 2>&1`.
 Exact clean candidate qualification follows before publication.
+
+### Full DeepSeek333 qualifies the published runtime-content revision
+
+Original session 57004 exits 0. Exact clean
+54976f4182bdcf96b9e28f08d2fed74c12da52fc PASSes all 333 unique DeepSeek cases,
+including the previous qualified282 scope and every targeted65 case. Audit:
+/tmp/gdx-04384-deepseek-message-content-full-audit.json. Original independent
+invariants, active corruption guards, source/reference/manifest/artifact pins,
+clean VCS metadata and specialized raw-key/restart/recovery run shapes were
+checked. No case or durable-state error remains. Earlier full273/full968 failures
+remain retained FAILs. This qualifies only that revision; neither newer numeric
+work nor an entire default gate inherits the result.
+
+### Canonical schema equality and echoed metadata complete the numeric fix
+
+Exact clean 85ab820a3f8a9ec723bf7f042e60f2f59bf67931 subsequently PASSes the
+85 targeted numeric/content/routing cases (original session 47205, exit 0),
+including all seventeen baseline cases and previous72 scope. Audit:
+/tmp/gdx-04384-deepseek-schema-numbers-targeted-audit.json. Exact command:
+`rtk proxy python3 /tmp/gdx-04384-deepseek-schema-numbers-targeted.py > /tmp/gdx-04384-deepseek-schema-numbers-targeted.log 2>&1`.
+It remains held and unpublished: a separate source audit found that retaining
+raw number tokens made the old bytewise duplicate comparator distinguish
+equivalent Serde exponent/fraction spellings. Opposite floating zero signs must
+also compare equal, while integer/float kinds and quoted zero strings differ.
+Metadata needs canonical number text before encoding the response as well.
+
+The original twelve-case executable baseline proves three Godex-only admission
+FAILs and nine PASS controls (session 3874, exit 0). Expanded sixteen-case
+qualification proves seven Godex-only FAILs and nine PASS controls against the
+same exact held production (original session 58288, exit 0). Every original
+reference invariant PASSes. Three equivalent duplicate schemas are incorrectly
+rejected before dispatch; four metadata cases retain noncanonical exponent,
+negative-zero or fraction text. Exact duplicates, distinct integer/float/string
+controls, integer precision, conflicting schema rejection, metadata u64,
+previous-ID rejection and numeric pending history PASS. Audits:
+/tmp/gdx-04384-deepseek-schema-equality-before-audit.json and
+/tmp/gdx-04384-deepseek-schema-equality-before-complete-audit.json. Exact expanded
+command:
+`rtk proxy python3 /tmp/gdx-04384-deepseek-schema-equality-before-complete.py > /tmp/gdx-04384-deepseek-schema-equality-before-complete-qualified.log 2>&1`.
+An earlier runner preflight rejected an allowed tracked test-only diff and
+dispatched no oracle; its original failure log remains retained. The corrected
+allowlist still excludes every production change during baseline qualification.
+
+The existing private copier now uses the existing Serde value writer before
+decoding with UseNumber. A private recursive tool-value comparison handles
+canonical numeric kinds and signed floating zero without altering first-tool
+bytes, strings, array order or map-member presence. It lives beside DeepSeek's
+tool translation in request_tool_equality.go, used at the single duplicate
+decision. No shared-helper root, new layer, API, interface, dependency, option,
+worker or persisted format is added. The existing metadata merger test uses
+the same number-token representation as its real consumer and retains its
+complete serialized JSON assertion.
+
+Six strict/non-strict equality regressions and four metadata regressions first
+FAIL at the held candidate; twelve controls PASS (original session 27510,
+exit 1). Retained log:
+/tmp/gdx-04384-deepseek-schema-equality-unit-complete-before.jsonl. Focused checks
+then PASS 1,503 tests (original session 40553, exit 0); additional map-order,
+array-length, boolean/number and null-kind controls are included in the final
+local checks. Fixture checks PASS 25 tests (original session 4575, exit 0),
+including registry, JSON goldens and matching-corruption assertions. Eleven
+new default executable cases extend DeepSeek351 to 362; Gemini remains 974.
+Full local and exact combined executable qualification follow before publication.
+The three earlier entire default gates retain their original handles and frozen
+sources. Overall 1:1 parity remains unproven.
+
+Full local validation PASSes 11,252 tests with 18 optional SKIP (original
+session 76761, exit 0). make verify PASSes (original session 81806, exit 0),
+including shuffled race tests, cross-builds, vet, formatting/source guards and
+the build. Exact commands:
+`rtk proxy go test -json ./... > /tmp/gdx-04384-deepseek-schema-equality-full.jsonl 2>&1`
+and `rtk proxy make verify > /tmp/gdx-04384-deepseek-schema-equality-verify.log 2>&1`.
+Exact clean combined candidate qualification follows before publication.

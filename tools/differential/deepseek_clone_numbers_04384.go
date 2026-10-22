@@ -1,7 +1,7 @@
 package main
 
 func deepSeekCloneNumberSuffixes04384() []string {
-	return []string{"clone-number-tool-small", "clone-number-tool-i53", "clone-number-tool-u64", "clone-number-tool-i64", "clone-number-tool-float-control", "clone-number-tool-normal", "clone-number-tool-nested", "clone-number-tool-distinct", "clone-number-metadata-u64", "clone-number-metadata-float-control", "clone-number-client-i53", "clone-number-metadata-nested"}
+	return []string{"clone-number-tool-small", "clone-number-tool-i53", "clone-number-tool-u64", "clone-number-tool-i64", "clone-number-tool-float-control", "clone-number-tool-normal", "clone-number-tool-nested", "clone-number-tool-distinct", "clone-number-metadata-u64", "clone-number-metadata-float-control", "clone-number-client-i53", "clone-number-metadata-nested", "clone-number-metadata-exponent", "clone-number-metadata-negative-zero", "clone-number-metadata-fraction", "clone-number-client-negative-zero"}
 }
 
 func deepSeekCloneNumberFixture04384(suffix string) (requestPrimitiveFixture04384, bool) {
@@ -23,6 +23,18 @@ func deepSeekCloneNumberFixture04384(suffix string) (requestPrimitiveFixture0438
 	case "clone-number-metadata-float-control":
 		fields = `,"metadata":{"probe":{"value":1.5}}`
 		metadata = `{"deepseek":{"finish_reason":"stop"},"probe":{"value":1.5}}`
+	case "clone-number-metadata-exponent":
+		fields = `,"metadata":{"probe":{"value":1e0}}`
+		metadata = `{"deepseek":{"finish_reason":"stop"},"probe":{"value":1.0}}`
+	case "clone-number-metadata-negative-zero":
+		fields = `,"metadata":{"probe":{"value":-0}}`
+		metadata = `{"deepseek":{"finish_reason":"stop"},"probe":{"value":-0.0}}`
+	case "clone-number-metadata-fraction":
+		fields = `,"metadata":{"probe":{"value":0.123456789012345678901234567890}}`
+		metadata = `{"deepseek":{"finish_reason":"stop"},"probe":{"value":0.12345678901234568}}`
+	case "clone-number-client-negative-zero":
+		fields = `,"client_metadata":{"value":-0}`
+		metadata = `{"client_metadata":{"value":-0.0},"deepseek":{"finish_reason":"stop"}}`
 	case "clone-number-client-i53":
 		fields = `,"client_metadata":{"value":9007199254740993}`
 		metadata = `{"client_metadata":{"value":9007199254740993},"deepseek":{"finish_reason":"stop"}}`

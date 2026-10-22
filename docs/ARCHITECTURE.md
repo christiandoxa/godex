@@ -344,6 +344,10 @@ The existing private request-object copier also preserves JSON number tokens
 for function schemas and request/client metadata, including the response merge.
 Strict normalization and duplicate comparison therefore retain distinct integer
 values without converting them through float64. This stays in gateway/deepseek.
+The copier uses the existing Serde value writer before decoding number tokens,
+so echoed metadata and schema comparison share canonical number spellings. A
+private recursive tool-value comparison treats floating signed zeros equally
+while retaining integer/float kinds, strings, array order and member presence.
 Runtime gateway startup marks the proxy model's internal GatewayMode field;
 ordinary local launches keep invocation-local history. The composition root
 selects Gemini's local pool constructor or its request-scoped shared gateway

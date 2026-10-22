@@ -755,11 +755,11 @@ func TestDeepSeekBufferedResponseUsesTaggedSparseDefaults(t *testing.T) {
 func TestDeepSeekMetadataMergeMatchesProdexShallowObjectPolicy(t *testing.T) {
 	response := map[string]any{"metadata": map[string]any{
 		"scalar": false,
-		"object": map[string]any{"old": float64(1), "nested": map[string]any{"a": float64(1)}},
+		"object": map[string]any{"old": json.Number("1"), "nested": map[string]any{"a": json.Number("1")}},
 	}}
 	mergeResponseMetadata(response, map[string]any{
-		"scalar":  map[string]any{"new": float64(2)},
-		"object":  map[string]any{"new": float64(2), "nested": map[string]any{"b": float64(2)}},
+		"scalar":  map[string]any{"new": json.Number("2")},
+		"object":  map[string]any{"new": json.Number("2"), "nested": map[string]any{"b": json.Number("2")}},
 		"missing": map[string]any{},
 	})
 	body, err := json.Marshal(response)

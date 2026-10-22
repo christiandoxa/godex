@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 )
 
 func deepSeekTools(object map[string]any, strictTools bool) ([]any, map[string]bool, error) {
@@ -35,7 +37,7 @@ func deepSeekTools(object map[string]any, strictTools bool) ([]any, map[string]b
 		}
 		name := converted[deepSeekFunctionKey].(map[string]any)["name"].(string)
 		if previous, exists := byName[name]; exists {
-			if mapsEquivalent(previous, converted) {
+			if deepSeekToolValuesEqual(previous, converted) {
 				continue
 			}
 			return nil, nil, fmt.Errorf("DeepSeek function tool name `%s` is duplicated after translation", name)
@@ -365,16 +367,10 @@ func normalizeStrictArray(schema map[string]any, path string) error {
 }
 
 func cloneMap(source map[string]any) map[string]any {
-	content, _ := json.Marshal(source)
+	content, _ := jsonutil.MarshalSerdeValue04384(source)
 	var result map[string]any
 	decoder := json.NewDecoder(bytes.NewReader(content))
 	decoder.UseNumber()
 	_ = decoder.Decode(&result)
 	return result
-}
-
-func mapsEquivalent(left, right map[string]any) bool {
-	leftJSON, _ := json.Marshal(left)
-	rightJSON, _ := json.Marshal(right)
-	return string(leftJSON) == string(rightJSON)
 }

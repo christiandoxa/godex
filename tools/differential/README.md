@@ -1222,3 +1222,13 @@ Exact original requests, response/stdout bytes, auth/state and active matching
 numeric-corruption guards apply. Strict-schema normalization is separately
 covered at the request boundary; these executable cases use default strict mode.
 Default DeepSeek reaches 351; Gemini remains 974.
+
+Seven DeepSeek `deepseek-request-primitive-schema-equal-*` cases cover duplicate
+schemas with exact large integers, equivalent exponent/fraction spellings and
+opposite floating zero signs. The first equivalent tool must survive unchanged.
+Integer/float zero or one and quoted zero strings remain distinct declarations,
+requiring HTTP 502/exit 2 before upstream dispatch. Four additional
+`clone-number-*` metadata cases require canonical exponent, negative zero and
+fraction bytes in metadata/client metadata. Independent original bytes and
+matching request/response/admission corruption guards remain active. Default
+DeepSeek reaches 362; Gemini remains 974.
