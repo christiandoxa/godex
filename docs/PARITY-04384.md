@@ -10075,3 +10075,24 @@ per-case or durable-state errors. This result qualifies only that revision;
 later matrices and the a05e1cbc entire default gate remain pending. Earlier
 failed captures, reference state-integrity failures and fixture errors remain
 retained. Overall 1:1 parity remains unproven.
+
+### Exact custom-input candidate qualification
+
+Exact clean 596e89c12be4b8c5dc54a2e2249a31c5d13c940f PASSes all 28 executable
+cases (original session 81607, exit 0): every baseline case plus prior tool,
+paired SSE, numeric-pending and inline-history controls. All 14 original
+Godex-only failures now satisfy the original independent invariants. Audit:
+/tmp/gdx-04384-deepseek-custom-input-targeted-audit.json. All 18 new custom
+wrappers were also independently decoded and checked for exact string input.
+Pinned reference, clean source and artifacts, original requests, responses,
+status/stdout, attempts/auth/slots, durable state and corruption guards PASS.
+Exact command:
+`rtk proxy python3 /tmp/gdx-04384-deepseek-custom-input-targeted.py > /tmp/gdx-04384-deepseek-custom-input-targeted.log 2>&1`.
+
+The complete DeepSeek273 matrix is running in original session 57095 against
+that immutable source. Its retained exact command is
+/tmp/gdx-04384-deepseek-custom-input-full-command.json and its report is
+/tmp/gdx-04384-deepseek-custom-input-oracle.json. Neither this full matrix nor
+the separate a05e1cbc entire default gate is claimed PASS. Earlier qualified
+full236/full940 scopes apply only to their recorded revisions. The complete
+default gate last qualified remains e9d88ce. Overall 1:1 remains unproven.
