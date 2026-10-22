@@ -10001,3 +10001,20 @@ gate remain pending. The current full255 phase has not been claimed PASS.
 Earlier reference state-integrity failures, capture failures and fixture
 errors remain retained; this result does not erase or explain them. Overall
 1:1 parity remains unproven.
+
+### Full Gemini934 qualifies exact c0d02b7
+
+Original session 57587 exits 0. The complete report PASSes 934 unique cases at
+exact clean c0d02b7099df3ed1c47a290030129c30c933485a, including every prior924
+case. Audit: /tmp/gdx-04384-gemini-stream-tool-lifecycle-full-audit.json.
+The original strict invariants and matching-corruption controls PASS, with
+no per-case or durable-state errors. Both artifact hashes, embedded clean VCS
+metadata, immutable source and the pinned 0.438.4 reference were checked.
+This qualifies that revision only; newer Gemini matrices and the a05e1cbc
+entire default gate remain pending. All original failures remain retained.
+
+The full DeepSeek232 external audit also verifies the original specialized
+raw-key, restart and recovery run shapes. Its earlier name-only audit rejected
+valid specialized labels; no executable run or oracle assertion was changed.
+The retained full-audit file now records exact per-run pins and raw-key phase
+persistence, exits, attempts, retries and credential ownership checks.
