@@ -72,7 +72,7 @@ func TestProdex04384GeminiChatSSEReasoningLifecycle(t *testing.T) {
 
 func TestProdex04384GeminiReasoningRetentionIsBounded(t *testing.T) {
 	state := geminiChatCompatibleStream043711{id: "resp_deepseek_synthetic", created: 111}
-	state.reasoning.WriteString(strings.Repeat("a", geminiStreamReasoningMaxBytes04384))
+	state.reasoning.WriteString(strings.Repeat("a", geminiStreamMetadataMaxBytes04384))
 	var wire bytes.Buffer
 	if err := state.accept(&wire, []byte(`{"choices":[{"delta":{"reasoning_content":"b","content":"must-not-emit"}}]}`)); err != nil {
 		t.Fatal(err)
@@ -80,7 +80,7 @@ func TestProdex04384GeminiReasoningRetentionIsBounded(t *testing.T) {
 	if err := state.accept(&wire, []byte("[DONE]")); err != nil {
 		t.Fatal(err)
 	}
-	if !state.done || state.reasoning.Len() != geminiStreamReasoningMaxBytes04384 || strings.Count(wire.String(), "event: response.failed") != 1 || strings.Contains(wire.String(), "must-not-emit") || strings.Contains(wire.String(), "response.completed") {
+	if !state.done || state.reasoning.Len() != geminiStreamMetadataMaxBytes04384 || strings.Count(wire.String(), "event: response.failed") != 1 || strings.Contains(wire.String(), "must-not-emit") || strings.Contains(wire.String(), "response.completed") {
 		t.Fatal("reasoning retention overflow did not terminate once before later content")
 	}
 }

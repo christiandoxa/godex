@@ -1014,6 +1014,13 @@ controls retain valid counters, explicit zero totals and absent usage. Original
 requests, stdout, single attempts and durable state remain strict; matching
 usage, request, auth, attempt and state mutations must fail the oracle.
 
+Eight refusal/annotation SSE cases require append order, arbitrary annotation
+elements and full unsigned precision, including metadata-only completions with
+no invented text item. Null, empty, wrong-type and absent updates preserve the
+tagged first-choice projection. Equal-but-wrong metadata, numeric precision,
+SSE sequence, request, auth and durable state must fail independent assertions.
+Refusal/annotation retention above the local 64 MiB safety budget is unqualified.
+
 ### Tagged 0.438.2 Gemini function-tool rejection parity
 
 Two additional **source/binary-pinned** cases, `invalid-wrapped-tool-parameters`

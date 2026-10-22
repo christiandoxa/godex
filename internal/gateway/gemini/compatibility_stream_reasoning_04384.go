@@ -2,9 +2,6 @@ package gemini
 
 import "io"
 
-// Bound retained completion metadata to the conversation cache's memory budget.
-const geminiStreamReasoningMaxBytes04384 = 64 << 20
-
 func (state *geminiChatCompatibleStream043711) observeReasoning(writer io.Writer, chunk map[string]any) error {
 	choices, _ := chunk["choices"].([]any)
 	if len(choices) == 0 {
@@ -16,7 +13,7 @@ func (state *geminiChatCompatibleStream043711) observeReasoning(writer io.Writer
 	if text == "" {
 		return nil
 	}
-	if len(text) > geminiStreamReasoningMaxBytes04384-state.reasoning.Len() {
+	if len(text) > geminiStreamMetadataMaxBytes04384-state.reasoning.Len() {
 		return state.failure(writer, "provider_stream_error", "provider reasoning exceeded safe size limit (67108864)")
 	}
 	if state.reasoning.Len() == 0 {

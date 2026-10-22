@@ -259,6 +259,11 @@ Model presence is retained separately from its string value, so an explicit
 empty upstream model survives completion while absent values remain absent.
 The finish-reason state likewise retains explicit empty strings and only ends
 the stream at the terminal sentinel, preserving trailing usage and metadata.
+Refusal strings and annotation arrays accumulate in first-choice chunk order;
+completion retains nonempty values and exact opaque annotation numbers. The
+same stream owner bounds combined refusal/annotation retention at 64 MiB of
+UTF-8 refusal bytes and serialized annotation chunks, independently of reasoning.
+Excess fails once without completion or a conversation snapshot update.
 Reasoning retention is bounded at 64 MiB; excess terminates the existing stream
 with one failure and no completion or cache update. Tool streams retain their
 existing uncached behavior until complete argument snapshots are qualified.

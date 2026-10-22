@@ -9020,3 +9020,42 @@ matrix remains running on its original immutable source worktree. The latest
 full Gemini PASS remains 851 cases at exact 05a61ff, and the latest complete
 default-gate PASS remains exact 78d256d. Neither qualifies a later revision;
 overall 1:1 parity remains unproven.
+
+### Accumulate Gemini SSE refusal and annotations
+
+Eight executable baselines on exact clean
+b717a6acdf0fed80d12aa6bab9dcb18a1edf9903 qualify five Godex-only completion
+metadata failures and three PASS controls. Refusal strings append across chunks;
+annotation arrays append every JSON element in order, retaining duplicates,
+nulls, arbitrary values and full unsigned precision. Metadata-only streams
+complete with empty output and no fabricated text item. Null, empty, wrong-type
+and absent fields retain the tagged projection behavior. Independent original
+request bytes, stdout, status, single attempts, state and matching corruption
+checks qualify outside the metadata mismatch. Records:
+/tmp/gdx-04384-gemini-stream-message-metadata-before-audit.json and
+/tmp/gdx-04384-gemini-stream-message-metadata-before-commands.json.
+
+Pinned Mojo StreamChoiceDelta projects the fields, provider-core stream.rs
+retains strings/arrays through typed deserializers, and runtime deepseek_sse.rs
+appends them before content/tool handling. StreamResponseMetadata emits nonempty
+values under the provider key. Godex now mirrors that flow in the existing
+Gemini SSE owner. Retention and completion stay private to gateway/gemini; the
+existing serde JSON writer counts annotation bytes without changing numeric
+kinds. No exported API, generic helper, dependency, option, durable format or
+background work is added. The existing private 64 MiB metadata limit is shared
+by the reasoning collector and the new combined refusal/annotation collector.
+The latter conservatively counts UTF-8 refusal bytes plus serialized annotation
+chunks; overflow fails once before retaining the delta, with no completion or
+snapshot update. Boundary regressions cover both fields and their combined
+budget. Executable parity near or above this safety ceiling remains unqualified.
+
+The gateway regression fails five cases before the fix and keeps three controls,
+also verifying ignored later choices and metadata-only output. Focused Gemini
+and differential tests pass 2,102 cases after the fix. The full Gemini matrix
+adds eight scenarios, reaching 902. Full local validation PASSes 10,814 tests
+with 18 optional SKIP. Exact commands:
+`rtk proxy go test -json ./... > /tmp/gdx-04384-gemini-stream-message-metadata-full.jsonl 2>&1`
+and `rtk proxy make verify > /tmp/gdx-04384-gemini-stream-message-metadata-verify.log 2>&1`.
+Both exit 0; make verify includes shuffled race tests, cross-builds,
+format/source guards, vet and the build. Exact clean executable qualification
+follows. Overall 1:1 parity remains unproven.

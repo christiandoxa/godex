@@ -39,6 +39,10 @@ func translateGeminiChatCompatibleStream043711(response *http.Response, requestM
 	}
 }
 
+// Bound retained completion metadata to the conversation cache's memory budget.
+// shortcut: retained metadata is capped at 64 MiB per collection; qualify larger streams before raising it.
+const geminiStreamMetadataMaxBytes04384 = 64 << 20
+
 type geminiChatCompatibleStream043711 struct {
 	id           string
 	itemID       string
@@ -60,6 +64,10 @@ type geminiChatCompatibleStream043711 struct {
 	json         sse.JSONFrames
 	conversation *geminiChatConversation04384
 	complexDelta bool
+
+	refusal              strings.Builder
+	annotations          []any
+	messageMetadataBytes int
 }
 
 func (state *geminiChatCompatibleStream043711) send(writer io.Writer, event string, fields map[string]any) error {
@@ -125,6 +133,12 @@ func (state *geminiChatCompatibleStream043711) complete(writer io.Writer) error 
 	}
 	if state.reasoning.Len() > 0 {
 		provider["reasoning_content"] = state.reasoning.String()
+	}
+	if state.refusal.Len() > 0 {
+		provider["refusal"] = state.refusal.String()
+	}
+	if len(state.annotations) > 0 {
+		provider["annotations"] = state.annotations
 	}
 	if state.fingerprint != "" {
 		provider["system_fingerprint"] = state.fingerprint
@@ -247,6 +261,9 @@ func (state *geminiChatCompatibleStream043711) accept(writer io.Writer, data []b
 		}
 	}
 	if err := state.observeReasoning(writer, root); err != nil || state.done {
+		return err
+	}
+	if err := state.observeMessageMetadata(writer, root); err != nil || state.done {
 		return err
 	}
 	translated, supported, err := chatcompat.TranslateChatSSEData(bytes.TrimSpace(data))
