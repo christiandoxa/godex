@@ -9068,3 +9068,33 @@ The latest full Gemini PASS remains 851 cases at exact 05a61ff; the latest
 complete default-gate PASS remains exact 78d256d. Overall 1:1 parity remains
 unproven, including complete tool-stream lifecycle and continuation, metadata
 above the safety ceiling, live authentication and native macOS/Windows behavior.
+
+### Distinguish truncated oracle responses from body overflow
+
+The synthetic Codex shim previously labeled every response read failure as a
+body overflow. An HTTP server declaring 100 bytes but sending only synthetic-ok
+reproduces the diagnostic bug: the narrow regression fails before the fix,
+while complete and oversized controls keep their behavior. The shim now checks
+the unchanged 1 MiB capture limit separately and reports an underlying read
+error only when the retained body has not exceeded that limit. A genuinely
+oversized truncated body still reports overflow. Failed captures keep exit 1
+and never write a valid-looking exchange; no comparison, timeout, retry, body
+limit or product behavior changes. Focused differential tests PASS 309 cases.
+Full local validation PASSes 10,819 tests with 18 optional SKIP, and make verify
+exits 0 including race tests, cross-builds, vet and source/format guards. Exact
+commands: `rtk proxy go test -json ./... > /tmp/gdx-04384-shim-response-read-full.jsonl 2>&1`
+and `rtk proxy make verify > /tmp/gdx-04384-shim-response-read-verify.log 2>&1`.
+The fail-before log is /tmp/gdx-04384-shim-response-read-before.log. This
+harness diagnostic is not a provider parity fix or evidence of a successful
+reference exchange. Two Gemini non-object tool-entry probes remain unqualified
+until their actual transport failure is identified.
+
+The original full Gemini 857-case matrix on exact clean
+ac597d49f7f8d3f8eb802a36234f0878de329c7c completes PASS with terminal exit 0.
+It includes every previous 851 case with unique names and preserves original
+request/state/wire assertions and matching corruption guards. The clean source,
+embedded VCS revision, reference binary SHA-256 and manifest pin qualify in
+/tmp/gdx-04384-gemini-stream-reasoning-audit.json. This advances the latest full
+Gemini PASS to exact ac597d4, without qualifying later source revisions. The
+original 844/847 FAIL reports remain retained; the latest complete default-gate
+PASS remains exact 78d256d. Overall 1:1 parity remains unproven.

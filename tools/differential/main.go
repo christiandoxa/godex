@@ -1253,8 +1253,11 @@ func runCodexShim(arguments []string) int {
 		}
 		body, err = io.ReadAll(io.LimitReader(response.Body, bodyLimit+1))
 		response.Body.Close()
-		if err != nil || len(body) > bodyLimit {
+		if len(body) > bodyLimit {
 			return shimFailure("synthetic Codex shim response exceeded its bound")
+		}
+		if err != nil {
+			return shimFailure("synthetic Codex shim response read failed: " + err.Error())
 		}
 		clientResult = exchange{Status: response.StatusCode, Headers: response.Header.Clone(), Body: string(body)}
 		if os.Getenv("DIFFERENTIAL_CONTINUATION_PHASE") == "same-process" && attempt == 0 {
