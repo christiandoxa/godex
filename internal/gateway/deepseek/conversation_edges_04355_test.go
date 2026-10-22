@@ -151,7 +151,7 @@ func TestProdex04355DeepSeekReplayEdgeCases(t *testing.T) {
 func translateDeepSeekEdgeRequest(t *testing.T, store chatcompat.ConversationStore, body string, thinking bool) map[string]any {
 	t.Helper()
 	history := deepSeekConversationHistoryForRequest([]byte(body), store)
-	translated, err := translateResponsesRequestWithHistory([]byte(body), RequestOptions{Model: "deepseek-v4-pro"}, history)
+	translated, err := translateResponsesRequestWithHistory([]byte(body), RequestOptions{Model: "deepseek-v4-pro"}, history, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

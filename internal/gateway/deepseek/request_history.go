@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
+	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 )
 
 func deepSeekConversationHistoryForRequest(body []byte, store chatcompat.ConversationStore) []any {
@@ -151,4 +152,57 @@ func deepSeekFirstToolOutputCallID(object map[string]any) string {
 		}
 	}
 	return ""
+}
+
+func translateResponsesRequestWithHistory(body []byte, options RequestOptions, history []any, contains func(string) bool) (TranslatedRequest, error) {
+	object, err := parseResponsesObject(body)
+	if err != nil {
+		return TranslatedRequest{}, err
+	}
+	parts, err := translateRequestParts(object, options)
+	if err != nil {
+		return TranslatedRequest{}, err
+	}
+	stateless := parts
+	override := contains != nil && deepSeekSimpleRequest04384(object, contains)
+	if override {
+		stateless.messages = chatcompat.CloneMessages(parts.messages)
+	}
+	parts.messages = repairDeepSeekToolCallAdjacency(chatcompat.MergeHistory(history, parts.messages))
+	if parts.thinking {
+		parts.messages = normalizeDeepSeekThinkingToolCallMessages(parts.messages)
+	}
+	metadata, err := deepSeekResponseMetadata(object, parts.thinking)
+	if err != nil {
+		return TranslatedRequest{}, err
+	}
+	result, err := buildTranslatedRequest(object, options.Model, parts)
+	if err != nil {
+		return TranslatedRequest{}, err
+	}
+	content, err := jsonutil.MarshalSerdeValue04384(result)
+	if err != nil {
+		return TranslatedRequest{}, err
+	}
+	var pending []any
+	if contains != nil {
+		pending = deepSeekTranslatedConversationMessages(content)
+		if override {
+			if stateless.thinking {
+				stateless.messages = normalizeDeepSeekThinkingToolCallMessages(stateless.messages)
+			}
+			if stateless.messages == nil {
+				stateless.messages = []any{}
+			}
+			result, err = buildTranslatedRequest(object, options.Model, stateless)
+			if err != nil {
+				return TranslatedRequest{}, err
+			}
+			content, err = jsonutil.MarshalSerdeValue04384(result)
+			if err != nil {
+				return TranslatedRequest{}, err
+			}
+		}
+	}
+	return TranslatedRequest{Body: content, ResponseMetadata: metadata, conversationMessages: pending}, nil
 }

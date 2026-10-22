@@ -121,7 +121,7 @@ func TestProdex04355DeepSeekToolOutputReplaysNewestHistoryByCallID(t *testing.T)
 	for _, body := range []string{
 		`{"input":"old prompt"}`,
 		`{"input":"new prompt"}`,
-		`{"input":[{"type":"function_call_output","call_id":"call-shared","output":"result"}]}`,
+		`{"input":[{"type":"function_call_output","call_id":"call-shared","output":"result"}],"safety_identifier":"synthetic_user"}`,
 	} {
 		requestBody := []byte(body)
 		for i := range requestBody {
@@ -138,7 +138,7 @@ func TestProdex04355DeepSeekToolOutputReplaysNewestHistoryByCallID(t *testing.T)
 		_ = response.Body.Close()
 	}
 	messages, _ := requests[2]["messages"].([]any)
-	if len(messages) != 3 || messages[0].(map[string]any)["content"] != "new prompt" || messages[2].(map[string]any)["tool_call_id"] != "call-shared" {
+	if len(messages) != 3 || messages[0].(map[string]any)["content"] != "new prompt" || messages[2].(map[string]any)["tool_call_id"] != "call-shared" || requests[2]["user_id"] != "synthetic_user" {
 		t.Fatalf("call-id replay = %#v", messages)
 	}
 }

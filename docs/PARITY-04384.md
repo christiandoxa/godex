@@ -8643,3 +8643,58 @@ trailing-JSON and nonobject controls; its unchanged-base run is
 /tmp/gdx-04384-chat-assistant-replay-final-unit-before-complete.jsonl.
 Exact clean executable qualification
 follows. Global continuation and 1:1 parity remain unproven.
+
+
+### Preserve DeepSeek stateless emitted requests and reconstructed pending history
+
+Four pinned executable baselines establish three Godex-only request mismatches
+and a full-inline-history PASS. Known and unknown tool-output IDs use the
+provider-core stateless body when the source simple-request policy permits it.
+The three-call case independently checks an exact successful intermediate
+response and requires the original reconstructed pending history on its third,
+non-simple request. All reference, seed/client, attempts, original bytes, state
+and matching mutations qualify. Reports and command arrays:
+/tmp/gdx-04384-deepseek-request-override-before-audit.json and
+/tmp/gdx-04384-deepseek-request-override-before-commands.json.
+
+Pinned local_rewrite_deepseek_send.rs:481-497 builds runtime messages first and
+replaces only translated.body with request conformance for a simple request.
+The existing Go gateway emitted reconstructed messages for every request.
+The source-aligned shape policy now stays private to gateway/deepseek, covering
+bound previous IDs, search/safety fields, response format, tools/choices,
+message content, function/custom/MCP output and call IDs, and local-shell shape.
+It runs after request admission. Runtime preparation preserves its original
+message snapshot before choosing stateless wire messages; recording the response
+uses that pending snapshot. Controls, metadata and normal error propagation keep
+their existing owners. The public pure converter is unchanged.
+
+The translation workflow moves from request.go to its existing request_history.go
+owner; both remain below the source guard. The existing history-by-call-ID test
+now supplies the source's valid safety_identifier selector and asserts user_id,
+while new emitted-body/pending-history and executable controls cover the source
+stateless path. No test is removed. New table tests cover the shape boundary,
+including presence and high-priority wrong-type suppression. The pending context
+is a private field and the membership callback is invocation-local; no exported
+API, option, dependency, helper package, goroutine or persisted format is added.
+
+`rtk go test ./internal/gateway/deepseek -count=1` PASSes 855 before an additional
+user_id assertion. The first broad run exposed the old test's wrong path; after
+selecting the actual runtime-reconstruction contract it passes. A moved import
+needed correction after the workflow extraction; the compile-only failure is
+retained in /tmp/gdx-04384-deepseek-request-override-focused-final.log.
+The final tree, including the user_id assertion, passes
+`rtk proxy go test -json ./...` (10,732 PASS and 18 optional SKIP) and
+`rtk proxy make verify` (exit 0, including shuffled race tests and cross-builds).
+Logs: /tmp/gdx-04384-deepseek-request-override-full-final.jsonl and
+/tmp/gdx-04384-deepseek-request-override-verify-final.log. Exact clean executable
+qualification follows. Global continuation and full parity remain unproven.
+
+The earlier exact clean Gemini Compact matrix now completes 837/837 PASS on
+78d256d363e8e6df079c3e4239a8c11b6ff27296, including every previous 821 case.
+The mechanical cache extraction separately passes 213/213 DeepSeek on
+e01a8e86dfde8e869c806f9661f08806f881f9ef. These qualified commits were pushed to
+origin/main. The original full 213-case DeepSeek failures on c32018d remain
+FAIL: reference temporary state files violate independent state invariants.
+An unchanged serial 213-case run on 0ea01e9 separately passes; it does not replace
+those reports or qualify a different source revision. The complete default gate
+on 78d256d remains running; the latest complete default-gate PASS is 15d1c55.

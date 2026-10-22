@@ -121,6 +121,12 @@ request bodies, order/count, credential, state and matching-corruption checks
 cover projected fields, RTK shell arguments, large integer fields and null/empty
 controls. Plain input without the field uses a separate tagged stateless
 request override and is not certified by these reconstruction cases.
+Four `deepseek-history-simple*` cases qualify that emitted-body override
+separately: known and unknown tool-output IDs, full inline history, and a third
+reconstructed request after the stateless second call. The third call requires
+the original pending history and an exact intermediate response, so clearing
+the cache to make the second wire match cannot pass. All attempts, body bytes,
+seed/client output, state and matching mutations remain mandatory.
 
 Build and run from a clean, committed Godex worktree:
 

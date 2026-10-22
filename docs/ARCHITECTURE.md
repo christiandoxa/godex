@@ -250,6 +250,13 @@ Gemini response text is not fabricated into a cached Chat assistant message.
 The existing Gemini SSE owner records completed text before the terminal event;
 EOF and provider failures do not record snapshots. Tool/reasoning streams retain their
 existing uncached behavior until complete argument snapshots are qualified.
+DeepSeek's runtime preparation retains the tagged distinction between emitted
+stateless messages and pending reconstructed history. The request-shape policy
+stays private to gateway/deepseek and consumes only a bounded store-membership
+callback. Ordinary text/tool/message inputs may select the source's stateless
+body; stored previous IDs and non-simple shapes retain reconstruction. Pending
+messages are captured before the body override and used when recording the next
+response. The public pure request translator keeps its independent contract.
 Runtime gateway startup marks the proxy model's internal GatewayMode field;
 ordinary local launches keep invocation-local history. The composition root
 selects Gemini's local pool constructor or its request-scoped shared gateway

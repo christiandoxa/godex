@@ -6,8 +6,9 @@ import (
 )
 
 type TranslatedRequest struct {
-	Body             []byte
-	ResponseMetadata map[string]any
+	Body                 []byte
+	ResponseMetadata     map[string]any
+	conversationMessages []any
 }
 
 func deepSeekResponseMetadata(object map[string]any, thinking bool) (map[string]any, error) {

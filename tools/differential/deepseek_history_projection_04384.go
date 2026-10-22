@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"reflect"
+	"strings"
 )
 
 func deepSeekHistoryCases04384() []string {
-	return []string{"deepseek-history-extra", "deepseek-history-rtk", "deepseek-history-null", "deepseek-history-empty", "deepseek-history-numeric"}
+	return []string{"deepseek-history-extra", "deepseek-history-rtk", "deepseek-history-null", "deepseek-history-empty", "deepseek-history-numeric", "deepseek-history-simple", "deepseek-history-simple-inline", "deepseek-history-simple-unbound", "deepseek-history-simple-pending"}
 }
 
 func deepSeekHistoryCase04384(scenario string) bool {
@@ -19,9 +20,19 @@ func deepSeekHistoryCase04384(scenario string) bool {
 	return false
 }
 
-func deepSeekHistoryInput04384(followup bool) []byte {
-	if followup {
-		return []byte(`{"model":"deepseek-v4-pro","input":[{"type":"function_call_output","call_id":"call-history","output":"synthetic result"}],"stream":false,"safety_identifier":"synthetic_user"}`)
+func deepSeekHistoryInput04384(scenario string, phase int) []byte {
+	if phase > 0 {
+		body := `{"model":"deepseek-v4-pro","input":[{"type":"function_call_output","call_id":"call-history","output":"synthetic result"}],"stream":false}`
+		if scenario == "deepseek-history-simple-unbound" {
+			body = strings.Replace(body, "call-history", "call-unknown", 1)
+		}
+		if scenario == "deepseek-history-simple-inline" {
+			body = `{"model":"deepseek-v4-pro","input":[{"type":"message","role":"user","content":"history request"},{"type":"function_call","call_id":"call-history","name":"lookup","arguments":"{}"},{"type":"function_call_output","call_id":"call-history","output":"synthetic result"}],"stream":false}`
+		}
+		if phase == 2 || !strings.HasPrefix(scenario, "deepseek-history-simple") {
+			body = strings.TrimSuffix(body, "}") + `,"safety_identifier":"synthetic_user"}`
+		}
+		return []byte(body)
 	}
 	return []byte(`{"model":"deepseek-v4-pro","input":"history request","stream":false}`)
 }
@@ -72,10 +83,20 @@ func deepSeekHistoryExpected04384(scenario string) productRun {
 	user := map[string]any{"role": "user", "content": "history request"}
 	assistant := map[string]any{"role": "assistant", "content": "", "tool_calls": []any{call}}
 	tool := map[string]any{"role": "tool", "tool_call_id": "call-history", "content": "synthetic result"}
+	if scenario == "deepseek-history-simple-unbound" {
+		tool["tool_call_id"] = "call-unknown"
+	}
+	requests := [][]any{{user}, {user, assistant, tool}}
+	if strings.HasPrefix(scenario, "deepseek-history-simple") && scenario != "deepseek-history-simple-inline" {
+		requests[1] = []any{tool}
+	}
+	if scenario == "deepseek-history-simple-pending" {
+		requests = append(requests, []any{user, assistant, tool, map[string]any{"role": "assistant", "content": "synthetic-ok"}})
+	}
 	run.Upstream = nil
-	for index, messages := range [][]any{{user}, {user, assistant, tool}} {
+	for index, messages := range requests {
 		request := map[string]any{"model": "deepseek-v4-pro", "stream": false, "messages": messages}
-		if index == 1 {
+		if index == 2 || index == 1 && !strings.HasPrefix(scenario, "deepseek-history-simple") {
 			request["user_id"] = "synthetic_user"
 		}
 		wire, _ := json.Marshal(request)
@@ -83,6 +104,10 @@ func deepSeekHistoryExpected04384(scenario string) productRun {
 	}
 	run.Retries = 1
 	run.Events = []upstreamEvent{{Kind: "upstream.request", Attempt: 1}, {Kind: "upstream.response", Attempt: 1, Status: 200}, {Kind: "upstream.request", Attempt: 2}, {Kind: "upstream.response", Attempt: 2, Status: 200}}
+	if scenario == "deepseek-history-simple-pending" {
+		run.Retries = 2
+		run.Events = append(run.Events, upstreamEvent{Kind: "upstream.request", Attempt: 3}, upstreamEvent{Kind: "upstream.response", Attempt: 3, Status: 200})
+	}
 	return run
 }
 
@@ -95,7 +120,7 @@ func deepSeekHistoryInvariants04384(scenario scenarioResult) []string {
 	for _, run := range scenario.Runs {
 		seed := run.Client.Seed
 		validSeed := seed != nil && seed.Seed == nil && seed.Status == 200 && seed.Body == want.Client.Seed.Body && seed.Headers.Get("Content-Type") == want.Client.Seed.Headers.Get("Content-Type")
-		if !validSeed || run.ClientError != "" || len(run.StateIntegrity) != 0 || run.ExitStatus != 0 || run.Cancelled || run.Retries != 1 || run.Client.Status != 200 || run.Client.Body != want.Client.Body || run.Client.Headers.Get("Content-Type") != want.Client.Headers.Get("Content-Type") || run.Stdout != want.Stdout || !reflect.DeepEqual(run.Events, want.Events) || len(run.Upstream) != 2 {
+		if !validSeed || run.ClientError != "" || len(run.StateIntegrity) != 0 || run.ExitStatus != 0 || run.Cancelled || run.Retries != want.Retries || run.Client.Status != 200 || run.Client.Body != want.Client.Body || run.Client.Headers.Get("Content-Type") != want.Client.Headers.Get("Content-Type") || run.Stdout != want.Stdout || !reflect.DeepEqual(run.Events, want.Events) || len(run.Upstream) != len(want.Upstream) {
 			failures = append(failures, scenario.Name+"."+run.Name+".seed_response_attempt_or_state")
 			continue
 		}

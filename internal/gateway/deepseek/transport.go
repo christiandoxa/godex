@@ -148,7 +148,7 @@ func (transport *RuntimeTransport) prepareResponseAttempt(input proxymodel.Reque
 	history := deepSeekConversationHistoryForRequest(input.Body, conversations)
 	translated, err := translateResponsesRequestWithHistory(input.Body, RequestOptions{
 		Model: candidate, StrictTools: transport.options.StrictTools, WebSearchMode: transport.options.WebSearchMode,
-	}, history)
+	}, history, conversations.Contains)
 	if err != nil {
 		var nonobject *nonobjectResponsesInputError04384
 		if errors.As(err, &nonobject) {
@@ -160,7 +160,7 @@ func (transport *RuntimeTransport) prepareResponseAttempt(input proxymodel.Reque
 		body: translated.Body, route: current, metadata: translated.ResponseMetadata, conversations: conversations,
 		nativeMessages: nativeMessagesMode(transport.options.WebSearchMode) && nativeMessagesContext(translated.Body),
 	}
-	attempt.conversationMessages = deepSeekTranslatedConversationMessages(translated.Body)
+	attempt.conversationMessages = translated.conversationMessages
 	if !attempt.nativeMessages {
 		return attempt, nil
 	}

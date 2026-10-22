@@ -1224,10 +1224,13 @@ func runCodexShim(arguments []string) int {
 		if !deepSeekHistoryCase04384(scenario) {
 			return shimFailure("unknown history projection fixture")
 		}
-		requestBody = deepSeekHistoryInput04384(false)
+		requestBody = deepSeekHistoryInput04384(scenario, 0)
 	}
 	if os.Getenv("DIFFERENTIAL_CONTINUATION_PHASE") == "same-process" {
 		maxAttempts = 2
+	}
+	if os.Getenv("DIFFERENTIAL_HISTORY_PROJECTION") == "deepseek-history-simple-pending" {
+		maxAttempts = 3
 	}
 	var clientResult exchange
 	var successfulSeed *exchange
@@ -1267,10 +1270,18 @@ func runCodexShim(arguments []string) int {
 					return shimFailure("synthetic Compact seed could not supply its public ID")
 				}
 			} else if os.Getenv("DIFFERENTIAL_HISTORY_PROJECTION") != "" {
-				requestBody = deepSeekHistoryInput04384(true)
+				requestBody = deepSeekHistoryInput04384(os.Getenv("DIFFERENTIAL_HISTORY_PROJECTION"), 1)
 			} else {
 				requestBody = []byte(strings.TrimSuffix(string(requestBody), "}") + `,"previous_response_id":"chatcmpl-differential"}`)
 			}
+			continue
+		}
+		if os.Getenv("DIFFERENTIAL_HISTORY_PROJECTION") == "deepseek-history-simple-pending" && attempt == 1 {
+			want := deepSeekPrimitiveExpected04384("deepseek-request-primitive-output").Client
+			if clientResult.Status != want.Status || clientResult.Body != want.Body || clientResult.Headers.Get("Content-Type") != want.Headers.Get("Content-Type") {
+				return shimFailure("synthetic pending history lacks its exact second response")
+			}
+			requestBody = deepSeekHistoryInput04384("deepseek-history-simple-pending", 2)
 			continue
 		}
 		if response.StatusCode != http.StatusTooManyRequests || attempt+1 == maxAttempts {

@@ -5,9 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
-	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 )
 
 const requestMaxBytes = 16 << 20
@@ -39,35 +36,7 @@ func ResponsesRequest(body []byte, options RequestOptions) ([]byte, error) {
 }
 
 func TranslateResponsesRequest(body []byte, options RequestOptions) (TranslatedRequest, error) {
-	return translateResponsesRequestWithHistory(body, options, nil)
-}
-
-func translateResponsesRequestWithHistory(body []byte, options RequestOptions, history []any) (TranslatedRequest, error) {
-	object, err := parseResponsesObject(body)
-	if err != nil {
-		return TranslatedRequest{}, err
-	}
-	parts, err := translateRequestParts(object, options)
-	if err != nil {
-		return TranslatedRequest{}, err
-	}
-	parts.messages = repairDeepSeekToolCallAdjacency(chatcompat.MergeHistory(history, parts.messages))
-	if parts.thinking {
-		parts.messages = normalizeDeepSeekThinkingToolCallMessages(parts.messages)
-	}
-	metadata, err := deepSeekResponseMetadata(object, parts.thinking)
-	if err != nil {
-		return TranslatedRequest{}, err
-	}
-	result, err := buildTranslatedRequest(object, options.Model, parts)
-	if err != nil {
-		return TranslatedRequest{}, err
-	}
-	content, err := jsonutil.MarshalSerdeValue04384(result)
-	if err != nil {
-		return TranslatedRequest{}, err
-	}
-	return TranslatedRequest{Body: content, ResponseMetadata: metadata}, nil
+	return translateResponsesRequestWithHistory(body, options, nil, nil)
 }
 
 func parseResponsesObject(body []byte) (map[string]any, error) {
