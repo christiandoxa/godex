@@ -4028,6 +4028,32 @@ valid Gemini continuation/Compact ownership, native macOS/Windows and live
 authentication remain open. Global 1:1 parity is not claimed.
 
 
+## Validated string EOF checkpoint: c1f0e5a
+
+Clean `c1f0e5a45b7705d21d95e6181663da3a9ffa5895` passes all 125 DeepSeek
+executable scenarios and independent status/header/event/state/retry/
+cancellation/stdout mutations: `/tmp/gdx-04384-string-eof-oracle.json`.
+The nine corrected EOF/surrogate cases and the earlier-range control satisfy
+the exact reference contract. All prior body, kernel admission, output-envelope
+and terminal no-rotation cases remain in this full run.
+
+The binaries were built from that clean commit with
+`rtk go build -trimpath -o /tmp/gdx-04384-string-eof-godex ./cmd/godex` and
+`rtk go build -trimpath -o /tmp/gdx-04384-string-eof-final-differential ./tools/differential`.
+The full run uses `--scenario all --scenario-workers 3`, the same pinned 0.438.4
+reference and verified clean Godex VCS evidence retained in the report.
+Latest local checks are 937 focused race tests, 9,366 full-suite tests and
+`rtk proxy make verify`, all PASS. This checkpoint is ready for direct
+fast-forward push after checking the primary worktree and remote.
+
+The latest Gemini 51-case PASS remains on `625fac5`, and the complete default
+release-script PASS remains on `e9ccedc`; neither was rerun here. The next
+source audit follows the shared 4 MiB buffered runtime gate into Gemini's
+API-key chat-compatible path. Valid Gemini continuation/Compact ownership,
+other lexical diagnostics, native macOS/Windows and live authentication remain
+open. Global 1:1 parity is not claimed.
+
+
 ## Quoted-string EOF preserves earlier errors and consumed escape bytes
 
 The structured envelope stage was fast-forwarded and pushed directly to
