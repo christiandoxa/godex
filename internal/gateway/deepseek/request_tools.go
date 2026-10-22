@@ -1,6 +1,7 @@
 package deepseek
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -366,7 +367,9 @@ func normalizeStrictArray(schema map[string]any, path string) error {
 func cloneMap(source map[string]any) map[string]any {
 	content, _ := json.Marshal(source)
 	var result map[string]any
-	_ = json.Unmarshal(content, &result)
+	decoder := json.NewDecoder(bytes.NewReader(content))
+	decoder.UseNumber()
+	_ = decoder.Decode(&result)
 	return result
 }
 

@@ -1212,3 +1212,13 @@ unknown accepted ID's owner. Exact requests, responses, attempts/events, state
 and active matching-corruption guards apply. These controls change no production
 code and do not qualify cache lookup beyond the earlier routing rejection.
 Default DeepSeek reaches 339; Gemini remains 974.
+
+Twelve DeepSeek `deepseek-request-primitive-clone-number-*` cases require exact
+integer kinds and values in function schemas and echoed request/client metadata.
+They cover small integers, 2^53+1, u64 maximum, i64 minimum, normal/nested tool
+shapes and floating-point controls. Distinct schemas whose integers would round
+to the same float must fail with HTTP 502/exit 2 before any upstream request.
+Exact original requests, response/stdout bytes, auth/state and active matching
+numeric-corruption guards apply. Strict-schema normalization is separately
+covered at the request boundary; these executable cases use default strict mode.
+Default DeepSeek reaches 351; Gemini remains 974.

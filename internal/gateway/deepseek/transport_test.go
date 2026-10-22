@@ -762,16 +762,9 @@ func TestDeepSeekMetadataMergeMatchesProdexShallowObjectPolicy(t *testing.T) {
 		"object":  map[string]any{"new": float64(2), "nested": map[string]any{"b": float64(2)}},
 		"missing": map[string]any{},
 	})
-	metadata := response["metadata"].(map[string]any)
-	if metadata["scalar"] != false {
-		t.Fatalf("scalar metadata was overwritten: %#v", metadata)
-	}
-	object := metadata["object"].(map[string]any)
-	if object["old"] != float64(1) || object["new"] != float64(2) {
-		t.Fatalf("object metadata = %#v", object)
-	}
-	nested := object["nested"].(map[string]any)
-	if len(nested) != 1 || nested["b"] != float64(2) {
-		t.Fatalf("nested metadata = %#v", nested)
+	body, err := json.Marshal(response)
+	want := `{"metadata":{"missing":{},"object":{"nested":{"b":2},"new":2,"old":1},"scalar":false}}`
+	if err != nil || string(body) != want {
+		t.Fatalf("shallow metadata merge changed JSON: error=%v body=%s", err, body)
 	}
 }

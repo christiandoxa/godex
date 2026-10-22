@@ -340,6 +340,10 @@ empty-object default. Explicit null survives. Structured values reuse the
 existing Serde JSON writer; string arguments remain opaque, including escapes.
 The pending snapshot decoder preserves JSON number kinds and integer precision,
 so repeated replay does not round cached tool-call fields through float64.
+The existing private request-object copier also preserves JSON number tokens
+for function schemas and request/client metadata, including the response merge.
+Strict normalization and duplicate comparison therefore retain distinct integer
+values without converting them through float64. This stays in gateway/deepseek.
 Runtime gateway startup marks the proxy model's internal GatewayMode field;
 ordinary local launches keep invocation-local history. The composition root
 selects Gemini's local pool constructor or its request-scoped shared gateway

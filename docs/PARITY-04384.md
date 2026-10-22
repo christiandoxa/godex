@@ -10542,3 +10542,59 @@ zero-attempt rejection; handling that empty representation corrected the audit
 without changing any oracle assertion or restarting the original run. The
 production diff remains empty and the rejected candidate is not an ancestor.
 This tools-only qualification is not a full339 or complete-default-gate PASS.
+
+### DeepSeek request-object copies retain integer kinds and precision
+
+The existing private cloneMap in gateway/deepseek copied validated JSON through
+encoding/json.Unmarshal without UseNumber. Function parameters, request metadata,
+client metadata and nested response-metadata merge therefore converted integers
+to float64. Even small schema integers became floating-point wire values, and
+large integers lost precision. Distinct tool schemas could collapse into one
+duplicate instead of being rejected. The pinned complete provider-tools and
+DeepSeek metadata pipelines retain serde_json::Value numbers through their Mojo
+transforms and function-tool validation.
+
+Exact clean published production 54976f4182bdcf96b9e28f08d2fed74c12da52fc proves
+ten Godex-only executable FAILs and seven PASS controls across seventeen cases
+(original session 26690, exit 0). Every original reference invariant PASSes.
+Six schema cases differ only in original request bytes; three metadata cases
+differ in response/stdout bytes. The distinct-schema case requires HTTP 502,
+exit 2 and zero upstream attempts in Prodex, while Godex incorrectly sends one
+request and succeeds. Floating-point tool/metadata controls, top-level numeric
+forwarding, custom input, numeric pending history, runtime object content and
+padded previous-ID rejection PASS. Auth/owner/state and active matching-corruption
+guards remain intact. Audit:
+/tmp/gdx-04384-deepseek-schema-numbers-before-audit.json. Exact command:
+`rtk proxy python3 /tmp/gdx-04384-deepseek-schema-numbers-before.py > /tmp/gdx-04384-deepseek-schema-numbers-before.log 2>&1`.
+
+The existing private copier now decodes with UseNumber after its existing JSON
+copy. The four real consumers keep their ownership and deep-copy behavior; no
+new helper, application layer, API, interface, dependency, option, worker or
+persisted format is introduced. Request schemas, strict normalization, duplicate
+comparison and metadata response merge retain integer kinds and all 64 bits.
+Nine observable request/strict/dedup/metadata regressions first FAIL, while two
+float controls PASS (original session 84004, exit 1; retained log:
+/tmp/gdx-04384-deepseek-schema-numbers-unit-before.jsonl). Initial focused checks
+also exposed an old merger test assuming internal float64 storage. That test now
+asserts the complete serialized JSON, preserving scalar protection, shallow
+replacement, old/new fields and empty-object checks. Its original failure remains
+retained; no public merge expectation was weakened. Final focused checks PASS
+1,472 tests (original session 59018, exit 0). Exact command:
+`rtk proxy go test -json ./internal/gateway/deepseek ./tools/differential > /tmp/gdx-04384-deepseek-schema-numbers-focused-final.jsonl 2>&1`.
+
+Fixture self-checks PASS 21 tests (original session 33608, exit 0), including
+registry/golden JSON and matching numeric/admission corruption. Twelve default
+cases extend DeepSeek339 to 351; Gemini remains 974. Full local validation and
+exact clean executable candidate qualification follow before publication.
+Strict normalization is covered at the deterministic request boundary, not
+claimed as executable strict-mode qualification here. The earlier full333 and
+three whole default gates retain their original handles and immutable sources.
+Overall 1:1 parity remains unproven.
+
+Full local validation PASSes 11,213 tests with 18 optional SKIP (original
+session 39408, exit 0). make verify PASSes (original session 17411, exit 0),
+including shuffled race tests, cross-builds, vet, source/format guards and the
+build. Exact commands:
+`rtk proxy go test -json ./... > /tmp/gdx-04384-deepseek-schema-numbers-full.jsonl 2>&1`
+and `rtk proxy make verify > /tmp/gdx-04384-deepseek-schema-numbers-verify.log 2>&1`.
+Exact clean candidate qualification follows before publication.

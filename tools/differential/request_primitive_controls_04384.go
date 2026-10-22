@@ -14,6 +14,7 @@ type requestPrimitiveFixture04384 struct {
 	geminiValidationError                                                 string
 	geminiOmittedChoice                                                   string
 	geminiMetadata                                                        string
+	deepSeekMetadata                                                      string
 	geminiChatStream                                                      bool
 	geminiChatFallback                                                    bool
 }
@@ -43,6 +44,7 @@ func deepSeekAdmissionSuffixes04384() []string {
 	suffixes = append(suffixes, deepSeekMessageTextSuffixes04384()...)
 	suffixes = append(suffixes, deepSeekMessageContentSuffixes04384()...)
 	suffixes = append(suffixes, deepSeekOutputTextSuffixes04384()...)
+	suffixes = append(suffixes, deepSeekCloneNumberSuffixes04384()...)
 	return append(suffixes, deepSeekFunctionArgumentSuffixes04384()...)
 }
 
@@ -89,6 +91,9 @@ func requestPrimitiveCase04384(scenario string) (requestPrimitiveFixture04384, b
 	}
 	const stops16 = `["s01","s02","s03","s04","s05","s06","s07","s08","s09","s10","s11","s12","s13","s14","s15","s16"]`
 	suffix := strings.TrimPrefix(strings.TrimPrefix(scenario, "deepseek-"), "request-primitive-")
+	if strings.HasPrefix(suffix, "clone-number-") {
+		return deepSeekCloneNumberFixture04384(suffix)
+	}
 	if strings.HasPrefix(suffix, "bridge-content-") {
 		return deepSeekMessageContentFixture04384(suffix)
 	}
@@ -465,6 +470,9 @@ func deepSeekPrimitiveExpected04384(scenario string) productRun {
 	fixture, _ := requestPrimitiveCase04384(scenario)
 	result := productRun{Client: exchange{Status: 200, Headers: http.Header{"Content-Type": {"application/json; charset=utf-8"}},
 		Body: `{"created_at":1,"id":"chatcmpl-differential","metadata":{"deepseek":{"finish_reason":"stop"}},"model":"deepseek-v4-pro","object":"response","output":[{"content":[{"text":"synthetic-ok","type":"output_text"}],"role":"assistant","type":"message"}],"usage":{"input_tokens":2,"output_tokens":1,"total_tokens":3}}`}}
+	if fixture.deepSeekMetadata != "" {
+		result.Client.Body = strings.Replace(result.Client.Body, `{"deepseek":{"finish_reason":"stop"}}`, fixture.deepSeekMetadata, 1)
+	}
 	if fixture.reject {
 		result.ExitStatus = 2
 		result.Client = exchange{Status: 502, Headers: http.Header{"Content-Type": {"text/plain; charset=utf-8"}}, Body: "upstream request failed"}
