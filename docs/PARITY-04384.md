@@ -10218,3 +10218,26 @@ build. Exact commands:
 `rtk proxy go test -json ./... > /tmp/gdx-04384-deepseek-bridge-messages-full.jsonl 2>&1`
 and `rtk proxy make verify > /tmp/gdx-04384-deepseek-bridge-messages-verify.log 2>&1`.
 Exact clean executable qualification follows before publication.
+
+### Exact normal-message projection qualification
+
+Exact clean a0b94afd59d8287b190b013095da84f7a7250b9b PASSes all 29 executable
+cases (original session 15397, exit 0): all fourteen baseline cases, all sixteen
+history cases, and prior tool/paired-SSE controls. All four original Godex-only
+failures now satisfy independent original invariants. Audit:
+/tmp/gdx-04384-deepseek-bridge-messages-targeted-audit.json. Exact simple and
+normal projection plus all three pending-history requests were independently
+checked. Pinned source/reference/artifacts, requests, seed/client responses,
+status/stdout, attempts/events/auth/slots, state and corruption guards PASS.
+Exact command:
+`rtk proxy python3 /tmp/gdx-04384-deepseek-bridge-messages-targeted.py > /tmp/gdx-04384-deepseek-bridge-messages-targeted.log 2>&1`.
+
+The entire default release gate is running in original session 87273 at that
+immutable source, without a phase option. Exact nested command:
+`rtk proxy scripts/verify-release-parity.sh`. Retained log:
+/tmp/gdx-04384-release-a0b94af.log. Its registry includes DeepSeek290/Gemini974;
+neither new full phase nor this entire gate is claimed PASS. The earlier
+a05e1cbc default gate and standalone full273/282 remain pending. No redundant
+standalone full290 was started. The entire default gate last qualified remains
+e9d88ce. Broader output-array semantics need separate executable proof before
+any production change. Overall 1:1 parity remains unproven.
