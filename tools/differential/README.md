@@ -109,6 +109,11 @@ SSE trace, use its actual generated public response ID for Compact, and compare
 cached user/assistant text. EOF and unknown-ID controls require fresh Compact
 requests. Seed event/framing/usage, raw Compact bytes, state and matching
 corruption checks remain independent of production code.
+Four `compact-owner-local-session-*` cases distinguish local invocation history
+from gateway request namespaces: same, changed, omitted and newly supplied
+session IDs use the same exact authenticated seed and public previous ID.
+Only the local Super executable path is certified by those cases; separate
+composition/runtime tests retain shared-gateway and credential isolation.
 
 Build and run from a clean, committed Godex worktree:
 

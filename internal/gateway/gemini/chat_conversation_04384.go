@@ -5,11 +5,19 @@ import (
 
 	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
 	"github.com/christiandoxa/godex/internal/helper/jsonutil"
+	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
 type geminiChatConversation04384 struct {
 	store    chatcompat.ConversationStore
 	messages []any
+}
+
+func (transport *RuntimeTransport) conversationsForRequest(input proxymodel.Request) chatcompat.ConversationStore {
+	if transport.scopeConversations {
+		return transport.conversations.ForRequest(input)
+	}
+	return transport.conversations
 }
 
 func (conversation *geminiChatConversation04384) remember(response, source map[string]any) {

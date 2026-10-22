@@ -268,7 +268,8 @@ endpoint with model fallback and buffered/SSE response mapping. Compact uses
 the same endpoint for semantic summarization and returns a bounded local fallback
 based on the original request when that fails.
 Compact can include successful buffered Chat or completed text-stream history identified by
-`previous_response_id` within the owning credential's request namespace.
+`previous_response_id` within the same local invocation and credential.
+Shared gateway requests keep session namespaces separate.
 For Responses, only structured Gemini quota/rate 429s advance the model chain;
 other 429 responses retain their original status and body.
 Messages and Embeddings pass through to their requested paths. Raw API keys stay

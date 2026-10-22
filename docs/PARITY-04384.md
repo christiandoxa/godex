@@ -8556,3 +8556,40 @@ runtime-scores.json.last-good temporary file. Godex invariants pass. An unchange
 isolated single-key-503 rerun PASSes; the original full FAIL is not relabeled.
 Full unchanged strict rerun is separately pending. No newer full default-gate
 PASS is attributed beyond 15d1c55.
+
+
+### Separate local Gemini history from shared gateway namespaces
+
+Four pinned same-process Compact cases establish three Godex-only mismatches
+(changed, omitted and newly supplied session IDs) plus a same-session PASS.
+The reference local Super proxy reuses its invocation-owned store when local
+file access is enabled; its shared gateway path scopes requests by session or
+internal namespace instead. Before reports retain exact original requests,
+client/seed output, attempts, state and matching mutations:
+/tmp/gdx-04384-gemini-compact-namespace-before-audit.json. No cross-credential
+history sharing is introduced to imitate the reference's process-wide store.
+
+The runtime use case sets the proxy model's internal GatewayMode on shared
+startup. The composition root selects Gemini's local or request-scoped pool
+constructor; the adapter retains bounded, private per-credential cache ownership.
+No command-line option, environment variable, persisted field, listener heuristic,
+helper package, dependency or goroutine is added. Existing direct pool callers
+retain scoped behavior. Provider gateway construction moves intact into focused
+cmd/godex/runtime_gateway.go because the changed main.go reached 403 lines;
+main.go is now 362 lines, with the 400-line guard unchanged. The new constructor
+exists to enforce the actual local/shared lifecycle boundary, not future options.
+
+The composition regression fails three local cases and passes five existing
+scope/account controls before behavioral changes:
+`rtk proxy go test -json ./cmd/godex -run '^TestGeminiRuntimeSeparatesLocalAndGatewayConversationScopes$' -count=1`.
+Report: /tmp/gdx-04384-gemini-compact-namespace-unit-corrected-before.jsonl.
+Only unused model metadata was added before that run; the initial unknown-field
+and interface-close compile errors remain unqualified in the first report.
+After repair, the targeted composition/startup command PASSes 11 and
+`rtk go test ./cmd/godex ./internal/gateway/gemini ./internal/usecase/runtime -count=1`
+PASSes 1,985. `rtk proxy go test -json ./...` PASSes 10,692 tests across 71
+packages, with 18 optional SKIP. `rtk proxy make verify` PASSes exit 0 after
+the composition extraction, including race tests and cross-builds. Logs use
+/tmp/gdx-04384-gemini-compact-namespace-. Exact clean executable qualification
+follows. Shared gateway scoping has local integration coverage; its executable
+CLI path and global parity remain unproven.

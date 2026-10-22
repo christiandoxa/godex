@@ -30,7 +30,7 @@ func TestProdex04356GatewayAccountUsesFixedProfileWithoutQuotaPreflight(t *testi
 	if !proxy.started {
 		t.Fatal("gateway proxy was not started")
 	}
-	if config.ListenAddr != "127.0.0.1:4567" || !config.SkipQuotaPreflight || config.AutoRedeem ||
+	if !config.GatewayMode || config.ListenAddr != "127.0.0.1:4567" || !config.SkipQuotaPreflight || config.AutoRedeem ||
 		config.PreferredAccount != "one" || config.Provider.Kind != "" || !config.SmartContextEnabled {
 		t.Fatalf("gateway config = %#v", config)
 	}
@@ -88,7 +88,7 @@ func TestProdex04356GatewayAPIKeysKeepsProviderCredentialPool(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer gateway.Close(context.Background())
-	if !config.SkipQuotaPreflight || config.AutoRedeem || config.Provider.Kind != "deepseek" ||
+	if !config.GatewayMode || !config.SkipQuotaPreflight || config.AutoRedeem || config.Provider.Kind != "deepseek" ||
 		len(config.ProviderCredentials) != 2 {
 		t.Fatalf("provider gateway config = %#v", config)
 	}

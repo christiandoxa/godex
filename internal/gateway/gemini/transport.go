@@ -21,11 +21,12 @@ const (
 )
 
 type RuntimeTransport struct {
-	client         *http.Client
-	upstream       *url.URL
-	apiKey         string
-	chatCompatible bool
-	conversations  chatcompat.ConversationStore
+	client             *http.Client
+	upstream           *url.URL
+	apiKey             string
+	chatCompatible     bool
+	conversations      chatcompat.ConversationStore
+	scopeConversations bool
 }
 
 func NewRuntimeTransport(apiURL, apiKey string, client *http.Client) (*RuntimeTransport, error) {

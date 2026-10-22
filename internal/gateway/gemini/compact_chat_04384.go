@@ -22,7 +22,7 @@ func (transport *RuntimeTransport) executeChatCompatibleCompact04384(ctx context
 		return compactgateway.LocalFallback(input.Body, "gemini", "invalid-response")
 	}
 	previous, _ := original["previous_response_id"].(string)
-	history := transport.conversations.ForRequest(input).History(previous)
+	history := transport.conversationsForRequest(input).History(previous)
 	body, _, err = prepareGeminiChatCompatibleRequest04384(body, history)
 	if err != nil {
 		return compactgateway.LocalFallback(input.Body, "gemini", geminiCompactFailureReason04384(err))

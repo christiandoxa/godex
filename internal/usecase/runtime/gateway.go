@@ -227,6 +227,7 @@ func (runner *Runner) startGateway(
 		return nil, err
 	}
 	config.ListenAddr = strings.TrimSpace(options.ListenAddr)
+	config.GatewayMode = true
 	config.SkipQuotaPreflight = skipQuotaPreflight
 	config.SmartContextEnabled = options.SmartContextEnabled
 	if options.PresidioEnabled {

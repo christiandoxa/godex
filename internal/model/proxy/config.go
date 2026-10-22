@@ -40,7 +40,9 @@ type BrokerConfig struct {
 }
 
 type Config struct {
-	Context                          context.Context
+	Context context.Context
+	// GatewayMode separates shared request namespaces from local invocation history.
+	GatewayMode                      bool
 	UpstreamURL                      string
 	ListenAddr                       string
 	PreferredAccount                 string

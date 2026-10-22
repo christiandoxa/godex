@@ -6,7 +6,7 @@ import (
 )
 
 func geminiCompactOwnershipCases04384() []string {
-	return []string{"compact-owner-previous", "compact-owner-session", "compact-owner-unbound", "compact-owner-assistant", "compact-owner-history-instructions", "compact-owner-duplicate", "compact-owner-numeric", "compact-owner-stream", "compact-owner-stream-eof", "compact-owner-stream-unbound"}
+	return []string{"compact-owner-previous", "compact-owner-session", "compact-owner-unbound", "compact-owner-assistant", "compact-owner-history-instructions", "compact-owner-duplicate", "compact-owner-numeric", "compact-owner-stream", "compact-owner-stream-eof", "compact-owner-stream-unbound", "compact-owner-local-session-same", "compact-owner-local-session-changed", "compact-owner-local-session-omitted", "compact-owner-local-session-added"}
 }
 
 func geminiCompactOwnershipSeed04384(scenario string) bool {
@@ -16,6 +16,9 @@ func geminiCompactOwnershipSeed04384(scenario string) bool {
 func geminiCompactOwnershipSession04384(scenario string) string {
 	if scenario == "compact-owner-session" {
 		return "synthetic-compact-session"
+	}
+	if scenario == "compact-owner-local-session-same" || scenario == "compact-owner-local-session-changed" || scenario == "compact-owner-local-session-omitted" {
+		return "synthetic-seed-session"
 	}
 	return ""
 }
@@ -37,12 +40,18 @@ func geminiCompactOwnershipSeedInput04384(scenario string) string {
 func geminiCompactOwnershipInput04384(scenario string) string {
 	body := `{"model":"gemini-3.1-pro-preview","input":[]`
 	switch scenario {
-	case "compact-owner-previous", "compact-owner-assistant", "compact-owner-history-instructions", "compact-owner-duplicate", "compact-owner-numeric", "compact-owner-stream", "compact-owner-stream-eof":
+	case "compact-owner-previous", "compact-owner-assistant", "compact-owner-history-instructions", "compact-owner-duplicate", "compact-owner-numeric", "compact-owner-stream", "compact-owner-stream-eof", "compact-owner-local-session-same", "compact-owner-local-session-changed", "compact-owner-local-session-omitted", "compact-owner-local-session-added":
 		body += `,"previous_response_id":"chatcmpl-differential"`
 	case "compact-owner-session":
 		body += `,"session_id":"synthetic-compact-session"`
 	case "compact-owner-unbound", "compact-owner-stream-unbound":
 		body += `,"previous_response_id":"chatcmpl-unknown"`
+	}
+	if scenario == "compact-owner-local-session-same" {
+		body += `,"session_id":"synthetic-seed-session"`
+	}
+	if scenario == "compact-owner-local-session-changed" || scenario == "compact-owner-local-session-added" {
+		body += `,"session_id":"synthetic-compact-session"`
 	}
 	if scenario == "compact-owner-numeric" {
 		body = strings.Replace(body, `"input":[]`, `"input":[{"type":"function_call_output","call_id":"call-synthetic","output":"done"}]`, 1)

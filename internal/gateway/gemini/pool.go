@@ -14,6 +14,15 @@ type RuntimePool struct {
 }
 
 func NewRuntimePool(apiURL string, credentials []proxymodel.ProviderCredential, client *http.Client) (*RuntimePool, error) {
+	return newRuntimePool(apiURL, credentials, client, true)
+}
+
+// NewLocalRuntimePool retains history across session labels within one local invocation.
+func NewLocalRuntimePool(apiURL string, credentials []proxymodel.ProviderCredential, client *http.Client) (*RuntimePool, error) {
+	return newRuntimePool(apiURL, credentials, client, false)
+}
+
+func newRuntimePool(apiURL string, credentials []proxymodel.ProviderCredential, client *http.Client, scopeConversations bool) (*RuntimePool, error) {
 	pool := &RuntimePool{transports: make(map[string]*RuntimeTransport, len(credentials))}
 	for _, credential := range credentials {
 		if credential.ID == "" || credential.Secret == "" {
@@ -29,6 +38,7 @@ func NewRuntimePool(apiURL string, credentials []proxymodel.ProviderCredential, 
 		// OpenAI-compatible chat bridge. Direct Gemini native transports
 		// retain generateContent for their separate provider surface.
 		transport.chatCompatible = true
+		transport.scopeConversations = scopeConversations
 		if previous := pool.transports[credential.ID]; previous != nil {
 			previous.Close()
 		}

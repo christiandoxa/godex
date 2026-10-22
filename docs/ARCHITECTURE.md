@@ -239,13 +239,20 @@ and deduplication of replayed Chat input remain protocol concerns; each credenti
 transport owns its cache lifetime. DeepSeek still owns request admission,
 assistant projection and response eligibility. Gemini records successful buffered
 Chat requests and completed text streams under their final public Responses ID
-and reuses matching history
-for API-key Compact before adjacency repair. Current Compact instructions precede
+and reuses matching history for API-key Compact before adjacency repair. Current Compact instructions precede
 cached context; input duplicates and repeated instructions are removed. Native
 Gemini response text is not fabricated into a cached Chat assistant message.
 The existing Gemini SSE owner records completed text before the terminal event;
 EOF and provider failures do not record snapshots. Tool/reasoning streams retain their
 existing uncached behavior until complete argument snapshots are qualified.
+Runtime gateway startup marks the proxy model's internal GatewayMode field;
+ordinary local launches keep invocation-local history. The composition root
+selects Gemini's local pool constructor or its request-scoped shared gateway
+constructor explicitly. Both retain separate credential caches and the same
+bounds, clone semantics and lifetime. No listener-address heuristic, CLI flag,
+environment toggle or persistence field controls this distinction. The focused
+cmd/godex/runtime_gateway.go file owns provider-adapter construction; it contains
+no routing or account selection rules.
 Its shared Chat Completions stream-error classifier owns exact field-presence
 and numeric-kind rules for the DeepSeek and Gemini adapters. Each adapter
 acquires its own input, preserves JSON number types, and controls response
@@ -322,8 +329,9 @@ token is written; the persistence format and managed-profile policy are unchange
 
 Local DeepSeek and Gemini raw-key Compact and Models routes run before continuation validation and
 do not observe or persist continuation identities. Gemini API-key Compact may
-replay successful buffered Chat context already held in the owning credential's
-request namespace; this in-memory cache adds no durable owner. The owning routing policy
+replay successful Chat context already held by the owning credential. Local
+invocations retain it across request session labels; shared gateways retain
+their per-session namespace. This in-memory cache adds no durable owner. The owning routing policy
 recognizes these existing local routes; their gateway still owns their payloads.
 
 gateway/compact owns the bounded deterministic local compaction fallback used by
