@@ -5381,3 +5381,47 @@ Clean-commit 174-case Gemini and 169-case DeepSeek matrices follow.
 Other controls, combined-error ordering, Gemini Compact, executable session/
 turn continuation, native macOS/Windows and live authentication remain open.
 Global 1:1 parity is not claimed.
+
+
+## Qualified clock repair and reference seed-state failure
+
+The repaired-oracle 156-case DeepSeek rerun PASSes for unchanged clean
+`f4bf577507cacd03abcd6d7fbbf8f49fc51f5271`, with independent mutation checks:
+`/tmp/gdx-04384-request-logprobs-deepseek-clock-oracle.json`.
+The exact command is
+`rtk proxy /tmp/gdx-04384-logprobs-oracle-clock-differential --prodex /tmp/godex-release-parity-04384-20261021/prodex-x86_64-unknown-linux-gnu --godex /tmp/gdx-04384-request-logprobs-godex --prodex-source /tmp/godex-release-parity-04384-20261021/prodex-source --godex-source /tmp/gdx-04384-request-logprobs-work --godex-commit f4bf577507cacd03abcd6d7fbbf8f49fc51f5271 --scenario all --scenario-workers 3`.
+Its original matrix remains FAIL for the late timestamp checks as recorded above.
+
+The original 169-case stop matrix also FAILs only the two product-specific
+terminal-SSE timestamp invariants:
+`/tmp/gdx-04384-request-stop-deepseek-oracle.json`.
+No additional comparison or state difference is reported. The repaired-oracle
+169-case rerun PASSes for clean `ffca69a`, including independent mutations:
+`/tmp/gdx-04384-request-stop-deepseek-clock-oracle.json`.
+The first report is not relabeled.
+
+The 133-case clean `f4bf577` Gemini invocation FAILs one strict reference
+invariant: `prodex: Gemini restart lacks an exact successful seed with durable ownership`.
+Report: `/tmp/gdx-04384-request-logprobs-gemini-oracle.json`.
+The `raw-key-bound-response-restart-key` reference seed has the exact successful
+200 output, one authenticated request and a persisted binding, but the durable
+auditor finds
+`unknown_persistent_file:state/state.json.last-good.985671.1792647113398884097.7.tmp`.
+The strict isolated rerun of that unchanged scenario PASSes:
+`/tmp/gdx-04384-request-logprobs-gemini-restart-key-rerun.json`.
+The other 132 cases match; no Godex invariant fails. This does not turn the
+original complete 133-case invocation into PASS. No persistence allowlist,
+seed requirement or reference binary was changed. The new clean `0ad214c`
+174-case Gemini matrix remains pending and includes all those earlier cases.
+
+Clean `0ad214cb731dae535f330e530accb2eb6c2ec028` targeted ignored-null-penalty,
+ignored numeric n and terminal-SSE cases PASS with the committed final harness:
+`/tmp/gdx-04384-gemini-ignored-presence_penalty-null-targeted-oracle.json`,
+`/tmp/gdx-04384-gemini-ignored-n-number-targeted-oracle.json` and
+`/tmp/gdx-04384-scenario-invariants-terminal-targeted-oracle.json`.
+The full 174-case Gemini/169-case DeepSeek matrices are pending:
+`/tmp/gdx-04384-gemini-ignored-sampling-oracle.json` and
+`/tmp/gdx-04384-gemini-ignored-sampling-deepseek-oracle.json`.
+The source-pin worktrees remain clean and unchanged while these execute.
+The complete default-gate PASS remains scoped to `293b1b6`.
+Global 1:1 parity is not claimed.
