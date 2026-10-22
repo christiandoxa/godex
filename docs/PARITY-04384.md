@@ -9984,3 +9984,20 @@ The latest completed entire default gate remains exact e9d88ce, and the latest
 completed full-Gemini qualification remains exact 5c15397/full924. Overall 1:1
 parity remains unproven; broader custom-call input shapes need executable
 qualification before any production change.
+
+### Full DeepSeek232 qualifies exact 382b3a7
+
+Original session 19735 exits 0. Its complete report PASSes all 232 unique
+scenarios at exact clean 382b3a7b4bcced5f35cb1f64c6e67de5a9be5730,
+including every prior224 case. Audit:
+/tmp/gdx-04384-deepseek-tool-id-full-audit.json. Original report:
+/tmp/gdx-04384-deepseek-tool-id-oracle.json. Every original independent
+invariant, per-case/state comparison and matching-corruption control PASSes.
+Reference source/binary/manifest, immutable source, both artifact hashes and
+embedded clean VCS metadata, and per-run source/hash pins were checked. This
+is the latest completed full DeepSeek qualification only at that revision.
+The cached-ID full236, later Gemini matrices and the a05e1cbc entire default
+gate remain pending. The current full255 phase has not been claimed PASS.
+Earlier reference state-integrity failures, capture failures and fixture
+errors remain retained; this result does not erase or explain them. Overall
+1:1 parity remains unproven.
