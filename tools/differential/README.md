@@ -1105,3 +1105,12 @@ earlier semantic failure from a DONE-only control. A single response.failed
 remains the terminal outcome even when a later valid finish stores new history.
 The default Gemini matrix reaches 943 cases. Restart and cross-account snapshot
 behavior remain outside this new qualification.
+
+Twenty tool-field cases require exact call-ID presence/update behavior,
+streaming name separators and original bytes, thought-signature alias/blank
+semantics, and unsigned/default index projection. Absent/null/numeric call IDs
+must produce a canonical UUIDv7 under call_deepseek_; only that verified random
+identifier is normalized, with consistency checked across the full lifecycle.
+Matching ID/name/index/signature and request/state mutations are rejected. The
+default Gemini matrix reaches 968 cases; production code needs no correction
+for these newly qualified field probes.

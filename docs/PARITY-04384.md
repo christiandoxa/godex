@@ -9650,3 +9650,38 @@ latest completed full-Gemini PASS only at that exact source. Later 918/924/934/
 sources. Original b80d targeted capture failures and prior 844/847/874 reference
 state-integrity failures remain FAIL and unexplained; this PASS does not erase
 or relabel those observations.
+
+### Qualify streamed Gemini tool identity, names, signatures and index fields
+
+Twenty-four exact clean d67033945f1076f87ec52532897d824d148a3692 executable
+baselines PASS: twenty new tool-field cases and four prior tool/semantic/
+pending/Compact controls. There is no observed production mismatch in this
+scope, so no production correction is added. Audit:
+/tmp/gdx-04384-gemini-stream-tool-fields-before-audit.json. The independently
+fingerprinted fixture driver checks exact wire and original request bytes,
+stdout/status, attempts/auth/slot and durable state for each product, including
+matching-corruption controls. Random fallback call IDs are normalized only
+after verifying the exact call_deepseek_ prefix, canonical UUIDv7/RFC4122 form
+and consistency across events. Every other ID byte remains significant.
+
+Cases cover absent/null/numeric/empty IDs and later empty/null updates, padded
+and dotted names, namespace/trailing separators, an empty MCP namespace, padded
+special-tool names, later name replacement, nonblank/blank/camelCase signatures
+and later blank preservation, plus maximum unsigned, floating and overflowing
+indices. Pinned domain ID generation uses Uuid::now_v7. The Mojo tool event
+planner also confirms that its added flag is set independently of whether a
+search item is materialized; an initial source suspicion was rejected without
+changing correct code. Only test tooling changes: no layer, helper, export,
+interface, dependency, worker, option or persisted format is added. Twenty new
+cases extend the default Gemini matrix to 968. Full local and exact clean
+fixture executable qualification follow before publication. This is a scoped
+field qualification, not a new overall 1:1 claim.
+
+Full local validation PASSes 10,951 tests with 18 optional SKIP; make verify
+exits 0 including race tests, cross-builds, vet and source/format guards. Exact
+commands:
+`rtk proxy go test -json ./... > /tmp/gdx-04384-gemini-stream-tool-fields-full.jsonl 2>&1`
+and `rtk proxy make verify > /tmp/gdx-04384-gemini-stream-tool-fields-verify.log 2>&1`.
+The final sentinel also rejects matching ID/name/index/signature field
+corruption. Exact clean executable fixture qualification follows before
+publication; cmd/internal production code is unchanged.

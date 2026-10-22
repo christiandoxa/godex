@@ -9,7 +9,7 @@ import (
 )
 
 func geminiChatStreamScenario04384(scenario string) bool {
-	return scenario == "stream-chat" || scenario == "stream-chat-eof" || scenario == "stream-chat-error" || scenario == "stream-chat-data-lines" || scenario == "stream-chat-json-fragments" || geminiProviderBOMScenario04384(scenario) || geminiReasoningStreamCase04384(scenario) || geminiStreamMetadataCase04384(scenario) || geminiStreamCreatedCase04384(scenario) || geminiStreamModelCase04384(scenario) || geminiStreamFinishPresenceCase04384(scenario) || geminiStreamUsageCase04384(scenario) || geminiStreamMessageMetadataCase04384(scenario) || geminiStreamProjectionCase04384(scenario) || geminiStreamToolAdmissionCase04384(scenario) || geminiStreamToolLifecycleCase04384(scenario)
+	return scenario == "stream-chat" || scenario == "stream-chat-eof" || scenario == "stream-chat-error" || scenario == "stream-chat-data-lines" || scenario == "stream-chat-json-fragments" || geminiProviderBOMScenario04384(scenario) || geminiReasoningStreamCase04384(scenario) || geminiStreamMetadataCase04384(scenario) || geminiStreamCreatedCase04384(scenario) || geminiStreamModelCase04384(scenario) || geminiStreamFinishPresenceCase04384(scenario) || geminiStreamUsageCase04384(scenario) || geminiStreamMessageMetadataCase04384(scenario) || geminiStreamProjectionCase04384(scenario) || geminiStreamToolAdmissionCase04384(scenario) || geminiStreamToolLifecycleCase04384(scenario) || geminiToolFieldsCase04384(scenario)
 }
 
 func geminiChatEOFFixture04384(responseID, itemID string, epoch int64) string {
