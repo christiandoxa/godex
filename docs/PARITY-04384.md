@@ -8773,3 +8773,38 @@ cross-builds, format/source guards, vet and the build. Logs:
 /tmp/gdx-04384-gemini-stream-reasoning-full.jsonl and
 /tmp/gdx-04384-gemini-stream-reasoning-verify.log. Exact clean executable
 qualification follows. Global continuation and overall 1:1 parity remain unproven.
+
+### Preserve latest Gemini SSE logprobs and system fingerprint
+
+Five exact clean executable baselines on ac597d49f7f8d3f8eb802a36234f0878de329c7c
+qualify four Godex-only metadata failures and one null/wrong-type control PASS.
+They cover opaque numeric logprobs, whole-value replacement, retaining the prior
+value after null/empty updates, and logprobs false. Reference lifecycle, raw
+request, client stdout, status, attempt count, durable state and matching
+corruption assertions all qualify. Records:
+/tmp/gdx-04384-gemini-stream-metadata-before-audit.json and
+/tmp/gdx-04384-gemini-stream-metadata-before-commands.json.
+
+Pinned deepseek/stream/shaping.rs:231-308 and deepseek.mojo:933-1078 project these
+fields into the shared Chat-compatible state. Rust ignores null logprobs and
+empty/wrong-type fingerprints; other JSON logprobs values replace the previous
+value whole. Godex's existing Gemini stream owner now applies that policy and
+adds the retained fields to completion metadata before the existing request
+metadata merge. JSON numbers keep their admitted serde kinds and integer
+precision. The retained values are bounded by the existing provider SSE frame
+limit; no growing collection or additional background work is introduced.
+
+The narrow gateway regression fails eight boundaries before the fix and retains
+the null control. It checks false, zero, floating kind, empty string/array/object,
+replacement and padded fingerprints. A malformed empty-object expectation in
+the first unit run was corrected before the final unchanged-code fail-before
+run; both logs remain under /tmp/gdx-04384-gemini-stream-metadata-unit-before.
+The change stays in gateway/gemini; no helper, exported API, dependency, setting
+or durable format is added. Refusal and annotation aggregation remain separate
+unqualified paths. Five new executable cases bring Gemini's matrix to 862.
+`rtk proxy go test -json ./...` PASSes 10,757 tests with 18 optional SKIP.
+`rtk proxy make verify` PASSes with exit 0, including shuffled race tests,
+cross-builds, format/source guards, vet and the build. Logs:
+/tmp/gdx-04384-gemini-stream-metadata-full.jsonl and
+/tmp/gdx-04384-gemini-stream-metadata-verify.log. Exact clean executable
+qualification follows. Global continuation and overall 1:1 parity remain unproven.

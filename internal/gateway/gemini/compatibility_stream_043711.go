@@ -51,6 +51,8 @@ type geminiChatCompatibleStream043711 struct {
 	reasoning    strings.Builder
 	model        string
 	finishReason string
+	fingerprint  string
+	logprobs     any
 	usage        map[string]any
 	metadata     map[string]any
 	json         sse.JSONFrames
@@ -122,6 +124,12 @@ func (state *geminiChatCompatibleStream043711) complete(writer io.Writer) error 
 	if state.reasoning.Len() > 0 {
 		provider["reasoning_content"] = state.reasoning.String()
 	}
+	if state.fingerprint != "" {
+		provider["system_fingerprint"] = state.fingerprint
+	}
+	if state.logprobs != nil {
+		provider["logprobs"] = state.logprobs
+	}
 	if len(provider) > 0 {
 		completed["metadata"] = map[string]any{"gemini": provider}
 	}
@@ -171,11 +179,17 @@ func (state *geminiChatCompatibleStream043711) failure(writer io.Writer, code, m
 }
 
 func (state *geminiChatCompatibleStream043711) observeChatChunk(chunk map[string]any) {
+	if fingerprint, _ := chunk["system_fingerprint"].(string); fingerprint != "" {
+		state.fingerprint = fingerprint
+	}
 	if model, ok := chunk["model"].(string); ok && model != "" {
 		state.model = model
 	}
 	if choices, ok := chunk["choices"].([]any); ok && len(choices) > 0 {
 		if first, ok := choices[0].(map[string]any); ok {
+			if logprobs := first["logprobs"]; logprobs != nil {
+				state.logprobs = logprobs
+			}
 			delta, _ := first["delta"].(map[string]any)
 			calls, _ := delta["tool_calls"].([]any)
 			if len(calls) > 0 {

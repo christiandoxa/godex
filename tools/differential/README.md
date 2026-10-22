@@ -990,6 +990,11 @@ content for reasoning-only output. Equal-but-wrong wire, request, metadata and
 state mutations must fail independently. Local reasoning retention is capped at
 64 MiB; executable parity above that safety ceiling remains unqualified.
 
+Five additional Gemini SSE metadata cases require the latest nonnull logprobs
+and nonempty system fingerprint, including opaque numbers, replacement and
+null/empty controls. Exact completion bytes and matching numeric corruption
+remain independent assertions.
+
 ### Tagged 0.438.2 Gemini function-tool rejection parity
 
 Two additional **source/binary-pinned** cases, `invalid-wrapped-tool-parameters`

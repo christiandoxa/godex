@@ -251,6 +251,8 @@ The existing Gemini SSE owner records completed text before the terminal event;
 EOF and provider failures do not record snapshots. Completed reasoning streams
 use the same owner to emit summary lifecycle events, retain completion metadata,
 and cache assistant reasoning for Compact, including reasoning-only responses.
+The stream owner also retains the latest nonempty fingerprint and nonnull
+logprobs value, preserving JSON numeric kinds and replacing prior metadata whole.
 Reasoning retention is bounded at 64 MiB; excess terminates the existing stream
 with one failure and no completion or cache update. Tool streams retain their
 existing uncached behavior until complete argument snapshots are qualified.
