@@ -71,7 +71,7 @@ func TestProdex04384GeminiChatRequestDecodersRequireCompleteObject(t *testing.T)
 			return value, err
 		},
 		filterGeminiOrphanToolMessages043711,
-		func(body []byte) ([]byte, error) { return geminiChatRequestOptions04384(body, nil) },
+		func(body []byte) ([]byte, error) { return geminiChatRequestOptions04384(body, nil, nil) },
 	} {
 		for _, body := range []string{`{"stream":true,"messages":[]} {"extra":true}`, `[{"stream":true}]`} {
 			if _, err := normalize([]byte(body)); err == nil {

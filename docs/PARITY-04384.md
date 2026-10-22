@@ -6976,3 +6976,76 @@ controls require separate audit and executable proof. Gemini Compact,
 executable session/turn continuation, native macOS/Windows and live login
 remain unproven. No force push, tag, release or editor edit occurred. Global
 1:1 parity is not claimed.
+
+## Qualified message/identity/name checkpoint and request signatures
+
+Clean `3c455f4b31593635cc7ba25be4e007208906adfd` PASSes all 333 Gemini
+cases, independent mutations and all 213 DeepSeek scenarios:
+`/tmp/gdx-04384-gemini-call-names-oracle.json` and
+`/tmp/gdx-04384-gemini-call-names-deepseek-oracle.json`.
+Its Gemini matrix includes all 322 cases from the earlier identity candidate.
+Primary fast-forwarded and pushed this checkpoint directly to `origin/main`.
+The earlier `1791a7e` 322-case report remains FAIL: on changed-key restart,
+the reference seed left an orphan continuation-journal temp file and lacked
+exact durable ownership, then executed new upstream work. Godex retained its
+terminal 503 without replay. No state/owner/status or mutation check is relaxed.
+
+Pinned `deepseek_raw_thought_signature` selects the first nonempty string from
+`gemini_thought_signature`, `thought_signature`, `thoughtSignature`,
+`provider_specific_fields.thought_signature`, then
+`extra_content.google.thought_signature`. Wrong types and empty strings fall
+through. A selected whitespace-only string blocks later aliases. After
+adjacency, the separate signature-preservation kernel moves nonblank values
+into exact Google `extra_content`, removing unrelated provider metadata;
+selected blank values remain in the projected legacy field. Function/custom/
+MCP calls follow this path; nested function signature fields do not.
+
+Godex's shared Chat converter discarded those signatures. The private Gemini
+final projection now receives normalized input explicitly, indexes the first
+source call for each ID (including unsigned calls), and restores signatures
+only on calls retained by adjacency. It reuses the exact package-local Mojo
+Unicode classifier, including U+001C through U+001F, and leaves orphan removal
+and stream controls intact. This concrete integration behavior stays in
+`gateway/gemini`; shared Chat, native/OAuth and other provider policies remain
+independent. No new shared helper, package, public API, dependency, option,
+background work or persisted format is introduced.
+
+Before repair, ten focused gateway cases plus their parent FAIL and three
+controls PASS:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiChatCallSignaturesSurviveProjection$' -count=1`;
+`/tmp/gdx-04384-gemini-thought-signature-before.log`.
+The expanded gateway table and decoder checks PASS all 17 tests:
+`rtk go test ./internal/gateway/gemini -run 'TestProdex04384Gemini(ChatCallSignaturesSurviveProjection|ChatRequestDecodersRequireCompleteObject)' -count=1`;
+`/tmp/gdx-04384-gemini-thought-signature-focused.log`.
+
+Twenty-one executable baselines pin clean
+`25cf23c4e09d64a3831631d26006340719f3b8e1`, the unchanged official reference,
+and `/tmp/gdx-04384-gemini-thought-signature-before-differential`.
+Sixteen FAIL only Godex's exact wire bytes; five controls PASS. Every reference
+and independent mutation invariant passes. Reports:
+`/tmp/gdx-04384-gemini-thought-signature-<suffix>-before-oracle.json`;
+exact argument arrays:
+`/tmp/gdx-04384-gemini-thought-signature-before-commands.json`.
+Commands use `--gemini --scenario request-primitive-request-signature-<suffix>`
+with exact source/commit pins. Full independent expectations retain signature
+precedence, whitespace bytes, duplicate-ID ownership, orphan filtering, stream
+options, one authenticated request, response/status/headers/stdout/exit and
+safe durable state. Matching-corruption checks reject changed signature values,
+fields and call IDs even if both products change identically.
+
+`rtk go test ./tools/differential -count=1` PASSes 282 tests:
+`/tmp/gdx-04384-gemini-thought-signature-oracle-tests.log`.
+`rtk proxy go test -json ./...` PASSes 10,007 tests in 71 packages; ten packages
+have no tests and 18 optional installed-Codex/executable tests are skipped:
+`/tmp/gdx-04384-gemini-thought-signature-test-all-final.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+PASSes 3,199 tests:
+`/tmp/gdx-04384-gemini-thought-signature-race-final.log`.
+`rtk proxy make verify` PASSes:
+`/tmp/gdx-04384-gemini-thought-signature-verify.log`.
+Clean-commit 399-case Gemini qualification follows. Other protected matrices
+remain scoped to their exact revisions; the default `175091f` gate remains
+pending until actual completion. Custom/MCP/shell projection beyond these
+signature controls, Gemini Compact, executable session/turn continuation,
+native macOS/Windows and live authentication remain unproven. No force push,
+tag, release or editor-checkout edit occurred. Global 1:1 parity is not claimed.

@@ -476,6 +476,13 @@ JSON text. It also maps developer to system, normalizes implicit roles and
 preserves empty messages. Shared `gateway/chatcompat` exposes a narrow message-
 preserving entry point used by Gemini; its original Claude entry point retains
 its empty/system-only admission behavior. No provider policy moves into a helper.
+The final private Gemini Chat projection receives normalized Responses input
+explicitly to restore call thought signatures after adjacency repair. It keeps
+the first source call for each ID, including an unsigned call, and follows the
+tagged nonempty-string alias selection before the separate Mojo whitespace
+test. Nonblank signatures become exact Google `extra_content`; selected blank
+strings retain their legacy field. The existing package-local Unicode
+classifier is reused; shared Chat conversion owns no Gemini signature policy.
 All supported call/tool-output items require a nonblank identity selected from
 the first string `call_id`, `tool_call_id`, then `id`. This local admission runs
 before conversion or orphan filtering can silently drop the malformed item.

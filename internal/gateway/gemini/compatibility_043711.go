@@ -44,7 +44,7 @@ func (transport *RuntimeTransport) executeChatCompatibleResponses(
 	if err != nil {
 		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
-	body, err = geminiChatRequestOptions04384(body, controls)
+	body, err = geminiChatRequestOptions04384(body, normalized, controls)
 	if err != nil {
 		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
@@ -72,10 +72,13 @@ func (transport *RuntimeTransport) executeChatCompatibleResponses(
 
 // Tagged Gemini uses user_id on the Chat wire and requests final token
 // usage for streaming requests.
-func geminiChatRequestOptions04384(body []byte, controls map[string]any) ([]byte, error) {
+func geminiChatRequestOptions04384(body, input []byte, controls map[string]any) ([]byte, error) {
 	request, err := decodeGeminiChatRequest04384(body)
 	if err != nil {
 		return nil, errors.New("invalid Gemini chat-compatible stream request")
+	}
+	if err := restoreGeminiChatCallSignatures04384(request, input); err != nil {
+		return nil, err
 	}
 	user, hasUser := request["user"]
 	if hasUser {
@@ -86,9 +89,6 @@ func geminiChatRequestOptions04384(body []byte, controls map[string]any) ([]byte
 		request[key] = value
 	}
 	stream, _ := request["stream"].(bool)
-	if !stream && !hasUser && len(controls) == 0 {
-		return body, nil
-	}
 	if stream {
 		options, _ := request["stream_options"].(map[string]any)
 		if options == nil {

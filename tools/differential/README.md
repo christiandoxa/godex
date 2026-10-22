@@ -1,5 +1,14 @@
 # Differential harness
 
+The 0.438.4 Gemini `request-primitive-request-signature-*` cases compare exact
+outgoing function/custom/MCP call signatures, five alias paths, nonempty-string
+precedence, blank legacy preservation, duplicate-ID ownership and orphan
+filtering. Full expected wire bytes remain independent of production code;
+matching-corruption controls reject modified signature values/fields and IDs
+even when both products change identically. Each case also checks response,
+status, headers, child exit, stdout, authenticated attempts and safe durable
+state against the pinned official release with synthetic credentials.
+
 Build and run from a clean, committed Godex worktree:
 
 ```bash
