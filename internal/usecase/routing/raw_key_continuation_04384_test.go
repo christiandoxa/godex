@@ -12,6 +12,15 @@ import (
 )
 
 func TestProdex04384RawKeyContinuationFailsBeforeDispatch(t *testing.T) {
+	assertRawKeyContinuationFailsBeforeDispatch(t, "deepseek")
+}
+
+func TestProdex04384GeminiRawKeyContinuationFailsBeforeDispatch(t *testing.T) {
+	assertRawKeyContinuationFailsBeforeDispatch(t, "gemini")
+}
+
+func assertRawKeyContinuationFailsBeforeDispatch(t *testing.T, provider string) {
+	t.Helper()
 	for _, fixture := range []struct {
 		name, previous, session, turn string
 	}{
@@ -34,7 +43,7 @@ func TestProdex04384RawKeyContinuationFailsBeforeDispatch(t *testing.T) {
 				router, err := NewRouter(Config{Gateway: gateway, Bindings: repository,
 					Accounts: func(context.Context) ([]proxymodel.Account, error) {
 						return []proxymodel.Account{{ID: id, Home: profileHome, Enabled: true, EphemeralAPIKey: true,
-							Provider: proxymodel.Provider{Kind: "deepseek", APIURL: endpoint}}}, nil
+							Provider: proxymodel.Provider{Kind: provider, APIURL: endpoint}}}, nil
 					},
 				})
 				if err != nil {
@@ -62,12 +71,15 @@ func TestProdex04384RawKeyContinuationFailsBeforeDispatch(t *testing.T) {
 			if fixture.turn != "" {
 				request.Header.Set("X-Codex-Turn-State", fixture.turn)
 			}
-			for _, router := range []*Router{
-				first,
-				newRouter(firstID, "http://127.0.0.1:1234/v1"),
-				newRouter("11223344556677889900aabbccddeeff", "http://127.0.0.1:1234/v1"),
-				newRouter(firstID, "http://127.0.0.1:5678/v1"),
-			} {
+			routers := []*Router{first}
+			if provider == "deepseek" {
+				routers = append(routers,
+					newRouter(firstID, "http://127.0.0.1:1234/v1"),
+					newRouter("11223344556677889900aabbccddeeff", "http://127.0.0.1:1234/v1"),
+					newRouter(firstID, "http://127.0.0.1:5678/v1"))
+			}
+			// shortcut: Gemini restart ownership needs its own executable fixture before extending this loop.
+			for _, router := range routers {
 				exchange, err := router.Forward(t.Context(), request)
 				if len(gateway.requests) != 1 {
 					if exchange != nil {

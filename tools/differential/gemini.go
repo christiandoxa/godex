@@ -38,6 +38,7 @@ type geminiCandidateResult struct {
 	Client         exchange                `json:"client_exchange"`
 	Stdout         string                  `json:"stdout,omitempty"`
 	StateIntegrity []string                `json:"state_integrity_errors,omitempty"`
+	ClientError    string                  `json:"client_error,omitempty"`
 }
 
 type geminiCaseResult struct {
@@ -153,6 +154,10 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, response)
 		return
 	}
+	if geminiContinuationCase04384(mock.scenario) {
+		_, _ = io.WriteString(w, geminiContinuationResponse04384())
+		return
+	}
 	if response, ok := geminiEnvelopeFixture04384(mock.scenario); ok {
 		_, _ = io.WriteString(w, response)
 		return
@@ -220,6 +225,8 @@ func (mock *geminiMock) recorded() []geminiCapturedRequest {
 
 func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit, selected string) error {
 	cases := []string{
+		geminiBoundResponseCase04384,
+		geminiUnboundResponseCase04384,
 		"buffered-body-under",
 		"buffered-body-limit",
 		"buffered-body-over",
@@ -354,7 +361,8 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	childResult := filepath.Join(home, "gemini-child-exchange.json")
 	_, _, rawIdentity := geminiRawKeyIdentity04384(scenario)
 	_, bodyBoundary := geminiBufferedBodyCase04384(scenario)
-	if rawIdentity || bodyBoundary {
+	continuation := geminiContinuationCase04384(scenario)
+	if rawIdentity || bodyBoundary || continuation {
 		childResult = filepath.Join(home, "child-exchange.json")
 	}
 	args := []string{"super", "--provider", "gemini"}
@@ -370,6 +378,11 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	cmd := exec.CommandContext(ctx, binary, args...)
 	env := productEnv(name, stateHome, codexHome, userHome, shim, childResult, runOptions{})
 	env = append(env, "DIFFERENTIAL_PROVIDER=gemini")
+	if scenario == geminiBoundResponseCase04384 {
+		env = append(env, "DIFFERENTIAL_CONTINUATION_PHASE=same-process")
+	} else if scenario == geminiUnboundResponseCase04384 {
+		env = append(env, "DIFFERENTIAL_CONTINUATION_PHASE=unknown")
+	}
 	if rawIdentity {
 		env = append(env, "DIFFERENTIAL_GEMINI_RAW_KEY_IDENTITY="+scenario)
 	}
@@ -402,17 +415,17 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	if err := cmd.Run(); err != nil {
 		var childExit *exec.ExitError
 		_, envelopeScenario := geminiEnvelopeFixture04384(scenario)
-		if !rawIdentity && !bodyBoundary && !geminiQuotaScenario043711(scenario) && !geminiInvalidToolScenario04380(scenario) && !geminiModelScenario04384(scenario) && !envelopeScenario ||
+		if !rawIdentity && !bodyBoundary && !continuation && !geminiQuotaScenario043711(scenario) && !geminiInvalidToolScenario04380(scenario) && !geminiModelScenario04384(scenario) && !envelopeScenario ||
 			!errors.As(err, &childExit) || ctx.Err() != nil {
 			return geminiCandidateResult{}, fmt.Errorf("child failed: %w stderr=%q upstream=%v",
 				err, redact(stderr.String()), mock.recorded())
 		}
 		exitCode = childExit.ExitCode()
 	}
-	result, err := readExchange(childResult)
-	if err != nil {
+	result, readErr := readExchange(childResult)
+	if readErr != nil && !continuation {
 		return geminiCandidateResult{}, fmt.Errorf("child response missing: %w stderr=%q upstream=%v",
-			err, redact(stderr.String()), mock.recorded())
+			readErr, redact(stderr.String()), mock.recorded())
 	}
 	version, err := productVersion(binary)
 	if err != nil {
@@ -421,9 +434,16 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	candidate := geminiCandidateResult{
 		Name: name, Version: version, ExitCode: exitCode, Upstream: mock.recorded(), Client: result,
 	}
-	if rawIdentity || bodyBoundary {
+	if readErr != nil {
+		candidate.ClientError = "missing client exchange: " + redact(stderr.String())
+	}
+	if rawIdentity || bodyBoundary || continuation {
 		candidate.Stdout = stdout.String()
 		candidate.StateIntegrity = auditFixtureDurableState(home)
+		if continuation {
+			owners := geminiContinuationOwners04384(scenario, candidate, mock.server.URL+"/v1beta")
+			candidate.StateIntegrity = auditFixtureDurableStateWithBindings(home, owners)
+		}
 	}
 	return candidate, nil
 }
@@ -440,6 +460,9 @@ func geminiCompare(scenario string, prodex, godex geminiCandidateResult) []strin
 	}
 	if prodex.ExitCode != godex.ExitCode {
 		differences = append(differences, "product child process exit status differs")
+	}
+	if geminiContinuationCase04384(scenario) {
+		return differences
 	}
 	if _, known := geminiBufferedBodyCase04384(scenario); known {
 		return differences
@@ -542,6 +565,9 @@ func geminiSemanticEqual043711(left, right map[string]any) bool {
 }
 
 func geminiFixtureInvariant(scenario string, result geminiCandidateResult) error {
+	if geminiContinuationCase04384(scenario) {
+		return geminiContinuationInvariant04384(scenario, result)
+	}
 	if _, known := geminiBufferedBodyCase04384(scenario); known {
 		return geminiBufferedBodyInvariant04384(scenario, result)
 	}

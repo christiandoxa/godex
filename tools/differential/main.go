@@ -1184,7 +1184,10 @@ func runCodexShim(arguments []string) int {
 			return shimFailure("synthetic Codex shim response exceeded its bound")
 		}
 		clientResult = exchange{Status: response.StatusCode, Headers: response.Header.Clone(), Body: string(body)}
-		if os.Getenv("DIFFERENTIAL_CONTINUATION_PHASE") == "same-process" && attempt == 0 && response.StatusCode == http.StatusOK {
+		if os.Getenv("DIFFERENTIAL_CONTINUATION_PHASE") == "same-process" && attempt == 0 {
+			if response.StatusCode != http.StatusOK {
+				return shimFailure("synthetic continuation seed did not succeed")
+			}
 			requestBody = []byte(strings.TrimSuffix(string(requestBody), "}") + `,"previous_response_id":"chatcmpl-differential"}`)
 			continue
 		}

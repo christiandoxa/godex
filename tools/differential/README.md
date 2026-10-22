@@ -173,6 +173,18 @@ default. Gemini model catalogs still require all cases and no DeepSeek workers.
 The raw-key cases also audit stdout and durable state. The existing Godex
 conversation-selection lock is accepted only as an empty private guard file.
 
+Gemini `raw-key-bound-response-same-process` requires a successful native seed,
+then exact HTTP 503 `bound_continuation_unavailable` with no additional upstream
+request. `raw-key-unbound-response` requires a fresh HTTP 200 response from the
+original input when the previous-response ID is not bound. Both run with
+`--gemini --scenario <name>` and enforce exact body/type/exit/stdout, one original
+authenticated attempt, credential slot and safe durable state. The state audit
+pins the observed Gemini provider, credential and endpoint identities, including
+the accepted unknown-ID alias. Missing child responses are explicit failures.
+The shared same-process shim rejects a failed seed, preventing its status from
+masquerading as the continuation result. These fixtures do not claim Gemini
+restart, session/turn executable or Compact coverage.
+
 The 0.438.4 `deepseek-sse-error-presence`, `deepseek-sse-error-i64` and
 `deepseek-sse-error-float` scenarios verify embedded-error primary-field
 presence and signed numeric kinds. Each must produce one failure frame

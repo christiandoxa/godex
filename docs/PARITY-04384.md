@@ -4214,11 +4214,84 @@ The Gemini command uses `--gemini`; DeepSeek uses
 are 2,734 focused race tests, 9,375 full-suite tests and
 `rtk proxy make verify`, all PASS.
 
-This stage is ready for direct fast-forward push after checking the clean
-primary worktree and remote. A complete default `rtk proxy scripts/verify-release-parity.sh`
-run is separately in progress on an isolated clean 8730116 worktree:
-`/tmp/gdx-04384-release-8730116.log`. It is not yet a PASS; the historical
-complete-default PASS remains on `e9ccedc` until that entire invocation exits,
-including stages after its phase-all marker. Other lexical classes, valid
-Gemini continuation/Compact ownership, native macOS/Windows and live
-authentication remain open. Global 1:1 parity is not claimed.
+The stage and documentation checkpoint were fast-forwarded and pushed directly
+to `origin/main` at `7e93289e6ac6d6b77fa94b0b15de81d02c201ad6`.
+The complete default `rtk proxy scripts/verify-release-parity.sh` invocation
+on isolated clean `8730116` finished with exit 0, including the HTTP profile
+status and raw HTTP 429 stages after its phase-all marker:
+`/tmp/gdx-04384-release-8730116.log`. The complete-default milestone therefore
+advances from historical `e9ccedc` to `8730116`; it does not cover subsequent
+continuation changes. Other lexical classes, Gemini restart/Compact ownership,
+native macOS/Windows and live authentication remain open.
+Global 1:1 parity is not claimed.
+
+
+## Gemini raw-key bound rejection and unbound fresh-input fallback
+
+The pinned `local_rewrite_pipeline_dispatch.rs:328–374` projects the selected
+dispatch identity through `from_profile`, while
+`local_rewrite_gemini_openai.rs` records accepted raw-key work through
+`from_raw_key`. The exact identity comparison in
+`mojo/prodex_core/runtime_lineage.mojo:656–682` rejects a known response binding
+before another upstream attempt. A successful seed therefore does not imply
+successful replay. `chat_compatible_request.rs:44–137` rebuilds an unbound
+request from the current input when no history is found.
+
+`usecase/routing/raw_key_continuation.go` reuses the existing DeepSeek
+dispatch-binding rejection for non-local Gemini raw-key routes. Known response,
+session and turn owners return the existing terminal HTTP 503 before gateway
+dispatch. `gateway/gemini/compatibility_043711.go` removes an unbound
+`previous_response_id` only after complete serde/JSON validation so the
+stateless request uses the current input. Models/Compact and managed profiles
+retain their separate policies. The use case owns routing policy; the gateway
+owns provider request normalization. No production helper, package, interface,
+dependency, configuration, goroutine or persistence format was added.
+
+Qualified baseline executable runs on clean
+`8730116c9ecafb6e6d9db06f5a76055ed868913f` FAIL only Godex:
+`/tmp/gdx-04384-gemini-bound-response-qualified-before-oracle.json` and
+`/tmp/gdx-04384-gemini-unbound-response-qualified-before-oracle.json`.
+The bound case has a successful native seed followed by exact reference 503
+JSON, exit 2 and one total upstream request; old Godex returns plain 502.
+The unknown-ID case has exact reference fresh-input 200, exit 0 and one
+authenticated original request; old Godex times out without an upstream
+request or client exchange. Missing exchanges are explicitly retained as
+`client_error` and always fail independent invariants.
+The harness is `/tmp/gdx-04384-gemini-binding-qualified-differential`, with
+`/tmp/gdx-04384-gemini-body-godex`, the isolated release-gate source worktree,
+and `--gemini --scenario raw-key-bound-response-same-process` or
+`--gemini --scenario raw-key-unbound-response`.
+
+Both new fixtures independently require exact client body/type/exit/stdout,
+one original authenticated request, selected key slot and safe durable state.
+The owner auditor now pins provider as well as credential and endpoint digests;
+Gemini aliases derive only from an observed authenticated successful response.
+Matching mutations must fail, including a foreign provider. The shared
+same-process shim now rejects a failed seed before reporting any continuation
+result. No state allowlist or assertion was weakened.
+
+The first successful-replay expectation was disproved by the released binary;
+`/tmp/gdx-04384-gemini-history-before-oracle.json` is an unqualified FAIL.
+The first unknown-ID report also FAILed because its auditor understood only
+DeepSeek ownership, before the explicit provider pin and observed alias fix:
+`/tmp/gdx-04384-gemini-unbound-response-before-oracle.json`.
+An unverified Gemini restart test extension timed out after 15 seconds:
+`/tmp/gdx-04384-gemini-binding-focused-diagnostic.log`.
+Its original unbounded run was stopped with exit 143, not PASS. The extension
+was removed; DeepSeek restart/key/endpoint coverage remains, while Gemini
+restart requires its own released-executable fixture before extension.
+
+The focused regression command passes 52 tests across three packages:
+`rtk go test ./internal/usecase/routing ./internal/gateway/gemini ./tools/differential -run '^TestProdex04384((Gemini)?RawKeyContinuationFailsBeforeDispatch|RawKeyRejectsInvalidContinuationIdentity|GeminiUnboundPreviousResponseUsesFreshInput|GeminiContinuationOracleRejectsMatchingMutations|GeminiContinuationOwnerPinsProvider|SameProcessProbeRequiresSuccessfulSeed)$' -count=1 -timeout=30s`;
+log: `/tmp/gdx-04384-gemini-binding-reviewed-focused.log`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+passes 2,746 tests: `/tmp/gdx-04384-gemini-binding-race.log`.
+`rtk go test ./...` passes 9,387 tests across 81 packages:
+`/tmp/gdx-04384-gemini-binding-test-all.log`.
+`rtk proxy make verify` passes formatting, source/TUI guards, vet, full shuffled
+race tests, cross-platform build/test compilation, installers and build:
+`/tmp/gdx-04384-gemini-binding-verify.log`.
+Clean-commit executable verification follows. The new unit session/turn checks
+do not claim executable coverage. Gemini restart/Compact, broader lexical
+classes, native macOS/Windows and live authentication remain open.
+Global 1:1 parity remains unproven.

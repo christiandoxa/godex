@@ -12,7 +12,7 @@ import (
 
 const fixtureConflictOwner = "__prodex_hard_binding_conflict__"
 
-type fixtureContinuationOwner struct{ credential, endpoint string }
+type fixtureContinuationOwner struct{ credential, endpoint, provider string }
 
 func fixtureContinuationOwners(client exchange, upstream []upstreamRequest, endpoint string, prior map[string]fixtureContinuationOwner) map[string]fixtureContinuationOwner {
 	owners := make(map[string]fixtureContinuationOwner, len(prior)+1)
@@ -26,7 +26,7 @@ func fixtureContinuationOwners(client exchange, upstream []upstreamRequest, endp
 	if credential == "" {
 		return owners
 	}
-	owner := fixtureContinuationOwner{credential: fixtureBindingDigest("credential", credential), endpoint: fixtureBindingDigest("endpoint", endpoint)}
+	owner := fixtureContinuationOwner{credential: fixtureBindingDigest("credential", credential), endpoint: fixtureBindingDigest("endpoint", endpoint), provider: "deepseek"}
 	parts := []string{client.Body}
 	if strings.Contains(client.Headers.Get("Content-Type"), "text/event-stream") {
 		parts = nil
@@ -169,7 +169,7 @@ func validFixtureProdexBindings(bindings map[string]fixtureProdexBinding, expect
 		if binding.ProfileName == fixtureConflictOwner && binding.Identity == nil {
 			continue
 		}
-		if binding.ProfileName != "local" || binding.Identity == nil || binding.Identity.Provider != "deepseek" ||
+		if binding.ProfileName != "local" || binding.Identity == nil || binding.Identity.Provider != owner.provider ||
 			binding.Identity.Credential != owner.credential || binding.Identity.Endpoint != owner.endpoint {
 			return false
 		}

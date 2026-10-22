@@ -48,6 +48,7 @@ func rawKeyProbeSeedOwner(endpoint string) map[string]fixtureContinuationOwner {
 	return map[string]fixtureContinuationOwner{"chatcmpl-differential": {
 		credential: fixtureBindingDigest("credential", rotationSecondaryKey),
 		endpoint:   fixtureBindingDigest("endpoint", endpoint),
+		provider:   "deepseek",
 	}}
 }
 

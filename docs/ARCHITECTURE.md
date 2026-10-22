@@ -296,6 +296,14 @@ turn and session component against the existing 1,024-byte UTF-8/control
 invariant before owner lookup or credential attempts. Local routes retain their
 existing provider-specific ordering and owner policy.
 
+For non-local Gemini raw-key routes, a known response, turn or session binding
+cannot satisfy the profile-projected dispatch identity. `usecase/routing`
+returns the existing bound-continuation HTTP 503 before another gateway call.
+An unbound previous-response identifier uses the fresh-input fallback:
+`gateway/gemini` validates the complete JSON before removing that identifier
+from its stateless chat request. Gemini restart and Compact ownership remain
+separate audit surfaces; no persistence format or managed-profile policy changes.
+
 Local DeepSeek raw-key Compact and Models routes run before continuation validation and
 do not observe or persist continuation identities. The owning routing policy
 recognizes these existing local routes; their gateway still owns their payloads.

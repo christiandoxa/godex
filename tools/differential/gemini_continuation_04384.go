@@ -1,0 +1,104 @@
+package main
+
+import (
+	"errors"
+	"net/http"
+	"reflect"
+	"strings"
+)
+
+const (
+	geminiBoundResponseCase04384   = "raw-key-bound-response-same-process"
+	geminiUnboundResponseCase04384 = "raw-key-unbound-response"
+)
+
+func geminiContinuationCase04384(scenario string) bool {
+	return scenario == geminiBoundResponseCase04384 || scenario == geminiUnboundResponseCase04384
+}
+
+func geminiContinuationResponse04384() string {
+	body, _ := geminiSourceIDResponse04384("buffered-source-id-string")
+	return strings.Replace(body, "native-preserved", "chatcmpl-differential", 1)
+}
+
+func geminiContinuationOwners04384(scenario string, result geminiCandidateResult, endpoint string) map[string]fixtureContinuationOwner {
+	var upstream []upstreamRequest
+	for _, request := range result.Upstream {
+		upstream = append(upstream, upstreamRequest{KeySlot: request.Slot})
+	}
+	owners := fixtureContinuationOwners(result.Client, upstream, endpoint, nil)
+	for id, owner := range owners {
+		owner.provider = "gemini"
+		owners[id] = owner
+	}
+	if scenario == geminiUnboundResponseCase04384 {
+		if owner, verified := owners["chatcmpl-differential"]; verified {
+			owners["chatcmpl-unknown"] = owner
+		}
+	}
+	return owners
+}
+
+func geminiContinuationInvariant04384(scenario string, result geminiCandidateResult) error {
+	if result.ClientError != "" || len(result.Upstream) != 1 || result.Stdout != result.Client.Body+"\n" || len(result.StateIntegrity) != 0 {
+		return errors.New("Gemini raw-key lineage lost client response, one original attempt or durable state")
+	}
+	request := result.Upstream[0]
+	want := map[string]any{"model": "gemini-3.1-pro-preview", "stream": false,
+		"messages": []any{map[string]any{"role": "user", "content": "same request"}}}
+	if request.Method != "POST" || request.Path != "/v1beta/openai/chat/completions" || !request.Auth || request.Slot != "single" || !reflect.DeepEqual(request.Body, want) {
+		return errors.New("Gemini raw-key lineage changed original request or credential")
+	}
+	body := strings.Replace(geminiBufferedBodySuccess04384, "response-uuid", "chatcmpl-differential", 1)
+	status, exit, contentType := 200, 0, "application/json; charset=utf-8"
+	if scenario == geminiBoundResponseCase04384 {
+		body = `{"error":{"code":"bound_continuation_unavailable","message":"bound continuation provider is unavailable"}}`
+		status, exit, contentType = 503, 2, "application/json"
+	}
+	if result.Client.Body != body || result.Client.Status != status || result.ExitCode != exit || result.Client.Headers.Get("Content-Type") != contentType {
+		return errors.New("Gemini raw-key bound rejection or unbound fresh response differs exactly")
+	}
+	return nil
+}
+
+func geminiContinuationNegativeControl04384() bool {
+	for _, scenario := range []string{geminiBoundResponseCase04384, geminiUnboundResponseCase04384} {
+		body := strings.Replace(geminiBufferedBodySuccess04384, "response-uuid", "chatcmpl-differential", 1)
+		run := geminiCandidateResult{Client: exchange{Status: 200, Body: body, Headers: http.Header{"Content-Type": {"application/json; charset=utf-8"}}},
+			Upstream: []geminiCapturedRequest{{Method: "POST", Path: "/v1beta/openai/chat/completions", Auth: true, Slot: "single",
+				Body: map[string]any{"model": "gemini-3.1-pro-preview", "stream": false,
+					"messages": []any{map[string]any{"role": "user", "content": "same request"}}}}}}
+		if scenario == geminiBoundResponseCase04384 {
+			run.Client.Body = `{"error":{"code":"bound_continuation_unavailable","message":"bound continuation provider is unavailable"}}`
+			run.Client.Status, run.ExitCode = 503, 2
+			run.Client.Headers.Set("Content-Type", "application/json")
+		}
+		run.Stdout = run.Client.Body + "\n"
+		if len(geminiCompare(scenario, run, run)) != 0 {
+			return false
+		}
+		for _, mutate := range []func(*geminiCandidateResult){
+			func(r *geminiCandidateResult) { r.ClientError = "missing exchange" },
+			func(r *geminiCandidateResult) { r.Client.Status++ },
+			func(r *geminiCandidateResult) { r.ExitCode++ },
+			func(r *geminiCandidateResult) { r.Client.Body = `{}` },
+			func(r *geminiCandidateResult) { r.Stdout = "changed" },
+			func(r *geminiCandidateResult) { r.Client.Headers.Set("Content-Type", "text/plain") },
+			func(r *geminiCandidateResult) { r.StateIntegrity = []string{"changed"} },
+			func(r *geminiCandidateResult) { r.Upstream = nil },
+			func(r *geminiCandidateResult) { r.Upstream = append(r.Upstream, r.Upstream[0]) },
+			func(r *geminiCandidateResult) { r.Upstream[0].Auth = false },
+			func(r *geminiCandidateResult) { r.Upstream[0].Slot = "secondary" },
+			func(r *geminiCandidateResult) { r.Upstream[0].Body = map[string]any{} },
+		} {
+			changed := run
+			changed.Client.Headers = run.Client.Headers.Clone()
+			changed.Upstream = append([]geminiCapturedRequest(nil), run.Upstream...)
+			mutate(&changed)
+			if len(geminiCompare(scenario, changed, changed)) == 0 {
+				return false
+			}
+		}
+	}
+	return true
+}
