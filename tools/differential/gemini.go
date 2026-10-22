@@ -96,7 +96,8 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	_, userID := geminiUserIDCase04384(mock.scenario)
 	_, parallel := geminiParallelControl04384(mock.scenario)
-	if geminiRequestNumberCase04384(mock.scenario) || userID || parallel {
+	_, _, _, controlTypes := geminiControlTypeCase04384(mock.scenario)
+	if geminiRequestNumberCase04384(mock.scenario) || userID || parallel || controlTypes {
 		record.RawBody = string(body)
 	}
 	mock.mu.Lock()
@@ -162,7 +163,7 @@ func (mock *geminiMock) serve(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, response)
 		return
 	}
-	if geminiContinuationCase04384(mock.scenario) || geminiRequestNumberCase04384(mock.scenario) || userID || parallel {
+	if geminiContinuationCase04384(mock.scenario) || geminiRequestNumberCase04384(mock.scenario) || userID || parallel || controlTypes {
 		_, _ = io.WriteString(w, geminiContinuationResponse04384())
 		return
 	}
@@ -233,6 +234,8 @@ func (mock *geminiMock) recorded() []geminiCapturedRequest {
 
 func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit, selected string) error {
 	cases := []string{
+		"request-control-stream-false", "request-control-stream-null", "request-control-stream-string", "request-control-stream-number",
+		"request-control-instructions-null", "request-control-instructions-array", "request-control-previous-null", "request-control-previous-array", "request-control-previous-number",
 		"request-parallel-true", "request-parallel-false", "request-parallel-null", "request-parallel-number", "request-parallel-string", "request-parallel-array", "request-parallel-object",
 		"request-user-id-absent", "request-user-id-canonical", "request-user-id-user-alias", "request-user-id-safety-alias", "request-user-id-blank",
 		"request-user-id-trim-limit", "request-user-id-null", "request-user-id-number", "request-user-id-over-limit", "request-user-id-invalid-character",
@@ -382,7 +385,8 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	requestNumbers := geminiRequestNumberCase04384(scenario)
 	_, userID := geminiUserIDCase04384(scenario)
 	_, parallel := geminiParallelControl04384(scenario)
-	auditState := rawIdentity || bodyBoundary || continuation || requestNumbers || userID || parallel
+	_, _, _, controlTypes := geminiControlTypeCase04384(scenario)
+	auditState := rawIdentity || bodyBoundary || continuation || requestNumbers || userID || parallel || controlTypes
 	if auditState {
 		childResult = filepath.Join(home, "child-exchange.json")
 	}
@@ -398,6 +402,9 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	defer cancel()
 	env := productEnv(name, stateHome, codexHome, userHome, shim, childResult, runOptions{})
 	env = append(env, "DIFFERENTIAL_PROVIDER=gemini")
+	if controlTypes {
+		env = append(env, "DIFFERENTIAL_GEMINI_CONTROL_TYPES="+scenario)
+	}
 	if parallel {
 		env = append(env, "DIFFERENTIAL_GEMINI_PARALLEL="+scenario)
 	}
@@ -465,7 +472,7 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 		exitCode = childExit.ExitCode()
 	}
 	result, readErr := readExchange(childResult)
-	if readErr != nil && !continuation && !userID && !parallel {
+	if readErr != nil && !continuation && !userID && !parallel && !controlTypes {
 		return geminiCandidateResult{}, fmt.Errorf("child response missing: %w stderr=%q upstream=%v",
 			readErr, redact(stderr.String()), mock.recorded())
 	}
@@ -510,6 +517,9 @@ func geminiCompare(scenario string, prodex, godex geminiCandidateResult) []strin
 		return differences
 	}
 	if _, known := geminiParallelControl04384(scenario); known {
+		return differences
+	}
+	if _, _, _, known := geminiControlTypeCase04384(scenario); known {
 		return differences
 	}
 	if _, known := geminiBufferedBodyCase04384(scenario); known {
@@ -613,6 +623,12 @@ func geminiSemanticEqual043711(left, right map[string]any) bool {
 }
 
 func geminiFixtureInvariant(scenario string, result geminiCandidateResult) error {
+	if _, _, _, known := geminiControlTypeCase04384(scenario); known {
+		if err := geminiUserIDInvariant04384(geminiControlTypeExpectation04384(scenario), result); err != nil {
+			return errors.New("Gemini control type lost exact prepared failure or accepted original request")
+		}
+		return nil
+	}
 	if _, known := geminiParallelControl04384(scenario); known {
 		return geminiParallelInvariant04384(result)
 	}

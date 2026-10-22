@@ -4674,6 +4674,28 @@ Gemini Compact, session/turn executable continuation, native macOS/Windows
 and live authentication remain separate audits. Global 1:1 parity is not claimed.
 
 
+## Validated Gemini user identity checkpoint: 4450527
+
+Clean `4450527691a17a3a1db7b08bdfabdb05dfb78acc` passes all 73 Gemini cases
+and all 125 DeepSeek scenarios, including both independent mutation sets:
+`/tmp/gdx-04384-gemini-user-id-oracle.json` and
+`/tmp/gdx-04384-gemini-user-id-deepseek-oracle.json`.
+Valid aliases and trim/length controls preserve the exact canonical original
+request. Invalid identities, including two configured keys, produce the exact
+terminal plain 502 with no upstream attempt, while all preceding numeric,
+buffered, continuation and stream fixtures remain matched.
+
+Clean builds use
+`rtk go build -trimpath -o /tmp/gdx-04384-gemini-user-id-godex ./cmd/godex` and
+`rtk go build -trimpath -o /tmp/gdx-04384-gemini-user-id-final-differential ./tools/differential`.
+The executable commands use the unchanged pinned reference, `--gemini`, or
+`--scenario all --scenario-workers 3`. The clean primary worktree and unchanged
+remote were checked before direct fast-forward push to `origin/main` at
+`4450527`. No CI wait, force push, tag, release or editor-worktree change
+occurred. The complete default-script milestone remains scoped to clean
+`8730116`; global 1:1 parity remains unproven.
+
+
 ## Gemini ignores the parallel-tool control after complete JSON validation
 
 The pinned Gemini chat request path deliberately skips
@@ -4733,3 +4755,62 @@ Clean-commit 80-case Gemini/125-case DeepSeek matrices follow.
 Other controls and combined-error ordering, Gemini Compact,
 session/turn executable continuation, native macOS/Windows and live
 authentication remain separate audits. Global 1:1 parity is not claimed.
+
+
+## Gemini control-type admission before continuation normalization
+
+The pinned `provider_core_chat_compatible_validate_top_level_request_shape`
+requires present `stream` values to be booleans and present `instructions`
+and `previous_response_id` values to be strings. This validation runs before
+request construction in `chat_compatible_request.rs:44–137`. Godex admitted
+other JSON types: its Chat converter defaulted invalid stream values to false,
+ignored invalid instructions, and its fresh-input normalization removed a
+non-string previous-response ID. Such a request could become fresh upstream
+work instead of the tagged terminal local preparation failure.
+
+The private Gemini adapter now checks these three control types after complete
+serde decoding and before user-ID/continuation normalization. Invalid input
+returns the existing terminal plain 502 `upstream request failed`; the existing
+routing preparation-error boundary prevents a model/key replay or wait.
+The check stays in `gateway/gemini`, with no new production package, shared
+helper, exported identifier, dependency, state field, configuration or worker.
+This stage does not change model selection or claim all top-level fields.
+
+Before repair, the table-driven regression passes six valid-type controls and
+fails eighteen invalid-type cases plus parent:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiControlTypesAreCheckedBeforeNormalization$' -count=1`;
+`/tmp/gdx-04384-gemini-control-types-before.log`.
+It covers null, booleans, strings, number, array and object values for each
+field. After repair, the new regression and preceding Gemini request contracts
+pass 64 tests:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384Gemini(ControlTypesAreCheckedBeforeNormalization|Chat(IgnoresParallelToolControl|UserIDUsesTaggedAliasesAndValidation|RequestPreservesSerdeToolNumbers|RequestDecodersRequireCompleteObject))$' -count=1`;
+`/tmp/gdx-04384-gemini-control-types-focused.log`.
+
+Nine strict baseline cases use clean
+`163d67eb9043439554e7a5dd9662c939db7bdb27` and the unchanged pinned reference.
+The stream-false control PASSes both products; stream-null/string/number,
+instructions-null/array and previous-null/array/number FAIL only Godex.
+All reference and independent matching-corruption invariants are satisfied:
+`/tmp/gdx-04384-gemini-control-<suffix>-before-oracle.json`.
+Invalid reference requests return the exact plain 502, exit 2 and zero upstream
+attempts. Old Godex returns 200 after submitting normalized input upstream.
+The harness is `/tmp/gdx-04384-gemini-control-types-differential`, the candidate
+is `/tmp/gdx-04384-gemini-parallel-control-godex`, and commands use the clean
+parallel-control source with `--gemini --scenario request-control-<suffix>`.
+Fixtures reuse the exact accepted/preparation-failure contracts already
+independently checked for user IDs; they still require exact client body/type/
+status/exit/stdout, authenticated original raw request where accepted and safe
+durable state. Missing child exchanges never satisfy the contract.
+
+`rtk go test ./tools/differential -count=1` passes 274 tests before the
+production repair: `/tmp/gdx-04384-gemini-control-types-oracle-tests.log`.
+`rtk proxy go test -json ./...` passes 9,471 tests across 81 packages:
+`/tmp/gdx-04384-gemini-control-types-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+passes 2,830 tests: `/tmp/gdx-04384-gemini-control-types-race.log`.
+`rtk proxy make verify` passes all local completion gates:
+`/tmp/gdx-04384-gemini-control-types-verify.log`.
+Clean-commit 89-case Gemini/125-case DeepSeek matrices follow.
+Other controls, combined validation-error
+ordering, Gemini Compact, session/turn executable continuation, native
+macOS/Windows and live authentication remain open. Global 1:1 parity is not claimed.

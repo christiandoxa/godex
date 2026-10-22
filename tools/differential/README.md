@@ -231,6 +231,14 @@ return the same native response after one attempt. A false value must not
 become an unrelated local rejection. Existing independent fresh-response
 invariants are reused; matching leaked raw control bytes must also fail.
 
+Gemini `request-control-*` cases require the released terminal plain 502 and
+zero upstream attempts for null/string/number stream controls, null/array
+instructions, and null/array/number previous-response IDs. The stream-false
+control must preserve the exact successful original request and response.
+The existing strict accepted/preparation-failure fixture contracts are reused,
+including body/type/status/exit/stdout, credential, raw request and safe state.
+Matching corruptions cannot turn an invalid control into fresh work.
+
 The 0.438.4 `deepseek-sse-error-presence`, `deepseek-sse-error-i64` and
 `deepseek-sse-error-float` scenarios verify embedded-error primary-field
 presence and signed numeric kinds. Each must produce one failure frame

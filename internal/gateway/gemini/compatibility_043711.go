@@ -106,6 +106,9 @@ func normalizeGeminiChatInput043711(body []byte) ([]byte, error) {
 	if err != nil {
 		return nil, errors.New("invalid Gemini Responses request")
 	}
+	if !validGeminiChatControlTypes04384(root) {
+		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
+	}
 	if err := normalizeGeminiUserID04384(root); err != nil {
 		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
@@ -140,6 +143,22 @@ func decodeGeminiChatRequest04384(body []byte) (map[string]any, error) {
 		return nil, errors.New("Gemini chat request must contain one JSON value")
 	}
 	return request, nil
+}
+
+func validGeminiChatControlTypes04384(request map[string]any) bool {
+	if value, present := request["stream"]; present {
+		if _, valid := value.(bool); !valid {
+			return false
+		}
+	}
+	for _, field := range []string{"instructions", "previous_response_id"} {
+		if value, present := request[field]; present {
+			if _, valid := value.(string); !valid {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // Tagged Prodex 0.437.11 uses the Gemini *native* response normalizer

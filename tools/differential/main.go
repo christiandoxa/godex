@@ -1132,6 +1132,9 @@ func runCodexShim(arguments []string) int {
 	if scenario := os.Getenv("DIFFERENTIAL_GEMINI_PARALLEL"); scenario != "" {
 		requestBody = geminiParallelInput04384(scenario)
 	}
+	if scenario := os.Getenv("DIFFERENTIAL_GEMINI_CONTROL_TYPES"); scenario != "" {
+		requestBody = geminiControlTypeInput04384(scenario)
+	}
 	if strings.HasPrefix(os.Getenv("DIFFERENTIAL_CONTINUATION_PHASE"), "resume") {
 		requestBody = []byte(strings.TrimSuffix(string(requestBody), "}") + `,"previous_response_id":"chatcmpl-differential"}`)
 	}
