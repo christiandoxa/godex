@@ -9415,3 +9415,42 @@ expected Godex-only FAIL and is retained as FAIL. Audit:
 clean revision; cmd/internal production code equals exact 5c15397. This
 qualifies the diagnostic tooling only. The fixture commit is pushed directly
 to origin/main after fetch, cleanliness and ancestry checks; no CI wait.
+
+### Emit the complete one-turn Gemini streamed-tool lifecycle
+
+The existing Gemini producer now owns text and all first-choice tool deltas
+directly, removing its generic single-event round trip. Private per-index state
+retains accepted identities/names/signatures and raw argument fragments. It
+announces tools without arguments, emits unmodified fragments with their output
+index, validates names/JSON before completion, and emits unfinished items once
+in sorted index order. Completion retains the current tool output and final
+usage. Shell arguments are wrapped with the existing RTK converter only at
+completion; search/patch output reuses the owning Gemini native item converter.
+Streaming name splitting stays local because its separator semantics differ
+from the buffered adapter. No concrete DeepSeek adapter, shared helper, export,
+dependency, worker, public option or persisted format is added.
+
+Aggregate tool retention is bounded at 64 MiB with a 128-byte reserve per
+accepted entry; completion text now has an independent explicit 64 MiB limit.
+These bounds preserve the existing index-cap ceiling and stop with one failure.
+Larger streams remain unqualified. Post-failure text still forwards without
+retaining completion text, and the original request/body close owner remains
+unchanged. Tool continuation snapshots remain uncached and unqualified; this
+stage qualifies one-turn event/argument behavior only.
+
+Four narrow lifecycle regressions fail before the fix. Initial focused Gemini
+and differential tests PASS 2,179 cases, followed by count-1 memory, fallback
+UUID/empty-ID and streaming-separator regressions. The ten independent
+executable fail-before cases retain their original FAIL reports. They now join
+the candidate's default matrix, reaching 934 cases; full local and exact clean
+executable qualification follow before publication of the producer change.
+
+Full local validation PASSes 10,908 tests with 18 optional SKIP; make verify
+exits 0 including race tests, cross-builds, vet and source/format guards. Exact
+commands:
+`rtk proxy go test -json ./... > /tmp/gdx-04384-gemini-stream-tool-lifecycle-full.jsonl 2>&1`
+and `rtk proxy make verify > /tmp/gdx-04384-gemini-stream-tool-lifecycle-verify.log 2>&1`.
+The producer stage replaces the old incomplete event adapter and its admission
+map together so every intermediate commit compiles; diagnostic fixtures were
+published separately to keep this protocol change reviewable. Exact clean
+executable qualification follows before promotion.

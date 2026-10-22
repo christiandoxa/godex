@@ -1092,9 +1092,8 @@ durable state are asserted separately for each product; matching corruption of
 those values or of the failure/continuation wire must fail. Successful tool
 lifecycles, accumulated arguments and tool snapshots remain outside this scope.
 
-The new streamed-tool lifecycle diagnostics are explicit `--scenario` probes
-while their producer correction is in progress. They cover raw argument
-fragments, item/index ordering, validation, shell completion and search/patch
-items. Their documented Godex mismatches remain FAIL; they join the default
-matrix only with the qualified producer correction. The current default stays
-at 924 Gemini cases. Continuation snapshots remain a separate qualification.
+Ten streamed-tool lifecycle cases cover raw argument fragments, item/index
+ordering, validation, shell completion, search/patch items and empty arguments.
+Their independent before reports retain the original Godex FAILs. The producer
+correction adds these cases to the default matrix, reaching 934 Gemini cases.
+Continuation snapshots remain a separate qualification.

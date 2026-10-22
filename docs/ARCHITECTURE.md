@@ -275,16 +275,24 @@ and suppress completion/cache; the terminal sentinel still stops upstream reads.
 Post-failure visible text is forwarded without retaining unused completion text.
 New tool indices require a function object, while known indices may omit it.
 Index projection retains Serde's unsigned integer/default rules. A private
-index-ownership map is bounded at 524,288 entries; excess ends the stream with
-an explicit failure. This adds no package, port, worker or persisted state.
+per-tool map retains raw argument fragments, identity, name and signature.
+Text precedes tool deltas, announcements omit arguments, and finish/DONE
+validates all tools before emitting unfinished items in index order. Incoming
+argument deltas stay raw; RTK wrapping occurs at item completion. Streaming
+name splitting stays private because its trailing-separator rule differs from
+the native buffered adapter. Search/patch completion reuses the native item
+converters; no concrete DeepSeek adapter is imported. Aggregate tool retention
+is bounded at 64 MiB including a 128-byte reserve per tool; visible completion
+text is independently bounded at 64 MiB. Excess fails explicitly. This adds
+no package, port, worker or persisted state.
 Refusal strings and annotation arrays accumulate in first-choice chunk order;
 completion retains nonempty values and exact opaque annotation numbers. The
 same stream owner bounds combined refusal/annotation retention at 64 MiB of
 UTF-8 refusal bytes and serialized annotation chunks, independently of reasoning.
 Excess fails once without completion or a conversation snapshot update.
 Reasoning retention is bounded at 64 MiB; excess terminates the existing stream
-with one failure and no completion or cache update. Tool streams retain their
-existing uncached behavior until complete argument snapshots are qualified.
+with one failure and no completion or cache update. Tool streams remain
+uncached until executable continuation snapshots are qualified.
 DeepSeek's runtime preparation retains the tagged distinction between emitted
 stateless messages and pending reconstructed history. The request-shape policy
 stays private to gateway/deepseek and consumes only a bounded store-membership

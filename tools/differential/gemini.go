@@ -444,12 +444,13 @@ func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit, selec
 	cases = append(cases, geminiStreamMessageMetadataCases04384()...)
 	cases = append(cases, geminiStreamProjectionCases04384()...)
 	cases = append(cases, geminiStreamToolAdmissionCases04384()...)
+	cases = append(cases, geminiStreamToolLifecycleCases04384()...)
 	cases = append(cases, geminiIgnoredControlCases04384()...)
 	for _, suffix := range geminiControlTypeSuffixes04384() {
 		cases = append(cases, "request-control-"+suffix)
 	}
 	if selected != "all" {
-		if !slices.Contains(cases, selected) && !geminiStreamToolLifecycleCase04384(selected) {
+		if !slices.Contains(cases, selected) {
 			return fmt.Errorf("unknown Gemini scenario %q", selected)
 		}
 		cases = []string{selected}

@@ -1,9 +1,7 @@
 package gemini
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -71,7 +69,8 @@ type geminiChatCompatibleStream043711 struct {
 	refusal              strings.Builder
 	annotations          []any
 	messageMetadataBytes int
-	toolIndices          map[uint64]struct{}
+	toolCalls            map[uint64]*geminiChatStreamTool04384
+	toolBytes            int
 }
 
 func (state *geminiChatCompatibleStream043711) send(writer io.Writer, event string, fields map[string]any) error {
@@ -105,6 +104,9 @@ func (state *geminiChatCompatibleStream043711) complete(writer io.Writer) error 
 	if state.done {
 		return nil
 	}
+	if err := state.completeToolEvents(writer); err != nil || state.done {
+		return err
+	}
 	if err := state.completeReasoning(writer); err != nil {
 		return err
 	}
@@ -125,6 +127,9 @@ func (state *geminiChatCompatibleStream043711) complete(writer io.Writer) error 
 		output = append(output, map[string]any{
 			"type": "message", "role": "assistant", "content": contents,
 		})
+	}
+	for _, index := range state.orderedToolIndices() {
+		output = append(output, geminiChatCompletedToolItem04384(state.toolCalls[index]))
 	}
 	state.done = true
 	completed := map[string]any{"id": state.id, "output": output}
@@ -164,7 +169,7 @@ func (state *geminiChatCompatibleStream043711) complete(writer io.Writer) error 
 	if state.usage != nil {
 		completed["usage"] = state.usage
 	}
-	// shortcut: tool snapshots need complete argument capture; qualify those paths before caching them.
+	// shortcut: tool snapshots are not cached, qualify executable continuations before enabling them.
 	if !state.complexDelta {
 		message := map[string]any{"content": state.text.String()}
 		if state.reasoning.Len() > 0 {
@@ -275,51 +280,7 @@ func (state *geminiChatCompatibleStream043711) accept(writer io.Writer, data []b
 	if err := state.observeMessageMetadata(writer, root); err != nil || state.eof {
 		return err
 	}
-	translated, supported, err := chatcompat.TranslateChatSSEData(bytes.TrimSpace(data))
-	if err != nil {
-		return err
-	}
-	if !supported {
-		return state.observeToolAdmission(writer, root)
-	}
-	// TranslateChatSSEData returns a single Responses SSE frame. Decode its
-	// bounded payload, attach the canonical sequence, and retain visible text
-	// for the final response. Gemini-native chunks are ignored above.
-	decoder := sse.NewDecoder(len(translated))
-	messages := decoder.Feed(translated)
-	messages = append(messages, decoder.Finish()...)
-	for _, raw := range messages {
-		var event map[string]any
-		decoder := json.NewDecoder(bytes.NewReader(raw))
-		decoder.UseNumber()
-		if err := decoder.Decode(&event); err != nil {
-			return err
-		}
-		name, _ := event["type"].(string)
-		switch name {
-		case "response.completed":
-			if bytes.Equal(bytes.TrimSpace(data), []byte("[DONE]")) {
-				return state.complete(writer)
-			}
-		case "response.output_text.delta":
-			if err := state.openTextItem(writer); err != nil {
-				return err
-			}
-			if text, ok := event["delta"].(string); ok && !state.done {
-				state.text.WriteString(text)
-			}
-			event["created_at"] = state.created
-			event["response_id"] = state.id
-			if err := state.send(writer, name, event); err != nil {
-				return err
-			}
-		case "response.function_call_arguments.delta", "response.reasoning_summary_text.delta":
-			if err := state.send(writer, name, event); err != nil {
-				return err
-			}
-		}
-	}
-	return state.observeToolAdmission(writer, root)
+	return state.observeChoiceOutput(writer, root)
 }
 
 func pumpGeminiChatCompatibleStream043711(ctx context.Context, source io.ReadCloser, writer *io.PipeWriter, requestMetadata map[string]any, conversation *geminiChatConversation04384) {

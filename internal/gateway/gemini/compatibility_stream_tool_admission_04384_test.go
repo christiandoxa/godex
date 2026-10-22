@@ -111,9 +111,10 @@ func TestProdex04384GeminiChatSSEKnownToolIndexMayOmitFunction(t *testing.T) {
 }
 
 func TestProdex04384GeminiChatSSEBoundsRetainedToolIndices(t *testing.T) {
-	state := geminiChatCompatibleStream043711{id: "resp_deepseek_synthetic", created: 1, toolIndices: make(map[uint64]struct{}, geminiStreamMetadataMaxBytes04384/128)}
+	state := geminiChatCompatibleStream043711{id: "resp_deepseek_synthetic", created: 1, toolCalls: make(map[uint64]*geminiChatStreamTool04384, geminiStreamMetadataMaxBytes04384/128), toolBytes: geminiStreamMetadataMaxBytes04384}
+	tool := &geminiChatStreamTool04384{bytes: 128}
 	for index := range geminiStreamMetadataMaxBytes04384 / 128 {
-		state.toolIndices[uint64(index)] = struct{}{}
+		state.toolCalls[uint64(index)] = tool
 	}
 	var wire bytes.Buffer
 	if err := state.accept(&wire, []byte(`{"choices":[{"delta":{"tool_calls":[{"function":{}}]}}]}`)); err != nil || state.done {
@@ -122,7 +123,7 @@ func TestProdex04384GeminiChatSSEBoundsRetainedToolIndices(t *testing.T) {
 	if err := state.accept(&wire, []byte(`{"choices":[{"delta":{"tool_calls":[{"index":18446744073709551615,"function":{}}]}}]}`)); err != nil {
 		t.Fatal(err)
 	}
-	if !state.done || !state.eof || len(state.toolIndices) != geminiStreamMetadataMaxBytes04384/128 || strings.Count(wire.String(), "event: response.failed") != 1 || !strings.Contains(wire.String(), "provider tool state exceeded safe size limit") {
+	if !state.done || !state.eof || len(state.toolCalls) != geminiStreamMetadataMaxBytes04384/128 || state.toolBytes != geminiStreamMetadataMaxBytes04384 || strings.Count(wire.String(), "event: response.failed") != 1 || !strings.Contains(wire.String(), "provider tool state exceeded safe size limit") {
 		t.Fatal("tool index retention exceeded its budget or lost the explicit failure")
 	}
 }
