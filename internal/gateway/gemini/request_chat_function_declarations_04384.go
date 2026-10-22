@@ -23,6 +23,16 @@ func normalizeGeminiChatFunctionDeclarations04384(root map[string]any) bool {
 			return false
 		}
 		kind, _ := tool["type"].(string)
+		if kind != "function" && kind != "custom" && kind != "namespace" && kind != "tool_search" && !strings.HasPrefix(kind, "mcp") && geminiChatBuiltinTool04384(tool) {
+			converted, valid := geminiChatBuiltinFunction04384(tool)
+			if !valid {
+				return false
+			}
+			if converted != nil {
+				tools = append(tools, converted)
+			}
+			continue
+		}
 		if kind == "custom" || kind == "namespace" || strings.HasPrefix(kind, "mcp") {
 			function, _ := tool["function"].(map[string]any)
 			if !validGeminiChatFunctionFields04384(tool) || !validGeminiChatFunctionFields04384(function) {
@@ -58,7 +68,7 @@ func normalizeGeminiChatFunctionDeclarations04384(root map[string]any) bool {
 			}
 			tools = append(tools, converted)
 		} else {
-			// shortcut: builtin/unknown kinds retain existing conversion until their wire is qualified.
+			// shortcut: search/unknown kinds retain existing conversion until their wire is qualified.
 			tools = append(tools, raw)
 		}
 	}

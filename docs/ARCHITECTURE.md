@@ -583,7 +583,16 @@ schema and tagged guidance, including apply_patch's case-sensitive grammar and
 canonical original-format JSON embedded in the description. Later admission
 keeps description/strict types, rejects enabled strict and validates the format
 object/type before normal function validation and duplicate/choice binding.
-Native custom conversion remains separate; builtin/unknown kinds await audit.
+Native custom conversion remains separate. Chat builtin classification recognizes
+the tagged aliases and object-key presence, after checking a present function
+field. Later host validation still checks typed builtin description/strict
+fields. Builtins normally emit no function; a non-web builtin with a flat MCP
+name and schema uses the existing MCP/function projector. The count limit follows
+projection and deduplication, and named choices bind to projected functions.
+Early local-media exemptions recurse within each original tool, preserve path-key
+presence and never suppress another tool's validation. Later host admission
+still applies. Native builtin validation/conversion retains its independent
+contract; search and unknown kinds remain under audit.
 All supported call/tool-output items require a nonblank identity selected from
 the first string `call_id`, `tool_call_id`, then `id`. This local admission runs
 before conversion or orphan filtering can silently drop the malformed item.

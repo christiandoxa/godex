@@ -35,9 +35,21 @@ func validateGeminiChatCompatibleTools04380(body []byte) error {
 		if !ok {
 			return fmt.Errorf("invalid_tool_declaration: Gemini request field `tools[%d]` must be an object", index)
 		}
+		if geminiChatToolHasLocalMedia04384(tool, 0) {
+			continue
+		}
 		kind, _ := tool["type"].(string)
 		_, nested := tool["function"]
-		if (kind == "custom" || kind == "namespace" || strings.HasPrefix(kind, "mcp")) && !nested {
+		if nested {
+			if err := validateGeminiToolDeclaration(map[string]any{"function": tool["function"]}, index); err != nil {
+				return err
+			}
+			continue
+		}
+		if kind != "function" && geminiChatBuiltinTool04384(tool) {
+			continue
+		}
+		if kind == "custom" || kind == "namespace" || strings.HasPrefix(kind, "mcp") {
 			var converted []any
 			if kind == "custom" {
 				converted = projectGeminiChatCustomDeclarations04384(tool)
@@ -56,7 +68,7 @@ func validateGeminiChatCompatibleTools04380(body []byte) error {
 			}
 			continue
 		}
-		if kind == "function" && !nested {
+		if kind == "function" {
 			function := make(map[string]any, 3)
 			for _, key := range []string{"name", "parameters", "description"} {
 				if value, present := tool[key]; present {
@@ -70,4 +82,33 @@ func validateGeminiChatCompatibleTools04380(body []byte) error {
 		}
 	}
 	return nil
+}
+
+func geminiChatToolHasLocalMedia04384(value any, depth int) bool {
+	if depth > 256 {
+		return false
+	}
+	switch value := value.(type) {
+	case map[string]any:
+		switch value["type"] {
+		case "input_image", "image_url", "input_file", "file", "media", "input_audio", "input_video":
+			for _, key := range []string{"path", "file_path", "filePath"} {
+				if _, present := value[key]; present {
+					return true
+				}
+			}
+		}
+		for _, nested := range value {
+			if geminiChatToolHasLocalMedia04384(nested, depth+1) {
+				return true
+			}
+		}
+	case []any:
+		for _, nested := range value {
+			if geminiChatToolHasLocalMedia04384(nested, depth+1) {
+				return true
+			}
+		}
+	}
+	return false
 }

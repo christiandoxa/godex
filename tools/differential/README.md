@@ -79,6 +79,11 @@ admission, canonical embedded numeric/Unicode JSON, duplicate policy, named
 choice and real SSE. Matching corruptions change raw and decoded requests
 together, including grammar, schema limits, description separators and numeric
 text inside the embedded format string.
+The 46 `request-primitive-builtin-*` cases cover builtin aliases/key presence,
+function precedence, later host field types, omitted tools, MCP-prefixed
+functions, projected counts/choices and SSE. Per-tool recursive media controls
+require path-key presence and preserve invalid earlier/later tool errors.
+Matching mutations reject incorrect tool presence, names, types and choices.
 
 Build and run from a clean, committed Godex worktree:
 

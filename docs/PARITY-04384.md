@@ -8160,3 +8160,76 @@ Global 1:1 parity is not claimed.
 Clean c086278 separately PASSes all 20 targeted namespace-declaration cases,
 with exact source/reference pins, state and independent mutations. Its full
 700-case matrix remains pending; no broader qualification is attributed.
+
+## Gemini Chat builtin admission and projection
+
+Pinned `provider_constraints.mojo:5428-5441,7798-7950` recognizes builtin aliases
+and the presence of computerUse/codeExecution/urlContext keys, while a present
+function field takes precedence and must validate. Later `deepseek.mojo:2965`
+still rejects unsupported string kinds and invalid description/strict types;
+missing/non-string kinds skip that host pass. `chat_tools.mojo:14-34` normally
+projects builtins to no function. Non-web builtins with flat MCP-prefixed names
+and a present schema can project through `chat_tool_shapes.mojo:88-117`.
+Web builtins remain omitted even with that name/schema. Function counts and
+named choices operate on projected, deduplicated functions.
+
+Forty-six independent executable baselines pin clean old production
+`521dcc2a072671b83039e382c99394e735eef5ca` and the unchanged official 0.438.4
+source, binary and manifest. Thirty-seven FAIL only Godex; nine controls PASS.
+All reference, independent mutation and durable-state assertions pass.
+Reports: `/tmp/gdx-04384-gemini-builtin-<suffix>-before-oracle.json`;
+commands: `/tmp/gdx-04384-gemini-builtin-declarations-before-commands.json`;
+additional media commands: `/tmp/gdx-04384-gemini-builtin-media-before-commands.json`;
+audit: `/tmp/gdx-04384-gemini-builtin-declarations-complete-before-audit.json`.
+The same final regression copied alone to old production in
+`/tmp/gdx-04384-gemini-builtin-declarations-before-work` FAILs 67 tests including
+the parent, with fourteen controls PASS:
+`rtk proxy go test -json ./internal/gateway/gemini -run '^TestProdex04384GeminiChatBuiltinDeclarationsPreservePipeline$' -count=1`.
+Log: `/tmp/gdx-04384-gemini-builtin-declarations-media-gateway-before.jsonl`.
+After repair,
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiChatBuiltinDeclarationsPreservePipeline$' -count=1`
+PASSes all 81: `/tmp/gdx-04384-gemini-builtin-declarations-gateway-final-focused.log`.
+The table checks exact buffered/SSE wire, output, status, attempts and early
+structured validation errors without upstream dispatch.
+The recursive local-media exemption from `provider_constraints.mojo:7509`
+applies per original tool, uses presence of path/file_path/filePath even for
+null/non-string values, and never exempts a different array element. Missing
+path/wrong media types retain structured errors; later host validation still
+rejects invalid metadata. Eight extra executable cases and buffered/SSE controls
+verify this precedence without reading a real file.
+
+Private `request_chat_builtin_declarations_04384.go` owns Chat classification
+and builtin host admission/projection. Early Chat validation prioritizes nested
+functions without changing the shared native validator. Final normalization
+reuses MCP/function projection, stable duplicate policy and choice binding.
+No shared helper, new package, dependency, exported API, option, goroutine,
+routing policy or durable format is introduced. Native behavior stays separate.
+Executable fixtures retain complete wire/client bytes and authenticated attempts;
+standalone matching-corruption controls reject incorrect tool presence, types,
+names and choices even when both products are mutated identically.
+
+`rtk proxy go test -json ./...` PASSes 10,548 tests in 71 packages; ten packages
+have no tests and 18 optional installed-Codex/executable tests are skipped.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+PASSes 3,727 tests. `rtk proxy make verify` PASSes with exit 0, including
+format/source-size, cross-compilation, installer checks, vet, full shuffled race
+tests and the build. All 291 differential self-tests pass.
+Logs use `/tmp/gdx-04384-gemini-builtin-declarations-final-`.
+Exact clean-commit executable qualification follows. Earlier smaller runs remain
+retained separately.
+
+The complete default gate on exact clean `15d1c558a740a04b4da0638650b221606d0f96d4`
+has now completed with exit 0, including final HTTP profile-status and raw-429:
+`rtk proxy scripts/verify-release-parity.sh`, session 20478,
+`/tmp/gdx-04384-release-15d1c55.log`. Its exact DeepSeek 213 and Gemini 559
+reports remain separately retained. Published clean `074d739` separately PASSes
+all 589 Gemini cases, including every preceding case, state and mutations:
+`/tmp/gdx-04384-gemini-response-format-oracle.json`. No newer full DeepSeek/default
+gate is attributed to Gemini-only descendants. Exact clean `ea27e1f` now PASSes
+all 626 Gemini cases, including every earlier 589, state and mutations:
+`/tmp/gdx-04384-gemini-tool-choice-oracle.json`. Primary fast-forwarded and pushed
+ea27e1f directly to origin/main after fetched remote/cleanliness/ancestry checks.
+Four protected larger Gemini matrices remain pending. Search tools, unknown
+kinds, broader media combinations, Gemini Compact, executable session/turn continuation,
+native macOS/Windows and live authentication remain unproven.
+Global 1:1 parity is not claimed.
