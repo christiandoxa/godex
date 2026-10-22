@@ -9058,4 +9058,13 @@ with 18 optional SKIP. Exact commands:
 and `rtk proxy make verify > /tmp/gdx-04384-gemini-stream-message-metadata-verify.log 2>&1`.
 Both exit 0; make verify includes shuffled race tests, cross-builds,
 format/source guards, vet and the build. Exact clean executable qualification
-follows. Overall 1:1 parity remains unproven.
+subsequently PASSes thirteen targeted scenarios on
+78078cb980d920d1b279b13d239ee8148af7c8bb. Eight new cases and three previous
+detailed SSE cases retain exact request/stdout/state/wire assertions; two legacy
+error/EOF controls retain their prior scope. Audit:
+/tmp/gdx-04384-gemini-stream-message-metadata-targeted-audit.json. The full
+902-case matrix remains running on its original immutable source worktree.
+The latest full Gemini PASS remains 851 cases at exact 05a61ff; the latest
+complete default-gate PASS remains exact 78d256d. Overall 1:1 parity remains
+unproven, including complete tool-stream lifecycle and continuation, metadata
+above the safety ceiling, live authentication and native macOS/Windows behavior.
