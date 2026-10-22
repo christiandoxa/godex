@@ -8793,7 +8793,7 @@ optional SKIP and shuffled race/cross-build checks. Original reports, terminal
 exit observations, binary/source pins and independent mutation/state assertions
 are retained in the corresponding /tmp/gdx-04384-*-audit.json records.
 
-The broader Gemini 847/851/857/862 matrices remain running on their original
+The broader Gemini 851/857/862 matrices remain running on their original
 immutable source worktrees. Targeted PASS does not imply those full matrices
 passed. The latest full Gemini matrix and entire default-gate PASS remain the
 837-case and completed default gate at exact 78d256d. The two original full
@@ -8903,3 +8903,34 @@ rerun on the same exact binaries PASSes with both returning 503 and one attempt:
 /tmp/gdx-04384-gemini-compact-history-changed-key-rerun-oracle.json. The original
 full report remains FAIL; its cause is unexplained, and the isolated PASS does
 not qualify the entire matrix. No ownership or retry assertion was weakened.
+
+### Latest SSE qualification checkpoint
+
+The timestamp stage ae685d1 passes ten exact clean executable cases: seven
+timestamp boundaries plus existing metadata, reasoning and error controls.
+The model-presence stage 4f9699e passes nine exact clean cases: five model
+boundaries plus prior unsigned timestamp, reasoning, metadata and error controls.
+Both revisions pass their full local suites and make verify; 4f9699e records
+10,773 PASS and 18 optional SKIP, including race tests and cross-builds.
+The target commands and strict audits are under
+/tmp/gdx-04384-gemini-stream-created-targeted- and
+/tmp/gdx-04384-gemini-stream-model-targeted-.
+
+The original 847-case matrix at 0ea01e9 completes FAIL for
+raw-key-bound-response-restart-endpoint. The reference seed leaves an unknown
+runtime-continuations.json.last-good temporary file, then sends a second upstream
+request and returns 200 after the endpoint changes. Godex's independent state
+invariants pass; it returns 503 with one attempt. Report:
+/tmp/gdx-04384-gemini-compact-stream-oracle.json. An unchanged isolated diagnostic
+is recorded separately under /tmp/gdx-04384-gemini-compact-stream-endpoint-rerun-.
+The original 844 and 847 full FAILs remain retained and are not replaced by
+targeted results.
+
+The broader Gemini 851/857/862/874 matrices and the entire default gate at
+ae685d1 remain running on their original immutable worktrees. The default gate
+includes the full 869-case Gemini and 224-case DeepSeek scopes; phase completion
+is not whole-gate success. The latest complete default gate and full Gemini
+PASS remain exact 78d256d (837 Gemini cases). The latest full DeepSeek PASS is
+exact 807607b (224 cases). No larger or later full PASS is implied. Global 1:1
+parity, full continuation, tool-stream snapshots, reasoning above 64 MiB, live
+authentication and native macOS/Windows execution remain unqualified.
