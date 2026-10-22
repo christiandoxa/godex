@@ -2,13 +2,18 @@ package gemini
 
 import "strings"
 
-func normalizeGeminiChatInputItems04384(value any) bool {
-	entries, _ := value.([]any)
+func normalizeGeminiChatInputItems04384(root map[string]any) bool {
+	entries, isArray := root["input"].([]any)
+	if !isArray {
+		return true
+	}
+	normalized := make([]any, 0, len(entries))
 	for _, raw := range entries {
 		item, ok := raw.(map[string]any)
 		if _, hasPrefix := item["prefix"]; !ok || hasPrefix {
 			return false
 		}
+		normalized = append(normalized, item)
 		if kind, hasKind := item["type"]; hasKind {
 			switch kind {
 			case "message":
@@ -30,8 +35,14 @@ func normalizeGeminiChatInputItems04384(value any) bool {
 					!validGeminiChatToolOutput04384(kind, item) {
 					return false
 				}
+				// Empty-call projection overwrites content, so retain original result presence and value.
+				inlineOutput, hasInlineOutput := firstPresent(item, "output", "content", "result", "error")
 				if !projectGeminiChatFunctionItem04384(kind, item) {
 					return false
+				}
+				if kind == "mcp_call" && item["type"] == "message" && hasInlineOutput {
+					normalized = append(normalized, map[string]any{"type": "mcp_tool_result",
+						"call_id": geminiChatWireCallIdentity04384(item), "output": inlineOutput})
 				}
 				continue
 			default:
@@ -42,6 +53,7 @@ func normalizeGeminiChatInputItems04384(value any) bool {
 			return false
 		}
 	}
+	root["input"] = normalized
 	return true
 }
 

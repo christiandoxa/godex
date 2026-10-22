@@ -82,7 +82,7 @@ func convertResponseItem(item map[string]any, preserveMessages bool) ([]any, str
 		message, err := convertLocalShellCall(item)
 		return oneMessage(message), "", true, err
 	case "custom_tool_call_output", "mcp_tool_result", "mcp_call_output":
-		message, err := convertBridgeToolOutput(item)
+		message, err := convertBridgeToolOutput(item, preserveMessages)
 		return oneMessage(message), "", true, err
 	case "input_image":
 		return nil, "", false, errors.New("Responses chat-compat only translates message/function-call history items")

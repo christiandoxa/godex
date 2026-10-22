@@ -7246,3 +7246,78 @@ and the default `20a7d41` gate remain pending. MCP name/inline-result and shell
 projection, Gemini Compact, executable session/turn continuation, native
 macOS/Windows and live login remain unproven. No force push, tag, release or
 editor edit occurred. Global 1:1 parity is not claimed.
+
+## Empty MCP calls retain original inline result values for adjacency
+
+Clean `25cf23c4e09d64a3831631d26006340719f3b8e1` now PASSes all 378 Gemini
+cases and independent mutations, including every earlier 368:
+`/tmp/gdx-04384-gemini-empty-input-oracle.json`. It is pushed to `origin/main`.
+Clean `677e792bad3bfe94431e61335280f8ca3efa522a` separately PASSes four
+targeted custom-call oracles: object-input, null-name, null-id and unicode-input;
+`/tmp/gdx-04384-gemini-custom-call-<suffix>-targeted-oracle.json`.
+Its full 452-case matrix remains pending. The preceding output candidate
+`cf40eb1` also PASSes exact custom-null-id, result-output-text and mcp-object
+targets: `/tmp/gdx-04384-gemini-bridge-output-<suffix>-targeted-oracle.json`.
+
+The pinned raw bridge uses function-call projection for MCP names too. An
+admitted but selected nonstring/missing name yields an empty assistant message;
+the original MCP inline result is still emitted independently and retains its
+raw JSON type. Adjacency can pair it with an earlier call of the same ID.
+An absent inline result cannot invent a tool output. Output/content/result/
+error precedence must be captured before empty-call projection overwrites
+content. Original implicit tool-message metadata still follows message
+projection rather than becoming an extra matching result.
+
+The private Gemini normalizer now shares the complete function-call projection
+for MCP, retaining any original inline result as a separate typed bridge
+output when the MCP call becomes empty. The existing shared message-preserving
+entry point keeps raw bridge-output content, while its default Claude entry
+point keeps legacy text conversion. Standalone Gemini output kinds have already
+been projected to function outputs, so their text contract remains independent.
+No raw-message metadata bypass, new public API, package, helper, dependency,
+option, worker or persisted format is introduced. The new slice contains only
+the original admitted items and at most one original inline result per MCP item.
+
+The final regression files were copied alone onto isolated old source
+`677e792` in `/tmp/gdx-04384-gemini-mcp-empty-name-before-work`.
+`rtk go test ./internal/gateway/chatcompat ./internal/gateway/gemini -run 'Test(BridgeOutputRetentionKeepsDefaultRequestContract|Prodex04384GeminiMCPEmptyNameRetainsInlineResult)$' -count=1`
+FAILs 17 tests and PASSes eight controls:
+`/tmp/gdx-04384-gemini-mcp-empty-name-final-before.log`.
+The same command PASSes all 25 tests after repair:
+`/tmp/gdx-04384-gemini-mcp-empty-name-focused.log`.
+The table includes original legacy conversion, raw null/false/array/object/large
+integer values, earlier-call pairing, output aliases and absent-result cases.
+The isolated old-source worktree retains its untracked regression files.
+
+Sixteen unique executable baselines pin clean
+`677e792bad3bfe94431e61335280f8ca3efa522a` and unchanged official reference.
+Eleven FAIL only Godex; five controls PASS. Every reference and independent
+mutation invariant passes. Initial twelve reports:
+`/tmp/gdx-04384-gemini-mcp-empty-name-<suffix>-before-oracle.json`.
+Four additional alias/absence reports:
+`/tmp/gdx-04384-gemini-mcp-empty-name-<suffix>-expanded-before-oracle.json`.
+Exact argument arrays are in the corresponding `before-commands.json` and
+`expanded-before-commands.json` files. Commands use
+`--gemini --scenario request-primitive-mcp-name-<suffix>` with exact source/
+commit pins. Complete independent wire expectations include raw result types,
+large integer and serde bytes, original signature ownership, message order,
+no invented output, implicit-tool metadata, authenticated attempts, exact
+response/status/headers/stdout/exit and safe durable state. Matching-corruption
+controls remain mandatory.
+
+`rtk go test ./tools/differential -count=1` PASSes 282 tests before and after
+the added alias/absence cases:
+`/tmp/gdx-04384-gemini-mcp-empty-name-oracle-tests.log` and
+`/tmp/gdx-04384-gemini-mcp-empty-name-expanded-oracle-tests.log`.
+`rtk proxy go test -json ./...` PASSes 10,081 tests in 71 packages; ten packages
+have no tests and 18 optional installed-Codex/executable tests are skipped:
+`/tmp/gdx-04384-gemini-mcp-empty-name-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/chatcompat ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+PASSes 3,358 tests: `/tmp/gdx-04384-gemini-mcp-empty-name-race.log`.
+`rtk proxy make verify` PASSes:
+`/tmp/gdx-04384-gemini-mcp-empty-name-verify.log`.
+Clean-commit 468-case Gemini qualification and exact DeepSeek regression follow.
+Older protected matrices and the full `20a7d41` default gate remain pending.
+Shell projection, remaining controls, Gemini Compact, executable session/turn
+continuation, native macOS/Windows and live authentication remain unproven.
+No force push, tag, release or editor edit occurred. Global 1:1 parity is not claimed.

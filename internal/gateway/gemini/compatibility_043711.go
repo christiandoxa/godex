@@ -148,7 +148,7 @@ func normalizeGeminiChatInput043711(body []byte) ([]byte, map[string]any, error)
 	if instructions, ok := root["instructions"].(string); ok && strings.TrimSpace(instructions) == "" {
 		delete(root, "instructions")
 	}
-	if !normalizeGeminiChatInputItems04384(root["input"]) {
+	if !normalizeGeminiChatInputItems04384(root) {
 		return nil, nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
 	_, hasInput := root["input"]

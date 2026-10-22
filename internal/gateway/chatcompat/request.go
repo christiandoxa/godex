@@ -13,7 +13,7 @@ func ResponsesRequest(body []byte, defaultModel, inputModel string) ([]byte, err
 	return responsesRequest(body, defaultModel, inputModel, false)
 }
 
-// ResponsesRequestPreservingMessages retains empty and system-only messages.
+// ResponsesRequestPreservingMessages retains empty/system-only messages and raw bridge outputs.
 // Callers still own provider-specific input validation and content projection.
 func ResponsesRequestPreservingMessages(body []byte, defaultModel, inputModel string) ([]byte, error) {
 	return responsesRequest(body, defaultModel, inputModel, true)

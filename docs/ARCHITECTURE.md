@@ -496,6 +496,14 @@ the tagged empty-assistant fallback, and serialize input into the canonical
 string-valued `input` argument. They then reuse the private function-call
 projection for wire identity and shared conversion. Nested-name admission
 does not authorize a nested custom-call wire name.
+MCP calls share the complete function-call name/identity/argument projection.
+When the selected name yields an empty assistant message, the Gemini normalizer
+retains any original inline result as a separate typed bridge output, capturing
+presence and value before content is overwritten. The existing message-
+preserving Chat entry point retains raw bridge-output content; its default
+entry point keeps legacy text conversion. Standalone Gemini outputs have
+already been projected to canonical function outputs, so their text contract
+remains separate. No raw message metadata bypass is introduced.
 All supported call/tool-output items require a nonblank identity selected from
 the first string `call_id`, `tool_call_id`, then `id`. This local admission runs
 before conversion or orphan filtering can silently drop the malformed item.

@@ -4,14 +4,10 @@ import "github.com/christiandoxa/godex/internal/helper/jsonutil"
 
 func projectGeminiChatFunctionItem04384(kind any, item map[string]any) bool {
 	switch kind {
-	case "function_call":
+	case "function_call", "mcp_call":
 		return projectGeminiChatFunctionCall04384(item)
 	case "custom_tool_call":
 		return projectGeminiChatCustomCall04384(item)
-	case "mcp_call":
-		arguments, valid := geminiChatFunctionArguments04384(item)
-		item["call_id"], item["arguments"] = geminiChatWireCallIdentity04384(item), arguments
-		return valid
 	case "function_call_output", "custom_tool_call_output", "mcp_tool_result", "mcp_call_output":
 		item["type"] = "function_call_output"
 		output, _ := firstPresent(item, "output", "content", "result", "error")

@@ -96,7 +96,7 @@ func convertLocalShellCall(item map[string]any) (map[string]any, error) {
 	return toolCallMessage(callID, "shell_command", compactJSONValue(arguments)), nil
 }
 
-func convertBridgeToolOutput(item map[string]any) (map[string]any, error) {
+func convertBridgeToolOutput(item map[string]any, preserveMessages bool) (map[string]any, error) {
 	callID := responseItemCallID(item)
 	if strings.TrimSpace(callID) == "" {
 		return nil, errors.New("Responses chat-compat input tool output items require a call_id")
@@ -105,11 +105,13 @@ func convertBridgeToolOutput(item map[string]any) (map[string]any, error) {
 	if !exists {
 		return nil, errors.New("Responses chat-compat input tool output items require output content")
 	}
-	if parts, ok := output.([]any); ok {
-		text, _ := textContent(parts)
-		output = text
-	} else if _, ok := output.(string); !ok {
-		output = compactJSONValue(output)
+	if !preserveMessages {
+		if parts, ok := output.([]any); ok {
+			text, _ := textContent(parts)
+			output = text
+		} else if _, ok := output.(string); !ok {
+			output = compactJSONValue(output)
+		}
 	}
 	return map[string]any{"role": "tool", "tool_call_id": callID, "content": output}, nil
 }

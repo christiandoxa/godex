@@ -17,6 +17,10 @@ aliases, selected text parts, structured JSON and null/false/empty controls.
 The 16 `request-primitive-custom-call-*` cases qualify custom-call input
 wrapping, canonical nested JSON/Unicode, name-shadow fallbacks, identity aliases
 and ignored fields against full independent wire/response/state expectations.
+The 16 `request-primitive-mcp-name-*` cases cover empty-name MCP messages,
+retained inline raw results, earlier-call adjacency, signature ownership,
+content/result/error alias capture, absent-result controls and implicit-tool
+metadata. Original legacy Chat conversion is checked independently.
 
 Build and run from a clean, committed Godex worktree:
 
@@ -25,9 +29,9 @@ go test ./tools/differential
 go build -trimpath -o /tmp/differential ./tools/differential
 go build -trimpath -o /tmp/godex-candidate ./cmd/godex
 /tmp/differential \
-  --prodex /absolute/path/to/prodex-0.438.2 \
+  --prodex /absolute/path/to/prodex-0.438.4 \
   --godex /tmp/godex-candidate \
-  --prodex-source /absolute/path/to/prodex-0.438.2-source \
+  --prodex-source /absolute/path/to/prodex-0.438.4-source \
   --godex-source "$PWD" \
   --godex-commit "$(git rev-parse HEAD)"
 ```
@@ -36,8 +40,9 @@ go build -trimpath -o /tmp/godex-candidate ./cmd/godex
 
 Use `--gemini` with the same `--prodex`, `--godex`,
 `--prodex-source`, `--godex-source`, and `--godex-commit` flags
-to run thirteen **additional** cases against the published Prodex 0.438.2
-binary, not against a guessed Gemini protocol. The reference was
+to run the Gemini cases against the pinned official Prodex 0.438.4 binary.
+The original thirteen scenarios below were introduced at 0.438.2 and are
+rechecked with the current source and executable pins. The reference was
 observed to send API-key Super requests as OpenAI-compatible
 `POST /v1beta/openai/chat/completions`, yet it decodes upstream
 **Gemini native GenerateContent** envelopes for the client response.
