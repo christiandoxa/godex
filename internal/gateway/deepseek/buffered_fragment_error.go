@@ -3,7 +3,7 @@ package deepseek
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
+	"io"
 	"strconv"
 	"strings"
 
@@ -12,10 +12,7 @@ import (
 
 func deepSeekBufferedArgumentError(name, arguments string) error {
 	if reason, offset := deepSeekBufferedSerdeFailure(arguments); reason != "" {
-		prefix := arguments[:offset]
-		line := strings.Count(prefix, "\n") + 1
-		column := len(prefix) - strings.LastIndex(prefix, "\n") - 1
-		return deepSeekMalformedArgumentError(name, fmt.Errorf("%s at line %d column %d", reason, line, column))
+		return deepSeekToolArgumentDiagnostic(name, arguments, reason, offset)
 	}
 	var value any
 	cause := json.Unmarshal([]byte(arguments), &value)
@@ -28,10 +25,22 @@ func deepSeekBufferedArgumentError(name, arguments string) error {
 func deepSeekBufferedSerdeFailure(raw string) (string, int) {
 	decoder := json.NewDecoder(strings.NewReader(raw))
 	decoder.UseNumber()
-	depth, previous := 0, 0
+	var containers []json.Delim
+	previous := 0
 	for {
 		token, err := decoder.Token()
 		if err != nil {
+			if errors.Is(err, io.EOF) && (len(containers) != 0 || previous == 0) {
+				kind := "a value"
+				trimmed := strings.TrimRight(raw, " \t\r\n")
+				if len(containers) != 0 && !strings.HasSuffix(trimmed, ":") && !strings.HasSuffix(trimmed, ",") {
+					kind = "a list"
+					if containers[len(containers)-1] == '{' {
+						kind = "an object"
+					}
+				}
+				return "EOF while parsing " + kind, len(raw)
+			}
 			return "", 0
 		}
 		end := int(decoder.InputOffset())
@@ -49,12 +58,12 @@ func deepSeekBufferedSerdeFailure(raw string) (string, int) {
 			}
 		case json.Delim:
 			if value == '[' || value == '{' {
-				depth++
-				if depth == 128 {
+				containers = append(containers, value)
+				if len(containers) == 128 {
 					return "recursion limit exceeded", end
 				}
 			} else {
-				depth--
+				containers = containers[:len(containers)-1]
 			}
 		}
 		previous = end

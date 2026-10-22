@@ -327,11 +327,13 @@ Private `gateway/deepseek/tool_arguments.go` owns structured tool-search and
 streamed apply-patch argument decoding; generic serde number serialization
 stays in `helper/jsonutil`.
 Private `gateway/deepseek/tool_argument_error.go` formats buffered object/array
-and trailing-input syntax diagnostics after argument validation fails.
+and trailing-input syntax diagnostics after argument validation fails. Its
+private byte-position formatter is also used by the buffered serde error path.
 Private `buffered_fragment.go` reproduces the tagged 256-depth structural view
 for ordinary buffered arguments without interpreting primitive or escape contents.
-`buffered_fragment_error.go` preserves earlier serde range/surrogate failures
-and recursion diagnostics after that view rejects input. Structured tool-search
+`buffered_fragment_error.go` preserves earlier serde range/surrogate failures,
+recursion and container/value EOF diagnostics after that view rejects input.
+Structured tool-search
 arguments retain their separate serde admission boundary.
 `gateway/deepseek` also owns Responses/SSE output shaping, web-search modes,
 beta-base routing, and the partial native Anthropic Messages bridge. Exact

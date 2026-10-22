@@ -6,7 +6,31 @@ import (
 )
 
 func bufferedFragmentCases04384() []string {
-	return []string{"deepseek-buffered-view-literal", "deepseek-buffered-view-overflow", "deepseek-buffered-view-escape", "deepseek-buffered-view-surrogate", "deepseek-buffered-view-depth-limit", "deepseek-buffered-view-depth-empty", "deepseek-buffered-view-depth-over", "deepseek-buffered-view-early-surrogate", "deepseek-buffered-view-early-range", "deepseek-buffered-view-patch", "deepseek-buffered-view-array-comma", "deepseek-buffered-view-array-separator", "deepseek-buffered-view-trailing", "deepseek-buffered-view-search-array-comma", "deepseek-buffered-view-search-array-separator", "deepseek-buffered-view-search-trailing"}
+	return []string{
+		"deepseek-buffered-view-literal",
+		"deepseek-buffered-view-overflow",
+		"deepseek-buffered-view-escape",
+		"deepseek-buffered-view-surrogate",
+		"deepseek-buffered-view-depth-limit",
+		"deepseek-buffered-view-depth-empty",
+		"deepseek-buffered-view-depth-over",
+		"deepseek-buffered-view-early-surrogate",
+		"deepseek-buffered-view-early-range",
+		"deepseek-buffered-view-patch",
+		"deepseek-buffered-view-array-comma",
+		"deepseek-buffered-view-array-separator",
+		"deepseek-buffered-view-trailing",
+		"deepseek-buffered-view-search-array-comma",
+		"deepseek-buffered-view-search-array-separator",
+		"deepseek-buffered-view-search-trailing",
+		"deepseek-buffered-view-eof-list",
+		"deepseek-buffered-view-eof-object",
+		"deepseek-buffered-view-eof-value",
+		"deepseek-buffered-view-eof-array-value",
+		"deepseek-buffered-view-search-eof-value",
+		"deepseek-buffered-view-eof-early-range",
+		"deepseek-buffered-view-eof-early-surrogate",
+	}
 }
 
 func bufferedFragmentFixture04384(phase string) (name, arguments, diagnostic string) {
@@ -44,6 +68,20 @@ func bufferedFragmentFixture04384(phase string) (name, arguments, diagnostic str
 		return "tool_search", "[1 2]", "expected `,` or `]` at line 1 column 4"
 	case "deepseek-buffered-view-search-trailing":
 		return "tool_search", "{} true", "trailing characters at line 1 column 4"
+	case "deepseek-buffered-view-eof-list":
+		return "lookup", "[1", "EOF while parsing a list at line 1 column 2"
+	case "deepseek-buffered-view-eof-object":
+		return "lookup", `{"k"`, "EOF while parsing an object at line 1 column 4"
+	case "deepseek-buffered-view-eof-value":
+		return "lookup", `{"k":`, "EOF while parsing a value at line 1 column 5"
+	case "deepseek-buffered-view-eof-array-value":
+		return "lookup", "[1,", "EOF while parsing a value at line 1 column 3"
+	case "deepseek-buffered-view-search-eof-value":
+		return "tool_search", `{"k":`, "EOF while parsing a value at line 1 column 5"
+	case "deepseek-buffered-view-eof-early-range":
+		return "lookup", `{"v":1e309,"k":`, "number out of range at line 1 column 10"
+	case "deepseek-buffered-view-eof-early-surrogate":
+		return "lookup", `{"v":"\uD800","k":`, "unexpected end of hex escape at line 1 column 13"
 	}
 	return "", "", ""
 }

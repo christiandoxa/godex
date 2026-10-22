@@ -3658,3 +3658,59 @@ open. Global 1:1 parity is not claimed.
 After checking the primary worktree and unchanged remote, the Gemini policy
 and oracle commits were fast-forwarded and pushed directly to `origin/main`.
 No force push, tag, release or unrelated editor-worktree change occurred.
+
+
+## Buffered container/value EOF retains the first serde error
+
+The pinned Rust diagnostic probe distinguishes EOF in a list, object or
+value, and counts the complete consumed UTF-8 byte position including trailing
+ASCII whitespace. A range/surrogate error encountered earlier remains the
+reported failure. Godex instead emitted Go EOF text for ordinary arguments and
+a generic error for structured search.
+
+The existing private buffered serde token walk now retains its bounded
+container stack and reports these EOF contexts. Structured search uses that
+same first-error walk after admission fails. A private byte-position formatter
+is reused by both buffered error paths and the existing object/array syntax
+mapper. All accepted ordinary opaque fragments and strict-search admission
+remain unchanged. There is no new parser on valid ordinary inputs, shared
+helper, exported API, dependency, setting, state field or worker. Quoted-string
+EOF and other lexical classes remain separate audit targets.
+
+The shared first-error walk is explicitly gated on structural kernel rejection.
+A review control preserves the caller's outer error cause for kernel-accepted
+overflow, surrogate and deep arguments. It rejects the initial unguarded
+prototype: `/tmp/gdx-04384-buffered-eof-outer-before.log`.
+
+`rtk go test ./internal/gateway/deepseek -run '^TestProdex04384BufferedContainerEOFUsesFirstSerdeDiagnostic$' -count=1`
+before repair passes four prior-error controls and fails 26 tool/argument
+cases plus their parent: `/tmp/gdx-04384-buffered-eof-before.log`.
+The locked Rust probe and Go token observations are retained at
+`/tmp/gdx-04384-buffered-eof-diagnostic-probe.jsonl` and
+`/tmp/gdx-04384-buffered-eof-go-token-probe.log`.
+They establish source semantics, not released-executable parity by themselves.
+`rtk go test ./internal/gateway/deepseek -run '^TestProdex04384Buffered' -count=1`
+after repair passes 81 tests:
+`/tmp/gdx-04384-buffered-eof-focused.log`.
+
+Seven strict executable baseline cases use eof-list, eof-object, eof-value,
+eof-array-value, search-eof-value, eof-early-range and eof-early-surrogate
+suffixes on clean `625fac5`. Every reference trace satisfies the exact failed
+Responses envelope, status/type, stdout, child exit, original authenticated
+request, single attempt, zero retry and safe durable-state contract. The two
+early-error controls PASS on both products; the other five fail only Godex.
+Reports: `/tmp/gdx-04384-buffered-<suffix>-before-oracle.json`.
+The shared independent corruption tests cover every new fixture.
+
+`rtk go test -race ./internal/gateway/deepseek ./tools/differential -count=1`
+passes 848 tests: `/tmp/gdx-04384-buffered-eof-race.log`.
+`rtk go test ./...` passes 9,277 tests across 81 packages:
+`/tmp/gdx-04384-buffered-eof-test-all.log`.
+After adding and satisfying the outer-cause control, the same focused race
+command passes 849 tests and the full suite passes 9,278 tests. Logs:
+`/tmp/gdx-04384-buffered-eof-final-race.log` and
+`/tmp/gdx-04384-buffered-eof-final-test-all.log`.
+`rtk proxy make verify` on the final tree passes formatting, source/TUI guards,
+vet, full shuffled race tests, cross-platform build/test compilation, installers
+and build: `/tmp/gdx-04384-buffered-eof-final-verify.log`.
+Clean-commit executable gates follow.

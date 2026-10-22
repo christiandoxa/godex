@@ -8,6 +8,11 @@ import (
 )
 
 func deepSeekToolArgumentError(name, arguments string, cause error) error {
+	if !deepSeekBufferedFragmentValid(arguments) {
+		if reason, offset := deepSeekBufferedSerdeFailure(arguments); reason != "" {
+			return deepSeekToolArgumentDiagnostic(name, arguments, reason, offset)
+		}
+	}
 	// shortcut: other diagnostic classes retain their existing errors; extend with pinned serde regressions.
 	var value json.RawMessage
 	var syntax *json.SyntaxError
@@ -33,14 +38,18 @@ func deepSeekToolArgumentError(name, arguments string, cause error) error {
 			diagnostic = "trailing comma"
 		}
 		if diagnostic != "" {
-			// Serde columns count UTF-8 bytes, including the unexpected byte.
-			prefix := arguments[:syntax.Offset]
-			line := strings.Count(prefix, "\n") + 1
-			column := len(prefix) - strings.LastIndex(prefix, "\n") - 1
-			cause = fmt.Errorf("%s at line %d column %d", diagnostic, line, column)
+			return deepSeekToolArgumentDiagnostic(name, arguments, diagnostic, int(syntax.Offset))
 		}
 	}
 	return deepSeekMalformedArgumentError(name, cause)
+}
+
+func deepSeekToolArgumentDiagnostic(name, arguments, reason string, offset int) error {
+	// Serde columns count consumed UTF-8 bytes, including the unexpected byte.
+	prefix := arguments[:offset]
+	line := strings.Count(prefix, "\n") + 1
+	column := len(prefix) - strings.LastIndex(prefix, "\n") - 1
+	return deepSeekMalformedArgumentError(name, fmt.Errorf("%s at line %d column %d", reason, line, column))
 }
 
 func deepSeekMalformedArgumentError(name string, cause error) error {

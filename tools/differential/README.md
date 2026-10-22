@@ -117,6 +117,11 @@ cases are positive controls. Equal corrupted outputs fail independent invariants
 The array-comma, array-separator and trailing suffixes, plus their search-
 prefixed equivalents, require the exact serde array/trailing-input diagnostics
 for ordinary tools and structured tool-search calls.
+The eof-list, eof-object, eof-value, eof-array-value and search-eof-value
+suffixes require the exact container/value EOF message and byte position.
+The eof-early-range and eof-early-surrogate controls retain the first serde
+failure before truncated input. Quoted-string EOF and other lexical classes
+remain separate audit targets.
 
 Gemini raw-key session identity cases cover ASCII/Unicode byte limits,
 overflow and embedded controls. Run one with
