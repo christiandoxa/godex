@@ -491,6 +491,11 @@ Standalone custom/MCP tool-result items normalize to the same private
 function-output shape after admission, sharing first-present ID fallback,
 text-array projection and canonical serde JSON content. Inline MCP results
 remain raw values and do not enter this standalone-output projection.
+Custom calls separately select first-present top-level name/tool_name, retain
+the tagged empty-assistant fallback, and serialize input into the canonical
+string-valued `input` argument. They then reuse the private function-call
+projection for wire identity and shared conversion. Nested-name admission
+does not authorize a nested custom-call wire name.
 All supported call/tool-output items require a nonblank identity selected from
 the first string `call_id`, `tool_call_id`, then `id`. This local admission runs
 before conversion or orphan filtering can silently drop the malformed item.

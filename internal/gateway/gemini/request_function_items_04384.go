@@ -6,6 +6,8 @@ func projectGeminiChatFunctionItem04384(kind any, item map[string]any) bool {
 	switch kind {
 	case "function_call":
 		return projectGeminiChatFunctionCall04384(item)
+	case "custom_tool_call":
+		return projectGeminiChatCustomCall04384(item)
 	case "mcp_call":
 		arguments, valid := geminiChatFunctionArguments04384(item)
 		item["call_id"], item["arguments"] = geminiChatWireCallIdentity04384(item), arguments
@@ -19,6 +21,34 @@ func projectGeminiChatFunctionItem04384(kind any, item map[string]any) bool {
 	default:
 		return true
 	}
+}
+
+func projectGeminiChatCustomCall04384(item map[string]any) bool {
+	name, _ := firstPresent(item, "name", "tool_name")
+	textName, _ := name.(string)
+	if textName == "" {
+		item["type"], item["role"], item["content"] = "message", "assistant", ""
+		return true
+	}
+	input, present := item["input"]
+	textInput := ""
+	if present {
+		var ok bool
+		textInput, ok = input.(string)
+		if !ok {
+			encoded, err := jsonutil.MarshalSerdeValue04384(input)
+			if err != nil {
+				return false
+			}
+			textInput = string(encoded)
+		}
+	}
+	arguments, err := jsonutil.MarshalSerdeValue04384(map[string]any{"input": textInput})
+	if err != nil {
+		return false
+	}
+	item["type"], item["name"], item["arguments"] = "function_call", textName, string(arguments)
+	return projectGeminiChatFunctionCall04384(item)
 }
 
 func projectGeminiChatFunctionCall04384(item map[string]any) bool {

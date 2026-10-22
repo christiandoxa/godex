@@ -7183,3 +7183,66 @@ No new full DeepSeek matrix is attributed to these Gemini-only revisions.
 Custom/MCP call-name and shell projection, Gemini Compact, executable session/
 turn continuation, native macOS/Windows and live login remain unproven. No
 force push, tag, release or editor edit occurred. Global 1:1 parity is not claimed.
+
+## Custom-call projection follows top-level name and canonical input semantics
+
+Clean `cf7e03de0297fc020a3c0a5b56a5141086042986` now PASSes all 368 Gemini
+cases and independent mutations, including every earlier 350:
+`/tmp/gdx-04384-gemini-function-aliases-oracle.json`. Primary fast-forwarded
+and pushed that checkpoint to `origin/main`. Its Gemini-only scope does not
+create a new full DeepSeek qualification on that exact revision.
+
+Pinned `deepseek_raw_put_custom_tool_call_message_from_item` selects the first
+present top-level name/tool_name, while the earlier admission may accept a
+later string, nested function name or the validator's sentinel. An empty or
+nonstring selected wire name produces an empty assistant message. The call
+identity uses the common first-present/default contract. Only custom `input`
+is wrapped as a string-valued `input` argument: absent input is empty text,
+present null is the text `null`, and structured values use canonical serde
+JSON before nesting. The unrelated arguments and namespace fields are ignored.
+
+Godex's shared custom converter rejected the admitted name-shadow cases and
+used different Go JSON bytes for nested JSON and HTML/Unicode-bearing strings.
+The private Gemini custom projection now follows those name/input semantics,
+then reuses existing function-call identity/argument conversion. The empty-name
+decision stays before input shaping, as in the tagged pipeline. Shared Chat,
+native Gemini and other providers retain their own behavior. No helper,
+package, public API, dependency, option, worker or persisted format is added.
+
+Before repair five gateway cases and their parent FAIL while three controls
+PASS:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiCustomCallsUseTaggedProjection$' -count=1`;
+`/tmp/gdx-04384-gemini-custom-call-before.log`.
+The same command PASSes all nine tests after repair:
+`/tmp/gdx-04384-gemini-custom-call-focused.log`.
+The gateway table asserts exact outgoing messages, input strings, one attempt
+and HTTP 200 for the legitimate empty-assistant and matched-call outcomes.
+
+Sixteen executable baselines pin clean
+`cf40eb1feeb273e4008c4a05103f8db5f12754b3`, unchanged official reference and
+`/tmp/gdx-04384-gemini-custom-call-before-differential`.
+Seven FAIL only Godex; nine controls PASS. Every reference and independent
+mutation invariant passes. Reports:
+`/tmp/gdx-04384-gemini-custom-call-<suffix>-before-oracle.json`;
+exact argument arrays: `/tmp/gdx-04384-gemini-custom-call-before-commands.json`.
+Commands use `--gemini --scenario request-primitive-custom-call-<suffix>` with
+exact source/commit pins. Independent complete wire expectations retain
+null/absent input, nested serde JSON, Unicode, alias IDs, empty-name outcomes,
+ignored arguments/namespaces, response/status/headers/stdout/exit, one original
+authenticated attempt and safe durable state. Existing matching-corruption
+checks remain mandatory.
+
+`rtk go test ./tools/differential -count=1` PASSes 282 tests:
+`/tmp/gdx-04384-gemini-custom-call-oracle-tests.log`.
+`rtk proxy go test -json ./...` PASSes 10,056 tests in 71 packages; ten packages
+have no tests and 18 optional installed-Codex/executable tests are skipped:
+`/tmp/gdx-04384-gemini-custom-call-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+PASSes 3,248 tests: `/tmp/gdx-04384-gemini-custom-call-race.log`.
+`rtk proxy make verify` PASSes:
+`/tmp/gdx-04384-gemini-custom-call-verify.log`.
+Clean-commit 452-case Gemini qualification follows. Larger protected matrices
+and the default `20a7d41` gate remain pending. MCP name/inline-result and shell
+projection, Gemini Compact, executable session/turn continuation, native
+macOS/Windows and live login remain unproven. No force push, tag, release or
+editor edit occurred. Global 1:1 parity is not claimed.

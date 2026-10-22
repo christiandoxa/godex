@@ -14,6 +14,9 @@ wire/response/state expectations and all matching-corruption checks.
 The 27 `request-primitive-bridge-output-*` cases extend those independent
 expectations to custom/MCP standalone output kinds: IDs, content/result
 aliases, selected text parts, structured JSON and null/false/empty controls.
+The 16 `request-primitive-custom-call-*` cases qualify custom-call input
+wrapping, canonical nested JSON/Unicode, name-shadow fallbacks, identity aliases
+and ignored fields against full independent wire/response/state expectations.
 
 Build and run from a clean, committed Godex worktree:
 
