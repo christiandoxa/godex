@@ -461,6 +461,11 @@ Explicit item types must match the tagged message, function/custom/MCP/shell
 call or corresponding tool-output kinds. Wrong-type and unknown type values
 fail terminal admission; they cannot fall through to the shared converter's
 loose-text behavior. Typeless message normalization remains in this adapter.
+Its private `request_input_items_04384.go` owns item admission and implicit
+message normalization. Explicit message roles must be absent or exactly user,
+assistant, system or developer before shared conversion; malformed roles cannot
+default to user. This package-local step has one caller and owns a concrete
+protocol invariant, so it does not belong in a shared helper package.
 DeepSeek independently checks present `stream` as a boolean and present
 `instructions`/`previous_response_id` as strings before constructing its
 translated request. Invalid types use its common terminal preparation boundary,

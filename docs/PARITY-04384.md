@@ -6299,3 +6299,96 @@ Message roles/content, call identities and other per-item fields, remaining
 request/response controls, Gemini Compact, executable session/turn continuation,
 native macOS/Windows and live authentication remain open. Global 1:1 parity
 is not claimed.
+
+
+## Validated candidate/tool admission checkpoint: 5f49a5f
+
+Clean `5f49a5ff86b6399fadb65ddb18ba649097ffe6b0` passes all 221 Gemini
+cases and 213 DeepSeek scenarios, including independent mutation controls:
+`/tmp/gdx-04384-gemini-candidate-count-oracle.json` and
+`/tmp/gdx-04384-gemini-candidate-count-deepseek-oracle.json`.
+Its clean product/harness builds use
+`rtk go build -trimpath -o /tmp/gdx-04384-gemini-candidate-count-godex ./cmd/godex` and
+`rtk go build -trimpath -o /tmp/gdx-04384-gemini-candidate-count-final-differential ./tools/differential`.
+Matrices use `--gemini`, or `--scenario all --scenario-workers 3`, with exact
+clean source/commit pins and the unchanged published 0.438.4 reference.
+This larger Gemini matrix includes every scenario from the earlier 199-case
+`4c270db` matrix, plus 22 candidate-count cases. After checking this inclusion,
+fetching and checking the clean primary/remote, the two small commits were
+fast-forwarded together and pushed directly to `origin/main` without CI wait.
+Main is `5f49a5f`. No force push, tag, release or editor-checkout edit occurred.
+
+Both older `4c270db` full Gemini reports remain FAIL. The unchanged 199-case
+rerun has a different reference failure on endpoint restart: its successful
+seed leaves `state/state.json.last-good.2472424.1792654026233650692.7.tmp`,
+which the unchanged strict state auditor rejects. Both final restart responses
+are the expected 503, exit 2, with only the original seed upstream attempt.
+Report: `/tmp/gdx-04384-gemini-tool-priority-rerun-oracle.json`.
+The first changed-key reference replay failure remains unexplained. No state
+allowlist, owner/status expectation, header requirement or mutation is relaxed;
+the later complete PASS is scoped to `5f49a5f`, not retroactively to `4c270db`.
+
+Clean `f4a277da9fd00ac5d45dfd570875e793cd7114d7` and
+`105d3fde3505f5d0a93ceb2ef24d53099735c86a` separately pass all 213 DeepSeek
+scenarios and independent mutations:
+`/tmp/gdx-04384-gemini-input-items-deepseek-oracle.json` and
+`/tmp/gdx-04384-gemini-input-kinds-deepseek-oracle.json`.
+Their Gemini matrices remain pending, alongside `a82be84` Gemini and the
+entire default `5f49a5f` gate. The last completed default gate remains `8d618e0`.
+
+
+## Gemini explicit message roles cannot default malformed input to user
+
+Pinned `deepseek_input_item_validation` checks a present role on an explicit
+message as exactly user, assistant, system or developer. Omitted role is valid.
+Null, wrong-type, empty, unknown, tool and padded labels are rejected. The
+API-key runtime presents plain terminal 502 with no provider attempt; its
+candidate/tool gate still runs earlier and preserves structured 400 errors.
+
+Godex's shared Chat converter defaulted non-string/empty roles to user and
+forwarded arbitrary strings. Gemini now checks its explicit-message role before
+that shared conversion. Existing item admission/implicit-type normalization
+moves into one private `request_input_items_04384.go` function in the same
+concrete gateway. This names a real protocol boundary, shortens the parent
+normalizer and keeps the production file below the normal 250-line target.
+It has one caller, no I/O or background work, and does not qualify as a generic
+shared helper. Native Gemini and shared Claude behavior remain independent.
+No interface, package, dependency, configuration, exported API or persisted
+format is added. Existing item-prefix/type rules retain their rejection paths.
+
+The focused command below first FAILs with 13 controls passing and 13 failures,
+including parents, then PASSes all 26 tests:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384Gemini(ExplicitMessageRolesRequireTaggedValues|RequestAdmissionDoesNotRetryModelOrCredential)$' -count=1`.
+Logs: `/tmp/gdx-04384-gemini-message-roles-before.log` and
+`/tmp/gdx-04384-gemini-message-roles-focused.log`.
+The real two-key gateway/router table proves null/tool roles have zero upstream
+attempts and no retry wait. Unit controls retain all four supported roles.
+
+Fifteen executable baselines pin clean
+`105d3fde3505f5d0a93ceb2ef24d53099735c86a`, the unchanged reference and
+`/tmp/gdx-04384-gemini-message-roles-before-differential`:
+`/tmp/gdx-04384-gemini-message-role-<suffix>-before-oracle.json`.
+Nine invalid-role cases FAIL only Godex, which executes an ordinary request.
+Six controls PASS: user, omitted role, escaped user, earlier tools/candidates
+and malformed Unicode. All reference and independent mutation invariants pass.
+Commands use `--gemini --scenario request-primitive-message-role-<suffix>` with
+exact clean source/commit pins. Original JSON, exact canonical upstream bytes,
+response/status/headers/stdout/exit, attempts and safe durable state remain
+covered by the existing independent matching-corruption checks.
+
+`rtk go test ./tools/differential -count=1` passes 281 tests:
+`/tmp/gdx-04384-gemini-message-roles-oracle-tests.log`.
+`rtk proxy go test -json ./...` passes 9,847 tests in 71 packages; ten packages
+have no tests and 18 optional installed-Codex/executable tests are skipped:
+`/tmp/gdx-04384-gemini-message-roles-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+passes 3,060 tests: `/tmp/gdx-04384-gemini-message-roles-race.log`.
+`rtk proxy make verify` PASSes the full local gate:
+`/tmp/gdx-04384-gemini-message-roles-verify.log`.
+Clean-commit 278-case Gemini and 213-case DeepSeek qualification follows.
+Previously started protected matrices and the entire `5f49a5f` default gate
+remain pending; no earlier reference FAIL is relabeled. Further message content,
+call IDs/names/output validation, instructions-only behavior and remaining
+request/response controls still require source audit and executable proof.
+Gemini Compact, executable session/turn continuation, native macOS/Windows and
+live authentication remain unproven. Global 1:1 parity is not claimed.

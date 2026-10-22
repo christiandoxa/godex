@@ -380,6 +380,12 @@ Explicit and implicit message controls remain accepted; rejected image controls,
 earlier candidate/tool 400s and malformed serde retain their exact outcomes.
 The existing exact wire, zero-attempt and independent mutation checks apply.
 
+Gemini `request-primitive-message-role-*` rejects wrong-type, empty, unknown,
+tool and padded roles on explicit messages. Controls accept canonical user,
+omitted role and escaped user, preserving exact canonical request bytes;
+earlier candidate/tool errors and invalid Unicode retain their prior outcomes.
+All rejected cases require plain terminal 502, exit 2 and zero upstream work.
+
 DeepSeek scenario workers evaluate their complete independent invariants as
 each scenario finishes, preserving failures in the ordered report. The strict
 five-minute generated SSE timestamp window is unchanged; later cases cannot
