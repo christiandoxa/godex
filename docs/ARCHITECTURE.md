@@ -490,6 +490,12 @@ when that index is nonempty, and re-emits only matched call/output pairs. With
 no valid output IDs it retains untouched malformed tool messages as the tagged
 kernel does. If repair removes every message, the adapter sends one empty user
 message, matching the runtime's post-repair fallback.
+Before shared conversion, Gemini privately projects function-call/output
+aliases using first-present serialization semantics. Absent arguments become
+`{}`, present nonstrings become canonical serde JSON text, and output aliases
+use the existing content projector. Wire ID fallback remains distinct from
+first-string admission. Function namespaces are ignored, and a selected
+non-string/missing name preserves the tagged empty assistant message.
 DeepSeek independently checks present `stream` as a boolean and present
 `instructions`/`previous_response_id` as strings before constructing its
 translated request. Invalid types use its common terminal preparation boundary,

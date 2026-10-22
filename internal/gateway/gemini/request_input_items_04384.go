@@ -30,6 +30,9 @@ func normalizeGeminiChatInputItems04384(value any) bool {
 					!validGeminiChatToolOutput04384(kind, item) {
 					return false
 				}
+				if !projectGeminiChatFunctionItem04384(kind, item) {
+					return false
+				}
 				continue
 			default:
 				return false

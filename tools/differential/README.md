@@ -423,6 +423,12 @@ orphan results retain the ordinary user message; output-only requests require
 the tagged empty-user fallback. The ordinary control, matched-output scenarios
 and all independent wire/status/attempt/state mutations remain active.
 
+Gemini `request-primitive-function-alias-*` compares full independent request
+bytes for ID/name/argument/output aliases, absent versus null arguments,
+canonical nested JSON, ignored namespace and selected-name shadowing. Matched
+call/output fixtures expose field loss before adjacency; accepted name-validation
+edge cases retain the tagged empty assistant message and discard orphan output.
+
 DeepSeek scenario workers evaluate their complete independent invariants as
 each scenario finishes, preserving failures in the ordered report. The strict
 five-minute generated SSE timestamp window is unchanged; later cases cannot

@@ -6850,3 +6850,67 @@ shell commands and remaining metadata/argument controls need separate proof.
 Gemini Compact, executable session/turn continuation, native macOS/Windows and
 live authentication remain unproven. No force push, tag, release or editor edit
 occurred. Global 1:1 parity is not claimed.
+
+
+## Function-call/output aliases preserve tagged wire serialization
+
+Pinned `deepseek_raw_put_tool_call_message_from_item` and output shaping use
+first-present fields, which differ from the validator's first-string admission.
+Wire IDs use call_id/tool_call_id/id and default to call_1 when the selected
+value is not a string. Names use name/tool_name/nested function.name; selected
+wrong-type or missing names preserve an empty assistant message. Arguments use
+arguments/input/nested function.arguments, default to {}, preserve present null,
+and serialize structured values as canonical serde JSON text. Function-call
+namespace is ignored. Output aliases use the tagged content-text projector.
+
+Godex's shared function converter lost these aliases, defaulted absent arguments
+to null, retained noncanonical numeric text and prefixed namespace. The concrete
+Gemini adapter now privately projects function call/output fields after the
+existing admission checks and before shared conversion/adjacency. It reuses
+package-local firstPresent and content projection plus the existing technical
+serde writer. Shared Claude, custom/MCP/shell conversion and routing remain
+independent. No helper, package, exported API, interface, dependency, worker,
+configuration or persisted format is added.
+
+Before repair the exact gateway-wire command FAILs with one control passing
+and 11 failures including the parent:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiFunctionItemsUseTaggedAliasesOnWire$' -count=1`;
+`/tmp/gdx-04384-gemini-function-aliases-before.log`.
+The same command PASSes all 12 tests after repair:
+`/tmp/gdx-04384-gemini-function-aliases-focused.log`.
+
+Eighteen executable baselines pin clean
+`dc0e44fc6600811b8e0e6c5046e42d4f1565d700` and unchanged reference.
+The initial fifteen use `/tmp/gdx-04384-gemini-function-aliases-before-differential`:
+`/tmp/gdx-04384-gemini-function-alias-<suffix>-before-oracle.json`.
+Three added name-shadow/sentinel cases use
+`/tmp/gdx-04384-gemini-function-aliases-expanded-before-differential`:
+`/tmp/gdx-04384-gemini-function-alias-<suffix>-expanded-before-oracle.json`.
+Sixteen FAIL only Godex on exact upstream bytes; canonical and present-null
+argument controls PASS. Every reference and independent mutation invariant
+passes. Commands use `--gemini --scenario request-primitive-function-alias-<suffix>`
+with exact clean source/commit pins. Full independent expected requests retain
+matched calls/results or the exact empty assistant shadow outcome, canonical
+numbers/text, one authenticated attempt, response/status/headers/stdout/exit
+and safe durable state. No assertion or matching-corruption mutation is relaxed.
+
+`rtk go test ./tools/differential -count=1` PASSes 281 tests before and after
+the extra name cases: `/tmp/gdx-04384-gemini-function-aliases-oracle-tests.log`
+and `/tmp/gdx-04384-gemini-function-aliases-expanded-oracle-tests.log`.
+`rtk proxy go test -json ./...` PASSes 9,981 tests in 71 packages; ten packages
+have no tests and 18 optional installed-Codex/executable tests are skipped:
+`/tmp/gdx-04384-gemini-function-aliases-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+PASSes 3,173 tests: `/tmp/gdx-04384-gemini-function-aliases-race.log`.
+`rtk proxy make verify` PASSes: `/tmp/gdx-04384-gemini-function-aliases-verify.log`.
+Clean-commit 368-case Gemini qualification follows. DeepSeek is unchanged and
+its existing exact reports retain their original revision scope. The later
+payload candidate `fd82f5c` separately PASSes all 213 DeepSeek cases:
+`/tmp/gdx-04384-gemini-tool-output-deepseek-oracle.json`.
+Protected `175091f` initial/isolated/full DeepSeek reruns remain FAIL due
+reference continuation temp files, invalid state or backup divergence; no
+Godex invariant fails and no assertion is relaxed. Older Gemini/default gates
+remain pending. Custom/MCP/shell projection and other controls need separate
+proof. Gemini Compact, executable session/turn continuation, native macOS/
+Windows and live authentication remain unproven. No force push, tag, release
+or editor edit occurred. Global 1:1 parity is not claimed.
