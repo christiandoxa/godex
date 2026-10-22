@@ -9635,3 +9635,18 @@ own running handles. The entire e9d88ce default gate also remains running,
 with its completed DeepSeek 224 phase separately qualified. Earlier failed
 reports remain retained. Overall 1:1 parity, live authentication, native
 macOS/Windows and larger retained streams remain unproven.
+
+### Complete the original Gemini 912-case projection/routing matrix
+
+The original full Gemini 912 run at exact clean
+9e4b80807f4a3a79201f4208852c241351a2f4d5 completes PASS with original session
+70523 exit 0. Unique names and all prior 902 cases qualify; all original
+independent state/request/wire/stdout/attempt and matching-corruption assertions
+pass. Source, both binary hashes and clean embedded VCS provenance still match
+the targeted qualification. Audit:
+/tmp/gdx-04384-gemini-stream-projection-route-full-audit.json. This is the
+latest completed full-Gemini PASS only at that exact source. Later 918/924/934/
+940/943/948 matrices retain their original running handles and immutable
+sources. Original b80d targeted capture failures and prior 844/847/874 reference
+state-integrity failures remain FAIL and unexplained; this PASS does not erase
+or relabel those observations.
