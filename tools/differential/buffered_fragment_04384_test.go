@@ -12,6 +12,13 @@ func TestProdex04384BufferedViewOracleRejectsMatchingWireMutations(t *testing.T)
 		run := productRun{Stdout: body + "\n", Client: exchange{Status: 200, Body: body,
 			Headers: http.Header{"Content-Type": {"application/json; charset=utf-8"}}},
 			Upstream: []upstreamRequest{{Method: "POST", Path: "/v1/chat/completions", AuthOK: true, KeySlot: "single", Body: syntheticFixtureRequest}}}
+		if bufferedSearchRuntimeDepthCase04384(phase) {
+			run.ExitStatus, run.Client.Status = 2, 500
+			run.Client.Headers.Del("Content-Type")
+			if strings.HasSuffix(phase, "-rotation") {
+				run.Upstream[0].KeySlot = "primary"
+			}
+		}
 		if failures := scenarioInvariants(scenarioResult{Name: phase, Runs: []productRun{run, run}}); len(failures) != 0 {
 			t.Fatalf("valid buffered view rejected: %v", failures)
 		}
@@ -19,12 +26,20 @@ func TestProdex04384BufferedViewOracleRejectsMatchingWireMutations(t *testing.T)
 			func(r *productRun) { r.Client.Body = `{}` },
 			func(r *productRun) {
 				r.Client.Body = strings.Replace(r.Client.Body, "chatcmpl-differential-tool", "response-changed", 1)
+				if r.Client.Body == "" {
+					r.Client.Body = "changed"
+				}
 			},
 			func(r *productRun) { r.Stdout = "changed" },
 			func(r *productRun) { r.Retries = 1 },
 			func(r *productRun) { r.Upstream = nil },
+			func(r *productRun) { r.Client.Status++ },
+			func(r *productRun) { r.ExitStatus++ },
+			func(r *productRun) { r.Client.Headers.Set("Content-Type", "text/plain") },
+			func(r *productRun) { r.StateIntegrity = []string{"changed"} },
 		} {
 			changed := run
+			changed.Client.Headers = run.Client.Headers.Clone()
 			mutate(&changed)
 			if failures := scenarioInvariants(scenarioResult{Name: phase, Runs: []productRun{changed, changed}}); len(failures) == 0 {
 				t.Fatalf("matching wire mutation escaped: %s", phase)

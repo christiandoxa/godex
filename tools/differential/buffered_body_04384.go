@@ -51,21 +51,9 @@ func bufferedBodyInvariants04384(scenario scenarioResult) []string {
 	if size <= 4<<20 {
 		return bufferedToolWireInvariants04384(scenario, want)
 	}
-	if len(scenario.Runs) != 2 {
-		return []string{scenario.Name + ".run_count"}
+	slot := "single"
+	if scenario.Name == "deepseek-buffered-body-over-rotation" {
+		slot = "primary"
 	}
-	var failures []string
-	for _, run := range scenario.Runs {
-		prefix := scenario.Name + "." + run.Name
-		if run.ExitStatus != 2 || run.Client.Status != 502 || run.Client.Body != want ||
-			strings.TrimSuffix(run.Stdout, "\n") != want || run.Client.Headers.Get("Content-Type") != "text/plain; charset=utf-8" {
-			failures = append(failures, prefix+".exact_oversize_rejection")
-		}
-		slot := "single"
-		if scenario.Name == "deepseek-buffered-body-over-rotation" {
-			slot = "primary"
-		}
-		failures = append(failures, bufferedToolAttemptInvariants04384(prefix, run, slot)...)
-	}
-	return failures
+	return bufferedToolTerminalWireInvariants04384(scenario, 502, want, "text/plain; charset=utf-8", slot)
 }

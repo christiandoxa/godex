@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"strings"
 )
 
@@ -29,6 +30,15 @@ func bufferedFragmentCases04384() []string {
 		"deepseek-buffered-view-search-eof-value",
 		"deepseek-buffered-view-eof-early-range",
 		"deepseek-buffered-view-eof-early-surrogate",
+		"deepseek-buffered-view-search-output-overflow",
+		"deepseek-buffered-view-search-output-overflow-line",
+		"deepseek-buffered-view-search-output-surrogate",
+		"deepseek-buffered-view-search-output-depth-limit",
+		"deepseek-buffered-view-search-output-depth-over",
+		"deepseek-buffered-view-search-output-early-surrogate",
+		"deepseek-buffered-view-search-depth-kernel-reject",
+		"deepseek-buffered-view-search-runtime-depth-over",
+		"deepseek-buffered-view-search-runtime-depth-over-rotation",
 	}
 }
 
@@ -81,17 +91,43 @@ func bufferedFragmentFixture04384(phase string) (name, arguments, diagnostic str
 		return "lookup", `{"v":1e309,"k":`, "number out of range at line 1 column 10"
 	case "deepseek-buffered-view-eof-early-surrogate":
 		return "lookup", `{"v":"\uD800","k":`, "unexpected end of hex escape at line 1 column 13"
+	case "deepseek-buffered-view-search-output-overflow":
+		return "tool_search", "1e309", "number out of range at line 1 column 95"
+	case "deepseek-buffered-view-search-output-overflow-line":
+		return "tool_search", "\n1e309", "number out of range at line 2 column 5"
+	case "deepseek-buffered-view-search-output-surrogate":
+		return "tool_search", `"\uD800"`, "unexpected end of hex escape at line 1 column 98"
+	case "deepseek-buffered-view-search-output-depth-limit":
+		return "tool_search", strings.Repeat("[", 124) + "0" + strings.Repeat("]", 124), ""
+	case "deepseek-buffered-view-search-output-depth-over":
+		return "tool_search", strings.Repeat("[", 127) + "0" + strings.Repeat("]", 127), "recursion limit exceeded at line 1 column 217"
+	case "deepseek-buffered-view-search-output-early-surrogate":
+		return "tool_search", `{"v":"\uD800","deep":` + strings.Repeat("[", 200) + "0" + strings.Repeat("]", 200) + `}`, "unexpected end of hex escape at line 1 column 103"
+	case "deepseek-buffered-view-search-depth-kernel-reject":
+		return "tool_search", deep, "recursion limit exceeded at line 1 column 128"
+	case "deepseek-buffered-view-search-runtime-depth-over", "deepseek-buffered-view-search-runtime-depth-over-rotation":
+		return "tool_search", strings.Repeat("[", 125) + "0" + strings.Repeat("]", 125), ""
 	}
 	return "", "", ""
 }
 
 func bufferedFragmentResponse04384(phase string) string {
+	if bufferedSearchRuntimeDepthCase04384(phase) {
+		return ""
+	}
 	name, arguments, diagnostic := bufferedFragmentFixture04384(phase)
 	if diagnostic != "" {
+		if strings.HasPrefix(phase, "deepseek-buffered-view-search-output-") {
+			return bufferedToolFailedMessage04384("DeepSeek Mojo returned invalid response tool-call JSON: " + diagnostic)
+		}
 		return bufferedToolFailedResponse04384(name, diagnostic)
 	}
 	if name == "" {
 		return ""
+	}
+	if name == "tool_search" {
+		return bufferedToolSuccessResponse04384(map[string]any{"type": "tool_search_call", "call_id": "call-differential",
+			"execution": "client", "arguments": json.RawMessage(arguments)})
 	}
 	item := map[string]any{"type": "function_call", "call_id": "call-differential", "name": name, "arguments": arguments}
 	if name == "apply_patch" {
@@ -99,4 +135,8 @@ func bufferedFragmentResponse04384(phase string) string {
 		delete(item, "arguments")
 	}
 	return bufferedToolSuccessResponse04384(item)
+}
+
+func bufferedSearchRuntimeDepthCase04384(phase string) bool {
+	return phase == "deepseek-buffered-view-search-runtime-depth-over" || phase == "deepseek-buffered-view-search-runtime-depth-over-rotation"
 }

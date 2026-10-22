@@ -141,9 +141,12 @@ func deepSeekResponseToolCall(raw any) (map[string]any, string, string, error) {
 
 func deepSeekResponseSpecialTool(call map[string]any, name, arguments string) (map[string]any, bool, error) {
 	if name == "tool_search" {
-		decoded, err := deepSeekToolSearchArguments(arguments)
+		if strings.TrimSpace(arguments) == "" || !deepSeekBufferedFragmentValid(arguments) {
+			return nil, true, deepSeekBufferedArgumentError(name, arguments)
+		}
+		decoded, err := deepSeekBufferedSearchArguments(call, arguments)
 		if err != nil {
-			return nil, true, deepSeekToolArgumentError(name, arguments, err)
+			return nil, true, err
 		}
 		return map[string]any{
 			"type": "tool_search_call", "call_id": deepSeekResponseCallID(call),

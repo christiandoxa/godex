@@ -3907,3 +3907,94 @@ editor-worktree modification is part of this stage. Latest Gemini 51-case PASS
 remains on `625fac5`; complete default-script PASS remains on `e9ccedc`.
 Structured search output-envelope diagnostics and runtime depth are in a
 separate follow-up. Global 1:1 parity is not claimed.
+
+
+## Structured search parses the kernel item and public response envelopes
+
+The buffered admission commits and checkpoint were fast-forwarded and pushed
+directly to `origin/main` at `bec259f6c33f1a0f22887c6e98e2c5958acd40c4`
+after checking the clean primary worktree and unchanged remote. No CI wait,
+force push, tag, release or editor-worktree modification occurred.
+
+The pinned `response_tool_calls.rs` first admits the whole kernel input, then
+parses the kernel's emitted item as serde JSON. For structured `tool_search`,
+Mojo embeds arguments verbatim inside that item. Godex instead parsed only the
+inner argument and either reported a generic malformed-argument error or
+accepted nesting that the real outer parse rejects. The error prefix, byte
+position and recursion boundary were therefore wrong.
+
+Private `gateway/deepseek/search_output.go` now constructs that exact item
+envelope and reuses the existing serde value decoder and canonical writer.
+Its call ID uses Mojo's `call_0` fallback for missing/non-string IDs during
+this parse; successful public output still uses the existing typed fallback.
+The existing private error walk runs only after decoding fails, preserving
+earlier numeric/surrogate diagnostics and the envelope's depth/byte position.
+The private byte-position formatter has two real callers. Structural kernel
+rejection remains on the inner-argument path. Ordinary opaque tools, streamed
+search conversion, field/aggregate bounds and RTK admission stay unchanged.
+No shared helper package, exported API, interface, dependency, configuration,
+state format or worker was added. Other output lexical diagnostics retain an
+explicit shortcut until their own pinned regressions are available.
+
+The full public flow has another parse:
+`provider_core_rewritten_json_value` reparses the serialized Responses envelope.
+An item with 126 nested arrays is valid in isolation, but 125 or 126 arrays
+exceed the public envelope's 127-container serde limit. The release's fallback
+path also fails its required response parse, producing empty HTTP 500. Godex
+now checks this runtime boundary before storing conversation ownership and
+returns that exact empty terminal response without retry/rotation. It does not
+panic. The accepted public control has 124 arrays; the separate provider-core
+control still accepts 126 arrays. HTTP 502 body-size admission remains distinct.
+
+The locked offline serde probe establishes overflow column 95, multiline
+overflow line 2 column 5, surrogate column 98, early-surrogate column 103 and
+item recursion column 217 for the fixed synthetic call ID. Separate probes
+cover missing, empty, escaped and UTF-8 IDs. Artifacts:
+`/tmp/gdx-04384-search-envelope-serde-probe.jsonl` and
+`/tmp/gdx-04384-search-envelope-id-serde-probe.jsonl`.
+They establish serde semantics, not executable parity by themselves.
+
+Qualified fail-before command:
+`rtk go test ./internal/gateway/deepseek -run '^TestProdex04384BufferedSearchOutput' -count=1`.
+It passes the boundary controls and fails all 11 diagnostic cases plus earlier
+output retention: `/tmp/gdx-04384-search-envelope-qualified-before.log`.
+The initial ID-column guesses were corrected against the locked probe before
+that qualified run; `/tmp/gdx-04384-search-envelope-before.log` remains an
+unqualified earlier fixture result. The runtime-depth regression separately
+fails before its gate:
+`rtk go test ./internal/gateway/deepseek -run '^TestProdex04384BufferedSearchRuntimeDepthBoundary$' -count=1`;
+log: `/tmp/gdx-04384-search-runtime-depth-before.log`.
+
+The initial executable depth control used 126 arrays and failed the reference
+because it assumed that item acceptance implied runtime acceptance. Its report
+remains FAIL and is not a qualified control:
+`/tmp/gdx-04384-search-envelope-depth-limit-before-oracle.json`.
+Nine corrected strict baseline invocations on clean
+`2a36859568bf5c54ae9409c42f20cb64099100af` use the output-overflow,
+output-overflow-line, output-surrogate, output-depth-limit, output-depth-over,
+output-early-surrogate, depth-kernel-reject, runtime-depth-over and
+runtime-depth-over-rotation suffixes. All reference traces satisfy the complete
+contract. The 124-array success and structural kernel-rejection controls PASS
+both products; the other seven FAIL only Godex. Reports:
+`/tmp/gdx-04384-search-envelope-qualified-<suffix>-before-oracle.json`.
+The exact two-executable invocations are retained in
+`/tmp/gdx-04384-search-envelope-qualified-baseline.py`.
+
+The nine fixtures require exact successful/failed Responses or empty HTTP 500,
+status/type, stdout, child exit, original authenticated request, selected key,
+one attempt, zero retry and safe durable state. Existing independent mutation
+tests include the new cases. Terminal wire checks are reused by actual HTTP 502
+body rejection and HTTP 500 depth rejection, and enforce absent Content-Type
+and the final stdout newline where required. Missing-child diagnostics now
+retain the child exit and redacted stderr instead of hiding timeout evidence.
+
+`rtk go test ./internal/gateway/deepseek -run '^TestProdex04384Buffered' -count=1`
+passes 114 tests: `/tmp/gdx-04384-search-envelope-all-focused.log`.
+`rtk go test -race ./internal/gateway/deepseek ./internal/usecase/routing ./tools/differential -count=1`
+passes 2,688 tests: `/tmp/gdx-04384-search-envelope-race.log`.
+`rtk go test ./...` passes 9,313 tests across 81 packages:
+`/tmp/gdx-04384-search-envelope-test-all.log`.
+`rtk proxy make verify` passes formatting, source/TUI guards, vet, full shuffled
+race tests, cross-platform build/test compilation, installers and build:
+`/tmp/gdx-04384-search-envelope-verify.log`.
+Clean-commit executable verification follows. Global 1:1 parity remains unproven.

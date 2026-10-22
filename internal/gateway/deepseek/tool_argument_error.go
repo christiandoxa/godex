@@ -45,11 +45,15 @@ func deepSeekToolArgumentError(name, arguments string, cause error) error {
 }
 
 func deepSeekToolArgumentDiagnostic(name, arguments, reason string, offset int) error {
+	return deepSeekMalformedArgumentError(name, deepSeekSerdeDiagnostic(arguments, reason, offset))
+}
+
+func deepSeekSerdeDiagnostic(arguments, reason string, offset int) error {
 	// Serde columns count consumed UTF-8 bytes, including the unexpected byte.
 	prefix := arguments[:offset]
 	line := strings.Count(prefix, "\n") + 1
 	column := len(prefix) - strings.LastIndex(prefix, "\n") - 1
-	return deepSeekMalformedArgumentError(name, fmt.Errorf("%s at line %d column %d", reason, line, column))
+	return fmt.Errorf("%s at line %d column %d", reason, line, column)
 }
 
 func deepSeekMalformedArgumentError(name string, cause error) error {

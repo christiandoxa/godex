@@ -133,6 +133,18 @@ one original authenticated attempt, no retry and safe durable state. The rotatio
 case configures two synthetic keys and requires only the primary attempt. These
 runtime tests do not claim executable coverage of larger provider-core limits.
 
+The `deepseek-buffered-view-search-output-*` cases cover overflow, overflow-line,
+surrogate, depth-limit, depth-over and early-surrogate. They require the exact
+outer Mojo-item serde message and byte position, or a successful structured
+response for the public depth-limit control (124 arrays).
+`deepseek-buffered-view-search-depth-kernel-reject` keeps the inner diagnostic
+when the 257-array argument fails structural admission.
+`deepseek-buffered-view-search-runtime-depth-over` and its `-rotation` variant
+require empty HTTP 500, no Content-Type, child exit 2, one authenticated attempt,
+no retry and safe durable state for 125 nested arrays. The rotation variant uses
+two synthetic keys. A 126-array item is accepted by provider-core but fails the
+public Responses envelope; it is covered separately by focused gateway tests.
+
 Gemini raw-key session identity cases cover ASCII/Unicode byte limits,
 overflow and embedded controls. Run one with
 `--gemini --scenario raw-key-session-over-limit`; `--scenario all` remains the

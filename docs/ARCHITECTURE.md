@@ -333,7 +333,16 @@ Private `buffered_fragment.go` reproduces the tagged 256-depth structural view
 for ordinary buffered arguments without interpreting primitive or escape contents.
 `buffered_fragment_error.go` preserves earlier serde range/surrogate failures,
 recursion and container/value EOF diagnostics after that view rejects input.
-Structured tool-search arguments retain their separate serde admission boundary.
+Private `search_output.go` parses structured tool-search arguments inside the
+kernel's complete item envelope, retaining its serde depth and byte positions.
+The formatter in `tool_argument_error.go` serves both inner-argument and outer
+output errors; structural kernel rejection keeps the inner diagnostic.
+The runtime also reparses the complete translated Responses envelope. Structured
+search arguments with 125 or 126 nested arrays fit the item but exceed that
+runtime boundary, yielding an empty terminal HTTP 500 before conversation
+ownership is stored. The public accepted control has 124 arrays; provider-core
+item conversion separately accepts 126. Ordinary opaque arguments keep their
+existing bounded-view behavior.
 The runtime reads at most 4 MiB of the complete buffered upstream body before
 provider-core conversion; larger bodies produce the terminal plain HTTP 502
 processing failure without retry or key rotation. Provider-core tool conversion

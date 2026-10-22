@@ -12,6 +12,7 @@ import (
 	"unicode"
 
 	"github.com/christiandoxa/godex/internal/gateway/chatcompat"
+	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
@@ -48,6 +49,13 @@ func translateResponseWithConversation(
 	translated, err := deepSeekChatResponse(body, time.Now())
 	if err != nil {
 		return nil, err
+	}
+	// The runtime reparses the full provider-core response, adding its container depth.
+	if jsonutil.CheckSerdeBoundary(string(translated)) != nil {
+		return &proxymodel.Response{
+			StatusCode: http.StatusInternalServerError, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("")),
+			PrecommitFailure: &proxymodel.PrecommitFailure{Code: "provider_response_translation_failed"},
+		}, nil
 	}
 	result, err := translatedDeepSeekResponse(response, translated, requestMetadata)
 	if err == nil {
