@@ -3400,3 +3400,55 @@ Logs: `/tmp/gdx-04384-raw-key-identity-race.log` and
 shuffled race suite, cross-platform build/test compilation, installers and build.
 Log: `/tmp/gdx-04384-raw-key-identity-verify.log`.
 Clean-commit executable gates follow.
+
+
+## Buffered ordinary arguments follow the bounded structural view
+
+Pinned `json_view.mojo` and buffered `response_tool_calls.rs` use Mojo's
+structural view for ordinary/custom tool arguments. Primitive contents and
+escaped bytes remain opaque. The root starts at depth zero with a 256 limit:
+256 arrays around a scalar and 257 empty arrays pass; 257 arrays around a
+scalar and 258 empty arrays fail. The Rust serde parser supplies diagnostics
+only after the authoritative kernel rejects input. Structured `tool_search`
+arguments cross an additional serde boundary and remain strict.
+
+A private scanner in `gateway/deepseek/buffered_fragment.go` reproduces that
+view without decoding JSON values. Its error path preserves the earlier serde
+range/surrogate diagnostic before excessive nesting, or serde's recursion
+failure at column 128. Existing object-syntax formatting is reused. No shared
+helper, exported API, dependency, option, state change or worker is added.
+Other lexical diagnostic classes remain a separate audit target.
+
+The narrow fail-before regression passes structured-search controls and fails
+ordinary opaque-value acceptance plus excessive-depth rejection:
+`/tmp/gdx-04384-buffered-fragment-before.log`.
+`rtk go test ./internal/gateway/deepseek -run '^TestProdex04384Buffered' -count=1`
+then passes all 31 focused tests:
+`/tmp/gdx-04384-buffered-fragment-focused.log`.
+Expected composite surrogate/range/depth diagnostics also match an offline
+Rust probe pinned to serde 1.0.229/serde_json 1.0.154; that is source-aligned
+evidence, not an executable parity result by itself.
+
+Ten strict released-executable cases were run against clean `9ed7963` using
+`--scenario deepseek-buffered-view-<suffix>`. All independently require exact
+client body/status/type, stdout, exit zero, one exact authenticated upstream
+request, zero retries and safe durable state. The surrogate, depth-limit and
+depth-empty controls PASS on both products. Literal, overflow, escape,
+depth-over, early-surrogate, early-range and patch satisfy the reference
+contract and FAIL only Godex. Reports:
+`/tmp/gdx-04384-buffered-fragment-<suffix>-before-oracle.json`.
+Independent mutations reject changed response bytes, stdout, retries and
+attempts even when both traces are corrupted alike. The shared wire oracle
+also retains its existing status, exit and state mutations.
+
+`rtk go test ./tools/differential -count=1` passes 248 tests after correcting
+a test-only mutation that previously targeted a nonexistent failed-call ID.
+The retained earlier fixture failure is not reported as a product failure.
+`rtk go test -race ./internal/gateway/deepseek ./tools/differential -count=1`
+passes 792 tests: `/tmp/gdx-04384-buffered-fragment-race.log`.
+`rtk go test ./...` passes 9,204 tests across 81 packages:
+`/tmp/gdx-04384-buffered-fragment-test-all.log`.
+`rtk proxy make verify` passes formatting, source/TUI guards, vet, the full
+shuffled race suite, cross-platform build/test compilation, installers and build.
+Log: `/tmp/gdx-04384-buffered-fragment-verify.log`.
+Clean-commit executable gates follow.

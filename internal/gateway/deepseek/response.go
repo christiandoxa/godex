@@ -144,11 +144,8 @@ func deepSeekResponseSpecialTool(call map[string]any, name, arguments string) (m
 			"execution": "client", "arguments": decoded,
 		}, true, nil
 	}
-	if strings.TrimSpace(arguments) != "" {
-		var decoded any
-		if err := json.Unmarshal([]byte(arguments), &decoded); err != nil {
-			return nil, true, deepSeekToolArgumentError(name, arguments, err)
-		}
+	if strings.TrimSpace(arguments) != "" && !deepSeekBufferedFragmentValid(arguments) {
+		return nil, true, deepSeekBufferedArgumentError(name, arguments)
 	}
 	if name == "apply_patch" {
 		return map[string]any{

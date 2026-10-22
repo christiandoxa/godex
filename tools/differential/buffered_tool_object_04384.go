@@ -28,15 +28,22 @@ func bufferedToolObjectResponse04384(phase string) string {
 	if name == "" {
 		return ""
 	}
+	return bufferedToolFailedResponse04384(name, diagnostic)
+}
+
+func bufferedToolFailedResponse04384(name, diagnostic string) string {
 	message, _ := json.Marshal("DeepSeek returned malformed JSON arguments for tool call `" + name + "`: " + diagnostic)
 	return `{"created_at":1,"error":{"code":"invalid_tool_call_arguments","message":` + string(message) + `},"id":"chatcmpl-differential-tool","metadata":{"deepseek":{"finish_reason":"tool_calls"}},"model":"deepseek-v4-pro","object":"response","output":[],"status":"failed","usage":{"input_tokens":2,"output_tokens":1,"total_tokens":3}}`
 }
 
 func bufferedToolObjectInvariants04384(scenario scenarioResult) []string {
+	return bufferedToolWireInvariants04384(scenario, bufferedToolObjectResponse04384(scenario.Name))
+}
+
+func bufferedToolWireInvariants04384(scenario scenarioResult, want string) []string {
 	if len(scenario.Runs) != 2 {
 		return []string{scenario.Name + ".run_count"}
 	}
-	want := bufferedToolObjectResponse04384(scenario.Name)
 	var failures []string
 	for _, run := range scenario.Runs {
 		prefix := scenario.Name + "." + run.Name

@@ -87,7 +87,7 @@ credential. They are automatically required by
 `scripts/verify-release-parity.sh`.
 
 The harness creates separate temporary homes, starts one loopback mock upstream,
-and runs both products independently through eighteen bounded scenarios: a successful request; a
+and runs both products independently through bounded scenarios: a successful request; a
 synthetic 429 followed by a retry owned by the **Codex shim**; a single-key
 429, 500, or 503 that must remain terminal without **proxy** retry; cancellation while
 upstream is delayed; two launches against the same home; and a terminal 429 followed by a
@@ -101,11 +101,19 @@ candidate executable's embedded Go VCS revision and requires `vcs.modified=false
 A stale binary, dirty build, or build without VCS metadata fails before execution.
 Both reference and candidate source trees must also have no tracked modifications
 or untracked files; a locally edited Prodex checkout cannot serve as the oracle.
-The resulting PASS is limited to the eighteen named DeepSeek synthetic scenarios and is
+The resulting PASS is limited to the named DeepSeek synthetic scenarios and is
 not equivalent to a global provider, live-TUI or transport parity certificate.
 
 Use `--scenario success|tool-call|deepseek-user-id|sse-stream|sse-rate-limit|retry|deepseek-sse-terminal|single-key-401|single-key-403|single-key-429|single-key-500|single-key-503|key-rotation-429|key-rotation-restart|cancel|restart|recover-after-429|recover-after-503` to rerun one case while
 investigating a mismatch; the default is `--scenario all`.
+
+The 0.438.4 `deepseek-buffered-view-*` cases cover literal, overflow, escape,
+surrogate, depth-limit, depth-empty, depth-over, early-surrogate, early-range
+and patch suffixes. They require byte-exact successful or failed Responses,
+original argument strings, the pinned serde diagnostic where applicable,
+HTTP status/type, stdout, child exit, one exact authenticated upstream request,
+zero retries and safe durable state. The surrogate and two depth-boundary
+cases are positive controls. Equal corrupted outputs fail independent invariants.
 
 The 0.438.4 `deepseek-sse-error-presence`, `deepseek-sse-error-i64` and
 `deepseek-sse-error-float` scenarios verify embedded-error primary-field

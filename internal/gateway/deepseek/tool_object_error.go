@@ -32,5 +32,9 @@ func deepSeekToolArgumentError(name, arguments string, cause error) error {
 			cause = fmt.Errorf("%s at line %d column %d", diagnostic, line, column)
 		}
 	}
+	return deepSeekMalformedArgumentError(name, cause)
+}
+
+func deepSeekMalformedArgumentError(name string, cause error) error {
 	return fmt.Errorf("DeepSeek returned malformed JSON arguments for tool call `%s`: %w", name, cause)
 }

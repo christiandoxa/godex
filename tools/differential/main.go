@@ -169,7 +169,7 @@ func run() error {
 	gemini := flags.Bool("gemini", false, "run isolated Gemini generateContent executable differential")
 	geminiModels := flags.Bool("gemini-models", false, "compare Gemini provider models catalog identity and aliases across two pinned binaries")
 	scenarioWorkers := flags.Int("scenario-workers", 1, "isolated DeepSeek scenario workers, 1-4 (parallel only for --scenario all)")
-	scenarioName := flags.String("scenario", "all", "scenario to run: all, deepseek-raw-key-id-limit, deepseek-raw-key-id-over-limit, deepseek-raw-key-id-unicode-limit, deepseek-raw-key-id-unicode-over, deepseek-raw-key-id-control, deepseek-raw-key-id-mixed, deepseek-raw-key-id-blank, deepseek-raw-key-id-local-compact, deepseek-buffered-tool-key, deepseek-buffered-tool-comma, deepseek-buffered-tool-colon, deepseek-buffered-tool-separator, deepseek-buffered-tool-search-key, deepseek-buffered-tool-padded-key, raw-key-continuation-probe, raw-key-in-process-probe, success, tool-call, tool-search-canonical, sse-tool-search-canonical, sse-apply-patch-canonical, deepseek-unsupported-message-role, deepseek-null-message-content, deepseek-request-over-kernel-limit, deepseek-input-type-null, deepseek-input-type-number, deepseek-input-type-empty, deepseek-empty-top-level-tool-name, deepseek-invalid-nested-shell-command, sse-stream, sse-rate-limit, sse-terminal-close, sse-json-fragments, sse-data-lines, sse-large-packet, sse-line-limit, sse-event-limit, sse-comment-utf8, sse-metadata-u64, deepseek-sse-error-presence, deepseek-sse-error-i64, deepseek-sse-error-float, deepseek-usage-u64, deepseek-sse-usage-u64, deepseek-usage-null, deepseek-sse-usage-null, deepseek-empty-identity, deepseek-sse-empty-identity, sse-tool-surrogate, sse-tool-depth, sse-tool-overflow, sse-tool-paired, sse-tool-finish-error, sse-tool-empty-finish-error, sse-tool-order-finish, sse-tool-order-done, sse-tool-signature, sse-tool-id-missing, sse-tool-id-empty, sse-tool-id-padded, sse-tool-name-padded, sse-tool-name-blank-namespace, sse-tool-name-blank-late, sse-payload-bom, sse-payload-bom-repeat, retry, deepseek-sse-terminal, single-key-401, single-key-403, single-key-429, single-key-503, single-key-500, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
+	scenarioName := flags.String("scenario", "all", "scenario to run: all, deepseek-buffered-view-literal, deepseek-buffered-view-overflow, deepseek-buffered-view-escape, deepseek-buffered-view-surrogate, deepseek-buffered-view-depth-limit, deepseek-buffered-view-depth-empty, deepseek-buffered-view-depth-over, deepseek-buffered-view-early-surrogate, deepseek-buffered-view-early-range, deepseek-buffered-view-patch, deepseek-raw-key-id-limit, deepseek-raw-key-id-over-limit, deepseek-raw-key-id-unicode-limit, deepseek-raw-key-id-unicode-over, deepseek-raw-key-id-control, deepseek-raw-key-id-mixed, deepseek-raw-key-id-blank, deepseek-raw-key-id-local-compact, deepseek-buffered-tool-key, deepseek-buffered-tool-comma, deepseek-buffered-tool-colon, deepseek-buffered-tool-separator, deepseek-buffered-tool-search-key, deepseek-buffered-tool-padded-key, raw-key-continuation-probe, raw-key-in-process-probe, success, tool-call, tool-search-canonical, sse-tool-search-canonical, sse-apply-patch-canonical, deepseek-unsupported-message-role, deepseek-null-message-content, deepseek-request-over-kernel-limit, deepseek-input-type-null, deepseek-input-type-number, deepseek-input-type-empty, deepseek-empty-top-level-tool-name, deepseek-invalid-nested-shell-command, sse-stream, sse-rate-limit, sse-terminal-close, sse-json-fragments, sse-data-lines, sse-large-packet, sse-line-limit, sse-event-limit, sse-comment-utf8, sse-metadata-u64, deepseek-sse-error-presence, deepseek-sse-error-i64, deepseek-sse-error-float, deepseek-usage-u64, deepseek-sse-usage-u64, deepseek-usage-null, deepseek-sse-usage-null, deepseek-empty-identity, deepseek-sse-empty-identity, sse-tool-surrogate, sse-tool-depth, sse-tool-overflow, sse-tool-paired, sse-tool-finish-error, sse-tool-empty-finish-error, sse-tool-order-finish, sse-tool-order-done, sse-tool-signature, sse-tool-id-missing, sse-tool-id-empty, sse-tool-id-padded, sse-tool-name-padded, sse-tool-name-blank-namespace, sse-tool-name-blank-late, sse-payload-bom, sse-payload-bom-repeat, retry, deepseek-sse-terminal, single-key-401, single-key-403, single-key-429, single-key-503, single-key-500, key-rotation-429, key-rotation-restart, cancel, restart, recover-after-429, or recover-after-503")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		return err
 	}
@@ -423,6 +423,12 @@ func run() error {
 		specs = append(specs, differentialScenario043713{name, func(mock *mockServer) (scenarioResult, error) {
 			return runPair(root, mock, name, mockPlan{}, *prodexBin, *godexBin,
 				prodexSourceCommit, godexSourceCommit, runOptions{rotate: true, rawKeyIdentity: name})
+		}})
+	}
+	for _, name := range bufferedFragmentCases04384() {
+		specs = append(specs, differentialScenario043713{name, func(mock *mockServer) (scenarioResult, error) {
+			return runPair(root, mock, name, mockPlan{ToolCall: true, SSEFraming: name}, *prodexBin, *godexBin,
+				prodexSourceCommit, godexSourceCommit, runOptions{})
 		}})
 	}
 	scenarios, err := executeDifferentialScenarios043713(specs, *scenarioName, *scenarioWorkers)
@@ -870,6 +876,12 @@ func (mock *mockServer) serveHTTP(writer http.ResponseWriter, request *http.Requ
 	}
 	if plan.ToolCall && status == http.StatusOK {
 		responseBody = `{"id":"chatcmpl-differential-tool","object":"chat.completion","created":1,"model":"deepseek-v4-pro","choices":[{"index":0,"message":{"role":"assistant","content":null,"tool_calls":[{"id":"call-differential","type":"function","function":{"name":"lookup","arguments":"{\"key\":\"alpha\"}"}}]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":2,"completion_tokens":1,"total_tokens":3}}`
+		if name, arguments, _ := bufferedFragmentFixture04384(plan.SSEFraming); name != "" {
+			nameJSON, _ := json.Marshal(name)
+			argumentsJSON, _ := json.Marshal(arguments)
+			responseBody = strings.Replace(responseBody, `"lookup"`, string(nameJSON), 1)
+			responseBody = strings.Replace(responseBody, `"{\"key\":\"alpha\"}"`, string(argumentsJSON), 1)
+		}
 		if name, arguments, _ := bufferedToolObjectFixture04384(plan.SSEFraming); name != "" {
 			nameJSON, _ := json.Marshal(name)
 			argumentsJSON, _ := json.Marshal(arguments)
@@ -1250,6 +1262,9 @@ func shimFailure(message string) int {
 // product failures, skipped upstream calls, and missing cancellations must not
 // turn into parity successes just because both implementations behave alike.
 func scenarioInvariants(scenario scenarioResult) []string {
+	if name, _, _ := bufferedFragmentFixture04384(scenario.Name); name != "" {
+		return bufferedToolWireInvariants04384(scenario, bufferedFragmentResponse04384(scenario.Name))
+	}
 	if _, known := rawKeyIdentityCase04384(scenario.Name); known {
 		return rawKeyIdentityInvariants04384(scenario)
 	}
