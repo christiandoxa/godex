@@ -9565,3 +9565,24 @@ and `rtk proxy make verify > /tmp/gdx-04384-gemini-stream-repaired-snapshot-veri
 Exact clean executable qualification follows. Empty text was also inspected:
 the pinned JSON view recognizes quoted empty strings and Mojo omits them, so
 Godex's current empty-text guard needs no speculative change.
+
+Exact clean d82cb0972ae6201c6ee34273c460e60dd9b2e07f then PASSes all 14
+targeted executable scenarios: three repaired/error/DONE-only cases and eleven
+prior snapshot, tool, semantic-failure and pending controls. Original independent
+seed/following-request bytes, history, stdout/status/headers, attempts/auth/slot,
+state and matching-corruption assertions pass. Both binaries embed the exact
+revision with vcs.modified=false. Commands and audit:
+/tmp/gdx-04384-gemini-stream-repaired-snapshot-targeted-commands.json and
+/tmp/gdx-04384-gemini-stream-repaired-snapshot-targeted-audit.json. The change
+is pushed directly to origin/main after fetch, cleanliness and ancestry checks
+without waiting for CI. Full Gemini 943 now runs on that unchanged source
+(original session 65534); it is not yet a PASS. All earlier source-scoped full
+and diagnostic reports remain retained; global parity is unproven.
+
+The complete DeepSeek 224-case phase from the original still-running e9d88ce
+release gate separately PASSes, with all independent invariants and matching
+mutations. Its complete JSON report is extracted at byte 26497 from the
+original log. Audit: /tmp/gdx-04384-release-e9d88ce-deepseek-phase-audit.json.
+This qualifies only DeepSeek at exact e9d88ce; the entire default gate remains
+RUNNING on original session 29510, and this phase is not attributed to later
+Gemini revisions.
