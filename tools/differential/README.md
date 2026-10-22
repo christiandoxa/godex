@@ -1193,3 +1193,10 @@ blank original content and supplies one empty user message when nothing
 remains. Complete original wire and pending-history unit checks preserve the
 standalone converter contract. Exact executable requests/client/state and
 matching-corruption controls apply. Default DeepSeek reaches 321; Gemini974.
+
+Twelve DeepSeek `deepseek-request-primitive-bridge-content-*` cases cover
+runtime message objects as Serde JSON text and array text with empty entries
+preserved. Simple/normal text, mixed-value and standalone unit controls retain
+their contracts. Image and cache-control inputs still fail before upstream
+attempts. Exact original request/response/state and matching-corruption guards
+apply. Default DeepSeek reaches 333; Gemini remains 974.

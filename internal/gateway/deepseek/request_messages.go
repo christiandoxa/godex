@@ -112,6 +112,9 @@ func deepSeekMessageItem(item map[string]any, projection messageProjection) (map
 	if err != nil {
 		return nil, err
 	}
+	if projection != standaloneMessages && contentValue != nil {
+		content = deepSeekBridgeContentText(contentValue)
+	}
 	if projection == normalMessages && strings.TrimSpace(content) == "" {
 		return nil, nil
 	}

@@ -10352,6 +10352,14 @@ then PASS 1,417 tests. Fifteen new executable cases extend DeepSeek306 to 321;
 Gemini remains 974. Full local and exact clean qualification follow before
 publication. Overall 1:1 parity remains unproven.
 
+Full local validation PASSes 11,179 tests with 18 optional SKIP (original
+session 22170, exit 0). make verify exits 0 (original session 54711), including
+shuffled race tests, cross-builds, vet, source/format guards and the build.
+Exact commands:
+`rtk proxy go test -json ./... > /tmp/gdx-04384-deepseek-message-content-full.jsonl 2>&1`
+and `rtk proxy make verify > /tmp/gdx-04384-deepseek-message-content-verify.log 2>&1`.
+Exact clean executable qualification follows before publication.
+
 Full local validation PASSes 11,158 tests with 18 optional SKIP (original
 session 75698, exit 0). make verify exits 0 (original session 68852), including
 shuffled race tests, cross-builds, vet, source/format guards and the build.
@@ -10395,3 +10403,49 @@ and full Gemini974 retain their original handles and immutable sources.
 Latest qualified complete default gate remains e9d88ce; latest qualified full
 Gemini remains948/d670339 and full DeepSeek is282/5165058. Overall 1:1 remains
 unproven, including broader normal message-content shapes and live auth.
+
+### Full Gemini974 qualifies exact 3399a8c
+
+Original session 59683 exits 0. All 974 unique cases PASS at exact clean
+3399a8c360aa5c52fbb06c0dceee80dd854569f7, including every prior968 scenario
+and the previously qualified948 scope. Audit:
+/tmp/gdx-04384-gemini-stream-failed-text-snapshot-full-audit.json. Original
+independent invariants and mutation guards, unique names/run shapes, pinned
+source/reference/artifacts and clean embedded VCS metadata were checked. No
+per-case or state-integrity error remains in this run. It does not explain or
+erase the retained full968/full273 failures, qualify newer production, or
+qualify an entire default gate. Overall 1:1 parity remains unproven.
+
+### DeepSeek runtime messages retain JSON-text and array-empty semantics
+
+The pinned normal message and separate tool-output Mojo projectors share
+deepseek_raw_put_content_text_string. Runtime content objects retain their
+complete Serde JSON text; arrays retain empty strings/text fields as newline
+positions. The exact ecd6a6e executable baseline proves seven Godex-only
+original-request FAILs and ten PASS controls across seventeen cases (original
+session 79095, exit 0). Audit:
+/tmp/gdx-04384-deepseek-message-content-before-audit.json. Every reference
+original invariant PASSes. Image/cache-control rejection retains exit 2,
+HTTP 502 and zero upstream attempts; simple/normal/mixed text, output/MCP,
+alias/fallback and three-turn history controls PASS. Request bytes are the
+only Godex differences. The initial two fixture self-test failures from a
+namespace collision remain retained; the unique bridge-content suffix and
+original Gemini route were fixed before any executable oracle. Final registry
+and matching-corruption checks PASS fourteen tests (original 46705, exit 0).
+
+The existing private output-text formatter now lives in request_content.go
+as deepSeekBridgeContentText and serves two real consumers inside gateway/
+deepseek. Runtime messages reuse it after their existing validation; missing
+content is left empty rather than converted to null text. Standalone message
+projection keeps its previous contract. No application layer, package,
+exported API, interface, dependency, option, worker, shared-helper root or
+persisted format is added. This reuses the exact shared provider invariant
+rather than extracting a generic JSON helper. Five unit regressions first FAIL
+and two controls PASS; retained log:
+/tmp/gdx-04384-deepseek-message-content-unit-before.jsonl. The initial local
+formatter attempt also triggered three existing alias/pending-history unit
+regressions; those logs remain retained. Its nil guard was corrected before
+any candidate qualification. Final focused tests PASS 1,438 tests (original
+49566, exit 0). Twelve new executable cases extend DeepSeek321 to 333;
+Gemini remains 974. Full local and exact clean qualification follow before
+publication. Overall 1:1 parity remains unproven.

@@ -324,6 +324,11 @@ using the existing Serde writer for nonstring JSON. Focused tool-output projecti
 stays in gateway/deepseek: separate outputs extract array text with empty entries
 preserved, while inline MCP results retain their original JSON type. These are
 private protocol transformations with no new shared helper or application layer.
+Runtime messages and separate tool outputs reuse the same private content-text
+formatter in request_content.go after message validation. It preserves full
+Serde JSON text for objects and empty array text entries; standalone message
+conversion retains its established projection. Missing content remains distinct
+from explicit JSON values. This reuse stays inside the provider gateway.
 DeepSeek's adjacency index matches opaque tool IDs byte for byte; whitespace
 classification only rejects blank IDs. Distinct padded IDs retain separate
 first-output and emitted-call ownership, without changing the stateless override.
