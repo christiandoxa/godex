@@ -87,11 +87,14 @@ func deepSeekResponseToolItem(raw any) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	if item, handled, err := deepSeekResponseSpecialTool(call, name, arguments); handled || err != nil {
-		return item, err
-	}
 	if name == "shell" || name == "exec" || name == "functions.exec_command" {
 		arguments = chatcompat.WrapRTKArguments(name, arguments)
+	}
+	if !deepSeekResponseKernelAdmits(call, name, arguments) {
+		return nil, deepSeekBufferedArgumentError(name, arguments)
+	}
+	if item, handled, err := deepSeekResponseSpecialTool(call, name, arguments); handled || err != nil {
+		return item, err
 	}
 	namespace, shortName := deepSeekSplitToolName(name)
 	item := map[string]any{
@@ -117,11 +120,14 @@ func deepSeekResponseToolCall(raw any) (map[string]any, string, string, error) {
 		return nil, "", "", errors.New("DeepSeek returned a tool call without a function object")
 	}
 	name, ok := function["name"].(string)
-	if !ok || strings.TrimSpace(name) == "" {
+	if !ok {
 		return nil, "", "", errors.New("DeepSeek returned a tool call without a function name")
 	}
 	if len(name) > deepSeekResponseNameMaxBytes {
 		return nil, "", "", errors.New("DeepSeek returned a tool call name exceeding the supported size")
+	}
+	if strings.TrimSpace(name) == "" {
+		return nil, "", "", errors.New("DeepSeek returned a tool call without a function name")
 	}
 	arguments, ok := function["arguments"].(string)
 	if !ok {
@@ -196,11 +202,16 @@ func deepSeekStreamSplitToolName(name string) (string, string) {
 }
 
 func deepSeekResponseThoughtSignature(call map[string]any) string {
-	extra, _ := call["extra_content"].(map[string]any)
-	google, _ := extra["google"].(map[string]any)
-	signature, _ := google["thought_signature"].(string)
+	signature := deepSeekResponseRawSignature(call)
 	if strings.TrimSpace(signature) == "" {
 		return ""
 	}
+	return signature
+}
+
+func deepSeekResponseRawSignature(call map[string]any) string {
+	extra, _ := call["extra_content"].(map[string]any)
+	google, _ := extra["google"].(map[string]any)
+	signature, _ := google["thought_signature"].(string)
 	return signature
 }

@@ -99,8 +99,8 @@ func TestDeepSeekResponsesToolShapingMatchesTaggedContract(t *testing.T) {
 	}
 }
 
-func TestDeepSeekResponsesRejectsOversizedToolNameOnRuntimePath(t *testing.T) {
-	response := executeDeepSeekBufferedResponse(t, map[string]any{
+func TestDeepSeekResponsesRejectsOversizedToolNameAtProviderCore(t *testing.T) {
+	response := translateDeepSeekProviderCoreResponse(t, map[string]any{
 		"choices": []any{map[string]any{"message": map[string]any{
 			"tool_calls": []any{map[string]any{"function": map[string]any{
 				"name": strings.Repeat("x", deepSeekResponseNameMaxBytes+1), "arguments": `{}`,
@@ -136,7 +136,7 @@ func TestProdex04361DeepSeekRTKArgumentsRespectProviderBoundary(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			response := executeDeepSeekBufferedResponse(t, map[string]any{
+			response := translateDeepSeekProviderCoreResponse(t, map[string]any{
 				"choices": []any{map[string]any{"message": map[string]any{
 					"tool_calls": []any{map[string]any{"function": map[string]any{
 						"name": "shell", "arguments": string(arguments),
@@ -204,6 +204,23 @@ func executeDeepSeekBufferedResponse(t *testing.T, payload map[string]any) map[s
 	var result map[string]any
 	if err := json.Unmarshal(translated, &result); err != nil {
 		t.Fatalf("translated response %q: %v", translated, err)
+	}
+	return result
+}
+
+func translateDeepSeekProviderCoreResponse(t *testing.T, payload map[string]any) map[string]any {
+	t.Helper()
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	translated, err := deepSeekChatResponse(body, time.Unix(42, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result map[string]any
+	if err := json.Unmarshal(translated, &result); err != nil {
+		t.Fatal(err)
 	}
 	return result
 }

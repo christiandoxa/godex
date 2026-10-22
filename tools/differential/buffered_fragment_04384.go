@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"strings"
 )
 
@@ -99,6 +98,5 @@ func bufferedFragmentResponse04384(phase string) string {
 		item["type"], item["input"] = "custom_tool_call", arguments
 		delete(item, "arguments")
 	}
-	output, _ := json.Marshal([]any{item})
-	return `{"created_at":1,"id":"chatcmpl-differential-tool","metadata":{"deepseek":{"finish_reason":"tool_calls"}},"model":"deepseek-v4-pro","object":"response","output":` + string(output) + `,"usage":{"input_tokens":2,"output_tokens":1,"total_tokens":3}}`
+	return bufferedToolSuccessResponse04384(item)
 }

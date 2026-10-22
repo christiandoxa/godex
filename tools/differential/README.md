@@ -123,6 +123,16 @@ The eof-early-range and eof-early-surrogate controls retain the first serde
 failure before truncated input. Quoted-string EOF and other lexical classes
 remain separate audit targets.
 
+The `deepseek-buffered-body-under`, `deepseek-buffered-body-limit`,
+`deepseek-buffered-body-over` and `deepseek-buffered-body-over-rotation` cases
+exercise complete serialized upstream bodies at 4 MiB minus one, exactly 4 MiB,
+and 4 MiB plus one. Ignored ASCII padding leaves the translated response small.
+Accepted bodies require the exact successful tool response. Oversized bodies
+require plain HTTP 502, `provider response could not be processed`, child exit 2,
+one original authenticated attempt, no retry and safe durable state. The rotation
+case configures two synthetic keys and requires only the primary attempt. These
+runtime tests do not claim executable coverage of larger provider-core limits.
+
 Gemini raw-key session identity cases cover ASCII/Unicode byte limits,
 overflow and embedded controls. Run one with
 `--gemini --scenario raw-key-session-over-limit`; `--scenario all` remains the

@@ -3755,3 +3755,75 @@ at `/tmp/gdx-04384-search-output-audit.txt`.
 Global 1:1 parity remains unproven. Quoted-string/literal EOF, other lexical
 classes, valid Gemini continuation/Compact ownership, native macOS/Windows
 execution and live authentication remain open.
+
+
+## Buffered runtime body gate and provider-core tool admission
+
+The pinned `core_constants.rs` sets the public buffered response cap to 4 MiB.
+`runtime_launch/proxy_startup/deepseek_rewrite/response.rs` reads the complete
+body under that cap before parsing or provider-core translation. Godex instead
+allowed 20 MiB. A body above 4 MiB could therefore produce a successful Godex
+tool response where the release returns the terminal plain HTTP 502
+`provider response could not be processed`.
+
+Provider-core has a separate boundary. The pinned
+`translators/deepseek/tooling/response_tool_calls.rs`, rich Rust bridge and
+`deepseek_input_valid` Mojo contract admit name, raw call ID and raw signature
+up to 4 MiB each, arguments up to 16 MiB, and aggregate input up to 16 MiB.
+RTK wrapping happens before aggregate admission. An absent ID contributes zero
+bytes, while a whitespace-only signature counts before being omitted from
+output. Name size validation precedes blank-name rejection. Godex now follows
+these checks in its private DeepSeek gateway without a new interface, shared
+helper, dependency, configuration, state format or background worker.
+
+Kernel rejection retains the existing inner-argument serde diagnostic; valid
+JSON rejected only by bounds uses the exact bounded-kernel error. The distinct
+kernel-accepted structured-output error remains an open follow-up. Existing
+9–17 MiB metadata, RTK and tool-field assertions now exercise provider-core
+conversion directly. The large-response regression separately requires public
+runtime HTTP 502. No meaningful large-field assertion was removed.
+
+The private fail-before tests catch oversized call ID/signature, aggregate
+overflow with present or absent ID, wrapped RTK growth, earlier numeric error
+precedence and oversized blank-name priority. Logs:
+`/tmp/gdx-04384-tool-kernel-before.log` and
+`/tmp/gdx-04384-tool-kernel-name-before.log`.
+The public body regression also fails before repair:
+`/tmp/gdx-04384-buffered-body-before.log`.
+These larger provider-core tests establish source-aligned behavior, not
+released-executable coverage beyond the public 4 MiB gate.
+
+Four strict executable fixtures use ignored ASCII padding so the complete
+serialized upstream body is 4 MiB minus one, exactly 4 MiB, or 4 MiB plus one.
+Under/limit require the exact successful tool response; over/over-rotation
+require plain HTTP 502, exit 2, exact stdout and content type, one original
+authenticated request, zero retry and safe durable state. The last case
+configures two synthetic keys and requires only the primary attempt. Fixture
+self-tests assert exact wire size and unchanged original content. Independent
+matching corruptions of status, body, content type, stdout, exit, state,
+attempts, authentication, selected key and original request must fail.
+
+Qualified baseline runs on clean `138ce847179a9f203542296a174ee251b5e5b145`
+PASS under/limit and FAIL only Godex for over/over-rotation. Every reference run
+meets the strict contract, including the two-key no-rotation check. Reports:
+`/tmp/gdx-04384-buffered-body-<under|limit|over|over-rotation>-before-oracle.json`.
+Earlier signature/aggregate executable prototypes assumed that the larger
+provider-core limits were reachable through this public route; all failed
+because the release's body gate fired first. Those reports remain FAIL:
+`/tmp/gdx-04384-tool-kernel-<signature-limit|signature-over|aggregate-limit|aggregate-over>-before-oracle.json`.
+They are not qualified evidence of provider-core executable behavior.
+
+Before the final fixture size/authentication controls, the commands
+`rtk go test -race ./internal/gateway/deepseek ./tools/differential -count=1`
+and `rtk go test ./...` pass 864 focused race tests and 9,293 tests across 81
+packages. Logs: `/tmp/gdx-04384-tool-kernel-final-race.log` and
+`/tmp/gdx-04384-tool-kernel-final-test-all.log`.
+The first settled production-tree `rtk proxy make verify` also passes:
+`/tmp/gdx-04384-tool-kernel-verify.log`.
+After adding exact-size and authentication/key/request corruption controls,
+`rtk go test -race ./internal/gateway/deepseek ./tools/differential -count=1`
+passes 865 tests: `/tmp/gdx-04384-tool-kernel-reviewed-race.log`.
+Final `rtk proxy make verify` passes formatting, source/TUI guards, vet, full
+shuffled race tests, cross-platform build/test compilation, installers and
+build: `/tmp/gdx-04384-tool-kernel-reviewed-verify.log`.
+Clean-commit executable verification follows; no new global parity claim is made.

@@ -333,8 +333,15 @@ Private `buffered_fragment.go` reproduces the tagged 256-depth structural view
 for ordinary buffered arguments without interpreting primitive or escape contents.
 `buffered_fragment_error.go` preserves earlier serde range/surrogate failures,
 recursion and container/value EOF diagnostics after that view rejects input.
-Structured tool-search
-arguments retain their separate serde admission boundary.
+Structured tool-search arguments retain their separate serde admission boundary.
+The runtime reads at most 4 MiB of the complete buffered upstream body before
+provider-core conversion; larger bodies produce the terminal plain HTTP 502
+processing failure without retry or key rotation. Provider-core tool conversion
+has separate limits: 4 MiB each for name, raw call ID and raw signature, 16 MiB
+for arguments, and 16 MiB for their combined input bytes after RTK wrapping.
+Private `tool_kernel.go` owns that provider-specific admission check. Missing
+call IDs contribute no input bytes; blank signatures still count before omission
+from output. These limits are not shared routing or generic JSON-helper policy.
 `gateway/deepseek` also owns Responses/SSE output shaping, web-search modes,
 beta-base routing, and the partial native Anthropic Messages bridge. Exact
 0.435.1 parity for that bridge remains open; delivery and generic routing do not

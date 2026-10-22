@@ -8,11 +8,12 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
-func TestProdex04357DeepSeekLargeResponsePreservesMetadata(t *testing.T) {
+func TestProdex04384LargeResponseHasSeparateCoreAndRuntimeBounds(t *testing.T) {
 	arguments := `{"payload":"` + strings.Repeat("x", 9<<20) + `"}`
 	upstream, err := json.Marshal(map[string]any{
 		"id":                 "chatcmpl_large",
@@ -60,9 +61,17 @@ func TestProdex04357DeepSeekLargeResponsePreservesMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if response.StatusCode != 502 || string(body) != "provider response could not be processed" {
+		t.Fatalf("oversized runtime response was not rejected: status=%d bytes=%d", response.StatusCode, len(body))
+	}
+	// Provider-core conversion has its own larger field limits after the runtime read gate.
+	translated, err := deepSeekChatResponse(upstream, time.Unix(1, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
 	var value map[string]any
-	if err := json.Unmarshal(body, &value); err != nil {
-		t.Fatalf("translated large response JSON: %v", err)
+	if err := json.Unmarshal(translated, &value); err != nil {
+		t.Fatalf("provider-core large response JSON: %v", err)
 	}
 	metadata, _ := value["metadata"].(map[string]any)
 	provider, _ := metadata["deepseek"].(map[string]any)

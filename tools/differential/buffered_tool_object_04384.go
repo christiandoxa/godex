@@ -36,6 +36,11 @@ func bufferedToolFailedResponse04384(name, diagnostic string) string {
 	return `{"created_at":1,"error":{"code":"invalid_tool_call_arguments","message":` + string(message) + `},"id":"chatcmpl-differential-tool","metadata":{"deepseek":{"finish_reason":"tool_calls"}},"model":"deepseek-v4-pro","object":"response","output":[],"status":"failed","usage":{"input_tokens":2,"output_tokens":1,"total_tokens":3}}`
 }
 
+func bufferedToolSuccessResponse04384(item map[string]any) string {
+	output, _ := json.Marshal([]any{item})
+	return `{"created_at":1,"id":"chatcmpl-differential-tool","metadata":{"deepseek":{"finish_reason":"tool_calls"}},"model":"deepseek-v4-pro","object":"response","output":` + string(output) + `,"usage":{"input_tokens":2,"output_tokens":1,"total_tokens":3}}`
+}
+
 func bufferedToolObjectInvariants04384(scenario scenarioResult) []string {
 	return bufferedToolWireInvariants04384(scenario, bufferedToolObjectResponse04384(scenario.Name))
 }
@@ -51,14 +56,20 @@ func bufferedToolWireInvariants04384(scenario scenarioResult, want string) []str
 			strings.TrimSuffix(run.Stdout, "\n") != want || run.Client.Headers.Get("Content-Type") != "application/json; charset=utf-8" {
 			failures = append(failures, prefix+".exact_failed_response")
 		}
-		if len(run.Upstream) != 1 || run.Retries != 0 || len(run.StateIntegrity) != 0 {
-			failures = append(failures, prefix+".attempts_or_state")
-		}
-		for _, request := range run.Upstream {
-			if request.Method != "POST" || request.Path != "/v1/chat/completions" || !request.AuthOK ||
-				request.KeySlot != "single" || !validFixtureRequest(request.Body) {
-				failures = append(failures, prefix+".request_or_credential")
-			}
+		failures = append(failures, bufferedToolAttemptInvariants04384(prefix, run, "single")...)
+	}
+	return failures
+}
+
+func bufferedToolAttemptInvariants04384(prefix string, run productRun, slot string) []string {
+	var failures []string
+	if len(run.Upstream) != 1 || run.Retries != 0 || len(run.StateIntegrity) != 0 {
+		failures = append(failures, prefix+".attempts_or_state")
+	}
+	for _, request := range run.Upstream {
+		if request.Method != "POST" || request.Path != "/v1/chat/completions" || !request.AuthOK ||
+			request.KeySlot != slot || !validFixtureRequest(request.Body) {
+			failures = append(failures, prefix+".request_or_credential")
 		}
 	}
 	return failures
