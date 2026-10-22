@@ -10746,3 +10746,56 @@ auth/state assertions and active matching-corruption guards. Audit:
 The candidate includes a documentation-only merge preserving the already
 published numeric qualification record; cmd/internal/tools bytes were unchanged
 by that merge. Neither a full369 nor a complete default-gate PASS is claimed.
+
+### The complete a05e1cbc default gate finishes; newer sources remain scoped
+
+Original session 30039 exits 0 after the entire default gate on exact clean
+a05e1cbc52185361d04981e73c0d3b5f1b642a53. Seven embedded reports PASS: initial
+probe, session footer, profile workflow, CLI validation, context policy,
+DeepSeek255 and Gemini974. The terminal HTTP 402/403 profile/quota and raw HTTP
+429 policy markers also PASS. Audit:
+/tmp/gdx-04384-release-a05e1cbc-audit.json. Exact nested command:
+`rtk proxy scripts/verify-release-parity.sh`. Original log:
+/tmp/gdx-04384-release-a05e1cbc.log. Original source/reference pins, unique names,
+specialized raw-key/restart/recovery run shapes, recursive state/comparison
+invariants and mutation guards were audited. Gemini includes every case from
+the previously qualified974 scope. The original script verified release source,
+binary/manifest checksums and clean candidate VCS metadata; its EXIT trap removed
+temporary artifacts, so this uses original successful evidence rather than
+newly rebuilt binaries. This is the latest qualified complete default gate only
+at a05e1cbc. Later production does not inherit it. Earlier full273/full968 FAILs
+remain retained.
+
+An entire default gate on exact b3ecbff2f61dfb063e1fd9d86c2a7027ed53cc88 is
+running in original session 14493, without a phase option. Exact command:
+`rtk proxy scripts/verify-release-parity.sh > /tmp/gdx-04384-release-b3ecbff2.log 2>&1`.
+Its registry includes DeepSeek369/Gemini974. The earlier a0b94af and ecd6a6e
+entire gates retain their original running handles and immutable sources.
+No newer entire gate or full369 is claimed PASS.
+
+### Function-schema aliases expose a separate tool-projection gap
+
+The pinned tool_parameters helper selects present keys in order: parameters,
+parametersJsonSchema, input_schema, schema. Missing alone permits fallback;
+present null remains invalid. A private fixture-only investigation on exact
+b3ecbff2f61dfb063e1fd9d86c2a7027ed53cc88 proves eight Godex-only FAILs and six
+PASS controls across fourteen final cases (original session 7339, exit 0).
+Audit: /tmp/gdx-04384-deepseek-schema-alias-before-final-audit.json. Exact command:
+`rtk proxy python3 /tmp/gdx-04384-deepseek-schema-alias-before-final.py > /tmp/gdx-04384-deepseek-schema-alias-before-final.log 2>&1`.
+All reference original invariants PASS. Simple nested functions preserve the
+original parametersJsonSchema field, while normal nested reconstruction writes
+parameters. Flat aliases and null-priority rejection also differ in Godex.
+Canonical-field precedence, explicit canonical null, strict false, signed-zero
+equality and exact schema integers remain PASS controls.
+
+Initial thirteen-case results included an incorrect nested reference golden;
+the next fourteen-case run had an inactive nested mutation in its self-test.
+Both original failures remain retained and are not qualification. The final
+fixture uses the observed distinct simple/normal wire views and an active name
+mutation; twelve fixture self-checks PASS (original session 81752, exit 0).
+Source-aligned unit failures are retained separately and do not prove the full
+runtime path. No alias production fix or fixture commit is published. The
+current published matrix remains DeepSeek369/Gemini974. Fixing a common alias
+lookup alone would not satisfy the simple nested view; full pipeline tracing
+and separate view controls remain required before implementation. Overall 1:1
+parity, live authentication and native foreign-platform execution remain unproven.
