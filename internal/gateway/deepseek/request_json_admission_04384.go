@@ -17,18 +17,6 @@ func (*nonobjectResponsesInputError04384) Error() string {
 }
 
 func parseResponsesObjectWithoutValidation(body []byte) (map[string]any, error) {
-	object, err := decodeDeepSeekResponsesObject(body)
-	if err != nil {
-		var nonobject *nonobjectResponsesInputError04384
-		if errors.As(err, &nonobject) {
-			return nil, err
-		}
-		return nil, &invalidResponsesInputError{err}
-	}
-	return object, nil
-}
-
-func decodeDeepSeekResponsesObject(body []byte) (map[string]any, error) {
 	if len(body) > requestMaxBytes {
 		return nil, fmt.Errorf("DeepSeek Responses request exceeds %d bytes", requestMaxBytes)
 	}

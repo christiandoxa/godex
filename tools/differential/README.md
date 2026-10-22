@@ -328,6 +328,14 @@ invalid identities require terminal plain 502, exit 2 and zero attempts.
 Selected null/blank values suppress lower-priority aliases. Existing independent
 auth/slot, response, retry, stdout and durable-state mutation checks apply.
 
+DeepSeek `deepseek-request-primitive-preparation-*` covers rejected frequency/
+presence penalties, seed, n, malformed include/store, background execution,
+automatic truncation, malformed text/tools/reasoning, missing named tools and
+invalid web-search context size. Each requires the same exact terminal plain
+502, exit 2 and zero upstream attempts. These cases exercise the common
+translation-failure boundary alongside all earlier successful control cases;
+matching errors, missing exchanges or unsafe durable state still fail.
+
 DeepSeek scenario workers evaluate their complete independent invariants as
 each scenario finishes, preserving failures in the ordered report. The strict
 five-minute generated SSE timestamp window is unchanged; later cases cannot

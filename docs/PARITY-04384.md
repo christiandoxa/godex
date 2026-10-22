@@ -4076,6 +4076,73 @@ Gemini Compact, session/turn executable continuation, native macOS/Windows
 and live authentication remain open. Global 1:1 parity is not claimed.
 
 
+## DeepSeek translation errors share one terminal presentation boundary
+
+The complete pinned runtime propagates translation failures from
+`runtime_deepseek_prepare_model_request` through `runtime_deepseek_response_attempts`
+with `?`. `local_rewrite_pipeline_dispatch.rs:272–307,402–404` presents any
+failed provider preparation result as plain HTTP 502 `upstream request failed`.
+The policy's details are not a per-field HTTP-status distinction.
+
+Godex's earlier targeted repairs used a private error marker for known fields;
+unmarked rejected controls still produced ordinary 400 errors and entered
+recovery. The request-attempt boundary now maps every Responses translation
+error to that exact terminal 502, preserving the distinct empty-500 valid-root
+case. The now-unnecessary marker, its wrappers and a parser forwarding function
+are removed. Detailed internal validation errors remain available through
+`ResponsesRequest`; protocol validation is not removed or weakened. Unit
+regressions assert rejection/diagnostics, and the actual transport table retains
+the terminal status/message and zero-upstream assertions for old and new fields.
+
+This fixes the common cause once in `gateway/deepseek`, reduces production code
+and keeps retry policy in `usecase/routing`. Native Messages conversion failures,
+provider responses and passthrough behavior retain their independent paths.
+No new production helper, package, exported API, interface, dependency, config,
+worker or persisted format is added. This supersedes the earlier field-specific
+marker implementation recorded in historical checkpoints without changing its
+already matched public outcomes.
+
+Before repair 42 controls pass and thirteen tests fail, including the parent:
+`rtk go test ./internal/gateway/deepseek -run '^TestProdex04380DeepSeekInvalidInputIsTerminalBeforeUpstream$' -count=1`;
+`/tmp/gdx-04384-deepseek-preparation-errors-before.log`.
+The original twelve new cases pass after repair, 55 tests including controls:
+`/tmp/gdx-04384-deepseek-preparation-errors-focused.log`.
+The first complete gateway run has 824 passes and two failures:
+`rtk go test ./internal/gateway/deepseek -count=1`;
+`/tmp/gdx-04384-deepseek-preparation-errors-gateway-tests.log`.
+Those older web-search transport tests required 400 or detailed internal text.
+They now require the tagged generic terminal 502 while retaining zero-attempt
+guards. Malformed search context is also added to the executable fixture set
+and transport table. The complete gateway rerun passes all 827 tests:
+`/tmp/gdx-04384-deepseek-preparation-errors-final-gateway-tests.log`.
+
+Thirteen executable baseline reports pin unchanged clean
+`587f04a08cd252fd44c8d231a344b4b06498d265` and the unchanged reference:
+`/tmp/gdx-04384-deepseek-preparation-<suffix>-before-oracle.json`.
+All FAIL only Godex; every reference and independent mutation invariant passes.
+The original twelve use `/tmp/gdx-04384-deepseek-preparation-errors-differential`;
+the additional search case uses
+`/tmp/gdx-04384-deepseek-preparation-errors-web-search-differential`.
+The existing strict primitive runner checks exact plain response/status/type,
+exit/stdout, zero attempts/retries and safe durable state. Prior accepted
+controls remain in the same complete executable matrix.
+
+`rtk go test ./tools/differential -count=1` passes 281 tests before the final
+web-search fixture addition:
+`/tmp/gdx-04384-deepseek-preparation-errors-oracle-tests.log`.
+`rtk go test -race ./internal/gateway/deepseek ./internal/usecase/routing ./tools/differential -count=1`
+passes 2,938 tests: `/tmp/gdx-04384-deepseek-preparation-errors-race.log`.
+`rtk proxy go test -json ./...` passes 9,747 tests across 81 packages
+(71 passing packages and ten with no tests):
+`/tmp/gdx-04384-deepseek-preparation-errors-test-all.jsonl`.
+`rtk proxy make verify` passes the complete local gate:
+`/tmp/gdx-04384-deepseek-preparation-errors-verify.log`.
+Clean-commit 213-case DeepSeek qualification follows. The separate 185-case
+Gemini PASS remains scoped to clean `8d618e0`; Gemini production is unchanged.
+The completed default gate remains `293b1b6` while the full protected
+`8d618e0` invocation runs. Global 1:1 parity is not claimed.
+
+
 ## Validated model-input and DeepSeek control-type checkpoints
 
 Clean `8d618e097c8549015785bce1e23c89999198d42f` passes all 185 Gemini cases

@@ -1,9 +1,6 @@
 package deepseek
 
-import (
-	"errors"
-	"testing"
-)
+import "testing"
 
 func TestProdex04384DeepSeekControlTypesAreCheckedBeforeTranslation(t *testing.T) {
 	for _, field := range []string{"stream", "instructions", "previous_response_id"} {
@@ -17,9 +14,8 @@ func TestProdex04384DeepSeekControlTypesAreCheckedBeforeTranslation(t *testing.T
 					}
 					return
 				}
-				var invalid *invalidResponsesInputError
-				if !errors.As(err, &invalid) {
-					t.Fatalf("wrong-type top-level control lost terminal admission: %v", err)
+				if err == nil {
+					t.Fatal("wrong-type top-level control was accepted")
 				}
 			})
 		}

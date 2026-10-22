@@ -29,7 +29,9 @@ func deepSeekAdmissionSuffixes04384() []string {
 		"json-valid-unicode", "json-root-null", "json-root-array", "json-root-number", "json-root-boolean", "json-root-string",
 		"json-syntax", "json-trailing", "json-surrogate", "json-utf8", "json-overflow", "json-depth",
 		"user-id-absent", "user-id-canonical", "user-id-user-alias", "user-id-safety-alias", "user-id-blank", "user-id-trim-limit",
-		"user-id-null", "user-id-number", "user-id-over-limit", "user-id-invalid-character"}
+		"user-id-null", "user-id-number", "user-id-over-limit", "user-id-invalid-character",
+		"preparation-frequency", "preparation-presence", "preparation-seed", "preparation-n", "preparation-include", "preparation-store",
+		"preparation-background", "preparation-truncation", "preparation-text", "preparation-tools", "preparation-tool-choice", "preparation-reasoning", "preparation-web-search"}
 }
 
 func requestPrimitiveCase04384(scenario string) (requestPrimitiveFixture04384, bool) {
@@ -161,6 +163,32 @@ func requestPrimitiveCase04384(scenario string) (requestPrimitiveFixture04384, b
 		return requestPrimitiveFixture04384{fields: `"previous_response_id":[]`, reject: true}, true
 	case "admission-previous-number":
 		return requestPrimitiveFixture04384{fields: `"previous_response_id":7`, reject: true}, true
+	case "preparation-frequency":
+		return requestPrimitiveFixture04384{fields: `"frequency_penalty":0.2`, reject: true}, true
+	case "preparation-presence":
+		return requestPrimitiveFixture04384{fields: `"presence_penalty":0.2`, reject: true}, true
+	case "preparation-seed":
+		return requestPrimitiveFixture04384{fields: `"seed":7`, reject: true}, true
+	case "preparation-n":
+		return requestPrimitiveFixture04384{fields: `"n":2`, reject: true}, true
+	case "preparation-include":
+		return requestPrimitiveFixture04384{fields: `"include":null`, reject: true}, true
+	case "preparation-store":
+		return requestPrimitiveFixture04384{fields: `"store":null`, reject: true}, true
+	case "preparation-background":
+		return requestPrimitiveFixture04384{fields: `"background":true`, reject: true}, true
+	case "preparation-truncation":
+		return requestPrimitiveFixture04384{fields: `"truncation":"auto"`, reject: true}, true
+	case "preparation-text":
+		return requestPrimitiveFixture04384{fields: `"text":null`, reject: true}, true
+	case "preparation-tools":
+		return requestPrimitiveFixture04384{fields: `"tools":"opaque"`, reject: true}, true
+	case "preparation-tool-choice":
+		return requestPrimitiveFixture04384{fields: `"tool_choice":{"type":"function","name":"missing_tool"}`, reject: true}, true
+	case "preparation-reasoning":
+		return requestPrimitiveFixture04384{fields: `"reasoning":"opaque"`, reject: true}, true
+	case "preparation-web-search":
+		return requestPrimitiveFixture04384{fields: `"web_search_options":{"search_context_size":"huge"}`, reject: true}, true
 	}
 	return requestPrimitiveFixture04384{}, false
 }

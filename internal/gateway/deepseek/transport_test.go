@@ -252,7 +252,7 @@ func TestDeepSeekOffModeRejectsSearchBeforeUpstream(t *testing.T) {
 		Method: http.MethodPost, Path: mountPath + "/responses", Body: []byte(`{"input":"search","web_search_options":{}}`),
 	}, proxymodel.Account{})
 	var proxyError *proxymodel.Error
-	if !errors.As(err, &proxyError) || proxyError.StatusCode != http.StatusBadRequest || !strings.Contains(err.Error(), "web search mode is off") {
+	if !errors.As(err, &proxyError) || proxyError.StatusCode != http.StatusBadGateway || proxyError.Message != "upstream request failed" {
 		t.Fatalf("off-mode response error = %v", err)
 	}
 	if calls != 0 {
@@ -347,7 +347,8 @@ func TestDeepSeekMalformedWebSearchFailsBeforeUpstream(t *testing.T) {
 		Method: http.MethodPost, Path: mountPath + "/responses",
 		Body: []byte(`{"input":"hello","web_search_options":{"search_context_size":"huge"}}`),
 	}, proxymodel.Account{})
-	if err == nil || !strings.Contains(err.Error(), "search_context_size") {
+	var proxyError *proxymodel.Error
+	if !errors.As(err, &proxyError) || proxyError.StatusCode != http.StatusBadGateway || proxyError.Message != "upstream request failed" {
 		t.Fatalf("malformed web-search request error = %v", err)
 	}
 	if calls != 0 {

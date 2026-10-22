@@ -1,7 +1,6 @@
 package deepseek
 
 import (
-	"errors"
 	"strings"
 	"testing"
 )
@@ -26,9 +25,8 @@ func TestProdex04384DeepSeekStopAdmissionAndAliases(t *testing.T) {
 		t.Run(fixture.name, func(t *testing.T) {
 			body, err := ResponsesRequest([]byte(`{"model":"deepseek-v4-pro","input":"same request",`+fixture.fields+`}`), RequestOptions{})
 			if fixture.want == "" {
-				var invalid *invalidResponsesInputError
-				if !errors.As(err, &invalid) {
-					t.Fatalf("invalid stop lost terminal admission: %v", err)
+				if err == nil {
+					t.Fatal("invalid stop was accepted")
 				}
 				return
 			}

@@ -153,11 +153,7 @@ func (transport *RuntimeTransport) prepareResponseAttempt(input proxymodel.Reque
 		if errors.As(err, &nonobject) {
 			return deepSeekResponseAttempt{}, err
 		}
-		var invalidInput *invalidResponsesInputError
-		if errors.As(err, &invalidInput) {
-			return deepSeekResponseAttempt{}, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
-		}
-		return deepSeekResponseAttempt{}, &proxymodel.Error{StatusCode: http.StatusBadRequest, Message: err.Error()}
+		return deepSeekResponseAttempt{}, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
 	attempt := deepSeekResponseAttempt{
 		body: translated.Body, route: current, metadata: translated.ResponseMetadata, conversations: conversations,

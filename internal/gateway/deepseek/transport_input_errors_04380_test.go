@@ -64,6 +64,19 @@ func TestProdex04380DeepSeekInvalidInputIsTerminalBeforeUpstream(t *testing.T) {
 		{"numeric-user-id", `{"input":"same request","user_id":7}`},
 		{"invalid-user-id", `{"input":"same request","user_id":"user.has.dot"}`},
 		{"over-limit-user-id", `{"input":"same request","user_id":"` + strings.Repeat("u", 513) + `"}`},
+		{"frequency-penalty", `{"input":"same request","frequency_penalty":0.2}`},
+		{"presence-penalty", `{"input":"same request","presence_penalty":0.2}`},
+		{"seed", `{"input":"same request","seed":7}`},
+		{"multiple-completions", `{"input":"same request","n":2}`},
+		{"null-include", `{"input":"same request","include":null}`},
+		{"null-store", `{"input":"same request","store":null}`},
+		{"background", `{"input":"same request","background":true}`},
+		{"truncation", `{"input":"same request","truncation":"auto"}`},
+		{"null-text", `{"input":"same request","text":null}`},
+		{"tools-string", `{"input":"same request","tools":"opaque"}`},
+		{"missing-tool-choice", `{"input":"same request","tool_choice":{"type":"function","name":"missing_tool"}}`},
+		{"reasoning-string", `{"input":"same request","reasoning":"opaque"}`},
+		{"web-search-context", `{"input":"same request","web_search_options":{"search_context_size":"huge"}}`},
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
 			calls.Store(0)

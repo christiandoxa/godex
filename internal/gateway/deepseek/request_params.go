@@ -32,7 +32,7 @@ func copyNumericFields(target, source map[string]any) error {
 			continue
 		}
 		if !jsonNumber(value) {
-			return &invalidResponsesInputError{fmt.Errorf("DeepSeek %s must be a number", key)}
+			return fmt.Errorf("DeepSeek %s must be a number", key)
 		}
 		target[key] = value
 	}
@@ -48,7 +48,7 @@ func copyMaxTokenField(target, source map[string]any) error {
 		number, valid := value.(json.Number)
 		count, err := strconv.ParseUint(string(number), 10, 64)
 		if !valid || err != nil || count == 0 {
-			return &invalidResponsesInputError{fmt.Errorf("DeepSeek %s must be a positive integer", key)}
+			return fmt.Errorf("DeepSeek %s must be a positive integer", key)
 		}
 		target["max_tokens"] = value
 	}
@@ -59,7 +59,7 @@ func copyLogprobFields(target, source map[string]any) error {
 	if value, ok := source[deepSeekLogprobsKey]; ok {
 		flag, valid := value.(bool)
 		if !valid {
-			return &invalidResponsesInputError{errors.New("DeepSeek logprobs must be a boolean")}
+			return errors.New("DeepSeek logprobs must be a boolean")
 		}
 		target[deepSeekLogprobsKey] = flag
 	}
@@ -70,13 +70,13 @@ func copyLogprobFields(target, source map[string]any) error {
 	number, valid := value.(json.Number)
 	count, err := strconv.ParseUint(string(number), 10, 64)
 	if !valid || err != nil {
-		return &invalidResponsesInputError{errors.New("DeepSeek top_logprobs must be an integer")}
+		return errors.New("DeepSeek top_logprobs must be an integer")
 	}
 	if count > 20 {
-		return &invalidResponsesInputError{errors.New("DeepSeek top_logprobs must be <= 20")}
+		return errors.New("DeepSeek top_logprobs must be <= 20")
 	}
 	if enabled, _ := source[deepSeekLogprobsKey].(bool); !enabled {
-		return &invalidResponsesInputError{errors.New("DeepSeek top_logprobs requires logprobs=true")}
+		return errors.New("DeepSeek top_logprobs requires logprobs=true")
 	}
 	target["top_logprobs"] = value
 	return nil
@@ -85,7 +85,7 @@ func copyLogprobFields(target, source map[string]any) error {
 func copyStopField(target, source map[string]any) error {
 	stop, ok, err := deepSeekStop(source)
 	if err != nil {
-		return &invalidResponsesInputError{err}
+		return err
 	}
 	if ok {
 		target["stop"] = stop
@@ -96,7 +96,7 @@ func copyStopField(target, source map[string]any) error {
 func copyUserField(target, source map[string]any) error {
 	user, err := deepSeekUserID(source)
 	if err != nil {
-		return &invalidResponsesInputError{err}
+		return err
 	}
 	if user != "" {
 		target["user_id"] = user

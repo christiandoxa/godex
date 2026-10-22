@@ -9,11 +9,6 @@ import (
 
 const requestPolicyMaxBytes = 4 << 20
 
-type invalidResponsesInputError struct{ cause error }
-
-func (err *invalidResponsesInputError) Error() string { return err.cause.Error() }
-func (err *invalidResponsesInputError) Unwrap() error { return err.cause }
-
 func checkRequestPolicySize(object map[string]any) error {
 	var encoded bytes.Buffer
 	encoder := json.NewEncoder(&encoded)
@@ -24,7 +19,7 @@ func checkRequestPolicySize(object map[string]any) error {
 	// serde_json leaves U+2028/U+2029 literal; Go escapes them even without HTML escaping.
 	size := encoded.Len() - 1 - deepSeekLineSeparatorEscapeBytes(object)
 	if size > requestPolicyMaxBytes {
-		return &invalidResponsesInputError{fmt.Errorf("DeepSeek request policy input exceeds %d bytes", requestPolicyMaxBytes)}
+		return fmt.Errorf("DeepSeek request policy input exceeds %d bytes", requestPolicyMaxBytes)
 	}
 	return nil
 }

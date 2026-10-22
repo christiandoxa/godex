@@ -342,14 +342,19 @@ UTF-8 wire representation. Invalid `temperature`/`top_p` types use the existing
 terminal preparation-error boundary before any upstream attempt.
 DeepSeek identity normalization retains first-present `user_id`, `user`, then
 `safety_identifier`, Unicode trimming, a 512-byte ASCII allowlist and omission
-of blank selected values. Its existing validation errors now use the same
-terminal preparation class; invalid identities cannot enter routing recovery.
+of blank selected values. Invalid identities use the common terminal request
+preparation boundary and cannot enter routing recovery.
 DeepSeek's complete Responses JSON decoder lives with its private admission
-classification. Parse/serde failures retain the existing terminal 502 class;
+classification. Parse/serde failures use the common terminal 502 boundary;
 valid nonobject roots retain a separate private error kind until the runtime
 gateway presents the released empty 500 with no content type and terminal
 precommit evidence. History parsing shares the decoder and cannot extract
 context from rejected input. Retry decisions remain in the routing use case.
+All DeepSeek Responses translation errors become the same plain terminal 502
+at the existing request-attempt boundary. The internal translation functions
+retain detailed errors without a field-specific classification wrapper. Valid
+nonobject JSON keeps its separate empty-500 outcome. Native Messages conversion
+and provider-response fallback retain their independent paths.
 Private `gateway/deepseek/tool_argument_error.go` formats buffered object/array
 and trailing-input syntax diagnostics after argument validation fails. Its
 private byte-position formatter is also used by the buffered serde error path.
@@ -433,7 +438,7 @@ terminal preparation 502 before a previous ID is removed or an ignored field
 is normalized. A non-string previous ID cannot become a fresh request.
 DeepSeek independently checks present `stream` as a boolean and present
 `instructions`/`previous_response_id` as strings before constructing its
-translated request. Invalid types use its existing terminal preparation class,
+translated request. Invalid types use its common terminal preparation boundary,
 so a malformed control cannot become a default non-streaming or fresh request.
 The Gemini adapter preserves the released complete-body admission outcomes:
 parse/serde failures use the terminal plain 502, while a valid nonobject

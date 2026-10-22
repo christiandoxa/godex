@@ -93,7 +93,7 @@ func translateRequestParts(object map[string]any, options RequestOptions) (trans
 	}
 	messages, err := deepSeekMessages(object)
 	if err != nil {
-		return translatedRequestParts{}, &invalidResponsesInputError{err}
+		return translatedRequestParts{}, err
 	}
 	tools, toolNames, err := deepSeekTools(object, options.StrictTools)
 	if err != nil {

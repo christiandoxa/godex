@@ -1,9 +1,6 @@
 package deepseek
 
-import (
-	"errors"
-	"testing"
-)
+import "testing"
 
 func TestProdex04384DeepSeekLogprobsAdmission(t *testing.T) {
 	for _, fixture := range []struct{ name, fields, want string }{
@@ -30,9 +27,8 @@ func TestProdex04384DeepSeekLogprobsAdmission(t *testing.T) {
 				}
 				return
 			}
-			var invalid *invalidResponsesInputError
-			if !errors.As(err, &invalid) || err.Error() != fixture.want {
-				t.Fatalf("logprobs admission = %v, want terminal %q", err, fixture.want)
+			if err == nil || err.Error() != fixture.want {
+				t.Fatalf("logprobs admission = %v, want %q", err, fixture.want)
 			}
 		})
 	}
