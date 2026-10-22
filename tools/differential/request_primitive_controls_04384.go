@@ -29,14 +29,14 @@ func requestPrimitiveSuffixes04384() []string {
 }
 
 func deepSeekAdmissionSuffixes04384() []string {
-	return []string{"admission-stream-false", "admission-stream-null", "admission-stream-string", "admission-stream-number",
+	return append([]string{"admission-stream-false", "admission-stream-null", "admission-stream-string", "admission-stream-number",
 		"admission-instructions-null", "admission-instructions-array", "admission-previous-null", "admission-previous-array", "admission-previous-number",
 		"json-valid-unicode", "json-root-null", "json-root-array", "json-root-number", "json-root-boolean", "json-root-string",
 		"json-syntax", "json-trailing", "json-surrogate", "json-utf8", "json-overflow", "json-depth",
 		"user-id-absent", "user-id-canonical", "user-id-user-alias", "user-id-safety-alias", "user-id-blank", "user-id-trim-limit",
 		"user-id-null", "user-id-number", "user-id-over-limit", "user-id-invalid-character",
 		"preparation-frequency", "preparation-presence", "preparation-seed", "preparation-n", "preparation-include", "preparation-store",
-		"preparation-background", "preparation-truncation", "preparation-text", "preparation-tools", "preparation-tool-choice", "preparation-reasoning", "preparation-web-search"}
+		"preparation-background", "preparation-truncation", "preparation-text", "preparation-tools", "preparation-tool-choice", "preparation-reasoning", "preparation-web-search"}, deepSeekToolIDSuffixes04384()...)
 }
 
 func geminiPreparationSuffixes04384() []string {
@@ -82,6 +82,9 @@ func requestPrimitiveCase04384(scenario string) (requestPrimitiveFixture04384, b
 	}
 	const stops16 = `["s01","s02","s03","s04","s05","s06","s07","s08","s09","s10","s11","s12","s13","s14","s15","s16"]`
 	suffix := strings.TrimPrefix(strings.TrimPrefix(scenario, "deepseek-"), "request-primitive-")
+	if strings.HasPrefix(suffix, "tool-id-") {
+		return deepSeekToolIDFixture04384(suffix)
+	}
 	if strings.HasPrefix(suffix, "tool-kind-") {
 		return geminiToolKindFixture04384(suffix)
 	}

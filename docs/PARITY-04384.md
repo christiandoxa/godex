@@ -9782,3 +9782,41 @@ DeepSeek224 phase is unchanged. Older b80d capture failures, full844/847/874
 reference state-integrity failures and the initial failed-text fixture errors
 remain retained; a later PASS does not explain or erase them. Global 1:1
 parity remains unproven.
+
+### Match DeepSeek tool identities exactly during adjacency repair
+
+Twelve exact clean 3399a8c360aa5c52fbb06c0dceee80dd854569f7 executable
+baselines qualify five Godex-only FAILs and seven PASS controls (original
+session 76159, exit 0). Audit: /tmp/gdx-04384-deepseek-tool-id-before-audit.json.
+Godex incorrectly paired a padded call with an unpadded output (and vice versa),
+paired different ASCII/Unicode padding, and collapsed two distinct padded IDs
+into one output owner. The pinned Mojo adjacency index compares original ID
+text exactly, checking whitespace only for blankness. Reference requests satisfy
+the independent original-wire invariant; Godex alone violates it. Responses,
+stdout/status, one upstream attempt, auth/slot, source/artifact pins and durable
+state checks pass in all twelve. Exact and equally padded IDs already match.
+A developer-role message deliberately reaches normal reconstruction; the
+separate ordinary simple-request override remains an unchanged PASS control.
+
+The gateway/deepseek adjacency owner now indexes original IDs and uses trimming
+only to reject blanks. It reuses the existing bounded request pipeline and local
+message cloning, with no shared helper, abstraction, export, interface, worker,
+dependency, option or persisted-format change. Unit regressions first FAIL on
+four mismatched-ID cases and distinct first-output/emitted-call ownership:
+/tmp/gdx-04384-deepseek-tool-id-unit-before.log. Focused gateway/tooling tests
+then PASS 1,234 tests. Eight new executable cases extend default DeepSeek224
+to 232; Gemini remains 974. Source-only suspicions about unreachable Gemini
+adjacency metadata were rejected without production changes. Cached DeepSeek
+call-ID fallback needs a separate executable qualification before any correction.
+
+The initial fixture-prefix self-test FAIL and the initial oracle invocation's
+twelve unknown-scenario errors are retained. They do not qualify product behavior;
+the corrected CLI names and fixture checks passed before original session 76159.
+Full local and exact clean candidate qualification follow before publication.
+
+Full local validation PASSes 10,975 tests with 18 optional SKIP. make verify
+exits 0, including shuffled race tests, cross-builds, vet, source/format guards
+and the build. Exact commands:
+`rtk proxy go test -json ./... > /tmp/gdx-04384-deepseek-tool-id-full.jsonl 2>&1`
+and `rtk proxy make verify > /tmp/gdx-04384-deepseek-tool-id-verify.log 2>&1`.
+Exact clean candidate executable qualification follows before publication.

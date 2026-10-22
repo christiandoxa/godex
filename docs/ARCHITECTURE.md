@@ -314,6 +314,9 @@ callback. Ordinary text/tool/message inputs may select the source's stateless
 body; stored previous IDs and non-simple shapes retain reconstruction. Pending
 messages are captured before the body override and used when recording the next
 response. The public pure request translator keeps its independent contract.
+DeepSeek's adjacency index matches opaque tool IDs byte for byte; whitespace
+classification only rejects blank IDs. Distinct padded IDs retain separate
+first-output and emitted-call ownership, without changing the stateless override.
 The pending snapshot decoder preserves JSON number kinds and integer precision,
 so repeated replay does not round cached tool-call fields through float64.
 Runtime gateway startup marks the proxy model's internal GatewayMode field;

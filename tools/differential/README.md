@@ -1123,3 +1123,12 @@ message, with first outputs in call order. Independent checks retain exact seed
 wire, Compact history and request bytes, attempts, credential scope and state;
 matching-corruption tests reject moved text and split call groups. These six
 cases extend the default Gemini matrix to 974.
+
+Eight DeepSeek tool-ID cases check exact nonblank identity in adjacency repair:
+ASCII/Unicode padding, matching padded IDs, differently padded IDs and distinct
+pairs with reverse-order outputs. A developer-role message reaches the normal
+reconstruction path; a separate ordinary-request control preserves the tagged
+stateless override. Original request bytes, response/stdout/status, attempt and
+credential ownership, and durable state remain independently checked. Matching
+ID corruption and injected orphan outputs are rejected. The default DeepSeek
+matrix grows from 224 to 232 cases; the Gemini matrix remains 974.

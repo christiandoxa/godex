@@ -40,8 +40,7 @@ func repairDeepSeekToolCallAdjacency(messages []any) []any {
 			continue
 		}
 		id, _ := message[deepSeekToolCallIDKey].(string)
-		id = strings.TrimSpace(id)
-		if id != "" {
+		if strings.TrimSpace(id) != "" {
 			if _, exists := outputs[id]; !exists {
 				outputs[id] = message
 			}
@@ -67,8 +66,7 @@ func repairDeepSeekToolCallAdjacency(messages []any) []any {
 		for _, rawCall := range calls {
 			call, _ := rawCall.(map[string]any)
 			id, _ := call["id"].(string)
-			id = strings.TrimSpace(id)
-			if id == "" || emitted[id] || outputs[id] == nil {
+			if strings.TrimSpace(id) == "" || emitted[id] || outputs[id] == nil {
 				continue
 			}
 			emitted[id] = true
