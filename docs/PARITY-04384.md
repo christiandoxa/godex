@@ -8017,3 +8017,70 @@ state. Full later matrices retain exact revision scope. Remaining declaration
 kinds, other controls, Gemini Compact, executable session/turn continuation,
 native macOS/Windows and live login remain unproven. No force push, tag, release
 or editor edit occurred. Global 1:1 parity is not claimed.
+
+## Gemini Chat namespace function declarations
+
+Pinned `chat_tool_shapes.mojo:114-138` projects direct function children from a
+nonblank namespace. Names trim selected whitespace and use double hyphens, or
+the tagged MCP double-underscore form when its delimiter restrictions permit.
+Child description, schema aliases and boolean strict project independently of
+unrelated fields. The early Gemini validator requires nonempty valid translated
+functions; later `deepseek_policy_namespace_tool` still validates every original
+child, including those omitted by projection. Wrong child kinds/scalars/names,
+present null description and nonboolean strict therefore fail terminal 502 even
+when another valid child passed early validation. Invalid translated schema
+retains early structured 400 context. Strict/name validation and duplicate policy
+then reuse the function-declaration boundary before named-choice binding.
+
+The final gateway regression is copied alone to old clean production source
+`073ad2eef79330f93af10c320716c7fc34135985` in
+`/tmp/gdx-04384-gemini-namespace-declarations-before-work`.
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiChatNamespaceDeclarationsPreserveCompletePipeline$' -count=1`
+FAILs 21 tests including the parent, with fourteen controls PASS:
+`/tmp/gdx-04384-gemini-namespace-declarations-gateway-before.log`.
+The same command PASSes all 35 after repair:
+`/tmp/gdx-04384-gemini-namespace-declarations-gateway-focused.log`.
+The table verifies exact names/description/wire, buffered/SSE output, duplicate
+survivors, error stages and no upstream attempt for invalid declarations.
+The twenty executable baselines use the same old clean source and unchanged
+official 0.438.4 source/binary/manifest:
+`/tmp/gdx-04384-gemini-namespace-declaration-<suffix>-before-oracle.json` and
+`/tmp/gdx-04384-gemini-namespace-declarations-before-commands.json`.
+All twenty executable baselines have completed: thirteen FAIL only Godex and
+seven controls PASS. All reference, independent mutation and durable-state
+invariants pass. No reference failure or fixture correction is hidden.
+
+Private `request_chat_namespace_declarations_04384.go` owns projection,
+original-child admission and the now-reused tagged name formatter. The existing
+choice helper moved here and was renamed without changing its existing MCP
+prefix behavior. Early validation and final normalization consume the same
+projector, and resulting functions reuse validation, duplicate/count policy and
+named-choice binding. No new shared helper, package, exported API, dependency,
+option, goroutine, routing policy or durable format is introduced. Native
+namespace conversion stays separate. Custom declaration conversion remains the
+explicit pending audit in the local shortcut comment.
+
+Twenty independent executable cases cover namespace/MCP names, selected trim,
+child metadata, missing/null schemas, mixed invalid children, duplicate policy,
+choice binding and real SSE. Matching corruptions change raw and decoded
+requests together, including delimiters, description whitespace, original error
+indexes and wording. They also run in the standalone negative-control gate.
+`rtk proxy go test -json ./...` PASSes 10,436 tests in 71 packages; ten packages
+have no tests and 18 optional installed-Codex/executable tests are skipped:
+`/tmp/gdx-04384-gemini-namespace-declarations-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+PASSes 3,615 tests: `/tmp/gdx-04384-gemini-namespace-declarations-race.log`.
+`rtk proxy make verify` PASSes with exit 0:
+`/tmp/gdx-04384-gemini-namespace-declarations-verify.log`.
+Exact clean-commit executable qualification follows local verification.
+
+Clean `073ad2e` separately PASSes all 25 targeted MCP-declaration cases,
+including exact source/reference pins, state and independent mutations:
+`/tmp/gdx-04384-gemini-mcp-declaration-<suffix>-targeted-oracle.json`.
+Its full 680-case matrix remains pending. Published origin/main remains exact
+15d1c55 with its 559-case Gemini PASS and completed exact 213-case DeepSeek
+phase; its complete default gate and later full matrices retain their own exact
+revision scope. Remaining custom/other controls, Gemini Compact, executable
+session/turn continuation, native macOS/Windows and live login remain unproven.
+No force push, tag, release or editor edit occurred. Global 1:1 parity is not
+claimed.

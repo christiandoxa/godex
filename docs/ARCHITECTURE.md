@@ -570,6 +570,13 @@ description context, and use the tagged ASCII segment transform. Singles keep
 first-present schema aliases. The resulting functions reuse name/strict/schema
 validation, stable duplicate policy and named-choice binding. Native MCP
 conversion remains separate; custom/namespace declarations await qualification.
+Namespace declarations now share that early-validation/final-projection path.
+Only direct function children project; the later host pass still rejects every
+invalid child and its present description/strict fields. Projected names and
+named choices reuse one package-local tagged namespace formatter, preserving
+the separate MCP prefix rule. Functions then use existing name/schema/strict
+validation and stable duplicate policy. No generic helper layer is introduced.
+Custom declaration conversion remains the explicit pending audit.
 All supported call/tool-output items require a nonblank identity selected from
 the first string `call_id`, `tool_call_id`, then `id`. This local admission runs
 before conversion or orphan filtering can silently drop the malformed item.

@@ -68,6 +68,11 @@ description preservation, schema aliases, named choices and real SSE. They also
 distinguish early structured 400s for unsupported/invalid translated tools from
 later terminal 502 shape failures. Eight original wrong-stage expectations stay
 unqualified FAIL; corrected unchanged-binary reruns carry their actual scope.
+The 20 `request-primitive-namespace-declaration-*` cases check namespace/MCP
+delimiters, selected whitespace, child fields, duplicate functions, named
+choices and actual SSE. They separately require early structured 400s and later
+terminal 502s. Matching-corruption checks change raw/decoded names and delimiters
+together, description whitespace, error indexes and exact error wording.
 
 Build and run from a clean, committed Godex worktree:
 

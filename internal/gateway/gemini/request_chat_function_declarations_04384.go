@@ -23,12 +23,21 @@ func normalizeGeminiChatFunctionDeclarations04384(root map[string]any) bool {
 			return false
 		}
 		kind, _ := tool["type"].(string)
-		if strings.HasPrefix(kind, "mcp") {
+		if kind == "namespace" || strings.HasPrefix(kind, "mcp") {
 			function, _ := tool["function"].(map[string]any)
 			if !validGeminiChatFunctionFields04384(tool) || !validGeminiChatFunctionFields04384(function) {
 				return false
 			}
-			for _, raw := range projectGeminiChatMCPDeclarations04384(tool) {
+			var projected []any
+			if kind == "namespace" {
+				if !validGeminiChatNamespaceFields04384(tool) {
+					return false
+				}
+				projected = projectGeminiChatNamespaceDeclarations04384(tool)
+			} else {
+				projected = projectGeminiChatMCPDeclarations04384(tool)
+			}
+			for _, raw := range projected {
 				converted, valid := geminiChatFunctionDeclaration04384(raw.(map[string]any))
 				if !valid {
 					return false
@@ -44,7 +53,7 @@ func normalizeGeminiChatFunctionDeclarations04384(root map[string]any) bool {
 			}
 			tools = append(tools, converted)
 		} else {
-			// shortcut: custom/namespace declarations keep existing conversion until their wire is qualified.
+			// shortcut: custom declarations keep existing conversion until their wire is qualified.
 			tools = append(tools, raw)
 		}
 	}

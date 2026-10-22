@@ -2,7 +2,6 @@ package gemini
 
 import (
 	"strings"
-	"unicode"
 )
 
 func normalizeGeminiChatChoice04384(root map[string]any) bool {
@@ -57,26 +56,7 @@ func geminiChatChoiceName04384(choice map[string]any) (string, bool) {
 		namespace, _ = function["namespace"].(string)
 	}
 	if strings.TrimSpace(namespace) != "" {
-		name = geminiChatNamespacedChoice04384(namespace, name, strings.HasPrefix(kind, "mcp") && !strings.HasPrefix(namespace, "mcp__"))
+		name = geminiChatNamespacedTool04384(namespace, name, strings.HasPrefix(kind, "mcp") && !strings.HasPrefix(namespace, "mcp__"))
 	}
 	return name, validGeminiChatFunctionName04384(name)
-}
-
-func geminiChatNamespacedChoice04384(namespace, name string, addMCPPrefix bool) string {
-	if addMCPPrefix {
-		// Tagged MCP prefixing retains leading namespace whitespace until name validation.
-		namespace = strings.TrimRightFunc(namespace, unicode.IsSpace)
-	} else {
-		namespace = strings.TrimSpace(namespace)
-	}
-	name = strings.TrimSpace(name)
-	separator := "--"
-	if (addMCPPrefix || strings.HasPrefix(namespace, "mcp__")) && !strings.HasSuffix(namespace, "_") &&
-		!strings.HasPrefix(name, "_") && !strings.Contains(name, "__") {
-		separator = "__"
-	}
-	if addMCPPrefix {
-		return "mcp__" + namespace + separator + name
-	}
-	return namespace + separator + name
 }
