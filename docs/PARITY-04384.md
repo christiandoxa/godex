@@ -9960,3 +9960,27 @@ and the build. Exact commands:
 `rtk proxy go test -json ./... > /tmp/gdx-04384-deepseek-function-arguments-full.jsonl 2>&1`
 and `rtk proxy make verify > /tmp/gdx-04384-deepseek-function-arguments-verify.log 2>&1`.
 Exact clean candidate executable qualification follows before publication.
+
+Exact clean a05e1cbc52185361d04981e73c0d3b5f1b642a53 executable qualification
+PASSes all 26 cases (original session 80646, exit 0): all twenty-two baseline
+cases and four prior tool-call, paired SSE, numeric-pending and inline-history
+controls. Every original Godex-only request-byte failure now satisfies the
+independent original invariant. Audit:
+/tmp/gdx-04384-deepseek-function-arguments-targeted-audit.json. Reference
+source/binary/manifest, immutable source, clean artifact VCS metadata and hashes,
+exact upstream requests, responses/stdout/status, attempts/auth/credential slot,
+durable state and matching argument-corruption controls were verified. The
+candidate was pushed directly to origin/main after fetch, clean-primary and
+ancestry checks, without waiting for CI.
+
+The entire default release gate is running in original session 30039 against
+that immutable source with no phase option. Exact nested command:
+`rtk proxy scripts/verify-release-parity.sh`; retained log:
+/tmp/gdx-04384-release-a05e1cbc.log. Its default registry includes DeepSeek255
+and Gemini974; neither that whole gate nor those new full phases are claimed
+PASS. No separate standalone full255 run was started. Existing standalone
+full232/236 and later Gemini matrices retain their original handles and sources.
+The latest completed entire default gate remains exact e9d88ce, and the latest
+completed full-Gemini qualification remains exact 5c15397/full924. Overall 1:1
+parity remains unproven; broader custom-call input shapes need executable
+qualification before any production change.
