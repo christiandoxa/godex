@@ -88,6 +88,10 @@ The 27 `request-primitive-search-declaration-*` cases verify fixed search names,
 raw schemas, strict/description admission, early translated errors, duplicate
 selection, MCP-prefixed extra functions, named choices and SSE. Function/media/
 builtin precedence distinguishes absent schemas from present null values.
+The 30 `request-primitive-tool-kind-*` cases distinguish missing/non-string
+types from unsupported strings. They cover early bridge rejection, nested
+function validation, omitted declarations, MCP aliases, skipped host metadata,
+late schema/strict/name rejection, media, choices, mixed tools and actual SSE.
 
 Build and run from a clean, committed Godex worktree:
 

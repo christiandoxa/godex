@@ -49,7 +49,7 @@ func validateGeminiChatCompatibleTools04380(body []byte) error {
 		if kind != "function" && geminiChatBuiltinTool04384(tool) {
 			continue
 		}
-		if kind == "custom" || kind == "namespace" || kind == "tool_search" || strings.HasPrefix(kind, "mcp") {
+		if kind != "function" {
 			var converted []any
 			if kind == "custom" {
 				converted = projectGeminiChatCustomDeclarations04384(tool)
@@ -57,8 +57,10 @@ func validateGeminiChatCompatibleTools04380(body []byte) error {
 				converted = projectGeminiChatNamespaceDeclarations04384(tool)
 			} else if kind == "tool_search" {
 				converted = projectGeminiChatSearchDeclarations04384(tool)
-			} else {
+			} else if strings.HasPrefix(kind, "mcp") {
 				converted = projectGeminiChatMCPDeclarations04384(tool)
+			} else {
+				converted = projectGeminiChatMCPAlias04384(tool)
 			}
 			if len(converted) == 0 {
 				return fmt.Errorf("invalid_tool_declaration: Gemini request field `tools[%d]` is not a supported tool declaration", index)

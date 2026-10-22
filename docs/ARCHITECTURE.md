@@ -558,8 +558,8 @@ selection retains equal declarations, prefers specific schemas over generic
 schemas and rejects conflicting specific definitions. Its equality follows
 canonical serde bytes with signed floating-zero equivalence outside quoted
 strings. The 128-function limit follows deduplication. A package-local name
-validator serves both declarations and named choices; broader declaration
-kinds retain their existing conversion pending executable qualification.
+validator serves both declarations and named choices. Every accepted declaration
+reaches this boundary before named-choice binding.
 MCP declarations use a private projector shared by the early Gemini validation
 and the Chat request normalizer. Early validation requires at least one valid
 projected declaration per MCP input and preserves the original tool index and
@@ -569,14 +569,13 @@ deduplicated allowed/configured names, preserve server alias presence and raw
 description context, and use the tagged ASCII segment transform. Singles keep
 first-present schema aliases. The resulting functions reuse name/strict/schema
 validation, stable duplicate policy and named-choice binding. Native MCP
-conversion remains separate; custom/namespace declarations await qualification.
+conversion remains separate.
 Namespace declarations now share that early-validation/final-projection path.
 Only direct function children project; the later host pass still rejects every
 invalid child and its present description/strict fields. Projected names and
 named choices reuse one package-local tagged namespace formatter, preserving
 the separate MCP prefix rule. Functions then use existing name/schema/strict
 validation and stable duplicate policy. No generic helper layer is introduced.
-Custom declaration conversion remains the explicit pending audit.
 Custom/freeform declarations now share early translated-function validation
 and final normalization. Their private projector emits the exact raw-input
 schema and tagged guidance, including apply_patch's case-sensitive grammar and
@@ -598,7 +597,12 @@ parameters; raw strict is host-validated but omitted from that function.
 An MCP-prefixed flat search name/schema additionally projects its MCP function.
 Final function normalization preserves absent parameters after an early
 function/media/builtin validation exemption, while rejecting present nonobjects.
-Unknown kinds and broader media combinations remain under audit.
+Unrecognized original tools now share early MCP-alias projection and translated
+validation. Missing/non-string types skip the later raw host field pass; an
+explicit unsupported string type still fails there. Final conversion omits
+nested-only untyped declarations and projects only flat MCP aliases. One private
+MCP-alias projector serves validation, final normalization, builtins and search;
+no generic helper package is involved. Broader combinations remain under audit.
 All supported call/tool-output items require a nonblank identity selected from
 the first string `call_id`, `tool_call_id`, then `id`. This local admission runs
 before conversion or orphan filtering can silently drop the malformed item.

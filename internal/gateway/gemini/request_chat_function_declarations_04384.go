@@ -70,8 +70,16 @@ func normalizeGeminiChatFunctionDeclarations04384(root map[string]any) bool {
 			}
 			tools = append(tools, converted)
 		} else {
-			// shortcut: unknown kinds retain existing conversion until their wire is qualified.
-			tools = append(tools, raw)
+			if _, typed := tool["type"].(string); typed {
+				return false
+			}
+			for _, raw := range projectGeminiChatMCPAlias04384(tool) {
+				converted, valid := geminiChatFunctionDeclaration04384(raw.(map[string]any))
+				if !valid {
+					return false
+				}
+				tools = append(tools, converted)
+			}
 		}
 	}
 	tools, valid := deduplicateGeminiChatFunctions04384(tools)

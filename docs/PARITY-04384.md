@@ -8285,3 +8285,58 @@ Clean 617ae56 separately PASSes all 46 targeted builtin/media cases with exact
 source pins, state and mutations. Its full 764-case matrix remains pending:
 `/tmp/gdx-04384-gemini-builtin-declarations-oracle.json`. Published main remains
 qualified ea27e1f (626 Gemini); no larger matrix is attributed yet.
+
+## Gemini Chat missing, non-string and unsupported tool kinds
+
+Pinned `provider_constraints.mojo:7798-7950` validates a present function first
+and otherwise bridges unrecognized declarations through Chat tool projection.
+That bridge accepts flat MCP-prefixed names with present schemas; an empty
+projection is an early structured 400. `deepseek.mojo:2965-3007` skips missing/
+non-string types and their raw metadata checks, while unsupported strings still
+fail later. Final `chat_tool_shapes.mojo:88-117` omits untyped nested-only
+functions, and preserves only the flat MCP alias when present. Projected alias
+schemas, strict flags, ASCII names, duplicates and named choices retain the
+existing function policy.
+
+Thirty executable baselines pin clean old production
+`b9f16002c855270151a61b72db9eb803bdf8b207` and the unchanged official 0.438.4
+source/binary/manifest. Twenty-four FAIL only Godex; six controls PASS. Every
+reference, independent mutation and durable-state assertion passes. Reports:
+`/tmp/gdx-04384-gemini-tool-kind-<suffix>-before-oracle.json`; commands:
+`/tmp/gdx-04384-gemini-tool-kind-before-commands.json`; audit:
+`/tmp/gdx-04384-gemini-tool-kind-before-audit.json`.
+The final gateway regression copied alone to the old source in
+`/tmp/gdx-04384-gemini-tool-kind-before-work` FAILs 39 tests including the parent,
+with six controls PASS:
+`rtk proxy go test -json ./internal/gateway/gemini -run '^TestProdex04384GeminiChatToolKindsPreservePipeline$' -count=1`.
+Log: `/tmp/gdx-04384-gemini-tool-kind-gateway-before.jsonl`.
+After repair,
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiChatToolKindsPreservePipeline$' -count=1`
+PASSes all 45: `/tmp/gdx-04384-gemini-tool-kind-gateway-focused.log`.
+These require complete buffered/SSE wire, output, status, exact early error
+paths and no dispatch on rejection.
+
+The existing private Gemini MCP declaration file owns the alias guard, reused
+by early validation, final normalization, builtin and search projectors. Raw
+untyped objects no longer pass through shared Chat conversion. Unsupported
+string kinds keep their later failure after a valid early projection or
+exemption. The remaining declaration shortcut is removed. No shared helper,
+new production package/file, exported API, dependency, option, goroutine,
+routing policy or durable format is added. Native behavior remains separate.
+Matching-corruption controls change both original/decoded tool presence and
+alias names and run inside the standalone executable gate.
+`rtk proxy go test -json ./...` PASSes 10,634 tests in 71 packages; ten packages
+have no tests and 18 optional installed-Codex/executable tests are skipped.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+PASSes 3,813 tests. `rtk proxy make verify` PASSes with exit 0, including
+format/source-size, cross-compilation, installers, vet, full shuffled race tests
+and the build. All 293 differential self-tests pass. Logs use
+`/tmp/gdx-04384-gemini-tool-kind-`. Exact clean executable qualification follows.
+
+Clean b9f1600 separately PASSes all 27 targeted search cases with exact source
+pins, state and independent mutations. Its full matrix has 791 cases (764 prior
+plus 27), and remains pending: `/tmp/gdx-04384-gemini-search-declarations-oracle.json`.
+No broader matrix or new full DeepSeek gate is attributed to this revision.
+Global 1:1 parity, broader media/tool combinations, Gemini Compact, executable
+session/turn continuation, native macOS/Windows and live authentication remain
+unproven.

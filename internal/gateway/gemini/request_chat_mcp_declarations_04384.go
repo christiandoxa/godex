@@ -2,6 +2,14 @@ package gemini
 
 import "strings"
 
+func projectGeminiChatMCPAlias04384(tool map[string]any) []any {
+	name, _ := tool["name"].(string)
+	if !strings.HasPrefix(name, "mcp__") {
+		return nil
+	}
+	return projectGeminiChatMCPDeclarations04384(tool)
+}
+
 func projectGeminiChatMCPDeclarations04384(tool map[string]any) []any {
 	kind, _ := tool["type"].(string)
 	var result []any

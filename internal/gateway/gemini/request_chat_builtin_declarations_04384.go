@@ -33,11 +33,7 @@ func geminiChatBuiltinFunction04384(tool map[string]any) (any, bool) {
 	if kind == "web_search" || kind == "web_search_preview" || strings.HasPrefix(kind, "web_search_preview_") {
 		return nil, true
 	}
-	name, _ := tool["name"].(string)
-	if !strings.HasPrefix(name, "mcp__") {
-		return nil, true
-	}
-	projected := projectGeminiChatMCPDeclarations04384(tool)
+	projected := projectGeminiChatMCPAlias04384(tool)
 	if len(projected) == 0 {
 		return nil, true
 	}
