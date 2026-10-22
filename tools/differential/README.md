@@ -224,6 +224,13 @@ attempt, including two configured keys. The fixtures compare exact response,
 type, exit, stdout, authenticated request bytes and safe durable state.
 Missing child exchanges remain explicit failing observations.
 
+Gemini `request-parallel-*` cases cover true, false, null, number, string,
+array and object values. Every complete valid request must omit the ignored
+`parallel_tool_calls` field on the exact authenticated upstream wire and
+return the same native response after one attempt. A false value must not
+become an unrelated local rejection. Existing independent fresh-response
+invariants are reused; matching leaked raw control bytes must also fail.
+
 The 0.438.4 `deepseek-sse-error-presence`, `deepseek-sse-error-i64` and
 `deepseek-sse-error-float` scenarios verify embedded-error primary-field
 presence and signed numeric kinds. Each must produce one failure frame

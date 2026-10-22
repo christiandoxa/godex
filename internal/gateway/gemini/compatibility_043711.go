@@ -111,6 +111,7 @@ func normalizeGeminiChatInput043711(body []byte) ([]byte, error) {
 	}
 	// Routing rejects bound raw-key IDs; unbound IDs use the tagged fresh-input fallback.
 	delete(root, "previous_response_id")
+	delete(root, "parallel_tool_calls")
 	if entries, ok := root["input"].([]any); ok {
 		for _, raw := range entries {
 			item, ok := raw.(map[string]any)

@@ -403,6 +403,10 @@ The gateway presents invalid identities as the tagged terminal plain HTTP 502
 before upstream dispatch, using the existing preparation-error boundary so
 routing cannot repair the request by waiting or changing credentials.
 The shared Claude Chat converter retains its existing user-field behavior.
+The tagged Gemini bridge ignores `parallel_tool_calls` rather than forwarding
+or enforcing it. Its complete-request serde validation still runs before the
+adapter removes that field; malformed ignored values cannot become valid
+requests. Claude and DeepSeek retain their independent control policies.
 `gateway/gemini` reuses `gateway/chatcompat` for shared message/history
 and Chat response conversion, while Gemini-specific reasoning, metadata, tool
 shapes, and thought signatures stay in the Gemini gateway. Native Messages and

@@ -4672,3 +4672,64 @@ Clean-commit 73-case Gemini/125-case DeepSeek matrices follow.
 Other request controls, combined validation-error ordering,
 Gemini Compact, session/turn executable continuation, native macOS/Windows
 and live authentication remain separate audits. Global 1:1 parity is not claimed.
+
+
+## Gemini ignores the parallel-tool control after complete JSON validation
+
+The pinned Gemini chat request path deliberately skips
+`deepseek_provider_core_reject_unsupported_request_fields` and constructs a
+new outbound map. Its primitive-field kernel does not insert
+`parallel_tool_calls`; the Gemini bridge therefore ignores that input member.
+The shared Godex Chat converter instead rejected false and forwarded other
+values. This is adapter policy, not a change to Claude or DeepSeek's own
+parallel-tool contracts.
+
+The production repair is one deletion after the existing complete serde
+admission gate in `gateway/gemini/compatibility_043711.go`. Malformed ignored
+values remain invalid. No helper, package, API, dependency, configuration,
+interface, persistent state or background work was introduced.
+
+Before repair,
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiChatIgnoresParallelToolControl$' -count=1`
+fails all seven value cases plus parent:
+`/tmp/gdx-04384-gemini-parallel-control-before.log`.
+The cases cover true, false, null, number, string, array and object. An
+additional negative fixture initially mislabeled 1.7976931348623157e308 as
+invalid. The locked offline Rust probe confirms that number is valid and
+rejects 1e309, an unpaired surrogate and truncated JSON:
+`/tmp/gdx-04384-gemini-parallel-control-serde-probe.jsonl`.
+The corrected negative gate passes without changing the serde implementation.
+The earlier failed fixture logs remain FAIL observations.
+
+All seven strict executable baseline cases FAIL only Godex on clean
+`4450527691a17a3a1db7b08bdfabdb05dfb78acc`, with every reference and independent
+invariant satisfied:
+`/tmp/gdx-04384-gemini-parallel-<true|false|null|number|string|array|object>-before-oracle.json`.
+The false case exposes a missing old Godex exchange as an explicit failing
+observation. The other six show the ignored member leaking into upstream.
+Commands use `/tmp/gdx-04384-gemini-parallel-control-differential`, the clean
+user-ID binary/source, the unchanged pinned reference, and
+`--gemini --scenario request-parallel-<suffix>`.
+Every fixture requires byte-exact original authenticated upstream input with
+the control absent, one attempt, exact native response/status/type/exit/stdout
+and safe durable state. The existing strict fresh-response invariant is reused;
+matching leaked raw control bytes are rejected independently.
+
+`rtk go test ./tools/differential -count=1` passes 273 tests before production
+repair: `/tmp/gdx-04384-gemini-parallel-control-oracle-tests.log`.
+The corrected focused command passes 39 tests:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiChat(IgnoresParallelToolControl|UserIDUsesTaggedAliasesAndValidation|RequestPreservesSerdeToolNumbers|RequestDecodersRequireCompleteObject)$' -count=1`;
+`/tmp/gdx-04384-gemini-parallel-control-reviewed-focused.log`.
+`rtk go test -race ./internal/gateway/gemini ./tools/differential -count=1`
+passes 989 tests: `/tmp/gdx-04384-gemini-parallel-control-race.log`.
+`rtk proxy go test -json ./...` passes 9,445 tests across 81 packages:
+`/tmp/gdx-04384-gemini-parallel-control-test-all.jsonl`.
+The fixture's repeated state-audit condition is kept in one local boolean;
+`rtk go test -race ./tools/differential -count=1` verifies the final cleanup:
+`/tmp/gdx-04384-gemini-parallel-control-final-oracle-tests.log`.
+`rtk proxy make verify` passes all local completion gates:
+`/tmp/gdx-04384-gemini-parallel-control-verify.log`.
+Clean-commit 80-case Gemini/125-case DeepSeek matrices follow.
+Other controls and combined-error ordering, Gemini Compact,
+session/turn executable continuation, native macOS/Windows and live
+authentication remain separate audits. Global 1:1 parity is not claimed.
