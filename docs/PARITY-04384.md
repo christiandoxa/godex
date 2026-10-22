@@ -6718,3 +6718,79 @@ presence, valid alias projection and argument semantics remain separate audits.
 Gemini Compact, executable session/turn continuation, native macOS/Windows and
 live authentication remain unproven. No force push, tag, release or editor edit
 occurred. Global 1:1 parity is not claimed.
+
+
+## Tool-output presence cannot become an invented null result
+
+Pinned `deepseek_input_item_validation` requires an output/content/result/error
+field on function/custom/MCP output items. The compiled presence check accepts
+null, false and empty values, which are distinct from an omitted result. Its
+API-key preparation failure is plain terminal 502 before upstream work.
+
+Godex's function-output converter invented the string null for missing output
+and could execute remaining input. The private Gemini item admission now checks
+presence once for all four output kinds. No shared conversion, generic helper,
+package, exported API, interface, dependency, configuration, worker or durable
+format changes. Existing identity/name validation keeps its precedence.
+Valid output-alias projection and orphan-output filtering remain separate audits.
+
+Before repair 18 controls pass and seven tests fail, including parents:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384Gemini(ToolOutputsRequirePresentResultField|RequestAdmissionDoesNotRetryModelOrCredential)$' -count=1`;
+`/tmp/gdx-04384-gemini-tool-output-before.log`.
+The same command passes all 25 tests after repair:
+`/tmp/gdx-04384-gemini-tool-output-focused.log`.
+Unit controls retain every presence alias with null/false/empty values. The real
+two-key gateway/router regression proves missing output creates zero attempts
+and no retry wait.
+
+The initial three accepted executable controls were unqualified: they expected
+orphan outputs on the wire, while the reference adjacency scanner drops every
+tool-role message when it has any valid output IDs and re-emits only matched
+pairs. Those reports remain FAIL:
+`/tmp/gdx-04384-gemini-tool-output-<null|empty|string>-before-oracle.json`.
+This also exposes an existing separate Godex orphan-output mismatch. The
+corrected acceptance fixtures contain matching function calls; their complete
+independent expected wire bodies preserve exact calls and outputs. No status,
+header, mutation, state or zero-attempt assertion was relaxed.
+
+Ten qualified baselines pin clean
+`3c455f4b31593635cc7ba25be4e007208906adfd`, unchanged reference and
+`/tmp/gdx-04384-gemini-tool-output-qualified-before-differential`:
+`/tmp/gdx-04384-gemini-tool-output-<suffix>-qualified-before-oracle.json`.
+Missing function output FAILs only Godex. Nine controls PASS, including existing
+custom/MCP rejection, paired explicit null/empty/string output and earlier
+candidate/tool/serde errors. Every reference and independent mutation invariant
+passes. Commands use `--gemini --scenario request-primitive-tool-output-<suffix>`
+with exact clean source/commit pins and retain original bytes, complete expected
+request/response/status/headers/stdout/exit, attempts and safe durable state.
+
+`rtk go test ./tools/differential -count=1` PASSes 281 tests before and after
+fixture correction: `/tmp/gdx-04384-gemini-tool-output-oracle-tests.log` and
+`/tmp/gdx-04384-gemini-tool-output-qualified-oracle-tests.log`.
+`rtk proxy go test -json ./...` PASSes 9,964 tests in 71 packages; ten packages
+have no tests and 18 optional installed-Codex/executable tests are skipped:
+`/tmp/gdx-04384-gemini-tool-output-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+PASSes 3,156 tests: `/tmp/gdx-04384-gemini-tool-output-race.log`.
+
+The protected `175091f` 213-case DeepSeek report remains FAIL on reference
+raw-key continuation state, with orphan continuation-journal/state last-good
+temp files and invalid main continuation state; later continuation attempts
+consequently differ. No Godex independent invariant fails:
+`/tmp/gdx-04384-gemini-message-projection-deepseek-oracle.json`.
+An unchanged isolated rerun remains FAIL only on reference unknown-ID state:
+`/tmp/gdx-04384-gemini-message-projection-deepseek-continuation-rerun-oracle.json`.
+The full unchanged rerun is pending:
+`/tmp/gdx-04384-gemini-message-projection-deepseek-rerun-oracle.json`.
+No state allowlist, owner rule, mutation or terminal-status assertion changed.
+The later clean ID candidate `1791a7ed64180a8875e51dfc15824feb2f73a87c`
+separately PASSes all 213 DeepSeek cases and independent mutations:
+`/tmp/gdx-04384-gemini-call-identity-deepseek-oracle.json`.
+Both relevant Gemini matrices remain pending. Original FAILs are retained.
+`rtk proxy make verify` PASSes: `/tmp/gdx-04384-gemini-tool-output-verify.log`.
+Clean-commit 343-case Gemini and 213-case DeepSeek qualification follows.
+Orphan filtering, valid alias projection, shell commands and argument semantics
+remain separate audits. The full default-gate PASS remains scoped to `5f49a5f`.
+Gemini Compact, executable session/turn continuation, native macOS/Windows and
+live authentication remain unproven. No force push, tag, release or editor edit
+occurred. Global 1:1 parity is not claimed.

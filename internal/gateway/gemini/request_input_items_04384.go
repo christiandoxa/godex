@@ -26,7 +26,8 @@ func normalizeGeminiChatInputItems04384(value any) bool {
 				}
 			case "function_call", "custom_tool_call", "mcp_call", "local_shell_call",
 				"function_call_output", "custom_tool_call_output", "mcp_tool_result", "mcp_call_output":
-				if !validGeminiChatCallIdentity04384(item) || !validGeminiChatCallName04384(kind, item) {
+				if !validGeminiChatCallIdentity04384(item) || !validGeminiChatCallName04384(kind, item) ||
+					!validGeminiChatToolOutput04384(kind, item) {
 					return false
 				}
 				continue
@@ -65,6 +66,20 @@ func validGeminiChatCallName04384(kind any, item map[string]any) bool {
 	function, _ := item["function"].(map[string]any)
 	name, _ := function["name"].(string)
 	return strings.TrimSpace(name) != ""
+}
+
+func validGeminiChatToolOutput04384(kind any, item map[string]any) bool {
+	switch kind {
+	case "function_call_output", "custom_tool_call_output", "mcp_tool_result", "mcp_call_output":
+	default:
+		return true
+	}
+	for _, field := range []string{"output", "content", "result", "error"} {
+		if _, present := item[field]; present {
+			return true
+		}
+	}
+	return false
 }
 
 func projectGeminiChatMessage04384(item map[string]any) bool {

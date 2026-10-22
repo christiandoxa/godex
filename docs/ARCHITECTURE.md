@@ -482,6 +482,9 @@ before conversion or orphan filtering can silently drop the malformed item.
 Function, custom and MCP calls also require a nonblank selected name before
 conversion. The owning gateway preserves the pinned validator's string-alias
 and nested-function precedence; output and shell items retain separate rules.
+Function/custom/MCP output items require the presence of output, content,
+result or error. Present null, false and empty values remain distinct from
+missing output; local admission cannot invent a successful null tool result.
 DeepSeek independently checks present `stream` as a boolean and present
 `instructions`/`previous_response_id` as strings before constructing its
 translated request. Invalid types use its common terminal preparation boundary,
