@@ -3227,3 +3227,56 @@ Logs: `/tmp/gdx-04384-compact-wire-race.log` and
 race suite, cross-platform builds/test compilation, installers and build.
 Log: `/tmp/gdx-04384-compact-wire-verify.log`.
 Clean-commit executable gates follow.
+
+
+## Buffered tool object-syntax errors use tagged serde diagnostics
+
+The pinned provider-core buffered tool normalizer reports serde_json errors
+when the authoritative Mojo kernel rejects malformed arguments. Godex instead
+returned Go decoder text for ordinary tools and generic `invalid JSON` for
+`tool_search`. Its private gateway error formatter now maps the three verified
+object-syntax error contexts to serde's key/colon/separator/trailing-comma
+messages and counts UTF-8 bytes for line/column locations. Accepted arguments
+and stream validation are unchanged. Other diagnostic classes retain their
+existing behavior and remain a separate audit target.
+
+The formatter stays private to `gateway/deepseek`, where two existing buffered
+argument-error paths consume it. It runs only after validation fails; there is
+no extra valid-path parsing, shared helper, exported API, dependency, setting,
+state format or worker. Architecture documentation records this protocol owner.
+
+Before repair, `rtk go test ./internal/gateway/deepseek -run '^TestProdex04384BufferedToolObjectSyntax' -count=1`
+passes the valid-argument control and fails all 21 ordinary/search/padded-name
+object-error cases. Log: `/tmp/gdx-04384-buffered-tool-object-before.log`.
+The expected messages, byte columns and Unicode/newline positions were also
+checked with an offline Rust probe pinned to serde 1.0.229/serde_json 1.0.154.
+This probe is source-aligned evidence, not a released-executable claim by itself.
+
+Six independent executable fail-before cases use exact HTTP 200/failed
+Responses envelopes, usage, metadata, exit 0, one upstream attempt, exact
+credential/route/request, stdout and safe durable-state checks. All six meet
+that contract on Prodex and fail only Godex on clean `bd08991`:
+`/tmp/gdx-04384-buffered-tool-object-key-before-oracle.json`,
+`/tmp/gdx-04384-buffered-tool-object-comma-before-oracle.json`,
+`/tmp/gdx-04384-buffered-tool-object-colon-before-oracle.json`,
+`/tmp/gdx-04384-buffered-tool-object-separator-before-oracle.json`,
+`/tmp/gdx-04384-buffered-tool-object-search-key-before-oracle.json` and
+`/tmp/gdx-04384-buffered-tool-object-padded-key-before-oracle.json`.
+Mutations reject changed bodies, stdout, status, child exit, attempts, retries
+and state even when both product traces are mutated alike. An envelope
+regression retains prior text and valid tools, records one exact failure, and
+suppresses later tools.
+
+`rtk go test -race ./internal/gateway/deepseek ./tools/differential -count=1`
+passes 783 tests. `rtk go test ./...` passes 9,166 tests across 81 packages.
+Logs: `/tmp/gdx-04384-buffered-tool-object-race.log` and
+`/tmp/gdx-04384-buffered-tool-object-test-all.log`.
+`rtk proxy make verify` passes formatting, source/TUI guards, vet, full
+shuffled race tests, cross-platform builds/test compilation, installer checks
+and build. Log: `/tmp/gdx-04384-buffered-tool-object-verify.log`.
+A further same-line Unicode-byte-column control agrees with the locked Rust
+probe and passes all 26 focused syntax cases:
+`/tmp/gdx-04384-buffered-tool-object-unicode-controls.log`.
+Final `rtk go test ./...` passes 9,169 tests across 81 packages after that
+additional control: `/tmp/gdx-04384-buffered-tool-object-final-test-all.log`.
+Clean-commit executable gates follow this candidate.

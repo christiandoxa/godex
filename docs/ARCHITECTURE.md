@@ -321,6 +321,8 @@ history). Shared RTK argument shaping stays in `gateway/chatcompat`.
 Private `gateway/deepseek/tool_arguments.go` owns structured tool-search and
 streamed apply-patch argument decoding; generic serde number serialization
 stays in `helper/jsonutil`.
+Private `gateway/deepseek/tool_object_error.go` formats buffered object-syntax
+diagnostics at the provider boundary; it runs only after argument validation fails.
 `gateway/deepseek` also owns Responses/SSE output shaping, web-search modes,
 beta-base routing, and the partial native Anthropic Messages bridge. Exact
 0.435.1 parity for that bridge remains open; delivery and generic routing do not
