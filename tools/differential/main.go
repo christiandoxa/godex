@@ -1109,6 +1109,18 @@ func runCodexShim(arguments []string) int {
 			return shimFailure("synthetic Codex shim received an unknown invalid-input fixture")
 		}
 	}
+	if scenario := os.Getenv("DIFFERENTIAL_GEMINI_RAW_KEY_IDENTITY"); scenario != "" {
+		var object map[string]any
+		if err := json.Unmarshal(requestBody, &object); err != nil {
+			return shimFailure("invalid Gemini identity fixture request")
+		}
+		value, _, known := geminiRawKeyIdentity04384(scenario)
+		if !known {
+			return shimFailure("unknown Gemini identity fixture")
+		}
+		object["session_id"] = value
+		requestBody, _ = json.Marshal(object)
+	}
 	if strings.HasPrefix(os.Getenv("DIFFERENTIAL_CONTINUATION_PHASE"), "resume") {
 		requestBody = []byte(strings.TrimSuffix(string(requestBody), "}") + `,"previous_response_id":"chatcmpl-differential"}`)
 	}

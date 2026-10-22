@@ -30,11 +30,13 @@ type geminiCapturedRequest struct {
 }
 
 type geminiCandidateResult struct {
-	Name     string                  `json:"name"`
-	Version  string                  `json:"version"`
-	ExitCode int                     `json:"exit_code"`
-	Upstream []geminiCapturedRequest `json:"upstream"`
-	Client   exchange                `json:"client_exchange"`
+	Name           string                  `json:"name"`
+	Version        string                  `json:"version"`
+	ExitCode       int                     `json:"exit_code"`
+	Upstream       []geminiCapturedRequest `json:"upstream"`
+	Client         exchange                `json:"client_exchange"`
+	Stdout         string                  `json:"stdout,omitempty"`
+	StateIntegrity []string                `json:"state_integrity_errors,omitempty"`
 }
 
 type geminiCaseResult struct {
@@ -214,6 +216,11 @@ func (mock *geminiMock) recorded() []geminiCapturedRequest {
 func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit string) error {
 	return runGeminiDifferentialCases04384(prodexBin, godexBin, prodexCommit, godexCommit,
 		[]string{
+			"raw-key-session-limit",
+			"raw-key-session-over-limit",
+			"raw-key-session-unicode-limit",
+			"raw-key-session-unicode-over",
+			"raw-key-session-control",
 			"chat-request",
 			"orphan-tool",
 			"chat-response",
@@ -300,7 +307,7 @@ func runGeminiDifferentialCases04384(prodexBin, godexBin, prodexCommit, godexCom
 	report := geminiDifferentialReport{
 		Status: status, ProdexSource: prodexCommit, GodexSource: godexCommit,
 		Cases: results, Differences: differences,
-		NegativeControl: "PASS: route, auth, model fallback, credential rotation, child exit, native/chat SSE, multi-turn tool adjacency, output, status, usage and error mutations detected",
+		NegativeControl: "PASS: route, auth, model fallback, credential rotation, child exit, native/chat SSE, multi-turn tool adjacency, output, status, usage, raw-key identity/state and error mutations detected",
 	}
 	encoded, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
@@ -330,6 +337,10 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 		return geminiCandidateResult{}, err
 	}
 	childResult := filepath.Join(home, "gemini-child-exchange.json")
+	_, _, rawIdentity := geminiRawKeyIdentity04384(scenario)
+	if rawIdentity {
+		childResult = filepath.Join(home, "child-exchange.json")
+	}
 	args := []string{"super", "--provider", "gemini"}
 	if !geminiQuotaScenario043711(scenario) {
 		args = append(args, "--api-key", apiKey)
@@ -343,6 +354,9 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	cmd := exec.CommandContext(ctx, binary, args...)
 	env := productEnv(name, stateHome, codexHome, userHome, shim, childResult, runOptions{})
 	env = append(env, "DIFFERENTIAL_PROVIDER=gemini")
+	if rawIdentity {
+		env = append(env, "DIFFERENTIAL_GEMINI_RAW_KEY_IDENTITY="+scenario)
+	}
 	if geminiQuotaScenario043711(scenario) {
 		env = append(env, "GEMINI_API_KEYS="+rotationPrimaryKey+","+rotationSecondaryKey)
 	}
@@ -372,7 +386,7 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	if err := cmd.Run(); err != nil {
 		var childExit *exec.ExitError
 		_, envelopeScenario := geminiEnvelopeFixture04384(scenario)
-		if !geminiQuotaScenario043711(scenario) && !geminiInvalidToolScenario04380(scenario) && !geminiModelScenario04384(scenario) && !envelopeScenario ||
+		if !rawIdentity && !geminiQuotaScenario043711(scenario) && !geminiInvalidToolScenario04380(scenario) && !geminiModelScenario04384(scenario) && !envelopeScenario ||
 			!errors.As(err, &childExit) || ctx.Err() != nil {
 			return geminiCandidateResult{}, fmt.Errorf("child failed: %w stderr=%q upstream=%v",
 				err, redact(stderr.String()), mock.recorded())
@@ -388,9 +402,14 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	if err != nil {
 		return geminiCandidateResult{}, err
 	}
-	return geminiCandidateResult{
+	candidate := geminiCandidateResult{
 		Name: name, Version: version, ExitCode: exitCode, Upstream: mock.recorded(), Client: result,
-	}, nil
+	}
+	if rawIdentity {
+		candidate.Stdout = stdout.String()
+		candidate.StateIntegrity = auditFixtureDurableState(home)
+	}
+	return candidate, nil
 }
 
 func geminiCompare(scenario string, prodex, godex geminiCandidateResult) []string {
@@ -405,6 +424,12 @@ func geminiCompare(scenario string, prodex, godex geminiCandidateResult) []strin
 	}
 	if prodex.ExitCode != godex.ExitCode {
 		differences = append(differences, "product child process exit status differs")
+	}
+	if _, reject, known := geminiRawKeyIdentity04384(scenario); known && reject {
+		if prodex.Client.Body != godex.Client.Body {
+			differences = append(differences, "Gemini raw-key identity rejection bytes differ")
+		}
+		return differences
 	}
 	if scenario == "buffered-args-canonical-wire" || scenario == "buffered-args-patch-fallback" {
 		left, leftErr := geminiBufferedWireProjection04384(prodex.Client.Body)
@@ -498,6 +523,9 @@ func geminiSemanticEqual043711(left, right map[string]any) bool {
 }
 
 func geminiFixtureInvariant(scenario string, result geminiCandidateResult) error {
+	if _, _, known := geminiRawKeyIdentity04384(scenario); known {
+		return geminiRawKeyIdentityInvariant04384(scenario, result)
+	}
 	if geminiModelScenario04384(scenario) {
 		return geminiModelFixtureInvariant04384(scenario, result)
 	}

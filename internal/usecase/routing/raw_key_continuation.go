@@ -11,7 +11,16 @@ import (
 )
 
 func (router *Router) resolveRequestOwner(ctx context.Context, request proxymodel.Request, accounts []proxymodel.Account, keys affinityKeys) (string, func() error, error) {
-	if !deepSeekRawKeyPool(accounts) {
+	deepSeek := rawKeyPool(accounts, "deepseek")
+	if (deepSeek || rawKeyPool(accounts, "gemini")) && !rawKeyLocalRoute(request) {
+		for _, value := range []string{keys.previous, keys.turn, keys.session} {
+			if strings.TrimSpace(value) != "" && !validHardBindingComponent04383(value) {
+				return "", nil, &proxymodel.Error{StatusCode: http.StatusServiceUnavailable,
+					Message: "bound continuation provider is unavailable"}
+			}
+		}
+	}
+	if !deepSeek {
 		if err := router.repairConflictedFullHistorySession043711(ctx, request, keys); err != nil {
 			return "", nil, err
 		}
@@ -19,12 +28,6 @@ func (router *Router) resolveRequestOwner(ctx context.Context, request proxymode
 	}
 	if rawKeyLocalRoute(request) {
 		return "", nil, nil
-	}
-	for _, value := range []string{keys.previous, keys.turn, keys.session} {
-		if strings.TrimSpace(value) != "" && !validHardBindingComponent04383(value) {
-			return "", nil, &proxymodel.Error{StatusCode: http.StatusServiceUnavailable,
-				Message: "bound continuation provider is unavailable"}
-		}
 	}
 	// Local-rewrite dispatch checks response, turn and session lineage before
 	// credential selection; an unresolved bound identity never becomes fresh work.
@@ -40,12 +43,12 @@ func (router *Router) resolveRequestOwner(ctx context.Context, request proxymode
 	return "", nil, nil
 }
 
-func deepSeekRawKeyPool(accounts []proxymodel.Account) bool {
+func rawKeyPool(accounts []proxymodel.Account, provider string) bool {
 	if len(accounts) == 0 {
 		return false
 	}
 	for _, account := range accounts {
-		if !account.EphemeralAPIKey || !strings.EqualFold(strings.TrimSpace(account.Provider.Kind), "deepseek") {
+		if !account.EphemeralAPIKey || !strings.EqualFold(strings.TrimSpace(account.Provider.Kind), provider) {
 			return false
 		}
 	}

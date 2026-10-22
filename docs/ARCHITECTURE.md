@@ -291,10 +291,10 @@ readers recognize the sentinel and still fail closed. Legacy synthetic account
 bindings remain ignored without deletion or adoption by a new key pool. Retry
 quarantine and profile turn-state sidecars keep their separate existing rules.
 
-DeepSeek provider dispatch validates every nonblank response, turn and session
-component against the existing 1,024-byte UTF-8/control invariant before any
-owner lookup or credential attempt. Local-route dispatch retains its earlier
-position in the pipeline.
+DeepSeek and Gemini raw-key provider routes validate every nonblank response,
+turn and session component against the existing 1,024-byte UTF-8/control
+invariant before owner lookup or credential attempts. Local routes retain their
+existing provider-specific ordering and owner policy.
 
 Local DeepSeek raw-key Compact and Models routes run before continuation validation and
 do not observe or persist continuation identities. The owning routing policy

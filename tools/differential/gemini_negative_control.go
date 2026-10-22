@@ -10,6 +10,9 @@ import (
 // certify the same bug twice; these synthetic mutations must be observable
 // through the independent wire and semantic-response guards.
 func geminiNegativeControl() bool {
+	if !geminiRawKeyIdentityNegativeControl04384() {
+		return false
+	}
 	good := geminiCandidateResult{
 		Name: "synthetic",
 		Upstream: []geminiCapturedRequest{{

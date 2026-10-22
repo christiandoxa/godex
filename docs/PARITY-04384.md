@@ -3506,3 +3506,68 @@ passes 811 tests: `/tmp/gdx-04384-buffered-array-race.log`.
 shuffled race suite, cross-platform build/test compilation, installers and build.
 Log: `/tmp/gdx-04384-buffered-array-verify.log`.
 Clean-commit executable gates follow.
+
+
+## Validated pushed checkpoint: d43855b
+
+Clean `d43855b0225d4e08a38d27e03949ec8c2ecb07f4` passes all 95 released
+DeepSeek scenarios and their independent mutation controls, including all six
+array/trailing-input cases and the earlier bounded-view controls. Report:
+`/tmp/gdx-04384-buffered-array-oracle.json`.
+After checking the clean primary worktree and unchanged remote, it was
+fast-forwarded and pushed directly to `origin/main`. No force push, tag,
+release or unrelated editor change occurred.
+
+
+## Gemini raw-key continuation component validation
+
+The pinned local-rewrite dispatch validates nonblank response, turn and
+session components before provider selection for Gemini as well as DeepSeek.
+The same 1,024-byte UTF-8/C0/C1 invariant applies. Godex applied that guard only
+to DeepSeek; invalid Gemini previous/session components could enter the normal
+routing path, and invalid turns received the generic unknown-owner response.
+
+The existing private raw-key pool predicate now takes its concrete provider
+name. `usecase/routing` applies the existing validator to both supported pools
+before owner lookup on provider routes. The second predicate consumer still
+exempts only DeepSeek local-route response binding. No gateway, transport,
+persistence, valid-continuation policy, shared helper, interface, dependency,
+setting or worker is added. Gemini Compact/Models retain their existing route
+order and are outside this validation change.
+
+The corrected bounded fail-before test overlays only the expanded test file
+onto clean `d43855b`, leaving that product source and binary untouched:
+`rtk go test -overlay /tmp/gdx-04384-gemini-identity-before-overlay.json ./internal/usecase/routing -run '^TestProdex04384RawKeyRejectsInvalidContinuationIdentity$' -count=1`.
+It passes 25 tests and fails nine invalid Gemini cases plus two parents:
+`/tmp/gdx-04384-gemini-identity-bounded-before.log`.
+The initial broader diagnostic log also exposed unbound valid Gemini turn
+policy differences: `/tmp/gdx-04384-gemini-identity-before.log`. Those valid-turn
+expectations were not treated as part of this component-validation regression.
+After repair, the focused test passes all 36 tests:
+`/tmp/gdx-04384-gemini-identity-focused.log`.
+
+Five Gemini executable cases add ASCII and Unicode session byte-limit controls,
+ASCII/Unicode overflow and an internal C0 control. They independently require
+exact status/type/exit/stdout, the precise 503 JSON for invalid sessions, zero
+upstream attempts on rejection, the exact authenticated request on acceptance
+and safe durable state. Equal status, exit, type, body, stdout, state or attempt
+corruption is rejected by self-checks also invoked by the executable oracle.
+`rtk go test ./tools/differential -count=1` passes 249 tests.
+
+`rtk go test -race ./internal/usecase/routing ./internal/repository/routing ./internal/delivery/http/proxy ./tools/differential -count=1`
+passes 2,459 tests: `/tmp/gdx-04384-gemini-identity-race.log`.
+`rtk go test ./...` passes 9,241 tests across 81 packages:
+`/tmp/gdx-04384-gemini-identity-test-all.log`.
+`rtk proxy make verify` passes formatting, source/TUI guards, vet, the full
+shuffled race suite, cross-platform build/test compilation, installers and build.
+Log: `/tmp/gdx-04384-gemini-identity-verify.log`.
+The 249 oracle self-tests also pass after wiring identity mutations into the
+executable negative controls: `/tmp/gdx-04384-gemini-identity-oracle-final-tests.log`.
+Clean-commit executable gates follow.
+
+Exploratory native and Chat-shaped Gemini probes also expose valid previous-ID
+translation timeouts and Compact unknown-owner rejection. Reports:
+`/tmp/gdx-04384-gemini-continuation-exploratory.json` and
+`/tmp/gdx-04384-gemini-continuation-native-exploratory.json`.
+They are diagnostic observations, not qualified parity passes. Native valid
+continuation/replay and Compact ownership remain separate audit targets.

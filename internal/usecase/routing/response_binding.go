@@ -19,7 +19,7 @@ func (router *Router) bindSuccessfulResponse(
 	request proxymodel.Request,
 	promptCacheKey string,
 ) error {
-	if deepSeekRawKeyPool(accounts) && rawKeyLocalRoute(request) {
+	if rawKeyPool(accounts, "deepseek") && rawKeyLocalRoute(request) {
 		return nil
 	}
 	if result.Response.PrecommitFailure != nil && result.Response.PrecommitFailure.StaleContinuation {
