@@ -12,7 +12,7 @@ import (
 
 const fixtureConflictOwner = "__prodex_hard_binding_conflict__"
 
-type fixtureContinuationOwner struct{ credential, endpoint, provider string }
+type fixtureContinuationOwner struct{ credential, endpoint, provider, kind string }
 
 func fixtureContinuationOwners(client exchange, upstream []upstreamRequest, endpoint string, prior map[string]fixtureContinuationOwner) map[string]fixtureContinuationOwner {
 	owners := make(map[string]fixtureContinuationOwner, len(prior)+1)
@@ -26,7 +26,7 @@ func fixtureContinuationOwners(client exchange, upstream []upstreamRequest, endp
 	if credential == "" {
 		return owners
 	}
-	owner := fixtureContinuationOwner{credential: fixtureBindingDigest("credential", credential), endpoint: fixtureBindingDigest("endpoint", endpoint), provider: "deepseek"}
+	owner := fixtureContinuationOwner{credential: fixtureBindingDigest("credential", credential), endpoint: fixtureBindingDigest("endpoint", endpoint), provider: "deepseek", kind: "previous"}
 	parts := []string{client.Body}
 	if strings.Contains(client.Headers.Get("Content-Type"), "text/event-stream") {
 		parts = nil
@@ -83,10 +83,11 @@ func validFixtureRoutingBindings(data []byte, expected map[string]fixtureContinu
 	seen := make(map[string]bool)
 	for _, binding := range snapshot.Bindings {
 		known := false
-		for id := range expected {
-			known = known || binding.Key == fixturePreviousDigest(id)
+		for id, owner := range expected {
+			digest := sha256.Sum256([]byte(owner.kind + ":" + id))
+			known = known || binding.Kind == owner.kind && binding.Key == hex.EncodeToString(digest[:])
 		}
-		if !known || binding.Kind != "previous" || binding.AccountID != fixtureConflictOwner ||
+		if !known || (binding.Kind != "previous" && binding.Kind != "session") || binding.AccountID != fixtureConflictOwner ||
 			!fixtureBindingTimestamp(binding.UpdatedUnix) || seen[binding.Key] {
 			return false
 		}
@@ -109,7 +110,7 @@ type fixtureProdexContinuations struct {
 	Responses map[string]fixtureProdexBinding `json:"response_profile_bindings"`
 	Sessions  map[string]json.RawMessage      `json:"session_profile_bindings"`
 	Turns     map[string]json.RawMessage      `json:"turn_state_bindings"`
-	SessionID map[string]json.RawMessage      `json:"session_id_bindings"`
+	SessionID map[string]fixtureProdexBinding `json:"session_id_bindings"`
 	Statuses  struct {
 		Response map[string]json.RawMessage `json:"response"`
 		Turn     map[string]json.RawMessage `json:"turn_state"`
@@ -130,7 +131,7 @@ func validFixtureProdexContinuations(name string, data []byte, expected map[stri
 		}
 		return strictFixtureStateJSON(data, &state) && state.Version == 1 && state.Active == nil &&
 			emptyFixtureStateMap(state.Profiles) && emptyFixtureStateMap(state.Selected) &&
-			emptyFixtureStateMap(state.Sessions) && validFixtureProdexBindings(state.Responses, expected)
+			emptyFixtureStateMap(state.Sessions) && validFixtureProdexBindings(state.Responses, expected, "previous")
 	}
 	var envelope struct {
 		Generation uint64          `json:"generation"`
@@ -152,18 +153,18 @@ func validFixtureProdexContinuations(name string, data []byte, expected map[stri
 	} else if !strictFixtureStateJSON(envelope.Value, &value) {
 		return false
 	}
-	return validFixtureProdexBindings(value.Responses, expected) &&
-		emptyFixtureStateMap(value.Sessions) && emptyFixtureStateMap(value.Turns) && emptyFixtureStateMap(value.SessionID) &&
+	return validFixtureProdexBindings(value.Responses, expected, "previous") &&
+		emptyFixtureStateMap(value.Sessions) && emptyFixtureStateMap(value.Turns) && validFixtureProdexBindings(value.SessionID, expected, "session") &&
 		emptyFixtureStateMap(value.Statuses.Response) && emptyFixtureStateMap(value.Statuses.Turn) && emptyFixtureStateMap(value.Statuses.Session)
 }
 
-func validFixtureProdexBindings(bindings map[string]fixtureProdexBinding, expected map[string]fixtureContinuationOwner) bool {
+func validFixtureProdexBindings(bindings map[string]fixtureProdexBinding, expected map[string]fixtureContinuationOwner, kind string) bool {
 	if bindings == nil {
 		return false
 	}
 	for id, binding := range bindings {
 		owner, known := expected[id]
-		if !known || !fixtureBindingTimestamp(binding.BoundAt) {
+		if !known || owner.kind != kind || !fixtureBindingTimestamp(binding.BoundAt) {
 			return false
 		}
 		if binding.ProfileName == fixtureConflictOwner && binding.Identity == nil {

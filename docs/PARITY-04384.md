@@ -4320,6 +4320,8 @@ The executable commands use the unchanged pinned reference, `--gemini`, or
 `--scenario all --scenario-workers 3`; the isolated rerun uses
 `--scenario raw-key-continuation-probe`. Source/binary provenance gates pass.
 The complete default-script milestone remains scoped to clean `8730116`.
+The verified continuation checkpoint was fast-forwarded and pushed directly
+to `origin/main` at `c2895f00f2d44f2c9deaef88eed51d43ee79f29b`.
 
 
 ## Gemini raw-key durable restart rejection
@@ -4391,3 +4393,55 @@ passes 2,081 tests: `/tmp/gdx-04384-gemini-restart-race.log`.
 Clean-commit executable verification follows. Native macOS/Windows execution,
 live authentication, Gemini Compact, session/turn executable continuation and
 broader lexical classes remain open. Global 1:1 parity is not claimed.
+
+
+## Gemini durable-state oracle qualification after restart repair
+
+Clean `25efbbf197dbb64974cd8ae8f70d60016ea5fb97` passes the three exact restart
+fixtures, including changed-key and changed-endpoint controls. Reports:
+`/tmp/gdx-04384-gemini-restart-raw-key-bound-response-restart-initial-oracle.json`,
+`/tmp/gdx-04384-gemini-restart-raw-key-bound-response-restart-key-initial-oracle.json`,
+`/tmp/gdx-04384-gemini-restart-raw-key-bound-response-restart-endpoint-initial-oracle.json`.
+The same initial harness FAILs the existing `buffered-body-under` and
+`raw-key-session-limit` controls because it previously audited those workflows
+without any expected durable owner. Their new synchronous hashed conflict
+bindings were therefore correctly flagged as unexpected by that old contract:
+`/tmp/gdx-04384-gemini-restart-buffered-body-under-initial-oracle.json` and
+`/tmp/gdx-04384-gemini-restart-raw-key-session-limit-initial-oracle.json`.
+These FAIL reports are retained; they are not passing restart-stage gates.
+
+The developer-only auditor now derives response owners for all audited Gemini
+successes, not only continuation cases. Accepted session-boundary fixtures
+add only their exact original session value, with a distinct session-kind
+hash namespace. The reference's `session_id_bindings` still require exact
+provider, credential and endpoint identity plus valid timestamps. Godex still
+requires the existing conflict sentinel and no credential owner. Unknown IDs,
+wrong kinds, foreign identities, failed or unauthenticated responses, corrupt
+backups, secret-bearing files and unknown paths remain rejected. Legacy
+session maps, turn maps and status maps remain required to be empty.
+No production code, schema, shared production helper or dependency changes.
+
+Before this auditor repair,
+`rtk go test ./tools/differential -run '^TestProdex04384GeminiState' -count=1`
+passes the response control and fails the session, parent and unauthenticated
+observation checks: `/tmp/gdx-04384-gemini-state-oracle-before.log`.
+After repair, the two executable controls PASS on the same clean `25efbbf`
+candidate with `/tmp/gdx-04384-gemini-state-evidence-differential`:
+`/tmp/gdx-04384-gemini-state-body-reviewed-oracle.json` and
+`/tmp/gdx-04384-gemini-state-session-reviewed-oracle.json`.
+The candidate source remains `/tmp/gdx-04384-gemini-restart-work`; both commands
+use the unchanged pinned reference and `--gemini --scenario <name>`.
+This is a newly qualified harness, not a changed candidate executable.
+
+`rtk go test ./tools/differential -count=1` passes 270 tests:
+`/tmp/gdx-04384-gemini-state-oracle-tests.log`.
+`rtk go test -race ./tools/differential -count=1` passes 270 tests:
+`/tmp/gdx-04384-gemini-state-oracle-race.log`.
+`rtk go test ./...` passes 9,402 tests across 81 packages:
+`/tmp/gdx-04384-gemini-state-oracle-test-all.log`.
+`rtk proxy make verify` passes all local completion gates:
+`/tmp/gdx-04384-gemini-state-oracle-verify.log`.
+Clean-commit 60-case Gemini/125-case DeepSeek matrices follow.
+Gemini Compact and session/turn executable continuation,
+other lexical classes, native macOS/Windows execution and live authentication
+remain separate audits. Global 1:1 parity is not claimed.

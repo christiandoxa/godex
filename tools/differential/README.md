@@ -193,6 +193,11 @@ requires the exact successful seed body/type/exit/stdout and a terminal 503
 after restart, with one total authenticated original upstream request. The
 report retains the seed and its persistence evidence. Matching corruptions
 of the seed, persistence, final response, request or state must fail.
+Successful Gemini body and session-boundary cases also authorize only their
+observed response IDs and the exact accepted fixture session. The state auditor
+checks the binding kind and its independent hash namespace, pins provider/key/
+endpoint identities for reference snapshots, and requires Godex's conflict
+sentinel. Unauthenticated or failed responses authorize no new binding.
 
 The 0.438.4 `deepseek-sse-error-presence`, `deepseek-sse-error-i64` and
 `deepseek-sse-error-float` scenarios verify embedded-error primary-field

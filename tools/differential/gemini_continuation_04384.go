@@ -25,6 +25,9 @@ func geminiContinuationOwners04384(scenario string, result geminiCandidateResult
 	if result.Seed != nil {
 		result = *result.Seed
 	}
+	if len(result.Upstream) == 0 || !result.Upstream[len(result.Upstream)-1].Auth {
+		return nil
+	}
 	var upstream []upstreamRequest
 	for _, request := range result.Upstream {
 		upstream = append(upstream, upstreamRequest{KeySlot: request.Slot})
@@ -37,6 +40,13 @@ func geminiContinuationOwners04384(scenario string, result geminiCandidateResult
 	if scenario == geminiUnboundResponseCase04384 {
 		if owner, verified := owners["chatcmpl-differential"]; verified {
 			owners["chatcmpl-unknown"] = owner
+		}
+	}
+	if session, reject, known := geminiRawKeyIdentity04384(scenario); known && !reject {
+		for _, owner := range owners {
+			owner.kind = "session"
+			owners[session] = owner
+			break
 		}
 	}
 	return owners

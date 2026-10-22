@@ -49,6 +49,7 @@ func rawKeyProbeSeedOwner(endpoint string) map[string]fixtureContinuationOwner {
 		credential: fixtureBindingDigest("credential", rotationSecondaryKey),
 		endpoint:   fixtureBindingDigest("endpoint", endpoint),
 		provider:   "deepseek",
+		kind:       "previous",
 	}}
 }
 

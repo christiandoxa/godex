@@ -456,11 +456,8 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	}
 	if rawIdentity || bodyBoundary || continuation {
 		candidate.Stdout = stdout.String()
-		candidate.StateIntegrity = auditFixtureDurableState(home)
-		if continuation {
-			owners := geminiContinuationOwners04384(scenario, candidate, mock.server.URL+"/v1beta")
-			candidate.StateIntegrity = auditFixtureDurableStateWithBindings(home, owners)
-		}
+		owners := geminiContinuationOwners04384(scenario, candidate, mock.server.URL+"/v1beta")
+		candidate.StateIntegrity = auditFixtureDurableStateWithBindings(home, owners)
 	}
 	return candidate, nil
 }
