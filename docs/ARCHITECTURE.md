@@ -524,6 +524,16 @@ buffered/SSE parameters; it never enters the outbound control map. Native
 responses, Chat fallback envelopes and completed SSE retain that metadata.
 Failed SSE keeps its tagged failure envelope. API-key SSE includes the tagged
 UTF-8 charset in Content-Type. All policy remains private to `gateway/gemini`.
+The API-key Chat adapter separately validates request/client/provider metadata
+and string-valued cache fields before shared Chat conversion. These fields are
+response-only: cache fields stay at metadata top level, explicit client/cache
+values override base metadata, and a blank cache key adds no override. Generated
+thinking omission notes replace the same provider key. Its private response
+merge combines immediate metadata subobject fields, replacing deeper values
+whole rather than recursively filling them from provider output. Native
+GenerateContent retains its own metadata contract. Buffered Chat fallback also
+uses the existing serde writer so metadata numbers and Unicode keep their tagged
+bytes; completed SSE applies the same merge without adding metadata to failures.
 All supported call/tool-output items require a nonblank identity selected from
 the first string `call_id`, `tool_call_id`, then `id`. This local admission runs
 before conversion or orphan filtering can silently drop the malformed item.

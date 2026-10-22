@@ -7600,8 +7600,90 @@ Gemini cases with independent mutations, including every earlier 409:
 `/tmp/gdx-04384-gemini-bridge-output-oracle.json`. It is pushed to origin/main.
 Exact DeepSeek qualification remains scoped to 213-case PASS reports at
 `20a7d41` and `2bd9081`; no new full run is attributed to the intermediate
-Gemini-only source. Other protected matrices and the full `20a7d41` default
-gate remain pending. Remaining format/metadata controls, Gemini Compact,
+Gemini-only source. Other protected matrices remain pending. The complete
+`20a7d41` default gate subsequently passed, as recorded below. Remaining format/metadata controls, Gemini Compact,
 executable session/turn continuation, native macOS/Windows and live login
 remain unproven. No force push, tag, release or editor edit occurred. Global
 1:1 parity is not claimed.
+
+## Gemini Chat request metadata and bounded response merge
+
+Pinned `chat_compatible_request.rs:176-188`, request-parameter `metadata.rs`,
+`deepseek_metadata_shape_plan` and `deepseek_put_request_metadata` require
+object-valued metadata/client_metadata and metadata.gemini, plus string-valued
+prompt cache fields. Nonblank cache keys preserve original whitespace; blank
+keys add nothing. Explicit client/cache fields override base metadata at its
+top level. Retention has no enum or nonblank restriction. Generated thinking
+omission notes replace the same provider key. The complete buffered/SSE callers
+retain this private metadata on successful/native output, Chat fallback and
+completed Chat SSE; failed SSE retains its separate failure envelope.
+Pinned `deepseek_message_metadata.mojo` merges immediate metadata subobjects
+and replaces their deeper values whole, rather than recursively filling them.
+
+Thirty-one executable baselines pin old clean production
+`e031ae874da8bb814e341ed127129e869a9be033` and the unchanged official 0.438.4
+source/binary/manifest. Twenty-three FAIL only Godex; eight controls PASS.
+Every reference, mutation and durable-state invariant passes. Valid metadata
+objects encounter the shared Chat converter's unsupported-field rejection;
+other metadata can disappear or bypass type validation. Reports are
+`/tmp/gdx-04384-gemini-request-metadata-<suffix>-before-oracle.json` and the
+summary is `/tmp/gdx-04384-gemini-request-metadata-before-summary.log`.
+Exact argument arrays are retained in
+`/tmp/gdx-04384-gemini-request-metadata-before-commands.json`.
+
+The gateway regression was copied alone to old clean production in
+`/tmp/gdx-04384-gemini-request-metadata-before-work`.
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiChat(MetadataPreservesCompletePipeline|RejectsInvalidMetadataBeforeDispatch)$' -count=1`
+FAILs 50 tests including parents, with eleven controls PASS:
+`/tmp/gdx-04384-gemini-request-metadata-gateway-final-before.log`.
+The same command PASSes all 61 after repair:
+`/tmp/gdx-04384-gemini-request-metadata-gateway-focused.log`.
+It checks exact upstream wire/credential/attempts, native/fallback/completed
+SSE metadata bytes, failed-SSE metadata exclusion and invalid-type rejection
+before dispatch. The synthetic transport explicitly fails any invalid dispatch.
+
+Private `gateway/gemini/request_chat_metadata_04384.go` acquires metadata from
+the original complete request before shared conversion. The normalizer removes
+these response-only fields from the outbound projection. The separate private
+response file owns the tagged shallow merge and serde-written Chat fallback.
+Buffered native translation selects this Chat-specific merge explicitly;
+the direct native GenerateContent contract remains separate. SSE applies the
+same merge on completion. No new shared helper, package, public API, dependency,
+option, goroutine, routing policy or durable format is introduced. The existing
+serde writer and explicit response-metadata parameters are reused.
+
+The differential adds 31 independent cases, including collisions, nested-object
+replacement, raw numeric/Unicode values, cache fields, invalid shapes, omission
+notes, fallback and actual SSE. Matching-corruption controls require exact
+terminal metadata position before canonical event/ID comparison; they reject
+wrong fields/values, altered numeric/escaping bytes and recursive filling.
+They also run inside the standalone executable's negative-control gate.
+`rtk go test ./tools/differential -count=1` PASSes 284 self-tests:
+`/tmp/gdx-04384-gemini-request-metadata-oracle-tests.log`.
+`rtk proxy go test -json ./...` PASSes 10,196 tests in 71 packages, with ten
+packages without tests and 18 optional installed-Codex/executable tests skipped:
+`/tmp/gdx-04384-gemini-request-metadata-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+PASSes 3,375 tests: `/tmp/gdx-04384-gemini-request-metadata-race.log`.
+`rtk proxy make verify` PASSes with exit 0:
+`/tmp/gdx-04384-gemini-request-metadata-verify.log`.
+Exact clean-commit executable qualification follows local verification.
+
+The complete default gate at exact clean
+`20a7d41c9fbcc6012300fb2b7975a64a70aba5b2` subsequently finished with exit 0,
+including final HTTP profile-status and raw-429 stages:
+`rtk proxy scripts/verify-release-parity.sh`;
+`/tmp/gdx-04384-release-20a7d41.log`. This supersedes earlier pending status,
+without attributing that full run to later revisions. Clean `2bd9081` PASSes
+all 468 Gemini cases, including every prior 452 and independent mutations:
+`/tmp/gdx-04384-gemini-mcp-empty-name-oracle.json`. Its separate exact 213-case
+DeepSeek PASS remains retained. It is pushed directly to origin/main.
+Clean `e031ae8` separately PASSes 213 DeepSeek scenarios:
+`/tmp/gdx-04384-gemini-reasoning-shape-deepseek-oracle.json`, and
+`rtk proxy make verify` finishes with exit 0 on that exact commit:
+`/tmp/gdx-04384-gemini-reasoning-shape-clean-verify.log`.
+Its eight targeted Gemini cases PASS; the full 528-case matrix remains pending.
+Other protected matrices retain their own exact revision scope.
+Remaining format/metadata controls, Gemini Compact, executable session/turn
+continuation, native macOS/Windows and live login remain unproven. No force
+push, tag, release or editor edit occurred. Global 1:1 parity is not claimed.

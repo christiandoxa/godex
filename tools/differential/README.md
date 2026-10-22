@@ -35,6 +35,14 @@ tool-choice omission. Real Chat SSE checks canonical framing/IDs/usage, exact
 terminal omission metadata and UTF-8 content type, while buffered native and
 Chat fallback responses retain the same request metadata. Mutation tests reject
 metadata moved to another SSE event as well as changed fields/values.
+The 31 `request-primitive-metadata-*` cases check response-only metadata,
+client/cache validation, explicit/base/provider collision precedence, blank
+keys, arbitrary retention strings, canonical numbers/Unicode, generated
+omission-note precedence, failed Chat fallback and completed Chat SSE. They
+retain independent full wire/response/status/header/stdout/exit/credential/state
+checks. Matching-corruption controls reject lost/renamed metadata, JSON number
+or escaping changes, recursive provider-field filling and metadata moved onto
+another stream event. These cases add no DeepSeek scenarios.
 
 Build and run from a clean, committed Godex worktree:
 

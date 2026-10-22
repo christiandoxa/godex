@@ -89,7 +89,13 @@ func geminiReasoningChoiceStreamInvariant04384(scenario string, result geminiCan
 		return errors.New("Gemini reasoning stream changed original request, route or credential")
 	}
 	body := result.Client.Body
-	if fixture.geminiOmittedChoice != "" {
+	if fixture.geminiMetadata != "" {
+		metadata := `"metadata":` + fixture.geminiMetadata
+		if strings.Count(body, metadata) != 1 {
+			return errors.New("Gemini stream lost exact request metadata")
+		}
+		body = strings.Replace(body, metadata, `"metadata":{"gemini":{"finish_reason":"stop"}}`, 1)
+	} else if fixture.geminiOmittedChoice != "" {
 		note := "," + geminiReasoningChoiceNote04384(fixture.geminiOmittedChoice)
 		metadata := `"metadata":{"gemini":{"finish_reason":"stop"` + note + `}}`
 		if strings.Count(body, note) != 1 || strings.Count(body, metadata) != 1 {

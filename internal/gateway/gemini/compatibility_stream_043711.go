@@ -115,10 +115,11 @@ func (state *geminiChatCompatibleStream043711) complete(writer io.Writer) error 
 		}
 	}
 	if len(state.metadata) != 0 {
-		metadata := make(map[string]any, len(state.metadata))
-		mergeMetadataFields(metadata, state.metadata)
-		provider, _ := completed["metadata"].(map[string]any)
-		mergeMetadataFields(metadata, provider)
+		metadata, _ := completed["metadata"].(map[string]any)
+		if metadata == nil {
+			metadata = make(map[string]any, len(state.metadata))
+		}
+		mergeGeminiChatMetadata04384(metadata, state.metadata)
 		completed["metadata"] = metadata
 	}
 	if state.usage != nil {

@@ -44,23 +44,6 @@ func geminiChatThinking04384(controls map[string]any) bool {
 	}
 }
 
-func geminiChatReasoningMetadata04384(body []byte, controls map[string]any) (map[string]any, error) {
-	if !geminiChatThinking04384(controls) {
-		return nil, nil
-	}
-	root, err := decodeGeminiChatRequest04384(body)
-	if err != nil {
-		return nil, err
-	}
-	choice, present := root["tool_choice"]
-	if !present {
-		return nil, nil
-	}
-	return map[string]any{"gemini": map[string]any{"omitted_tool_choice": map[string]any{
-		"from": choice, "reason": geminiChatThinkingChoiceReason04384,
-	}}}, nil
-}
-
 func normalizeGeminiChatThinkingMessages04384(request map[string]any) {
 	messages, _ := request["messages"].([]any)
 	for _, raw := range messages {

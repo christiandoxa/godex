@@ -36,6 +36,10 @@ func (transport *RuntimeTransport) executeChatCompatibleResponses(
 		}
 		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
+	metadata, err := geminiChatResponseMetadata04384(input.Body, controls)
+	if err != nil {
+		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
+	}
 	body, err := chatcompat.ResponsesRequestPreservingMessages(normalized, requestModel(input.Body), "")
 	if err != nil {
 		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
@@ -45,10 +49,6 @@ func (transport *RuntimeTransport) executeChatCompatibleResponses(
 		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
 	body, err = geminiChatRequestOptions04384(body, normalized, controls)
-	if err != nil {
-		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
-	}
-	metadata, err := geminiChatReasoningMetadata04384(input.Body, controls)
 	if err != nil {
 		return nil, &proxymodel.Error{StatusCode: http.StatusBadGateway, Message: "upstream request failed"}
 	}
@@ -157,6 +157,10 @@ func normalizeGeminiChatInput043711(body []byte) ([]byte, map[string]any, error)
 	for _, field := range []string{"parallel_tool_calls", "presence_penalty", "frequency_penalty", "seed", "n"} {
 		delete(root, field)
 	}
+	// The original response-only fields are validated before shared Chat conversion.
+	for _, field := range []string{"metadata", "client_metadata", "prompt_cache_key", "prompt_cache_retention"} {
+		delete(root, field)
+	}
 	if instructions, ok := root["instructions"].(string); ok && strings.TrimSpace(instructions) == "" {
 		delete(root, "instructions")
 	}
@@ -242,21 +246,7 @@ func translateGeminiChatOrNativeResponse043711(
 			// This is the exact tagged provider translator's fallback for
 			// an upstream Chat Completion that cannot be decoded as native
 			// Gemini GenerateContent. Never fabricate successful text.
-			metadata := make(map[string]any, len(requestMetadata))
-			mergeMetadataFields(metadata, requestMetadata)
-			return jsonResponse(response.StatusCode, map[string]any{
-				"id":       "gemini_resp_prodex",
-				"model":    "gemini-2.5-pro",
-				"object":   "response",
-				"output":   []any{},
-				"metadata": metadata,
-				"usage":    map[string]any{},
-				"status":   "failed",
-				"error": map[string]any{
-					"code":    "gemini_empty_response",
-					"message": "Gemini returned no visible response content.",
-				},
-			})
+			return geminiChatFallbackResponse04384(response.StatusCode, requestMetadata)
 		}
 	}
 	native := *response

@@ -90,7 +90,14 @@ func geminiNativeResponsesValueWithFallback04380(
 		usage, _ := rawUsage.(map[string]any)
 		result["usage"] = geminiNativeUsage(usage)
 	}
-	if metadata := geminiNativeResponseMetadataValue(root, candidate, requestMetadata); len(metadata) > 0 {
+	var metadata map[string]any
+	if chatCompatible {
+		metadata = geminiNativeResponseMetadataValue(root, candidate, nil)
+		mergeGeminiChatMetadata04384(metadata, requestMetadata)
+	} else {
+		metadata = geminiNativeResponseMetadataValue(root, candidate, requestMetadata)
+	}
+	if len(metadata) > 0 {
 		result["metadata"] = metadata
 	}
 	geminiApplyNativeStatus(result, root, candidate, len(output) > 0)
