@@ -183,7 +183,16 @@ pins the observed Gemini provider, credential and endpoint identities, including
 the accepted unknown-ID alias. Missing child responses are explicit failures.
 The shared same-process shim rejects a failed seed, preventing its status from
 masquerading as the continuation result. These fixtures do not claim Gemini
-restart, session/turn executable or Compact coverage.
+session/turn executable or Compact payload coverage.
+
+Gemini `raw-key-bound-response-restart`, `raw-key-bound-response-restart-key`
+and `raw-key-bound-response-restart-endpoint` launch a successful native seed,
+verify durable response ownership, then restart against the same isolated home.
+The latter cases replace the key or endpoint only after the seed. Every case
+requires the exact successful seed body/type/exit/stdout and a terminal 503
+after restart, with one total authenticated original upstream request. The
+report retains the seed and its persistence evidence. Matching corruptions
+of the seed, persistence, final response, request or state must fail.
 
 The 0.438.4 `deepseek-sse-error-presence`, `deepseek-sse-error-i64` and
 `deepseek-sse-error-float` scenarios verify embedded-error primary-field

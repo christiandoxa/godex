@@ -71,15 +71,11 @@ func assertRawKeyContinuationFailsBeforeDispatch(t *testing.T, provider string) 
 			if fixture.turn != "" {
 				request.Header.Set("X-Codex-Turn-State", fixture.turn)
 			}
-			routers := []*Router{first}
-			if provider == "deepseek" {
-				routers = append(routers,
-					newRouter(firstID, "http://127.0.0.1:1234/v1"),
-					newRouter("11223344556677889900aabbccddeeff", "http://127.0.0.1:1234/v1"),
-					newRouter(firstID, "http://127.0.0.1:5678/v1"))
-			}
-			// shortcut: Gemini restart ownership needs its own executable fixture before extending this loop.
-			for _, router := range routers {
+			for _, router := range []*Router{first,
+				newRouter(firstID, "http://127.0.0.1:1234/v1"),
+				newRouter("11223344556677889900aabbccddeeff", "http://127.0.0.1:1234/v1"),
+				newRouter(firstID, "http://127.0.0.1:5678/v1"),
+			} {
 				exchange, err := router.Forward(t.Context(), request)
 				if len(gateway.requests) != 1 {
 					if exchange != nil {

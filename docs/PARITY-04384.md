@@ -4295,3 +4295,99 @@ Clean-commit executable verification follows. The new unit session/turn checks
 do not claim executable coverage. Gemini restart/Compact, broader lexical
 classes, native macOS/Windows and live authentication remain open.
 Global 1:1 parity remains unproven.
+
+
+## Validated Gemini continuation checkpoint: c2895f0
+
+Clean `c2895f00f2d44f2c9deaef88eed51d43ee79f29b` passes all 57 Gemini cases:
+`/tmp/gdx-04384-gemini-binding-oracle.json`.
+The first 125-case DeepSeek invocation FAILs only the reference's unknown-ID
+durable-state audit: a `state.json.last-good.<pid>.<time>.<sequence>.tmp` file
+remained and the backup differed from the primary. This report remains FAIL:
+`/tmp/gdx-04384-gemini-binding-deepseek-oracle.json`.
+No path allowlist, backup check or state invariant was relaxed.
+The exact single-scenario rerun PASSes:
+`/tmp/gdx-04384-gemini-binding-deepseek-probe-rerun.json`.
+A second full invocation PASSes all 125 cases and independent mutations:
+`/tmp/gdx-04384-gemini-binding-deepseek-rerun-oracle.json`.
+The first reference teardown artifact is retained as an observed limitation,
+not reclassified as a passing run or a Godex regression.
+
+Both binaries were built from that clean commit using
+`rtk go build -trimpath -o /tmp/gdx-04384-gemini-binding-godex ./cmd/godex` and
+`rtk go build -trimpath -o /tmp/gdx-04384-gemini-binding-final-differential ./tools/differential`.
+The executable commands use the unchanged pinned reference, `--gemini`, or
+`--scenario all --scenario-workers 3`; the isolated rerun uses
+`--scenario raw-key-continuation-probe`. Source/binary provenance gates pass.
+The complete default-script milestone remains scoped to clean `8730116`.
+
+
+## Gemini raw-key durable restart rejection
+
+The continuation audit found a separate confirmed restart gap. Godex's
+`usecase/routing/ephemeral_keys.go` persisted the existing conflict sentinel
+only for DeepSeek. Gemini's accepted response ownership disappeared on exit,
+so a subsequent launch treated a known response ID as fresh work and sent it
+upstream again. The pinned released executable instead retains ownership and
+rejects the request before another attempt, even after the key or endpoint
+changes. The same profile-projected dispatch identity described above applies
+after restart; this does not establish successful replay.
+
+Three strict executable baseline fixtures use clean `c2895f0` and
+`/tmp/gdx-04384-gemini-restart-differential` with
+`--gemini --scenario raw-key-bound-response-restart`,
+`--gemini --scenario raw-key-bound-response-restart-key`, and
+`--gemini --scenario raw-key-bound-response-restart-endpoint`.
+All three FAIL only Godex, while reference and independent mutation controls
+PASS. Each reference seed is exact native HTTP 200 with verified durable
+ownership; the next process returns exact 503 JSON and exit 2, with one total
+authenticated upstream request. Old Godex has no durable seed binding and
+returns 200, exit 0 and a second upstream request. Reports:
+`/tmp/gdx-04384-gemini-restart-before-oracle.json`,
+`/tmp/gdx-04384-gemini-restart-key-before-oracle.json`, and
+`/tmp/gdx-04384-gemini-restart-endpoint-before-oracle.json`.
+
+The routing use case now applies the existing hashed conflict-sentinel policy
+to verified Gemini raw-key work. No credential owner, endpoint or token enters
+durable metadata; the version-1 repository format and atomic snapshot/backup
+remain unchanged. Models and Compact local dispatch occurs before ordinary
+binding lookup and does not create continuation identities, as in the pinned
+`local_rewrite_pipeline_dispatch.rs` and `local_rewrite_gemini_compact.rs`.
+This local-route policy has source-aligned routing regression coverage; it
+does not claim Gemini Compact payload or executable ownership parity.
+No production helper, package, interface, dependency, configuration or
+background worker was introduced. The earlier restart test shortcut is removed
+after the released-executable evidence; unit response/session/turn checks now
+include restart, changed account ID and changed endpoint.
+
+The extended persistence regression fails only the Gemini branch before repair:
+`rtk go test ./internal/usecase/routing -run '^TestProdex04384RawKeyResponsePersistsRejectionWithoutCredentialOwner$' -count=1 -timeout=30s`;
+`/tmp/gdx-04384-gemini-restart-before.log`.
+The first local-route fixture lacked a profile home and failed the DeepSeek
+controls as well; that report is unqualified:
+`/tmp/gdx-04384-gemini-local-binding-before.log`.
+With an isolated profile home and the three original production files restored
+through a Go overlay, the qualified local test passes all three DeepSeek
+controls and fails the three Gemini cases plus parent:
+`rtk go test -overlay /tmp/gdx-04384-gemini-restart-before-overlay.json ./internal/usecase/routing -run '^TestProdex04384RawKeyLocalRoutesDoNotConsumeOrCreateBindings$' -count=1 -timeout=30s`;
+`/tmp/gdx-04384-gemini-local-binding-qualified-before.log`.
+
+The oracle retains the exact successful seed, its stdout and durable-persistence
+evidence, removes the seed exchange before the next launch, and requires one
+total authenticated original request. Equal corruptions of the seed,
+persistence, request, final body/type/status/exit/stdout and state all fail.
+Its first self-test exposed a shared synthetic header map between seed and
+final results; cloning that map fixes the fixture without weakening assertions.
+`rtk go test ./tools/differential -count=1` passes 266 tests:
+`/tmp/gdx-04384-gemini-restart-all-oracle-tests.log`.
+The focused routing/oracle command passes 26 tests:
+`/tmp/gdx-04384-gemini-restart-reviewed-focused.log`.
+`rtk go test -race ./internal/usecase/routing ./tools/differential -count=1`
+passes 2,081 tests: `/tmp/gdx-04384-gemini-restart-race.log`.
+`rtk go test ./...` passes 9,398 tests across 81 packages:
+`/tmp/gdx-04384-gemini-restart-test-all.log`.
+`rtk proxy make verify` passes all local completion gates:
+`/tmp/gdx-04384-gemini-restart-verify.log`.
+Clean-commit executable verification follows. Native macOS/Windows execution,
+live authentication, Gemini Compact, session/turn executable continuation and
+broader lexical classes remain open. Global 1:1 parity is not claimed.

@@ -301,10 +301,12 @@ cannot satisfy the profile-projected dispatch identity. `usecase/routing`
 returns the existing bound-continuation HTTP 503 before another gateway call.
 An unbound previous-response identifier uses the fresh-input fallback:
 `gateway/gemini` validates the complete JSON before removing that identifier
-from its stateless chat request. Gemini restart and Compact ownership remain
-separate audit surfaces; no persistence format or managed-profile policy changes.
+from its stateless chat request. Verified Gemini raw-key observations persist
+the same hashed conflict sentinel as DeepSeek, so restart, key and endpoint
+changes cannot turn known work into a fresh request. No credential owner or
+token is written; the persistence format and managed-profile policy are unchanged.
 
-Local DeepSeek raw-key Compact and Models routes run before continuation validation and
+Local DeepSeek and Gemini raw-key Compact and Models routes run before continuation validation and
 do not observe or persist continuation identities. The owning routing policy
 recognizes these existing local routes; their gateway still owns their payloads.
 

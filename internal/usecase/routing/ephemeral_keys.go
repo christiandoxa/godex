@@ -88,14 +88,14 @@ func (router *Router) persistAccountState(accountID string) bool {
 	return !ephemeral
 }
 
-// DeepSeek raw-key bindings cannot pass the local-rewrite dispatch identity check.
+// DeepSeek and Gemini raw-key bindings cannot pass the dispatch identity check.
 // Persist the existing conflict sentinel so a restart cannot rediscover another owner.
 func (router *Router) rememberVerifiedAccountBinding(ctx context.Context, accountID string, keys affinityKeys, now time.Time) error {
 	router.mu.Lock()
 	provider, ephemeral := router.ephemeralCredentialIDs[accountID]
 	router.mu.Unlock()
 	var err error
-	if ephemeral && provider != "deepseek" {
+	if ephemeral && provider != "deepseek" && provider != "gemini" {
 		err = router.affinity.rememberVerifiedVolatile(accountID, keys, now)
 	} else {
 		if ephemeral {

@@ -13,7 +13,10 @@ import (
 func (router *Router) resolveRequestOwner(ctx context.Context, request proxymodel.Request, accounts []proxymodel.Account, keys affinityKeys) (string, func() error, error) {
 	deepSeek := rawKeyPool(accounts, "deepseek")
 	gemini := rawKeyPool(accounts, "gemini")
-	if (deepSeek || gemini) && !rawKeyLocalRoute(request) {
+	if (deepSeek || gemini) && rawKeyLocalRoute(request) {
+		return "", nil, nil
+	}
+	if deepSeek || gemini {
 		for _, value := range []string{keys.previous, keys.turn, keys.session} {
 			if strings.TrimSpace(value) != "" && !validHardBindingComponent04383(value) {
 				return "", nil, &proxymodel.Error{StatusCode: http.StatusServiceUnavailable,
@@ -21,14 +24,11 @@ func (router *Router) resolveRequestOwner(ctx context.Context, request proxymode
 			}
 		}
 	}
-	if !deepSeek && (!gemini || rawKeyLocalRoute(request)) {
+	if !deepSeek && !gemini {
 		if err := router.repairConflictedFullHistorySession043711(ctx, request, keys); err != nil {
 			return "", nil, err
 		}
 		return router.resolveOwner(ctx, keys, request.QuotaSelection)
-	}
-	if rawKeyLocalRoute(request) {
-		return "", nil, nil
 	}
 	// Local-rewrite dispatch checks response, turn and session lineage before
 	// credential selection; an unresolved bound identity never becomes fresh work.

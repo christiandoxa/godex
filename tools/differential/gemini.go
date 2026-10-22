@@ -31,14 +31,16 @@ type geminiCapturedRequest struct {
 }
 
 type geminiCandidateResult struct {
-	Name           string                  `json:"name"`
-	Version        string                  `json:"version"`
-	ExitCode       int                     `json:"exit_code"`
-	Upstream       []geminiCapturedRequest `json:"upstream"`
-	Client         exchange                `json:"client_exchange"`
-	Stdout         string                  `json:"stdout,omitempty"`
-	StateIntegrity []string                `json:"state_integrity_errors,omitempty"`
-	ClientError    string                  `json:"client_error,omitempty"`
+	Name                  string                  `json:"name"`
+	Version               string                  `json:"version"`
+	ExitCode              int                     `json:"exit_code"`
+	Upstream              []geminiCapturedRequest `json:"upstream"`
+	Client                exchange                `json:"client_exchange"`
+	Stdout                string                  `json:"stdout,omitempty"`
+	StateIntegrity        []string                `json:"state_integrity_errors,omitempty"`
+	ClientError           string                  `json:"client_error,omitempty"`
+	Seed                  *geminiCandidateResult  `json:"continuation_seed,omitempty"`
+	ContinuationPersisted bool                    `json:"continuation_persisted,omitempty"`
 }
 
 type geminiCaseResult struct {
@@ -225,6 +227,9 @@ func (mock *geminiMock) recorded() []geminiCapturedRequest {
 
 func runGeminiDifferential(prodexBin, godexBin, prodexCommit, godexCommit, selected string) error {
 	cases := []string{
+		geminiRestartResponseCase04384,
+		geminiRestartKeyCase04384,
+		geminiRestartEndpointCase04384,
 		geminiBoundResponseCase04384,
 		geminiUnboundResponseCase04384,
 		"buffered-body-under",
@@ -375,7 +380,6 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	)
 	ctx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, binary, args...)
 	env := productEnv(name, stateHome, codexHome, userHome, shim, childResult, runOptions{})
 	env = append(env, "DIFFERENTIAL_PROVIDER=gemini")
 	if scenario == geminiBoundResponseCase04384 {
@@ -407,6 +411,19 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 	if scenario == "stream-native" || geminiChatStreamScenario04384(scenario) {
 		env = append(env, "DIFFERENTIAL_STREAM=1")
 	}
+	var seed *geminiCandidateResult
+	if geminiRestartCase04384(scenario) {
+		seed, err = runGeminiRestartSeed04384(ctx, binary, args, env, home, childResult, mock)
+		if err != nil {
+			return geminiCandidateResult{}, err
+		}
+		if err := os.Remove(childResult); err != nil {
+			return geminiCandidateResult{}, fmt.Errorf("remove Gemini seed exchange: %w", err)
+		}
+		args = geminiRestartArguments04384(scenario, args)
+		env = append(env, "DIFFERENTIAL_CONTINUATION_PHASE=resume")
+	}
+	cmd := exec.CommandContext(ctx, binary, args...)
 	cmd.Env = env
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -432,7 +449,7 @@ func runGeminiProduct(root, scenario, name, binary string) (geminiCandidateResul
 		return geminiCandidateResult{}, err
 	}
 	candidate := geminiCandidateResult{
-		Name: name, Version: version, ExitCode: exitCode, Upstream: mock.recorded(), Client: result,
+		Name: name, Version: version, ExitCode: exitCode, Upstream: mock.recorded(), Client: result, Seed: seed,
 	}
 	if readErr != nil {
 		candidate.ClientError = "missing client exchange: " + redact(stderr.String())

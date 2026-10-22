@@ -22,7 +22,7 @@ func TestProdex04384RawKeyResponsePersistsRejectionWithoutCredentialOwner(t *tes
 	}{
 		{"transient_provider_key", "deepseek", true},
 		{"managed_provider_profile", "deepseek", false},
-		{"gemini_scope_control", "gemini", true},
+		{"transient_gemini_key", "gemini", true},
 		{"anthropic_scope_control", "anthropic", true},
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
@@ -57,7 +57,8 @@ func TestProdex04384RawKeyResponsePersistsRejectionWithoutCredentialOwner(t *tes
 				t.Fatal(err)
 			}
 			memoryOwner, err := router.affinity.owner(t.Context(), affinityKeys{previous: responseID}, router.now())
-			if fixture.ephemeral && fixture.provider == "deepseek" {
+			boundRawKey := fixture.ephemeral && (fixture.provider == "deepseek" || fixture.provider == "gemini")
+			if boundRawKey {
 				if memoryOwner != "" || !errors.Is(err, errConflictingAccountAffinity) {
 					t.Fatalf("raw-key continuation is not fenced: owner=%q err=%v", memoryOwner, err)
 				}
@@ -69,10 +70,10 @@ func TestProdex04384RawKeyResponsePersistsRejectionWithoutCredentialOwner(t *tes
 				t.Fatal(err)
 			}
 			wantOwner := owner
-			if fixture.ephemeral && fixture.provider == "deepseek" {
+			if boundRawKey {
 				wantOwner = routingentity.ConflictAccountID
 			}
-			if fixture.ephemeral && fixture.provider != "deepseek" {
+			if fixture.ephemeral && !boundRawKey {
 				if len(bindings) != 0 {
 					t.Fatalf("unrelated provider persistence changed: %v", bindings)
 				}
