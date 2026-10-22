@@ -8,7 +8,15 @@ import (
 	"github.com/christiandoxa/godex/internal/helper/jsonutil"
 )
 
-func deepSeekMessages(object map[string]any, preserveMessageCalls bool) ([]any, error) {
+type messageProjection uint8
+
+const (
+	standaloneMessages messageProjection = iota
+	normalMessages
+	simpleMessages
+)
+
+func deepSeekMessages(object map[string]any, projection messageProjection) ([]any, error) {
 	messages := make([]any, 0)
 	if instructions, ok := object["instructions"].(string); ok && strings.TrimSpace(instructions) != "" {
 		messages = append(messages, map[string]any{"role": "system", deepSeekContentKey: instructions})
@@ -26,7 +34,7 @@ func deepSeekMessages(object map[string]any, preserveMessageCalls bool) ([]any, 
 			if !ok {
 				return nil, errors.New("DeepSeek input items must be objects")
 			}
-			converted, err := deepSeekInputItem(item, preserveMessageCalls)
+			converted, err := deepSeekInputItem(item, projection)
 			if err != nil {
 				return nil, err
 			}
@@ -38,7 +46,7 @@ func deepSeekMessages(object map[string]any, preserveMessageCalls bool) ([]any, 
 	return messages, nil
 }
 
-func deepSeekInputItem(item map[string]any, preserveMessageCalls bool) ([]any, error) {
+func deepSeekInputItem(item map[string]any, projection messageProjection) ([]any, error) {
 	if _, found := item["prefix"]; found {
 		return nil, errors.New("DeepSeek chat prefix completion requires the beta chat endpoint, which is outside this Responses adapter")
 	}
@@ -48,7 +56,7 @@ func deepSeekInputItem(item map[string]any, preserveMessageCalls bool) ([]any, e
 	}
 	switch kind {
 	case "", "message":
-		message, err := deepSeekMessageItem(item, preserveMessageCalls)
+		message, err := deepSeekMessageItem(item, projection)
 		if err != nil || message == nil {
 			return nil, err
 		}
@@ -76,7 +84,7 @@ func deepSeekInputItem(item map[string]any, preserveMessageCalls bool) ([]any, e
 	}
 }
 
-func deepSeekMessageItem(item map[string]any, preserveMessageCalls bool) (map[string]any, error) {
+func deepSeekMessageItem(item map[string]any, projection messageProjection) (map[string]any, error) {
 	role := "user"
 	if value, ok := item["role"]; ok {
 		text, valid := value.(string)
@@ -97,9 +105,15 @@ func deepSeekMessageItem(item map[string]any, preserveMessageCalls bool) (map[st
 	if item["type"] == "message" && contentPresent && contentValue == nil {
 		return nil, errors.New("DeepSeek message content must be a string, object, or array")
 	}
+	if !contentPresent && projection != normalMessages {
+		contentValue = item["text"]
+	}
 	content, err := deepSeekTextContent(contentValue)
 	if err != nil {
 		return nil, err
+	}
+	if projection == normalMessages && strings.TrimSpace(content) == "" {
+		return nil, nil
 	}
 	message := map[string]any{"role": role, deepSeekContentKey: content}
 	if role == "tool" {
@@ -109,7 +123,7 @@ func deepSeekMessageItem(item map[string]any, preserveMessageCalls bool) (map[st
 		}
 		message[deepSeekToolCallIDKey] = callID
 	}
-	if !preserveMessageCalls {
+	if projection == normalMessages {
 		return message, nil
 	}
 	toolCalls, err := deepSeekMessageToolCalls(item["tool_calls"])
@@ -119,7 +133,7 @@ func deepSeekMessageItem(item map[string]any, preserveMessageCalls bool) (map[st
 	if len(toolCalls) > 0 {
 		message["tool_calls"] = toolCalls
 	}
-	if strings.TrimSpace(content) == "" && len(toolCalls) == 0 {
+	if projection == standaloneMessages && strings.TrimSpace(content) == "" && len(toolCalls) == 0 {
 		return nil, nil
 	}
 	return message, nil

@@ -10293,3 +10293,69 @@ final make verify exits 0 after the dead-helper deletion (original session
 20524), including all race tests and the build. Exact final commands:
 `rtk proxy go test -json ./internal/gateway/deepseek ./tools/differential > /tmp/gdx-04384-deepseek-output-text-focused-final.jsonl 2>&1`
 and `rtk proxy make verify > /tmp/gdx-04384-deepseek-output-text-verify-final.log 2>&1`.
+
+### Exact output-content qualification; broader reference failures retained
+
+Exact clean 4b9f4de01775ad41a56561815af28e7ef97f55e3 PASSes all 24 executable
+cases (original session 66232, exit 0), including every twenty-case baseline
+and prior tool/SSE/numeric-pending/inline-history controls. Audit:
+/tmp/gdx-04384-deepseek-output-text-targeted-audit.json. All twelve original
+Godex-only request failures now satisfy the original invariants. Raw inline
+MCP types, output text, source/artifact pins, responses/stdout/status, attempts,
+auth/slots, state and mutation guards were checked. Exact command:
+`rtk proxy python3 /tmp/gdx-04384-deepseek-output-text-targeted.py > /tmp/gdx-04384-deepseek-output-text-targeted.log 2>&1`.
+Publication was held for the independently confirmed blank-message regression
+below, so this qualification is not a claim that its full matrix passed.
+
+Original full Gemini968 session 88702 exits 1 at exact c42bd28c. The sole failed
+case is request-primitive-format-thinking: reference state contains two
+unexpected temporary continuation files. Original full DeepSeek273 session
+57095 also exits 1 at exact 596e89c, on
+deepseek-buffered-view-eof-string-unicode with two unexpected reference
+continuation temporary files. Both preserve matching client body/stdout, and
+Godex has no state-integrity error in those observations. The original reports
+remain FAIL. Audits: /tmp/gdx-04384-gemini-stream-tool-fields-full-failure-audit.json
+and /tmp/gdx-04384-deepseek-custom-input-full-failure-audit.json. No assertion
+was bypassed, no failed run was restarted or relabeled, and no root cause is
+claimed from these observations. Latest qualified full scopes remain exact
+Gemini948/d670339 and DeepSeek236/0c78e259; the complete default gate last
+qualified remains e9d88ce. Targeted qualifications do not replace these failures.
+
+### DeepSeek message views preserve simple text and normal blank filtering
+
+The pinned normal replay planner filters blank original content before input
+projection. Simple wire instead reads text when content is absent and retains
+empty/blank messages. Normal reconstruction inserts one empty user message
+when filtering/adjacency leaves none. Exact a0b94af baseline proves thirteen
+Godex-only original-request FAILs and five PASS controls across eighteen cases
+(original session 30053, exit 0). Audit:
+/tmp/gdx-04384-deepseek-message-text-before-audit.json. The initial fourteen
+cases also qualify independently (original 9931, exit 0). The retained expanded
+fixture self-test initially FAILed because its test-only corruption did not
+touch four single-message cases. After the original executable run completed,
+that mutation was fixed to change every golden request; all seventeen fixture
+self-tests PASS (original 72100, exit 0). No original report is relabeled.
+
+The prior normal-message correction introduced a blank-message early-return
+regression by coupling standalone/simple preservation to normal projection.
+The private gateway now names the three real message projections explicitly.
+Normal history filters blank original content; simple wire acquires the text
+alias and retains blanks; standalone conversion keeps its previous blank
+filtering contract. A runtime-only empty-user fallback follows adjacency.
+No exported option, interface, helper, package, layer, dependency, worker or
+persisted format is added. The private enum replaces an insufficient boolean
+and names existing protocol views rather than adding configuration. Output
+content and message fixture histories were merged without discarding either
+registry. Seven unit cases first FAIL while visible/standalone controls PASS;
+the log is /tmp/gdx-04384-deepseek-message-text-unit-before.jsonl. Focused tests
+then PASS 1,417 tests. Fifteen new executable cases extend DeepSeek306 to 321;
+Gemini remains 974. Full local and exact clean qualification follow before
+publication. Overall 1:1 parity remains unproven.
+
+Full local validation PASSes 11,158 tests with 18 optional SKIP (original
+session 75698, exit 0). make verify exits 0 (original session 68852), including
+shuffled race tests, cross-builds, vet, source/format guards and the build.
+Exact commands:
+`rtk proxy go test -json ./... > /tmp/gdx-04384-deepseek-message-text-full.jsonl 2>&1`
+and `rtk proxy make verify > /tmp/gdx-04384-deepseek-message-text-verify.log 2>&1`.
+Exact clean combined executable qualification follows before publication.

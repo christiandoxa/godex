@@ -314,6 +314,16 @@ callback. Ordinary text/tool/message inputs may select the source's stateless
 body; stored previous IDs and non-simple shapes retain reconstruction. Pending
 messages are captured before the body override and used when recording the next
 response. The public pure request translator keeps its independent contract.
+The private message projector names standalone, normal-history and simple-wire
+views explicitly. Normal history omits embedded message calls and blank original
+content; simple wire preserves its calls, text alias and blank messages. An
+empty normal runtime reconstruction receives one empty user message after
+adjacency repair. Cached upstream calls retain their existing ownership.
+Custom calls wrap only input as a string, defaulting absence to empty text and
+using the existing Serde writer for nonstring JSON. Focused tool-output projection
+stays in gateway/deepseek: separate outputs extract array text with empty entries
+preserved, while inline MCP results retain their original JSON type. These are
+private protocol transformations with no new shared helper or application layer.
 DeepSeek's adjacency index matches opaque tool IDs byte for byte; whitespace
 classification only rejects blank IDs. Distinct padded IDs retain separate
 first-output and emitted-call ownership, without changing the stateless override.

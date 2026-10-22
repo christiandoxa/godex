@@ -1185,3 +1185,11 @@ array/object/null/string values remain JSON values. String/null/object outputs,
 normal reconstruction and custom/MCP output aliases are controlled separately.
 Complete independent request/client/state assertions and matching-corruption
 guards apply. The default DeepSeek matrix reaches 306; Gemini remains 974.
+
+Fifteen DeepSeek `deepseek-request-primitive-message-text-*` cases cover text
+aliases, blank/empty messages, content priority and single-message fallback.
+Simple wire preserves alias text and empty messages; normal history filters
+blank original content and supplies one empty user message when nothing
+remains. Complete original wire and pending-history unit checks preserve the
+standalone converter contract. Exact executable requests/client/state and
+matching-corruption controls apply. Default DeepSeek reaches 321; Gemini974.
