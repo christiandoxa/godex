@@ -4256,6 +4256,85 @@ turn continuation, native macOS/Windows and live authentication remain open.
 Global 1:1 parity is not claimed.
 
 
+## Validated common DeepSeek preparation boundary: 18f7ad3
+
+Clean `18f7ad39733e8a5a033a5766d6d14ecd934401bd` passes all 213 DeepSeek
+scenarios and independent mutations:
+`/tmp/gdx-04384-deepseek-preparation-errors-oracle.json`.
+Frequency-penalty and malformed-search targeted reports also PASS:
+`/tmp/gdx-04384-deepseek-preparation-<frequency|web-search>-targeted-oracle.json`.
+The exact binaries were built with
+`rtk go build -trimpath -o /tmp/gdx-04384-deepseek-preparation-errors-godex ./cmd/godex` and
+`rtk go build -trimpath -o /tmp/gdx-04384-deepseek-preparation-errors-final-differential ./tools/differential`.
+The full matrix uses `--scenario all --scenario-workers 3`, the unchanged
+pinned reference and matching clean candidate/source pins. The clean primary
+worktree and remote were checked and fast-forwarded; `18f7ad3` was pushed
+directly to `origin/main` without CI wait, force push, tag, release or
+editor-checkout changes.
+
+The clean next candidate `a7fabe987e50e30330599c534367323254db8f00` passes
+targeted invalid-input, invalid-reasoning and malformed-tool cases:
+`/tmp/gdx-04384-gemini-preparation-<input|reasoning|tool-params>-targeted-oracle.json`.
+Its full 192-case Gemini and 213-case DeepSeek matrices are pending:
+`/tmp/gdx-04384-gemini-preparation-errors-oracle.json` and
+`/tmp/gdx-04384-gemini-preparation-errors-deepseek-oracle.json`.
+The completed default gate remains scoped to `8d618e0`, not later candidates.
+
+
+## Gemini validates malformed tools before other request-shape errors
+
+The pinned runtime's tool/candidate-count gate runs before model selection and
+chat-compatible shape validation. Complete serde parsing precedes that gate.
+Thus malformed tools combined with invalid stream, temperature, tokens, user
+identity, input or reasoning retain the indexed structured 400. A malformed
+Unicode value anywhere in the body instead prevents the gate from parsing and
+retains the later plain terminal 502 outcome.
+
+Godex ran its existing tool validator only after control normalization and
+shared Chat conversion. Six combined-error cases returned the later 502
+instead of the earlier tool 400. The API-key adapter now invokes that same
+private validator after complete JSON/root admission but before normalization,
+removing the later duplicate location. Flat-tool projection and indexed
+diagnostics are unchanged. Valid tool schemas, request numbers, alias handling,
+empty-500 roots and malformed-JSON admission retain their existing checks.
+All production logic remains in `gateway/gemini`; no helper, package, exported
+API, interface, dependency, config, worker or persisted format is added.
+Candidate-count precedence and other combined errors remain separate audits.
+
+Before repair the malformed-serde control PASSes and seven tests fail,
+including the parent:
+`rtk go test ./internal/gateway/gemini -run '^TestProdex04384GeminiToolValidationPrecedesOtherShapeErrors$' -count=1`;
+`/tmp/gdx-04384-gemini-tool-priority-before.log`.
+The same command passes all eight tests after repair:
+`/tmp/gdx-04384-gemini-tool-priority-focused.log`.
+
+Seven executable baselines pin clean `a7fabe9`, the unchanged reference and
+`/tmp/gdx-04384-gemini-tool-priority-differential`:
+`/tmp/gdx-04384-gemini-tool-priority-<suffix>-before-oracle.json`.
+Six combined shape errors FAIL only Godex; the invalid-surrogate control PASSes.
+Every reference and independent mutation invariant passes. The existing strict
+fixture runner retains the exact 400/502 body/status/type, terminal headers,
+exit/stdout, zero attempts and safe durable state. A focused private tool-priority
+fixture file owns the raw combinations without another production abstraction.
+
+`rtk go test ./tools/differential -count=1` passes 281 tests before repair:
+`/tmp/gdx-04384-gemini-tool-priority-oracle-tests.log`.
+`rtk go test ./internal/gateway/gemini -count=1` passes 865 tests:
+`/tmp/gdx-04384-gemini-tool-priority-gateway-tests.log`.
+`rtk proxy go test -json ./...` passes 9,763 tests across 81 packages
+(71 passing and ten with no tests):
+`/tmp/gdx-04384-gemini-tool-priority-test-all.jsonl`.
+`rtk go test -race ./internal/gateway/gemini ./internal/usecase/routing ./tools/differential -count=1`
+passes 2,976 tests: `/tmp/gdx-04384-gemini-tool-priority-race.log`.
+`rtk proxy make verify` PASSes the complete local gate:
+`/tmp/gdx-04384-gemini-tool-priority-verify.log`.
+Clean-commit 199-case Gemini qualification follows, with 213-case DeepSeek
+coverage separately pinned to its unchanged production implementation.
+Other controls, combined-error ordering, Gemini Compact, executable session/
+turn continuation, native macOS/Windows and live authentication remain open.
+Global 1:1 parity is not claimed.
+
+
 ## Validated model-input and DeepSeek control-type checkpoints
 
 Clean `8d618e097c8549015785bce1e23c89999198d42f` passes all 185 Gemini cases

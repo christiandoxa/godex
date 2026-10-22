@@ -345,6 +345,14 @@ no-store/nosniff headers, exit 2 and zero attempts. Invalid input/reasoning
 requires plain terminal 502. Independent mutations cover both error forms;
 Content-Type mutations use a value different from every valid fixture type.
 
+Gemini `request-primitive-tool-priority-*` combines malformed function
+parameters with invalid stream, temperature, token count, user ID, input or
+reasoning. Each must preserve the exact indexed structured 400 and its terminal
+headers with no attempt. The serde suffix instead includes an unpaired
+surrogate and must preserve plain terminal 502 before tool validation.
+The original raw body is retained and existing independent error/state/header/
+attempt mutations cover every combination.
+
 DeepSeek scenario workers evaluate their complete independent invariants as
 each scenario finishes, preserving failures in the ordered report. The strict
 five-minute generated SSE timestamp window is unchanged; later cases cannot
