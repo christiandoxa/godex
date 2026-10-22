@@ -1071,6 +1071,16 @@ func runCodexShim(arguments []string) int {
 	if strings.HasPrefix(os.Getenv("DIFFERENTIAL_CONTINUATION_PHASE"), "resume") {
 		requestBody = []byte(strings.TrimSuffix(string(requestBody), "}") + `,"previous_response_id":"chatcmpl-differential"}`)
 	}
+	if os.Getenv("DIFFERENTIAL_CONTINUATION_PHASE") == "resume-compact" {
+		endpoint.Path += "/compact"
+	}
+	if strings.HasPrefix(os.Getenv("DIFFERENTIAL_CONTINUATION_PHASE"), "resume-models") {
+		endpoint.Path = strings.TrimSuffix(endpoint.Path, "/responses") + "/models"
+		if os.Getenv("DIFFERENTIAL_CONTINUATION_PHASE") == "resume-models-single" {
+			endpoint.Path += "/deepseek-chat"
+		}
+		method = http.MethodGet
+	}
 	if os.Getenv("DIFFERENTIAL_CONTINUATION_PHASE") == "unknown" {
 		requestBody = []byte(strings.TrimSuffix(string(requestBody), "}") + `,"previous_response_id":"chatcmpl-unknown"}`)
 	}

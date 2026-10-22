@@ -16,6 +16,9 @@ func TestRawKeyContinuationProbeRejectsWrongRestartOwner(t *testing.T) {
 			var slots []string
 			if phase == "seed" {
 				slots = []string{"primary", "secondary"}
+			} else if local := rawKeyLocalRouteFixture04384(phase); local != "" {
+				run.Client.Body = local
+				run.Client.Headers = rawKeyLocalFixtureHeaders04384(phase)
 			} else if phase == "fresh" || phase == "unknown" {
 				slots = []string{"primary"}
 				run.Client.Body = strings.Replace(run.Client.Body, `"object":`, `"id":"chatcmpl-fresh","object":`, 1)

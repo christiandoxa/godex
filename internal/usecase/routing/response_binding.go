@@ -16,10 +16,12 @@ func (router *Router) bindSuccessfulResponse(
 	result *proxymodel.Forwarded,
 	accounts []proxymodel.Account,
 	keys affinityKeys,
-	websocketMessage bool,
-	selection quotamodel.Selection,
+	request proxymodel.Request,
 	promptCacheKey string,
 ) error {
+	if deepSeekRawKeyPool(accounts) && rawKeyLocalRoute(request) {
+		return nil
+	}
 	if result.Response.PrecommitFailure != nil && result.Response.PrecommitFailure.StaleContinuation {
 		result.Failed = true
 		return nil
@@ -44,7 +46,8 @@ func (router *Router) bindSuccessfulResponse(
 	}
 	router.clearPreviousResponseFailures(ctx, result.AccountID, keys.previous)
 	router.rememberPromptCacheOwner(result.AccountID, promptCacheKey, router.now())
-	if websocketMessage {
+	selection := request.QuotaSelection
+	if request.WebSocketMessage {
 		previousBound := keys.previous != ""
 		if result.Response.WebSocketResponseID != "" {
 			keys.previous = result.Response.WebSocketResponseID

@@ -3049,19 +3049,20 @@ after the two seed attempts. These are confirmed routing mismatches, beyond
 file-layout differences. Production repair and clean-commit gates follow.
 
 
-## Raw-key continuations fail before credential dispatch
+## DeepSeek raw-key continuations fail before credential dispatch
 
-`usecase/routing` now resolves raw-key response/turn/session bindings before
+`usecase/routing` now resolves DeepSeek raw-key response/turn/session bindings before
 ordinary managed-owner recovery. Known bindings return the reference HTTP 503
 message without retry or another credential attempt. Fresh and unknown-response
-requests retain bounded discovery. Verified raw-key observations use the
+requests retain bounded discovery. Verified DeepSeek raw-key observations use the
 existing conflict sentinel with hashed continuation keys in the existing
 version-1 routing snapshot/backup; no raw credential, credential ID, endpoint,
 new field or migration is introduced. Legacy synthetic-account owners are
 still ignored without modifying their records, and managed-profile bindings
 and private turn-state sidecars retain their existing boundaries.
 
-The obsolete volatile-only observation function is removed. The new private
+The initial candidate removed the volatile observation function; the final scope
+correction below retains it for unaudited provider continuation workflows. The new private
 owner-resolution policy belongs to `usecase/routing`; HTTP JSON code/presentation
 belongs to `delivery/http/proxy`, and the existing repository remains responsible
 for locking, atomic snapshots and recovery. No shared helper, dependency,
@@ -3129,3 +3130,61 @@ shared-filename spoofing and exact-key persistence controls. Log:
 The earlier failed reports remain failed evidence. `rtk go test ./...` passes
 9,138 tests across 81 packages: `/tmp/gdx-04384-accepted-previous-test-all.log`.
 Final local and clean-commit executable gates follow this oracle correction.
+
+
+## Preserve local DeepSeek routes before binding validation
+
+Clean `664ac9165861d12c2cc38486bb6e20cb85b91731` passes all 65 DeepSeek
+scenarios and independent mutations. Report:
+`/tmp/gdx-04384-accepted-previous-oracle.json`. Its full local gate also passed:
+`/tmp/gdx-04384-accepted-previous-verify.log`. This was not pushed: an additional
+pipeline audit found local Compact and Models dispatch occurs before provider
+binding validation. The broader exact-output probe proves the reference accepts
+bound context there, while the initial candidate returns 503. Reports:
+`/tmp/gdx-04384-local-route-probe.json` and
+`/tmp/gdx-04384-local-route-confirmed-before-oracle.json`.
+All three new reference controls satisfy their exact payload contracts; only
+Godex's Compact, Models list and single-model phases fail. Existing response
+rejection, restart, fresh/discovery, ownership and sidecar assertions remain.
+
+Routing now bypasses binding validation and observation only for the verified
+DeepSeek raw-key local routes. They write no continuation keys or session
+markers. Exact Compact output and all four degradation headers, the full
+four-model list, and the single-model object are pinned as synthetic fixtures;
+mutations reject altered status, exit, body bytes and headers. The shared
+response binder receives the request model instead of separate transport flags,
+keeping route policy in the owning routing use case. No public API, shared
+helper, dependency, option or persisted field is added.
+
+This repair is scoped to DeepSeek's raw-key contract. The existing credential-ID
+cache retains provider kind, and other raw-key providers keep their previous
+volatile observations. Gemini Compact uses its own upstream semantic workflow;
+its complete continuation/identity pipeline is a separate audit target, not
+covered by the DeepSeek local-route result. Managed-profile recovery, legacy
+synthetic-owner filtering, retry quarantine and private turn-state rules retain
+their existing controls.
+
+Exact fail-before `rtk go test ./internal/delivery/http/proxy -run '^TestProdex04384RawKeyContinuationHTTPRejectionSurvivesRestart$' -count=1`
+fails the added Compact control with 503. Log:
+`/tmp/gdx-04384-raw-key-local-routes-before.log`.
+Focused raw-key regression `rtk go test ./internal/usecase/routing ./internal/delivery/http/proxy -run '^TestProdex04384RawKeyContinuation' -count=1`
+passes five tests after repair. Log:
+`/tmp/gdx-04384-raw-key-local-routes-focused.log`.
+`rtk go test -race ./internal/usecase/routing ./internal/delivery/http/proxy ./tools/differential -count=1`
+passes 2,352 tests; `rtk go test ./...` passes 9,141 tests across 81 packages.
+Logs: `/tmp/gdx-04384-raw-key-local-routes-final-race.log` and
+`/tmp/gdx-04384-raw-key-local-routes-final-test-all.log`.
+The final scope/legacy/HTTP/oracle control run passes twelve tests:
+`/tmp/gdx-04384-raw-key-local-routes-final-controls.log`.
+`rtk proxy make verify` passes every local gate, including the full shuffled
+race suite, cross-platform build/test compilation, installers and build. Log:
+`/tmp/gdx-04384-raw-key-local-routes-final-verify.log`.
+Clean-commit release gates follow.
+
+The next separate confirmed gap is buffered malformed-tool JSON diagnostics.
+A released synthetic `{bad` response returns the pinned serde diagnostic on
+Prodex but Go's decoder diagnostic on Godex, with one upstream attempt and
+HTTP 200/failed Responses on both. Exploratory report:
+`/tmp/gdx-04384-buffered-tool-invalid-confirmed-probe.json`. Its generic success
+invariant is intentionally still FAIL; this is diagnostic mismatch evidence,
+not a qualified parity gate or a production fix.

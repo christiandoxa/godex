@@ -17,11 +17,13 @@ import (
 
 func TestProdex04384RawKeyResponsePersistsRejectionWithoutCredentialOwner(t *testing.T) {
 	for _, fixture := range []struct {
-		name      string
-		ephemeral bool
+		name, provider string
+		ephemeral      bool
 	}{
-		{"transient_provider_key", true},
-		{"managed_provider_profile", false},
+		{"transient_provider_key", "deepseek", true},
+		{"managed_provider_profile", "deepseek", false},
+		{"gemini_scope_control", "gemini", true},
+		{"anthropic_scope_control", "anthropic", true},
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
 			repository := routingrepo.NewStore(t.TempDir())
@@ -36,7 +38,7 @@ func TestProdex04384RawKeyResponsePersistsRejectionWithoutCredentialOwner(t *tes
 				Accounts: func(context.Context) ([]proxymodel.Account, error) {
 					return []proxymodel.Account{{
 						ID: owner, Home: t.TempDir(), Enabled: true,
-						Provider:        proxymodel.Provider{Kind: "deepseek"},
+						Provider:        proxymodel.Provider{Kind: fixture.provider},
 						EphemeralAPIKey: fixture.ephemeral,
 					}}, nil
 				},
@@ -55,7 +57,7 @@ func TestProdex04384RawKeyResponsePersistsRejectionWithoutCredentialOwner(t *tes
 				t.Fatal(err)
 			}
 			memoryOwner, err := router.affinity.owner(t.Context(), affinityKeys{previous: responseID}, router.now())
-			if fixture.ephemeral {
+			if fixture.ephemeral && fixture.provider == "deepseek" {
 				if memoryOwner != "" || !errors.Is(err, errConflictingAccountAffinity) {
 					t.Fatalf("raw-key continuation is not fenced: owner=%q err=%v", memoryOwner, err)
 				}
@@ -67,8 +69,14 @@ func TestProdex04384RawKeyResponsePersistsRejectionWithoutCredentialOwner(t *tes
 				t.Fatal(err)
 			}
 			wantOwner := owner
-			if fixture.ephemeral {
+			if fixture.ephemeral && fixture.provider == "deepseek" {
 				wantOwner = routingentity.ConflictAccountID
+			}
+			if fixture.ephemeral && fixture.provider != "deepseek" {
+				if len(bindings) != 0 {
+					t.Fatalf("unrelated provider persistence changed: %v", bindings)
+				}
+				return
 			}
 			if len(bindings) != 1 || bindings[0].AccountID != wantOwner {
 				t.Fatalf("durable previous response bindings=%#v, want owner=%q", bindings, wantOwner)
@@ -144,7 +152,7 @@ func TestProdex04370LegacyEphemeralAffinityCannotHijackNewLaunch(t *testing.T) {
 	}
 	source := func(context.Context) ([]proxymodel.Account, error) {
 		return []proxymodel.Account{
-			{ID: transientID, Enabled: true, EphemeralAPIKey: true},
+			{ID: transientID, Enabled: true, EphemeralAPIKey: true, Provider: proxymodel.Provider{Kind: "deepseek"}},
 			{ID: managedID, Enabled: true},
 		}, nil
 	}

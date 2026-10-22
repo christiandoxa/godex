@@ -2,9 +2,11 @@ package routing
 
 import (
 	"context"
+	"strings"
+	"time"
+
 	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
-	"time"
 )
 
 func (router *Router) loadAccounts(ctx context.Context) ([]proxymodel.Account, error) {
@@ -39,7 +41,7 @@ func (router *Router) observeEphemeralCredentials(accounts []proxymodel.Account)
 	router.mu.Lock()
 	defer router.mu.Unlock()
 	if router.ephemeralCredentialIDs == nil {
-		router.ephemeralCredentialIDs = make(map[string]struct{})
+		router.ephemeralCredentialIDs = make(map[string]string)
 	}
 	for _, account := range accounts {
 		if !account.EphemeralAPIKey {
@@ -48,7 +50,7 @@ func (router *Router) observeEphemeralCredentials(accounts []proxymodel.Account)
 		if _, exists := router.ephemeralCredentialIDs[account.ID]; exists {
 			continue
 		}
-		router.ephemeralCredentialIDs[account.ID] = struct{}{}
+		router.ephemeralCredentialIDs[account.ID] = strings.ToLower(strings.TrimSpace(account.Provider.Kind))
 		router.affinity.registerEphemeralOwner(account.ID)
 		delete(router.quarantine, account.ID)
 		for key := range router.routeHealth {
@@ -86,17 +88,22 @@ func (router *Router) persistAccountState(accountID string) bool {
 	return !ephemeral
 }
 
-// Raw-key bindings cannot pass the local-rewrite dispatch identity check.
+// DeepSeek raw-key bindings cannot pass the local-rewrite dispatch identity check.
 // Persist the existing conflict sentinel so a restart cannot rediscover another owner.
 func (router *Router) rememberVerifiedAccountBinding(ctx context.Context, accountID string, keys affinityKeys, now time.Time) error {
 	router.mu.Lock()
-	_, ephemeral := router.ephemeralCredentialIDs[accountID]
+	provider, ephemeral := router.ephemeralCredentialIDs[accountID]
 	router.mu.Unlock()
-	if ephemeral {
-		accountID = routingentity.ConflictAccountID
-		keys.thread = ""
+	var err error
+	if ephemeral && provider != "deepseek" {
+		err = router.affinity.rememberVerifiedVolatile(accountID, keys, now)
+	} else {
+		if ephemeral {
+			accountID = routingentity.ConflictAccountID
+			keys.thread = ""
+		}
+		err = router.affinity.rememberVerified(ctx, accountID, keys, now)
 	}
-	err := router.affinity.rememberVerified(ctx, accountID, keys, now)
 	if err == nil {
 		router.notifySelectionChange()
 	}

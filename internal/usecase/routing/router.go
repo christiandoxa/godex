@@ -107,7 +107,7 @@ type Router struct {
 	profileInflightAdmissionsTotal        uint64
 	profileInflightReleasesTotal          uint64
 	profileInflightReleaseUnderflowsTotal uint64
-	ephemeralCredentialIDs                map[string]struct{}
+	ephemeralCredentialIDs                map[string]string
 	quarantine                            map[string]quarantineState
 	quotaBlocked                          map[string]bool
 	quotaChecks                           map[quotaCheckKey]quotaCheck
@@ -190,7 +190,7 @@ func NewRouter(config Config) (*Router, error) {
 		preferred: strings.TrimSpace(config.PreferredAccount),
 		now:       config.Now, wait: config.Wait, maxInspect: config.MaxInspectBytes,
 		affinity: newAffinityStore(), quarantine: make(map[string]quarantineState),
-		ephemeralCredentialIDs: make(map[string]struct{}),
+		ephemeralCredentialIDs: make(map[string]string),
 		inflight:               make(map[string]int), inflightChanged: make(chan struct{}),
 		profileInflightHardLimit: config.ProfileInflightHardLimit, profileInflightWait: config.ProfileInflightWait,
 		precommitWatchdogBudget: config.PrecommitWatchdogBudget,
@@ -333,7 +333,7 @@ func (router *Router) forwardWithoutWatchdog(ctx context.Context, request proxym
 		}
 	}
 	if err := router.bindSuccessfulResponse(
-		ctx, &result, accounts, keys, request.WebSocketMessage, request.QuotaSelection, promptCacheKey,
+		ctx, &result, accounts, keys, request, promptCacheKey,
 	); err != nil {
 		return nil, err
 	}

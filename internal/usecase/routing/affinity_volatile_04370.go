@@ -1,10 +1,27 @@
 package routing
 
 import (
+	"errors"
+	"strings"
 	"time"
 
 	routingentity "github.com/christiandoxa/godex/internal/entity/routing"
 )
+
+func (store *affinityStore) rememberVerifiedVolatile(accountID string, keys affinityKeys, now time.Time) error {
+	if strings.TrimSpace(accountID) == "" {
+		return errors.New("cannot bind volatile affinity without an account")
+	}
+	values := keys.values()
+	if len(values) == 0 {
+		return nil
+	}
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	store.pruneLocked(now)
+	store.rememberVerifiedInMemoryLocked(accountID, values, keys, now)
+	return nil
+}
 
 func (store *affinityStore) rememberVerifiedInMemoryLocked(accountID string, values []string, keys affinityKeys, now time.Time) {
 	for _, key := range values {

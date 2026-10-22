@@ -58,4 +58,23 @@ func TestProdex04384RawKeyContinuationHTTPRejectionSurvivesRestart(t *testing.T)
 	if calls.Load() != 1 {
 		t.Fatalf("continuation reached upstream: %d calls", calls.Load())
 	}
+	before, err := store.Load(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, fixture := range []struct{ method, path string }{
+		{http.MethodPost, "/responses/compact"},
+		{http.MethodGet, "/models"},
+		{http.MethodGet, "/models/deepseek-chat"},
+	} {
+		response := httptest.NewRecorder()
+		first.ServeHTTP(response, httptest.NewRequest(fixture.method, fixture.path, strings.NewReader(`{"previous_response_id":"resp-raw-key","session_id":"local-route-session"}`)))
+		if response.Code != http.StatusOK {
+			t.Fatalf("local route %s rejected bound context: %d %s", fixture.path, response.Code, response.Body.String())
+		}
+	}
+	after, err := store.Load(t.Context())
+	if err != nil || len(after) != len(before) || len(after) != 1 || after[0] != before[0] {
+		t.Fatalf("local routes changed durable continuation bindings: before=%v after=%v err=%v", before, after, err)
+	}
 }

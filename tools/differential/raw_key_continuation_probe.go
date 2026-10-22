@@ -42,7 +42,7 @@ func runRawKeyContinuationProbe(root string, mock *mockServer, prodexBin, godexB
 	return result, nil
 }
 
-var rawKeyProbePhases = []string{"seed", "resume", "resume-key", "resume-endpoint", "fresh", "unknown"}
+var rawKeyProbePhases = []string{"seed", "resume", "resume-key", "resume-endpoint", "resume-compact", "resume-models", "resume-models-single", "fresh", "unknown"}
 
 func rawKeyProbeSeedOwner(endpoint string) map[string]fixtureContinuationOwner {
 	return map[string]fixtureContinuationOwner{"chatcmpl-differential": {
@@ -66,7 +66,9 @@ func rawKeyContinuationProbeInvariants(scenario scenarioResult) []string {
 			validIdentity = body != run.Client.Body
 		}
 		validResponse := validIdentity && run.ExitStatus == 0 && run.Client.Status == http.StatusOK && validFixtureResponse(body)
-		if strings.HasPrefix(phase, "resume") {
+		if rawKeyLocalRouteFixture04384(phase) != "" {
+			validResponse = validRawKeyLocalRoute04384(phase, run)
+		} else if strings.HasPrefix(phase, "resume") {
 			validResponse = rawKeyProbeRejected(run)
 		}
 		if !validResponse {
