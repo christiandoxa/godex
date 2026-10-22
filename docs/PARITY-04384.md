@@ -8836,3 +8836,34 @@ cross-builds, format/source guards, vet and the build. Logs:
 /tmp/gdx-04384-gemini-stream-metadata-full.jsonl and
 /tmp/gdx-04384-gemini-stream-metadata-verify.log. Exact clean executable
 qualification follows. Global continuation and overall 1:1 parity remain unproven.
+
+### Preserve unsigned Gemini SSE creation timestamps before event emission
+
+Seven exact clean executable baselines on 6818d40296238180ef0393048bf00d1249c07afa
+qualify five Godex-only failures and two PASS controls. The source uses accepted
+upstream created timestamps for the initial response, text deltas and completion,
+including zero, 2^53+1, uint64 maximum and subsequent chunk updates. Godex used
+its signed local clock for every event. Decimal/negative and overflowing integer
+controls correctly retain the fallback clock. Exact original requests, timestamp
+order/bytes, lifecycle, client stdout, status, attempts, state and matching
+corruption assertions qualify. Records:
+/tmp/gdx-04384-gemini-stream-created-before-audit.json and
+/tmp/gdx-04384-gemini-stream-created-before-commands.json.
+
+Pinned RuntimeDeepSeekSseState applies chunk metadata before response-created
+events. stream/shaping.rs accepts created only through serde Value::as_u64.
+Godex's Gemini SSE state now uses uint64, consumes metadata after error detection
+and before its first event, and reuses the package's existing nativeUintPresent
+unsigned JSON contract. The local clock fallback saturates pre-epoch time at zero,
+matching provider_core_chat_compatible_created_at. No shared helper, exported API,
+dependency, option, persisted format or background work is added.
+
+The focused regression fails five timestamp cases before the fix, while invalid
+number and embedded-error precedence controls pass. Afterward the focused Gemini
+and differential packages pass 2,054 tests. Seven new executable cases bring the
+Gemini matrix to 869. `rtk proxy go test -json ./...` PASSes 10,766 tests with
+18 optional SKIP. `rtk proxy make verify` PASSes with exit 0, including shuffled
+race tests, cross-builds, format/source guards, vet and the build. Logs:
+/tmp/gdx-04384-gemini-stream-created-full.jsonl and
+/tmp/gdx-04384-gemini-stream-created-verify.log. Exact clean executable
+qualification follows. Global continuation and overall 1:1 parity remain unproven.

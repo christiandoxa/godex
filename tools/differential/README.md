@@ -995,6 +995,10 @@ and nonempty system fingerprint, including opaque numbers, replacement and
 null/empty controls. Exact completion bytes and matching numeric corruption
 remain independent assertions.
 
+The unsigned Gemini stream timestamp cases require upstream created values before
+the first emitted event, covering zero, 2^53+1, uint64 maximum, chunk updates and
+invalid numeric controls. The oracle checks timestamp order before normalization.
+
 ### Tagged 0.438.2 Gemini function-tool rejection parity
 
 Two additional **source/binary-pinned** cases, `invalid-wrapped-tool-parameters`

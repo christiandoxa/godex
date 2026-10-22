@@ -42,7 +42,7 @@ func translateGeminiChatCompatibleStream043711(response *http.Response, requestM
 type geminiChatCompatibleStream043711 struct {
 	id           string
 	itemID       string
-	created      int64
+	created      uint64
 	sequence     int
 	started      bool
 	done         bool
@@ -179,6 +179,9 @@ func (state *geminiChatCompatibleStream043711) failure(writer io.Writer, code, m
 }
 
 func (state *geminiChatCompatibleStream043711) observeChatChunk(chunk map[string]any) {
+	if created, ok := nativeUintPresent(chunk["created"]); ok {
+		state.created = created
+	}
 	if fingerprint, _ := chunk["system_fingerprint"].(string); fingerprint != "" {
 		state.fingerprint = fingerprint
 	}
@@ -236,6 +239,7 @@ func (state *geminiChatCompatibleStream043711) accept(writer io.Writer, data []b
 		code, message := chatcompat.ChatStreamError(value)
 		return state.failure(writer, code, message)
 	}
+	state.observeChatChunk(root)
 	if !state.started {
 		state.started = true
 		if err := state.send(writer, "response.created", map[string]any{
@@ -244,7 +248,6 @@ func (state *geminiChatCompatibleStream043711) accept(writer io.Writer, data []b
 			return err
 		}
 	}
-	state.observeChatChunk(root)
 	if err := state.observeReasoning(writer, root); err != nil || state.done {
 		return err
 	}
@@ -302,7 +305,7 @@ func pumpGeminiChatCompatibleStream043711(source io.ReadCloser, writer *io.PipeW
 		responseID = "resp_deepseek_" + value.String()
 	}
 	state := &geminiChatCompatibleStream043711{
-		id: responseID, created: time.Now().Unix(), metadata: requestMetadata, conversation: conversation,
+		id: responseID, created: uint64(max(0, time.Now().Unix())), metadata: requestMetadata, conversation: conversation,
 	}
 	decoder := sse.NewStrictDecoder(4 << 20)
 	buffer := make([]byte, 32<<10)
