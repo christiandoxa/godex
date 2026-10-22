@@ -9173,3 +9173,34 @@ separately qualified object-admission mismatch and full successful tool
 lifecycle/snapshots remain open; neither is hidden by this projection stage.
 Earlier v1/v2/v3/v4 tool-admission diagnostic reports remain retained and are not
 relabeled. Overall 1:1 parity remains unproven.
+
+### Release Gemini SSE headers through the routing workflow
+
+The first exact candidate b80df3df71225b4c1f7e02a4ddef7185b9536c04 passes local
+checks but fails five pending-projection executable captures: the synthetic
+client expires while awaiting headers. Ten successful/error/EOF controls PASS.
+The candidate and all original reports remain retained in
+/tmp/gdx-04384-gemini-stream-projection-targeted-initial-audit.json; no full
+912-case run was started on that incomplete revision and it was not pushed.
+
+The gateway's pending frame now exposes a pre-existing integration mismatch:
+routing still waits for translated body bytes before delivery can release
+Gemini headers. Pinned local_rewrite_response_chat_compatible.rs constructs the
+Gemini streaming response around its lazy reader, and the reference exposes
+SSE 200 before that reader yields. The routing owner now passes a successful
+Gemini SSE response directly to delivery. Explicit precommit failures retain
+priority, and other provider paths keep their inspection. No adapter commitment
+flag, option, helper or new boundary is introduced. This preserves the tagged
+header commitment and its no-replay consequence in the owning use case.
+
+Two normalized/canonical Gemini policy regressions fail before the correction;
+OpenAI, DeepSeek and Claude controls retain body inspection. Focused routing,
+Gemini, HTTP delivery and differential tests PASS 4,314 cases afterward. Full
+local validation PASSes 10,850 tests with 18 optional SKIP; make verify exits 0
+including race tests, cross-builds, vet, source size and formatting. Exact final
+commands:
+`rtk proxy go test -json ./... > /tmp/gdx-04384-gemini-stream-projection-route-full-confirm.jsonl 2>&1`
+and `rtk proxy make verify > /tmp/gdx-04384-gemini-stream-projection-route-verify-confirm.log 2>&1`.
+The earlier full/verify logs are retained as well. Exact executable
+qualification follows. The original b80df3d capture FAILs remain FAIL; later
+results cannot retroactively qualify that revision.

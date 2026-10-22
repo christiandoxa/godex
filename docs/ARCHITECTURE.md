@@ -264,6 +264,10 @@ frame emits no events, and the existing producer waits for request or body
 cancellation. A private child context follows `helper/sse.PipeBody`'s single
 upstream close owner. HTTP delivery flushes SSE headers at commitment before
 waiting for body bytes. This path adds no worker or conversation snapshot.
+The routing use case passes successful Gemini SSE headers directly to delivery,
+matching the tagged API-key bridge's commitment boundary. Other providers keep
+their existing precommit body inspection; explicit precommit failures retain
+priority over the Gemini stream policy.
 Refusal strings and annotation arrays accumulate in first-choice chunk order;
 completion retains nonempty values and exact opaque annotation numbers. The
 same stream owner bounds combined refusal/annotation retention at 64 MiB of

@@ -177,6 +177,10 @@ func (proxy *Router) classifySpecialResponse(
 		response.Header.Get("Content-Encoding") == "" &&
 		(strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream") ||
 			(response.RequestedStreaming && strings.TrimSpace(response.Header.Get("Content-Type")) == "")):
+		// The tagged Gemini API-key bridge commits SSE headers before translated bytes.
+		if strings.EqualFold(strings.TrimSpace(providerKind), "gemini") {
+			return responseOutcome{kind: responsePass}, pending, nil, true
+		}
 		outcome, pending, err := proxy.inspectStream(response, pending, providerKind)
 		if err != nil {
 			pending.transient = true
