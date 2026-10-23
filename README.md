@@ -688,6 +688,9 @@ across managed profiles. A conflicting explicit account fails. A bare full UUID
 is shorthand for `session resume`. Native names, `--last`, and interactive pickers
 remain scoped to the active or explicitly selected profile. Local native commands
 such as `mcp`, `features`, and `completion` bypass quota and rotation.
+For `run --profile NAME`, a session missing from the shared catalog may resolve
+from that profile's legacy rollout files. Shared matches and ambiguous identities
+retain precedence, and the durable upstream owner remains attached.
 
 `queue --thread UUID_OR_PREFIX --message TEXT` also resolves the owning profile;
 the `--thread=VALUE` form is preserved. Named queue targets stay profile-local.

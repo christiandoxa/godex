@@ -201,6 +201,7 @@ func sessionReport(home sessionmodel.ProfileHome, stored sessionentity.Session) 
 		ModelProvider: stored.ModelProvider, LastModel: stored.LastModel, LastReasoningEffort: stored.LastReasoningEffort,
 		Source: stored.Source, Path: stored.Path, ParentThreadID: stored.ParentThreadID,
 		Profile: home.Name, AccountID: home.AccountID,
+		CodexHome: home.CodexHome,
 	}
 }
 

@@ -126,7 +126,7 @@ func runProfileSelection(
 ) error {
 	if index, args := sessionArgument(codexArguments); index >= 0 {
 		return runSessionArgumentWithLauncher(
-			ctx, sessions, selection.Account, args, index,
+			ctx, sessions, selection, args, index,
 			runSessionLauncher{runner: runner, profiles: profiles, selection: selection, options: launchOptions},
 		)
 	}
@@ -382,7 +382,7 @@ func runParsedWithOptions(
 ) error {
 	if index, args := sessionArgument(codexArguments); index >= 0 {
 		return runSessionArgumentWithLauncher(
-			ctx, sessions, selector, args, index,
+			ctx, sessions, runtimemodel.Selection{Account: selector}, args, index,
 			runSessionLauncher{runner: runner, options: launchOptions},
 		)
 	}
@@ -394,17 +394,10 @@ func runParsedWithOptions(
 	return runner.RunWithOptions(ctx, selector, codexArguments, launchOptions)
 }
 
-func runSessionArgument(ctx context.Context, sessions *sessionusecase.Catalog, selector string, args []string, index int) error {
-	if sessions == nil {
-		return errors.New("session support is not configured")
-	}
-	return runSessionArgumentWithLauncher(ctx, sessions, selector, args, index, nil)
-}
-
 func runSessionArgumentWithLauncher(
 	ctx context.Context,
 	sessions *sessionusecase.Catalog,
-	selector string,
+	selection runtimemodel.Selection,
 	args []string,
 	index int,
 	launcher sessionusecase.Launcher,
@@ -416,7 +409,8 @@ func runSessionArgumentWithLauncher(
 	local := command >= 0 && localSessionCommand(args[command])
 	prefix, sessionSelector := splitThreadSelector(args[index])
 	launch := sessionmodel.Launch{
-		AccountSelector: selector,
+		AccountSelector: selection.Account,
+		ProfileSelector: selection.Profile,
 		SessionSelector: sessionSelector,
 		IDIndex:         index,
 		IDPrefix:        prefix,
@@ -424,8 +418,5 @@ func runSessionArgumentWithLauncher(
 		Local:           local,
 		Delete:          command >= 0 && args[command] == "delete",
 	}
-	if launcher != nil {
-		return sessions.ResumeArgumentsWithLauncher(ctx, launch, launcher)
-	}
-	return sessions.ResumeArguments(ctx, launch)
+	return sessions.ResumeArgumentsWithLauncher(ctx, launch, launcher)
 }

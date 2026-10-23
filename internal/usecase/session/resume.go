@@ -18,6 +18,10 @@ func (service *Catalog) Resolve(ctx context.Context, selector string) (sessionmo
 	if err != nil {
 		return sessionmodel.Report{}, err
 	}
+	return service.resolveReport(ctx, selector, reports)
+}
+
+func (service *Catalog) resolveReport(ctx context.Context, selector string, reports []sessionmodel.Report) (sessionmodel.Report, error) {
 	exact := make([]sessionmodel.Report, 0, 1)
 	prefix := make([]sessionmodel.Report, 0, 1)
 	names := make([]sessionmodel.Report, 0, 1)
@@ -52,7 +56,7 @@ func (service *Catalog) Resolve(ctx context.Context, selector string) (sessionmo
 	if len(names) > 1 {
 		return sessionmodel.Report{}, fmt.Errorf("session name %q is ambiguous", selector)
 	}
-	return sessionmodel.Report{}, fmt.Errorf("session %q was not found", selector)
+	return sessionmodel.Report{}, missingSessionError{selector: selector}
 }
 
 func (catalog *Catalog) Resume(ctx context.Context, selector string) error {
@@ -73,6 +77,9 @@ func (catalog *Catalog) ResolveArguments(
 		report, err = catalog.resolveLast(ctx, input.Arguments)
 	} else {
 		report, err = catalog.Resolve(ctx, input.SessionSelector)
+		if _, missing := err.(missingSessionError); missing && input.ProfileSelector != "" {
+			report, err = catalog.resolveProfileSession(ctx, input.ProfileSelector, input.SessionSelector)
+		}
 	}
 	if err != nil {
 		return sessionmodel.Report{}, nil, err

@@ -31,6 +31,7 @@ type Query struct {
 // Launch carries the resolved transport intent without reparsing CLI arguments.
 type Launch struct {
 	AccountSelector string
+	ProfileSelector string
 	SessionSelector string
 	IDIndex         int
 	IDPrefix        string

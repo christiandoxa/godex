@@ -1173,6 +1173,12 @@ sorts, resolves unique IDs/prefixes, and preserves profile ownership on resume.
 `model/session` carries queries and reports; `delivery/cli/session` owns flags
 and text/JSON presentation. These packages follow the repository's layer-first,
 domain-second layout. Session helpers remain private to their owning packages.
+Runtime CLI delivery passes an explicit profile selector in the session launch
+model. Only a missing shared target permits the session use case to inspect that
+profile's legacy rollouts through its existing reader; shared matches, ambiguous
+identities and I/O failures keep precedence. The existing resolver and durable
+owner lookup apply to both sources. Fallback does not mutate the shared catalog
+or broaden scans to unrelated profiles. No filesystem access enters delivery.
 For Super workspace trust, `repository/session` separately reads initial rollout
 metadata in native directory order, bounded to 65,536 directory entries and the
 same file/line byte limits. `entity/session` selects 4,096 newest absolute paths

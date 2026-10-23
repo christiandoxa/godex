@@ -41,7 +41,7 @@ Their current executable regressions remain in the gate.
 | Native metadata-patch and model-instruction ownership | Delegated to official Codex; no wrapper merge | 0.164.0 schema / source qualification | `gateway/codex` | PASS credential-free schema and 82-file/101-group source guard; full model-turn behavior unverified |
 | Failed compaction attempts stay isolated | Native compaction delegated; translated Compact is separate | Native lifecycle and Compact oracles | `gateway/codex`, `gateway/compact` | FAIL no comprehensive 0.439.0 evidence |
 | Compressed rollout resume preserves invocation choices | Existing compressed-session support | Session repository and resume tests | Session domain, `gateway/codex` | FAIL current executable qualification needed |
-| Hard continuation ownership and no postcommit replay | Existing bounded routing and recovery | Continuation HTTP/WebSocket oracles | `usecase/routing` | FAIL current executable rerun needed |
+| Hard continuation ownership and no postcommit replay | Existing bounded routing and recovery | Continuation HTTP/WebSocket oracles | `usecase/routing` | PASS current HTTP session-conflict and HTTP/WebSocket Compact phases on `a2e14460a`; remaining phases uncertified |
 | Precommit quota/retry, weighted capacity and watchdogs | Existing admission and recovery | HTTP/WebSocket deadline/capacity phases | Routing use case, HTTP delivery | FAIL current executable rerun needed |
 | Concurrent durable state and recovery | Atomic stores, journals and conflict checks exist | Profile, restart, ownership oracles | Owning repositories/use cases | FAIL finite coverage must be rerun; formats differ |
 | CLI parsing, diagnostics and exit status | Existing profile and CLI matrices | `profileparity`, `clierrorparity` | CLI domain delivery | FAIL current executable rerun needed |
@@ -54,7 +54,8 @@ Their current executable regressions remain in the gate.
 | Positive reset-credit counts show earliest available expiry | Optional display-only detail GET; raw/runtime unchanged | Pinned reset-credit executable oracle | `gateway/openai`, `usecase/quota`, CLI quota | PASS seven cases per product on clean `cea73bcdd`; finite display coverage |
 | Single-profile one-shot quota fails on malformed config or probe errors | Delivery returns the report error before stdout | CLI regression, profile executable oracle | CLI quota delivery | PASS nine failure cases on clean `0209f13a1`; aggregate fixture isolates optional workspace lookup |
 | Aggregate quota resolves workspace metadata for an account ID | Prodex makes a separate account-check GET; Godex omits it | Exact tagged collector and failed quota oracle run | Quota use case / OpenAI gateway | FAIL; failure-only fixtures omit account ID to isolate exit behavior |
-| Codex auth originator override retains valid and empty values | Codex auth-header port now supplies originator and residency | Expanded reset-credit oracle and gateway HTTP tests | `gateway/codex`, `model/auth`, `gateway/openai` | FAIL on clean `1978eced1`; fixed-candidate executable qualification pending |
+| Codex auth originator override retains valid and empty values | Codex auth-header port supplies originator and residency | Expanded reset-credit oracle and gateway HTTP tests | `gateway/codex`, `model/auth`, `gateway/openai` | PASS seventeen cases per product on clean `a2e14460a`; refresh/consume have local wire coverage |
+| Explicit profile can resume a legacy rollout absent from shared catalog | Added profile-scoped fallback only for a missing shared target | Context executable oracle and session use-case regressions | Session use case, runtime CLI | FAIL before fix on clean `a2e14460a`; fixed-candidate executable qualification pending |
 | Authentication and refresh against real services | Official clients retain authentication ownership | Synthetic auth and lifecycle fixtures | Auth/profile domains, native gateways | BLOCKED live OAuth unavailable; synthetic tests remain runnable |
 | Native macOS/Windows runtime behavior | Six cross-build targets and native runners exist | `check-cross-build.sh`, native parity runner | Platform-specific adapters | BLOCKED native execution unavailable here; cross-build is weaker evidence |
 
@@ -68,14 +69,15 @@ Their current executable regressions remain in the gate.
 - PASS: `rtk proxy go test -json ./tools/...`
 - PASS: `bash -n scripts/verify-release-parity.sh`; workspace oracle Python
   syntax and `git diff --check`.
-- Latest pushed production: `1978eced1` (strict reset-credit detail fields),
-  after one-shot errors, expiry, residency, native config, schema and agent fixes.
+- Latest pushed production: `a2e14460a` (auth originator override), after strict
+  detail fields, one-shot errors, expiry, residency, native config and wire fixes.
 - Clean `0209f13a1` PASSes the expanded 49-step profile oracle with the corrected
   failure fixtures. `make verify` PASSes on `30ddd406e`; later changes affect
   only fixtures and documentation. Clean `cea73bcdd` full tests PASS 11,361
   cases with 19 optional SKIP.
-- Clean `1978eced1` PASSes fourteen reset-credit scenarios per product and
-  `make verify`. Current work: auth originator override; clean after-test next.
+- Clean `a2e14460a` PASSes seventeen reset-credit scenarios per product,
+  11,398 full tests with 19 optional SKIP, and `make verify`. Current work:
+  explicit-profile legacy resume; clean executable after-test next.
 - Full gates for frozen `c72085ef0` and `1fb3dbe4f` are still running. No complete
   gate or native foreign-platform PASS is claimed.
 - No release version, tag or package publication is authorized by this work.
@@ -411,3 +413,46 @@ PASS: `rtk proxy go test -race ./internal/gateway/openai ./internal/gateway/code
 and the focused Codex header tests, plus reset-credit oracle self-tests.
 Clean seventeen-case executable qualification follows before publication.
 Quota User-Agent construction remains a separate unimplemented parity gap.
+
+Clean `a2e14460a` now PASSes seventeen reset-credit/originator scenarios per
+product. Driver SHA-256:
+`94d5f8ac5c4061168a1e4ac7777a160d2ba4b80b627f7d05ee7aaa25d007f8ea`.
+PASS: `rtk proxy go test -json ./...` (11,398 tests, 19 optional SKIP) and
+`rtk proxy make verify`. Pushed normally to `origin/main`.
+Current remote CI runs remain in progress; no green result is inferred.
+
+## Current continuation and compaction checks
+
+Clean `a2e14460a` PASSes these complete pinned executable phases, including
+their original credential, wire, retry-count, durable-owner and mutation guards:
+
+- `rtk proxy scripts/verify-release-parity.sh --phase=http-compact`
+- `rtk proxy scripts/verify-release-parity.sh --phase=http-session-conflict`
+- `rtk proxy scripts/verify-release-parity.sh --phase=websocket-compact-lineage`
+
+These are finite transport/ownership checks, not proof of every native Codex
+compaction lifecycle. Frozen full gates on older commits remain running.
+Reviewing official Codex 0.164.0 exec --last confirms provider filtering, all
+thread-source kinds and latest turn cwd inspection differ from the current
+wrapper catalog. The retained --last argument/selection FAIL stays open.
+
+## Explicit-profile legacy rollout resume
+
+A private profile-only rollout and an empty separate shared home reproduce an
+exit mismatch on clean `a2e14460a`: Prodex launches exact exec/resume UUID/prompt
+in the selected original profile, without copying a rollout to shared storage;
+Godex exits 1 before child launch. The integrated context oracle independently
+reproduces that FAIL with exact arguments/home and profile integrity checks.
+
+Runtime delivery now carries its explicit profile selection in model/session.
+The session use case falls back only after a typed missing-target result,
+reusing its existing bounded profile reader, identity resolver and durable-owner
+lookup. Shared matches and ambiguity still win, account conflicts still fail,
+and public shared listing is unchanged. Local private code owns the fallback;
+no helper, gateway, dependency, file-format change or migration is introduced.
+The dead private runSessionArgument wrapper was removed while passing selection
+through its two real runtime callers. Super is not given an uncertified fallback.
+
+PASS focused race tests for session use case, runtime delivery/use case and the
+context oracle; clean executable qualification follows before publication.
+Native --last and unselected/implicit legacy resume remain separately unverified.
