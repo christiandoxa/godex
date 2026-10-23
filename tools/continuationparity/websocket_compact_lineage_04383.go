@@ -13,7 +13,7 @@ import (
 )
 
 // A Compact request establishes a separate durable turn lineage. The tagged
-// 0.438.4 WebSocket selector honors that lineage even though its request's
+// 0.439.0 WebSocket selector honors that lineage even though its request's
 // quota route remains WebSocket. The unbound control must stay on main.
 const compactLineageMessage04383 = `{"type":"response.create","model":"gpt-6","x-codex-turn-state":"compact-turn","input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`
 const compactPreviousConflictMessage04383 = `{"type":"response.create","model":"gpt-6","previous_response_id":"resp-main","x-codex-turn-state":"compact-turn","input":[{"type":"message","role":"user","content":"first"},{"type":"message","role":"assistant","content":"answer"},{"type":"message","role":"user","content":"followup"}]}`

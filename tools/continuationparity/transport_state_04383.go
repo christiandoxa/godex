@@ -78,7 +78,7 @@ func seedTransportAlternate04383(p product, scenario string) error {
 		}
 		if scenario == "compact-lineage" || scenario == "compact-turn-conflict" || scenario == "compact-previous-conflict" || strings.HasPrefix(scenario, "compact-shadow-") {
 			// Compact provenance is distinct from a plain turn-state binding.
-			// The tagged 0.438.4 Mojo key builder uses this exact namespace.
+			// The tagged 0.439.0 Mojo key builder uses this exact namespace.
 			value["turn_state_bindings"].(map[string]any)["__compact_turn_state__:compact-turn"] = map[string]any{"profile_name": "second", "bound_at": time.Now().Unix()}
 			value["statuses"].(map[string]any)["turn_state"].(map[string]any)["__compact_turn_state__:compact-turn"] = map[string]any{"state": "Verified", "confidence": 4, "last_verified_at": time.Now().Unix(), "last_touched_at": time.Now().Unix(), "last_verified_route": "compact", "success_count": 1}
 		}

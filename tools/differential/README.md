@@ -1,6 +1,6 @@
 # Differential harness
 
-The 0.438.4 Gemini `request-primitive-request-signature-*` cases compare exact
+The 0.439.0 Gemini `request-primitive-request-signature-*` cases compare exact
 outgoing function/custom/MCP call signatures, five alias paths, nonempty-string
 precedence, blank legacy preservation, duplicate-ID ownership and orphan
 filtering. Full expected wire bytes remain independent of production code;
@@ -135,9 +135,9 @@ go test ./tools/differential
 go build -trimpath -o /tmp/differential ./tools/differential
 go build -trimpath -o /tmp/godex-candidate ./cmd/godex
 /tmp/differential \
-  --prodex /absolute/path/to/prodex-0.438.4 \
+  --prodex /absolute/path/to/prodex-0.439.0 \
   --godex /tmp/godex-candidate \
-  --prodex-source /absolute/path/to/prodex-0.438.4-source \
+  --prodex-source /absolute/path/to/prodex-0.439.0-source \
   --godex-source "$PWD" \
   --godex-commit "$(git rev-parse HEAD)"
 ```
@@ -146,7 +146,7 @@ go build -trimpath -o /tmp/godex-candidate ./cmd/godex
 
 Use `--gemini` with the same `--prodex`, `--godex`,
 `--prodex-source`, `--godex-source`, and `--godex-commit` flags
-to run the Gemini cases against the pinned official Prodex 0.438.4 binary.
+to run the Gemini cases against the pinned official Prodex 0.439.0 binary.
 The original thirteen scenarios below were introduced at 0.438.2 and are
 rechecked with the current source and executable pins. The reference was
 observed to send API-key Super requests as OpenAI-compatible
@@ -236,7 +236,7 @@ not equivalent to a global provider, live-TUI or transport parity certificate.
 Use `--scenario success|tool-call|deepseek-user-id|sse-stream|sse-rate-limit|retry|deepseek-sse-terminal|single-key-401|single-key-403|single-key-429|single-key-500|single-key-503|key-rotation-429|key-rotation-restart|cancel|restart|recover-after-429|recover-after-503` to rerun one case while
 investigating a mismatch; the default is `--scenario all`.
 
-The 0.438.4 `deepseek-buffered-view-*` cases cover literal, overflow, escape,
+The 0.439.0 `deepseek-buffered-view-*` cases cover literal, overflow, escape,
 surrogate, depth-limit, depth-empty, depth-over, early-surrogate, early-range
 and patch suffixes. They require byte-exact successful or failed Responses,
 original argument strings, the pinned serde diagnostic where applicable,
@@ -570,7 +570,7 @@ age already observed valid frames into a false failure. Stale/future timestamp
 mutations must still fail when observed. This changes test-harness timing,
 not product clock, stream, retry or comparison policy.
 
-The 0.438.4 `deepseek-sse-error-presence`, `deepseek-sse-error-i64` and
+The 0.439.0 `deepseek-sse-error-presence`, `deepseek-sse-error-i64` and
 `deepseek-sse-error-float` scenarios verify embedded-error primary-field
 presence and signed numeric kinds. Each must produce one failure frame
 with the expected code/message, HTTP 200, one primary-key attempt and no
@@ -831,7 +831,7 @@ metadata. These scenarios are included in `--scenario all`.
 
 ## Gemini wrapped native response oracle (0.438.2)
 
-The active 0.438.4 oracle also checks original top-level `id` type presence.
+The active 0.439.0 oracle also checks original top-level `id` type presence.
 When it is a string (including empty), the API-key bridge retains the native
 `responseId`/trace identity produced by the Gemini transform. Otherwise it
 generates the `resp_deepseek_` UUIDv7 used by the wrapped fixtures below.
@@ -951,7 +951,7 @@ the previous one. Exact zero integer fields are independently checked before
 the existing full response/SSE oracle runs. Missing, null, stale and decimal
 zero counters are negative controls.
 
-The 0.438.4 matrix includes `deepseek-usage-u64` and
+The 0.439.0 matrix includes `deepseek-usage-u64` and
 `deepseek-sse-usage-u64`. Their synthetic upstream usage covers integers above
 2^53 and i64, present u64::MAX cache/reasoning counters, and a missing total
 that must saturate at u64::MAX. The SSE fixture also uses a u64::MAX creation
@@ -979,7 +979,7 @@ release SHA-256 plus manifest, and builds/validates the Godex candidate.
 A successful subset is not a complete gate. Never skip an unverified phase
 or treat partial-phase PASS as general production readiness.
 
-The 0.438.4 DeepSeek history matrix also checks three-call numeric pending
+The 0.439.0 DeepSeek history matrix also checks three-call numeric pending
 snapshots at 2^53+1 and uint64 maximum. Its independent expected bytes detect
 rounding on the third request even when the preceding request matches.
 

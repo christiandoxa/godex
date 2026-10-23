@@ -6,7 +6,7 @@ import (
 	"fmt"
 )
 
-// These four fixtures exercise actual, published Prodex 0.438.4 executable
+// These four fixtures exercise actual, published Prodex 0.439.0 executable
 // response media behavior, beyond the local tagged-Mojo unit regressions.
 // All upstream data, accounts, and API keys are synthetic loopback values.
 func geminiMediaScenario04384(scenario string) bool {

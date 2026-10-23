@@ -1,6 +1,6 @@
-# Prodex 0.438.4 continuation and WebSocket executable differential
+# Prodex 0.439.0 continuation and WebSocket executable differential
 
-This harness compares an official SHA-256-pinned Prodex `0.438.4` binary
+This harness compares an official SHA-256-pinned Prodex `0.439.0` binary
 and Godex using isolated two-profile homes, synthetic credentials, and a
 loopback-only upstream. It does **not** send real model requests or use
 the caller's account credentials.
@@ -11,15 +11,15 @@ streaming output, cancellation, and process restart. Historical status
 and retry differences may remain within this bounded HTTP observation;
 the fixture is not a full feature-parity certificate.
 
-The current runner and published native manifest are pinned to **0.438.4**
-source commit `4cf03ccff2b6132058e2359fd253ad6e2d107011`, Linux
+The current runner and published native manifest are pinned to **0.439.0**
+source commit `433aad44bb249d5c25a231a6b06c2fa522a39a1f`, Linux
 x86-64 executable SHA-256
-`b736e1b2430b80ff2af35cff18e884b42ca83e8028c4fd47df5285f5d0d584e9`,
+`2dec9565fd94eb59aeb83ae5e7cc4b772db130cbd45258d86a2104c8f4ba186a`,
 and release-manifest SHA-256
-`28b7a894cd10fb69c528245e25dc01b9f204cfcc78b5ee575e22b4967c72c650`.
+`ba2f1f8d3430bd3fe64addd886ebee1207bf59b9db0d0e34b834b0dc7a0008f8`.
 The earlier 0.438.2/0.438.3 names below identify where particular
 compatibility fixtures originated; their **active executable reference is
-0.438.4**. All release phases must use the same clean Godex commit.
+0.439.0**. All release phases must use the same clean Godex commit.
 
 ## HTTP keep-alive request budgets
 

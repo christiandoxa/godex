@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare Super workspace trust against the pinned official Prodex 0.438.4."""
+"""Compare Super workspace trust against the pinned official Prodex 0.439.0."""
 import argparse
 import hashlib
 import json
@@ -11,9 +11,9 @@ import tempfile
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-SOURCE = '4cf03ccff2b6132058e2359fd253ad6e2d107011'
-BINARY_SHA = 'b736e1b2430b80ff2af35cff18e884b42ca83e8028c4fd47df5285f5d0d584e9'
-MANIFEST_SHA = '28b7a894cd10fb69c528245e25dc01b9f204cfcc78b5ee575e22b4967c72c650'
+SOURCE = '433aad44bb249d5c25a231a6b06c2fa522a39a1f'
+BINARY_SHA = '2dec9565fd94eb59aeb83ae5e7cc4b772db130cbd45258d86a2104c8f4ba186a'
+MANIFEST_SHA = 'ba2f1f8d3430bd3fe64addd886ebee1207bf59b9db0d0e34b834b0dc7a0008f8'
 ENTRY = re.compile(r'("(?:[^"\\]|\\.)*")=\{trust_level="trusted"\}')
 SHIM = '''#!/usr/bin/python3
 import json,os,sys
@@ -38,7 +38,7 @@ def verify(options):
     assert hashlib.sha256(Path(options.prodex).read_bytes()).hexdigest() == BINARY_SHA
     manifest = Path(options.prodex).parent / 'release-manifest.json'
     assert hashlib.sha256(manifest.read_bytes()).hexdigest() == MANIFEST_SHA
-    assert output([options.prodex, '--version']) == 'prodex 0.438.4'
+    assert output([options.prodex, '--version']) == 'prodex 0.439.0'
     for source, commit in [(options.prodex_source, SOURCE), (options.godex_source, options.godex_commit)]:
         assert len(commit) == 40 and output(['git', '-C', source, 'rev-parse', 'HEAD']) == commit
         assert not output(['git', '-C', source, 'status', '--porcelain', '--untracked-files=all'])

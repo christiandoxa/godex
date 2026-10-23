@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// The scoped oracles must cover the exact same published 0.438.4 finite
+// The scoped oracles must cover the exact same published 0.439.0 finite
 // fixture in the same order. In particular, the original deadline and busy
 // permit case may not vanish from the default or native mode.
 func TestProdex04383WebSocketTransportSlicesExhaustive(t *testing.T) {
