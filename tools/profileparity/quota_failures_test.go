@@ -20,7 +20,7 @@ func TestQuotaFailureOracleRejectsMatchingCorruption(t *testing.T) {
 				func(r *quotaFailureResult) { r.unchanged = false },
 				func(r *quotaFailureResult) { r.stdout, r.stderr = r.stderr, r.stdout },
 				func(r *quotaFailureResult) { r.requests = append(r.requests, startupProbeRequest{}) },
-				func(r *quotaFailureResult) { r.stderr += "synthetic-private-quota-body" },
+				func(r *quotaFailureResult) { r.stderr += "synthetic-access" },
 			} {
 				bad := good
 				mutate(&bad)

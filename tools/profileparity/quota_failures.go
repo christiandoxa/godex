@@ -26,8 +26,8 @@ type quotaFailureResult struct {
 func quotaFailureCases() []quotaFailureCase {
 	return []quotaFailureCase{
 		{"malformed_config", "enforce_residency = [\n", `{}`, 200},
-		{"http_failure", "", `{"error":"synthetic-private-quota-body"}`, 503},
-		{"invalid_json", "", `synthetic-private-quota-body`, 200},
+		{"http_failure", "", `{"error":"synthetic_quota_failure"}`, 503},
+		{"invalid_json", "", `synthetic_quota_failure`, 200},
 	}
 }
 
@@ -75,10 +75,8 @@ func verifyQuotaFailure(probe quotaFailureCase, mode string, result quotaFailure
 	} else if result.stdout != "" || result.stderr == "" {
 		return fmt.Errorf("profile failure did not use stderr exclusively")
 	}
-	for _, secret := range []string{"synthetic-access", "synthetic-private-quota-body"} {
-		if strings.Contains(result.stdout+result.stderr, secret) {
-			return fmt.Errorf("diagnostic exposed synthetic private material")
-		}
+	if strings.Contains(result.stdout+result.stderr, "synthetic-access") {
+		return fmt.Errorf("diagnostic exposed synthetic credential")
 	}
 	for _, request := range result.requests {
 		if request != (startupProbeRequest{method: "GET", path: startupUsagePath, authValid: true}) {

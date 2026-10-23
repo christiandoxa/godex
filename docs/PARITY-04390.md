@@ -332,3 +332,12 @@ exit/stream/request/state/credential assertions and mutation guards. Existing
 profile fixtures are reused locally; no production helper or dependency is added.
 PASS: `rtk proxy go test -race ./internal/delivery/cli/quota ./internal/usecase/quota ./tools/profileparity`.
 Clean executable qualification follows before publication.
+
+The initial expanded run passed malformed-config selected/raw/aggregate cases,
+then rejected Prodex's ordinary HTTP error text as synthetic private material.
+That oracle assertion was too broad: the reference intentionally renders its
+upstream error message. The corrected fixture uses ordinary synthetic error text
+and continues rejecting credential exposure. The failed run is retained; no
+successful fixed-candidate qualification is inferred from it. Exact diagnostic
+wording/body equality is outside this finite failure projection. Godex continues
+to use its existing body-free diagnostics.
