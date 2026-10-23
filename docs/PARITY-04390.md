@@ -56,7 +56,7 @@ Their current executable regressions remain in the gate.
 | Aggregate quota resolves workspace metadata for an account ID | Optional account-check GET and detail label | Exact tagged collector, quota display oracle and local regressions | Quota use case / OpenAI gateway / CLI quota | PASS 32 cases per product on clean `4f7ece56d`; doctor and raw/runtime isolation covered |
 | No generated quota User-Agent when version probing fails | Suppressed Go's automatic agent on usage/credit/workspace requests | Missing-version display oracle and gateway HTTP regressions | `gateway/openai` | PASS 32 cases per product on clean `b1240683a`; known-version construction stays open |
 | Codex auth originator override retains valid and empty values | Codex auth-header port supplies originator and residency | Expanded reset-credit oracle and gateway HTTP tests | `gateway/codex`, `model/auth`, `gateway/openai` | PASS seventeen cases per product on clean `a2e14460a`; refresh/consume have local wire coverage |
-| Explicit profile can resume a legacy rollout absent from shared catalog | Profile-scoped fallback only for a missing shared target | Context executable oracle and session use-case regressions | Session use case, runtime CLI | PASS three context and eight native-argv cases on clean `1a8d44630`; `--last` and Super remain separate gaps |
+| Explicit profile can resume a legacy rollout absent from shared catalog | Profile-scoped fallback only for a missing shared target | Context executable oracle and session use-case regressions | Session use case, runtime CLI | PASS three context and eight native-argv cases on clean `1a8d44630`; Super implementation has focused coverage, clean executable qualification pending; `--last` remains separate |
 | Authentication and refresh against real services | Official clients retain authentication ownership | Synthetic auth and lifecycle fixtures | Auth/profile domains, native gateways | BLOCKED live OAuth unavailable; synthetic tests remain runnable |
 | Native macOS/Windows runtime behavior | Six cross-build targets and native runners exist | `check-cross-build.sh`, native parity runner | Platform-specific adapters | BLOCKED native execution unavailable here; cross-build is weaker evidence |
 
@@ -84,8 +84,9 @@ Their current executable regressions remain in the gate.
   display cases, 49 profile steps, 11,451 tests with 19 optional SKIP and make verify.
   Clean `b1240683a` PASSes the corrected missing-version 32-case oracle and
   make verify. Next: known-version auth metadata or native resume ownership.
-- Full gates for frozen `c72085ef0` and `1fb3dbe4f` are still running. No complete
-  gate or native foreign-platform PASS is claimed.
+- Frozen `c72085ef0` full gate exits 1 on the Prodex Gemini primitive-control
+  invariant after DeepSeek369 PASS. Frozen `1fb3dbe4f` remains running. No
+  complete gate or native foreign-platform PASS is claimed.
 - No release version, tag or package publication is authorized by this work.
 
 ## Codex 0.164.0 qualification and HTTP fixture expansion
@@ -578,3 +579,31 @@ The commit is pushed normally to `origin/main`. Full known-version agent
 construction remains FAIL. The frozen old full gates are making progress through
 Gemini974; observed scenario directories reached 885 and 591 respectively.
 Neither full run has a collected terminal success result.
+
+## Super explicit-profile legacy resume
+
+A pinned synthetic preflight and recording child reproduce the next gap on
+clean `b1240683a`: Prodex reaches exec/resume UUID/prompt in both native and
+local Super, with a temporary overlay and unchanged original auth; Godex exits
+before child launch because the rollout exists only in the selected profile.
+The initial probe lacked the required hooks-list handshake and failed on both
+products for different reasons; that exploratory run is retained. The corrected
+probe and integrated context oracle reject the original candidate independently.
+
+Runtime delivery now passes its explicit profile through both Super resolution
+steps. Its existing launchers consume the resolved report and dispatch standalone
+profiles through the existing Super target/lease paths, keeping full access,
+Smart Context, synthetic local auth and durable managed-account ownership.
+Shared resolution and the bounded session use-case fallback are reused without
+changes. Local target dispatch remains a private runtime-delivery function with
+three real callers; no helper root, dependency, worker or persistent format is
+added. Local Super code moves into super_local.go, reducing super_launch.go to
+382 lines and removing its source-size exception.
+
+Both new native/local Go regressions FAIL before the fix. PASS:
+`rtk proxy go test -race ./internal/delivery/cli/runtime ./internal/usecase/session ./internal/usecase/runtime ./tools/contextparity`
+and the focused prior Super resume/owner suite. Clean candidate verification
+follows before pushing. The executable projection covers dispatch, arguments,
+credential isolation and overlay cleanup; it does not run a native resume turn
+or claim complete generated-argument equality. Native --last and implicit legacy
+selection remain open.

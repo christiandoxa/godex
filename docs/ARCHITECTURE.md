@@ -1194,6 +1194,11 @@ profile's legacy rollouts through its existing reader; shared matches, ambiguous
 identities and I/O failures keep precedence. The existing resolver and durable
 owner lookup apply to both sources. Fallback does not mutate the shared catalog
 or broaden scans to unrelated profiles. No filesystem access enters delivery.
+Super uses the same launch model and resolver. Its report-aware CLI adapters
+retain explicit profile dispatch, temporary overlays and the existing profile
+leases; managed launches retain the report's durable upstream owner. Local
+Super dispatch and overlay preparation live in `super_local.go`, with session
+dispatch in `super_resume.go`. Their private helpers stay inside runtime delivery.
 For Super workspace trust, `repository/session` separately reads initial rollout
 metadata in native directory order, bounded to 65,536 directory entries and the
 same file/line byte limits. `entity/session` selects 4,096 newest absolute paths

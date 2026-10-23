@@ -693,9 +693,11 @@ interactive pickers use the active or explicitly selected profile. Godex current
 resolves `--last` through its catalog; unchanged native forwarding remains a
 known Prodex parity gap. Local native commands
 such as `mcp`, `features`, and `completion` bypass quota and rotation.
-For `run --profile NAME`, a session missing from the shared catalog may resolve
-from that profile's legacy rollout files. Shared matches and ambiguous identities
-retain precedence, and the durable upstream owner remains attached.
+For `run --profile NAME` and `super --profile NAME`, a session missing from the
+shared catalog may resolve from that profile's legacy rollout files. Shared
+matches and ambiguous identities retain precedence, and the durable upstream
+owner remains attached. Super keeps its temporary overlay and selected profile
+lease, including local `--url` launches.
 
 `queue --thread UUID_OR_PREFIX --message TEXT` also resolves the owning profile;
 the `--thread=VALUE` form is preserved. Named queue targets stay profile-local.
