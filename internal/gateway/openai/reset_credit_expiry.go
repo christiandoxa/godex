@@ -47,6 +47,7 @@ func (client *QuotaClient) enrichResetCreditExpiry(ctx context.Context, home, up
 	}
 	request.Header.Set("Authorization", "Bearer "+auth.AccessToken)
 	request.Header.Set("originator", headers.Originator)
+	request.Header.Set("User-Agent", "")
 	request.Header.Set("x-openai-codex-luna-reserve", "1")
 	if auth.AccountID != "" {
 		request.Header.Set("ChatGPT-Account-Id", auth.AccountID)

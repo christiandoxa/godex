@@ -32,6 +32,7 @@ func (client *QuotaClient) FetchWorkspaceAt(ctx context.Context, home, upstream 
 	request.Header.Set("Authorization", "Bearer "+auth.AccessToken)
 	request.Header.Set("ChatGPT-Account-Id", auth.AccountID)
 	request.Header.Set("originator", headers.Originator)
+	request.Header.Set("User-Agent", "")
 	if headers.Residency != "" {
 		request.Header.Set("x-openai-internal-codex-residency", headers.Residency)
 	}

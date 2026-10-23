@@ -830,6 +830,8 @@ values and invalid-header fallback. It reuses that private originator resolver
 for its existing auth-refresh adapter. `gateway/openai` applies these model facts
 to usage, credit-detail and consume requests without importing the Codex adapter.
 Invalid config stops dispatch. Ordinary model traffic gains no config-file read.
+Generated usage, reset-credit and workspace requests suppress net/http's default
+User-Agent. Native Codex version/terminal User-Agent construction remains a gap.
 
 The quota use case selects an explicit display-fetch port for user reports.
 The OpenAI gateway alone enriches positive reset-credit counts with a bounded

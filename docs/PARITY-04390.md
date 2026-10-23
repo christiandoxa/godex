@@ -54,6 +54,7 @@ Their current executable regressions remain in the gate.
 | Positive reset-credit counts show earliest available expiry | Optional display-only detail GET; raw/runtime unchanged | Pinned reset-credit executable oracle | `gateway/openai`, `usecase/quota`, CLI quota | PASS seven cases per product on clean `cea73bcdd`; finite display coverage |
 | Single-profile one-shot quota fails on malformed config or probe errors | Delivery returns the report error before stdout | CLI regression, profile executable oracle | CLI quota delivery | PASS nine failure cases on clean `0209f13a1`; aggregate fixture isolates optional workspace lookup |
 | Aggregate quota resolves workspace metadata for an account ID | Added optional account-check GET and detail label | Exact tagged collector, quota display oracle and local regressions | Quota use case / OpenAI gateway / CLI quota | FAIL on clean `196a27571`; fixed-candidate executable qualification pending |
+| No generated quota User-Agent when version probing fails | Suppressed Go's automatic agent on usage/credit/workspace requests | Missing-version display oracle and gateway HTTP regressions | `gateway/openai` | FAIL before fix on clean `4f7ece56d`; clean fixed-candidate qualification pending; known-version construction stays open |
 | Codex auth originator override retains valid and empty values | Codex auth-header port supplies originator and residency | Expanded reset-credit oracle and gateway HTTP tests | `gateway/codex`, `model/auth`, `gateway/openai` | PASS seventeen cases per product on clean `a2e14460a`; refresh/consume have local wire coverage |
 | Explicit profile can resume a legacy rollout absent from shared catalog | Profile-scoped fallback only for a missing shared target | Context executable oracle and session use-case regressions | Session use case, runtime CLI | PASS three context and eight native-argv cases on clean `1a8d44630`; `--last` and Super remain separate gaps |
 | Authentication and refresh against real services | Official clients retain authentication ownership | Synthetic auth and lifecycle fixtures | Auth/profile domains, native gateways | BLOCKED live OAuth unavailable; synthetic tests remain runnable |
@@ -69,8 +70,8 @@ Their current executable regressions remain in the gate.
 - PASS: `rtk proxy go test -json ./tools/...`
 - PASS: `bash -n scripts/verify-release-parity.sh`; workspace oracle Python
   syntax and `git diff --check`.
-- Latest pushed production: `196a27571` (expiry timestamp boundary), plus
-  gate-reporting fix `e6b54bb23`; prior session/auth/quota fixes remain qualified.
+- Latest pushed production: `4f7ece56d` (aggregate workspace metadata); prior
+  gate/session/auth/quota fixes remain qualified. Original checkout is preserved.
 - Clean `0209f13a1` PASSes the expanded 49-step profile oracle with the corrected
   failure fixtures. `make verify` PASSes on `30ddd406e`; later changes affect
   only fixtures and documentation. Clean `cea73bcdd` full tests PASS 11,361
@@ -79,7 +80,9 @@ Their current executable regressions remain in the gate.
   11,398 full tests with 19 optional SKIP, and `make verify`. Clean `1a8d44630`
   PASSes context/native-argv and make verify. Clean `196a27571` PASSes 26 expiry
   scenarios per product and make verify. Clean `e6b54bb23` PASSes make verify,
-  HTTP profile-status and raw 429 phases. Current work: aggregate workspace metadata.
+  HTTP profile-status and raw 429 phases. Clean `4f7ece56d` PASSes 32 quota
+  display cases, 49 profile steps, 11,451 tests with 19 optional SKIP and make verify.
+  Current work: generated-agent suppression; clean missing-version after-test next.
 - Full gates for frozen `c72085ef0` and `1fb3dbe4f` are still running. No complete
   gate or native foreign-platform PASS is claimed.
 - No release version, tag or package publication is authorized by this work.
@@ -538,3 +541,31 @@ the OpenAI gateway and is reused by the two quota response boundaries.
 PASS: `rtk proxy go test -race ./internal/gateway/openai ./internal/usecase/quota ./internal/delivery/cli/quota`
 and `rtk proxy python3 tools/reset-credit-oracle.py --self-test`, plus Python
 syntax and diff checks. Clean 32-case executable qualification follows.
+
+Clean `4f7ece56d` now PASSes all 32 quota-display scenarios per product and the
+49-step profile workflow. PASS: `rtk proxy go test -json ./...` (11,451 tests,
+19 optional SKIP) and `rtk proxy make verify`. Display driver SHA-256:
+`db0d395ee7b970c757f90476f6a0c4cf8774ceaff92e1c9e160642303d08cdcf`.
+The initial profile-driver start raced the candidate build and correctly failed
+provenance; a subsequent run after the build PASSes. Both logs are retained.
+The commit is pushed normally to `origin/main`.
+
+## Generated quota agent with unavailable native version
+
+The reference omits User-Agent when Codex version probing fails. Godex still
+manufactured Go-http-client/1.1 on its own usage, credit-detail, consume and
+workspace requests. Nine focused HTTP regressions FAIL before suppression.
+The first executable fixture incorrectly assumed /bin/true had no version;
+GNU true --version reports a candidate accepted by the tagged version lexer.
+That reference-side fixture failure is retained. The corrected failing-version
+fixture uses /bin/false: all 32 reference cases PASS, while clean `4f7ece56d`
+fails the first agent assertion. Original wire/count/auth/residency checks remain.
+
+Each owning OpenAI request builder now suppresses the fabricated Go default.
+No new helper, port, option, process probe or persistence is added. The existing
+quota flow has no native User-Agent metadata yet, documented by a shortcut
+comment. Full known-version Codex/OS/terminal construction and auth-refresh
+User-Agent parity remain separate FAILs; no complete auth-header parity is claimed.
+
+PASS focused gateway/Codex/quota/composition race tests and oracle self-tests.
+Clean missing-version executable qualification follows before publication.

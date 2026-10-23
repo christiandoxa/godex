@@ -21,13 +21,16 @@ func TestQuotaRequestsHonorCodexOriginator(t *testing.T) {
 				calls := make(chan string, 3)
 				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					calls <- r.Header.Get("originator")
+					if _, present := r.Header["User-Agent"]; present {
+						t.Error("quota request invented a User-Agent without native metadata")
+					}
 					if r.Header.Get("Authorization") != "Bearer synthetic-token" || r.Header.Get("ChatGPT-Account-Id") != "synthetic-account" {
 						t.Error("originator changed credential ownership")
 					}
 					_, _ = w.Write([]byte(`{"plan_type":"plus","rate_limit_reset_credits":{"available_count":1},"credits":[{"status":"available","expires_at":null}],"outcome":"reset"}`))
 				}))
 				defer server.Close()
-				client, err := NewQuotaClient(server.URL+"/backend-api", nil, codex.NewCodexProcess("", codex.Terminal{}))
+				client, err := NewQuotaClient(server.URL+"/backend-api", nil, codex.NewCodexProcess("missing-codex-header-fixture", codex.Terminal{}))
 				if err != nil {
 					t.Fatal(err)
 				}

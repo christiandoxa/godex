@@ -43,6 +43,9 @@ func TestQuotaWorkspaceLookupKeepsIdentityAndOptionalFailureFallback(t *testing.
 			calls := 0
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				calls++
+				if _, present := r.Header["User-Agent"]; present {
+					t.Error("workspace lookup invented a User-Agent without native metadata")
+				}
 				if r.Method != "GET" || r.URL.Path != "/backend-api/wham/accounts/check" ||
 					r.Header.Get("Authorization") != "Bearer synthetic-access" || r.Header.Get("ChatGPT-Account-Id") != "selected" ||
 					r.Header.Get("originator") != "codex_cli_rs" || r.Header.Get("x-openai-codex-luna-reserve") != "" {

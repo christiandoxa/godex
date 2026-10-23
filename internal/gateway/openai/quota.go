@@ -168,6 +168,8 @@ func (client *QuotaClient) fetchBodyWithIdentity043714(
 		request.Header.Set("Authorization", "Bearer "+identity.AccessToken)
 		request.Header.Set("Accept", "application/json")
 		request.Header.Set("originator", headers.Originator)
+		// shortcut: native User-Agent metadata is unavailable; add it after native header qualification.
+		request.Header.Set("User-Agent", "")
 		request.Header.Set("x-openai-codex-luna-reserve", "1")
 		if headers.Residency != "" {
 			request.Header.Set("x-openai-internal-codex-residency", headers.Residency)

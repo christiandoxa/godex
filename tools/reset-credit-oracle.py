@@ -75,6 +75,7 @@ def verify_result(case, result):
     assert all(call['auth'] and call['account'] and call['residency'] == 'us' for call in calls), 'accepted identity/residency lost'
     originator = ORIGINATORS.get(name, (None, 'codex_cli_rs'))[1]
     assert all(call['originator'] == originator for call in calls), 'wrong auth request originator'
+    assert all(call['user_agent'] is None for call in calls), 'invented auth request User-Agent without Codex version'
     if name == 'raw':
         assert json.loads(text)['rate_limit_reset_credits']['available_count'] == count
         assert 'next expiry' not in text
@@ -87,7 +88,7 @@ def self_test():
     for case in CASES:
         name, count, _, _, summary = case
         calls = [{'path': '/backend-api/wham/usage', 'auth': True, 'account': True, 'residency': 'us',
-                  'originator': ORIGINATORS.get(name, (None, 'codex_cli_rs'))[1]}]
+                  'originator': ORIGINATORS.get(name, (None, 'codex_cli_rs'))[1], 'user_agent': None}]
         if count > 0 and name != 'raw':
             calls.append(dict(calls[0], path='/backend-api/wham/rate-limit-reset-credits'))
         if name.startswith('workspace_'):
@@ -97,7 +98,8 @@ def self_test():
         mutations = [(calls + calls, text, 0, True), (calls, text, 1, True), (calls, text, 0, False),
                      (calls, text.replace(summary if name.startswith('workspace_') else str(count), '999'), 0, True),
                      ([dict(call, auth=False) for call in calls], text, 0, True),
-                     ([dict(call, originator='invented') for call in calls], text, 0, True)]
+                     ([dict(call, originator='invented') for call in calls], text, 0, True),
+                     ([dict(call, user_agent='Go-http-client/1.1') for call in calls], text, 0, True)]
         for changed in mutations:
             try:
                 verify_result(case, changed)
@@ -130,6 +132,7 @@ def run_case(root, binary, product, case):
             calls.append({'path': self.path, 'auth': self.headers.get('Authorization') == 'Bearer synthetic-access',
                           'account': self.headers.get('ChatGPT-Account-Id') == 'synthetic-account',
                           'originator': self.headers.get('originator'),
+                          'user_agent': self.headers.get('User-Agent'),
                           'residency': self.headers.get('x-openai-internal-codex-residency')})
             is_usage = self.path == '/backend-api/wham/usage'
             body = details.encode() if not is_usage and isinstance(details, str) else json.dumps(usage if is_usage else details).encode()
@@ -141,7 +144,7 @@ def run_case(root, binary, product, case):
 
     environment = {'PATH': os.environ['PATH'], 'HOME': str(directory / 'user'), 'CODEX_HOME': str(directory / 'ambient'),
                    'PRODEX_HOME': str(directory / 'state'), 'GODEX_HOME': str(directory / 'state'),
-                   'PRODEX_CODEX_BIN': '/bin/true', 'GODEX_CODEX_BIN': '/bin/true', 'TZ': 'UTC',
+                   'PRODEX_CODEX_BIN': '/bin/false', 'GODEX_CODEX_BIN': '/bin/false', 'TZ': 'UTC',
                    'PRODEX_NO_UPDATE_CHECK': '1', 'GODEX_NO_UPDATE_CHECK': '1', 'NO_COLOR': '1', 'CI': '1', 'TERM': 'dumb'}
     if name in ORIGINATORS:
         environment['CODEX_INTERNAL_ORIGINATOR_OVERRIDE'] = ORIGINATORS[name][0]
