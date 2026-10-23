@@ -839,6 +839,8 @@ probes and auto-redeem eligibility retain their existing single-request paths.
 Expiry fields are display-only model facts and excluded from JSON persistence.
 The private detail parser matches exact field names and rejects duplicate known
 fields; unknown fields remain ignored, matching the tagged Serde wire boundary.
+Expiry timestamps retain Chrono's RFC3339 separators, offset bounds and Unix
+leap-second projection. A private lexical check precedes Go calendar validation.
 CLI quota delivery formats local timestamps and wraps terminal output with the
 existing Lip Gloss dependency; Bubble Tea still owns refresh and resize events.
 It also presents a single-profile one-shot report error as a command failure

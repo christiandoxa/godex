@@ -464,3 +464,20 @@ oversized run.go without reducing its source-size exception. Session dispatch
 now lives with the existing resume delivery in resume_session.go; run.go falls
 below 400 lines and its exception is removed. No guard limit is raised. The
 clean follow-up must rerun make verify before this session fix is pushed.
+
+## Reset-credit timestamp boundaries
+
+An adversarial nine-timestamp comparison reproduces seven differences from the
+tagged Chrono 0.4.45 boundary: lowercase/space separators, leap-second Unix
+projection, single-digit hours, comma fractions and invalid offset components.
+Year zero and long fractions already agree. Seven Go regressions FAIL before
+the fix. All 26 expanded reference scenarios PASS; clean `1a8d44630` fails the
+first lowercase-timestamp case after passing the existing seventeen cases.
+
+The private expiry parser now checks Chrono's exact lexical form, normalizes its
+accepted separators and maps second 60 onto second 59 before Go's existing
+calendar parser. Time selection, count preservation, requests and optional-error
+handling remain unchanged. No general time helper or dependency is introduced.
+PASS: `rtk proxy go test -race ./internal/gateway/openai ./internal/delivery/cli/quota ./internal/usecase/quota`
+and `rtk proxy python3 tools/reset-credit-oracle.py --self-test`.
+Clean 26-case executable qualification follows before publication.

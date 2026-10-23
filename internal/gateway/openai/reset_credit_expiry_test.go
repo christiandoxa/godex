@@ -37,6 +37,15 @@ const finiteCreditDetails = `{"credits":[{"status":"consumed","expires_at":"2020
 func TestCreditExpirySelectsInstantsAndPreservesUnavailable(t *testing.T) {
 	for _, fixture := range []struct{ body, want string }{
 		{finiteCreditDetails, "1792693425"},
+		{`{"credits":[{"status":"available","expires_at":"2026-10-23t01:23:45z"}]}`, "1792718625"},
+		{`{"credits":[{"status":"available","expires_at":"2026-10-23 01:23:45+07:00"}]}`, "1792693425"},
+		{`{"credits":[{"status":"available","expires_at":"2026-10-23T1:23:45+07:00"}]}`, "unavailable"},
+		{`{"credits":[{"status":"available","expires_at":"2026-10-23T01:23:45,987+07:00"}]}`, "unavailable"},
+		{`{"credits":[{"status":"available","expires_at":"2026-10-23T01:23:45+24:00"}]}`, "unavailable"},
+		{`{"credits":[{"status":"available","expires_at":"2026-10-23T01:23:45+01:60"}]}`, "unavailable"},
+		{`{"credits":[{"status":"available","expires_at":"2016-12-31T23:59:60Z"}]}`, "1483228799"},
+		{`{"credits":[{"status":"available","expires_at":"0000-01-01T00:00:00Z"}]}`, "-62167219200"},
+		{`{"credits":[{"status":"available","expires_at":"2026-10-23T01:23:45.12345678901Z"}]}`, "1792718625"},
 		{`{"credits":[{"status":"available","expires_at":null}]}`, "never"},
 		{`{"credits":[]}`, "unavailable"},
 		{`{"credits":[{"status":"available"}]}`, "unavailable"},

@@ -40,6 +40,18 @@ CASES = [
 ]
 CASES += [(name, 1, 200, {'credits': [{'status': 'available', 'expires_at': None}]},
            '1 available | next expiry: never') for name in ORIGINATORS]
+CASES += [(name, 1, 200, {'credits': [{'status': 'available', 'expires_at': timestamp}]},
+           '1 available | next expiry: ' + expected) for name, timestamp, expected in [
+    ('time_lowercase', '2026-10-23t01:23:45z', '2026-10-23 01:23:45 +00:00'),
+    ('time_space', '2026-10-23 01:23:45+07:00', '2026-10-22 18:23:45 +00:00'),
+    ('time_short_hour', '2026-10-23T1:23:45+07:00', 'unavailable'),
+    ('time_comma', '2026-10-23T01:23:45,987+07:00', 'unavailable'),
+    ('time_offset_hour', '2026-10-23T01:23:45+24:00', 'unavailable'),
+    ('time_offset_minute', '2026-10-23T01:23:45+01:60', 'unavailable'),
+    ('time_leap_second', '2016-12-31T23:59:60Z', '2016-12-31 23:59:59 +00:00'),
+    ('time_zero_year', '0000-01-01T00:00:00Z', '0000-01-01 00:00:00 +00:00'),
+    ('time_long_fraction', '2026-10-23T01:23:45.12345678901Z', '2026-10-23 01:23:45 +00:00'),
+]]
 
 
 def verify_result(case, result):

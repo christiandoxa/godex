@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -14,6 +15,8 @@ import (
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
+
+var resetCreditTimePattern = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:(?:[0-5][0-9]|60)(?:\.[0-9]+)?(?:[Zz]|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])$`)
 
 func (client *QuotaClient) FetchForDisplayAt(ctx context.Context, home, upstream string) (quotamodel.Usage, error) {
 	body, acceptedAuth, _, err := client.fetchBodyWithIdentity043714(ctx, home, upstream, false)
@@ -95,11 +98,11 @@ func setResetCreditExpiry(summary *quotamodel.ResetCredits, body []byte) {
 		if json.Unmarshal(fields["expires_at"], &value) != nil {
 			return
 		}
-		expiry, err := time.Parse(time.RFC3339Nano, value)
-		if err != nil {
+		epoch, ok := resetCreditExpiryEpoch(value)
+		if !ok {
 			return
 		}
-		if epoch := expiry.Unix(); next == nil || epoch < *next {
+		if next == nil || epoch < *next {
 			next = &epoch
 		}
 	}
@@ -132,4 +135,20 @@ func resetCreditObjectFields(body []byte, names ...string) (map[string]json.RawM
 		fields[name] = value
 	}
 	return fields, true
+}
+
+func resetCreditExpiryEpoch(value string) (int64, bool) {
+	if !resetCreditTimePattern.MatchString(value) {
+		return 0, false
+	}
+	value = value[:10] + "T" + value[11:]
+	if strings.HasSuffix(value, "z") {
+		value = value[:len(value)-1] + "Z"
+	}
+	// Chrono's Unix timestamp projects a leap second onto its preceding second.
+	if value[17:19] == "60" {
+		value = value[:17] + "59" + value[19:]
+	}
+	expiry, err := time.Parse(time.RFC3339Nano, value)
+	return expiry.Unix(), err == nil
 }
