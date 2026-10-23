@@ -56,12 +56,13 @@ type caseResult struct {
 }
 
 type report struct {
-	Status          string       `json:"status"`
-	Oracle          string       `json:"oracle"`
-	OracleSource    string       `json:"oracle_source"`
-	CandidateSource string       `json:"candidate_source"`
-	Cases           []caseResult `json:"cases"`
-	NegativeControl string       `json:"negative_control"`
+	Status          string                      `json:"status"`
+	Oracle          string                      `json:"oracle"`
+	OracleSource    string                      `json:"oracle_source"`
+	CandidateSource string                      `json:"candidate_source"`
+	Cases           []caseResult                `json:"cases"`
+	NegativeControl string                      `json:"negative_control"`
+	NativeArguments []nativeArgumentResult04390 `json:"native_arguments"`
 }
 
 func main() {
@@ -130,12 +131,17 @@ func run() error {
 			return err
 		}
 	}
+	nativeResults, err := runNativeArgumentProbes04390(options, oracleRoot, candidateRoot, fake)
+	if err != nil {
+		return err
+	}
 	if err := checkNegativeControl(); err != nil {
 		return err
 	}
 	encoded, err := json.MarshalIndent(report{
 		Status: "PASS", Oracle: oracleVersion, OracleSource: oracleSourceCommit,
 		CandidateSource: options.godexCommit, Cases: results,
+		NativeArguments: nativeResults,
 		NegativeControl: "PASS: cached maximum promotion is rejected",
 	}, "", "  ")
 	if err != nil {
@@ -274,7 +280,7 @@ func probeEnvironment(root, name, fake, record string) []string {
 
 func writeFakeCodex(root string) (string, error) {
 	path := filepath.Join(root, "codex")
-	body := "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then printf 'codex 0.162.0\\n'; exit 0; fi\nprintf '%s\\n' \"$@\" > \"$CONTEXT_PARITY_ARGS\"\nprintf '%s' \"$CODEX_HOME\" > \"$CONTEXT_PARITY_HOME\"\ncat \"$CODEX_HOME/config.toml\" > \"$CONTEXT_PARITY_CONFIG\"\nprintf 'context-probe-ok\\n'\n"
+	body := "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then printf 'codex-cli 0.164.0\\n'; exit 0; fi\nfor arg in \"$@\"; do case \"$arg\" in app-server|exec-server) exit 0;; esac; done\nprintf '%s\\n' \"$@\" > \"$CONTEXT_PARITY_ARGS\"\nprintf '%s' \"$CODEX_HOME\" > \"$CONTEXT_PARITY_HOME\"\ncat \"$CODEX_HOME/config.toml\" > \"$CONTEXT_PARITY_CONFIG\"\nprintf 'context-probe-ok\\n'\n"
 	if err := os.WriteFile(path, []byte(body), 0o700); err != nil {
 		return "", err
 	}

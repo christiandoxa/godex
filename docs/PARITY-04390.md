@@ -47,7 +47,7 @@ Their current executable regressions remain in the gate.
 | CLI parsing, diagnostics and exit status | Existing profile and CLI matrices | `profileparity`, `clierrorparity` | CLI domain delivery | FAIL current executable rerun needed |
 | Terminal shutdown, protocols and saved-session guidance | Existing PTY differential | `sessionfooterparity` | `gateway/codex` | FAIL current executable rerun needed |
 | Native TUI semantics | Bubble Tea owns corresponding Godex surfaces | Owning delivery tests, TUI guard | CLI domain delivery | FAIL incomplete interactive differential coverage |
-| DeepSeek request/response/stream behavior | Existing finite matrix; schema-alias gap retained from 0.438.4 | `tools/differential` | `gateway/deepseek` | FAIL alias gap and current full-matrix rerun |
+| DeepSeek request/response/stream behavior | Existing finite matrix; schema aliases now fixed | `tools/differential` | `gateway/deepseek` | PASS fourteen alias cases; full383 matrix rerun pending |
 | Gemini request/response/stream behavior | Existing finite matrix | `tools/differential` | `gateway/gemini` | FAIL current full-matrix rerun needed |
 | Other providers, catalogs, quota and terminal migrations | Existing implementations; changed source needs comparison | Tagged migration baselines and owning tests | Owning gateways/use cases/delivery | FAIL migration inventory not fully qualified |
 | Authentication and refresh against real services | Official clients retain authentication ownership | Synthetic auth and lifecycle fixtures | Auth/profile domains, native gateways | BLOCKED live OAuth unavailable; synthetic tests remain runnable |
@@ -176,3 +176,39 @@ Clean `9a4c2654b` also PASSes `rtk proxy go test -json ./...` (11,286 passed,
 must run its own gates. CI for the pushed checkpoints was observed in progress;
 no remote success is inferred. The prior baseline CI failure is being inspected
 without waiting for asynchronous runs before pushing completed fixes.
+
+## Native config-scope fix
+
+The exact release applies scope_codex_exec_config_args at every child plan,
+not only proxy-configured launches. A recording-child executable comparison
+with shared synthetic rollout ownership proves Prodex moves root and exec
+config overrides into exec/resume in original override order. Godex's direct
+launch left them in the outer scopes. Inline native prompt text already PASSes.
+A profile-only rollout was rejected by the shared-session catalog; the corrected
+fixture seeds the shared store and verifies the selected original profile home.
+That fixture correction is not a production session-ownership change.
+
+The existing gateway/codex scopeModelArguments parser now serves both runtime
+child entry points. The low-level Run primitive remains unchanged. Six focused
+child-argv regressions FAIL before the fix and PASS after; inline controls PASS
+throughout. The existing direct context test still requires exact argv and
+unchanged model/context values under the corrected native scope contract.
+
+The context executable oracle adds seven exact-argv cases and mutation guards,
+using a fake Codex that does not record maintenance app-server invocations as
+model child launches. PASS: `rtk proxy go test -race ./internal/gateway/codex ./internal/usecase/runtime ./internal/delivery/cli/runtime`
+and `rtk proxy go test ./tools/contextparity -count=1`. Exact clean executable
+qualification follows before publication.
+
+Latest pushed production: `03b58873f`. All fourteen alias scenarios now PASS
+on that clean commit against the exact official 0.439.0 executable, with driver
+and candidate hashes retained in the local audit. Its full tests and make verify
+PASS independently. The full383 DeepSeek phase is still running; no full-phase
+PASS is inferred from those fourteen scenarios.
+
+Observed baseline CI failures predate this work: macOS realtime fails in the
+reference Prodex process with EOF during session update; Windows session-conflict
+fails in the reference durable escaped-surrogate response-owner assertion.
+Both native lanes pass ordinary tests/builds. Original job logs were retrieved
+through the GitHub API; these reference failures are not waived or reclassified
+as Godex successes. Current pushed CI runs remain asynchronous.

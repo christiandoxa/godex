@@ -104,7 +104,7 @@ func TestProdex04377DirectRuntimePreservesContextAndModelSwitching(t *testing.T)
 			if err != nil {
 				t.Fatal(err)
 			}
-			want := strings.Join(test.args, "\n") + "\n"
+			want := strings.Join([]string{"--model", test.model, "exec", "-c", test.args[3], "-c", test.args[5], "hello"}, "\n") + "\n"
 			if string(got) != want {
 				t.Fatalf("child args = %q, want %q", got, want)
 			}

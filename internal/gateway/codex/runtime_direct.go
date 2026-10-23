@@ -23,6 +23,7 @@ func (process *CodexProcess) RunRuntimeDirect(
 		arguments = codexTUIArguments(arguments)
 		resetTerminalKeyboardEnhancementBestEffort(process.terminal.Stdout)
 	}
+	arguments = scopeModelArguments(arguments, nil)
 	binary, err := process.resolveBinary()
 	if err != nil {
 		return err

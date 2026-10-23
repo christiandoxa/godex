@@ -12,5 +12,5 @@ func (process *CodexProcess) RunRuntime(ctx context.Context, codexHome string, a
 		arguments = codexTUIArguments(arguments)
 		resetTerminalKeyboardEnhancementBestEffort(process.terminal.Stdout)
 	}
-	return process.run(ctx, codexHome, arguments)
+	return process.run(ctx, codexHome, scopeModelArguments(arguments, nil))
 }

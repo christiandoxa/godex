@@ -89,7 +89,8 @@ starts the bounded continuation prompt for a verified non-goal thread. Every
 RPC has one total deadline; an ambiguous mutation is never replayed.
 
 The Codex gateway keeps argument recognition and config scoping private to
-`gateway/codex`. Managed overrides enter the innermost exec command scope;
+`gateway/codex`. Runtime config overrides enter the innermost exec command scope on both direct
+and managed launches, retaining root/exec/resume order;
 routing and credential-store bypasses fail before process execution. A bounded
 strict-config probe uses a temporary home and `exec-server` with stdio EOF, so
 configuration is validated without accepting execution or model work. No shared
