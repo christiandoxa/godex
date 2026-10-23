@@ -463,6 +463,11 @@ Codex configuration precedence and do not change the saved profile config.
 Quota and reset-credit requests honor `enforce_residency = "us"` in the selected
 profile's Codex configuration.
 
+Quota displays include available reset credits and their next expiry in local
+time. Failed detail lookups show `next expiry: unavailable`; non-expiring
+credits show `next expiry: never`. Raw output and runtime probes do not fetch
+these optional details.
+
 Quota follows Prodex 0.435.1's aggregate default: unless `--profile` or
 `--raw` is supplied, Godex enables the all-profile detailed view automatically.
 Without `--once`, that view refreshes every five seconds; `--watch` is also

@@ -63,9 +63,14 @@ Their current executable regressions remain in the gate.
 - PASS: `rtk proxy go test -json ./tools/...`
 - PASS: `bash -n scripts/verify-release-parity.sh`; workspace oracle Python
   syntax and `git diff --check`.
-- Next: commit the pin migration, build the clean candidate, execute 0.439.0
-  differentials, and close verified production gaps. No current full-gate or
-  native foreign-platform PASS is claimed.
+- Latest pushed production: `1fb3dbe4f` (profile residency), after the native
+  config-scope, DeepSeek schema-alias and omitted-User-Agent fixes.
+- Its 40-step profile workflow PASSes; full tests PASS 11,343 cases with 19
+  optional SKIP. `make verify` PASSes on that exact clean source.
+- Current work: display-only reset-credit expiry; next run its clean executable
+  oracle, push the verified change and continue the remaining matrix gaps.
+- Full gates for frozen `c72085ef0` and `1fb3dbe4f` are still running. No complete
+  gate or native foreign-platform PASS is claimed.
 - No release version, tag or package publication is authorized by this work.
 
 ## Codex 0.164.0 qualification and HTTP fixture expansion
@@ -269,3 +274,33 @@ exact case PASSes on both products; it does not replace the failed full run.
 No temporary-file exception or state-integrity assertion was weakened.
 The earlier pin-only clean `c72085ef0` full run completed DeepSeek369 with PASS
 and is still executing Gemini974. Its results qualify only that frozen commit.
+
+## Reset-credit expiry: display workflow
+
+Prodex 0.438.4 introduced optional reset-credit details; 0.439.0 retains them.
+Godex parsed only the count and did not request or display expiry. The new
+pinned two-executable oracle runs seven scenarios: finite offset-aware earliest
+expiry, never-expiring credits, HTTP failure, incomplete/invalid details, zero
+count and unchanged raw JSON. Every reference scenario PASSes. Against clean
+`1fb3dbe4f`, the first Godex case FAILs the required second read-only GET.
+An initial fixture with public intermediate directories was rejected by the
+reference safety checks; the corrected fixture makes every owned directory
+private and retains the safety guards.
+
+The gateway's display-only method retains the accepted usage credential for
+its optional 4 MiB detail GET. Parsing ignores unavailable credits, distinguishes
+null from missing expiry, rejects incomplete available entries, and chooses the
+earliest instant. Optional failures preserve count and quota. The use case
+selects this port only for display reports; raw/runtime probes remain unchanged.
+Display facts are excluded from serialized model JSON and snapshot formats.
+Delivery places the summary beside the quota windows and wraps narrow terminal
+rows using existing Lip Gloss; Bubble Tea retains refresh/resize ownership.
+
+Focused race checks PASS for gateway/openai, usecase/quota and CLI quota. They
+cover credential continuity, request count/routes, finite/never/unavailable
+states, raw/runtime isolation, serialization and 30-column rendering. The shared
+read-only quota sender also avoids retrying timeout errors while retaining one
+transient retry, matching the tagged transport policy. No model, live account
+or real credit consumption is involved. The release gate now runs the oracle
+and its matching-corruption self-tests. Full current executable qualification
+follows before publication; broader display-layout equality remains unverified.

@@ -298,7 +298,7 @@ func (status *Status) fetchHomeUsage(ctx context.Context, home, baseURL string) 
 }
 
 func (status *Status) fetchUsage(ctx context.Context, account accountentity.Account, baseURL string) (quotamodel.Usage, error) {
-	return status.fetchHomeUsage(ctx, status.accounts.CodexHome(account.ID), baseURL)
+	return status.fetchDisplayUsage(ctx, status.accounts.CodexHome(account.ID), baseURL)
 }
 
 func (status *Status) selectedAccounts(ctx context.Context, options Options) ([]accountentity.Account, error) {

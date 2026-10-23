@@ -7,9 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/charmbracelet/lipgloss"
+	"golang.org/x/term"
 
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 	quotausecase "github.com/christiandoxa/godex/internal/usecase/quota"
@@ -75,19 +79,23 @@ func showRaw(ctx context.Context, status statusRunner, out io.Writer, options sh
 }
 
 func writeQuotaReports(out io.Writer, reports []quotamodel.Report, detail bool) error {
+	width := 0
+	if file, ok := out.(*os.File); ok && quotaTerminalWriter(out) {
+		width, _, _ = term.GetSize(int(file.Fd()))
+	}
+	var output strings.Builder
 	header := "PROFILE\tCURRENT\tPROVIDER\tAUTH\tSTATE\tPLAN\t5H\tWEEKLY"
 	if detail {
 		header += "\t5H_RESET_AT\t5H_WINDOW_SECONDS\tWEEKLY_RESET_AT\tWEEKLY_WINDOW_SECONDS"
 	}
-	if _, err := fmt.Fprintln(out, header); err != nil {
-		return err
-	}
+	fmt.Fprintln(&output, header)
 	for _, report := range reports {
-		if err := writeReport(out, report, detail); err != nil {
+		if err := writeReport(&output, report, detail); err != nil {
 			return err
 		}
 	}
-	return nil
+	_, err := io.WriteString(out, wrapQuotaText(output.String(), width))
+	return err
 }
 
 func writeReport(out io.Writer, report quotamodel.Report, detail bool) error {
@@ -121,7 +129,11 @@ func quotaReportRowValues(report quotamodel.Report, usage quotamodel.Usage) (pla
 	if report.External != nil && report.Err == nil {
 		return report.External.Plan, valueOrDash(report.External.Main), valueOrDash(report.External.Reset)
 	}
-	return usage.PlanType, formatWindow(usage.Primary), formatWindow(usage.Secondary)
+	secondary = formatWindow(usage.Secondary)
+	if summary := formatResetCredits(usage.ResetCredits); summary != "" {
+		secondary += " | reset credits: " + summary
+	}
+	return usage.PlanType, formatWindow(usage.Primary), secondary
 }
 
 func formatWindowDetails(window *quotamodel.Window) (reset, seconds string) {
@@ -157,4 +169,11 @@ func valueOrDash(value string) string {
 		return "-"
 	}
 	return value
+}
+
+func wrapQuotaText(text string, width int) string {
+	if width < 1 {
+		return text
+	}
+	return lipgloss.NewStyle().Width(width).Render(strings.TrimSuffix(text, "\n")) + "\n"
 }

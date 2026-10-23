@@ -829,6 +829,15 @@ reusing the same private reader as provider inspection; `gateway/openai` maps
 the returned value onto the HTTP header. Invalid config stops the request before
 dispatch. Ordinary model traffic does not acquire another config-file read.
 
+The quota use case selects an explicit display-fetch port for user reports.
+The OpenAI gateway alone enriches positive reset-credit counts with a bounded
+read-only detail GET using the identity accepted by the usage request. Optional
+failures keep the successful usage result. Raw output, runtime/authenticated
+probes and auto-redeem eligibility retain their existing single-request paths.
+Expiry fields are display-only model facts and excluded from JSON persistence.
+CLI quota delivery formats local timestamps and wraps terminal output with the
+existing Lip Gloss dependency; Bubble Tea still owns refresh and resize events.
+
 Before proxy startup, Godex probes enabled launch candidates once. Confirmed
 exhaustion removes an account from fresh-work eligibility for that launch; a
 transport or auth probe failure is treated as unknown and remains eligible.

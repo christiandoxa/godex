@@ -535,6 +535,12 @@ python3 tools/workspace-oracle.py \
   --godex "$tmp/godex" --godex-source "$root" \
   --godex-commit "$(git rev-parse HEAD)"
 
+python3 tools/reset-credit-oracle.py --self-test
+python3 tools/reset-credit-oracle.py \
+  --prodex "$tmp/prodex" --prodex-source "$tmp/prodex-source" \
+  --godex "$tmp/godex" --godex-source "$root" \
+  --godex-commit "$(git rev-parse HEAD)"
+
 fi
 fi
 

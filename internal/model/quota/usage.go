@@ -13,6 +13,8 @@ type WindowPair struct {
 
 type ResetCredits struct {
 	AvailableCount int64
+	NextExpiry     *int64 `json:"-"`
+	NeverExpires   bool   `json:"-"`
 }
 
 type Usage struct {

@@ -29,6 +29,7 @@ type quotaTUIModel struct {
 	updated              time.Time
 	loading              bool
 	height               int
+	width                int
 	scrollOffset         int
 	sortMode             quotaReportSort
 	providerFilter       quotaProviderFilter
@@ -52,6 +53,7 @@ func (model quotaTUIModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	switch message := message.(type) {
 	case tea.WindowSizeMsg:
 		model.height = max(6, message.Height)
+		model.width = max(1, message.Width)
 		model.clampScroll()
 	case tea.KeyMsg:
 		return model.updateKey(message)
@@ -143,7 +145,7 @@ func (model quotaTUIModel) View() string {
 	}
 	output.WriteString("\n")
 	output.WriteString(model.footer())
-	return clipQuotaTUIView04379(output.String(), model.height)
+	return clipQuotaTUIView04379(wrapQuotaText(output.String(), model.width), model.height)
 }
 
 func (model quotaTUIModel) writePoolSummary(output *strings.Builder) {
@@ -172,6 +174,7 @@ func (model quotaTUIModel) writeQuotaBody(output *strings.Builder, budget int) {
 	var header strings.Builder
 	_ = writeQuotaReports(&header, nil, model.options.detail)
 	text := header.String()
+	text = wrapQuotaText(text, model.width)
 	lines := strings.Count(text, "\n")
 	if lines > budget {
 		return
@@ -181,12 +184,13 @@ func (model quotaTUIModel) writeQuotaBody(output *strings.Builder, budget int) {
 	for _, report := range reports[start:] {
 		var section strings.Builder
 		_ = writeReport(&section, report, model.options.detail)
-		sectionLines := strings.Count(section.String(), "\n")
+		text := wrapQuotaText(section.String(), model.width)
+		sectionLines := strings.Count(text, "\n")
 		plan, ok := planQuotaPage04379(len(reports), start, shown, lines, sectionLines, &budget)
 		if !ok || !plan.appendSection {
 			break
 		}
-		output.WriteString(section.String())
+		output.WriteString(text)
 		lines += sectionLines
 		shown++
 	}

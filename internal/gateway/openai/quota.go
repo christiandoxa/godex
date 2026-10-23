@@ -235,6 +235,10 @@ func (client *QuotaClient) doWithClient(httpClient *http.Client, request *http.R
 	if request.Context().Err() != nil {
 		return nil, request.Context().Err()
 	}
+	var timeout interface{ Timeout() bool }
+	if errors.As(err, &timeout) && timeout.Timeout() {
+		return nil, err
+	}
 	clone := request.Clone(request.Context())
 	response, retryErr := httpClient.Do(clone)
 	if retryErr != nil {
