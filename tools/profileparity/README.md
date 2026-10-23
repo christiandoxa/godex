@@ -145,3 +145,9 @@ sentinels reject wrong status/type, missing SSE frame, changed bytes,
 credential violations, duplicate dispatch or unclean exit. This is a
 cross-executable synthetic wire fixture, not live native inference or
 foreground/background compaction qualification.
+
+The startup matrix also checks profile-local residency on the actual quota
+request: lowercase/padded-uppercase US, unsupported regions and a Unicode
+confusable. Original authenticated request counts, paths, process exit and
+private usage-snapshot checks remain required. Matching missing or fabricated
+residency in both products fails the oracle's mutation controls.

@@ -460,6 +460,9 @@ Super runtime launches temporarily trust the current workspace and up to 4,096
 recent absolute session workspaces. These overrides preserve user-supplied
 Codex configuration precedence and do not change the saved profile config.
 
+Quota and reset-credit requests honor `enforce_residency = "us"` in the selected
+profile's Codex configuration.
+
 Quota follows Prodex 0.435.1's aggregate default: unless `--profile` or
 `--raw` is supplied, Godex enables the all-profile detailed view automatically.
 Without `--once`, that view refreshes every five seconds; `--watch` is also

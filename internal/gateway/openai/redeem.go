@@ -63,6 +63,10 @@ func (client *QuotaClient) sendRedeem(
 	if err != nil {
 		return 0, nil, err
 	}
+	residency, err := client.auth.ReadQuotaResidency(ctx, codexHome)
+	if err != nil {
+		return 0, nil, err
+	}
 	payload, err := json.Marshal(redeemRequest{RequestID: requestID})
 	if err != nil {
 		return 0, nil, errors.New("encode reset-credit request")
@@ -76,6 +80,9 @@ func (client *QuotaClient) sendRedeem(
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("originator", "codex_cli_rs")
 	request.Header.Set("x-openai-codex-luna-reserve", "1")
+	if residency != "" {
+		request.Header.Set("x-openai-internal-codex-residency", residency)
+	}
 	if auth.AccountID != "" {
 		request.Header.Set("ChatGPT-Account-Id", auth.AccountID)
 	}

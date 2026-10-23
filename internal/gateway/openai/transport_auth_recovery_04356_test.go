@@ -18,6 +18,10 @@ type authReloadSequence struct {
 	reads  int
 }
 
+func (*authReloadSequence) ReadQuotaResidency(context.Context, string) (string, error) {
+	return "", nil
+}
+
 type authRefreshSequence struct {
 	authReloadSequence
 	refreshed    proxymodel.Auth

@@ -823,6 +823,12 @@ bounded, and never persists credentials or quota snapshots. The quota use case
 classifies ready/exhausted state. Runtime launch code consumes that policy
 through a narrow interface, so it does not import the quota use-case package.
 
+Quota and reset-credit requests read the selected profile's residency through a
+mandatory narrow Codex config port. `gateway/codex` owns bounded config parsing,
+reusing the same private reader as provider inspection; `gateway/openai` maps
+the returned value onto the HTTP header. Invalid config stops the request before
+dispatch. Ordinary model traffic does not acquire another config-file read.
+
 Before proxy startup, Godex probes enabled launch candidates once. Confirmed
 exhaustion removes an account from fresh-work eligibility for that launch; a
 transport or auth probe failure is treated as unknown and remains eligible.

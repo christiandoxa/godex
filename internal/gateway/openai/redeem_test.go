@@ -15,6 +15,10 @@ type rotatingAuthReader struct {
 	calls int
 }
 
+func (*rotatingAuthReader) ReadQuotaResidency(context.Context, string) (string, error) {
+	return "", nil
+}
+
 func (reader *rotatingAuthReader) ReadAuth(context.Context, string) (proxymodel.Auth, error) {
 	reader.calls++
 	token := "first-token"

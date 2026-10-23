@@ -225,3 +225,47 @@ context oracle: all three original context cases and all seven explicit-session
 argv cases match on both binaries, including literal tails and native inline
 commands. Driver mutation tests retain their expected scoped arrays. The
 additional native --last selector difference remains open as documented above.
+
+## Quota/reset-credit profile residency
+
+The exact 0.439.0 codex_openai_auth_headers_for_home sends the selected profile's
+normalized US residency on quota, account-detail and reset-credit requests. A
+five-case loopback CLI probe on clean `a01bca13f` proves Godex omitted the header
+for both lowercase and padded-uppercase US. Other/absent controls agree. A
+separate existing CLI difference remains: malformed config yields Prodex exit 1
+and Godex's exit-0 config-error table, with no upstream request in either case.
+That CLI difference is **FAIL**, not silently treated as equivalent output.
+
+The integrated profile oracle independently reproduces the US header difference
+with private imported homes, one authenticated GET, a valid durable usage
+snapshot and successful child shutdown. Its matching-corruption guards reject
+missing or fabricated residency in both products.
+
+QuotaClient now consumes a mandatory narrow ReadQuotaResidency contract from
+its Codex auth adapter. Codex's original bounded config reader is package-local
+and reused by provider inspection and residency. The OpenAI quota and redeem
+adapters apply the returned residency before each credential attempt. Invalid
+config is terminal before dispatch. The shared model-request hot path acquires
+no extra config I/O. The existing composition root still injects CodexProcess;
+no new dependency, option, shared helper, worker or persistence format is added.
+
+Six new quota/redeem regressions FAIL before the fix, with absent/other/Unicode
+controls passing. PASS after the fix:
+`rtk proxy go test -race ./internal/gateway/openai ./internal/gateway/codex ./internal/usecase/quota ./cmd/godex`
+and `rtk proxy go test -race ./tools/profileparity`.
+Exact clean-candidate runtime qualification follows before publication. Quota
+User-Agent/originator and reset-credit expiry presentation remain separate
+unverified differences; this header fix does not claim their parity.
+
+## Expanded DeepSeek gate result and retained failure
+
+The original `rtk proxy scripts/verify-release-parity.sh --phase=deepseek` on
+clean `03b58873f` completes all 383 cases and exits 1. Every Godex invariant
+PASSes. One reference case, custom-input-null, leaves two unrecognized atomic
+state temporary files after the Prodex process exits. Its request/response wire,
+authentication and exit status otherwise match; the durable-state guard correctly
+fails. The full383 result remains **FAIL**. An unchanged isolated rerun of that
+exact case PASSes on both products; it does not replace the failed full run.
+No temporary-file exception or state-integrity assertion was weakened.
+The earlier pin-only clean `c72085ef0` full run completed DeepSeek369 with PASS
+and is still executing Gemini974. Its results qualify only that frozen commit.

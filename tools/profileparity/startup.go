@@ -26,6 +26,8 @@ type startupProbeCase struct {
 	wantState   bool
 	response    string
 	reloadOn401 bool
+	config      string
+	residency   string
 }
 
 type startupProbeResult struct {
@@ -38,6 +40,7 @@ type startupProbeRequest struct {
 	method    string
 	path      string
 	authValid bool
+	residency string
 }
 
 type usageServer struct {
@@ -67,6 +70,16 @@ func checkStartupWarmup(root string, opts cliOptions) ([]stepResult, error) {
 			response: `{"error":{"code":"synthetic_unavailable"}}`},
 		{name: "startup_usage_401_credential_reload", status: http.StatusOK, wantState: true, reloadOn401: true,
 			response: `{"plan_type":"plus","rate_limit":{"primary_window":{"used_percent":20,"reset_at":4102444800,"limit_window_seconds":18000},"secondary_window":{"used_percent":40,"reset_at":4102444800,"limit_window_seconds":604800}}}`},
+	}
+	for _, item := range []struct{ name, value, want string }{
+		{"us", "us", "us"}, {"uppercase", " US ", "us"},
+		{"other", "eu", ""}, {"confusable", "uſ", ""},
+	} {
+		probe := cases[0]
+		probe.name = "startup_residency_" + item.name
+		probe.config = "enforce_residency='" + item.value + "'\n"
+		probe.residency = item.want
+		cases = append(cases, probe)
 	}
 	results := make([]stepResult, 0, len(cases))
 	for _, probeCase := range cases {
@@ -98,7 +111,7 @@ func sameStartupProbeResult(left, right startupProbeResult, probeCase startupPro
 		len(left.requests) != wantRequests || left.snapshot != right.snapshot || left.snapshot != probeCase.wantState {
 		return false
 	}
-	canonical := startupProbeRequest{method: http.MethodGet, path: startupUsagePath, authValid: true}
+	canonical := startupProbeRequest{method: http.MethodGet, path: startupUsagePath, authValid: true, residency: probeCase.residency}
 	for index := 0; index < wantRequests; index++ {
 		if left.requests[index] != canonical || right.requests[index] != canonical {
 			return false
@@ -119,6 +132,11 @@ func runStartupProbeCase(root, binary, product string, probeCase startupProbeCas
 	}
 	if err := os.WriteFile(filepath.Join(currentHome, "auth.json"), []byte(`{"auth_mode":"chatgpt","tokens":{"access_token":"synthetic-access","account_id":"synthetic-account"}}`), 0o600); err != nil {
 		return startupProbeResult{}, err
+	}
+	if probeCase.config != "" {
+		if err := os.WriteFile(filepath.Join(currentHome, "config.toml"), []byte(probeCase.config), 0o600); err != nil {
+			return startupProbeResult{}, err
+		}
 	}
 	fixture := profileFixture{
 		name: product, binary: binary, home: userHome, configHome: configHome,
@@ -171,6 +189,7 @@ func newUsageServer(status int, body string) *usageServer {
 		usage.mu.Lock()
 		usage.requestLog = append(usage.requestLog, startupProbeRequest{
 			method: request.Method, path: request.URL.Path,
+			residency: request.Header.Get("x-openai-internal-codex-residency"),
 			authValid: request.Header.Get("Authorization") == "Bearer synthetic-access" &&
 				request.Header.Get("ChatGPT-Account-Id") == "synthetic-account" &&
 				request.Header.Get("originator") == "codex_cli_rs" &&

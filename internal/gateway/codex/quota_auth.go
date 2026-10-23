@@ -15,6 +15,18 @@ import (
 
 const unreadableAuthLabel = "unreadable-auth"
 
+func (*CodexProcess) ReadQuotaResidency(ctx context.Context, home string) (string, error) {
+	config, err := readCodexConfig(ctx, home)
+	if err != nil {
+		return "", err
+	}
+	value, _ := config["enforce_residency"].(string)
+	if strings.ToLower(strings.TrimSpace(value)) == "us" {
+		return "us", nil
+	}
+	return "", nil
+}
+
 func (process *CodexProcess) InspectQuotaAuth(ctx context.Context, codexHome string) (profilemodel.QuotaAuthSummary, error) {
 	if err := ctx.Err(); err != nil {
 		return profilemodel.QuotaAuthSummary{}, err

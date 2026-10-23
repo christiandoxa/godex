@@ -18,13 +18,18 @@ import (
 
 const maxQuotaResponseBytes = 1 << 20
 
+type quotaAuthReader interface {
+	authReader
+	ReadQuotaResidency(context.Context, string) (string, error)
+}
+
 type QuotaClient struct {
 	client   *http.Client
 	upstream *url.URL
-	auth     authReader
+	auth     quotaAuthReader
 }
 
-func NewQuotaClient(upstream string, client *http.Client, auth authReader) (*QuotaClient, error) {
+func NewQuotaClient(upstream string, client *http.Client, auth quotaAuthReader) (*QuotaClient, error) {
 	if strings.TrimSpace(upstream) == "" {
 		upstream = DefaultUpstreamURL
 	}
@@ -151,6 +156,10 @@ func (client *QuotaClient) fetchBodyWithIdentity043714(
 		return nil, proxymodel.Auth{}, time.Time{}, err
 	}
 	send := func(identity proxymodel.Auth) (int, []byte, time.Time, error) {
+		residency, err := client.auth.ReadQuotaResidency(ctx, codexHome)
+		if err != nil {
+			return 0, nil, time.Time{}, err
+		}
 		request, requestErr := http.NewRequestWithContext(ctx, http.MethodGet, usageURL, nil)
 		if requestErr != nil {
 			return 0, nil, time.Time{}, fmt.Errorf("create quota request: %w", requestErr)
@@ -159,6 +168,9 @@ func (client *QuotaClient) fetchBodyWithIdentity043714(
 		request.Header.Set("Accept", "application/json")
 		request.Header.Set("originator", "codex_cli_rs")
 		request.Header.Set("x-openai-codex-luna-reserve", "1")
+		if residency != "" {
+			request.Header.Set("x-openai-internal-codex-residency", residency)
+		}
 		if identity.AccountID != "" {
 			request.Header.Set("ChatGPT-Account-Id", identity.AccountID)
 		}
