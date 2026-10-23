@@ -637,3 +637,27 @@ also launches on the reference; Godex instead selects Kiro or rejects the
 provider before launch. These saved-setting/provider counterexamples remain
 FAIL pending a source-aware fallback fix. The earlier minimal-metadata dispatch
 PASS does not qualify them.
+
+## Profile-only session settings stay native
+
+Nine focused delivery cases FAIL before the fix: run/Super/local Super across
+saved OpenAI, Kiro and unknown provider identities. The expanded executable
+context oracle independently rejects clean `47b22b95e` for injecting saved
+model/effort into a legacy run. Synthetic Super probes separately reproduce the
+incorrect Kiro selection and unknown-provider rejection, while Prodex launches.
+The tagged resume_provider.rs reconstructs settings only from shared reports;
+a missing shared identity returns no settings before native profile dispatch.
+
+The session use case now marks a successful explicit-profile fallback in its
+existing report, preserving all metadata and durable ownership. This fact is
+excluded from JSON and persistence. Runtime delivery skips only wrapper
+model/effort/provider reconstruction for that source. Shared reports retain
+their existing restoration, unsupported-provider rejection, explicit override
+and recovery contracts. No entity, persistence format, helper, dependency or
+worker is added. The new marker is a boundary fact, not a filesystem decision
+inside delivery.
+
+PASS: `rtk proxy go test -race ./internal/usecase/session ./internal/delivery/cli/runtime ./internal/usecase/runtime ./tools/contextparity`.
+The expanded fixture checks nine exact native argument cases and six Super
+provider/mode cases, with saved settings, explicit native overrides and mutation
+controls. Clean executable and make verify qualification follow before push.

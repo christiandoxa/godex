@@ -221,7 +221,8 @@ func resumeProviderIdentity(value string) (resumeProviderPlan, error) {
 }
 
 func restoreResumeSessionSettings(args []string, report sessionmodel.Report) []string {
-	if !codexResumeRequested(args) {
+	// Profile-only targets retain native Codex's model and effort selection.
+	if report.ProfileFallback || !codexResumeRequested(args) {
 		return args
 	}
 	result := append([]string(nil), args...)

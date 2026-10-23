@@ -1199,6 +1199,10 @@ retain explicit profile dispatch, temporary overlays and the existing profile
 leases; managed launches retain the report's durable upstream owner. Local
 Super dispatch and overlay preparation live in `super_local.go`, with session
 dispatch in `super_resume.go`. Their private helpers stay inside runtime delivery.
+The session launch report carries an unpersisted profile-fallback fact while
+retaining the original metadata and durable owner. Runtime delivery uses that
+fact to leave profile-only model, effort and provider selection to native Codex
+and the selected profile, matching the reference's shared-only reconstruction.
 For Super workspace trust, `repository/session` separately reads initial rollout
 metadata in native directory order, bounded to 65,536 directory entries and the
 same file/line byte limits. `entity/session` selects 4,096 newest absolute paths

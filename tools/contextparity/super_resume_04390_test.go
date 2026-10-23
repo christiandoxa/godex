@@ -17,7 +17,7 @@ func TestSuperResumeOracleRejectsLaunchMutations(t *testing.T) {
 		if err := verifySuperResumeChild04390(valid, "/synthetic/profile", local); err != nil {
 			t.Fatal(err)
 		}
-		for _, mutation := range []string{"command", "target", "prompt", "access", "duplicate", "home", "auth", "rollout"} {
+		for _, mutation := range []string{"command", "target", "prompt", "access", "duplicate", "home", "auth", "rollout", "saved_model", "saved_effort"} {
 			changed := valid
 			changed.Arguments = slices.Clone(valid.Arguments)
 			switch mutation {
@@ -37,6 +37,10 @@ func TestSuperResumeOracleRejectsLaunchMutations(t *testing.T) {
 				changed.AuthKind = "unexpected"
 			case "rollout":
 				changed.SessionVisible = false
+			case "saved_model":
+				changed.Arguments = append([]string{"-c", `model="synthetic-saved-model"`}, changed.Arguments...)
+			case "saved_effort":
+				changed.Arguments = append([]string{"-c", `model_reasoning_effort="high"`}, changed.Arguments...)
 			}
 			if err := verifySuperResumeChild04390(changed, "/synthetic/profile", local); err == nil {
 				t.Fatalf("accepted changed Super %s, local=%t", mutation, local)

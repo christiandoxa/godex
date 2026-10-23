@@ -698,6 +698,9 @@ shared catalog may resolve from that profile's legacy rollout files. Shared
 matches and ambiguous identities retain precedence, and the durable upstream
 owner remains attached. Super keeps its temporary overlay and selected profile
 lease, including local `--url` launches.
+Profile-only fallback leaves saved model, effort and provider selection to
+native Codex and the explicitly selected profile; shared-session restoration
+keeps its existing behavior.
 
 `queue --thread UUID_OR_PREFIX --message TEXT` also resolves the owning profile;
 the `--thread=VALUE` form is preserved. Named queue targets stay profile-local.

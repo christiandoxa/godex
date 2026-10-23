@@ -37,7 +37,7 @@ func resolveSuperResumeOptions(
 		report.LastModel = ""
 	}
 	options.codexArgs = restoreResumeSessionSettings(resolved, report)
-	if options.provider != "" || options.localURL != "" {
+	if report.ProfileFallback || options.provider != "" || options.localURL != "" {
 		return options, nil
 	}
 	if _, explicit := runDryConfigOverride(options.codexArgs, "model_provider"); explicit {

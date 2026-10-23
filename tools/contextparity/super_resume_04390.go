@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 )
 
 const superResumeAuth04390 = `{"OPENAI_API_KEY":"synthetic-profile-key"}`
@@ -30,29 +31,32 @@ func runSuperResumeProbes04390(input options, root string) ([]superResumeResult0
 		return nil, err
 	}
 	var results []superResumeResult04390
-	for _, local := range []bool{false, true} {
-		name := "legacy_profile_native"
-		if local {
-			name = "legacy_profile_local"
-		}
-		result := superResumeResult04390{Name: name}
-		for _, product := range []struct{ name, binary string }{{"prodex", input.prodex}, {"godex", input.godex}} {
-			directory := filepath.Join(root, name, product.name)
-			if err := runSuperResumeProbe04390(product.binary, product.name, directory, fake, local); err != nil {
-				return nil, fmt.Errorf("%s Super resume %s: %w", product.name, name, err)
+	for _, provider := range []string{"openai", "prodex-kiro", "synthetic-unknown"} {
+		for _, local := range []bool{false, true} {
+			name := "legacy_profile_native"
+			if local {
+				name = "legacy_profile_local"
 			}
-			if product.name == "prodex" {
-				result.Prodex = "PASS"
-			} else {
-				result.Godex = "PASS"
+			name += "_" + strings.TrimPrefix(provider, "prodex-")
+			result := superResumeResult04390{Name: name}
+			for _, product := range []struct{ name, binary string }{{"prodex", input.prodex}, {"godex", input.godex}} {
+				directory := filepath.Join(root, name, product.name)
+				if err := runSuperResumeProbe04390(product.binary, product.name, directory, fake, provider, local); err != nil {
+					return nil, fmt.Errorf("%s Super resume %s: %w", product.name, name, err)
+				}
+				if product.name == "prodex" {
+					result.Prodex = "PASS"
+				} else {
+					result.Godex = "PASS"
+				}
 			}
+			results = append(results, result)
 		}
-		results = append(results, result)
 	}
 	return results, nil
 }
 
-func runSuperResumeProbe04390(binary, product, root, fake string, local bool) error {
+func runSuperResumeProbe04390(binary, product, root, fake, provider string, local bool) error {
 	profile := filepath.Join(root, "profile")
 	if err := os.MkdirAll(profile, 0o700); err != nil {
 		return err
@@ -69,12 +73,13 @@ func runSuperResumeProbe04390(binary, product, root, fake string, local bool) er
 		return err
 	}
 	metadata, err := json.Marshal(map[string]any{"type": "session_meta", "timestamp": "2026-10-23T00:00:00Z", "payload": map[string]any{
-		"id": legacySession04390, "timestamp": "2026-10-23T00:00:00Z", "cwd": root, "source": "cli", "model_provider": "openai",
+		"id": legacySession04390, "timestamp": "2026-10-23T00:00:00Z", "cwd": root, "source": "cli", "model_provider": provider,
 	}})
 	if err != nil {
 		return err
 	}
 	metadata = append(metadata, '\n')
+	metadata = append(metadata, legacySavedTurn04390...)
 	rollout := filepath.Join(rolloutDirectory, "rollout-2026-10-23T00-00-00-"+legacySession04390+".jsonl")
 	if err := os.WriteFile(rollout, metadata, 0o600); err != nil {
 		return err
@@ -128,6 +133,7 @@ func verifySuperResumeChild04390(child superResumeChild04390, profile string, lo
 	execIndex, resumeIndex := slices.Index(args, "exec"), slices.Index(args, "resume")
 	if len(args) < 4 || execIndex < 0 || resumeIndex <= execIndex ||
 		!slices.Equal(args[len(args)-2:], []string{legacySession04390, "continue"}) ||
+		slices.Contains(args, `model="synthetic-saved-model"`) || slices.Contains(args, `model_reasoning_effort="high"`) ||
 		!slices.Contains(args, "--dangerously-bypass-approvals-and-sandbox") {
 		return fmt.Errorf("Super changed the native resume command, target, prompt or full access")
 	}

@@ -79,6 +79,7 @@ func (catalog *Catalog) ResolveArguments(
 		report, err = catalog.Resolve(ctx, input.SessionSelector)
 		if _, missing := err.(missingSessionError); missing && input.ProfileSelector != "" {
 			report, err = catalog.resolveProfileSession(ctx, input.ProfileSelector, input.SessionSelector)
+			report.ProfileFallback = err == nil
 		}
 	}
 	if err != nil {

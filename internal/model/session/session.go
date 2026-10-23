@@ -10,6 +10,7 @@ type Report struct {
 	UpstreamAccountID   string `json:"-"`
 	AccountID           string `json:"-"`
 	CodexHome           string `json:"-"`
+	ProfileFallback     bool   `json:"-"`
 	ModelProvider       string `json:"model_provider,omitempty"`
 	LastModel           string `json:"-"`
 	LastReasoningEffort string `json:"-"`

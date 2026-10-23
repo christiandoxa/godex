@@ -11,7 +11,7 @@ import (
 
 func TestExplicitProfileResolvesLegacySessionWithoutSharedCatalogMutation(t *testing.T) {
 	catalog := NewCatalog(accountsFake{}, readerFake{reports: map[string][]sessionentity.Session{
-		"one": {{ID: "a111", Path: "legacy-one", Source: "cli"}},
+		"one": {{ID: "a111", Path: "legacy-one", Source: "cli", ModelProvider: "prodex-kiro", LastModel: "saved-model", LastReasoningEffort: "high"}},
 		"two": {{ID: "a111", Path: "foreign-duplicate", Source: "cli"}},
 	}}, nil)
 	catalog.SetSharedCodexHome("shared")
@@ -26,6 +26,9 @@ func TestExplicitProfileResolvesLegacySessionWithoutSharedCatalogMutation(t *tes
 	}
 	if report.Profile != "personal" || report.AccountID != "one" || report.UpstreamAccountID != "two" || report.CodexHome != "one" || report.Path != "legacy-one" || !reflect.DeepEqual(args, []string{"exec", "resume", "a111", "continue"}) {
 		t.Fatalf("legacy profile target/arguments = %+v / %q", report, args)
+	}
+	if !report.ProfileFallback || report.ModelProvider != "prodex-kiro" || report.LastModel != "saved-model" || report.LastReasoningEffort != "high" {
+		t.Fatal("profile fallback lost its source or saved metadata")
 	}
 	listed, err := catalog.List(t.Context(), sessionmodel.Query{})
 	if err != nil || len(listed) != 0 {
@@ -61,7 +64,7 @@ func TestLegacyProfileFallbackPreservesSharedTargetsAndAmbiguity(t *testing.T) {
 			catalog.SetSharedCodexHome("shared")
 			input := sessionmodel.Launch{ProfileSelector: "personal", SessionSelector: "a111", IDIndex: 1, Arguments: []string{"resume", "a111"}}
 			report, _, err := catalog.ResolveArguments(t.Context(), input)
-			if (err != nil) != fixture.wantError || (err == nil && report.Path != fixture.wantPath) {
+			if (err != nil) != fixture.wantError || (err == nil && (report.Path != fixture.wantPath || report.ProfileFallback)) {
 				t.Fatalf("target=%+v err=%v", report, err)
 			}
 		})

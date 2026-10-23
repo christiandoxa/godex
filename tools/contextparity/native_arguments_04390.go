@@ -12,6 +12,7 @@ import (
 
 const nativeSession04390 = "01900000-0000-7000-8000-000000000164"
 const legacySession04390 = "01900000-0000-7000-8000-000000000165"
+const legacySavedTurn04390 = `{"type":"turn_context","payload":{"model":"synthetic-saved-model","effort":"high"}}` + "\n"
 
 type nativeArgumentProbe04390 struct {
 	name        string
@@ -32,6 +33,7 @@ func nativeArgumentProbes04390() []nativeArgumentProbe04390 {
 		{"inline_config_forms", []string{`--config=model_reasoning_effort="low"`, "exec", `-cmodel_reasoning_effort="high"`, "resume", nativeSession04390, "hello"}, []string{"exec", "resume", `--config=model_reasoning_effort="low"`, `-cmodel_reasoning_effort="high"`, nativeSession04390, "hello"}, ""},
 		{"literal_tail", []string{"-c", "model_context_window=500000", "exec", "--", "--config", "literal=prompt"}, []string{"exec", "-c", "model_context_window=500000", "--", "--config", "literal=prompt"}, ""},
 		{"legacy_profile_resume", []string{"exec", "resume", legacySession04390, "continue"}, []string{"exec", "resume", legacySession04390, "continue"}, "profile"},
+		{"legacy_profile_explicit_settings", []string{"exec", "resume", "-c", `model="explicit-model"`, "-c", `model_reasoning_effort="low"`, legacySession04390, "continue"}, []string{"exec", "resume", "-c", `model="explicit-model"`, "-c", `model_reasoning_effort="low"`, legacySession04390, "continue"}, "profile"},
 	}
 	for index, prompt := range []string{"/model gpt-5.6 high", "/permissions read-only", "/presets"} {
 		probes = append(probes, nativeArgumentProbe04390{fmt.Sprintf("native_inline_%d", index),
@@ -80,7 +82,11 @@ func runNativeArgumentProbe04390(binary, name, root, fake string, probe nativeAr
 		return nil, err
 	}
 	path := filepath.Join(rollouts, "rollout-2026-10-23T00-00-00-"+sessionID+".jsonl")
-	if err := os.WriteFile(path, append(metadata, '\n'), 0o600); err != nil {
+	metadata = append(metadata, '\n')
+	if probe.sessionHome != "" {
+		metadata = append(metadata, legacySavedTurn04390...)
+	}
+	if err := os.WriteFile(path, metadata, 0o600); err != nil {
 		return nil, err
 	}
 	record := filepath.Join(root, probe.name+"-native-args")
