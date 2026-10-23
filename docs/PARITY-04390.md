@@ -55,7 +55,7 @@ Their current executable regressions remain in the gate.
 | Single-profile one-shot quota fails on malformed config or probe errors | Delivery returns the report error before stdout | CLI regression, profile executable oracle | CLI quota delivery | PASS nine failure cases on clean `0209f13a1`; aggregate fixture isolates optional workspace lookup |
 | Aggregate quota resolves workspace metadata for an account ID | Prodex makes a separate account-check GET; Godex omits it | Exact tagged collector and failed quota oracle run | Quota use case / OpenAI gateway | FAIL; failure-only fixtures omit account ID to isolate exit behavior |
 | Codex auth originator override retains valid and empty values | Codex auth-header port supplies originator and residency | Expanded reset-credit oracle and gateway HTTP tests | `gateway/codex`, `model/auth`, `gateway/openai` | PASS seventeen cases per product on clean `a2e14460a`; refresh/consume have local wire coverage |
-| Explicit profile can resume a legacy rollout absent from shared catalog | Added profile-scoped fallback only for a missing shared target | Context executable oracle and session use-case regressions | Session use case, runtime CLI | FAIL before fix on clean `a2e14460a`; fixed-candidate executable qualification pending |
+| Explicit profile can resume a legacy rollout absent from shared catalog | Profile-scoped fallback only for a missing shared target | Context executable oracle and session use-case regressions | Session use case, runtime CLI | PASS three context and eight native-argv cases on clean `1a8d44630`; `--last` and Super remain separate gaps |
 | Authentication and refresh against real services | Official clients retain authentication ownership | Synthetic auth and lifecycle fixtures | Auth/profile domains, native gateways | BLOCKED live OAuth unavailable; synthetic tests remain runnable |
 | Native macOS/Windows runtime behavior | Six cross-build targets and native runners exist | `check-cross-build.sh`, native parity runner | Platform-specific adapters | BLOCKED native execution unavailable here; cross-build is weaker evidence |
 
@@ -69,15 +69,16 @@ Their current executable regressions remain in the gate.
 - PASS: `rtk proxy go test -json ./tools/...`
 - PASS: `bash -n scripts/verify-release-parity.sh`; workspace oracle Python
   syntax and `git diff --check`.
-- Latest pushed production: `a2e14460a` (auth originator override), after strict
-  detail fields, one-shot errors, expiry, residency, native config and wire fixes.
+- Latest pushed production: `7c29b6e4a` (legacy explicit-profile resume), with
+  source-size cleanup `1a8d44630`; prior auth/quota/wire fixes remain qualified.
 - Clean `0209f13a1` PASSes the expanded 49-step profile oracle with the corrected
   failure fixtures. `make verify` PASSes on `30ddd406e`; later changes affect
   only fixtures and documentation. Clean `cea73bcdd` full tests PASS 11,361
   cases with 19 optional SKIP.
 - Clean `a2e14460a` PASSes seventeen reset-credit scenarios per product,
-  11,398 full tests with 19 optional SKIP, and `make verify`. Current work:
-  explicit-profile legacy resume; clean executable after-test next.
+  11,398 full tests with 19 optional SKIP, and `make verify`. Clean `1a8d44630`
+  PASSes context/native-argv and make verify. Clean `196a27571` PASSes 26 expiry
+  scenarios per product; make verify is running. Gate completion-message fix next.
 - Full gates for frozen `c72085ef0` and `1fb3dbe4f` are still running. No complete
   gate or native foreign-platform PASS is claimed.
 - No release version, tag or package publication is authorized by this work.
@@ -465,6 +466,10 @@ now lives with the existing resume delivery in resume_session.go; run.go falls
 below 400 lines and its exception is removed. No guard limit is raised. The
 clean follow-up must rerun make verify before this session fix is pushed.
 
+Clean `1a8d44630` PASSes the same three context/eight native-argv executable
+cases and `rtk proxy make verify`. The fallback and its size cleanup are pushed
+normally to `origin/main`. Original failed size validation remains recorded.
+
 ## Reset-credit timestamp boundaries
 
 An adversarial nine-timestamp comparison reproduces seven differences from the
@@ -481,3 +486,20 @@ handling remain unchanged. No general time helper or dependency is introduced.
 PASS: `rtk proxy go test -race ./internal/gateway/openai ./internal/delivery/cli/quota ./internal/usecase/quota`
 and `rtk proxy python3 tools/reset-credit-oracle.py --self-test`.
 Clean 26-case executable qualification follows before publication.
+
+Clean `196a27571` now PASSes all 26 reset-credit scenarios per product. Its
+make verify is running; no completed result is inferred yet.
+
+## Release-gate completion reporting
+
+The release script printed its PASS line before the appended HTTP profile-status
+and 429-policy stages. Its actual exit code stayed nonzero on failure, but the
+message could claim success too early. A shell execution regression FAILs before
+the fix for each late-phase failure. The success line now follows every selected
+stage. The test executes the actual script tail with deterministic stand-ins,
+checking success and failure for all three final HTTP phases without network.
+
+PASS: `rtk proxy go test -race ./tools/continuationparity -run '^TestReleaseGateSuccessFollowsEverySelectedHTTPPhase$' -count=1`
+and `bash -n scripts/verify-release-parity.sh`. No oracle assertion, exit policy
+or production behavior is weakened. Earlier complete-phase results still use
+their collected terminal exit status, not a bare PASS line.

@@ -860,10 +860,6 @@ go test -race ./tools/continuationparity \
   -run '^TestProdex04383HTTPPromptCacheOracleRejectsMutations$|^TestProdex04390NativeMetadataOracleRejectsMutations$' -count=1 -timeout=30s
 fi
 
-# Printed only after all stages *selected for this invocation* succeeded.
-# --phase=... must never be mistaken for the default complete release gate.
-printf 'PASS: Prodex 0.439.0 parity phase %s (Godex %s)\n' "$phase" "$(git rev-parse HEAD)"
-
 # The tagged 402/403 profile/quota text scanner folds ASCII only. Check
 # Kelvin-sign confusables and exact ASCII controls with verified account
 # dispatch and durable new-response ownership on both pinned executables.
@@ -889,3 +885,7 @@ if [ "$phase" = 'all' ] || [ "$phase" = 'http-429-policy' ]; then
 go test -race ./tools/continuationparity \
   -run '^TestProdex04383HTTP429PolicyOracleRejectsMutations$' -count=1 -timeout=30s
 fi
+
+# Printed only after all stages *selected for this invocation* succeeded.
+# --phase=... must never be mistaken for the default complete release gate.
+printf 'PASS: Prodex 0.439.0 parity phase %s (Godex %s)\n' "$phase" "$(git rev-parse HEAD)"
