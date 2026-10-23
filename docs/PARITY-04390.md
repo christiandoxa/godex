@@ -53,8 +53,8 @@ Their current executable regressions remain in the gate.
 | Quota/reset-credit requests respect profile US residency | Codex config port supplies normalized residency | Forty-step profile oracle, gateway regressions | `gateway/codex`, `gateway/openai` | PASS on clean `1fb3dbe4f`; no model-path I/O added |
 | Positive reset-credit counts show earliest available expiry | Optional display-only detail GET; raw/runtime unchanged | Pinned reset-credit executable oracle | `gateway/openai`, `usecase/quota`, CLI quota | PASS seven cases per product on clean `cea73bcdd`; finite display coverage |
 | Single-profile one-shot quota fails on malformed config or probe errors | Delivery returns the report error before stdout | CLI regression, profile executable oracle | CLI quota delivery | PASS nine failure cases on clean `0209f13a1`; aggregate fixture isolates optional workspace lookup |
-| Aggregate quota resolves workspace metadata for an account ID | Added optional account-check GET and detail label | Exact tagged collector, quota display oracle and local regressions | Quota use case / OpenAI gateway / CLI quota | FAIL on clean `196a27571`; fixed-candidate executable qualification pending |
-| No generated quota User-Agent when version probing fails | Suppressed Go's automatic agent on usage/credit/workspace requests | Missing-version display oracle and gateway HTTP regressions | `gateway/openai` | FAIL before fix on clean `4f7ece56d`; clean fixed-candidate qualification pending; known-version construction stays open |
+| Aggregate quota resolves workspace metadata for an account ID | Optional account-check GET and detail label | Exact tagged collector, quota display oracle and local regressions | Quota use case / OpenAI gateway / CLI quota | PASS 32 cases per product on clean `4f7ece56d`; doctor and raw/runtime isolation covered |
+| No generated quota User-Agent when version probing fails | Suppressed Go's automatic agent on usage/credit/workspace requests | Missing-version display oracle and gateway HTTP regressions | `gateway/openai` | PASS 32 cases per product on clean `b1240683a`; known-version construction stays open |
 | Codex auth originator override retains valid and empty values | Codex auth-header port supplies originator and residency | Expanded reset-credit oracle and gateway HTTP tests | `gateway/codex`, `model/auth`, `gateway/openai` | PASS seventeen cases per product on clean `a2e14460a`; refresh/consume have local wire coverage |
 | Explicit profile can resume a legacy rollout absent from shared catalog | Profile-scoped fallback only for a missing shared target | Context executable oracle and session use-case regressions | Session use case, runtime CLI | PASS three context and eight native-argv cases on clean `1a8d44630`; `--last` and Super remain separate gaps |
 | Authentication and refresh against real services | Official clients retain authentication ownership | Synthetic auth and lifecycle fixtures | Auth/profile domains, native gateways | BLOCKED live OAuth unavailable; synthetic tests remain runnable |
@@ -70,7 +70,7 @@ Their current executable regressions remain in the gate.
 - PASS: `rtk proxy go test -json ./tools/...`
 - PASS: `bash -n scripts/verify-release-parity.sh`; workspace oracle Python
   syntax and `git diff --check`.
-- Latest pushed production: `4f7ece56d` (aggregate workspace metadata); prior
+- Latest pushed production: `b1240683a` (generated-agent suppression); prior
   gate/session/auth/quota fixes remain qualified. Original checkout is preserved.
 - Clean `0209f13a1` PASSes the expanded 49-step profile oracle with the corrected
   failure fixtures. `make verify` PASSes on `30ddd406e`; later changes affect
@@ -82,7 +82,8 @@ Their current executable regressions remain in the gate.
   scenarios per product and make verify. Clean `e6b54bb23` PASSes make verify,
   HTTP profile-status and raw 429 phases. Clean `4f7ece56d` PASSes 32 quota
   display cases, 49 profile steps, 11,451 tests with 19 optional SKIP and make verify.
-  Current work: generated-agent suppression; clean missing-version after-test next.
+  Clean `b1240683a` PASSes the corrected missing-version 32-case oracle and
+  make verify. Next: known-version auth metadata or native resume ownership.
 - Full gates for frozen `c72085ef0` and `1fb3dbe4f` are still running. No complete
   gate or native foreign-platform PASS is claimed.
 - No release version, tag or package publication is authorized by this work.
@@ -569,3 +570,11 @@ User-Agent parity remain separate FAILs; no complete auth-header parity is claim
 
 PASS focused gateway/Codex/quota/composition race tests and oracle self-tests.
 Clean missing-version executable qualification follows before publication.
+
+Clean `b1240683a` now PASSes all 32 missing-version quota display scenarios per
+product and `rtk proxy make verify`. Driver SHA-256:
+`a29bbeba6d6f537a7997cfa7906fbcd1aad0676a6733edcf9ff26468d712c55a`.
+The commit is pushed normally to `origin/main`. Full known-version agent
+construction remains FAIL. The frozen old full gates are making progress through
+Gemini974; observed scenario directories reached 885 and 591 respectively.
+Neither full run has a collected terminal success result.

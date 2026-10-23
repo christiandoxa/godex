@@ -34,3 +34,8 @@ synthetic rollout plus its original selected profile. Exact argv, exit status,
 child CODEX_HOME and unchanged profile config/model cache are required. Mutation
 checks reject reordered or dropped overrides and rewritten prompt text. The
 recording child performs no authentication, tools or model turn.
+
+An additional UUID exists only in the selected original profile's legacy
+rollout directory, with no shared counterpart. Explicit `run --profile main`
+must resume it in that original home while preserving exact child argv. This
+does not qualify native `--last`, implicit legacy selection or Super resume.

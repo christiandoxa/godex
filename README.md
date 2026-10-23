@@ -688,8 +688,10 @@ or rotation. Logout retains the managed account, settings, and sessions.
 Explicit UUIDs and hexadecimal prefixes of at least four characters in native
 `resume`, `exec resume`, `fork`, `exec fork`, `delete`, `archive`, and `unarchive` commands resolve
 across managed profiles. A conflicting explicit account fails. A bare full UUID
-is shorthand for `session resume`. Native names, `--last`, and interactive pickers
-remain scoped to the active or explicitly selected profile. Local native commands
+is shorthand for `session resume`. Session names resolve through the catalog;
+interactive pickers use the active or explicitly selected profile. Godex currently
+resolves `--last` through its catalog; unchanged native forwarding remains a
+known Prodex parity gap. Local native commands
 such as `mcp`, `features`, and `completion` bypass quota and rotation.
 For `run --profile NAME`, a session missing from the shared catalog may resolve
 from that profile's legacy rollout files. Shared matches and ambiguous identities
