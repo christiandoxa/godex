@@ -105,6 +105,11 @@ func run() error {
 		return fmt.Errorf("startup probe parity failed closed: %w", err)
 	}
 	stages = append(stages, startupStages...)
+	failureStages, err := checkQuotaFailures(work, options)
+	if err != nil {
+		return fmt.Errorf("quota failure parity failed closed: %w", err)
+	}
+	stages = append(stages, failureStages...)
 	pressureStages, err := checkGatewayFDPressure(work, options)
 	if err != nil {
 		return fmt.Errorf("real TCP gateway descriptor-pressure parity failed closed: %w", err)

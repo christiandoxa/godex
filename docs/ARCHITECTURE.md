@@ -837,6 +837,9 @@ probes and auto-redeem eligibility retain their existing single-request paths.
 Expiry fields are display-only model facts and excluded from JSON persistence.
 CLI quota delivery formats local timestamps and wraps terminal output with the
 existing Lip Gloss dependency; Bubble Tea still owns refresh and resize events.
+It also presents a single-profile one-shot report error as a command failure
+before writing stdout. The use case retains errors in its report model for
+aggregate, watch and doctor consumers; gateway diagnostics remain body-free.
 
 Before proxy startup, Godex probes enabled launch candidates once. Confirmed
 exhaustion removes an account from fresh-work eligibility for that launch; a

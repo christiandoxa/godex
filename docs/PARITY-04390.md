@@ -35,10 +35,10 @@ Their current executable regressions remain in the gate.
 | Custom cache key independent of session header; omitted key stays absent | Raw forwarding exists; explicit new-release comparison pending | Tagged `http_backend_passthrough.rs`; HTTP oracle | `gateway/openai`, `usecase/routing`, HTTP delivery | PASS exact HTTP cases on clean `9a4c2654b`; finite fixture only |
 | Merged turn metadata and unknown fields survive precommit rotation | Raw request forwarding and rotation exist | Tagged `http_followups/memory_metadata.rs` | `usecase/routing`, `gateway/openai` | PASS exact HTTP cases on clean `9a4c2654b`; finite fixture only |
 | An omitted User-Agent stays omitted | Go's default agent reproduced on both HTTP and WebSocket; shared header preparation now suppresses it | `TestForwardedUserAgentPreservesClientOwnership`; HTTP native-metadata oracle | `gateway/openai` | PASS after fix on clean `9a4c2654b`; HTTP/WebSocket wire regressions and exact-binary HTTP check |
-| Repeated root/exec/resume config overrides retain precedence | Scope-aware Codex gateway exists | Tagged `args_resume.rs`; context oracle | CLI runtime delivery, `gateway/codex` | FAIL expanded scoped comparison needed |
-| Inline native commands remain prompt text | Native argument forwarding exists | Tagged `args_resume.rs` | CLI runtime delivery, `gateway/codex` | FAIL current executable comparison needed |
+| Repeated root/exec/resume config overrides retain precedence | Shared scoping now covers direct and managed launches | Tagged `args_resume.rs`; context oracle | CLI runtime delivery, `gateway/codex` | PASS seven exact-argv cases on clean `a01bca13f`; native `--last` remains a separate FAIL |
+| Inline native commands remain prompt text | Native argument forwarding preserves inline commands | Tagged `args_resume.rs`; context oracle | CLI runtime delivery, `gateway/codex` | PASS explicit-session model, permissions and presets cases on clean `a01bca13f` |
 | Codex 0.164.0 initialization and thread listing | Shared official fixture covers both 0.163.0 and 0.164.0 | `TestProdex04390OfficialCodex0164AppServerInitializeAndThreadList` | `gateway/codex` | PASS credential-free initialize and active/archived thread lists; no model turn |
-| Native metadata-patch and model-instruction ownership | Delegated to official Codex; no wrapper merge | 0.164.0 schema / source qualification | `gateway/codex` | FAIL exact upstream contracts need qualification |
+| Native metadata-patch and model-instruction ownership | Delegated to official Codex; no wrapper merge | 0.164.0 schema / source qualification | `gateway/codex` | PASS credential-free schema and 82-file/101-group source guard; full model-turn behavior unverified |
 | Failed compaction attempts stay isolated | Native compaction delegated; translated Compact is separate | Native lifecycle and Compact oracles | `gateway/codex`, `gateway/compact` | FAIL no comprehensive 0.439.0 evidence |
 | Compressed rollout resume preserves invocation choices | Existing compressed-session support | Session repository and resume tests | Session domain, `gateway/codex` | FAIL current executable qualification needed |
 | Hard continuation ownership and no postcommit replay | Existing bounded routing and recovery | Continuation HTTP/WebSocket oracles | `usecase/routing` | FAIL current executable rerun needed |
@@ -47,9 +47,12 @@ Their current executable regressions remain in the gate.
 | CLI parsing, diagnostics and exit status | Existing profile and CLI matrices | `profileparity`, `clierrorparity` | CLI domain delivery | FAIL current executable rerun needed |
 | Terminal shutdown, protocols and saved-session guidance | Existing PTY differential | `sessionfooterparity` | `gateway/codex` | FAIL current executable rerun needed |
 | Native TUI semantics | Bubble Tea owns corresponding Godex surfaces | Owning delivery tests, TUI guard | CLI domain delivery | FAIL incomplete interactive differential coverage |
-| DeepSeek request/response/stream behavior | Existing finite matrix; schema aliases now fixed | `tools/differential` | `gateway/deepseek` | PASS fourteen alias cases; full383 matrix rerun pending |
+| DeepSeek request/response/stream behavior | Existing finite matrix; schema aliases now fixed | `tools/differential` | `gateway/deepseek` | PASS fourteen alias cases; full383 FAIL on reference leftover state temporaries; Godex invariants PASS |
 | Gemini request/response/stream behavior | Existing finite matrix | `tools/differential` | `gateway/gemini` | FAIL current full-matrix rerun needed |
 | Other providers, catalogs, quota and terminal migrations | Existing implementations; changed source needs comparison | Tagged migration baselines and owning tests | Owning gateways/use cases/delivery | FAIL migration inventory not fully qualified |
+| Quota/reset-credit requests respect profile US residency | Codex config port supplies normalized residency | Forty-step profile oracle, gateway regressions | `gateway/codex`, `gateway/openai` | PASS on clean `1fb3dbe4f`; no model-path I/O added |
+| Positive reset-credit counts show earliest available expiry | Optional display-only detail GET; raw/runtime unchanged | Pinned reset-credit executable oracle | `gateway/openai`, `usecase/quota`, CLI quota | PASS seven cases per product on clean `cea73bcdd`; finite display coverage |
+| Single-profile one-shot quota fails on malformed config or probe errors | Delivery now returns the report error before stdout | CLI regression, profile executable oracle | CLI quota delivery | FAIL reproduced on clean `cea73bcdd`; clean fixed-candidate qualification pending |
 | Authentication and refresh against real services | Official clients retain authentication ownership | Synthetic auth and lifecycle fixtures | Auth/profile domains, native gateways | BLOCKED live OAuth unavailable; synthetic tests remain runnable |
 | Native macOS/Windows runtime behavior | Six cross-build targets and native runners exist | `check-cross-build.sh`, native parity runner | Platform-specific adapters | BLOCKED native execution unavailable here; cross-build is weaker evidence |
 
@@ -63,12 +66,12 @@ Their current executable regressions remain in the gate.
 - PASS: `rtk proxy go test -json ./tools/...`
 - PASS: `bash -n scripts/verify-release-parity.sh`; workspace oracle Python
   syntax and `git diff --check`.
-- Latest pushed production: `1fb3dbe4f` (profile residency), after the native
-  config-scope, DeepSeek schema-alias and omitted-User-Agent fixes.
-- Its 40-step profile workflow PASSes; full tests PASS 11,343 cases with 19
-  optional SKIP. `make verify` PASSes on that exact clean source.
-- Current work: display-only reset-credit expiry; next run its clean executable
-  oracle, push the verified change and continue the remaining matrix gaps.
+- Latest pushed production: `cea73bcdd` (reset-credit expiry), after profile
+  residency, native config-scope, DeepSeek schema-alias and omitted-agent fixes.
+- Its seven reset-credit executable cases per product PASS; full tests PASS
+  11,361 cases with 19 optional SKIP. `make verify` PASSes on that clean source.
+- Current work: single-profile one-shot quota errors; next qualify the clean
+  candidate, push the verified fix and continue the remaining matrix gaps.
 - Full gates for frozen `c72085ef0` and `1fb3dbe4f` are still running. No complete
   gate or native foreign-platform PASS is claimed.
 - No release version, tag or package publication is authorized by this work.
@@ -304,3 +307,28 @@ transient retry, matching the tagged transport policy. No model, live account
 or real credit consumption is involved. The release gate now runs the oracle
 and its matching-corruption self-tests. Full current executable qualification
 follows before publication; broader display-layout equality remains unverified.
+
+Clean `cea73bcdd` now PASSes the pinned reset-credit oracle: seven scenarios
+per product, with the expected request counts, routes, credentials, residency,
+summaries and unchanged auth. Its driver SHA-256 is
+`19ccf59a65d3c060262dd84349ceb96ca5e37c99985a84fa160d5c017bdad1fc`.
+PASS: `rtk proxy go test -json ./...` (11,361 tests, 19 optional SKIP) and
+`rtk proxy make verify`. The commit was pushed normally to `origin/main`.
+
+## Single-profile one-shot quota errors
+
+The exact handle_profile_quota propagates fetch errors, while aggregate reports
+retain individual failures. Godex's CLI always rendered the report as success.
+A new CLI test FAILs before the fix; the expanded profile executable oracle
+independently rejects clean `cea73bcdd` for malformed-config exit 0 after
+Prodex returns exit 1. Both products make no upstream request and keep the
+profile files unchanged in that reproduced case.
+
+The CLI delivery change returns a single-profile one-shot report error before
+writing stdout. The existing use-case error model remains available to aggregate,
+watch and doctor consumers. Nine new executable scenarios cover config, HTTP 503
+and invalid JSON across selected, raw and aggregate modes, with independent
+exit/stream/request/state/credential assertions and mutation guards. Existing
+profile fixtures are reused locally; no production helper or dependency is added.
+PASS: `rtk proxy go test -race ./internal/delivery/cli/quota ./internal/usecase/quota ./tools/profileparity`.
+Clean executable qualification follows before publication.

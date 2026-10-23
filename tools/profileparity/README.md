@@ -1,4 +1,4 @@
-# Prodex 0.438.2 managed-profile lifecycle differential
+# Prodex 0.439.0 managed-profile lifecycle differential
 
 This tool compares real Prodex and Godex binaries, each operating in a
 separate fresh HOME/PRODEX_HOME/GODEX_HOME, over 29 sequential CLI operations.
@@ -7,9 +7,9 @@ or external model request is needed. The subprocess receives a minimal
 environment with nonfunctional outbound proxy settings.
 
 It pins the Prodex source to commit
-decfed45f884fe2bef20911303beab7b198698b7 and the official Linux
+433aad44bb249d5c25a231a6b06c2fa522a39a1f and the official Linux
 artifact SHA-256 to
-3f2fcd776fee0335dc49910d0651adc43a55c8627913556c307755b1575dac3f.
+2dec9565fd94eb59aeb83ae5e7cc4b772db130cbd45258d86a2104c8f4ba186a.
 It checks that the Godex executable's embedded clean VCS revision equals the
 candidate source commit. Both source checkouts must be clean.
 
@@ -17,9 +17,9 @@ To run from a clean Godex checkout, build the two Go binaries and invoke:
 
     go build -trimpath -o /tmp/godex-candidate ./cmd/godex
     go build -trimpath -o /tmp/profileparity ./tools/profileparity
-    /tmp/profileparity --prodex /path/to/official/prodex-0.438.2 \
+    /tmp/profileparity --prodex /path/to/official/prodex-0.439.0 \
       --godex /tmp/godex-candidate \
-      --prodex-source /path/to/prodex-tag-0.438.2 \
+      --prodex-source /path/to/prodex-tag-0.439.0 \
       --godex-source "$PWD" --godex-commit "$(git rev-parse HEAD)"
 
 The tool returns exit 1 for *any* unexpected outcome and produces a JSON
@@ -35,6 +35,15 @@ that arbitrary OAuth, multi-profile recovery, quota, goals, TUI, or other
 runtime behavior matches. The separate DeepSeek differential and release
 gate remain required and fail-closed.
 
+
+### Single-profile quota failure
+
+Nine cases check malformed configuration, upstream HTTP 503 and invalid usage
+JSON in single-profile one-shot, raw and aggregate modes. Each profile failure
+must exit 1 with empty stdout and a safe stderr diagnostic; aggregate views must
+exit 0 and retain the profile row. Every case checks exact request count, route
+and synthetic identity, plus unchanged credentials, config and profile state.
+Mutation tests reject matching corrupt outcomes in both products.
 
 ### Startup quota warmup
 

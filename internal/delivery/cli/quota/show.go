@@ -45,6 +45,9 @@ func Show(ctx context.Context, status statusRunner, out io.Writer, arguments []s
 	if err != nil {
 		return err
 	}
+	if !options.All && len(reports) == 1 && reports[0].Err != nil {
+		return reports[0].Err
+	}
 	if options.once && len(reports) == 0 {
 		if err := requireProfiles(ctx, status); err != nil {
 			return err

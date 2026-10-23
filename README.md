@@ -477,9 +477,10 @@ is also requested. `--base-url URL` is command-scoped: OpenAI uses it as the
 quota backend override, DeepSeek uses it as the API base, and `local` requires it
 for the OpenAI-compatible server. `--raw` prints bounded upstream OpenAI usage
 JSON for one selected or active profile and cannot be combined with aggregate,
-detail, watch, auth, or provider filters. Missing fields, disabled profiles, and
-failed probes display conservatively; probe error bodies/secrets are never
-rendered.
+detail, watch, auth, or provider filters. Missing fields and disabled profiles
+display conservatively. Single-profile `--once` returns configuration and probe
+failures on stderr with exit 1; aggregate views retain individual error rows.
+Probe error bodies and secrets are never rendered.
 `--auth` supports Prodex labels such as `chatgpt`, `no-auth`, `api-key`,
 `invalid-auth`, `unreadable-auth`, `quota-compatible`, and
 `non-quota-compatible`. `--provider` accepts the Prodex 0.435.1 canonical names
