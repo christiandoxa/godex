@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -17,7 +18,7 @@ const nativeMetadataReply04390 = `{"id":"resp-native-metadata-0164","object":"re
 
 func nativeMetadataRequest04390(shape string) string {
 	cache := ""
-	if shape != "omitted" {
+	if shape == "custom" {
 		cache = `,"prompt_cache_key":"custom-cache-key-not-session-0164"`
 	}
 	return `{"model":"gpt-6","input":[{"type":"message","role":"developer","content":[{"type":"input_text","text":"Consolidate detached memory."}]}],"client_metadata":{"x-codex-turn-metadata":` + strconv.Quote(nativeTurnMetadata04390) + `,"request_origin":"detached_memory","future_client_field":{"preserve":true}},"future_body_field":["preserve",9007199254740993]` + cache + `}`
@@ -30,7 +31,7 @@ func (b *transportBackend04383) serveNativeMetadata04390(w http.ResponseWriter, 
 		owner: r.Header.Get("ChatGPT-Account-Id"), body: body,
 		metadata: r.Header.Get("x-codex-turn-metadata"), session: r.Header.Get("session_id"),
 		turn: r.Header.Get("x-codex-turn-state"), trace: r.Header.Get("thread-id"),
-		userAgent: r.Header.Get("User-Agent"), ready: b.receipts["account-a"] > 0 && b.receipts["account-b"] > 0,
+		userAgent: r.Header.Get("User-Agent"), ready: b.receipts["account-a"] > 0 && (b.scenario != "http-native-metadata-rotation" || b.receipts["account-b"] > 0),
 	})
 	b.mu.Unlock()
 	if b.scenario == "http-native-metadata-rotation" && prior == 0 {
@@ -59,20 +60,43 @@ func runHTTPNativeMetadataCase04390(root string, p product, shape string) error 
 	p.env = append(p.env, "PRODEX_RUNTIME_LOG_RECORD=true")
 	b := newTransportBackend04383("http-native-metadata-" + shape)
 	defer b.server.Close()
-	endpoint, stop, err := startTransportLaunch04383(p, b.server.URL+"/backend-api")
+	// The tagged custom-cache fixture fixes one profile; placement policy is separate.
+	var endpoint string
+	var stop func()
+	var err error
+	if shape == "rotation" {
+		endpoint, stop, err = startTransportLaunch04383(p, b.server.URL+"/backend-api")
+	} else {
+		var command *exec.Cmd
+		endpoint, command, err = startGateway(p, b.server.URL+"/backend-api")
+		stop = func() { stopGateway(command) }
+	}
 	if err != nil {
 		return err
 	}
 	defer stop()
 	client := &http.Client{Timeout: 8 * time.Second}
-	for _, previous := range []string{"resp-ready-b", "resp-main"} {
+	previousIDs := []string{"resp-main"}
+	if shape == "rotation" {
+		previousIDs = []string{"resp-ready-b", "resp-main"}
+	}
+	for _, previous := range previousIDs {
 		warmup, err := post(client, endpoint+"/responses", fmt.Sprintf(`{"previous_response_id":%q,"input":[]}`, previous))
 		if err != nil || warmup.status != http.StatusOK {
 			return fmt.Errorf("native metadata warmup %s: status=%d err=%v", previous, warmup.status, err)
 		}
 	}
 	until := time.Now().Add(5 * time.Second)
-	for !transportProfilesReady04383(p, b) {
+	for {
+		b.mu.Lock()
+		ready := b.receipts["account-a"] > 0 && !b.invalid
+		b.mu.Unlock()
+		if shape == "rotation" {
+			ready = transportProfilesReady04383(p, b)
+		}
+		if ready {
+			break
+		}
 		if time.Now().After(until) {
 			return errors.New("native metadata requires two authenticated Ready profiles")
 		}
@@ -139,7 +163,7 @@ func verifyNativeMetadata04390(shape string, result httpSoftConflictResult04383)
 			owner = "account-b"
 		}
 		if attempt.owner != owner || !attempt.ready || attempt.body != nativeMetadataRequest04390(shape) || attempt.metadata != nativeTurnMetadata04390 || attempt.session != nativeSession04390 || attempt.turn != "" || attempt.trace != "" || attempt.userAgent != "" {
-			return fmt.Errorf("native metadata attempt %d changed owner, cache identity, headers or opaque input", index)
+			return fmt.Errorf("native metadata attempt %d changed: owner=%s ready=%t body_equal=%t metadata_equal=%t session_equal=%t turn_empty=%t trace_empty=%t user_agent_empty=%t", index, attempt.owner, attempt.ready, attempt.body == nativeMetadataRequest04390(shape), attempt.metadata == nativeTurnMetadata04390, attempt.session == nativeSession04390, attempt.turn == "", attempt.trace == "", attempt.userAgent == "")
 		}
 	}
 	return nil

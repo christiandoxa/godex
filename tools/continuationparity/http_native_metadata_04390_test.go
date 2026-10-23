@@ -39,7 +39,7 @@ func TestProdex04390NativeMetadataOracleRejectsMutations(t *testing.T) {
 					r.attempts[0].body = strings.Replace(r.attempts[0].body, "future_client_field", "dropped_field", 1)
 				},
 				func(r *httpSoftConflictResult04383) {
-					if shape == "omitted" {
+					if shape != "custom" {
 						r.attempts[0].body = strings.TrimSuffix(r.attempts[0].body, "}") + `,"prompt_cache_key":"fabricated"}`
 					} else {
 						r.attempts[0].body = strings.Replace(r.attempts[0].body, "custom-cache-key-not-session-0164", nativeSession04390, 1)
