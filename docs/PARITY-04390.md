@@ -32,9 +32,9 @@ Their current executable regressions remain in the gate.
 | Reference behavior | Godex behavior / difference | Test or fixture | Owner | Result / limitation |
 | --- | --- | --- | --- | --- |
 | Exact tagged source, binary and manifest | Active oracles pinned to 0.439.0; older identities rejected | Release checksums, version, provenance guards | `tools/*parity`, `scripts/verify-*parity*` | PASS reference provenance; candidate differential pending |
-| Custom cache key independent of session header; omitted key stays absent | Raw forwarding exists; explicit new-release comparison pending | Tagged `http_backend_passthrough.rs`; HTTP oracle | `gateway/openai`, `usecase/routing`, HTTP delivery | FAIL missing 0.439.0 executable evidence |
-| Merged turn metadata and unknown fields survive precommit rotation | Raw request forwarding and rotation exist | Tagged `http_followups/memory_metadata.rs` | `usecase/routing`, `gateway/openai` | FAIL missing 0.439.0 executable evidence |
-| An omitted User-Agent stays omitted | Go's default agent reproduced on both HTTP and WebSocket; shared header preparation now suppresses it | `TestForwardedUserAgentPreservesClientOwnership`; HTTP native-metadata oracle | `gateway/openai` | FAIL before fix; cross-binary rerun pending |
+| Custom cache key independent of session header; omitted key stays absent | Raw forwarding exists; explicit new-release comparison pending | Tagged `http_backend_passthrough.rs`; HTTP oracle | `gateway/openai`, `usecase/routing`, HTTP delivery | PASS exact HTTP cases on clean `9a4c2654b`; finite fixture only |
+| Merged turn metadata and unknown fields survive precommit rotation | Raw request forwarding and rotation exist | Tagged `http_followups/memory_metadata.rs` | `usecase/routing`, `gateway/openai` | PASS exact HTTP cases on clean `9a4c2654b`; finite fixture only |
+| An omitted User-Agent stays omitted | Go's default agent reproduced on both HTTP and WebSocket; shared header preparation now suppresses it | `TestForwardedUserAgentPreservesClientOwnership`; HTTP native-metadata oracle | `gateway/openai` | PASS after fix on clean `9a4c2654b`; HTTP/WebSocket wire regressions and exact-binary HTTP check |
 | Repeated root/exec/resume config overrides retain precedence | Scope-aware Codex gateway exists | Tagged `args_resume.rs`; context oracle | CLI runtime delivery, `gateway/codex` | FAIL expanded scoped comparison needed |
 | Inline native commands remain prompt text | Native argument forwarding exists | Tagged `args_resume.rs` | CLI runtime delivery, `gateway/codex` | FAIL current executable comparison needed |
 | Codex 0.164.0 initialization and thread listing | Shared official fixture covers both 0.163.0 and 0.164.0 | `TestProdex04390OfficialCodex0164AppServerInitializeAndThreadList` | `gateway/codex` | PASS credential-free initialize and active/archived thread lists; no model turn |
@@ -113,3 +113,25 @@ The first pin-only commit `c72085ef0` is pushed. Its `rtk proxy make verify`
 PASSes, including source/format/TUI guards, cross-builds, installers, vet, shuffled
 race tests and the build. Its original full differential gate remains separate
 from newer production and cannot qualify this header fix.
+
+## Verified header fix checkpoint
+
+Clean `9a4c2654b` passes the complete HTTP prompt-cache mode against the exact
+0.439.0 source, official binary and manifest: eleven cached-token shapes plus
+three native metadata cases on each product. All original request, header,
+response, authentication, attempt-count and durable-owner assertions remain
+active. Single-profile omitted/custom keys and two-Ready-profile metadata
+rotation PASS. The driver also rejects a present empty fabricated User-Agent.
+Earlier invalid fixture runs and the correctly rejected mistyped candidate SHA
+are retained as failures; they are not qualification evidence.
+
+PASS: `rtk proxy go test -race ./internal/gateway/openai ./internal/delivery/http/proxy ./internal/usecase/routing ./tools/continuationparity`
+and `rtk proxy go test -race ./internal/gateway/openai ./tools/continuationparity -count=1`.
+The clean candidate and driver were built with `go build -trimpath` and the
+existing `continuationparity --http-prompt-cache` mode verified source cleanliness
+and candidate VCS metadata before execution. Current full tests and make verify
+run independently; no complete release-gate PASS is inferred from this mode.
+
+Latest production checkpoint: `9a4c2654b`, pushed normally to `origin/main`.
+Next independent gap: source-ordered DeepSeek function schema aliases and the
+simple nested-tool wire view; add executable fixtures before fixing it.
