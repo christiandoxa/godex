@@ -219,3 +219,9 @@ while Godex resolves it to a UUID before launch. The config-form fixture now
 uses an explicit UUID to isolate override scoping. The original --last failure
 is retained and remains **FAIL**, requiring its own ownership/concurrency review;
 no selector check was weakened or production selector policy changed here.
+
+The scoped override fix on clean `a01bca13f` now PASSes the exact executable
+context oracle: all three original context cases and all seven explicit-session
+argv cases match on both binaries, including literal tails and native inline
+commands. Driver mutation tests retain their expected scoped arrays. The
+additional native --last selector difference remains open as documented above.
