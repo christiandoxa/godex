@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check display-only reset-credit expiry against exact Prodex 0.439.0."""
+"""Check quota display metadata against exact Prodex 0.439.0."""
 import argparse
 import hashlib
 import json
@@ -52,6 +52,14 @@ CASES += [(name, 1, 200, {'credits': [{'status': 'available', 'expires_at': time
     ('time_zero_year', '0000-01-01T00:00:00Z', '0000-01-01 00:00:00 +00:00'),
     ('time_long_fraction', '2026-10-23T01:23:45.12345678901Z', '2026-10-23 01:23:45 +00:00'),
 ]]
+CASES += [
+    ('workspace_list', 0, 200, {'accounts': [{'id': 'synthetic-account', 'name': ' Synthetic Team '}]}, 'workspace: Synthetic Team'),
+    ('workspace_personal', 0, 200, {'accounts': [{'id': 'synthetic-account', 'name': None, 'structure': ' PERSONAL '}]}, 'workspace: Personal'),
+    ('workspace_map', 0, 200, {'accounts': {'selected': {'account': {'account_id': 'synthetic-account', 'name': 'Selected Team'}}}}, 'workspace: Selected Team'),
+    ('workspace_ordered', 0, 200, {'accounts': {'selected': {'account': {'account_id': 'synthetic-account', 'name': 'Excluded Team'}}, 'other': {'account': {'account_id': 'other-account', 'name': 'Other Team'}}}, 'account_ordering': ['other']}, 'workspace: synthetic-account'),
+    ('workspace_failed', 0, 500, {}, 'workspace: synthetic-account'),
+    ('workspace_invalid', 0, 200, {'accounts': False}, 'workspace: synthetic-account'),
+]
 
 
 def verify_result(case, result):
@@ -60,6 +68,8 @@ def verify_result(case, result):
     expected_paths = ['/backend-api/wham/usage']
     if count > 0 and name != 'raw':
         expected_paths.append('/backend-api/wham/rate-limit-reset-credits')
+    if name.startswith('workspace_'):
+        expected_paths.append('/backend-api/wham/accounts/check')
     assert code == 0 and unchanged, 'failed command or changed credentials'
     assert [call['path'] for call in calls] == expected_paths, 'wrong request count or route'
     assert all(call['auth'] and call['account'] and call['residency'] == 'us' for call in calls), 'accepted identity/residency lost'
@@ -80,10 +90,12 @@ def self_test():
                   'originator': ORIGINATORS.get(name, (None, 'codex_cli_rs'))[1]}]
         if count > 0 and name != 'raw':
             calls.append(dict(calls[0], path='/backend-api/wham/rate-limit-reset-credits'))
+        if name.startswith('workspace_'):
+            calls.append(dict(calls[0], path='/backend-api/wham/accounts/check'))
         text = json.dumps({'rate_limit_reset_credits': {'available_count': count}}) if name == 'raw' else summary
         verify_result(case, (calls, text, 0, True))
         mutations = [(calls + calls, text, 0, True), (calls, text, 1, True), (calls, text, 0, False),
-                     (calls, text.replace(str(count), '999'), 0, True),
+                     (calls, text.replace(summary if name.startswith('workspace_') else str(count), '999'), 0, True),
                      ([dict(call, auth=False) for call in calls], text, 0, True),
                      ([dict(call, originator='invented') for call in calls], text, 0, True)]
         for changed in mutations:
@@ -140,8 +152,8 @@ def run_case(root, binary, product, case):
     worker = threading.Thread(target=server.serve_forever)
     worker.start()
     try:
-        arguments = ['quota', '--profile', 'main', '--base-url', f'http://127.0.0.1:{server.server_port}/backend-api']
-        arguments.append('--raw' if name == 'raw' else '--once')
+        arguments = ['quota', '--base-url', f'http://127.0.0.1:{server.server_port}/backend-api']
+        arguments += ['--all', '--detail', '--once'] if name.startswith('workspace_') else ['--profile', 'main', '--raw' if name == 'raw' else '--once']
         result = subprocess.run([binary, *arguments], cwd=directory, env=environment, capture_output=True, text=True, timeout=25)
     finally:
         server.shutdown()

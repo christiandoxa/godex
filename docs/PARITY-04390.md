@@ -53,7 +53,7 @@ Their current executable regressions remain in the gate.
 | Quota/reset-credit requests respect profile US residency | Codex config port supplies normalized residency | Forty-step profile oracle, gateway regressions | `gateway/codex`, `gateway/openai` | PASS on clean `1fb3dbe4f`; no model-path I/O added |
 | Positive reset-credit counts show earliest available expiry | Optional display-only detail GET; raw/runtime unchanged | Pinned reset-credit executable oracle | `gateway/openai`, `usecase/quota`, CLI quota | PASS seven cases per product on clean `cea73bcdd`; finite display coverage |
 | Single-profile one-shot quota fails on malformed config or probe errors | Delivery returns the report error before stdout | CLI regression, profile executable oracle | CLI quota delivery | PASS nine failure cases on clean `0209f13a1`; aggregate fixture isolates optional workspace lookup |
-| Aggregate quota resolves workspace metadata for an account ID | Prodex makes a separate account-check GET; Godex omits it | Exact tagged collector and failed quota oracle run | Quota use case / OpenAI gateway | FAIL; failure-only fixtures omit account ID to isolate exit behavior |
+| Aggregate quota resolves workspace metadata for an account ID | Added optional account-check GET and detail label | Exact tagged collector, quota display oracle and local regressions | Quota use case / OpenAI gateway / CLI quota | FAIL on clean `196a27571`; fixed-candidate executable qualification pending |
 | Codex auth originator override retains valid and empty values | Codex auth-header port supplies originator and residency | Expanded reset-credit oracle and gateway HTTP tests | `gateway/codex`, `model/auth`, `gateway/openai` | PASS seventeen cases per product on clean `a2e14460a`; refresh/consume have local wire coverage |
 | Explicit profile can resume a legacy rollout absent from shared catalog | Profile-scoped fallback only for a missing shared target | Context executable oracle and session use-case regressions | Session use case, runtime CLI | PASS three context and eight native-argv cases on clean `1a8d44630`; `--last` and Super remain separate gaps |
 | Authentication and refresh against real services | Official clients retain authentication ownership | Synthetic auth and lifecycle fixtures | Auth/profile domains, native gateways | BLOCKED live OAuth unavailable; synthetic tests remain runnable |
@@ -69,8 +69,8 @@ Their current executable regressions remain in the gate.
 - PASS: `rtk proxy go test -json ./tools/...`
 - PASS: `bash -n scripts/verify-release-parity.sh`; workspace oracle Python
   syntax and `git diff --check`.
-- Latest pushed production: `7c29b6e4a` (legacy explicit-profile resume), with
-  source-size cleanup `1a8d44630`; prior auth/quota/wire fixes remain qualified.
+- Latest pushed production: `196a27571` (expiry timestamp boundary), plus
+  gate-reporting fix `e6b54bb23`; prior session/auth/quota fixes remain qualified.
 - Clean `0209f13a1` PASSes the expanded 49-step profile oracle with the corrected
   failure fixtures. `make verify` PASSes on `30ddd406e`; later changes affect
   only fixtures and documentation. Clean `cea73bcdd` full tests PASS 11,361
@@ -78,7 +78,8 @@ Their current executable regressions remain in the gate.
 - Clean `a2e14460a` PASSes seventeen reset-credit scenarios per product,
   11,398 full tests with 19 optional SKIP, and `make verify`. Clean `1a8d44630`
   PASSes context/native-argv and make verify. Clean `196a27571` PASSes 26 expiry
-  scenarios per product; make verify is running. Gate completion-message fix next.
+  scenarios per product and make verify. Clean `e6b54bb23` PASSes make verify,
+  HTTP profile-status and raw 429 phases. Current work: aggregate workspace metadata.
 - Full gates for frozen `c72085ef0` and `1fb3dbe4f` are still running. No complete
   gate or native foreign-platform PASS is claimed.
 - No release version, tag or package publication is authorized by this work.
@@ -488,7 +489,9 @@ and `rtk proxy python3 tools/reset-credit-oracle.py --self-test`.
 Clean 26-case executable qualification follows before publication.
 
 Clean `196a27571` now PASSes all 26 reset-credit scenarios per product. Its
-make verify is running; no completed result is inferred yet.
+`rtk proxy make verify` PASSes. Driver SHA-256:
+`b870434e0b50e5de31abd25ca2492394029f196b485e2768700e21f15f16a98f`.
+The commit is pushed normally to `origin/main`.
 
 ## Release-gate completion reporting
 
@@ -503,3 +506,35 @@ PASS: `rtk proxy go test -race ./tools/continuationparity -run '^TestReleaseGate
 and `bash -n scripts/verify-release-parity.sh`. No oracle assertion, exit policy
 or production behavior is weakened. Earlier complete-phase results still use
 their collected terminal exit status, not a bare PASS line.
+
+Clean `e6b54bb23` PASSes `rtk proxy make verify` and both complete executable
+phases `--phase=http-profile-status` and `--phase=http-429-policy`, with the
+success line now last. It is pushed normally to `origin/main`.
+Remote CI on `1978eced1` passes Linux and both security jobs; macOS fails in
+the official Prodex realtime process with connection reset during session update.
+Its diagnostic again records an accepted nonblocking socket returning would-block.
+That native reference failure remains FAIL; no timing workaround is introduced.
+Windows was still running when inspected. The complete failed macOS log is saved
+locally with SHA-256 `4b98477ce6f62790ef1fec380005e255d95cfd4e9e0c6acca7a9f600f7ad56e8`.
+
+## Aggregate quota workspace metadata
+
+Six additional pinned display scenarios cover list/map account shapes, trimmed
+names, Personal fallback, explicit map ordering, HTTP failure and invalid JSON.
+All 32 reference scenarios PASS; clean `196a27571` fails workspace_list because
+it never makes the authenticated account-check GET. Prior failure-only fixtures
+still omit account ID and keep their exact request invariants.
+
+The OpenAI adapter adds one bounded optional metadata GET for aggregate reports,
+using the profile's current account identity, originator and residency without
+inventing the usage-only reserve header. Parsed details match the auth account;
+HTTP/parse failures retain its ID. The use case owns explicitly requested
+aggregate enrichment, while doctor keeps its existing network behavior,
+and CLI delivery owns detail labels, Unicode shortening and safe terminal text.
+Raw/single-profile/runtime paths and quota state remain unchanged. Model facts
+are excluded from persistence. The existing exact-field parser stays private to
+the OpenAI gateway and is reused by the two quota response boundaries.
+
+PASS: `rtk proxy go test -race ./internal/gateway/openai ./internal/usecase/quota ./internal/delivery/cli/quota`
+and `rtk proxy python3 tools/reset-credit-oracle.py --self-test`, plus Python
+syntax and diff checks. Clean 32-case executable qualification follows.

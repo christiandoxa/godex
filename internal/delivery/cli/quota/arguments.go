@@ -32,6 +32,7 @@ func parseArguments(arguments []string) (showOptions, error) {
 		options.All = true
 		options.detail = true
 	}
+	options.IncludeWorkspace = options.All
 	return options, nil
 }
 

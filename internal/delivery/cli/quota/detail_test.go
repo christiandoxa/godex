@@ -60,7 +60,7 @@ func TestDetailPreservesQuotaSelection(t *testing.T) {
 		selector string
 		want     quotausecase.Options
 	}{
-		{"", quotausecase.Options{All: true}},
+		{"", quotausecase.Options{All: true, IncludeWorkspace: true}},
 		{"work", quotausecase.Options{Selector: "work"}},
 	} {
 		status := &fakeStatus{}

@@ -217,7 +217,7 @@ func TestShowSupportsAuthAndProviderFilters(t *testing.T) {
 	if err := Show(context.Background(), status, &output, arguments); err != nil {
 		t.Fatal(err)
 	}
-	want := quotausecase.Options{All: true, AuthFilter: "quota-compatible", ProviderFilter: "openai"}
+	want := quotausecase.Options{All: true, IncludeWorkspace: true, AuthFilter: "quota-compatible", ProviderFilter: "openai"}
 	if status.options != want {
 		t.Fatalf("options = %+v, want %+v", status.options, want)
 	}

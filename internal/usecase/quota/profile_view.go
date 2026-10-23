@@ -27,6 +27,9 @@ func (status *Status) runProfiles(ctx context.Context, options Options) ([]quota
 			Email: target.Email, Active: target.Active, Enabled: target.Enabled,
 		}
 		status.populateProfileQuota(ctx, &report, inspected, options.BaseURL)
+		if options.All && options.IncludeWorkspace && target.Provider == "openai" {
+			report.Workspace = status.fetchWorkspace(ctx, target.CodexHome, options.BaseURL)
+		}
 		reports = append(reports, report)
 		if err := ctx.Err(); err != nil {
 			return nil, err

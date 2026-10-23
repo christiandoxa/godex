@@ -50,6 +50,7 @@ type Report struct {
 	Enabled     bool
 	Usage       Usage
 	External    *ExternalInfo
+	Workspace   *Workspace `json:"-"`
 	State       string
 	Err         error
 }

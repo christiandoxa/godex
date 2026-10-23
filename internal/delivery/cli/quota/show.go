@@ -125,6 +125,11 @@ func writeReport(out io.Writer, report quotamodel.Report, detail bool) error {
 		}
 	}
 	_, err := fmt.Fprintln(out, strings.Join(fields, "\t"))
+	if err == nil && detail {
+		if label := quotaWorkspaceLabel(report.Workspace); label != "" {
+			_, err = fmt.Fprintln(out, "  workspace: "+label)
+		}
+	}
 	return err
 }
 

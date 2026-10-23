@@ -66,11 +66,12 @@ type virtualGateway interface {
 }
 
 type Options struct {
-	All            bool
-	Selector       string
-	BaseURL        string
-	AuthFilter     string
-	ProviderFilter string
+	All              bool
+	IncludeWorkspace bool
+	Selector         string
+	BaseURL          string
+	AuthFilter       string
+	ProviderFilter   string
 }
 
 type Status struct {

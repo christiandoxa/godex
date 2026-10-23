@@ -847,6 +847,17 @@ It also presents a single-profile one-shot report error as a command failure
 before writing stdout. The use case retains errors in its report model for
 aggregate, watch and doctor consumers; gateway diagnostics remain body-free.
 
+Aggregate quota reports consume a separate optional workspace-metadata port on
+the same usage adapter. The OpenAI gateway owns the bounded single account-check
+GET, authenticated header envelope and exact list/map/order response decoding.
+Missing account identity avoids the request; transport/parse failures retain
+the known account ID without changing quota state. The use case supplies this
+display-only model only when quota delivery explicitly requests aggregate
+enrichment; doctor keeps the plain report path. Workspace fields are
+excluded from JSON persistence. CLI delivery owns detail labels, Unicode-aware
+ID shortening and control-character removal. The private exact-field decoder
+is reused inside the OpenAI gateway; no cross-domain helper is introduced.
+
 Before proxy startup, Godex probes enabled launch candidates once. Confirmed
 exhaustion removes an account from fresh-work eligibility for that launch; a
 transport or auth probe failure is treated as unknown and remains eligible.
