@@ -56,14 +56,15 @@ type caseResult struct {
 }
 
 type report struct {
-	Status          string                      `json:"status"`
-	Oracle          string                      `json:"oracle"`
-	OracleSource    string                      `json:"oracle_source"`
-	CandidateSource string                      `json:"candidate_source"`
-	Cases           []caseResult                `json:"cases"`
-	NegativeControl string                      `json:"negative_control"`
-	NativeArguments []nativeArgumentResult04390 `json:"native_arguments"`
-	SuperResume     []superResumeResult04390    `json:"super_resume"`
+	Status             string                        `json:"status"`
+	Oracle             string                        `json:"oracle"`
+	OracleSource       string                        `json:"oracle_source"`
+	CandidateSource    string                        `json:"candidate_source"`
+	Cases              []caseResult                  `json:"cases"`
+	NegativeControl    string                        `json:"negative_control"`
+	NativeArguments    []nativeArgumentResult04390   `json:"native_arguments"`
+	SuperResume        []superResumeResult04390      `json:"super_resume"`
+	ProviderIdentities []providerIdentityResult04390 `json:"provider_identities"`
 }
 
 func main() {
@@ -140,15 +141,20 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	providerResults, err := runProviderIdentityProbes04390(options, root, fake)
+	if err != nil {
+		return err
+	}
 	if err := checkNegativeControl(); err != nil {
 		return err
 	}
 	encoded, err := json.MarshalIndent(report{
 		Status: "PASS", Oracle: oracleVersion, OracleSource: oracleSourceCommit,
 		CandidateSource: options.godexCommit, Cases: results,
-		NativeArguments: nativeResults,
-		SuperResume:     superResults,
-		NegativeControl: "PASS: cached maximum promotion is rejected",
+		NativeArguments:    nativeResults,
+		SuperResume:        superResults,
+		ProviderIdentities: providerResults,
+		NegativeControl:    "PASS: cached maximum promotion is rejected",
 	}, "", "  ")
 	if err != nil {
 		return err

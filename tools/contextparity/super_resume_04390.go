@@ -84,14 +84,10 @@ func runSuperResumeProbe04390(binary, product, root, fake string, probe superRes
 	if err := os.MkdirAll(rolloutDirectory, 0o700); err != nil {
 		return err
 	}
-	metadata, err := json.Marshal(map[string]any{"type": "session_meta", "timestamp": "2026-10-23T00:00:00Z", "payload": map[string]any{
-		"id": legacySession04390, "timestamp": "2026-10-23T00:00:00Z", "cwd": root, "source": "cli", "model_provider": probe.provider,
-		"session_id": legacySession04390, "originator": "codex_cli_rs", "cli_version": "0.164.0",
-	}})
+	metadata, err := nativeCLISessionMetadata04390(root, legacySession04390, probe.provider)
 	if err != nil {
 		return err
 	}
-	metadata = append(metadata, '\n')
 	metadata = append(metadata, legacySavedTurn04390...)
 	rollout := filepath.Join(rolloutDirectory, "rollout-2026-10-23T00-00-00-"+legacySession04390+".jsonl")
 	if probe.compressed {

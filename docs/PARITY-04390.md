@@ -31,7 +31,7 @@ Their current executable regressions remain in the gate.
 
 | Reference behavior | Godex behavior / difference | Test or fixture | Owner | Result / limitation |
 | --- | --- | --- | --- | --- |
-| Exact tagged source, binary and manifest | Active oracles pinned to 0.439.0; older identities rejected | Release checksums, version, provenance guards | `tools/*parity`, `scripts/verify-*parity*` | PASS reference provenance; candidate differential pending |
+| Exact tagged source, binary and manifest | Active oracles pinned to 0.439.0; older identities rejected | Release checksums, version, provenance guards | `tools/*parity`, `scripts/verify-*parity*` | PASS full finite release gate on frozen `1fb3dbe4f`; latest context matrix on clean `48f8a6c31` |
 | Custom cache key independent of session header; omitted key stays absent | Raw forwarding exists; explicit new-release comparison pending | Tagged `http_backend_passthrough.rs`; HTTP oracle | `gateway/openai`, `usecase/routing`, HTTP delivery | PASS exact HTTP cases on clean `9a4c2654b`; finite fixture only |
 | Merged turn metadata and unknown fields survive precommit rotation | Raw request forwarding and rotation exist | Tagged `http_followups/memory_metadata.rs` | `usecase/routing`, `gateway/openai` | PASS exact HTTP cases on clean `9a4c2654b`; finite fixture only |
 | An omitted User-Agent stays omitted | Go's default agent reproduced on both HTTP and WebSocket; shared header preparation now suppresses it | `TestForwardedUserAgentPreservesClientOwnership`; HTTP native-metadata oracle | `gateway/openai` | PASS after fix on clean `9a4c2654b`; HTTP/WebSocket wire regressions and exact-binary HTTP check |
@@ -42,14 +42,14 @@ Their current executable regressions remain in the gate.
 | Native metadata-patch and model-instruction ownership | Delegated to official Codex; no wrapper merge | 0.164.0 schema / source qualification | `gateway/codex` | PASS credential-free schema and 82-file/101-group source guard; full model-turn behavior unverified |
 | Failed compaction attempts stay isolated | Native compaction delegated; translated Compact is separate | Native lifecycle and Compact oracles | `gateway/codex`, `gateway/compact` | FAIL no comprehensive 0.439.0 evidence |
 | Compressed rollout resume preserves invocation choices | Existing compressed-session support | Context oracle: native, Super and local Super legacy rollouts | Session domain, `gateway/codex` | PASS three finite dispatch/file-preservation cases per product on clean `293ccd49d`; no native model turn |
-| Hard continuation ownership and no postcommit replay | Existing bounded routing and recovery | Continuation HTTP/WebSocket oracles | `usecase/routing` | PASS current HTTP session-conflict and HTTP/WebSocket Compact phases on `a2e14460a`; remaining phases uncertified |
-| Precommit quota/retry, weighted capacity and watchdogs | Existing admission and recovery | HTTP/WebSocket deadline/capacity phases | Routing use case, HTTP delivery | FAIL current executable rerun needed |
-| Concurrent durable state and recovery | Atomic stores, journals and conflict checks exist | Profile, restart, ownership oracles | Owning repositories/use cases | FAIL finite coverage must be rerun; formats differ |
-| CLI parsing, diagnostics and exit status | Existing profile and CLI matrices | `profileparity`, `clierrorparity` | CLI domain delivery | FAIL current executable rerun needed |
-| Terminal shutdown, protocols and saved-session guidance | Existing PTY differential | `sessionfooterparity` | `gateway/codex` | FAIL current executable rerun needed |
+| Hard continuation ownership and no postcommit replay | Existing bounded routing and recovery | Continuation HTTP/WebSocket oracles | `usecase/routing` | PASS full finite release gate on frozen `1fb3dbe4f`; native --last remains a separate selection FAIL |
+| Precommit quota/retry, weighted capacity and watchdogs | Existing admission and recovery | HTTP/WebSocket deadline/capacity phases | Routing use case, HTTP delivery | PASS complete finite phases in frozen `1fb3dbe4f` full gate; current production is newer |
+| Concurrent durable state and recovery | Atomic stores, journals and conflict checks exist | Profile, restart, ownership oracles | Owning repositories/use cases | PASS pinned profile/restart/continuation projections on frozen `1fb3dbe4f`; formats differ and comprehensive concurrency is unverified |
+| CLI parsing, diagnostics and exit status | Existing profile and CLI matrices | `profileparity`, `clierrorparity` | CLI domain delivery | PASS pinned 40-step profile and fourteen-error projections on frozen `1fb3dbe4f`; later quota errors and provider identity cases have named newer evidence |
+| Terminal shutdown, protocols and saved-session guidance | Existing PTY differential | `sessionfooterparity` | `gateway/codex` | PASS five Linux PTY cases in frozen `1fb3dbe4f` full gate; broader native platform/TUI equality unverified |
 | Native TUI semantics | Bubble Tea owns corresponding Godex surfaces | Owning delivery tests, TUI guard | CLI domain delivery | FAIL incomplete interactive differential coverage |
-| DeepSeek request/response/stream behavior | Existing finite matrix; schema aliases now fixed | `tools/differential` | `gateway/deepseek` | PASS fourteen alias cases; full383 FAIL on reference leftover state temporaries; Godex invariants PASS |
-| Gemini request/response/stream behavior | Existing finite matrix | `tools/differential` | `gateway/gemini` | PASS all 974 cases on frozen `1fb3dbe4f`; current production is newer and the full gate is still running |
+| DeepSeek request/response/stream behavior | Existing finite matrix; schema aliases now fixed | `tools/differential` | `gateway/deepseek` | PASS all 383 cases on frozen `1fb3dbe4f`; earlier `03b58873f` full383 reference-temporary FAIL remains recorded |
+| Gemini request/response/stream behavior | Existing finite matrix | `tools/differential` | `gateway/gemini` | PASS all 974 cases in the completed frozen `1fb3dbe4f` full gate; current production is newer |
 | Other providers, catalogs, quota and terminal migrations | Existing implementations; changed source needs comparison | Tagged migration baselines and owning tests | Owning gateways/use cases/delivery | FAIL migration inventory not fully qualified |
 | Quota/reset-credit requests respect profile US residency | Codex config port supplies normalized residency | Forty-step profile oracle, gateway regressions | `gateway/codex`, `gateway/openai` | PASS on clean `1fb3dbe4f`; no model-path I/O added |
 | Positive reset-credit counts show earliest available expiry | Optional display-only detail GET; raw/runtime unchanged | Pinned reset-credit executable oracle | `gateway/openai`, `usecase/quota`, CLI quota | PASS seven cases per product on clean `cea73bcdd`; finite display coverage |
@@ -58,6 +58,7 @@ Their current executable regressions remain in the gate.
 | No generated quota User-Agent when version probing fails | Suppressed Go's automatic agent on usage/credit/workspace requests | Missing-version display oracle and gateway HTTP regressions | `gateway/openai` | PASS 32 cases per product on clean `b1240683a`; known-version construction stays open |
 | Codex auth originator override retains valid and empty values | Codex auth-header port supplies originator and residency | Expanded reset-credit oracle and gateway HTTP tests | `gateway/codex`, `model/auth`, `gateway/openai` | PASS seventeen cases per product on clean `a2e14460a`; refresh/consume have local wire coverage |
 | Explicit profile can resume a legacy rollout absent from shared catalog | Profile-scoped fallback only for a missing shared target; saved settings remain native | Context executable oracle and session use-case regressions | Session use case, runtime CLI | PASS three context, ten native-argv and eight Super dispatch cases per product on clean `293ccd49d`; `--last` and implicit legacy selection remain open |
+| Explicit profiles reject unsupported shared provider identities | Pre-child validation, registry aliases and ASCII-only case handling | Eight executable provider cases plus Kelvin lookalike comparison and runtime regressions | Runtime CLI delivery | PASS complete 29-case context matrix per product on clean `48f8a6c31`; broader external-provider dispatch remains separately scoped |
 | Authentication and refresh against real services | Official clients retain authentication ownership | Synthetic auth and lifecycle fixtures | Auth/profile domains, native gateways | BLOCKED live OAuth unavailable; synthetic tests remain runnable |
 | Native macOS/Windows runtime behavior | Six cross-build targets and native runners exist | `check-cross-build.sh`, native parity runner | Platform-specific adapters | BLOCKED native execution unavailable here; cross-build is weaker evidence |
 
@@ -71,7 +72,7 @@ Their current executable regressions remain in the gate.
 - PASS: `rtk proxy go test -json ./tools/...`
 - PASS: `bash -n scripts/verify-release-parity.sh`; workspace oracle Python
   syntax and `git diff --check`.
-- Latest pushed production: `293ccd49d` (profile-only native settings); prior
+- Latest pushed production: `48f8a6c31` (shared provider identities); prior
   gate/session/auth/quota fixes remain qualified. Original checkout is preserved.
 - Clean `0209f13a1` PASSes the expanded 49-step profile oracle with the corrected
   failure fixtures. `make verify` PASSes on `30ddd406e`; later changes affect
@@ -87,12 +88,14 @@ Their current executable regressions remain in the gate.
   make verify. Clean `47b22b95e` PASSes make verify and context/native-argv plus
   both Super dispatch cases. Clean `293ccd49d` PASSes make verify and the
   expanded context oracle with saved settings, provider identities, explicit
-  native overrides and compressed rollouts. Next: native --last ownership or
-  known-version auth metadata.
+  native overrides and compressed rollouts. Clean `48f8a6c31` PASSes make verify
+  and the 29-case context/provider matrix per product. Next: native --last
+  ownership or known-version auth metadata.
 - Frozen `c72085ef0` full gate exits 1 on the Prodex Gemini primitive-control
-  invariant after DeepSeek369 PASS. Frozen `1fb3dbe4f` PASSes all 974 Gemini
-  cases and remains running in WebSocket checks. No
-  complete gate or native foreign-platform PASS is claimed.
+  invariant after DeepSeek369 PASS. Frozen `1fb3dbe4f` completes the full default
+  gate with exit 0, including DeepSeek383 and Gemini974. This qualifies only that
+  frozen candidate and finite matrix; full 1:1 and foreign-platform parity remain
+  uncertified.
 - No release version, tag or package publication is authorized by this work.
 
 ## Codex 0.164.0 qualification and HTTP fixture expansion
@@ -785,3 +788,30 @@ explicit-override precedence, known aliases, Unicode trim/ASCII case behavior an
 unchanged Godex identity compatibility. Clean executable and make verify checks
 follow before pushing; broader external-provider dispatch stays independently
 qualified rather than inferred from alias recognition.
+
+Clean `48f8a6c31` PASSes `rtk proxy make verify` and the expanded context oracle:
+three context, ten exact native arguments, eight Super and eight shared-provider
+cases per product. The same driver rejects clean `293ccd49d` at the first retired
+Prodex identity after the existing cases pass. Driver SHA-256:
+`057124eb92c925b844a72f133cb26fc2bceba3c373e747727334d2a31ea279ea`.
+A separate two-product wire-to-child probe verifies the Kelvin-sign identity:
+before the fix only Godex launches; after it both reject before child launch.
+The production fix is pushed normally to origin/main. PASS:
+`rtk proxy go test -race ./tools/contextparity -count=1` and
+`rtk proxy make verify` on the expanded driver and its mutation controls.
+The complete native metadata builder stays private to the developer fixture
+package and has three real consumers; no production helper is introduced.
+
+## Collected full release-gate result
+
+The long-running frozen `1fb3dbe4f` default gate now exits 0 after every selected
+phase, including the late HTTP profile-status and raw 429 stages. Full log
+SHA-256: `45042f990831807a328a41783d68b04111c002ff47b63bf4f406b9e3244147d8`.
+Its structured reports include DeepSeek383 and Gemini974 with no differences,
+five terminal cases, forty profile steps and fourteen CLI error probes. Original
+wire, credential, state, retry, ownership and mutation guards remain active.
+This is a complete finite gate PASS for that old frozen source. It does not
+replace the earlier failed runs or certify newer production, native --last,
+known-version auth metadata, other providers, native foreign platforms or all TUI
+behavior. A new frozen current-candidate gate can now run independently of
+continued development; no failed invariant was waived to collect this result.

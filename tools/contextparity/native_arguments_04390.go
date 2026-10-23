@@ -84,15 +84,11 @@ func runNativeArgumentProbe04390(binary, name, root, fake string, probe nativeAr
 	if err := os.MkdirAll(rollouts, 0o700); err != nil {
 		return nil, err
 	}
-	metadata, err := json.Marshal(map[string]any{"type": "session_meta", "timestamp": "2026-10-23T00:00:00Z", "payload": map[string]any{
-		"id": sessionID, "timestamp": "2026-10-23T00:00:00Z", "cwd": root, "source": "cli", "model_provider": "openai",
-		"session_id": sessionID, "originator": "codex_cli_rs", "cli_version": "0.164.0",
-	}})
+	metadata, err := nativeCLISessionMetadata04390(root, sessionID, "openai")
 	if err != nil {
 		return nil, err
 	}
 	path := filepath.Join(rollouts, "rollout-2026-10-23T00-00-00-"+sessionID+".jsonl")
-	metadata = append(metadata, '\n')
 	if probe.sessionHome != "" {
 		metadata = append(metadata, legacySavedTurn04390...)
 	}
@@ -131,6 +127,17 @@ func runNativeArgumentProbe04390(binary, name, root, fake string, probe nativeAr
 		return nil, err
 	}
 	return got, nil
+}
+
+func nativeCLISessionMetadata04390(root, id, provider string) ([]byte, error) {
+	data, err := json.Marshal(map[string]any{"type": "session_meta", "timestamp": "2026-10-23T00:00:00Z", "payload": map[string]any{
+		"id": id, "session_id": id, "timestamp": "2026-10-23T00:00:00Z", "cwd": root, "source": "cli",
+		"model_provider": provider, "originator": "codex_cli_rs", "cli_version": "0.164.0",
+	}})
+	if err != nil {
+		return nil, err
+	}
+	return append(data, '\n'), nil
 }
 
 func verifyNativeArguments04390(got, want []string) error {

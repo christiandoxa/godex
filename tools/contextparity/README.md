@@ -61,3 +61,12 @@ native Super and local Super. Fixture compression uses the repository's existing
 Zstandard dependency; plain and compressed original files must stay byte-exact.
 Every seed includes native session_id/originator/cli_version metadata, so these
 preservation cases do not request the reference's incomplete-metadata repair.
+
+Eight shared-provider cases cover five accepted OpenAI identities and three
+unsupported identities with an explicit profile. Accepted cases require exact
+native arguments, child output and selected home. Rejected cases require exit 1,
+empty stdout, a generic unsupported-provider diagnostic and no child launch.
+Auth, config, model cache and original rollout bytes must remain unchanged.
+Mutation tests reject matching unrelated errors, leaked identities, unsafe
+launches and altered accepted commands. A private metadata builder shared by
+the native, Super and provider fixtures keeps their complete seed contract.
