@@ -2,7 +2,6 @@
 # Lower this value whenever a file shrinks; new files are always capped by GODEX_MAX_GO_FILE_LINES.
 611	internal/delivery/cli/dispatcher.go
 437	internal/delivery/cli/public_help.go
-431	internal/delivery/cli/runtime/run.go
 487	internal/delivery/cli/runtime/status_resource.go
 889	internal/delivery/cli/runtime/super.go
 502	internal/delivery/cli/runtime/super_launch.go

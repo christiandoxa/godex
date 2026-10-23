@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	profilemodel "github.com/christiandoxa/godex/internal/model/profile"
+	runtimemodel "github.com/christiandoxa/godex/internal/model/runtime"
 	sessionmodel "github.com/christiandoxa/godex/internal/model/session"
 	runtimeusecase "github.com/christiandoxa/godex/internal/usecase/runtime"
 	sessionusecase "github.com/christiandoxa/godex/internal/usecase/session"
@@ -15,6 +16,33 @@ import (
 type resumeProviderPlan struct {
 	kind   string
 	direct bool
+}
+
+func runSessionArgumentWithLauncher(
+	ctx context.Context,
+	sessions *sessionusecase.Catalog,
+	selection runtimemodel.Selection,
+	args []string,
+	index int,
+	launcher sessionusecase.Launcher,
+) error {
+	if sessions == nil {
+		return errors.New("session support is not configured")
+	}
+	command := nativeCommandIndex(args)
+	local := command >= 0 && localSessionCommand(args[command])
+	prefix, sessionSelector := splitThreadSelector(args[index])
+	launch := sessionmodel.Launch{
+		AccountSelector: selection.Account,
+		ProfileSelector: selection.Profile,
+		SessionSelector: sessionSelector,
+		IDIndex:         index,
+		IDPrefix:        prefix,
+		Arguments:       args,
+		Local:           local,
+		Delete:          command >= 0 && args[command] == "delete",
+	}
+	return sessions.ResumeArgumentsWithLauncher(ctx, launch, launcher)
 }
 
 func NewSessionLauncher(runner *runtimeusecase.Runner, profiles launchProfiles) sessionusecase.Launcher {

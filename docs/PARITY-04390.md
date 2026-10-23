@@ -456,3 +456,11 @@ through its two real runtime callers. Super is not given an uncertified fallback
 PASS focused race tests for session use case, runtime delivery/use case and the
 context oracle; clean executable qualification follows before publication.
 Native --last and unselected/implicit legacy resume remain separately unverified.
+
+Clean `7c29b6e4a` PASSes the context executable oracle: three original context
+cases and eight exact native-argument cases, including legacy profile resume.
+Its make verify correctly FAILs because removing dead code shrank an inherited
+oversized run.go without reducing its source-size exception. Session dispatch
+now lives with the existing resume delivery in resume_session.go; run.go falls
+below 400 lines and its exception is removed. No guard limit is raised. The
+clean follow-up must rerun make verify before this session fix is pushed.
