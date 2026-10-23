@@ -168,6 +168,7 @@ func translateResponsesRequestWithHistory(body []byte, options RequestOptions, h
 	stateless := parts
 	override := contains != nil && deepSeekSimpleRequest04384(object, contains)
 	if override {
+		stateless.tools, _ = object["tools"].([]any)
 		stateless.messages, err = deepSeekMessages(object, simpleMessages)
 		if err != nil {
 			return TranslatedRequest{}, err

@@ -116,7 +116,7 @@ func deepSeekFunctionMetadata(function map[string]any, name string) (map[string]
 
 func deepSeekFunctionParameters(function map[string]any, name string) (map[string]any, error) {
 	parameters := map[string]any{"type": "object", deepSeekPropertiesKey: map[string]any{}, deepSeekAdditionalPropertiesKey: true}
-	raw, found := function["parameters"]
+	raw, found := firstExistingRequestValue(function, "parameters", "parametersJsonSchema", "input_schema", "schema")
 	if !found {
 		return parameters, nil
 	}

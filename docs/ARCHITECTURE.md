@@ -350,6 +350,11 @@ private recursive tool-value comparison treats floating signed zeros equally
 while retaining integer/float kinds, strings, array order and member presence.
 Function-tool normalization also retains an explicitly present false strict
 flag in default mode; strict runtime mode continues to normalize it to true.
+Function schema lookup selects the first present parameters, parametersJsonSchema,
+input_schema or schema field; an invalid selected value cannot fall through.
+Normal reconstruction emits canonical parameters. The separately eligible
+stateless request body retains its original nested function objects, while
+normal validation and pending conversation capture still run first.
 Runtime gateway startup marks the proxy model's internal GatewayMode field;
 ordinary local launches keep invocation-local history. The composition root
 selects Gemini's local pool constructor or its request-scoped shared gateway

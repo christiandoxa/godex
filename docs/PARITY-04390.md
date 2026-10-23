@@ -135,3 +135,44 @@ run independently; no complete release-gate PASS is inferred from this mode.
 Latest production checkpoint: `9a4c2654b`, pushed normally to `origin/main`.
 Next independent gap: source-ordered DeepSeek function schema aliases and the
 simple nested-tool wire view; add executable fixtures before fixing it.
+
+## DeepSeek schema aliases: reproduced gap and fix
+
+Fourteen new exact-binary cases compare all three schema aliases in flat,
+simple nested and normal reconstructed forms, canonical-field precedence,
+selected-null rejection, missing schema and an explicit false strict flag.
+Against clean `9a4c2654b`, all fourteen reference invariants PASS; twelve
+Godex cases FAIL and two precedence/admission controls PASS. The executable
+reports retain original wire, response, authentication, state and exit checks.
+Independent mutation tests reject matching corruption in both product runs.
+
+The existing private request-value selector now chooses the first present key
+in parameters/parametersJsonSchema/input_schema/schema order. Present invalid
+values remain terminal errors. The existing stateless body override also keeps
+its original nested tools, matching the tagged compiled request writer; normal
+validation and pending-history acquisition still happen first. This preserves
+large schema integers and the different normal/simple wire views with two
+production-line changes. Both stay in gateway/deepseek and reuse its existing
+presence selector; no shared helper, dependency or exported API is added.
+
+PASS: `rtk proxy go test -race ./internal/gateway/deepseek ./tools/differential`.
+New clean-candidate executable comparison follows before publication. The
+registry expands from DeepSeek369 to DeepSeek383; Gemini974 is unchanged.
+These finite matrices do not prove complete provider or authentication parity.
+
+## Native source qualification
+
+The exact official Codex tag resolves to
+`6aaac694803004a63c6f393d153c96d22521a6b9`. The tagged Prodex source guard and
+its negative self-tests PASS against that clean source: 82 critical files and
+101 semantic groups, including the eleven newly required groups. Commands:
+`rtk proxy node scripts/compat/check-upstream-baseline.mjs --source "$CODEX_SOURCE" --report "$ARTIFACTS/codex-0164-source-report.json"`
+and `rtk proxy node scripts/compat/check-upstream-baseline.mjs --self-test`.
+This qualifies the native owners; it is not end-to-end wrapper proof for every
+compaction/resume path. The live-account and foreign-platform limits remain.
+
+Clean `9a4c2654b` also PASSes `rtk proxy go test -json ./...` (11,286 passed,
+19 optional skipped) and `rtk proxy make verify`. A newer production change
+must run its own gates. CI for the pushed checkpoints was observed in progress;
+no remote success is inferred. The prior baseline CI failure is being inspected
+without waiting for asynchronous runs before pushing completed fixes.

@@ -47,6 +47,7 @@ func deepSeekAdmissionSuffixes04384() []string {
 	suffixes = append(suffixes, deepSeekCloneNumberSuffixes04384()...)
 	suffixes = append(suffixes, deepSeekSchemaEqualitySuffixes04384()...)
 	suffixes = append(suffixes, deepSeekToolStrictSuffixes04384()...)
+	suffixes = append(suffixes, deepSeekSchemaAliasSuffixes04390()...)
 	return append(suffixes, deepSeekFunctionArgumentSuffixes04384()...)
 }
 
@@ -93,6 +94,9 @@ func requestPrimitiveCase04384(scenario string) (requestPrimitiveFixture04384, b
 	}
 	const stops16 = `["s01","s02","s03","s04","s05","s06","s07","s08","s09","s10","s11","s12","s13","s14","s15","s16"]`
 	suffix := strings.TrimPrefix(strings.TrimPrefix(scenario, "deepseek-"), "request-primitive-")
+	if strings.HasPrefix(suffix, "schema-alias-") {
+		return deepSeekSchemaAliasFixture04390(suffix)
+	}
 	if strings.HasPrefix(suffix, "tool-strict-") {
 		return deepSeekToolStrictFixture04384(suffix)
 	}
