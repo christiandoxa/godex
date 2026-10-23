@@ -36,6 +36,7 @@ Their current executable regressions remain in the gate.
 | Merged turn metadata and unknown fields survive precommit rotation | Raw request forwarding and rotation exist | Tagged `http_followups/memory_metadata.rs` | `usecase/routing`, `gateway/openai` | PASS exact HTTP cases on clean `9a4c2654b`; finite fixture only |
 | An omitted User-Agent stays omitted | Go's default agent reproduced on both HTTP and WebSocket; shared header preparation now suppresses it | `TestForwardedUserAgentPreservesClientOwnership`; HTTP native-metadata oracle | `gateway/openai` | PASS after fix on clean `9a4c2654b`; HTTP/WebSocket wire regressions and exact-binary HTTP check |
 | Repeated root/exec/resume config overrides retain precedence | Shared scoping now covers direct and managed launches | Tagged `args_resume.rs`; context oracle | CLI runtime delivery, `gateway/codex` | PASS seven exact-argv cases on clean `a01bca13f`; native `--last` remains a separate FAIL |
+| Native exec --last selects across thread source kinds and native SQLite | Godex resolves an older CLI thread before native Codex can choose the newer exec thread | Verified Codex 0.164.0 with native-created rollouts/SQLite and loopback HTTP errors | Session/runtime use cases and runtime CLI | FAIL reproduced on clean `293ccd49d`; ownership-safe delegation remains unimplemented |
 | Inline native commands remain prompt text | Native argument forwarding preserves inline commands | Tagged `args_resume.rs`; context oracle | CLI runtime delivery, `gateway/codex` | PASS explicit-session model, permissions and presets cases on clean `a01bca13f` |
 | Codex 0.164.0 initialization and thread listing | Shared official fixture covers both 0.163.0 and 0.164.0 | `TestProdex04390OfficialCodex0164AppServerInitializeAndThreadList` | `gateway/codex` | PASS credential-free initialize and active/archived thread lists; no model turn |
 | Native metadata-patch and model-instruction ownership | Delegated to official Codex; no wrapper merge | 0.164.0 schema / source qualification | `gateway/codex` | PASS credential-free schema and 82-file/101-group source guard; full model-turn behavior unverified |
@@ -48,7 +49,7 @@ Their current executable regressions remain in the gate.
 | Terminal shutdown, protocols and saved-session guidance | Existing PTY differential | `sessionfooterparity` | `gateway/codex` | FAIL current executable rerun needed |
 | Native TUI semantics | Bubble Tea owns corresponding Godex surfaces | Owning delivery tests, TUI guard | CLI domain delivery | FAIL incomplete interactive differential coverage |
 | DeepSeek request/response/stream behavior | Existing finite matrix; schema aliases now fixed | `tools/differential` | `gateway/deepseek` | PASS fourteen alias cases; full383 FAIL on reference leftover state temporaries; Godex invariants PASS |
-| Gemini request/response/stream behavior | Existing finite matrix | `tools/differential` | `gateway/gemini` | FAIL current full-matrix rerun needed |
+| Gemini request/response/stream behavior | Existing finite matrix | `tools/differential` | `gateway/gemini` | PASS all 974 cases on frozen `1fb3dbe4f`; current production is newer and the full gate is still running |
 | Other providers, catalogs, quota and terminal migrations | Existing implementations; changed source needs comparison | Tagged migration baselines and owning tests | Owning gateways/use cases/delivery | FAIL migration inventory not fully qualified |
 | Quota/reset-credit requests respect profile US residency | Codex config port supplies normalized residency | Forty-step profile oracle, gateway regressions | `gateway/codex`, `gateway/openai` | PASS on clean `1fb3dbe4f`; no model-path I/O added |
 | Positive reset-credit counts show earliest available expiry | Optional display-only detail GET; raw/runtime unchanged | Pinned reset-credit executable oracle | `gateway/openai`, `usecase/quota`, CLI quota | PASS seven cases per product on clean `cea73bcdd`; finite display coverage |
@@ -89,7 +90,8 @@ Their current executable regressions remain in the gate.
   native overrides and compressed rollouts. Next: native --last ownership or
   known-version auth metadata.
 - Frozen `c72085ef0` full gate exits 1 on the Prodex Gemini primitive-control
-  invariant after DeepSeek369 PASS. Frozen `1fb3dbe4f` remains running. No
+  invariant after DeepSeek369 PASS. Frozen `1fb3dbe4f` PASSes all 974 Gemini
+  cases and remains running in WebSocket checks. No
   complete gate or native foreign-platform PASS is claimed.
 - No release version, tag or package publication is authorized by this work.
 
@@ -714,3 +716,46 @@ exploratory driver retains its other request/count/auth/residency/profile checks
 while recording this one header projection; it is not a release-gate PASS.
 No production metadata implementation has been added. Native known-version
 User-Agent construction and auth-refresh parity remain open.
+
+## Native --last counterexample with official Codex
+
+The seventh exploratory fixture uses the SHA-256-verified Codex 0.164.0
+executable to create two native rollouts and their SQLite state against an
+owned loopback backend. Every model attempt stops on a synthetic HTTP 400;
+there is no live service or paid inference. The older rollout's source becomes
+CLI while its original timestamps are preserved. The newer one remains exec.
+Both products share the normal profile-to-shared sessions directory link.
+
+Prodex forwards --last and the native request's prompt-cache key identifies the
+newer exec thread. Godex instead resolves the older CLI thread and its native
+request carries that older key. Both use the correct synthetic credential and
+keep auth.json unchanged. This is a selection/continuation FAIL, not merely an
+argument-format difference. Result SHA-256:
+`34c713371cf58a0680a1a81d0accec6dab6f66631b5caa45a88a6d47f27c3a27`.
+The probe's status remains EXPLORATORY: the backend intentionally rejects turns,
+and this is not a complete ownership or recovery qualification.
+
+Earlier fixture attempts remain unqualified: native 0.164 rejects overriding
+the built-in provider table; OPENAI_BASE_URL is not its inference override;
+hand-written histories did not establish the intended native thread-list state;
+and date-scoped seed discovery missed Codex's local-date directory. The corrected
+probe uses top-level openai_base_url, native-written state and full-tree seed
+discovery. A timed-out earlier fixture required terminating its owned Python
+process and orphan Codex helper; the cleanup was restricted to that exact
+synthetic CODEX_HOME. No owned native probe processes remain. A loopback server
+connection-reset diagnostic after the corrected run does not change its captured
+request projection; no successful model turn is claimed.
+
+Do not globally remove --last rewriting without qualifying native provider and
+SQLite selection, the latest turn's cwd, profile leases, durable ownership and
+recovery. Official exec uses all thread-source kinds, filters the configured
+provider even with --all, and treats a usable SQLite candidate as authoritative.
+An explicit standalone API-key launch can be investigated separately from
+managed-account routing, but optional wrapper settings and empty catalogs still
+need the tagged reference behavior.
+
+The frozen `1fb3dbe4f` full gate now emits a Gemini PASS report for all 974 cases
+with no comparison differences, then advances through its WebSocket checks.
+Its extracted Gemini report SHA-256 is
+`c57d82b8e406c121ed6f24323b117e9f6f6bbdec8b52210f4e718ca93492fbed`.
+The full gate remains running; no overall terminal success has been collected.
