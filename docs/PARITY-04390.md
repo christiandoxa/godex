@@ -56,7 +56,7 @@ Their current executable regressions remain in the gate.
 | Aggregate quota resolves workspace metadata for an account ID | Optional account-check GET and detail label | Exact tagged collector, quota display oracle and local regressions | Quota use case / OpenAI gateway / CLI quota | PASS 32 cases per product on clean `4f7ece56d`; doctor and raw/runtime isolation covered |
 | No generated quota User-Agent when version probing fails | Suppressed Go's automatic agent on usage/credit/workspace requests | Missing-version display oracle and gateway HTTP regressions | `gateway/openai` | PASS 32 cases per product on clean `b1240683a`; known-version construction stays open |
 | Codex auth originator override retains valid and empty values | Codex auth-header port supplies originator and residency | Expanded reset-credit oracle and gateway HTTP tests | `gateway/codex`, `model/auth`, `gateway/openai` | PASS seventeen cases per product on clean `a2e14460a`; refresh/consume have local wire coverage |
-| Explicit profile can resume a legacy rollout absent from shared catalog | Profile-scoped fallback only for a missing shared target | Context executable oracle and session use-case regressions | Session use case, runtime CLI | PASS three context and eight native-argv cases on clean `1a8d44630`; Super implementation has focused coverage, clean executable qualification pending; `--last` remains separate |
+| Explicit profile can resume a legacy rollout absent from shared catalog | Profile-scoped fallback only for a missing shared target | Context executable oracle and session use-case regressions | Session use case, runtime CLI | PASS three context, eight native-argv and two Super dispatch cases per product on clean `47b22b95e`; `--last` and implicit legacy selection remain open |
 | Authentication and refresh against real services | Official clients retain authentication ownership | Synthetic auth and lifecycle fixtures | Auth/profile domains, native gateways | BLOCKED live OAuth unavailable; synthetic tests remain runnable |
 | Native macOS/Windows runtime behavior | Six cross-build targets and native runners exist | `check-cross-build.sh`, native parity runner | Platform-specific adapters | BLOCKED native execution unavailable here; cross-build is weaker evidence |
 
@@ -70,7 +70,7 @@ Their current executable regressions remain in the gate.
 - PASS: `rtk proxy go test -json ./tools/...`
 - PASS: `bash -n scripts/verify-release-parity.sh`; workspace oracle Python
   syntax and `git diff --check`.
-- Latest pushed production: `b1240683a` (generated-agent suppression); prior
+- Latest pushed production: `47b22b95e` (Super explicit legacy resume); prior
   gate/session/auth/quota fixes remain qualified. Original checkout is preserved.
 - Clean `0209f13a1` PASSes the expanded 49-step profile oracle with the corrected
   failure fixtures. `make verify` PASSes on `30ddd406e`; later changes affect
@@ -83,7 +83,9 @@ Their current executable regressions remain in the gate.
   HTTP profile-status and raw 429 phases. Clean `4f7ece56d` PASSes 32 quota
   display cases, 49 profile steps, 11,451 tests with 19 optional SKIP and make verify.
   Clean `b1240683a` PASSes the corrected missing-version 32-case oracle and
-  make verify. Next: known-version auth metadata or native resume ownership.
+  make verify. Clean `47b22b95e` PASSes make verify and context/native-argv plus
+  both Super dispatch cases. Next: adversarial legacy settings or known-version
+  auth metadata.
 - Frozen `c72085ef0` full gate exits 1 on the Prodex Gemini primitive-control
   invariant after DeepSeek369 PASS. Frozen `1fb3dbe4f` remains running. No
   complete gate or native foreign-platform PASS is claimed.
@@ -607,3 +609,31 @@ follows before pushing. The executable projection covers dispatch, arguments,
 credential isolation and overlay cleanup; it does not run a native resume turn
 or claim complete generated-argument equality. Native --last and implicit legacy
 selection remain open.
+
+Clean `47b22b95e` now PASSes the context oracle: three context, eight exact
+native-argument and two Super dispatch cases per product. The strengthened
+Super check reads the exact UUID metadata through the overlay's actual sessions
+directory; mutation tests reject an inaccessible rollout as well. Driver SHA-256:
+`1dc86599ece984fdee0947f87716a89503009786d50f7aac284bb41973cf9192`.
+PASS: `rtk proxy make verify` on that clean source and
+`rtk proxy go test -race ./tools/contextparity -count=1` on the expanded driver.
+The production fix is pushed normally to origin/main. The new driver is wired
+into the already-required context stage; no release-gate assertion is weakened.
+
+Frozen `c72085ef0` completes all 974 Gemini cases but exits 1: the reference
+numeric-unicode case leaves two atomic state temporary files. Godex's state
+invariants PASS, and no other full-run comparison difference is reported.
+Full log SHA-256:
+`524296a14ab8638ee683e38a514f0e6bbb55c710c2ac45c4a6dc607717a41c04`.
+The unchanged isolated numeric-unicode retry PASSes both products with the
+original wire, credentials, state and mutation guards. Full974 remains FAIL;
+that retry does not replace it. Frozen `1fb3dbe4f` is still running.
+
+PASS: `rtk proxy make verify` on the expanded context driver and mutation tests.
+The next adversarial probe keeps the same legacy path but adds a saved turn
+model and effort. Both products launch, but clean `47b22b95e` injects those
+settings while the reference adds neither. A legacy Kiro or unknown provider
+also launches on the reference; Godex instead selects Kiro or rejects the
+provider before launch. These saved-setting/provider counterexamples remain
+FAIL pending a source-aware fallback fix. The earlier minimal-metadata dispatch
+PASS does not qualify them.

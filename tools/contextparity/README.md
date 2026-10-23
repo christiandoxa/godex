@@ -38,4 +38,16 @@ recording child performs no authentication, tools or model turn.
 An additional UUID exists only in the selected original profile's legacy
 rollout directory, with no shared counterpart. Explicit `run --profile main`
 must resume it in that original home while preserving exact child argv. This
-does not qualify native `--last`, implicit legacy selection or Super resume.
+does not qualify native `--last` or implicit legacy selection.
+
+Two Super cases require the same profile-only UUID to reach `exec resume`
+with its prompt and full access. Native and local `--url` modes must use a
+temporary overlay, preserve the original auth/config/model cache/rollout,
+avoid copying rollouts into shared storage, and remove the overlay on exit.
+The recording child must read the selected legacy session metadata through
+its overlay's sessions directory, including the actual directory link.
+The Python 3 recording child provides only synthetic initialize/hooks-list
+responses for Prodex's preflight. It classifies auth without recording keys.
+Mutation checks reject a changed command, target, prompt, access, home or auth
+kind. These cases qualify dispatch and lifecycle; they do not execute a native
+Codex resume turn or establish complete generated-argument equality.

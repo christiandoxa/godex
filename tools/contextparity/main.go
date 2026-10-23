@@ -63,6 +63,7 @@ type report struct {
 	Cases           []caseResult                `json:"cases"`
 	NegativeControl string                      `json:"negative_control"`
 	NativeArguments []nativeArgumentResult04390 `json:"native_arguments"`
+	SuperResume     []superResumeResult04390    `json:"super_resume"`
 }
 
 func main() {
@@ -135,6 +136,10 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	superResults, err := runSuperResumeProbes04390(options, root)
+	if err != nil {
+		return err
+	}
 	if err := checkNegativeControl(); err != nil {
 		return err
 	}
@@ -142,6 +147,7 @@ func run() error {
 		Status: "PASS", Oracle: oracleVersion, OracleSource: oracleSourceCommit,
 		CandidateSource: options.godexCommit, Cases: results,
 		NativeArguments: nativeResults,
+		SuperResume:     superResults,
 		NegativeControl: "PASS: cached maximum promotion is rejected",
 	}, "", "  ")
 	if err != nil {
