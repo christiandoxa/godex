@@ -18,6 +18,10 @@ func removeHopHeaders(headers http.Header) {
 			delete(headers, key)
 		}
 	}
+	// A present empty entry suppresses net/http's default client identity.
+	if _, present := headers["User-Agent"]; !present {
+		headers["User-Agent"] = nil
+	}
 }
 
 func prepareWebSocketRequestHeaders(headers http.Header, websocketKey string) {

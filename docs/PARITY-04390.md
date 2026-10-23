@@ -34,6 +34,7 @@ Their current executable regressions remain in the gate.
 | Exact tagged source, binary and manifest | Active oracles pinned to 0.439.0; older identities rejected | Release checksums, version, provenance guards | `tools/*parity`, `scripts/verify-*parity*` | PASS reference provenance; candidate differential pending |
 | Custom cache key independent of session header; omitted key stays absent | Raw forwarding exists; explicit new-release comparison pending | Tagged `http_backend_passthrough.rs`; HTTP oracle | `gateway/openai`, `usecase/routing`, HTTP delivery | FAIL missing 0.439.0 executable evidence |
 | Merged turn metadata and unknown fields survive precommit rotation | Raw request forwarding and rotation exist | Tagged `http_followups/memory_metadata.rs` | `usecase/routing`, `gateway/openai` | FAIL missing 0.439.0 executable evidence |
+| An omitted User-Agent stays omitted | Go's default agent reproduced on both HTTP and WebSocket; shared header preparation now suppresses it | `TestForwardedUserAgentPreservesClientOwnership`; HTTP native-metadata oracle | `gateway/openai` | FAIL before fix; cross-binary rerun pending |
 | Repeated root/exec/resume config overrides retain precedence | Scope-aware Codex gateway exists | Tagged `args_resume.rs`; context oracle | CLI runtime delivery, `gateway/codex` | FAIL expanded scoped comparison needed |
 | Inline native commands remain prompt text | Native argument forwarding exists | Tagged `args_resume.rs` | CLI runtime delivery, `gateway/codex` | FAIL current executable comparison needed |
 | Codex 0.164.0 initialization and thread listing | Shared official fixture covers both 0.163.0 and 0.164.0 | `TestProdex04390OfficialCodex0164AppServerInitializeAndThreadList` | `gateway/codex` | PASS credential-free initialize and active/archived thread lists; no model turn |
@@ -84,3 +85,31 @@ merged-metadata rotation cases. Mutation checks PASS, including large-integer
 rounding, fabricated cache/session/User-Agent, missing fields, incorrect owners
 and extra attempts. Cross-binary execution against the new clean commit is the
 next gate; this fixture addition alone is not a runtime parity PASS.
+
+## User-Agent mismatch and root fix
+
+The new exact-binary comparison rejected an invalid initial multi-profile
+custom-cache fixture: cache identity may affect placement, so its transport
+check now follows the tagged single-profile reference. A separate managed
+rotation case retains two independently authenticated Ready profiles. The
+single-profile gateway can use cached quota, so that transport check does not
+claim to prove an asynchronous two-profile quota refresh.
+
+With those reference conditions corrected, Prodex passes all new cases, while
+Godex fails the omitted-agent control with exact body, session and metadata
+preserved. The shared OpenAI header preparer let net/http manufacture
+`Go-http-client/1.1` after an absent or hop-removed agent. Four wire regressions
+FAIL before the fix (HTTP and WebSocket, omitted and hop-removed); explicit and
+empty controls PASS. The common preparer now suppresses automatic generation
+while retaining explicit client agents and leaving input header maps untouched.
+
+The change stays private to gateway/openai. No new helper, interface, option,
+dependency, worker or durable format is needed. The native patch/schema and
+base-instruction policies remain owned by Codex. Credential-free schema export
+also confirms `responsesapiClientMetadataPatch` on both TurnStartParams and
+TurnSteerParams. Live authentication and model inference were not exercised.
+
+The first pin-only commit `c72085ef0` is pushed. Its `rtk proxy make verify`
+PASSes, including source/format/TUI guards, cross-builds, installers, vet, shuffled
+race tests and the build. Its original full differential gate remains separate
+from newer production and cannot qualify this header fix.

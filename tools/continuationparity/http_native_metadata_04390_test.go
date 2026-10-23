@@ -31,6 +31,7 @@ func TestProdex04390NativeMetadataOracleRejectsMutations(t *testing.T) {
 				func(r *httpSoftConflictResult04383) { r.attempts[0].session = "custom-cache-key-not-session-0164" },
 				func(r *httpSoftConflictResult04383) { r.attempts[0].turn = "fabricated" },
 				func(r *httpSoftConflictResult04383) { r.attempts[0].userAgent = "fabricated" },
+				func(r *httpSoftConflictResult04383) { r.attempts[0].userAgentPresent = true },
 				func(r *httpSoftConflictResult04383) {
 					r.attempts[0].body = strings.Replace(r.attempts[0].body, "9007199254740993", "9007199254740992", 1)
 				},

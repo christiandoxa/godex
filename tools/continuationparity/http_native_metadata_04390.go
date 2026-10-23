@@ -32,6 +32,7 @@ func (b *transportBackend04383) serveNativeMetadata04390(w http.ResponseWriter, 
 		metadata: r.Header.Get("x-codex-turn-metadata"), session: r.Header.Get("session_id"),
 		turn: r.Header.Get("x-codex-turn-state"), trace: r.Header.Get("thread-id"),
 		userAgent: r.Header.Get("User-Agent"), ready: b.receipts["account-a"] > 0 && (b.scenario != "http-native-metadata-rotation" || b.receipts["account-b"] > 0),
+		userAgentPresent: len(r.Header.Values("User-Agent")) != 0,
 	})
 	b.mu.Unlock()
 	if b.scenario == "http-native-metadata-rotation" && prior == 0 {
@@ -153,7 +154,7 @@ func verifyNativeMetadata04390(shape string, result httpSoftConflictResult04383)
 		if index == 1 {
 			owner = "account-b"
 		}
-		if attempt.owner != owner || shape == "rotation" && !attempt.ready || attempt.body != nativeMetadataRequest04390(shape) || attempt.metadata != nativeTurnMetadata04390 || attempt.session != nativeSession04390 || attempt.turn != "" || attempt.trace != "" || attempt.userAgent != "" {
+		if attempt.owner != owner || shape == "rotation" && !attempt.ready || attempt.body != nativeMetadataRequest04390(shape) || attempt.metadata != nativeTurnMetadata04390 || attempt.session != nativeSession04390 || attempt.turn != "" || attempt.trace != "" || attempt.userAgent != "" || attempt.userAgentPresent {
 			return fmt.Errorf("native metadata attempt %d changed: owner=%s ready=%t body_equal=%t metadata_equal=%t session_equal=%t turn_empty=%t trace_empty=%t user_agent_empty=%t", index, attempt.owner, attempt.ready, attempt.body == nativeMetadataRequest04390(shape), attempt.metadata == nativeTurnMetadata04390, attempt.session == nativeSession04390, attempt.turn == "", attempt.trace == "", attempt.userAgent == "")
 		}
 	}

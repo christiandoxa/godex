@@ -21,6 +21,7 @@ const transportCompleted04383 = `{"type":"response.completed","response":{"id":"
 type transportAttempt04383 struct {
 	owner, turn, body, metadata, trace string
 	session, userAgent                 string
+	userAgentPresent                   bool
 	ready                              bool
 }
 

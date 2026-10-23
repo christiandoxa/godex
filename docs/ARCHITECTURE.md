@@ -1204,6 +1204,10 @@ same narrow auth port. The stateless `helper/httpheader` package shares RFC
 hop-header policy between the two concrete HTTP boundaries, with focused tests.
 The sole integration root remains `cmd/godex`.
 
+The OpenAI gateway preserves the caller's User-Agent on HTTP requests and
+WebSocket handshakes. If absent after hop-header removal, a private empty header
+entry suppresses the Go transport's default identity; no new agent is sent.
+
 HTTP delivery uses one context-error snapshot when distinguishing its local
 request deadline from client cancellation. A deadline firing during error
 presentation must retain the typed timeout instead of returning empty success.
