@@ -147,7 +147,7 @@ func runStartupProbeCase(root, binary, product string, probeCase startupProbeCas
 	} else if code != 0 {
 		return startupProbeResult{}, fmt.Errorf("import-current exit=%d output=%q", code, output)
 	}
-	usage := newUsageServer(probeCase.status, probeCase.response)
+	usage := newUsageServer(probeCase.status, probeCase.response, "synthetic-account")
 	if probeCase.reloadOn401 {
 		importedAuth, locateErr := startupManagedAuthFile043714(configHome)
 		if locateErr != nil {
@@ -183,7 +183,7 @@ func startupEnvironment(userHome, currentHome, configHome string) []string {
 	}
 }
 
-func newUsageServer(status int, body string) *usageServer {
+func newUsageServer(status int, body, accountID string) *usageServer {
 	usage := &usageServer{status: status, body: body}
 	usage.server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		usage.mu.Lock()
@@ -191,7 +191,7 @@ func newUsageServer(status int, body string) *usageServer {
 			method: request.Method, path: request.URL.Path,
 			residency: request.Header.Get("x-openai-internal-codex-residency"),
 			authValid: request.Header.Get("Authorization") == "Bearer synthetic-access" &&
-				request.Header.Get("ChatGPT-Account-Id") == "synthetic-account" &&
+				request.Header.Get("ChatGPT-Account-Id") == accountID &&
 				request.Header.Get("originator") == "codex_cli_rs" &&
 				request.Header.Get("x-openai-codex-luna-reserve") == "1",
 		})

@@ -94,7 +94,7 @@ func runQuotaFailure(root, product, binary string, probe quotaFailureCase, mode 
 	}
 	auth := filepath.Join(profile, "auth.json")
 	config := filepath.Join(profile, "config.toml")
-	if err := os.WriteFile(auth, []byte(`{"auth_mode":"chatgpt","tokens":{"access_token":"synthetic-access","account_id":"synthetic-account"}}`), 0o600); err != nil {
+	if err := os.WriteFile(auth, []byte(`{"auth_mode":"chatgpt","tokens":{"access_token":"synthetic-access"}}`), 0o600); err != nil {
 		return quotaFailureResult{}, err
 	}
 	if err := os.WriteFile(config, []byte(probe.config), 0o600); err != nil {
@@ -117,7 +117,7 @@ func runQuotaFailure(root, product, binary string, probe quotaFailureCase, mode 
 			return quotaFailureResult{}, err
 		}
 	}
-	usage := newUsageServer(probe.status, probe.body)
+	usage := newUsageServer(probe.status, probe.body, "")
 	defer usage.Close()
 	args := []string{"quota", "--base-url", usage.server.URL + "/backend-api"}
 	if mode == "all" {

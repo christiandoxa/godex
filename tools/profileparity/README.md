@@ -44,6 +44,9 @@ must exit 1 with empty stdout and a safe stderr diagnostic; aggregate views must
 exit 0 and retain the profile row. Every case checks exact request count, route
 and synthetic identity, plus unchanged credentials, config and profile state.
 Mutation tests reject matching corrupt outcomes in both products.
+These fixtures omit the optional account ID to isolate failure behavior from
+the separate aggregate workspace lookup. Startup tests still require the
+synthetic account ID; no extra or missing request is accepted in either mode.
 
 ### Startup quota warmup
 

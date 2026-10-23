@@ -52,7 +52,8 @@ Their current executable regressions remain in the gate.
 | Other providers, catalogs, quota and terminal migrations | Existing implementations; changed source needs comparison | Tagged migration baselines and owning tests | Owning gateways/use cases/delivery | FAIL migration inventory not fully qualified |
 | Quota/reset-credit requests respect profile US residency | Codex config port supplies normalized residency | Forty-step profile oracle, gateway regressions | `gateway/codex`, `gateway/openai` | PASS on clean `1fb3dbe4f`; no model-path I/O added |
 | Positive reset-credit counts show earliest available expiry | Optional display-only detail GET; raw/runtime unchanged | Pinned reset-credit executable oracle | `gateway/openai`, `usecase/quota`, CLI quota | PASS seven cases per product on clean `cea73bcdd`; finite display coverage |
-| Single-profile one-shot quota fails on malformed config or probe errors | Delivery now returns the report error before stdout | CLI regression, profile executable oracle | CLI quota delivery | FAIL reproduced on clean `cea73bcdd`; clean fixed-candidate qualification pending |
+| Single-profile one-shot quota fails on malformed config or probe errors | Delivery returns the report error before stdout | CLI regression, profile executable oracle | CLI quota delivery | PASS nine failure cases on clean `0209f13a1`; aggregate fixture isolates optional workspace lookup |
+| Aggregate quota resolves workspace metadata for an account ID | Prodex makes a separate account-check GET; Godex omits it | Exact tagged collector and failed quota oracle run | Quota use case / OpenAI gateway | FAIL; failure-only fixtures omit account ID to isolate exit behavior |
 | Authentication and refresh against real services | Official clients retain authentication ownership | Synthetic auth and lifecycle fixtures | Auth/profile domains, native gateways | BLOCKED live OAuth unavailable; synthetic tests remain runnable |
 | Native macOS/Windows runtime behavior | Six cross-build targets and native runners exist | `check-cross-build.sh`, native parity runner | Platform-specific adapters | BLOCKED native execution unavailable here; cross-build is weaker evidence |
 
@@ -66,12 +67,14 @@ Their current executable regressions remain in the gate.
 - PASS: `rtk proxy go test -json ./tools/...`
 - PASS: `bash -n scripts/verify-release-parity.sh`; workspace oracle Python
   syntax and `git diff --check`.
-- Latest pushed production: `cea73bcdd` (reset-credit expiry), after profile
-  residency, native config-scope, DeepSeek schema-alias and omitted-agent fixes.
-- Its seven reset-credit executable cases per product PASS; full tests PASS
-  11,361 cases with 19 optional SKIP. `make verify` PASSes on that clean source.
-- Current work: single-profile one-shot quota errors; next qualify the clean
-  candidate, push the verified fix and continue the remaining matrix gaps.
+- Latest pushed production: `30ddd406e` (single-profile quota errors), after
+  reset-credit expiry, residency, native config-scope, schema and agent fixes.
+- Clean `0209f13a1` PASSes the expanded 49-step profile oracle with the corrected
+  failure fixtures. `make verify` PASSes on `30ddd406e`; later changes affect
+  only fixtures and documentation. Clean `cea73bcdd` full tests PASS 11,361
+  cases with 19 optional SKIP.
+- Current work: strict reset-credit detail fields; six Go regressions and the
+  expanded executable oracle FAIL before the parser fix. Clean after-test next.
 - Full gates for frozen `c72085ef0` and `1fb3dbe4f` are still running. No complete
   gate or native foreign-platform PASS is claimed.
 - No release version, tag or package publication is authorized by this work.
@@ -341,3 +344,21 @@ and continues rejecting credential exposure. The failed run is retained; no
 successful fixed-candidate qualification is inferred from it. Exact diagnostic
 wording/body equality is outside this finite failure projection. Godex continues
 to use its existing body-free diagnostics.
+
+The next run independently exposed an aggregate workspace lookup difference:
+Prodex sends an account-check GET after usage when account_id is present, while
+Godex does not. That run remains FAIL and workspace lookup remains open. The
+failure-only fixtures now omit the optional account ID; both products must send
+the same bearer-only usage request with no account header. Existing startup and
+residency fixtures still require their account ID. This isolates error handling
+without accepting an extra or missing request in either product.
+
+Clean `0209f13a1` now PASSes the 49-step profile workflow using the corrected
+driver, including all nine failure cases and the original lifecycle, startup,
+residency, gateway and restart checks. Driver executable SHA-256:
+`50ea436284d1713456f32469c2d20b4f820776194ad62df7ff54b6b24238d570`.
+The corrected driver was built from the working fixture changes; the candidate
+source and binary provenance remained pinned and clean. Its seven reset-credit
+display cases also PASS. `rtk proxy make verify` PASSes on production commit
+`30ddd406e`; `rtk proxy go test -race ./tools/profileparity -count=1` PASSes on
+the corrected fixtures. No full release-gate PASS is inferred.
