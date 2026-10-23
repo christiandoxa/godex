@@ -63,7 +63,7 @@ func (client *QuotaClient) sendRedeem(
 	if err != nil {
 		return 0, nil, err
 	}
-	residency, err := client.auth.ReadQuotaResidency(ctx, codexHome)
+	headers, err := client.auth.ReadQuotaHeaders(ctx, codexHome)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -78,10 +78,10 @@ func (client *QuotaClient) sendRedeem(
 	request.Header.Set("Authorization", "Bearer "+auth.AccessToken)
 	request.Header.Set("Accept", "application/json")
 	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("originator", "codex_cli_rs")
+	request.Header.Set("originator", headers.Originator)
 	request.Header.Set("x-openai-codex-luna-reserve", "1")
-	if residency != "" {
-		request.Header.Set("x-openai-internal-codex-residency", residency)
+	if headers.Residency != "" {
+		request.Header.Set("x-openai-internal-codex-residency", headers.Residency)
 	}
 	if auth.AccountID != "" {
 		request.Header.Set("ChatGPT-Account-Id", auth.AccountID)

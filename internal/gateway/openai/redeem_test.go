@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	authmodel "github.com/christiandoxa/godex/internal/model/auth"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
@@ -15,8 +16,8 @@ type rotatingAuthReader struct {
 	calls int
 }
 
-func (*rotatingAuthReader) ReadQuotaResidency(context.Context, string) (string, error) {
-	return "", nil
+func (*rotatingAuthReader) ReadQuotaHeaders(context.Context, string) (authmodel.RequestHeaders, error) {
+	return authmodel.RequestHeaders{Originator: "codex_cli_rs"}, nil
 }
 
 func (reader *rotatingAuthReader) ReadAuth(context.Context, string) (proxymodel.Auth, error) {

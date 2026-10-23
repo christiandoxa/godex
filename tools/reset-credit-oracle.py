@@ -17,6 +17,11 @@ FINITE = {'credits': [
     {'status': 'available', 'expires_at': '2026-10-23T01:23:45.987+07:00'},
     {'status': 'available', 'expires_at': None},
 ]}
+ORIGINATORS = {
+    'originator_custom': ('codex-tui', 'codex-tui'),
+    'originator_empty': ('', ''),
+    'originator_invalid': ('invalid\noriginator', 'codex_cli_rs'),
+}
 CASES = [
     ('finite', 3, 200, FINITE, '3 available | next expiry: 2026-10-22 18:23:45 +00:00'),
     ('never', 2, 200, {'credits': [{'status': 'available', 'expires_at': None}]}, '2 available | next expiry: never'),
@@ -33,6 +38,8 @@ CASES = [
     ('zero', 0, 200, FINITE, '0 available'),
     ('raw', 3, 200, FINITE, ''),
 ]
+CASES += [(name, 1, 200, {'credits': [{'status': 'available', 'expires_at': None}]},
+           '1 available | next expiry: never') for name in ORIGINATORS]
 
 
 def verify_result(case, result):
@@ -44,6 +51,8 @@ def verify_result(case, result):
     assert code == 0 and unchanged, 'failed command or changed credentials'
     assert [call['path'] for call in calls] == expected_paths, 'wrong request count or route'
     assert all(call['auth'] and call['account'] and call['residency'] == 'us' for call in calls), 'accepted identity/residency lost'
+    originator = ORIGINATORS.get(name, (None, 'codex_cli_rs'))[1]
+    assert all(call['originator'] == originator for call in calls), 'wrong auth request originator'
     if name == 'raw':
         assert json.loads(text)['rate_limit_reset_credits']['available_count'] == count
         assert 'next expiry' not in text
@@ -55,14 +64,16 @@ def verify_result(case, result):
 def self_test():
     for case in CASES:
         name, count, _, _, summary = case
-        calls = [{'path': '/backend-api/wham/usage', 'auth': True, 'account': True, 'residency': 'us'}]
+        calls = [{'path': '/backend-api/wham/usage', 'auth': True, 'account': True, 'residency': 'us',
+                  'originator': ORIGINATORS.get(name, (None, 'codex_cli_rs'))[1]}]
         if count > 0 and name != 'raw':
             calls.append(dict(calls[0], path='/backend-api/wham/rate-limit-reset-credits'))
         text = json.dumps({'rate_limit_reset_credits': {'available_count': count}}) if name == 'raw' else summary
         verify_result(case, (calls, text, 0, True))
         mutations = [(calls + calls, text, 0, True), (calls, text, 1, True), (calls, text, 0, False),
                      (calls, text.replace(str(count), '999'), 0, True),
-                     ([dict(call, auth=False) for call in calls], text, 0, True)]
+                     ([dict(call, auth=False) for call in calls], text, 0, True),
+                     ([dict(call, originator='invented') for call in calls], text, 0, True)]
         for changed in mutations:
             try:
                 verify_result(case, changed)
@@ -94,6 +105,7 @@ def run_case(root, binary, product, case):
         def do_GET(self):
             calls.append({'path': self.path, 'auth': self.headers.get('Authorization') == 'Bearer synthetic-access',
                           'account': self.headers.get('ChatGPT-Account-Id') == 'synthetic-account',
+                          'originator': self.headers.get('originator'),
                           'residency': self.headers.get('x-openai-internal-codex-residency')})
             is_usage = self.path == '/backend-api/wham/usage'
             body = details.encode() if not is_usage and isinstance(details, str) else json.dumps(usage if is_usage else details).encode()
@@ -107,6 +119,8 @@ def run_case(root, binary, product, case):
                    'PRODEX_HOME': str(directory / 'state'), 'GODEX_HOME': str(directory / 'state'),
                    'PRODEX_CODEX_BIN': '/bin/true', 'GODEX_CODEX_BIN': '/bin/true', 'TZ': 'UTC',
                    'PRODEX_NO_UPDATE_CHECK': '1', 'GODEX_NO_UPDATE_CHECK': '1', 'NO_COLOR': '1', 'CI': '1', 'TERM': 'dumb'}
+    if name in ORIGINATORS:
+        environment['CODEX_INTERNAL_ORIGINATOR_OVERRIDE'] = ORIGINATORS[name][0]
     registered = subprocess.run([binary, 'profile', 'add', 'main', '--codex-home', str(profile), '--activate'],
                                 cwd=directory, env=environment, capture_output=True, text=True, timeout=15)
     assert registered.returncode == 0, registered.stderr

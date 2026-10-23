@@ -40,18 +40,18 @@ func (client *QuotaClient) enrichResetCreditExpiry(ctx context.Context, home, up
 	if err != nil {
 		return
 	}
-	residency, err := client.auth.ReadQuotaResidency(ctx, home)
+	headers, err := client.auth.ReadQuotaHeaders(ctx, home)
 	if err != nil {
 		return
 	}
 	request.Header.Set("Authorization", "Bearer "+auth.AccessToken)
-	request.Header.Set("originator", "codex_cli_rs")
+	request.Header.Set("originator", headers.Originator)
 	request.Header.Set("x-openai-codex-luna-reserve", "1")
 	if auth.AccountID != "" {
 		request.Header.Set("ChatGPT-Account-Id", auth.AccountID)
 	}
-	if residency != "" {
-		request.Header.Set("x-openai-internal-codex-residency", residency)
+	if headers.Residency != "" {
+		request.Header.Set("x-openai-internal-codex-residency", headers.Residency)
 	}
 	response, err := client.doWithClient(client.client, request)
 	if err != nil {

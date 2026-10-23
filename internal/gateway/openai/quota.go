@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	authmodel "github.com/christiandoxa/godex/internal/model/auth"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 	quotamodel "github.com/christiandoxa/godex/internal/model/quota"
 )
@@ -20,7 +21,7 @@ const maxQuotaResponseBytes = 1 << 20
 
 type quotaAuthReader interface {
 	authReader
-	ReadQuotaResidency(context.Context, string) (string, error)
+	ReadQuotaHeaders(context.Context, string) (authmodel.RequestHeaders, error)
 }
 
 type QuotaClient struct {
@@ -156,7 +157,7 @@ func (client *QuotaClient) fetchBodyWithIdentity043714(
 		return nil, proxymodel.Auth{}, time.Time{}, err
 	}
 	send := func(identity proxymodel.Auth) (int, []byte, time.Time, error) {
-		residency, err := client.auth.ReadQuotaResidency(ctx, codexHome)
+		headers, err := client.auth.ReadQuotaHeaders(ctx, codexHome)
 		if err != nil {
 			return 0, nil, time.Time{}, err
 		}
@@ -166,10 +167,10 @@ func (client *QuotaClient) fetchBodyWithIdentity043714(
 		}
 		request.Header.Set("Authorization", "Bearer "+identity.AccessToken)
 		request.Header.Set("Accept", "application/json")
-		request.Header.Set("originator", "codex_cli_rs")
+		request.Header.Set("originator", headers.Originator)
 		request.Header.Set("x-openai-codex-luna-reserve", "1")
-		if residency != "" {
-			request.Header.Set("x-openai-internal-codex-residency", residency)
+		if headers.Residency != "" {
+			request.Header.Set("x-openai-internal-codex-residency", headers.Residency)
 		}
 		if identity.AccountID != "" {
 			request.Header.Set("ChatGPT-Account-Id", identity.AccountID)

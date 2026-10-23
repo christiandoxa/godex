@@ -54,6 +54,7 @@ Their current executable regressions remain in the gate.
 | Positive reset-credit counts show earliest available expiry | Optional display-only detail GET; raw/runtime unchanged | Pinned reset-credit executable oracle | `gateway/openai`, `usecase/quota`, CLI quota | PASS seven cases per product on clean `cea73bcdd`; finite display coverage |
 | Single-profile one-shot quota fails on malformed config or probe errors | Delivery returns the report error before stdout | CLI regression, profile executable oracle | CLI quota delivery | PASS nine failure cases on clean `0209f13a1`; aggregate fixture isolates optional workspace lookup |
 | Aggregate quota resolves workspace metadata for an account ID | Prodex makes a separate account-check GET; Godex omits it | Exact tagged collector and failed quota oracle run | Quota use case / OpenAI gateway | FAIL; failure-only fixtures omit account ID to isolate exit behavior |
+| Codex auth originator override retains valid and empty values | Codex auth-header port now supplies originator and residency | Expanded reset-credit oracle and gateway HTTP tests | `gateway/codex`, `model/auth`, `gateway/openai` | FAIL on clean `1978eced1`; fixed-candidate executable qualification pending |
 | Authentication and refresh against real services | Official clients retain authentication ownership | Synthetic auth and lifecycle fixtures | Auth/profile domains, native gateways | BLOCKED live OAuth unavailable; synthetic tests remain runnable |
 | Native macOS/Windows runtime behavior | Six cross-build targets and native runners exist | `check-cross-build.sh`, native parity runner | Platform-specific adapters | BLOCKED native execution unavailable here; cross-build is weaker evidence |
 
@@ -67,14 +68,14 @@ Their current executable regressions remain in the gate.
 - PASS: `rtk proxy go test -json ./tools/...`
 - PASS: `bash -n scripts/verify-release-parity.sh`; workspace oracle Python
   syntax and `git diff --check`.
-- Latest pushed production: `30ddd406e` (single-profile quota errors), after
-  reset-credit expiry, residency, native config-scope, schema and agent fixes.
+- Latest pushed production: `1978eced1` (strict reset-credit detail fields),
+  after one-shot errors, expiry, residency, native config, schema and agent fixes.
 - Clean `0209f13a1` PASSes the expanded 49-step profile oracle with the corrected
   failure fixtures. `make verify` PASSes on `30ddd406e`; later changes affect
   only fixtures and documentation. Clean `cea73bcdd` full tests PASS 11,361
   cases with 19 optional SKIP.
-- Current work: strict reset-credit detail fields; six Go regressions and the
-  expanded executable oracle FAIL before the parser fix. Clean after-test next.
+- Clean `1978eced1` PASSes fourteen reset-credit scenarios per product and
+  `make verify`. Current work: auth originator override; clean after-test next.
 - Full gates for frozen `c72085ef0` and `1fb3dbe4f` are still running. No complete
   gate or native foreign-platform PASS is claimed.
 - No release version, tag or package publication is authorized by this work.
@@ -252,7 +253,7 @@ with private imported homes, one authenticated GET, a valid durable usage
 snapshot and successful child shutdown. Its matching-corruption guards reject
 missing or fabricated residency in both products.
 
-QuotaClient now consumes a mandatory narrow ReadQuotaResidency contract from
+At `1fb3dbe4f`, QuotaClient consumes a mandatory narrow ReadQuotaResidency contract from
 its Codex auth adapter. Codex's original bounded config reader is package-local
 and reused by provider inspection and residency. The OpenAI quota and redeem
 adapters apply the returned residency before each credential attempt. Invalid
@@ -382,3 +383,31 @@ PASS: `rtk proxy go test -race ./internal/gateway/openai ./internal/usecase/quot
 `rtk proxy go test -race ./internal/gateway/openai -run '^TestCredit' -count=1`,
 and `rtk proxy python3 tools/reset-credit-oracle.py --self-test`.
 Clean fourteen-case executable qualification follows before publication.
+
+Clean `1978eced1` now PASSes all fourteen executable reset-credit scenarios per
+product, with driver SHA-256
+`3fec17f586b7b59598f87a376a18b3a4b91ff3f1a6f3943bd130ec446180ab56`.
+`rtk proxy make verify` also PASSes on that exact clean source. The commit was
+pushed normally to `origin/main`.
+
+## Auth request originator
+
+The tagged auth-header builder honors CODEX_INTERNAL_ORIGINATOR_OVERRIDE and
+retains valid empty values; invalid HTTP field values fall back to codex_cli_rs.
+Godex hardcoded the default on usage, credit-detail, consume and auth refresh.
+Six new usage/display/consume HTTP tests FAIL before the fix. All seventeen
+expanded reference scenarios PASS, while clean `1978eced1` fails the custom
+override after passing the fourteen existing reset-credit scenarios.
+
+The existing mandatory config port now returns originator and residency through
+a two-field auth request model. The Codex gateway owns native environment and
+HTTP field validation; OpenAI consumes those facts on every credential attempt.
+The existing Codex refresh sender reuses the private originator resolver.
+There is no cross-gateway concrete dependency, shared helper, new configuration
+option, worker or durable format. Empty, custom, invalid/control/UTF-8 values,
+credential continuity and the refresh adapter have focused regressions.
+
+PASS: `rtk proxy go test -race ./internal/gateway/openai ./internal/gateway/codex ./cmd/godex`
+and the focused Codex header tests, plus reset-credit oracle self-tests.
+Clean seventeen-case executable qualification follows before publication.
+Quota User-Agent construction remains a separate unimplemented parity gap.

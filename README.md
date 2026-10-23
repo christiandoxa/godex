@@ -481,6 +481,9 @@ detail, watch, auth, or provider filters. Missing fields and disabled profiles
 display conservatively. Single-profile `--once` returns configuration and probe
 failures on stderr with exit 1; aggregate views retain individual error rows.
 Probe error bodies and secrets are never rendered.
+OpenAI quota and reset-credit requests honor Codex's
+`CODEX_INTERNAL_ORIGINATOR_OVERRIDE`, including an explicitly empty value.
+Invalid HTTP field values use the native `codex_cli_rs` default.
 `--auth` supports Prodex labels such as `chatgpt`, `no-auth`, `api-key`,
 `invalid-auth`, `unreadable-auth`, `quota-compatible`, and
 `non-quota-compatible`. `--provider` accepts the Prodex 0.435.1 canonical names

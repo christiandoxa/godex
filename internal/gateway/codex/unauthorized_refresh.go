@@ -132,7 +132,7 @@ func requestChatGPTAuthRefresh(ctx context.Context, refreshToken string) (ChatGP
 		return ChatGPTRefreshResponse{}, fmt.Errorf("build ChatGPT auth refresh request: %w", err)
 	}
 	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("originator", "codex_cli_rs")
+	request.Header.Set("originator", codexAuthOriginator())
 
 	client := &http.Client{Timeout: 30 * time.Second}
 	response, err := client.Do(request)

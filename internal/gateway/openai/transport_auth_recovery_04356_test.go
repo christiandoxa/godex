@@ -9,6 +9,7 @@ import (
 	"sync"
 	"testing"
 
+	authmodel "github.com/christiandoxa/godex/internal/model/auth"
 	proxymodel "github.com/christiandoxa/godex/internal/model/proxy"
 )
 
@@ -18,8 +19,8 @@ type authReloadSequence struct {
 	reads  int
 }
 
-func (*authReloadSequence) ReadQuotaResidency(context.Context, string) (string, error) {
-	return "", nil
+func (*authReloadSequence) ReadQuotaHeaders(context.Context, string) (authmodel.RequestHeaders, error) {
+	return authmodel.RequestHeaders{Originator: "codex_cli_rs"}, nil
 }
 
 type authRefreshSequence struct {

@@ -823,11 +823,13 @@ bounded, and never persists credentials or quota snapshots. The quota use case
 classifies ready/exhausted state. Runtime launch code consumes that policy
 through a narrow interface, so it does not import the quota use-case package.
 
-Quota and reset-credit requests read the selected profile's residency through a
-mandatory narrow Codex config port. `gateway/codex` owns bounded config parsing,
-reusing the same private reader as provider inspection; `gateway/openai` maps
-the returned value onto the HTTP header. Invalid config stops the request before
-dispatch. Ordinary model traffic does not acquire another config-file read.
+Quota and reset-credit requests consume a mandatory narrow Codex auth-header
+port returning `model/auth.RequestHeaders`. `gateway/codex` owns bounded profile
+config parsing and the native originator environment contract, including empty
+values and invalid-header fallback. It reuses that private originator resolver
+for its existing auth-refresh adapter. `gateway/openai` applies these model facts
+to usage, credit-detail and consume requests without importing the Codex adapter.
+Invalid config stops dispatch. Ordinary model traffic gains no config-file read.
 
 The quota use case selects an explicit display-fetch port for user reports.
 The OpenAI gateway alone enriches positive reset-credit counts with a bounded
