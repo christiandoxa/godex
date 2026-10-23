@@ -23,6 +23,13 @@ CASES = [
     ('failed', 3, 500, {}, '3 available | next expiry: unavailable'),
     ('incomplete', 3, 200, {'credits': [{'status': 'available'}]}, '3 available | next expiry: unavailable'),
     ('invalid', 3, 200, {'credits': [{'status': 'available', 'expires_at': 'bad'}]}, '3 available | next expiry: unavailable'),
+    ('uppercase_credits', 3, 200, '{"Credits":[{"status":"available","expires_at":null}]}', '3 available | next expiry: unavailable'),
+    ('uppercase_status', 3, 200, '{"credits":[{"Status":"available","expires_at":null}]}', '3 available | next expiry: unavailable'),
+    ('uppercase_expiry', 3, 200, '{"credits":[{"status":"available","Expires_At":null}]}', '3 available | next expiry: unavailable'),
+    ('duplicate_credits', 3, 200, '{"credits":[],"credits":[{"status":"available","expires_at":null}]}', '3 available | next expiry: unavailable'),
+    ('duplicate_status', 3, 200, '{"credits":[{"status":"consumed","status":"available","expires_at":null}]}', '3 available | next expiry: unavailable'),
+    ('duplicate_expiry', 3, 200, '{"credits":[{"status":"available","expires_at":"bad","expires_at":null}]}', '3 available | next expiry: unavailable'),
+    ('unknown_duplicates', 3, 200, '{"credits":[{"status":"available","expires_at":null,"unknown":1,"unknown":2}],"ignored":1,"ignored":2}', '3 available | next expiry: never'),
     ('zero', 0, 200, FINITE, '0 available'),
     ('raw', 3, 200, FINITE, ''),
 ]
@@ -89,7 +96,7 @@ def run_case(root, binary, product, case):
                           'account': self.headers.get('ChatGPT-Account-Id') == 'synthetic-account',
                           'residency': self.headers.get('x-openai-internal-codex-residency')})
             is_usage = self.path == '/backend-api/wham/usage'
-            body = json.dumps(usage if is_usage else details).encode()
+            body = details.encode() if not is_usage and isinstance(details, str) else json.dumps(usage if is_usage else details).encode()
             self.send_response(200 if is_usage else detail_status)
             self.send_header('Content-Type', 'application/json')
             self.send_header('Content-Length', str(len(body)))

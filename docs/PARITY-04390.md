@@ -362,3 +362,23 @@ source and binary provenance remained pinned and clean. Its seven reset-credit
 display cases also PASS. `rtk proxy make verify` PASSes on production commit
 `30ddd406e`; `rtk proxy go test -race ./tools/profileparity -count=1` PASSes on
 the corrected fixtures. No full release-gate PASS is inferred.
+
+## Strict reset-credit detail fields
+
+The expanded reset-credit oracle adds six malformed known-field shapes and an
+unknown-duplicate control. All fourteen reference scenarios PASS. Clean
+`0209f13a1` fails uppercase_credits after passing the original scenarios; six
+new Go cases independently FAIL before the fix because encoding/json accepts
+case-insensitive names and overwrites duplicate fields.
+
+The OpenAI gateway now selects exact known names from validated raw JSON and
+rejects a repeated credits/status/expires_at field, including escaped names.
+Unknown fields, including repeated unknown names, remain ignored. Malformed
+optional details preserve the quota and credit count with unavailable expiry.
+The small parser stays private to the owning gateway; no shared helper, exported
+type, interface, dependency, persistence or request-count change is needed.
+
+PASS: `rtk proxy go test -race ./internal/gateway/openai ./internal/usecase/quota ./internal/delivery/cli/quota`,
+`rtk proxy go test -race ./internal/gateway/openai -run '^TestCredit' -count=1`,
+and `rtk proxy python3 tools/reset-credit-oracle.py --self-test`.
+Clean fourteen-case executable qualification follows before publication.

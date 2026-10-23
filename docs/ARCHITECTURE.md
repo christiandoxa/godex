@@ -835,6 +835,8 @@ read-only detail GET using the identity accepted by the usage request. Optional
 failures keep the successful usage result. Raw output, runtime/authenticated
 probes and auto-redeem eligibility retain their existing single-request paths.
 Expiry fields are display-only model facts and excluded from JSON persistence.
+The private detail parser matches exact field names and rejects duplicate known
+fields; unknown fields remain ignored, matching the tagged Serde wire boundary.
 CLI quota delivery formats local timestamps and wraps terminal output with the
 existing Lip Gloss dependency; Bubble Tea still owns refresh and resize events.
 It also presents a single-profile one-shot report error as a command failure

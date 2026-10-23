@@ -44,6 +44,18 @@ func TestCreditExpirySelectsInstantsAndPreservesUnavailable(t *testing.T) {
 		{`{"credits":[{"status":"available","expires_at":null},{"status":"available","expires_at":false}]}`, "unavailable"},
 		{`{"credits":[{"status":"available","expires_at":"2026-10-23T01:23:45+07:00"},{"status":"available","expires_at":"invalid"}]}`, "unavailable"},
 		{`{"credits":[{"status":7}]}`, "unavailable"},
+		{`invalid JSON`, "unavailable"},
+		{`[]`, "unavailable"},
+		{`{"credits":[null]}`, "unavailable"},
+		{`{"credits":[{"status":null,"expires_at":null}]}`, "unavailable"},
+		{`{"Credits":[{"status":"available","expires_at":null}]}`, "unavailable"},
+		{`{"credits":[{"Status":"available","expires_at":null}]}`, "unavailable"},
+		{`{"credits":[{"status":"available","Expires_At":null}]}`, "unavailable"},
+		{`{"credits":[],"credits":[{"status":"available","expires_at":null}]}`, "unavailable"},
+		{`{"credits":[{"status":"consumed","status":"available","expires_at":null}]}`, "unavailable"},
+		{`{"credits":[{"status":"consumed","sta\u0074us":"available","expires_at":null}]}`, "unavailable"},
+		{`{"credits":[{"status":"available","expires_at":"bad","expires_at":null}]}`, "unavailable"},
+		{`{"credits":[{"status":"available","expires_at":null,"unknown":1,"unknown":2}],"ignored":1,"ignored":2}`, "never"},
 	} {
 		t.Run(fixture.body, func(t *testing.T) {
 			credits := &quotamodel.ResetCredits{AvailableCount: 3, NeverExpires: true}
