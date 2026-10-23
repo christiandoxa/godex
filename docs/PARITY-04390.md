@@ -212,3 +212,10 @@ fails in the reference durable escaped-surrogate response-owner assertion.
 Both native lanes pass ordinary tests/builds. Original job logs were retrieved
 through the GitHub API; these reference failures are not waived or reclassified
 as Godex successes. Current pushed CI runs remain asynchronous.
+
+The first clean scope executable run additionally identified a separate native
+selector difference: `exec resume --last` reaches Prodex's child unchanged,
+while Godex resolves it to a UUID before launch. The config-form fixture now
+uses an explicit UUID to isolate override scoping. The original --last failure
+is retained and remains **FAIL**, requiring its own ownership/concurrency review;
+no selector check was weakened or production selector policy changed here.

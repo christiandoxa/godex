@@ -27,7 +27,7 @@ func nativeArgumentProbes04390() []nativeArgumentProbe04390 {
 	probes := []nativeArgumentProbe04390{
 		{"root_exec", []string{"-c", `model_reasoning_effort="low"`, "exec", "--config", `model_reasoning_effort="high"`, "hello"}, []string{"exec", "-c", `model_reasoning_effort="low"`, "--config", `model_reasoning_effort="high"`, "hello"}},
 		{"root_exec_resume", []string{"-c", `model_reasoning_effort="low"`, "exec", "--config", `model_reasoning_effort="high"`, "resume", "-c", `model_reasoning_effort="medium"`, nativeSession04390, "continue without replaying completed tools"}, []string{"exec", "resume", "-c", `model_reasoning_effort="low"`, "--config", `model_reasoning_effort="high"`, "-c", `model_reasoning_effort="medium"`, nativeSession04390, "continue without replaying completed tools"}},
-		{"inline_config_forms", []string{`--config=model_reasoning_effort="low"`, "exec", `-cmodel_reasoning_effort="high"`, "resume", "--last", "hello"}, []string{"exec", "resume", `--config=model_reasoning_effort="low"`, `-cmodel_reasoning_effort="high"`, "--last", "hello"}},
+		{"inline_config_forms", []string{`--config=model_reasoning_effort="low"`, "exec", `-cmodel_reasoning_effort="high"`, "resume", nativeSession04390, "hello"}, []string{"exec", "resume", `--config=model_reasoning_effort="low"`, `-cmodel_reasoning_effort="high"`, nativeSession04390, "hello"}},
 		{"literal_tail", []string{"-c", "model_context_window=500000", "exec", "--", "--config", "literal=prompt"}, []string{"exec", "-c", "model_context_window=500000", "--", "--config", "literal=prompt"}},
 	}
 	for index, prompt := range []string{"/model gpt-5.6 high", "/permissions read-only", "/presets"} {
