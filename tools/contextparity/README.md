@@ -42,12 +42,12 @@ rollout has saved model/effort metadata; the wrapper must leave both choices
 to native Codex, and preserve explicit user overrides. This does not qualify
 native `--last` or implicit legacy selection.
 
-Six Super cases require the same profile-only UUID to reach `exec resume`
+Eight Super cases require the same profile-only UUID to reach `exec resume`
 with its prompt and full access. Native and local `--url` modes must use a
 temporary overlay, preserve the original auth/config/model cache/rollout,
 avoid copying rollouts into shared storage, and remove the overlay on exit.
-The recording child must read the selected legacy session metadata through
-its overlay's sessions directory, including the actual directory link.
+The recording child must read the original rollout bytes through its overlay's
+sessions directory, including the actual directory link, and match their digest.
 The Python 3 recording child provides only synthetic initialize/hooks-list
 responses for Prodex's preflight. It classifies auth without recording keys.
 Mutation checks reject a changed command, target, prompt, access, home or auth
@@ -55,3 +55,9 @@ kind, or injected saved model/effort. Saved OpenAI, Kiro and unknown provider
 identities must retain selected-profile dispatch. These cases qualify dispatch
 and lifecycle; they do not execute a native
 Codex resume turn or establish complete generated-argument equality.
+
+Three cases use only a Zstandard-compressed legacy rollout: exact native argv,
+native Super and local Super. Fixture compression uses the repository's existing
+Zstandard dependency; plain and compressed original files must stay byte-exact.
+Every seed includes native session_id/originator/cli_version metadata, so these
+preservation cases do not request the reference's incomplete-metadata repair.

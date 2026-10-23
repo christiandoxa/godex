@@ -40,7 +40,7 @@ Their current executable regressions remain in the gate.
 | Codex 0.164.0 initialization and thread listing | Shared official fixture covers both 0.163.0 and 0.164.0 | `TestProdex04390OfficialCodex0164AppServerInitializeAndThreadList` | `gateway/codex` | PASS credential-free initialize and active/archived thread lists; no model turn |
 | Native metadata-patch and model-instruction ownership | Delegated to official Codex; no wrapper merge | 0.164.0 schema / source qualification | `gateway/codex` | PASS credential-free schema and 82-file/101-group source guard; full model-turn behavior unverified |
 | Failed compaction attempts stay isolated | Native compaction delegated; translated Compact is separate | Native lifecycle and Compact oracles | `gateway/codex`, `gateway/compact` | FAIL no comprehensive 0.439.0 evidence |
-| Compressed rollout resume preserves invocation choices | Existing compressed-session support | Session repository and resume tests | Session domain, `gateway/codex` | FAIL current executable qualification needed |
+| Compressed rollout resume preserves invocation choices | Existing compressed-session support | Context oracle: native, Super and local Super legacy rollouts | Session domain, `gateway/codex` | PASS three finite dispatch/file-preservation cases per product on clean `293ccd49d`; no native model turn |
 | Hard continuation ownership and no postcommit replay | Existing bounded routing and recovery | Continuation HTTP/WebSocket oracles | `usecase/routing` | PASS current HTTP session-conflict and HTTP/WebSocket Compact phases on `a2e14460a`; remaining phases uncertified |
 | Precommit quota/retry, weighted capacity and watchdogs | Existing admission and recovery | HTTP/WebSocket deadline/capacity phases | Routing use case, HTTP delivery | FAIL current executable rerun needed |
 | Concurrent durable state and recovery | Atomic stores, journals and conflict checks exist | Profile, restart, ownership oracles | Owning repositories/use cases | FAIL finite coverage must be rerun; formats differ |
@@ -56,7 +56,7 @@ Their current executable regressions remain in the gate.
 | Aggregate quota resolves workspace metadata for an account ID | Optional account-check GET and detail label | Exact tagged collector, quota display oracle and local regressions | Quota use case / OpenAI gateway / CLI quota | PASS 32 cases per product on clean `4f7ece56d`; doctor and raw/runtime isolation covered |
 | No generated quota User-Agent when version probing fails | Suppressed Go's automatic agent on usage/credit/workspace requests | Missing-version display oracle and gateway HTTP regressions | `gateway/openai` | PASS 32 cases per product on clean `b1240683a`; known-version construction stays open |
 | Codex auth originator override retains valid and empty values | Codex auth-header port supplies originator and residency | Expanded reset-credit oracle and gateway HTTP tests | `gateway/codex`, `model/auth`, `gateway/openai` | PASS seventeen cases per product on clean `a2e14460a`; refresh/consume have local wire coverage |
-| Explicit profile can resume a legacy rollout absent from shared catalog | Profile-scoped fallback only for a missing shared target | Context executable oracle and session use-case regressions | Session use case, runtime CLI | PASS three context, eight native-argv and two Super dispatch cases per product on clean `47b22b95e`; `--last` and implicit legacy selection remain open |
+| Explicit profile can resume a legacy rollout absent from shared catalog | Profile-scoped fallback only for a missing shared target; saved settings remain native | Context executable oracle and session use-case regressions | Session use case, runtime CLI | PASS three context, ten native-argv and eight Super dispatch cases per product on clean `293ccd49d`; `--last` and implicit legacy selection remain open |
 | Authentication and refresh against real services | Official clients retain authentication ownership | Synthetic auth and lifecycle fixtures | Auth/profile domains, native gateways | BLOCKED live OAuth unavailable; synthetic tests remain runnable |
 | Native macOS/Windows runtime behavior | Six cross-build targets and native runners exist | `check-cross-build.sh`, native parity runner | Platform-specific adapters | BLOCKED native execution unavailable here; cross-build is weaker evidence |
 
@@ -70,7 +70,7 @@ Their current executable regressions remain in the gate.
 - PASS: `rtk proxy go test -json ./tools/...`
 - PASS: `bash -n scripts/verify-release-parity.sh`; workspace oracle Python
   syntax and `git diff --check`.
-- Latest pushed production: `47b22b95e` (Super explicit legacy resume); prior
+- Latest pushed production: `293ccd49d` (profile-only native settings); prior
   gate/session/auth/quota fixes remain qualified. Original checkout is preserved.
 - Clean `0209f13a1` PASSes the expanded 49-step profile oracle with the corrected
   failure fixtures. `make verify` PASSes on `30ddd406e`; later changes affect
@@ -84,8 +84,10 @@ Their current executable regressions remain in the gate.
   display cases, 49 profile steps, 11,451 tests with 19 optional SKIP and make verify.
   Clean `b1240683a` PASSes the corrected missing-version 32-case oracle and
   make verify. Clean `47b22b95e` PASSes make verify and context/native-argv plus
-  both Super dispatch cases. Next: adversarial legacy settings or known-version
-  auth metadata.
+  both Super dispatch cases. Clean `293ccd49d` PASSes make verify and the
+  expanded context oracle with saved settings, provider identities, explicit
+  native overrides and compressed rollouts. Next: native --last ownership or
+  known-version auth metadata.
 - Frozen `c72085ef0` full gate exits 1 on the Prodex Gemini primitive-control
   invariant after DeepSeek369 PASS. Frozen `1fb3dbe4f` remains running. No
   complete gate or native foreign-platform PASS is claimed.
@@ -661,3 +663,54 @@ PASS: `rtk proxy go test -race ./internal/usecase/session ./internal/delivery/cl
 The expanded fixture checks nine exact native argument cases and six Super
 provider/mode cases, with saved settings, explicit native overrides and mutation
 controls. Clean executable and make verify qualification follow before push.
+
+Clean `293ccd49d` PASSes the saved-settings context oracle: three context,
+nine exact native-argument and six Super cases per product. Driver SHA-256:
+`28fab232a889edc1adc829e25ea14bc08d37fc4438bcdf4796f55a42d45491e6`.
+Its clean `rtk proxy make verify` PASSes, including six cross-build targets,
+vet, shuffled race tests and build. The fix is pushed normally to origin/main.
+
+## Compressed legacy launch qualification
+
+The context oracle adds a compressed-only legacy native case plus native/local
+Super cases. Its existing Zstandard dependency creates deterministic fixture
+frames; the child reads the exact original bytes through the overlay link and
+checks their SHA-256. All native fixture rollouts now require unchanged bytes,
+and both Super storage formats keep the existing credential, shared-copy,
+arguments, provider, saved-setting and cleanup assertions.
+
+The first stronger plain-file check correctly rejected the reference: old
+synthetic metadata lacked session_id, originator and cli_version, so Prodex
+repaired it. The diagnostic confirms only those fields were added. Those failed
+runs remain recorded. The corrected fixtures seed complete native metadata;
+no unchanged-byte, request, credential or state assertion was relaxed.
+
+Clean `293ccd49d` PASSes all three context, ten native-argument and eight Super
+cases per product using the corrected driver. This qualifies three compressed
+launch cases, not a native Codex resume/model turn. Driver SHA-256:
+`b681a896a68ef0739c8ce0967f69b66f681b7a674607b46fafeda8e51aade81c`.
+PASS: `rtk proxy go test -race ./tools/contextparity -count=1`,
+`git diff --check`, and `rtk proxy make verify` on the expanded driver.
+No production code, dependency, state format or helper root changes are needed.
+Frozen `1fb3dbe4f` is still executing Gemini974, observed at 877 scenario
+directories; no terminal PASS has been collected. Remote CI for the new pushes
+is queued/running; the earlier macOS reference failure remains unresolved.
+
+The final driver also rejects compressed rollout copies in shared storage.
+It PASSes the same complete 21-case-per-product context matrix and the focused
+race tests. Final driver SHA-256:
+`80fe298b18f31060bf56b3693371249ab7d4aabf581892ff154a2336c1bc3a30`.
+`rtk proxy make verify` PASSes again after that stricter compressed-copy guard.
+Earlier corrected-driver evidence remains valid for its narrower assertion set.
+
+An exploratory six-case quota metadata probe on clean `293ccd49d` confirms
+five existing generated-agent differences and the leading-v rejection control.
+The native version lexer accepts 0.alpha.1, uses the rightmost digit/dot token
+(2.7! becomes 2.7), and omits an agent for v0.164.0. Terminal padding is preserved
+as underscores, and each Unicode scalar projects to one underscore. The
+reference's standard local prefix includes Zorin OS 18.0.0 and x86_64.
+Godex still omits the agent when a usable native version exists. The copied
+exploratory driver retains its other request/count/auth/residency/profile checks
+while recording this one header projection; it is not a release-gate PASS.
+No production metadata implementation has been added. Native known-version
+User-Agent construction and auth-refresh parity remain open.

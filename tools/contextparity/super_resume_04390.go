@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -18,6 +19,11 @@ type superResumeResult04390 struct {
 	Godex  string `json:"godex"`
 }
 
+type superResumeProbe04390 struct {
+	provider          string
+	local, compressed bool
+}
+
 type superResumeChild04390 struct {
 	Arguments      []string `json:"arguments"`
 	Home           string   `json:"home"`
@@ -31,32 +37,38 @@ func runSuperResumeProbes04390(input options, root string) ([]superResumeResult0
 		return nil, err
 	}
 	var results []superResumeResult04390
-	for _, provider := range []string{"openai", "prodex-kiro", "synthetic-unknown"} {
-		for _, local := range []bool{false, true} {
-			name := "legacy_profile_native"
-			if local {
-				name = "legacy_profile_local"
-			}
-			name += "_" + strings.TrimPrefix(provider, "prodex-")
-			result := superResumeResult04390{Name: name}
-			for _, product := range []struct{ name, binary string }{{"prodex", input.prodex}, {"godex", input.godex}} {
-				directory := filepath.Join(root, name, product.name)
-				if err := runSuperResumeProbe04390(product.binary, product.name, directory, fake, provider, local); err != nil {
-					return nil, fmt.Errorf("%s Super resume %s: %w", product.name, name, err)
-				}
-				if product.name == "prodex" {
-					result.Prodex = "PASS"
-				} else {
-					result.Godex = "PASS"
-				}
-			}
-			results = append(results, result)
+	for _, probe := range []superResumeProbe04390{
+		{provider: "openai"}, {provider: "openai", local: true},
+		{provider: "prodex-kiro"}, {provider: "prodex-kiro", local: true},
+		{provider: "synthetic-unknown"}, {provider: "synthetic-unknown", local: true},
+		{provider: "openai", compressed: true}, {provider: "openai", local: true, compressed: true},
+	} {
+		name := "legacy_profile_native"
+		if probe.local {
+			name = "legacy_profile_local"
 		}
+		name += "_" + strings.TrimPrefix(probe.provider, "prodex-")
+		if probe.compressed {
+			name += "_compressed"
+		}
+		result := superResumeResult04390{Name: name}
+		for _, product := range []struct{ name, binary string }{{"prodex", input.prodex}, {"godex", input.godex}} {
+			directory := filepath.Join(root, name, product.name)
+			if err := runSuperResumeProbe04390(product.binary, product.name, directory, fake, probe); err != nil {
+				return nil, fmt.Errorf("%s Super resume %s: %w", product.name, name, err)
+			}
+			if product.name == "prodex" {
+				result.Prodex = "PASS"
+			} else {
+				result.Godex = "PASS"
+			}
+		}
+		results = append(results, result)
 	}
 	return results, nil
 }
 
-func runSuperResumeProbe04390(binary, product, root, fake, provider string, local bool) error {
+func runSuperResumeProbe04390(binary, product, root, fake string, probe superResumeProbe04390) error {
 	profile := filepath.Join(root, "profile")
 	if err := os.MkdirAll(profile, 0o700); err != nil {
 		return err
@@ -73,7 +85,8 @@ func runSuperResumeProbe04390(binary, product, root, fake, provider string, loca
 		return err
 	}
 	metadata, err := json.Marshal(map[string]any{"type": "session_meta", "timestamp": "2026-10-23T00:00:00Z", "payload": map[string]any{
-		"id": legacySession04390, "timestamp": "2026-10-23T00:00:00Z", "cwd": root, "source": "cli", "model_provider": provider,
+		"id": legacySession04390, "timestamp": "2026-10-23T00:00:00Z", "cwd": root, "source": "cli", "model_provider": probe.provider,
+		"session_id": legacySession04390, "originator": "codex_cli_rs", "cli_version": "0.164.0",
 	}})
 	if err != nil {
 		return err
@@ -81,6 +94,13 @@ func runSuperResumeProbe04390(binary, product, root, fake, provider string, loca
 	metadata = append(metadata, '\n')
 	metadata = append(metadata, legacySavedTurn04390...)
 	rollout := filepath.Join(rolloutDirectory, "rollout-2026-10-23T00-00-00-"+legacySession04390+".jsonl")
+	if probe.compressed {
+		metadata, err = compressNativeRollout04390(metadata)
+		if err != nil {
+			return err
+		}
+		rollout += ".zst"
+	}
 	if err := os.WriteFile(rollout, metadata, 0o600); err != nil {
 		return err
 	}
@@ -89,9 +109,11 @@ func runSuperResumeProbe04390(binary, product, root, fake, provider string, loca
 		return err
 	}
 	record := filepath.Join(root, "child.json")
-	env := append(probeEnvironment(root, product, fake, record), "PRODEX_SHARED_CODEX_HOME="+shared)
+	env := append(probeEnvironment(root, product, fake, record), "PRODEX_SHARED_CODEX_HOME="+shared,
+		"CONTEXT_PARITY_SESSION_FILE="+filepath.Base(rollout),
+		fmt.Sprintf("CONTEXT_PARITY_SESSION_DIGEST=%x", sha256.Sum256(metadata)))
 	arguments := []string{"super", "--no-presidio", "--no-sub-agent", "--skip-quota-check", "--no-auto-rotate", "--profile", "main"}
-	if local {
+	if probe.local {
 		arguments = append(arguments, "--url", "http://127.0.0.1:11434", "--model", "synthetic-local")
 	}
 	arguments = append(arguments, "exec", "resume", legacySession04390, "continue")
@@ -106,7 +128,7 @@ func runSuperResumeProbe04390(binary, product, root, fake, provider string, loca
 	if err := json.Unmarshal(data, &child); err != nil {
 		return err
 	}
-	if err := verifySuperResumeChild04390(child, profile, local); err != nil {
+	if err := verifySuperResumeChild04390(child, profile, probe.local); err != nil {
 		return err
 	}
 	if _, err := os.Stat(child.Home); !os.IsNotExist(err) {
@@ -118,7 +140,7 @@ func runSuperResumeProbe04390(binary, product, root, fake, provider string, loca
 		}
 	}
 	if err := filepath.WalkDir(shared, func(path string, entry os.DirEntry, err error) error {
-		if err == nil && !entry.IsDir() && filepath.Ext(path) == ".jsonl" {
+		if err == nil && !entry.IsDir() && (filepath.Ext(path) == ".jsonl" || strings.HasSuffix(path, ".jsonl.zst")) {
 			return fmt.Errorf("Super copied a legacy rollout into shared storage")
 		}
 		return err
@@ -156,7 +178,7 @@ func verifySuperResumeChild04390(child superResumeChild04390, profile string, lo
 func writeSuperFakeCodex04390(root string) (string, error) {
 	path := filepath.Join(root, "super-codex")
 	body := `#!/usr/bin/env python3
-import json, os, sys
+import hashlib, json, os, sys
 from pathlib import Path
 if '--version' in sys.argv:
     print('codex-cli 0.164.0')
@@ -170,8 +192,8 @@ elif 'exec-server' not in sys.argv[1:]:
     home = Path(os.environ['CODEX_HOME'])
     auth = json.loads((home / 'auth.json').read_text()).get('OPENAI_API_KEY')
     kind = 'profile' if auth == 'synthetic-profile-key' else 'synthetic' if auth in ('prodex-runtime-provider', 'godex-runtime-provider') else 'unexpected'
-    session = home / 'sessions' / 'rollout-2026-10-23T00-00-00-01900000-0000-7000-8000-000000000165.jsonl'
-    visible = session.is_file() and json.loads(session.read_text().splitlines()[0]).get('payload', {}).get('id') == '01900000-0000-7000-8000-000000000165'
+    session = home / 'sessions' / os.environ['CONTEXT_PARITY_SESSION_FILE']
+    visible = session.is_file() and hashlib.sha256(session.read_bytes()).hexdigest() == os.environ['CONTEXT_PARITY_SESSION_DIGEST']
     Path(os.environ['CONTEXT_PARITY_ARGS']).write_text(json.dumps({'arguments': sys.argv[1:], 'home': str(home), 'auth_kind': kind, 'session_visible': visible}))
     print('super-resume-probe-ok')
 `
