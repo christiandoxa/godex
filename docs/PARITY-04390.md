@@ -36,7 +36,7 @@ Their current executable regressions remain in the gate.
 | Merged turn metadata and unknown fields survive precommit rotation | Raw request forwarding and rotation exist | Tagged `http_followups/memory_metadata.rs` | `usecase/routing`, `gateway/openai` | FAIL missing 0.439.0 executable evidence |
 | Repeated root/exec/resume config overrides retain precedence | Scope-aware Codex gateway exists | Tagged `args_resume.rs`; context oracle | CLI runtime delivery, `gateway/codex` | FAIL expanded scoped comparison needed |
 | Inline native commands remain prompt text | Native argument forwarding exists | Tagged `args_resume.rs` | CLI runtime delivery, `gateway/codex` | FAIL current executable comparison needed |
-| Codex 0.164.0 initialization and thread listing | Opt-in official qualification currently covers 0.163.0 | Official app-server fixture | `gateway/codex` | FAIL new official binary probe needed |
+| Codex 0.164.0 initialization and thread listing | Shared official fixture covers both 0.163.0 and 0.164.0 | `TestProdex04390OfficialCodex0164AppServerInitializeAndThreadList` | `gateway/codex` | PASS credential-free initialize and active/archived thread lists; no model turn |
 | Native metadata-patch and model-instruction ownership | Delegated to official Codex; no wrapper merge | 0.164.0 schema / source qualification | `gateway/codex` | FAIL exact upstream contracts need qualification |
 | Failed compaction attempts stay isolated | Native compaction delegated; translated Compact is separate | Native lifecycle and Compact oracles | `gateway/codex`, `gateway/compact` | FAIL no comprehensive 0.439.0 evidence |
 | Compressed rollout resume preserves invocation choices | Existing compressed-session support | Session repository and resume tests | Session domain, `gateway/codex` | FAIL current executable qualification needed |
@@ -66,3 +66,21 @@ Their current executable regressions remain in the gate.
   differentials, and close verified production gaps. No current full-gate or
   native foreign-platform PASS is claimed.
 - No release version, tag or package publication is authorized by this work.
+
+## Codex 0.164.0 qualification and HTTP fixture expansion
+
+The official Codex and standalone app-server compressed Linux assets match
+both the tagged audit and GitHub release API digests. Decompressed hashes:
+`b93f6811d3f653f0fb83be4050d857fb9abbb111dfa2ce160563327daff7f306`
+(Codex) and `27e9426359a5b34b8de3c10efd60765924929b6a61ea8d2b8b4e05c00abad6bc`
+(app-server). Both report 0.164.0. No installed executable was replaced.
+
+PASS: `GODEX_TEST_CODEX_0164_APP_SERVER_BIN=$ARTIFACTS/codex-0164 rtk proxy go test -race ./internal/gateway/codex -run '^TestProdex04390OfficialCodex0164AppServerInitializeAndThreadList$' -count=1 -timeout=40s`.
+The test uses a temporary isolated home, no credentials and no model request.
+Its existing 0.163.0 qualification remains available through its original opt-in.
+
+The existing HTTP prompt-cache oracle now includes omitted/custom-key and
+merged-metadata rotation cases. Mutation checks PASS, including large-integer
+rounding, fabricated cache/session/User-Agent, missing fields, incorrect owners
+and extra attempts. Cross-binary execution against the new clean commit is the
+next gate; this fixture addition alone is not a runtime parity PASS.

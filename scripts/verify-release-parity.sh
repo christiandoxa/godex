@@ -113,6 +113,13 @@ go test ./internal/gateway/codex \
   -run '^Test(TerminalCommandCancelsNonTTYChildWithTermination|RunCancellationSendsTermination|RunTerminalCommandPreservesInteractiveFirstInterrupt|RunCancellationReapsNonTTYDescendants)$' \
   -count=1 -timeout=45s
 
+# Codex 0.164.0 uses the same credential-free initialize/thread-list boundary.
+if [ -n "${GODEX_TEST_CODEX_0164_APP_SERVER_BIN:-}" ]; then
+  go test ./internal/gateway/codex \
+    -run '^TestProdex04390OfficialCodex0164AppServerInitializeAndThreadList$' \
+    -count=1 -timeout=40s
+fi
+
 # Optional independently verified official Codex rust-v0.163.0 app-server
 # handshake. This does not alter the user's installed codex or start turns.
 # Supply the verified test-only executable through the opt-in environment.
@@ -844,7 +851,7 @@ if [ "$phase" = 'all' ] || [ "$phase" = 'http-prompt-cache' ]; then
   --godex-source "$root" --godex-commit "$(git rev-parse HEAD)" \
   --http-prompt-cache
 go test -race ./tools/continuationparity \
-  -run '^TestProdex04383HTTPPromptCacheOracleRejectsMutations$' -count=1 -timeout=30s
+  -run '^TestProdex04383HTTPPromptCacheOracleRejectsMutations$|^TestProdex04390NativeMetadataOracleRejectsMutations$' -count=1 -timeout=30s
 fi
 
 # Printed only after all stages *selected for this invocation* succeeded.

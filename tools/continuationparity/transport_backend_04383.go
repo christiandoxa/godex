@@ -20,6 +20,7 @@ const transportCompleted04383 = `{"type":"response.completed","response":{"id":"
 
 type transportAttempt04383 struct {
 	owner, turn, body, metadata, trace string
+	session, userAgent                 string
 	ready                              bool
 }
 
@@ -85,6 +86,10 @@ func (b *transportBackend04383) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.HasSuffix(r.URL.Path, "/responses") && r.Method == http.MethodPost {
 		body, _ := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+		if strings.HasPrefix(b.scenario, "http-native-metadata-") && !strings.Contains(string(body), `"previous_response_id"`) {
+			b.serveNativeMetadata04390(w, r, string(body))
+			return
+		}
 		if strings.HasPrefix(b.scenario, "http-profile-status-") && string(body) == httpProfileStatusRequest04383 {
 			shape := strings.TrimPrefix(b.scenario, "http-profile-status-")
 			b.mu.Lock()

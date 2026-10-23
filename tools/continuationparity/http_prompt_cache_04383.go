@@ -89,7 +89,7 @@ func runHTTPPromptCacheProduct04383(root string, p product) error {
 			return fmt.Errorf("prompt cache %s: %w", shape, err)
 		}
 	}
-	return nil
+	return runHTTPNativeMetadataProduct04390(filepath.Join(root, "native-metadata"), p)
 }
 
 type httpPromptCacheResult04383 struct {

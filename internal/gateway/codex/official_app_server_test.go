@@ -19,14 +19,20 @@ import (
 
 const officialCodex0163LinuxSHA04380 = "399ff69c431c066e40de318fba45c2b07f45a76b19939d247ee4828fc70c4215"
 
-// Opt-in real upstream 0.163.0 app-server regression. The user-installed
-// Codex is deliberately not modified. The expected file digest comes from
-// the separately verified official release tarball's immutable asset digest.
-// This fixture needs no authentication and never creates a model turn.
+// These opt-in probes never change the installed Codex or create a model turn.
 func TestProdex04380OfficialCodex0163AppServerInitializeAndThreadList(t *testing.T) {
-	binary := os.Getenv("GODEX_TEST_CODEX_0163_APP_SERVER_BIN")
+	testOfficialCodexAppServer(t, "GODEX_TEST_CODEX_0163_APP_SERVER_BIN", "0.163.0", officialCodex0163LinuxSHA04380)
+}
+
+func TestProdex04390OfficialCodex0164AppServerInitializeAndThreadList(t *testing.T) {
+	testOfficialCodexAppServer(t, "GODEX_TEST_CODEX_0164_APP_SERVER_BIN", "0.164.0", "b93f6811d3f653f0fb83be4050d857fb9abbb111dfa2ce160563327daff7f306")
+}
+
+func testOfficialCodexAppServer(t *testing.T, variable, version, expectedSHA string) {
+	t.Helper()
+	binary := os.Getenv(variable)
 	if binary == "" {
-		t.Skip("set GODEX_TEST_CODEX_0163_APP_SERVER_BIN to verified Codex 0.163.0 Linux binary")
+		t.Skipf("set %s to the verified official Codex %s Linux binary", variable, version)
 	}
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		t.Skip("release qualification requires native Linux amd64")
@@ -43,12 +49,12 @@ func TestProdex04380OfficialCodex0163AppServerInitializeAndThreadList(t *testing
 	digest := sha256.New()
 	_, err = io.Copy(digest, file)
 	closeErr := file.Close()
-	if err != nil || closeErr != nil || hex.EncodeToString(digest.Sum(nil)) != officialCodex0163LinuxSHA04380 {
-		t.Fatalf("Codex 0.163.0 binary SHA mismatch: read=%v close=%v", err, closeErr)
+	if err != nil || closeErr != nil || hex.EncodeToString(digest.Sum(nil)) != expectedSHA {
+		t.Fatalf("Codex %s binary SHA mismatch: read=%v close=%v", version, err, closeErr)
 	}
-	version, err := exec.Command(binary, "--version").CombinedOutput()
-	if err != nil || strings.TrimSpace(string(version)) != "codex-cli 0.163.0" {
-		t.Fatalf("unsupported native binary version=%q err=%v", version, err)
+	versionOutput, err := exec.Command(binary, "--version").CombinedOutput()
+	if err != nil || strings.TrimSpace(string(versionOutput)) != "codex-cli "+version {
+		t.Fatalf("unsupported native binary version=%q err=%v", versionOutput, err)
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 25*time.Second)
 	defer cancel()
@@ -81,9 +87,9 @@ func TestProdex04380OfficialCodex0163AppServerInitializeAndThreadList(t *testing
 	}()
 	if err := reconcileCodexThreadIndexProtocol(stdout, stdin); err != nil {
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			t.Fatal("real 0.163.0 handshake deadline expired")
+			t.Fatalf("real %s handshake deadline expired", version)
 		}
-		t.Fatal(fmt.Errorf("actual 0.163.0 initialize, thread/list active+archived failed: %w, stderr=%q", err, stderr.String()))
+		t.Fatal(fmt.Errorf("actual %s initialize, thread/list active+archived failed: %w, stderr=%q", version, err, stderr.String()))
 	}
 	if ctx.Err() != nil {
 		t.Fatalf("native handshake cancelled: %v", ctx.Err())

@@ -1127,3 +1127,12 @@ quota failure; the request may rotate to an authenticated Ready second
 profile before releasing any client output. Both binaries must return the
 same recovered SSE, two exact model attempts, and unchanged previously
 verified response ownership. This mode remains in `--http-turn-transport`.
+
+The `--http-prompt-cache` mode also checks the 0.439.0 transport contracts:
+custom cache identity independent of `session_id`, an omitted cache key,
+and merged memory-consolidation metadata across precommit quota rotation.
+It compares exact request bytes (including unknown fields and large integers),
+session/metadata headers, absent User-Agent, authenticated Ready owners,
+attempt counts, response bytes and durable ownership. Mutation tests reject
+cache synthesis, session substitution, lost metadata, number rounding and replay.
+These credential-free fixtures do not implement native turn metadata patches.
