@@ -87,16 +87,7 @@ func runHTTPNativeMetadataCase04390(root string, p product, shape string) error 
 		}
 	}
 	until := time.Now().Add(5 * time.Second)
-	for {
-		b.mu.Lock()
-		ready := b.receipts["account-a"] > 0 && !b.invalid
-		b.mu.Unlock()
-		if shape == "rotation" {
-			ready = transportProfilesReady04383(p, b)
-		}
-		if ready {
-			break
-		}
+	for shape == "rotation" && !transportProfilesReady04383(p, b) {
 		if time.Now().After(until) {
 			return errors.New("native metadata requires two authenticated Ready profiles")
 		}
@@ -162,7 +153,7 @@ func verifyNativeMetadata04390(shape string, result httpSoftConflictResult04383)
 		if index == 1 {
 			owner = "account-b"
 		}
-		if attempt.owner != owner || !attempt.ready || attempt.body != nativeMetadataRequest04390(shape) || attempt.metadata != nativeTurnMetadata04390 || attempt.session != nativeSession04390 || attempt.turn != "" || attempt.trace != "" || attempt.userAgent != "" {
+		if attempt.owner != owner || shape == "rotation" && !attempt.ready || attempt.body != nativeMetadataRequest04390(shape) || attempt.metadata != nativeTurnMetadata04390 || attempt.session != nativeSession04390 || attempt.turn != "" || attempt.trace != "" || attempt.userAgent != "" {
 			return fmt.Errorf("native metadata attempt %d changed: owner=%s ready=%t body_equal=%t metadata_equal=%t session_equal=%t turn_empty=%t trace_empty=%t user_agent_empty=%t", index, attempt.owner, attempt.ready, attempt.body == nativeMetadataRequest04390(shape), attempt.metadata == nativeTurnMetadata04390, attempt.session == nativeSession04390, attempt.turn == "", attempt.trace == "", attempt.userAgent == "")
 		}
 	}

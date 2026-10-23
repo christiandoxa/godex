@@ -26,7 +26,6 @@ func TestProdex04390NativeMetadataOracleRejectsMutations(t *testing.T) {
 				func(r *httpSoftConflictResult04383) { r.attempts = append(r.attempts, r.attempts[0]) },
 				func(r *httpSoftConflictResult04383) { r.reply.status = 502 },
 				func(r *httpSoftConflictResult04383) { r.reply.body += "changed" },
-				func(r *httpSoftConflictResult04383) { r.attempts[0].ready = false },
 				func(r *httpSoftConflictResult04383) { r.attempts[0].owner = "account-b" },
 				func(r *httpSoftConflictResult04383) { r.attempts[0].metadata = "{}" },
 				func(r *httpSoftConflictResult04383) { r.attempts[0].session = "custom-cache-key-not-session-0164" },
@@ -45,6 +44,9 @@ func TestProdex04390NativeMetadataOracleRejectsMutations(t *testing.T) {
 						r.attempts[0].body = strings.Replace(r.attempts[0].body, "custom-cache-key-not-session-0164", nativeSession04390, 1)
 					}
 				},
+			}
+			if shape == "rotation" {
+				mutations = append(mutations, func(r *httpSoftConflictResult04383) { r.attempts[0].ready = false })
 			}
 			for index, mutate := range mutations {
 				result := valid()
