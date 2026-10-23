@@ -1203,6 +1203,11 @@ The session launch report carries an unpersisted profile-fallback fact while
 retaining the original metadata and durable owner. Runtime delivery uses that
 fact to leave profile-only model, effort and provider selection to native Codex
 and the selected profile, matching the reference's shared-only reconstruction.
+Native provider-token parsing remains private to runtime CLI delivery in
+`resume_provider.go`. Its ASCII-only registry matching protects the shared
+session boundary before an explicit profile is launched. A native provider
+override stays authoritative, and the profile-only fallback keeps native
+configuration ownership. No repository or gateway dependency enters delivery.
 For Super workspace trust, `repository/session` separately reads initial rollout
 metadata in native directory order, bounded to 65,536 directory entries and the
 same file/line byte limits. `entity/session` selects 4,096 newest absolute paths

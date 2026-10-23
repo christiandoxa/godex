@@ -701,6 +701,10 @@ lease, including local `--url` launches.
 Profile-only fallback leaves saved model, effort and provider selection to
 native Codex and the explicitly selected profile; shared-session restoration
 keeps its existing behavior.
+Shared sessions validate their provider identity even with an explicit profile,
+unless a native `model_provider` override is supplied. Unsupported Prodex IDs
+such as `prodex-openai` and `prodex-openai-compatible` fail before child launch;
+Godex's own persisted provider IDs remain compatible.
 
 `queue --thread UUID_OR_PREFIX --message TEXT` also resolves the owning profile;
 the `--thread=VALUE` form is preserved. Named queue targets stay profile-local.

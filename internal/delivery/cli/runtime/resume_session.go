@@ -13,11 +13,6 @@ import (
 	sessionusecase "github.com/christiandoxa/godex/internal/usecase/session"
 )
 
-type resumeProviderPlan struct {
-	kind   string
-	direct bool
-}
-
 func runSessionArgumentWithLauncher(
 	ctx context.Context,
 	sessions *sessionusecase.Catalog,
@@ -74,6 +69,11 @@ func (launcher runSessionLauncher) RunSessionReport(
 		return runProviderSelection(ctx, launcher.runner, launcher.profiles, selection, args, launcher.options)
 	}
 	if selection.Profile != "" {
+		if _, explicit := runDryConfigOverride(args, "model_provider"); !report.ProfileFallback && !explicit {
+			if _, err := resumeProviderIdentity(report.ModelProvider); err != nil {
+				return err
+			}
+		}
 		if launcher.profiles == nil {
 			return errors.New("--profile requires profile-aware runtime dispatch")
 		}
@@ -192,32 +192,6 @@ func (launcher runSessionLauncher) runResolvedTarget(
 		return launcher.runner.RunSessionWithOptions(ctx, target.AccountID, owner, args, launcher.options)
 	}
 	return runLaunchTarget(ctx, launcher.runner, nil, launcher.profiles, target, args, true, launcher.options)
-}
-
-func resumeProviderIdentity(value string) (resumeProviderPlan, error) {
-	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "", "openai", "godex-openai", "godex-openai-governed-http",
-		"prodex-openai", "prodex-openai-governed-http",
-		"godex-openai-compatible", "prodex-openai-compatible",
-		"godex-local", "prodex-local":
-		return resumeProviderPlan{}, nil
-	case "amazon-bedrock", "amazon-bedrock-runtime":
-		return resumeProviderPlan{direct: true}, nil
-	case "godex-anthropic", "prodex-anthropic":
-		return resumeProviderPlan{kind: anthropicProviderKind}, nil
-	case "godex-copilot", "prodex-copilot":
-		return resumeProviderPlan{kind: copilotProviderKind}, nil
-	case "godex-deepseek", "prodex-deepseek":
-		return resumeProviderPlan{kind: deepSeekProviderKind}, nil
-	case "godex-gemini", "prodex-gemini":
-		return resumeProviderPlan{kind: geminiProviderKind}, nil
-	case "godex-kiro", "prodex-kiro":
-		return resumeProviderPlan{kind: kiroProviderKind}, nil
-	default:
-		return resumeProviderPlan{}, errors.New(
-			"resumed session has an unsupported provider identity; configure the matching provider or start a fresh session",
-		)
-	}
 }
 
 func restoreResumeSessionSettings(args []string, report sessionmodel.Report) []string {

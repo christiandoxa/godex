@@ -759,3 +759,29 @@ with no comparison differences, then advances through its WebSocket checks.
 Its extracted Gemini report SHA-256 is
 `c57d82b8e406c121ed6f24323b117e9f6f6bbdec8b52210f4e718ca93492fbed`.
 The full gate remains running; no overall terminal success has been collected.
+
+## Shared-session provider validation
+
+An eight-case pinned recording-child probe reproduces three explicit-profile
+mismatches on clean `293ccd49d`: Prodex rejects prodex-openai,
+prodex-openai-compatible and a synthetic unknown identity before child launch;
+Godex launches all three. Five accepted OpenAI aliases launch on both products.
+The tagged provider_registry.mojo accepts the general provider aliases plus its
+specific native IDs; the two plain Prodex OpenAI IDs are absent.
+
+New delivery regressions FAIL before the fix for that explicit-profile bypass,
+missing registry aliases, retired identities and a Unicode Kelvin-sign lookalike.
+Runtime delivery now validates a shared report's identity before explicit profile
+launch unless the user supplied a native model_provider override. Profile-only
+fallbacks keep the previous stage's native configuration policy. The existing
+private mapper now follows ASCII-only registry aliases and deliberately preserves
+Godex-written native IDs for existing sessions. Its parser and small plan type
+move to resume_provider.go; no model, persistence, dependency or helper root is
+added. Unsupported errors stay generic and do not expose the metadata value.
+
+PASS: `rtk proxy go test -race ./internal/delivery/cli/runtime ./internal/usecase/runtime ./internal/usecase/session`.
+The focused tests require pre-child rejection and no profile lease on failure,
+explicit-override precedence, known aliases, Unicode trim/ASCII case behavior and
+unchanged Godex identity compatibility. Clean executable and make verify checks
+follow before pushing; broader external-provider dispatch stays independently
+qualified rather than inferred from alias recognition.
