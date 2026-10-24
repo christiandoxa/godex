@@ -4,6 +4,7 @@ import (
 	"context"
 
 	runtimemodel "github.com/christiandoxa/godex/internal/model/runtime"
+	sessionmodel "github.com/christiandoxa/godex/internal/model/session"
 	sessionusecase "github.com/christiandoxa/godex/internal/usecase/session"
 )
 
@@ -32,7 +33,7 @@ func resolveRunResumeLast(
 	if !nativeResumeLastRequested(args) || sessions == nil {
 		return selection, args, nil
 	}
-	report, err := sessions.LastResumeSettings(ctx, args)
+	report, err := nativeResumeSettings(ctx, sessions, args)
 	if err != nil {
 		return selection, nil, err
 	}
@@ -48,4 +49,12 @@ func resolveRunResumeLast(
 		selection.Provider = plan.kind
 	}
 	return selection, args, err
+}
+
+func nativeResumeSettings(ctx context.Context, sessions *sessionusecase.Catalog, args []string) (sessionmodel.Report, error) {
+	selector := "--last"
+	if index := findResumeSessionSelector(args, nativeCommandIndex(args)+1); index >= 0 {
+		selector = args[index]
+	}
+	return sessions.NativeResumeSettings(ctx, sessionmodel.Launch{SessionSelector: selector, Arguments: args})
 }

@@ -22,9 +22,32 @@ func (service *Catalog) Resolve(ctx context.Context, selector string) (sessionmo
 }
 
 func (service *Catalog) resolveReport(ctx context.Context, selector string, reports []sessionmodel.Report) (sessionmodel.Report, error) {
+	report, err := resolveSessionID(selector, reports)
+	if err == nil {
+		return service.withOwner(ctx, report)
+	}
+	if _, missing := err.(missingSessionError); !missing {
+		return sessionmodel.Report{}, err
+	}
+	var names []sessionmodel.Report
+	for _, report := range reports {
+		if !sessionReportArchived(report.Path) && sessionReportSourceAllowed(report, false) &&
+			sessionDisplayLabel(report) == selector {
+			names = append(names, report)
+		}
+	}
+	if len(names) == 1 {
+		return service.withOwner(ctx, names[0])
+	}
+	if len(names) > 1 {
+		return sessionmodel.Report{}, fmt.Errorf("session name %q is ambiguous", selector)
+	}
+	return sessionmodel.Report{}, missingSessionError{selector: selector}
+}
+
+func resolveSessionID(selector string, reports []sessionmodel.Report) (sessionmodel.Report, error) {
 	exact := make([]sessionmodel.Report, 0, 1)
 	prefix := make([]sessionmodel.Report, 0, 1)
-	names := make([]sessionmodel.Report, 0, 1)
 	for _, report := range reports {
 		if sessionIDMatchesSelector(report.ID, selector, true) {
 			exact = append(exact, report)
@@ -33,28 +56,18 @@ func (service *Catalog) resolveReport(ctx context.Context, selector string, repo
 		if sessionIDMatchesSelector(report.ID, selector, false) {
 			prefix = append(prefix, report)
 		}
-		if !sessionReportArchived(report.Path) && sessionReportSourceAllowed(report, false) &&
-			sessionDisplayLabel(report) == selector {
-			names = append(names, report)
-		}
 	}
 	if len(exact) == 1 {
-		return service.withOwner(ctx, exact[0])
+		return exact[0], nil
 	}
 	if len(exact) > 1 {
 		return sessionmodel.Report{}, fmt.Errorf("session id %q is ambiguous", selector)
 	}
 	if len(prefix) == 1 {
-		return service.withOwner(ctx, prefix[0])
+		return prefix[0], nil
 	}
 	if len(prefix) > 1 {
 		return sessionmodel.Report{}, fmt.Errorf("session id prefix %q is ambiguous", selector)
-	}
-	if len(names) == 1 {
-		return service.withOwner(ctx, names[0])
-	}
-	if len(names) > 1 {
-		return sessionmodel.Report{}, fmt.Errorf("session name %q is ambiguous", selector)
 	}
 	return sessionmodel.Report{}, missingSessionError{selector: selector}
 }

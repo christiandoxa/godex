@@ -29,7 +29,7 @@ func resolveSuperResumeOptions(
 	var err error
 	resolved := args
 	if nativeLast {
-		report, err = sessions.LastResumeSettings(ctx, args)
+		report, err = nativeResumeSettings(ctx, sessions, args)
 	} else {
 		prefix, selector := splitThreadSelector(args[index])
 		report, resolved, err = sessions.ResolveArguments(ctx, sessionmodel.Launch{

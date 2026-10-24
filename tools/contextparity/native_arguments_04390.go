@@ -23,6 +23,7 @@ type nativeArgumentProbe04390 struct {
 	input, want []string
 	sessionHome string
 	compressed  bool
+	turn        string
 }
 
 type nativeArgumentResult04390 struct {
@@ -33,22 +34,26 @@ type nativeArgumentResult04390 struct {
 
 func nativeArgumentProbes04390() []nativeArgumentProbe04390 {
 	probes := []nativeArgumentProbe04390{
-		{"root_exec", []string{"-c", `model_reasoning_effort="low"`, "exec", "--config", `model_reasoning_effort="high"`, "hello"}, []string{"exec", "-c", `model_reasoning_effort="low"`, "--config", `model_reasoning_effort="high"`, "hello"}, "", false},
-		{"root_exec_resume", []string{"-c", `model_reasoning_effort="low"`, "exec", "--config", `model_reasoning_effort="high"`, "resume", "-c", `model_reasoning_effort="medium"`, nativeSession04390, "continue without replaying completed tools"}, []string{"exec", "resume", "-c", `model_reasoning_effort="low"`, "--config", `model_reasoning_effort="high"`, "-c", `model_reasoning_effort="medium"`, nativeSession04390, "continue without replaying completed tools"}, "", false},
-		{"inline_config_forms", []string{`--config=model_reasoning_effort="low"`, "exec", `-cmodel_reasoning_effort="high"`, "resume", nativeSession04390, "hello"}, []string{"exec", "resume", `--config=model_reasoning_effort="low"`, `-cmodel_reasoning_effort="high"`, nativeSession04390, "hello"}, "", false},
-		{"literal_tail", []string{"-c", "model_context_window=500000", "exec", "--", "--config", "literal=prompt"}, []string{"exec", "-c", "model_context_window=500000", "--", "--config", "literal=prompt"}, "", false},
-		{"legacy_profile_resume", []string{"exec", "resume", legacySession04390, "continue"}, []string{"exec", "resume", legacySession04390, "continue"}, "profile", false},
-		{"legacy_profile_explicit_settings", []string{"exec", "resume", "-c", `model="explicit-model"`, "-c", `model_reasoning_effort="low"`, legacySession04390, "continue"}, []string{"exec", "resume", "-c", `model="explicit-model"`, "-c", `model_reasoning_effort="low"`, legacySession04390, "continue"}, "profile", false},
-		{"legacy_profile_compressed_resume", []string{"exec", "resume", compressedSession04390, "continue"}, []string{"exec", "resume", compressedSession04390, "continue"}, "profile", true},
-		{"native_last_exec", []string{"exec", "resume", "--last", "continue"}, []string{"exec", "resume", "--last", "continue"}, "", false},
-		{"native_last_all", []string{"exec", "resume", "--last", "--all", "continue"}, []string{"exec", "resume", "--last", "--all", "continue"}, "", false},
-		{"native_last_after_prompt", []string{"exec", "resume", "continue", "--last"}, []string{"exec", "resume", "continue", "--last"}, "", false},
-		{"native_last_tui", []string{"resume", "--last"}, []string{"-c", "disable_paste_burst=true", "resume", "--last"}, "", false},
+		{"root_exec", []string{"-c", `model_reasoning_effort="low"`, "exec", "--config", `model_reasoning_effort="high"`, "hello"}, []string{"exec", "-c", `model_reasoning_effort="low"`, "--config", `model_reasoning_effort="high"`, "hello"}, "", false, ""},
+		{"root_exec_resume", []string{"-c", `model_reasoning_effort="low"`, "exec", "--config", `model_reasoning_effort="high"`, "resume", "-c", `model_reasoning_effort="medium"`, nativeSession04390, "continue without replaying completed tools"}, []string{"exec", "resume", "-c", `model_reasoning_effort="low"`, "--config", `model_reasoning_effort="high"`, "-c", `model_reasoning_effort="medium"`, nativeSession04390, "continue without replaying completed tools"}, "", false, ""},
+		{"inline_config_forms", []string{`--config=model_reasoning_effort="low"`, "exec", `-cmodel_reasoning_effort="high"`, "resume", nativeSession04390, "hello"}, []string{"exec", "resume", `--config=model_reasoning_effort="low"`, `-cmodel_reasoning_effort="high"`, nativeSession04390, "hello"}, "", false, ""},
+		{"literal_tail", []string{"-c", "model_context_window=500000", "exec", "--", "--config", "literal=prompt"}, []string{"exec", "-c", "model_context_window=500000", "--", "--config", "literal=prompt"}, "", false, ""},
+		{"legacy_profile_resume", []string{"exec", "resume", legacySession04390, "continue"}, []string{"exec", "resume", legacySession04390, "continue"}, "profile", false, legacySavedTurn04390},
+		{"legacy_profile_explicit_settings", []string{"exec", "resume", "-c", `model="explicit-model"`, "-c", `model_reasoning_effort="low"`, legacySession04390, "continue"}, []string{"exec", "resume", "-c", `model="explicit-model"`, "-c", `model_reasoning_effort="low"`, legacySession04390, "continue"}, "profile", false, legacySavedTurn04390},
+		{"legacy_profile_compressed_resume", []string{"exec", "resume", compressedSession04390, "continue"}, []string{"exec", "resume", compressedSession04390, "continue"}, "profile", true, legacySavedTurn04390},
+		{"native_last_exec", []string{"exec", "resume", "--last", "continue"}, []string{"exec", "resume", "--last", "continue"}, "", false, ""},
+		{"native_last_all", []string{"exec", "resume", "--last", "--all", "continue"}, []string{"exec", "resume", "--last", "--all", "continue"}, "", false, ""},
+		{"native_last_after_prompt", []string{"exec", "resume", "continue", "--last"}, []string{"exec", "resume", "continue", "--last"}, "", false, ""},
+		{"native_last_tui", []string{"resume", "--last"}, []string{"-c", "disable_paste_burst=true", "resume", "--last"}, "", false, ""},
+		{"native_last_saved_settings", []string{"exec", "resume", "--last", "continue"}, []string{"exec", "resume", "-c", `model_reasoning_effort="high"`, "-c", `model="synthetic-saved-model"`, "--last", "continue"}, "", false, legacySavedTurn04390},
+		{"native_last_saved_after_prompt", []string{"exec", "resume", "continue", "--last"}, []string{"exec", "resume", "continue", "--last"}, "", false, legacySavedTurn04390},
+		{"native_last_saved_after_missing_id", []string{"exec", "resume", "01900000-0000-7000-8000-000000000169", "--last"}, []string{"exec", "resume", "01900000-0000-7000-8000-000000000169", "--last"}, "", false, legacySavedTurn04390},
+		{"native_last_saved_after_id", []string{"exec", "resume", nativeSession04390, "--last"}, []string{"exec", "resume", "-c", `model_reasoning_effort="high"`, "-c", `model="synthetic-saved-model"`, nativeSession04390, "--last"}, "", false, legacySavedTurn04390},
 	}
 	for index, prompt := range []string{"/model gpt-5.6 high", "/permissions read-only", "/presets"} {
 		probes = append(probes, nativeArgumentProbe04390{fmt.Sprintf("native_inline_%d", index),
 			[]string{"resume", nativeSession04390, prompt},
-			[]string{"-c", "disable_paste_burst=true", "resume", nativeSession04390, prompt}, "", false})
+			[]string{"-c", "disable_paste_burst=true", "resume", nativeSession04390, prompt}, "", false, ""})
 	}
 	return probes
 }
@@ -93,9 +98,7 @@ func runNativeArgumentProbe04390(binary, name, root, fake string, probe nativeAr
 		return nil, err
 	}
 	path := filepath.Join(rollouts, "rollout-2026-10-23T00-00-00-"+sessionID+".jsonl")
-	if probe.sessionHome != "" {
-		metadata = append(metadata, legacySavedTurn04390...)
-	}
+	metadata = append(metadata, probe.turn...)
 	if probe.compressed {
 		metadata, err = compressNativeRollout04390(metadata)
 		if err != nil {

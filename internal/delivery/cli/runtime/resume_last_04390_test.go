@@ -21,7 +21,8 @@ func (reader lastSettingsReader04390) List(_ context.Context, home string) ([]se
 		return nil, nil
 	}
 	return []sessionentity.Session{
-		{ID: legacySettingsSession04390, CWD: reader.cwd, Source: "cli", UpdatedUnix: 1},
+		{ID: legacySettingsSession04390, CWD: reader.cwd, Source: "cli", UpdatedUnix: 1,
+			LastModel: "saved-cli-model", LastReasoningEffort: "low"},
 		{ID: nativeLastExec04390, CWD: reader.cwd, Source: "exec", UpdatedUnix: 2,
 			ModelProvider: "openai", LastModel: "saved-exec-model", LastReasoningEffort: "high"},
 		{ID: "archived", CWD: reader.cwd, Source: "cli", UpdatedUnix: 3, Path: "/shared/archived_sessions/rollout.jsonl"},
@@ -133,6 +134,12 @@ func TestProdex04390NativeLastKeepsSelectionWithCodex(t *testing.T) {
 			[]string{"exec", "resume", "--last", "--all", "continue"}},
 		{"explicit settings", catalog, []string{"exec", "resume", "-c", `model="explicit"`, "-c", `model_reasoning_effort="low"`, "--last", "continue"},
 			[]string{"exec", "resume", "-c", `model="explicit"`, "-c", `model_reasoning_effort="low"`, "--last", "continue"}},
+		{"prompt before last", catalog, []string{"exec", "resume", "continue", "--last"},
+			[]string{"exec", "resume", "continue", "--last"}},
+		{"missing id before last", catalog, []string{"exec", "resume", "01900000-0000-7000-8000-000000000169", "--last"},
+			[]string{"exec", "resume", "01900000-0000-7000-8000-000000000169", "--last"}},
+		{"known id before last", catalog, []string{"exec", "resume", legacySettingsSession04390, "--last"},
+			[]string{"-c", `model_reasoning_effort="low"`, "-c", `model="saved-cli-model"`, "exec", "resume", legacySettingsSession04390, "--last"}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			process := &fakeRunnerProcess{}

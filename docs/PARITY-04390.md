@@ -36,7 +36,7 @@ Their current executable regressions remain in the gate.
 | Merged turn metadata and unknown fields survive precommit rotation | Raw request forwarding and rotation exist | Tagged `http_followups/memory_metadata.rs` | `usecase/routing`, `gateway/openai` | PASS exact HTTP cases on clean `9a4c2654b`; finite fixture only |
 | An omitted User-Agent stays omitted | Go's default agent reproduced on both HTTP and WebSocket; shared header preparation now suppresses it | `TestForwardedUserAgentPreservesClientOwnership`; HTTP native-metadata oracle | `gateway/openai` | PASS after fix on clean `9a4c2654b`; HTTP/WebSocket wire regressions and exact-binary HTTP check |
 | Repeated root/exec/resume config overrides retain precedence | Shared scoping now covers direct and managed launches | Tagged `args_resume.rs`; context oracle | CLI runtime delivery, `gateway/codex` | PASS seven exact-argv cases on clean `a01bca13f`; native `--last` remains a separate FAIL |
-| Native exec --last selects across thread source kinds and native SQLite | Native selection preserved; shared settings carry no owner identity | Verified Codex 0.164.0 native-created rollouts/SQLite, context argv oracle, owning regressions | Session/runtime use cases and runtime CLI | FAIL reproduced again on clean `0eff8135d`; implemented fix awaits clean executable qualification |
+| Native exec --last selects across thread source kinds and native SQLite | Native selection preserved; shared settings carry no owner identity | Verified Codex 0.164.0 native-created rollouts/SQLite, context argv oracle, owning regressions | Session/runtime use cases and runtime CLI | PASS finite native selection and 33-case context matrix on clean `836d24b5a`; comprehensive managed recovery remains unverified |
 | Inline native commands remain prompt text | Native argument forwarding preserves inline commands | Tagged `args_resume.rs`; context oracle | CLI runtime delivery, `gateway/codex` | PASS explicit-session model, permissions and presets cases on clean `a01bca13f` |
 | Codex 0.164.0 initialization and thread listing | Shared official fixture covers both 0.163.0 and 0.164.0 | `TestProdex04390OfficialCodex0164AppServerInitializeAndThreadList` | `gateway/codex` | PASS credential-free initialize and active/archived thread lists; no model turn |
 | Native metadata-patch and model-instruction ownership | Delegated to official Codex; no wrapper merge | 0.164.0 schema / source qualification | `gateway/codex` | PASS credential-free schema and 82-file/101-group source guard; full model-turn behavior unverified |
@@ -72,7 +72,7 @@ Their current executable regressions remain in the gate.
 - PASS: `rtk proxy go test -json ./tools/...`
 - PASS: `bash -n scripts/verify-release-parity.sh`; workspace oracle Python
   syntax and `git diff --check`.
-- Latest pushed production: `48f8a6c31` (shared provider identities); prior
+- Latest pushed production: `836d24b5a` (native last delegation); prior
   gate/session/auth/quota fixes remain qualified. Original checkout is preserved.
 - Clean `0209f13a1` PASSes the expanded 49-step profile oracle with the corrected
   failure fixtures. `make verify` PASSes on `30ddd406e`; later changes affect
@@ -844,3 +844,37 @@ worker is added. One unused standalone-profile wrapper is removed.
 Validation and exact executable qualification follow before push. Native
 cross-platform execution and comprehensive last-selection recovery remain
 unverified; this change alone does not establish full parity.
+
+Clean `836d24b5a` PASSes `rtk proxy make verify` and all 33 context cases per
+product. The official Codex selection probe also PASSes on both products:
+one synthetic HTTP 400 attempt, the newer exec thread's prompt-cache identity,
+correct credential and unchanged auth file. Report SHA-256:
+`28fb793765c8b495647b3a8f63e6cbc4b8494722fb60e5d4402f508252de1872`.
+The recording-driver SHA-256 is
+`96a53e58a308125d9c77691d5011d09b189a60d994d87a6d73adbfc8b826542e`.
+The fix is pushed normally to origin/main. The complete finite release gate on
+the previous clean `0eff8135d` also PASSes; its terminal-log SHA-256 is
+`655fa5f8d92c9512e2d11dc2aec3e3abda1150802793445b609a6b7d838baadb`.
+
+## Reordered last-selector settings
+
+The stronger context oracle rejects clean `836d24b5a` when `--last` follows a
+prompt and shared saved settings exist: Prodex leaves the settings absent,
+where Godex incorrectly adds the newest thread's model/effort. Three local
+regressions reproduce prompt, missing-ID and different-known-ID variants.
+Tagged launch_inspect and runtime_resume_session_report_from_codex_args give
+the first positional selector precedence for settings, while the native child
+still owns actual last selection.
+
+Runtime delivery now carries that settings selector through the session model.
+The use case reuses the existing exact/prefix matching policy, returns no
+settings for a missing ID, excludes display-name lookup and preserves ambiguity
+errors. Its result still carries no session/home/owner identity. The existing
+name resolver reuses the factored private ID matcher before its name fallback.
+Both run and Super consume the same boundary. No shared helper or new exported
+port, package, dependency, worker or persisted field is added; the newly added
+settings operation is renamed to describe its broader contract.
+
+PASS: `rtk proxy go test -race ./internal/delivery/cli/runtime ./internal/usecase/runtime ./internal/usecase/session ./tools/contextparity`.
+The expanded context matrix has 37 cases per product, including four saved
+last-selector scenarios. Clean executable qualification follows before push.

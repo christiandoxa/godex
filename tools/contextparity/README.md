@@ -42,6 +42,12 @@ rollout has saved model/effort metadata; the wrapper must leave both choices
 to native Codex, and preserve explicit user overrides. This does not qualify
 native `--last` or implicit legacy selection.
 
+Eight native `--last` cases preserve exec/TUI arguments, `--all`, prompt/flag
+ordering, and saved shared settings. Settings lookup follows the tagged first
+selector even when native `--last` appears later; missing IDs and prompt text
+must not acquire unrelated saved settings. These recording-child cases do not
+execute SQLite selection or model inference.
+
 Eight Super cases require the same profile-only UUID to reach `exec resume`
 with its prompt and full access. Native and local `--url` modes must use a
 temporary overlay, preserve the original auth/config/model cache/rollout,

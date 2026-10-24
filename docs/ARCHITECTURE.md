@@ -1210,8 +1210,10 @@ override stays authoritative, and the profile-only fallback keeps native
 configuration ownership. No repository or gateway dependency enters delivery.
 Native `resume --last` stays with Codex, whose provider-filtered SQLite and
 latest-turn working directory can select a different thread than the wrapper
-catalog. The session use case returns only the newest active, non-subagent
-shared provider/model/effort settings; it returns no session or owner identity.
+catalog. The session use case returns only shared provider/model/effort settings;
+the tagged first selector chooses their source. Last mode uses the newest
+active, non-subagent report; an earlier positional uses shared ID/prefix lookup,
+ignoring names and missing targets. The result carries no session or owner identity.
 Runtime delivery restores those settings without substituting a UUID. The
 runtime use case launches from the active or explicit profile with the existing
 owner pool and launch options, avoiding fresh-work quota selection. Routing
