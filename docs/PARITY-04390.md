@@ -36,7 +36,7 @@ Their current executable regressions remain in the gate.
 | Merged turn metadata and unknown fields survive precommit rotation | Raw request forwarding and rotation exist | Tagged `http_followups/memory_metadata.rs` | `usecase/routing`, `gateway/openai` | PASS exact HTTP cases on clean `9a4c2654b`; finite fixture only |
 | An omitted User-Agent stays omitted | Go's default agent reproduced on both HTTP and WebSocket; shared header preparation now suppresses it | `TestForwardedUserAgentPreservesClientOwnership`; HTTP native-metadata oracle | `gateway/openai` | PASS after fix on clean `9a4c2654b`; HTTP/WebSocket wire regressions and exact-binary HTTP check |
 | Repeated root/exec/resume config overrides retain precedence | Shared scoping now covers direct and managed launches | Tagged `args_resume.rs`; context oracle | CLI runtime delivery, `gateway/codex` | PASS seven exact-argv cases on clean `a01bca13f`; native `--last` remains a separate FAIL |
-| Native exec --last selects across thread source kinds and native SQLite | Godex resolves an older CLI thread before native Codex can choose the newer exec thread | Verified Codex 0.164.0 with native-created rollouts/SQLite and loopback HTTP errors | Session/runtime use cases and runtime CLI | FAIL reproduced on clean `293ccd49d`; ownership-safe delegation remains unimplemented |
+| Native exec --last selects across thread source kinds and native SQLite | Native selection preserved; shared settings carry no owner identity | Verified Codex 0.164.0 native-created rollouts/SQLite, context argv oracle, owning regressions | Session/runtime use cases and runtime CLI | FAIL reproduced again on clean `0eff8135d`; implemented fix awaits clean executable qualification |
 | Inline native commands remain prompt text | Native argument forwarding preserves inline commands | Tagged `args_resume.rs`; context oracle | CLI runtime delivery, `gateway/codex` | PASS explicit-session model, permissions and presets cases on clean `a01bca13f` |
 | Codex 0.164.0 initialization and thread listing | Shared official fixture covers both 0.163.0 and 0.164.0 | `TestProdex04390OfficialCodex0164AppServerInitializeAndThreadList` | `gateway/codex` | PASS credential-free initialize and active/archived thread lists; no model turn |
 | Native metadata-patch and model-instruction ownership | Delegated to official Codex; no wrapper merge | 0.164.0 schema / source qualification | `gateway/codex` | PASS credential-free schema and 82-file/101-group source guard; full model-turn behavior unverified |
@@ -64,8 +64,8 @@ Their current executable regressions remain in the gate.
 
 ## Current checkpoint
 
-- Worktree: `$HOME/.cache/godex-parity-04390-20261023`
-- Branch: `parity/04390-20261023`, based on `origin/main` at `cea78671d`.
+- Worktree: `$HOME/.cache/godex-parity-04390-20261024`
+- Branch: `parity/04390-20261024`, based on `origin/main` at `0eff8135d`.
 - Original checkout, its local-only quota commit and untracked files preserved.
 - Active oracle identities migrated together; historical parity records kept.
 - PASS: `rtk proxy go test -json ./internal/gateway/codex ./internal/delivery/cli/runtime ./internal/usecase/routing ./internal/delivery/http/proxy`
@@ -815,3 +815,32 @@ replace the earlier failed runs or certify newer production, native --last,
 known-version auth metadata, other providers, native foreign platforms or all TUI
 behavior. A new frozen current-candidate gate can now run independently of
 continued development; no failed invariant was waived to collect this result.
+
+## Native last delegation
+
+The previous current-candidate gate is terminal: its log ends with PASS for all
+selected phases on clean `0eff8135d`. No matching gate process remains. This
+qualifies that frozen candidate's finite matrix; it does not certify native last
+selection or newer production.
+
+The official Codex 0.164.0 loopback fixture reproduces the last-selection failure
+again on clean `0eff8135d`: Prodex selects the newer exec thread; Godex rewrites
+the selector to the older CLI thread. Both retain the correct synthetic key and
+unchanged auth file. Three focused delivery regressions also fail before the fix,
+covering shared settings, an empty native catalog and explicit setting overrides.
+
+Native resume last selection now stays with Codex, including flags following
+prompt text. The session use case restores only shared provider/model/effort
+settings and returns no session ID, home or upstream owner. Its metadata view
+includes exec threads and excludes archived/subagent reports. Delivery preserves
+explicit overrides and provider validation. Managed launches use the active or
+selected home, preserve launch options and retain their existing routing pool;
+actual request affinity remains routing-owned. Super retains its overlay, leases
+and local transport. Fork last remains a separate catalog-owned path.
+
+The changes stay in CLI runtime delivery and session/runtime use cases. Private
+parsers remain local; no helper root, gateway, dependency, durable format or
+worker is added. One unused standalone-profile wrapper is removed.
+Validation and exact executable qualification follow before push. Native
+cross-platform execution and comprehensive last-selection recovery remain
+unverified; this change alone does not establish full parity.

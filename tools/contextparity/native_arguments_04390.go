@@ -40,6 +40,10 @@ func nativeArgumentProbes04390() []nativeArgumentProbe04390 {
 		{"legacy_profile_resume", []string{"exec", "resume", legacySession04390, "continue"}, []string{"exec", "resume", legacySession04390, "continue"}, "profile", false},
 		{"legacy_profile_explicit_settings", []string{"exec", "resume", "-c", `model="explicit-model"`, "-c", `model_reasoning_effort="low"`, legacySession04390, "continue"}, []string{"exec", "resume", "-c", `model="explicit-model"`, "-c", `model_reasoning_effort="low"`, legacySession04390, "continue"}, "profile", false},
 		{"legacy_profile_compressed_resume", []string{"exec", "resume", compressedSession04390, "continue"}, []string{"exec", "resume", compressedSession04390, "continue"}, "profile", true},
+		{"native_last_exec", []string{"exec", "resume", "--last", "continue"}, []string{"exec", "resume", "--last", "continue"}, "", false},
+		{"native_last_all", []string{"exec", "resume", "--last", "--all", "continue"}, []string{"exec", "resume", "--last", "--all", "continue"}, "", false},
+		{"native_last_after_prompt", []string{"exec", "resume", "continue", "--last"}, []string{"exec", "resume", "continue", "--last"}, "", false},
+		{"native_last_tui", []string{"resume", "--last"}, []string{"-c", "disable_paste_burst=true", "resume", "--last"}, "", false},
 	}
 	for index, prompt := range []string{"/model gpt-5.6 high", "/permissions read-only", "/presets"} {
 		probes = append(probes, nativeArgumentProbe04390{fmt.Sprintf("native_inline_%d", index),

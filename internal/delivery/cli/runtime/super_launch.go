@@ -135,6 +135,9 @@ func launchSuperProfiles(
 			return launchSuperTarget(ctx, runner, profiles, target, options, true)
 		}
 	}
+	if nativeResumeLastRequested(launchArguments) {
+		return runner.RunCurrentWithOptions(ctx, "", launchArguments, launchOptions)
+	}
 	return runner.RunWithOptions(ctx, "", launchArguments, launchOptions)
 }
 
@@ -149,6 +152,13 @@ func launchSuperTarget(
 	launchOptions := superRuntimeLaunchOptions(options)
 	launchArguments := superPreparedCodexArgs(options)
 	if target.AccountID != "" {
+		if nativeResumeLastRequested(launchArguments) {
+			selector := target.AccountID
+			if allowProviderPool {
+				selector = ""
+			}
+			return runner.RunCurrentWithOptions(ctx, selector, launchArguments, launchOptions)
+		}
 		return runner.RunWithOptions(ctx, target.AccountID, launchArguments, launchOptions)
 	}
 	if strings.TrimSpace(target.Name) == "" {

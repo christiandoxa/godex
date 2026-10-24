@@ -689,9 +689,12 @@ Explicit UUIDs and hexadecimal prefixes of at least four characters in native
 `resume`, `exec resume`, `fork`, `exec fork`, `delete`, `archive`, and `unarchive` commands resolve
 across managed profiles. A conflicting explicit account fails. A bare full UUID
 is shorthand for `session resume`. Session names resolve through the catalog;
-interactive pickers use the active or explicitly selected profile. Godex currently
-resolves `--last` through its catalog; unchanged native forwarding remains a
-known Prodex parity gap. Local native commands
+interactive pickers use the active or explicitly selected profile. Native
+`resume --last` and `exec resume --last` preserve the original selector, leaving
+provider-filtered SQLite and rollout selection to Codex. The shared catalog
+supplies saved model, effort and provider settings without claiming ownership of
+the native-selected thread. `fork --last` still resolves through Godex's catalog.
+Local native commands
 such as `mcp`, `features`, and `completion` bypass quota and rotation.
 For `run --profile NAME` and `super --profile NAME`, a session missing from the
 shared catalog may resolve from that profile's legacy rollout files. Shared
@@ -713,8 +716,10 @@ because they discard managed configuration or escape the profile lease and proxy
 lifetime. Use `godex exec` or a foreground `godex app-server` for managed work.
 
 Native command recognition preserves root options and wrapper-generated config.
-Picker/name/`--last` resumes keep the selected rollout home and retain the enabled
-upstream owner pool, without fresh-work quota selection. An explicit `--account`
+Picker/name resumes keep the selected rollout home. Native `--last` keeps the
+active or selected profile home and retains the enabled upstream owner pool,
+without fresh-work quota selection. Launch options, including fixed-account
+rotation policy, still apply. An explicit `--account`
 still restricts that pool. Passthrough `login` mutations and `logout` are rejected
 with guidance to use `godex login`/`godex logout`, whose managed workflows enforce
 identity registration and exclusive credential mutation. `login status` stays

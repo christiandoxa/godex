@@ -47,7 +47,11 @@ func (runner *Runner) RunLocal(ctx context.Context, selector string, args []stri
 	return runner.runRuntimeChild(ctx, runner.accounts.CodexHome(account.ID), args)
 }
 
-func (runner *Runner) RunCurrent(ctx context.Context, selector string, args []string) (err error) {
+func (runner *Runner) RunCurrent(ctx context.Context, selector string, args []string) error {
+	return runner.RunCurrentWithOptions(ctx, selector, args, RuntimeLaunchOptions{})
+}
+
+func (runner *Runner) RunCurrentWithOptions(ctx context.Context, selector string, args []string, options RuntimeLaunchOptions) (err error) {
 	if err := runner.prepareSharedAccountHomes(ctx); err != nil {
 		return err
 	}
@@ -71,7 +75,7 @@ func (runner *Runner) RunCurrent(ctx context.Context, selector string, args []st
 		return err
 	}
 	defer func() { err = errors.Join(err, release()) }()
-	return runner.launch(ctx, account.ID, account.ID, profiles, args)
+	return runner.launchWithOptions(ctx, account.ID, account.ID, profiles, args, options)
 }
 
 func (runner *Runner) RunHome(ctx context.Context, codexHome string, args []string) error {

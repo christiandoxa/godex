@@ -47,6 +47,35 @@ func TestNativePickerKeepsHomeAndRotatedOwnerPoolWithoutQuota(t *testing.T) {
 	}
 }
 
+func TestNativeLastRetainsLaunchPolicyAndOwnerPool(t *testing.T) {
+	for _, rotate := range []bool{true, false} {
+		accounts := activeLaunchAccounts{&fakeLaunchAccounts{
+			accounts:  []accountentity.Account{{ID: "home", Enabled: true}, {ID: "owner", Enabled: true}},
+			homes:     map[string]string{"home": "/rollouts", "owner": "/credentials"},
+			selectErr: errors.New("fresh selection must not run"),
+		}}
+		var config proxymodel.Config
+		runner := NewRunner(accounts, &fakeProxyProcess{}, func(got proxymodel.Config) (Proxy, error) {
+			config = got
+			return &fakeProxy{}, nil
+		})
+		options := RuntimeLaunchOptions{SkipQuotaPreflight: true, SmartContextEnabled: true,
+			UpstreamURL: "https://synthetic.example.invalid/v1", UpstreamNoProxy: true, AllowAutoRotate: &rotate}
+		if err := runner.RunCurrentWithOptions(t.Context(), "", []string{"exec", "resume", "--last"}, options); err != nil {
+			t.Fatal(err)
+		}
+		pool, err := config.Accounts(t.Context())
+		want := 1
+		if rotate {
+			want = 2
+		}
+		if err != nil || len(pool) != want || config.PreferredAccount != "home" ||
+			!config.SkipQuotaPreflight || !config.SmartContextEnabled || !config.UpstreamNoProxy || config.UpstreamURL != options.UpstreamURL {
+			t.Fatalf("native selection changed launch policy: pool=%d error=%v", len(pool), err)
+		}
+	}
+}
+
 type disablingLaunchAccounts struct {
 	activeLaunchAccounts
 	disableID string

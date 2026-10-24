@@ -27,6 +27,9 @@ func sessionArgument(arguments []string) (int, []string) {
 	case "queue":
 		return queueArgument(args, command+1), args
 	case "resume":
+		if nativeResumeLastRequested(args) {
+			return -1, args
+		}
 		return findResumeSessionSelector(args, command+1), args
 	case "fork":
 		return findForkSessionSelector(args, command+1), args

@@ -1208,6 +1208,16 @@ Native provider-token parsing remains private to runtime CLI delivery in
 session boundary before an explicit profile is launched. A native provider
 override stays authoritative, and the profile-only fallback keeps native
 configuration ownership. No repository or gateway dependency enters delivery.
+Native `resume --last` stays with Codex, whose provider-filtered SQLite and
+latest-turn working directory can select a different thread than the wrapper
+catalog. The session use case returns only the newest active, non-subagent
+shared provider/model/effort settings; it returns no session or owner identity.
+Runtime delivery restores those settings without substituting a UUID. The
+runtime use case launches from the active or explicit profile with the existing
+owner pool and launch options, avoiding fresh-work quota selection. Routing
+resolves hard affinity from the actual native request. Super uses the same
+settings boundary and retains its existing overlays and profile leases. Private
+argument recognition stays in runtime delivery; no shared helper is added.
 For Super workspace trust, `repository/session` separately reads initial rollout
 metadata in native directory order, bounded to 65,536 directory entries and the
 same file/line byte limits. `entity/session` selects 4,096 newest absolute paths

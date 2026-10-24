@@ -19,7 +19,7 @@ func splitThreadSelector(value string) (string, string) {
 	return "", value
 }
 
-func runNativeCommand(ctx context.Context, runner *runtimeusecase.Runner, selector string, arguments []string, index int) (bool, error) {
+func runNativeCommand(ctx context.Context, runner *runtimeusecase.Runner, selector string, arguments []string, index int, options runtimeusecase.RuntimeLaunchOptions) (bool, error) {
 	if unsafeNativeCommand(arguments, index) {
 		return true, errors.New("native command bypasses Godex routing; use godex exec or godex app-server without daemon/proxy")
 	}
@@ -31,7 +31,7 @@ func runNativeCommand(ctx context.Context, runner *runtimeusecase.Runner, select
 	case "mcp", "features", "completion", "debug", "config", "delete", "archive", "unarchive", "version", "--version":
 		return true, runner.RunLocal(ctx, selector, arguments)
 	case "resume", "fork", "queue":
-		return true, runner.RunCurrent(ctx, selector, arguments)
+		return true, runner.RunCurrentWithOptions(ctx, selector, arguments, options)
 	default:
 		return false, nil
 	}

@@ -15,21 +15,32 @@ func resolveSuperResumeOptions(
 	options superOptions,
 ) (superOptions, error) {
 	index, args := sessionArgument(options.codexArgs)
-	if index < 0 {
+	nativeLast := nativeResumeLastRequested(options.codexArgs)
+	if index < 0 && !nativeLast {
 		return options, nil
 	}
 	if sessions == nil {
+		if nativeLast {
+			return options, nil
+		}
 		return superOptions{}, errors.New("session support is not configured")
 	}
-	prefix, selector := splitThreadSelector(args[index])
-	report, resolved, err := sessions.ResolveArguments(ctx, sessionmodel.Launch{
-		ProfileSelector: options.profile,
-		SessionSelector: selector,
-		IDIndex:         index,
-		IDPrefix:        prefix,
-		Arguments:       args,
-		Local:           options.localURL != "",
-	})
+	var report sessionmodel.Report
+	var err error
+	resolved := args
+	if nativeLast {
+		report, err = sessions.LastResumeSettings(ctx, args)
+	} else {
+		prefix, selector := splitThreadSelector(args[index])
+		report, resolved, err = sessions.ResolveArguments(ctx, sessionmodel.Launch{
+			ProfileSelector: options.profile,
+			SessionSelector: selector,
+			IDIndex:         index,
+			IDPrefix:        prefix,
+			Arguments:       args,
+			Local:           options.localURL != "",
+		})
+	}
 	if err != nil {
 		return superOptions{}, err
 	}
@@ -47,7 +58,7 @@ func resolveSuperResumeOptions(
 	if err != nil {
 		return superOptions{}, err
 	}
-	if plan.kind != "" {
+	if plan.kind != "" && (!nativeLast || options.profile == "") {
 		options.provider = plan.kind
 		options.skipQuota = true
 	}

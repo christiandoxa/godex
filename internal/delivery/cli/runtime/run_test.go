@@ -798,12 +798,11 @@ func (reader sharedNativeSessionReader) List(_ context.Context, home string) ([]
 	}}, nil
 }
 
-func TestNativeSessionDeliveryRoutesNameAndLastAcrossProfileHomes(t *testing.T) {
+func TestNativeSessionDeliveryRoutesNameAndForkLastAcrossProfileHomes(t *testing.T) {
 	project := t.TempDir()
 	t.Chdir(project)
 	for _, args := range [][]string{
 		{"--", "resume", "Repair", "continue"},
-		{"--", "resume", "--last", "continue"},
 		{"--", "fork", "--last", "continue"},
 	} {
 		accounts := sharedNativeSessionAccounts{}
