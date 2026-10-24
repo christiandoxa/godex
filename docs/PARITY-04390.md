@@ -72,7 +72,7 @@ Their current executable regressions remain in the gate.
 - PASS: `rtk proxy go test -json ./tools/...`
 - PASS: `bash -n scripts/verify-release-parity.sh`; workspace oracle Python
   syntax and `git diff --check`.
-- Latest pushed production: `836d24b5a` (native last delegation); prior
+- Latest pushed production: `71817d23d` (last-selector settings); prior
   gate/session/auth/quota fixes remain qualified. Original checkout is preserved.
 - Clean `0209f13a1` PASSes the expanded 49-step profile oracle with the corrected
   failure fixtures. `make verify` PASSes on `30ddd406e`; later changes affect
@@ -878,3 +878,45 @@ settings operation is renamed to describe its broader contract.
 PASS: `rtk proxy go test -race ./internal/delivery/cli/runtime ./internal/usecase/runtime ./internal/usecase/session ./tools/contextparity`.
 The expanded context matrix has 37 cases per product, including four saved
 last-selector scenarios. Clean executable qualification follows before push.
+
+Clean `71817d23d` PASSes the complete 37-case context matrix per product,
+`rtk proxy go test ./...` and `rtk proxy make verify`. Context report SHA-256:
+`9ae88523dfbf5a88a78718c1ebc1eb1a92a83db89f76ab1e4f706a4040ed346b`.
+It is pushed normally to origin/main. Its complete default release gate is
+running in the frozen `$HOME/.cache/godex-04390-last-settings-71817d23d`
+worktree with the verified official Codex opt-in; no terminal PASS is claimed.
+
+## Reusable native selection oracle
+
+The previously local Codex selection fixture is now
+`tools/native-last-oracle.py`, with CLI inputs and the existing strict
+source/binary/manifest provenance guard. It pins the native Codex digest,
+creates native rollouts/SQLite against a loopback HTTP 400 backend, and requires
+one newer-exec attempt, correct credentials and an unchanged auth file on both
+products. It never emits child output or credential values. Seven mutation
+controls reject corrupted results. A real helper cleanup check requires that
+the owned process exits while an unrelated process stays alive; cleanup signals
+use Linux pidfds matched to the private fixture home.
+
+PASS on clean `71817d23d`; report SHA-256:
+`4c6339da70bfb09a6634309e4872164a0e69ce45cd7aa83ae48c7a39d45a585f`.
+The same driver rejects clean `0eff8135d` with wrong native thread, reproducing
+the original failure independently of the Go tests. Driver SHA-256:
+`84975027c45c8d99d23a10c8d594f2e60776570859f2f1eb6d424c3c14f86ea1`.
+PASS: `python3 tools/native-last-oracle.py --self-test`,
+`bash -n scripts/verify-release-parity.sh` and `git diff --check`.
+
+The release preflight always runs the mutation controls and runs the complete
+native probe when its existing verified 0.164.0 opt-in is supplied. This adds no
+product option, dependency, release version or production package. Its new wiring
+will be checked on a clean commit. The qualified scenario is an explicit
+standalone API-key profile; broader managed routing/recovery and provider-filter
+selection need independent evidence. The current managed ChatGPT exploratory
+fixture has failed a native-selection invariant and is being diagnosed; it is
+not a PASS or evidence that either product owns the expected thread.
+
+Immediate next task: inspect that managed fixture's per-product projection,
+verify its provider/governance assumptions, and correct the fixture or implement
+the actual mismatch. Known-version quota User-Agent construction, full native
+recovery, remaining provider migrations, TUI and native foreign platforms remain
+open. The original checkout and earlier untracked agent work are preserved.

@@ -48,6 +48,32 @@ selector even when native `--last` appears later; missing IDs and prompt text
 must not acquire unrelated saved settings. These recording-child cases do not
 execute SQLite selection or model inference.
 
+`tools/native-last-oracle.py` independently executes the SHA-256-pinned official
+Codex 0.164.0 on Linux. It creates two native rollouts and SQLite records against
+a loopback backend, changes the older rollout's source to CLI while preserving
+its timestamps, and requires both wrappers to select the newer exec thread.
+Each run must make exactly one request, keep the synthetic credential and leave
+auth.json unchanged. Every turn stops on a synthetic HTTP 400; no upstream
+service or paid inference is used. Native helpers are reaped through pidfds
+matched to the private fixture home. Seven mutation controls reject missing or
+replayed attempts, wrong selection, credentials, exit status and timeouts.
+
+```bash
+python3 tools/native-last-oracle.py --self-test
+python3 tools/native-last-oracle.py \
+  --prodex /path/to/official/prodex-0.439.0 \
+  --prodex-source /path/to/tagged/prodex-source \
+  --godex /tmp/godex-candidate --godex-source "$PWD" \
+  --godex-commit "$(git rev-parse HEAD)" \
+  --codex /path/to/verified/codex-0.164.0
+```
+
+The release gate always runs its mutation controls. Setting the existing
+`GODEX_TEST_CODEX_0164_APP_SERVER_BIN` opt-in to the verified Codex executable
+also runs this native selection comparison beside its initialize/thread-list
+check. The standalone selection probe requires Linux pidfd support; it does not
+certify managed-account recovery, other provider catalogs or foreign platforms.
+
 Eight Super cases require the same profile-only UUID to reach `exec resume`
 with its prompt and full access. Native and local `--url` modes must use a
 temporary overlay, preserve the original auth/config/model cache/rollout,

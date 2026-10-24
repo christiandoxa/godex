@@ -114,10 +114,16 @@ go test ./internal/gateway/codex \
   -count=1 -timeout=45s
 
 # Codex 0.164.0 uses the same credential-free initialize/thread-list boundary.
+python3 tools/native-last-oracle.py --self-test
 if [ -n "${GODEX_TEST_CODEX_0164_APP_SERVER_BIN:-}" ]; then
   go test ./internal/gateway/codex \
     -run '^TestProdex04390OfficialCodex0164AppServerInitializeAndThreadList$' \
     -count=1 -timeout=40s
+  python3 tools/native-last-oracle.py \
+    --prodex "$tmp/prodex" --prodex-source "$tmp/prodex-source" \
+    --godex "$tmp/godex" --godex-source "$root" \
+    --godex-commit "$(git rev-parse HEAD)" \
+    --codex "$GODEX_TEST_CODEX_0164_APP_SERVER_BIN"
 fi
 
 # Optional independently verified official Codex rust-v0.163.0 app-server
